@@ -1,0 +1,93 @@
+/* Markdown Styles for AI Chat */
+.markdown-body {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #374151;
+}
+
+.markdown-body h1, .markdown-body h2, .markdown-body h3 {
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  color: #111827;
+}
+
+.markdown-body h1 { font-size: 1.25em; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.3em; }
+.markdown-body h2 { font-size: 1.1em; }
+.markdown-body h3 { font-size: 1em; }
+
+.markdown-body p {
+  margin-bottom: 0.8em;
+}
+
+.markdown-body ul, .markdown-body ol {
+  padding-left: 1.5em;
+  margin-bottom: 0.8em;
+}
+
+.markdown-body ul { list-style-type: disc; }
+.markdown-body ol { list-style-type: decimal; }
+
+.markdown-body li {
+  margin-bottom: 0.3em;
+}
+
+.markdown-body code {
+  background-color: #f3f4f6;
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9em;
+  color: #ef4444;
+}
+
+.markdown-body pre {
+  background-color: #1f2937;
+  padding: 1em;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin-bottom: 1em;
+}
+
+.markdown-body pre code {
+  background-color: transparent;
+  color: #e5e7eb;
+  padding: 0;
+  font-size: 0.85em;
+}
+
+.markdown-body blockquote {
+  border-left: 4px solid #d97757;
+  padding-left: 1em;
+  color: #6b7280;
+  margin-bottom: 1em;
+  background-color: #fff7ed;
+  padding: 0.5em 0.5em 0.5em 1em;
+  border-radius: 0 4px 4px 0;
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1em;
+  font-size: 0.9em;
+}
+
+.markdown-body th, .markdown-body td {
+  border: 1px solid #e5e7eb;
+  padding: 0.5em;
+  text-align: left;
+}
+
+.markdown-body th {
+  background-color: #f9fafb;
+  font-weight: 600;
+}
+
+.markdown-body a {
+  color: #d97757;
+  text-decoration: underline;
+}
+.markdown-body a:hover {
+  text-decoration: none;
+}
