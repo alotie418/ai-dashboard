@@ -6,7 +6,8 @@ import {
 } from 'recharts';
 import { BusinessData } from '../types';
 import { GoogleGenAI, Type } from "@google/genai";
-import { getApiKey, getTavilyApiKey } from '../services/apiKey';
+import { getApiKey } from '../services/apiKey';
+import { searchTavily } from '../services/api';
 
 interface Props {
   data: BusinessData;
@@ -217,27 +218,13 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
         ? monteCarloSimulation(historicalRevenues, varPred.map(v => v.revenue))
         : null;
 
-      // STEP 4: Tavily search for market data
+      // STEP 4: Tavily search for market data (via Worker proxy)
       let tavilyContext = '';
       try {
-        const tavilyKey = getTavilyApiKey();
-        const tavilyRes = await fetch('https://api.tavily.com/search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            api_key: tavilyKey,
-            query: '软水盐 市场行情 价格趋势 原盐 化工盐 2026',
-            search_depth: 'advanced',
-            max_results: 5,
-            include_answer: false,
-          }),
-        });
-        if (tavilyRes.ok) {
-          const tavilyData = await tavilyRes.json();
-          tavilyContext = (tavilyData.results || [])
-            .map((r: any, i: number) => `[来源${i + 1}] ${r.title}\n${r.content}`)
-            .join('\n\n');
-        }
+        const tavilyData = await searchTavily('软水盐 市场行情 价格趋势 原盐 化工盐 2026', 5);
+        tavilyContext = (tavilyData.results || [])
+          .map((r: any, i: number) => `[来源${i + 1}] ${r.title}\n${r.content}`)
+          .join('\n\n');
       } catch (e) {
         console.warn('Tavily search skipped:', e);
       }

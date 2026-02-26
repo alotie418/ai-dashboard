@@ -313,6 +313,82 @@ export default {
         return jsonResponse({ success: true }, corsHeaders);
       }
 
+      // ==================== SEARCH PROXY ====================
+
+      if (path === '/api/search/brave' && request.method === 'POST') {
+        const braveKey = env.BRAVE_API_KEY;
+        if (!braveKey) {
+          return errorResponse(500, 'Brave API key not configured', corsHeaders);
+        }
+
+        const body = await request.json();
+        const q = safeString(body.q, 200);
+        const count = Math.min(Math.max(parseInt(body.count) || 10, 1), 20);
+        const freshness = safeString(body.freshness || '', 20);
+
+        if (!q) {
+          return errorResponse(400, 'q: search query is required', corsHeaders);
+        }
+
+        const params = new URLSearchParams({ q, count: String(count) });
+        if (freshness) params.set('freshness', freshness);
+
+        const braveResponse = await fetch(
+          `https://api.search.brave.com/res/v1/web/search?${params.toString()}`,
+          {
+            headers: {
+              'Accept': 'application/json',
+              'Accept-Encoding': 'gzip',
+              'X-Subscription-Token': braveKey,
+            },
+          }
+        );
+
+        if (!braveResponse.ok) {
+          console.error('Brave API error:', braveResponse.status);
+          return errorResponse(braveResponse.status, `Brave API error: ${braveResponse.status}`, corsHeaders);
+        }
+
+        const braveData = await braveResponse.json();
+        return jsonResponse(braveData, corsHeaders);
+      }
+
+      if (path === '/api/search/tavily' && request.method === 'POST') {
+        const tavilyKey = env.TAVILY_API_KEY;
+        if (!tavilyKey) {
+          return errorResponse(500, 'Tavily API key not configured', corsHeaders);
+        }
+
+        const body = await request.json();
+        const query = safeString(body.query, 500);
+        const searchDepth = body.search_depth === 'advanced' ? 'advanced' : 'basic';
+        const maxResults = Math.min(Math.max(parseInt(body.max_results) || 10, 1), 20);
+
+        if (!query) {
+          return errorResponse(400, 'query: search query is required', corsHeaders);
+        }
+
+        const tavilyResponse = await fetch('https://api.tavily.com/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            api_key: tavilyKey,
+            query,
+            search_depth: searchDepth,
+            max_results: maxResults,
+            include_answer: false,
+          }),
+        });
+
+        if (!tavilyResponse.ok) {
+          console.error('Tavily API error:', tavilyResponse.status);
+          return errorResponse(tavilyResponse.status, `Tavily API error: ${tavilyResponse.status}`, corsHeaders);
+        }
+
+        const tavilyData = await tavilyResponse.json();
+        return jsonResponse(tavilyData, corsHeaders);
+      }
+
       // ==================== SYNC (disabled for safety) ====================
 
       if (path === '/api/sync') {

@@ -2,22 +2,20 @@ import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { GoogleGenAI, Type } from "@google/genai";
-import { getApiKey, getTavilyApiKey } from '../services/apiKey';
-import { MarketSearchResponse, MarketSummaryRow } from '../types';
+import { getApiKey } from '../services/apiKey';
+import { searchBrave, searchTavily } from '../services/api';
+import { MarketSearchResponse, MarketSummaryRow, BraveSearchResponse } from '../types';
 
-interface TavilyResult {
+interface SearchResult {
   title: string;
   url: string;
   content: string;
-  score: number;
-}
-
-interface TavilySearchResponse {
-  results: TavilyResult[];
+  source: 'brave' | 'tavily';
 }
 
 interface SearchSourceStatus {
   gemini: 'idle' | 'loading' | 'done' | 'error';
+  brave: 'idle' | 'loading' | 'done' | 'error';
   tavily: 'idle' | 'loading' | 'done' | 'error';
   merging: 'idle' | 'loading' | 'done' | 'error';
 }
@@ -28,7 +26,7 @@ const MarketSearchPage: React.FC = () => {
   const [results, setResults] = useState<MarketSearchResponse | null>(null);
   const [groundingLinks, setGroundingLinks] = useState<{ title: string, uri: string }[]>([]);
   const [sourceStatus, setSourceStatus] = useState<SearchSourceStatus>({
-    gemini: 'idle', tavily: 'idle', merging: 'idle'
+    gemini: 'idle', brave: 'idle', tavily: 'idle', merging: 'idle'
   });
 
   const searchWithGemini = async (searchQuery: string): Promise<{ prices: string; grounding: { title: string, uri: string }[] }> => {
@@ -95,63 +93,78 @@ const MarketSearchPage: React.FC = () => {
     return { prices: text, grounding };
   };
 
-  const searchWithTavily = async (searchQuery: string): Promise<TavilySearchResponse> => {
-    const tavilyKey = getTavilyApiKey();
-    const response = await fetch('https://api.tavily.com/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        api_key: tavilyKey,
-        query: `${searchQuery} 最新价格 批发价 零售价 成交价 市场行情 2026`,
-        search_depth: 'advanced',
-        max_results: 15,
-        include_answer: false,
-      }),
-    });
+  const searchWithBraveProxy = async (searchQuery: string): Promise<SearchResult[]> => {
+    const data: BraveSearchResponse = await searchBrave(
+      `${searchQuery} 最新价格 批发价 零售价 成交价 市场行情 2026`,
+      15
+    );
+    const webResults = data.web?.results || [];
+    return webResults.map(r => ({
+      title: r.title,
+      url: r.url,
+      content: r.description,
+      source: 'brave' as const,
+    }));
+  };
 
-    if (!response.ok) {
-      throw new Error(`Tavily API error: ${response.status} `);
-    }
-
-    return response.json();
+  const searchWithTavilyProxy = async (searchQuery: string): Promise<SearchResult[]> => {
+    const data = await searchTavily(
+      `${searchQuery} 最新价格 批发价 零售价 成交价 市场行情 2026`,
+      15
+    );
+    const results = data.results || [];
+    return results.map((r: any) => ({
+      title: r.title,
+      url: r.url,
+      content: r.content,
+      source: 'tavily' as const,
+    }));
   };
 
   const mergeWithGemini = async (
     geminiRaw: string,
-    tavilyResults: TavilyResult[]
+    braveResults: SearchResult[],
+    tavilyResults: SearchResult[]
   ): Promise<MarketSearchResponse> => {
     const ai = new GoogleGenAI({ apiKey: getApiKey() });
+
+    const braveSummary = braveResults.map((r, i) =>
+      `[Brave结果${i + 1}]标题: ${r.title} \n内容摘要: ${r.content} \n来源: ${r.url} `
+    ).join('\n\n');
 
     const tavilySummary = tavilyResults.map((r, i) =>
       `[Tavily结果${i + 1}]标题: ${r.title} \n内容摘要: ${r.content} \n来源: ${r.url} `
     ).join('\n\n');
 
     const prompt = `
-    你是一名专业的市场销售调研员。我通过两个搜索引擎查找了产品的市场价格信息，请你整合分析这些数据。
+    你是一名专业的市场销售调研员。我通过三个搜索引擎查找了产品的市场价格信息，请你整合分析这些数据。
 
 ## 搜索引擎 1: Google Search(Gemini Grounding) 返回结果
     涵盖领域：综合零售(淘宝 / 京东 / 拼多多 / 亚马逊)、B2B批发(1688 / 慧聪 / 中国制造网 / 义乌购)、内容电商(抖音 / 快手 / 小红书)、即时零售(美团 / 京东到家)、垂直行业(17网 / 3e3e / 华强电子 / 一亩田 / 惠农 / 工邦邦 / 震坤行)、二手(爱回收 / 找靓机)。
 ${geminiRaw}
 
-## 搜索引擎 2: Tavily 搜索引擎返回结果
-${tavilySummary}
+## 搜索引擎 2: Brave Search 返回结果
+${braveSummary || '（无结果）'}
+
+## 搜索引擎 3: Tavily 搜索引擎返回结果
+${tavilySummary || '（无结果）'}
 
     请完成以下任务：
-    1. ** 合并去重 **：将两个引擎的价格数据合并，去掉明显重复的条目。
+    1. ** 合并去重 **：将三个引擎的价格数据合并，去掉明显重复的条目。
     2. ** summaryTable 汇总表格 **：生成一个关键数据汇总表，每行包含 label 和 value。包含：
     - "最低价" → 最低价格及平台
       - "最高价" → 最高价格及平台
         - "价格区间" → 如 "18.0 - 65.0 元"
           - "市场均价" → 如 "32.5 元"
             - "推荐对标平台" → 综合竞争最激烈的平台
-              - "数据来源数量" → 如 "Google: 5条, Tavily: 4条"
+              - "数据来源数量" → 如 "Google: 5条, Brave: 3条, Tavily: 4条"
     如有其他有价值的统计数据也请加入。
     3. ** analysis 综合分析报告 **：请生成一份结构清晰的 Markdown 格式分析报告，必须包含以下三个章节：
        - ### 📊 价格行情：简述主流价格区间和市场均价。
        - ### 💡 销售建议 (卖家)：定价策略、渠道选择、竞争对手分析。
        - ### 🛍️ 购买建议 (买家)：最佳入手渠道、避坑指南、促销建议。
        请使用列表和加粗增强可读性。禁止使用三个星号 (***)，仅使用两个星号 (**)。不要返回 Markdown代码块标记，直接返回内容。
-    4. ** 输出格式 **：按指定 JSON Schema 返回，prices 数组中每条记录的 platform 字段请在平台名后标注数据来源（如 "京东 [Google]" 或 "1688 [Tavily]"）。
+    4. ** 输出格式 **：按指定 JSON Schema 返回，prices 数组中每条记录的 platform 字段请在平台名后标注数据来源（如 "京东 [Google]"、"Amazon [Brave]" 或 "1688 [Tavily]"）。
 
     请确保分析专业、数据准确。
     `;
@@ -207,15 +220,19 @@ ${tavilySummary}
     setIsLoading(true);
     setResults(null);
     setGroundingLinks([]);
-    setSourceStatus({ gemini: 'loading', tavily: 'loading', merging: 'idle' });
+    setSourceStatus({ gemini: 'loading', brave: 'loading', tavily: 'loading', merging: 'idle' });
 
     try {
-      const [geminiResult, tavilyResult] = await Promise.allSettled([
+      const [geminiResult, braveResult, tavilyResult] = await Promise.allSettled([
         searchWithGemini(query).then(r => {
           setSourceStatus(prev => ({ ...prev, gemini: 'done' }));
           return r;
         }),
-        searchWithTavily(query).then(r => {
+        searchWithBraveProxy(query).then(r => {
+          setSourceStatus(prev => ({ ...prev, brave: 'done' }));
+          return r;
+        }),
+        searchWithTavilyProxy(query).then(r => {
           setSourceStatus(prev => ({ ...prev, tavily: 'done' }));
           return r;
         }),
@@ -225,6 +242,10 @@ ${tavilySummary}
         console.error("Gemini search failed:", geminiResult.reason);
         setSourceStatus(prev => ({ ...prev, gemini: 'error' }));
       }
+      if (braveResult.status === 'rejected') {
+        console.error("Brave search failed:", braveResult.reason);
+        setSourceStatus(prev => ({ ...prev, brave: 'error' }));
+      }
       if (tavilyResult.status === 'rejected') {
         console.error("Tavily search failed:", tavilyResult.reason);
         setSourceStatus(prev => ({ ...prev, tavily: 'error' }));
@@ -232,16 +253,17 @@ ${tavilySummary}
 
       const geminiRaw = geminiResult.status === 'fulfilled' ? geminiResult.value.prices : '{"analysis":"搜索失败","prices":[]}';
       const geminiGrounding = geminiResult.status === 'fulfilled' ? geminiResult.value.grounding : [];
-      const tavilyData = tavilyResult.status === 'fulfilled' ? tavilyResult.value.results : [];
+      const braveData = braveResult.status === 'fulfilled' ? braveResult.value : [];
+      const tavilyData = tavilyResult.status === 'fulfilled' ? tavilyResult.value : [];
 
       setGroundingLinks(geminiGrounding);
 
-      if (geminiResult.status === 'rejected' && tavilyResult.status === 'rejected') {
-        throw new Error('两个搜索引擎均失败，请检查网络或 API 配置。');
+      if (geminiResult.status === 'rejected' && braveResult.status === 'rejected' && tavilyResult.status === 'rejected') {
+        throw new Error('三个搜索引擎均失败，请检查网络或 API 配置。');
       }
 
       setSourceStatus(prev => ({ ...prev, merging: 'loading' }));
-      const merged = await mergeWithGemini(geminiRaw, tavilyData);
+      const merged = await mergeWithGemini(geminiRaw, braveData, tavilyData);
       setSourceStatus(prev => ({ ...prev, merging: 'done' }));
       setResults(merged);
     } catch (error) {
@@ -289,7 +311,7 @@ ${tavilySummary}
         <div className="absolute -top-24 -left-24 w-64 h-64 bg-[#d97757]/5 blur-[100px] rounded-full"></div>
         <div className="relative z-10">
           <h2 className="text-3xl font-semibold text-[#191918] mb-2 tracking-tight">市场聚合价格搜索</h2>
-          <p className="text-[#5c5c5a] mt-2 text-sm">双引擎驱动：Gemini 3 Pro + Google Search Grounding & Tavily，覆盖 30+ 平台</p>
+          <p className="text-[#5c5c5a] mt-2 text-sm">三引擎驱动：Gemini 3 Pro + Google Search Grounding & Brave Search & Tavily，覆盖 30+ 平台</p>
 
           <form onSubmit={handleSearch} className="max-w-2xl mx-auto relative group">
             <input
@@ -311,6 +333,9 @@ ${tavilySummary}
           <div className="mt-6 flex justify-center items-center space-x-6">
             <div className="flex items-center text-[10px] text-[#5c5c5a] font-bold uppercase tracking-widest">
               <span className="w-1.5 h-1.5 bg-[#d97757] rounded-full mr-2"></span> Google Grounding
+            </div>
+            <div className="flex items-center text-[10px] text-[#5c5c5a] font-bold uppercase tracking-widest">
+              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2"></span> Brave Search
             </div>
             <div className="flex items-center text-[10px] text-[#5c5c5a] font-bold uppercase tracking-widest">
               <span className="w-1.5 h-1.5 bg-teal-500 rounded-full mr-2"></span> Tavily Search
@@ -338,6 +363,15 @@ ${tavilySummary}
               </div>
               <span className="text-[10px] text-[#5c5c5a] font-mono">
                 {sourceStatus.gemini === 'loading' ? '搜索中...' : sourceStatus.gemini === 'done' ? '已完成' : sourceStatus.gemini === 'error' ? '失败' : '等待'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                {statusIcon(sourceStatus.brave)}
+                <span className="text-sm text-[#4a4a48]">Brave 深度搜索</span>
+              </div>
+              <span className="text-[10px] text-[#5c5c5a] font-mono">
+                {sourceStatus.brave === 'loading' ? '搜索中...' : sourceStatus.brave === 'done' ? '已完成' : sourceStatus.brave === 'error' ? '失败' : '等待'}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -374,6 +408,7 @@ ${tavilySummary}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {results.prices.map((item, idx) => {
                 const isGoogle = item.platform.includes('[Google]');
+                const isBrave = item.platform.includes('[Brave]');
                 const isTavily = item.platform.includes('[Tavily]');
                 return (
                   <div key={idx} className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl p-6 hover:border-[#d97757]/40 transition-all group">
@@ -384,6 +419,9 @@ ${tavilySummary}
                         </span>
                         {isGoogle && (
                           <span className="px-1.5 py-0.5 bg-[#d97757]/10 text-[#d97757] text-[8px] font-bold rounded-full">G</span>
+                        )}
+                        {isBrave && (
+                          <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-500 text-[8px] font-bold rounded-full">B</span>
                         )}
                         {isTavily && (
                           <span className="px-1.5 py-0.5 bg-teal-500/10 text-teal-400 text-[8px] font-bold rounded-full">T</span>
@@ -417,6 +455,8 @@ ${tavilySummary}
               </div>
               <div className="flex items-center space-x-2 mb-5">
                 <span className="px-2 py-0.5 bg-[#d97757]/10 text-[#d97757] text-[9px] font-bold rounded-full">Google</span>
+                <span className="text-[#d1cdc4] text-[10px]">+</span>
+                <span className="px-2 py-0.5 bg-blue-500/10 text-blue-500 text-[9px] font-bold rounded-full">Brave</span>
                 <span className="text-[#d1cdc4] text-[10px]">+</span>
                 <span className="px-2 py-0.5 bg-teal-500/10 text-teal-400 text-[9px] font-bold rounded-full">Tavily</span>
                 <span className="text-[#d1cdc4] text-[10px]">→</span>
@@ -475,7 +515,7 @@ ${tavilySummary}
             <i className="fas fa-search-dollar"></i>
           </div>
           <h3 className="text-[#5c5c5a] font-medium">输入关键词并开始市场调研</h3>
-          <p className="text-[#7a7a78] text-xs mt-1">双引擎搜索 + AI 智能合并，覆盖 30+ 电商/批发/垂直平台</p>
+          <p className="text-[#7a7a78] text-xs mt-1">三引擎搜索 + AI 智能合并，覆盖 30+ 电商/批发/垂直平台</p>
         </div>
       )}
     </div>

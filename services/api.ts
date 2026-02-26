@@ -241,3 +241,19 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
     body: JSON.stringify(settings),
   });
 }
+
+// --- Search Proxy ---
+
+export async function searchBrave(q: string, count = 15): Promise<any> {
+  return apiFetch('/api/search/brave', {
+    method: 'POST',
+    body: JSON.stringify({ q, count }),
+  });
+}
+
+export async function searchTavily(query: string, maxResults = 15): Promise<any> {
+  return apiFetch('/api/search/tavily', {
+    method: 'POST',
+    body: JSON.stringify({ query, search_depth: 'advanced', max_results: maxResults }),
+  });
+}

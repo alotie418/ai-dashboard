@@ -6,13 +6,6 @@ export const getApiKey = (): string => {
   return key;
 };
 
-export const getTavilyApiKey = (): string => {
-  const key = import.meta.env.VITE_TAVILY_API_KEY as string | undefined;
-  if (!key) {
-    throw new Error('Tavily API Key 未配置。请在 .env 文件中设置 VITE_TAVILY_API_KEY。');
-  }
-  return key;
-};
 
 export const getGoogleSearchCx = (): string => {
   const cx = import.meta.env.VITE_GOOGLE_SEARCH_CX as string | undefined;

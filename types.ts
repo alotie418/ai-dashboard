@@ -92,3 +92,13 @@ export interface MarketSearchResponse {
   prices: MarketPriceResult[];
   summaryTable?: MarketSummaryRow[];
 }
+
+export interface BraveSearchResult {
+  title: string;
+  url: string;
+  description: string;
+}
+
+export interface BraveSearchResponse {
+  web?: { results: BraveSearchResult[] };
+}
