@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { GoogleGenAI, Type } from "@google/genai";
-import { getApiKey } from '../services/apiKey';
-import { searchBrave, searchTavily } from '../services/api';
-import { MarketSearchResponse, MarketSummaryRow, BraveSearchResponse } from '../types';
+import { searchBrave, searchTavily, searchGemini, mergeSearch } from '../services/api';
+import { MarketSearchResponse, MarketSummaryRow, BraveSearchResponse, GeminiSearchProxyResponse } from '../types';
 
 interface SearchResult {
   title: string;
@@ -29,74 +27,25 @@ const MarketSearchPage: React.FC = () => {
     gemini: 'idle', brave: 'idle', tavily: 'idle', merging: 'idle'
   });
 
-  const searchWithGemini = async (searchQuery: string): Promise<{ prices: string; grounding: { title: string, uri: string }[] }> => {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
-    const prompt = `
-      作为一名专业的市场销售调研员，请帮我查找产品"${searchQuery}"在全网主要渠道的当前实时价格。
-      
-      重点覆盖以下六大类平台（共30+个渠道）：
-      
-      1. **综合型传统电商**：淘宝(taobao.com)、天猫(tmall.com)、京东(jd.com)、拼多多(pinduoduo.com)、亚马逊(amazon.com)
-      2. **内容/兴趣电商**：抖音(douyin.com)、快手(kuaishou.com)、小红书(xiaohongshu.com)
-      3. **即时零售**：美团(meituan.com)、京东到家(jddj.com)
-      4. **综合B2B/批发**：1688(1688.com)、阿里巴巴国际站(alibaba.com)、慧聪网(hc360.com)、中国制造网(made-in-china.com)、马可波罗(makepolo.com)、百度爱采购(b2b.baidu.com)、义乌购(yiwugo.com)
-      5. **垂直行业批发**：
-         - 服装鞋包：17网(17zwd.com)、3e3e(3e3e.cn)、衣联网(eelly.com)、网商园(wsy.com)、PP(pp.cn)
-         - 电子元器件：华强电子网(hqew.com)、Digi-Key(digikey.cn)、Mouser(mouser.cn)
-         - 农业：一亩田(ymt.com)、惠农网(cnhnb.com)
-         - 工业MRO：震坤行(ehsy.com)、工邦邦(gongbangbang.com)、Grainger(grainger.com)、ThomasNet(thomasnet.com)
-      6. **跨境/海外平台**：
-         - B2B：Global Sources(globalsources.com)、DHgate(dhgate.com)、TradeKey(tradekey.com)
-         - B2C：eBay(ebay.com)、AliExpress(aliexpress.com)、Walmart(walmart.com)、Shopee(shopee.com)、Lazada(lazada.com)
-      7. **二手/回收**：爱回收(aihuishou.com)、找靓机(zhaoliangji.com)
+  // AbortController for cancelling in-flight searches
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-      请提供一份结构清晰的【市场分析报告】，包含以下 Markdown 章节：
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
-      ### 1. 📊 价格行情
-      - **最低价**：[平台] ￥xx
-      - **最高价**：[平台] ￥xx
-      - **主流价格区间**：￥xx - ￥xx
-
-      ### 2. 💡 销售建议 (针对卖家)
-      - **定价策略**：...
-      - **渠道推荐**：...
-
-      ### 3. 🛍️ 购买建议 (针对买家)
-      - **最佳入手渠道**：...
-      - **避坑指南**：...
-
-      请务必使用搜索功能获取最新数据。返回结果请尽量包含具体价格数字和来源平台。不要返回 Markdown代码块标记，直接返回内容。
-    `;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-      }
-    });
-
-    const text = response.text || '';
-    const grounding: { title: string, uri: string }[] = [];
-    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-    if (chunks) {
-      for (const chunk of chunks) {
-        if (chunk.web) {
-          grounding.push({
-            title: chunk.web.title || '参考来源',
-            uri: chunk.web.uri
-          });
-        }
-      }
-    }
-
-    return { prices: text, grounding };
+  const searchWithGeminiProxy = async (searchQuery: string, signal: AbortSignal): Promise<GeminiSearchProxyResponse> => {
+    return searchGemini(searchQuery, signal);
   };
 
-  const searchWithBraveProxy = async (searchQuery: string): Promise<SearchResult[]> => {
+  const searchWithBraveProxy = async (searchQuery: string, signal: AbortSignal): Promise<SearchResult[]> => {
     const data: BraveSearchResponse = await searchBrave(
       `${searchQuery} 最新价格 批发价 零售价 成交价 市场行情 2026`,
-      15
+      15,
+      signal
     );
     const webResults = data.web?.results || [];
     return webResults.map(r => ({
@@ -107,10 +56,11 @@ const MarketSearchPage: React.FC = () => {
     }));
   };
 
-  const searchWithTavilyProxy = async (searchQuery: string): Promise<SearchResult[]> => {
+  const searchWithTavilyProxy = async (searchQuery: string, signal: AbortSignal): Promise<SearchResult[]> => {
     const data = await searchTavily(
       `${searchQuery} 最新价格 批发价 零售价 成交价 市场行情 2026`,
-      15
+      15,
+      signal
     );
     const results = data.results || [];
     return results.map((r: any) => ({
@@ -121,106 +71,18 @@ const MarketSearchPage: React.FC = () => {
     }));
   };
 
-  const mergeWithGemini = async (
-    geminiRaw: string,
-    braveResults: SearchResult[],
-    tavilyResults: SearchResult[]
-  ): Promise<MarketSearchResponse> => {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
-
-    const braveSummary = braveResults.map((r, i) =>
-      `[Brave结果${i + 1}]标题: ${r.title} \n内容摘要: ${r.content} \n来源: ${r.url} `
-    ).join('\n\n');
-
-    const tavilySummary = tavilyResults.map((r, i) =>
-      `[Tavily结果${i + 1}]标题: ${r.title} \n内容摘要: ${r.content} \n来源: ${r.url} `
-    ).join('\n\n');
-
-    const prompt = `
-    你是一名专业的市场销售调研员。我通过三个搜索引擎查找了产品的市场价格信息，请你整合分析这些数据。
-
-## 搜索引擎 1: Google Search(Gemini Grounding) 返回结果
-    涵盖领域：综合零售(淘宝 / 京东 / 拼多多 / 亚马逊)、B2B批发(1688 / 慧聪 / 中国制造网 / 义乌购)、内容电商(抖音 / 快手 / 小红书)、即时零售(美团 / 京东到家)、垂直行业(17网 / 3e3e / 华强电子 / 一亩田 / 惠农 / 工邦邦 / 震坤行)、二手(爱回收 / 找靓机)。
-${geminiRaw}
-
-## 搜索引擎 2: Brave Search 返回结果
-${braveSummary || '（无结果）'}
-
-## 搜索引擎 3: Tavily 搜索引擎返回结果
-${tavilySummary || '（无结果）'}
-
-    请完成以下任务：
-    1. ** 合并去重 **：将三个引擎的价格数据合并，去掉明显重复的条目。
-    2. ** summaryTable 汇总表格 **：生成一个关键数据汇总表，每行包含 label 和 value。包含：
-    - "最低价" → 最低价格及平台
-      - "最高价" → 最高价格及平台
-        - "价格区间" → 如 "18.0 - 65.0 元"
-          - "市场均价" → 如 "32.5 元"
-            - "推荐对标平台" → 综合竞争最激烈的平台
-              - "数据来源数量" → 如 "Google: 5条, Brave: 3条, Tavily: 4条"
-    如有其他有价值的统计数据也请加入。
-    3. ** analysis 综合分析报告 **：请生成一份结构清晰的 Markdown 格式分析报告，必须包含以下三个章节：
-       - ### 📊 价格行情：简述主流价格区间和市场均价。
-       - ### 💡 销售建议 (卖家)：定价策略、渠道选择、竞争对手分析。
-       - ### 🛍️ 购买建议 (买家)：最佳入手渠道、避坑指南、促销建议。
-       请使用列表和加粗增强可读性。禁止使用三个星号 (***)，仅使用两个星号 (**)。不要返回 Markdown代码块标记，直接返回内容。
-    4. ** 输出格式 **：按指定 JSON Schema 返回，prices 数组中每条记录的 platform 字段请在平台名后标注数据来源（如 "京东 [Google]"、"Amazon [Brave]" 或 "1688 [Tavily]"）。
-
-    请确保分析专业、数据准确。
-    `;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            analysis: { type: Type.STRING, description: "结构化的Markdown分析报告(含价格行情、销售建议、购买建议)" },
-            summaryTable: {
-              type: Type.ARRAY,
-              description: "关键数据汇总表格，每行一个 label-value 对",
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  label: { type: Type.STRING, description: "指标名称，如 最低价、均价、价格区间" },
-                  value: { type: Type.STRING, description: "指标值，如 18.0元 (1688)" },
-                },
-                required: ["label", "value"]
-              }
-            },
-            prices: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  platform: { type: Type.STRING },
-                  title: { type: Type.STRING },
-                  price: { type: Type.NUMBER },
-                  link: { type: Type.STRING },
-                },
-                required: ["platform", "title", "price", "link"]
-              }
-            }
-          },
-          required: ["analysis", "prices", "summaryTable"]
-        }
-      }
-    });
-
-    const text = response.text || '{}';
-    try {
-      return JSON.parse(text) as MarketSearchResponse;
-    } catch {
-      console.error('Failed to parse merge response as JSON:', text.slice(0, 200));
-      return { analysis: text, prices: [], summaryTable: [] } as MarketSearchResponse;
-    }
-  };
-
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!query.trim() || isLoading) return;
+
+    // Abort previous search if any
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const signal = controller.signal;
+
+    // Overall timeout: 60 seconds
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     setIsLoading(true);
     setResults(null);
@@ -229,19 +91,22 @@ ${tavilySummary || '（无结果）'}
 
     try {
       const [geminiResult, braveResult, tavilyResult] = await Promise.allSettled([
-        searchWithGemini(query).then(r => {
+        searchWithGeminiProxy(query, signal).then(r => {
           setSourceStatus(prev => ({ ...prev, gemini: 'done' }));
           return r;
         }),
-        searchWithBraveProxy(query).then(r => {
+        searchWithBraveProxy(query, signal).then(r => {
           setSourceStatus(prev => ({ ...prev, brave: 'done' }));
           return r;
         }),
-        searchWithTavilyProxy(query).then(r => {
+        searchWithTavilyProxy(query, signal).then(r => {
           setSourceStatus(prev => ({ ...prev, tavily: 'done' }));
           return r;
         }),
       ]);
+
+      // Check if aborted
+      if (signal.aborted) return;
 
       if (geminiResult.status === 'rejected') {
         console.error("Gemini search failed:", geminiResult.reason);
@@ -256,7 +121,7 @@ ${tavilySummary || '（无结果）'}
         setSourceStatus(prev => ({ ...prev, tavily: 'error' }));
       }
 
-      const geminiRaw = geminiResult.status === 'fulfilled' ? geminiResult.value.prices : '{"analysis":"搜索失败","prices":[]}';
+      const geminiRaw = geminiResult.status === 'fulfilled' ? geminiResult.value.text : '';
       const geminiGrounding = geminiResult.status === 'fulfilled' ? geminiResult.value.grounding : [];
       const braveData = braveResult.status === 'fulfilled' ? braveResult.value : [];
       const tavilyData = tavilyResult.status === 'fulfilled' ? tavilyResult.value : [];
@@ -267,15 +132,28 @@ ${tavilySummary || '（无结果）'}
         throw new Error('三个搜索引擎均失败，请检查网络或 API 配置。');
       }
 
+      if (signal.aborted) return;
+
       setSourceStatus(prev => ({ ...prev, merging: 'loading' }));
-      const merged = await mergeWithGemini(geminiRaw, braveData, tavilyData);
+      const merged = await mergeSearch({
+        geminiRaw,
+        braveResults: braveData.map(r => ({ title: r.title, url: r.url, content: r.content })),
+        tavilyResults: tavilyData.map(r => ({ title: r.title, url: r.url, content: r.content })),
+      }, signal);
+
+      if (signal.aborted) return;
+
       setSourceStatus(prev => ({ ...prev, merging: 'done' }));
       setResults(merged);
     } catch (error) {
+      if (signal.aborted) return; // Silently ignore abort errors
       console.error("Market Search Failed:", error);
       alert(`搜索失败：${error instanceof Error ? error.message : '未知错误'} `);
     } finally {
-      setIsLoading(false);
+      clearTimeout(timeoutId);
+      if (!signal.aborted) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -316,7 +194,7 @@ ${tavilySummary || '（无结果）'}
         <div className="absolute -top-24 -left-24 w-64 h-64 bg-[#d97757]/5 blur-[100px] rounded-full"></div>
         <div className="relative z-10">
           <h2 className="text-3xl font-semibold text-[#191918] mb-2 tracking-tight">市场聚合价格搜索</h2>
-          <p className="text-[#5c5c5a] mt-2 text-sm">三引擎驱动：Gemini 3 Pro + Google Search Grounding & Brave Search & Tavily，覆盖 30+ 平台</p>
+          <p className="text-[#5c5c5a] mt-2 text-sm">三引擎驱动：Gemini 3.1 Pro + Google Search Grounding & Brave Search & Tavily，覆盖 30+ 平台</p>
 
           <form onSubmit={handleSearch} className="max-w-2xl mx-auto relative group">
             <input

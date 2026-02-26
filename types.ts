@@ -102,3 +102,14 @@ export interface BraveSearchResult {
 export interface BraveSearchResponse {
   web?: { results: BraveSearchResult[] };
 }
+
+export interface GeminiSearchProxyResponse {
+  text: string;
+  grounding: { title: string; uri: string }[];
+}
+
+export interface MergeSearchRequest {
+  geminiRaw: string;
+  braveResults: { title: string; url: string; content: string }[];
+  tavilyResults: { title: string; url: string; content: string }[];
+}

@@ -168,7 +168,7 @@ function fromApiPurchase(a: ApiPurchaseRecord): PurchaseRecord {
 
 // ==================== API Calls ====================
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+async function apiFetch<T>(path: string, options?: RequestInit & { signal?: AbortSignal }): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
@@ -177,6 +177,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   }
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
+    signal: options?.signal,
     headers: {
       ...headers,
       ...(options?.headers || {}),
@@ -244,16 +245,37 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
 
 // --- Search Proxy ---
 
-export async function searchBrave(q: string, count = 15): Promise<any> {
+export async function searchBrave(q: string, count = 15, signal?: AbortSignal): Promise<any> {
   return apiFetch('/api/search/brave', {
     method: 'POST',
     body: JSON.stringify({ q, count }),
+    signal,
   });
 }
 
-export async function searchTavily(query: string, maxResults = 15): Promise<any> {
+export async function searchTavily(query: string, maxResults = 15, signal?: AbortSignal): Promise<any> {
   return apiFetch('/api/search/tavily', {
     method: 'POST',
     body: JSON.stringify({ query, search_depth: 'advanced', max_results: maxResults }),
+    signal,
+  });
+}
+
+export async function searchGemini(query: string, signal?: AbortSignal): Promise<import('../types').GeminiSearchProxyResponse> {
+  return apiFetch('/api/search/gemini', {
+    method: 'POST',
+    body: JSON.stringify({ query }),
+    signal,
+  });
+}
+
+export async function mergeSearch(
+  data: import('../types').MergeSearchRequest,
+  signal?: AbortSignal
+): Promise<import('../types').MarketSearchResponse> {
+  return apiFetch('/api/search/merge', {
+    method: 'POST',
+    body: JSON.stringify(data),
+    signal,
   });
 }
