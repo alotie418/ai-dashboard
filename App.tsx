@@ -545,14 +545,7 @@ const App: React.FC = () => {
           <header className="h-16 bg-[#f9f9f8] border-b border-[#e0ddd5] flex items-center justify-between px-8 z-10 shrink-0">
             <div className="flex items-center space-x-6">
               <h2 className="text-xl font-semibold text-[#191918]">
-                {currentPage === 'dashboard' && '经营数据概览'}
-                {currentPage === 'sales' && '销售与销项'}
-                {currentPage === 'purchase' && '采购与进项'}
-                {currentPage === 'analysis' && '数据分析中心'}
-                {currentPage === 'inventory' && '发票查询'}
-                {currentPage === 'finance' && '财务报表'}
-                {currentPage === 'market' && '市场聚合搜索'}
-                {currentPage === 'settings' && '系统设置'}
+                {{ dashboard: '经营数据概览', sales: '销售与销项', purchase: '采购与进项', analysis: '数据分析中心', inventory: '发票查询', finance: '财务报表', market: '市场聚合搜索', settings: '系统设置' }[currentPage]}
               </h2>
               <div className="hidden lg:flex items-center space-x-4 pl-4 border-l border-[#e0ddd5]">
                 <div className="flex items-center space-x-2 bg-white rounded-lg p-1 border border-[#e0ddd5]">

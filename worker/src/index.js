@@ -66,7 +66,7 @@ function checkRateLimit(ip) {
   let entry = rateLimitMap.get(ip);
   if (!entry || now > entry.resetAt) {
     entry = { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
-    rateLimitMap.set(ip);
+    rateLimitMap.set(ip, entry);
   }
   entry.count++;
   rateLimitMap.set(ip, entry);
@@ -107,7 +107,7 @@ export default {
     // Preflight
     if (request.method === 'OPTIONS') {
       if (!requestOrigin || !isOriginAllowed) {
-        return new Response(null, { status: 204, headers: corsHeaders });
+        return new Response('Forbidden', { status: 403 });
       }
       return new Response(null, { status: 204, headers: corsHeaders });
     }
@@ -183,19 +183,31 @@ export default {
         const id = extractId(path);
         if (!id) return errorResponse(400, 'Invalid ID', corsHeaders);
         const data = await request.json();
+        // Coerce numeric fields and validate
+        data.tons = Number(data.tons) || 0;
+        data.pricePerTon = Number(data.pricePerTon) || 0;
+        data.totalAmount = Number(data.totalAmount) || 0;
+        data.amountWithoutTax = Number(data.amountWithoutTax) || 0;
+        data.taxAmount = Number(data.taxAmount) || 0;
+        data.taxRate = Number(data.taxRate) || 13;
+        data.id = id; // use URL id for validation
+        const errors = validatePurchase(data);
+        if (errors.length > 0) {
+          return errorResponse(400, errors.join('; '), corsHeaders);
+        }
         await env.DB.prepare(`
           UPDATE purchases SET date=?, supplier=?, tons=?, pricePerTon=?, totalAmount=?,
           amountWithoutTax=?, taxAmount=?, taxRate=?, invoiceNumber=?, invoiceStatus=?
           WHERE id=?
         `).bind(
-          safeString(data.date, 10),
+          data.date,
           safeString(data.supplier),
-          data.tons ?? 0,
-          data.pricePerTon ?? 0,
-          data.totalAmount ?? 0,
-          data.amountWithoutTax ?? 0,
-          data.taxAmount ?? 0,
-          data.taxRate ?? 13,
+          data.tons,
+          data.pricePerTon,
+          data.totalAmount,
+          data.amountWithoutTax,
+          data.taxAmount,
+          data.taxRate,
           safeString(data.invoiceNumber, 100),
           safeString(data.invoiceStatus, 20),
           id
@@ -247,20 +259,33 @@ export default {
         const id = extractId(path);
         if (!id) return errorResponse(400, 'Invalid ID', corsHeaders);
         const data = await request.json();
+        // Coerce numeric fields and validate
+        data.tons = Number(data.tons) || 0;
+        data.pricePerTon = Number(data.pricePerTon) || 0;
+        data.totalAmount = Number(data.totalAmount) || 0;
+        data.amountWithoutTax = Number(data.amountWithoutTax) || 0;
+        data.taxAmount = Number(data.taxAmount) || 0;
+        data.taxRate = Number(data.taxRate) || 13;
+        data.shippingCost = Number(data.shippingCost) || 0;
+        data.id = id; // use URL id for validation
+        const errors = validateSale(data);
+        if (errors.length > 0) {
+          return errorResponse(400, errors.join('; '), corsHeaders);
+        }
         await env.DB.prepare(`
           UPDATE sales SET date=?, customer=?, tons=?, pricePerTon=?, totalAmount=?,
           amountWithoutTax=?, taxAmount=?, taxRate=?, shippingCost=?, invoiceNumber=?, invoiceStatus=?
           WHERE id=?
         `).bind(
-          safeString(data.date, 10),
+          data.date,
           safeString(data.customer),
-          data.tons ?? 0,
-          data.pricePerTon ?? 0,
-          data.totalAmount ?? 0,
-          data.amountWithoutTax ?? 0,
-          data.taxAmount ?? 0,
-          data.taxRate ?? 13,
-          data.shippingCost ?? 0,
+          data.tons,
+          data.pricePerTon,
+          data.totalAmount,
+          data.amountWithoutTax,
+          data.taxAmount,
+          data.taxRate,
+          data.shippingCost,
           safeString(data.invoiceNumber, 100),
           safeString(data.invoiceStatus, 20),
           id

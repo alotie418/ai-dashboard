@@ -96,7 +96,7 @@ function parseTaxRatePercent(taxRate: string): number {
 function toApiSales(r: SalesRecord): ApiSalesRecord {
   const tons = parseTons(r.quantity);
   const totalAmount = r.price;
-  const taxRate = 13;
+  const taxRate = parseTaxRatePercent((r as any).taxRate || '13%');
   const amountWithoutTax = totalAmount / (1 + taxRate / 100);
   const taxAmount = totalAmount - amountWithoutTax;
   const pricePerTon = tons > 0 ? totalAmount / tons : 0;

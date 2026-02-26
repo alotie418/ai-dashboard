@@ -210,7 +210,12 @@ ${tavilySummary || '（无结果）'}
     });
 
     const text = response.text || '{}';
-    return JSON.parse(text) as MarketSearchResponse;
+    try {
+      return JSON.parse(text) as MarketSearchResponse;
+    } catch {
+      console.error('Failed to parse merge response as JSON:', text.slice(0, 200));
+      return { analysis: text, prices: [], summaryTable: [] } as MarketSearchResponse;
+    }
   };
 
   const handleSearch = async (e?: React.FormEvent) => {
