@@ -6,14 +6,16 @@ const SettingsPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState('company');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Lifted state for all settings
+  // Lifted state for all settings — empty defaults, populated from API
   const [companyInfo, setCompanyInfo] = useState({
-    name: 'AI看板 贸易有限公司',
-    creditCode: '91110000XXXXXXXXXX',
-    legalPerson: '张晓明',
-    industry: '通用贸易 / 供应链',
-    address: '北京市朝阳区国际创新中心 A 座',
+    name: '',
+    creditCode: '',
+    legalPerson: '',
+    industry: '',
+    address: '',
   });
   const [taxAutoAuth, setTaxAutoAuth] = useState(false);
   const [aiAutoInsight, setAiAutoInsight] = useState(true);
@@ -24,32 +26,47 @@ const SettingsPage: React.FC = () => {
     monthlyReport: true,
   });
 
+  // Apply fetched settings to state
+  const applySettings = (s: any) => {
+    if (s.company_info) setCompanyInfo(s.company_info);
+    if (s.tax_auto_auth !== undefined) setTaxAutoAuth(s.tax_auto_auth);
+    if (s.ai_auto_insight !== undefined) setAiAutoInsight(s.ai_auto_insight);
+    if (s.notifications) setNotifications(s.notifications);
+  };
+
   // Load settings from API on mount
   useEffect(() => {
+    setLoadError(null);
     fetchSettings()
-      .then((s) => {
-        if (s.company_info) setCompanyInfo(s.company_info);
-        if (s.tax_auto_auth !== undefined) setTaxAutoAuth(s.tax_auto_auth);
-        if (s.ai_auto_insight !== undefined) setAiAutoInsight(s.ai_auto_insight);
-        if (s.notifications) setNotifications(s.notifications);
+      .then(applySettings)
+      .catch((err) => {
+        console.error('Failed to load settings:', err);
+        setLoadError(`加载设置失败：${err.message || '网络错误'}`);
       })
-      .catch((err) => console.error('Failed to load settings:', err))
       .finally(() => setIsLoading(false));
   }, []);
 
   const handleSave = async () => {
     setIsSaving(true);
+    setSaveMessage(null);
     try {
-      await saveSettings({
+      const payload = {
         company_info: companyInfo,
         tax_auto_auth: taxAutoAuth,
         ai_auto_insight: aiAutoInsight,
         notifications,
-      });
-      alert('设置已成功保存！');
-    } catch (err) {
+      };
+      await saveSettings(payload);
+
+      // Re-fetch to confirm persistence
+      const verified = await fetchSettings();
+      applySettings(verified);
+
+      setSaveMessage({ type: 'success', text: '设置已成功保存！' });
+      setTimeout(() => setSaveMessage(null), 3000);
+    } catch (err: any) {
       console.error(err);
-      alert('保存失败，请重试');
+      setSaveMessage({ type: 'error', text: `保存失败：${err.message || '请重试'}` });
     } finally {
       setIsSaving(false);
     }
@@ -94,8 +111,52 @@ const SettingsPage: React.FC = () => {
 
         {/* Content Area */}
         <div className="flex-1 space-y-6">
+          {/* Toast notification */}
+          {saveMessage && (
+            <div className={`px-5 py-3 rounded-xl text-sm font-medium flex items-center justify-between transition-all animate-in fade-in slide-in-from-top-2 duration-300 ${saveMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+              <span>
+                <i className={`fas ${saveMessage.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2`}></i>
+                {saveMessage.text}
+              </span>
+              <button onClick={() => setSaveMessage(null)} className="ml-4 opacity-50 hover:opacity-100">
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+          )}
+
           <div className="bg-white/80 border border-[#e0ddd5] rounded-xl p-8" style={{boxShadow: '0 4px 24px rgba(0,0,0,0.05)'}}>
-            {activeSection === 'company' && (
+            {/* Loading state */}
+            {isLoading && (
+              <div className="flex flex-col items-center justify-center py-16 space-y-4">
+                <div className="w-10 h-10 border-3 border-[#d97757]/20 border-t-[#d97757] rounded-full animate-spin"></div>
+                <p className="text-sm text-[#5c5c5a]">正在加载设置...</p>
+              </div>
+            )}
+
+            {/* Load error state */}
+            {!isLoading && loadError && (
+              <div className="flex flex-col items-center justify-center py-16 space-y-4">
+                <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center">
+                  <i className="fas fa-exclamation-triangle text-red-400 text-xl"></i>
+                </div>
+                <p className="text-sm text-red-600 font-medium">{loadError}</p>
+                <button
+                  onClick={() => {
+                    setIsLoading(true);
+                    setLoadError(null);
+                    fetchSettings()
+                      .then(applySettings)
+                      .catch((err) => setLoadError(`加载失败：${err.message || '网络错误'}`))
+                      .finally(() => setIsLoading(false));
+                  }}
+                  className="px-5 py-2 bg-[#f9f9f8] hover:bg-[#f0eeeb] text-[#191918] border border-[#e0ddd5] rounded-xl text-sm transition-all"
+                >
+                  <i className="fas fa-redo mr-2"></i>重试
+                </button>
+              </div>
+            )}
+
+            {!isLoading && !loadError && activeSection === 'company' && (
               <section className="space-y-6">
                 <h3 className="text-xl font-bold text-[#191918] mb-6">企业基础信息</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -110,7 +171,7 @@ const SettingsPage: React.FC = () => {
               </section>
             )}
 
-            {activeSection === 'tax' && (
+            {!isLoading && !loadError && activeSection === 'tax' && (
               <section className="space-y-6">
                 <h3 className="text-xl font-bold text-[#191918] mb-6">税务规则配置</h3>
                 <div className="space-y-4">
@@ -136,7 +197,7 @@ const SettingsPage: React.FC = () => {
               </section>
             )}
 
-            {activeSection === 'ai' && (
+            {!isLoading && !loadError && activeSection === 'ai' && (
               <section className="space-y-6">
                 <h3 className="text-xl font-bold text-[#191918] mb-6">AI 引擎偏好</h3>
                 <div className="grid grid-cols-1 gap-4">
@@ -162,7 +223,7 @@ const SettingsPage: React.FC = () => {
               </section>
             )}
 
-            {activeSection === 'notifications' && (
+            {!isLoading && !loadError && activeSection === 'notifications' && (
               <section className="space-y-6">
                 <h3 className="text-xl font-bold text-[#191918] mb-6">预警与通知</h3>
                 <div className="space-y-4">
@@ -174,7 +235,7 @@ const SettingsPage: React.FC = () => {
               </section>
             )}
 
-            {activeSection === 'security' && (
+            {!isLoading && !loadError && activeSection === 'security' && (
               <section className="space-y-6 text-center py-10">
                 <div className="w-16 h-16 bg-[#f9f9f8] rounded-full flex items-center justify-center mx-auto mb-4 border border-[#e0ddd5]">
                   <i className="fas fa-lock text-[#5c5c5a] text-2xl"></i>
@@ -187,16 +248,18 @@ const SettingsPage: React.FC = () => {
               </section>
             )}
 
-            <div className="mt-10 pt-6 border-t border-[#e0ddd5] flex justify-end">
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="px-10 py-3 bg-[#d97757] hover:bg-[#c56a4a] text-white font-bold rounded-xl transition-all active:scale-95 disabled:opacity-50 flex items-center" style={{boxShadow: '0 4px 16px rgba(217,119,87,0.15)'}}
-              >
-                {isSaving ? <i className="fas fa-spinner animate-spin mr-2"></i> : <i className="fas fa-save mr-2"></i>}
-                保存更改
-              </button>
-            </div>
+            {!isLoading && !loadError && (
+              <div className="mt-10 pt-6 border-t border-[#e0ddd5] flex justify-end">
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="px-10 py-3 bg-[#d97757] hover:bg-[#c56a4a] text-white font-bold rounded-xl transition-all active:scale-95 disabled:opacity-50 flex items-center" style={{boxShadow: '0 4px 16px rgba(217,119,87,0.15)'}}
+                >
+                  {isSaving ? <i className="fas fa-spinner animate-spin mr-2"></i> : <i className="fas fa-save mr-2"></i>}
+                  保存更改
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
