@@ -191,40 +191,34 @@ async function callGeminiWithFallback(geminiKey, requestBody) {
 // ==================== Gemini Search Prompt (server-side, tamper-proof) ====================
 
 function buildGeminiSearchPrompt(productQuery) {
-  return `作为一名专业的市场销售调研员，请帮我查找产品"${productQuery}"在全网主要渠道的当前实时价格。
+  return `你是一名专业的市场价格调研分析师。请利用搜索功能，对产品"${productQuery}"进行全网实时价格调研。
 
-重点覆盖以下六大类平台（共30+个渠道）：
+## 搜索策略
+请根据产品品类，自动选择最相关的渠道类型进行搜索：
+- **行业垂直网站**：该品类最权威的专业报价/行情平台
+- **大宗商品/期货行情**：如有对应期货品种，查询最新期货价格和现货报价
+- **B2B 批发平台**：综合及垂直批发渠道的批量采购价
+- **零售电商**：主流零售平台的终端销售价
+- **跨境平台**：如有出口/进口需求，查询海外平台价格
 
-1. **综合型传统电商**：淘宝(taobao.com)、天猫(tmall.com)、京东(jd.com)、拼多多(pinduoduo.com)、亚马逊(amazon.com)
-2. **内容/兴趣电商**：抖音(douyin.com)、快手(kuaishou.com)、小红书(xiaohongshu.com)
-3. **即时零售**：美团(meituan.com)、京东到家(jddj.com)
-4. **综合B2B/批发**：1688(1688.com)、阿里巴巴国际站(alibaba.com)、慧聪网(hc360.com)、中国制造网(made-in-china.com)、马可波罗(makepolo.com)、百度爱采购(b2b.baidu.com)、义乌购(yiwugo.com)
-5. **垂直行业批发**：
-   - 服装鞋包：17网(17zwd.com)、3e3e(3e3e.cn)、衣联网(eelly.com)、网商园(wsy.com)、PP(pp.cn)
-   - 电子元器件：华强电子网(hqew.com)、Digi-Key(digikey.cn)、Mouser(mouser.cn)
-   - 农业：一亩田(ymt.com)、惠农网(cnhnb.com)
-   - 工业MRO：震坤行(ehsy.com)、工邦邦(gongbangbang.com)、Grainger(grainger.com)、ThomasNet(thomasnet.com)
-6. **跨境/海外平台**：
-   - B2B：Global Sources(globalsources.com)、DHgate(dhgate.com)、TradeKey(tradekey.com)
-   - B2C：eBay(ebay.com)、AliExpress(aliexpress.com)、Walmart(walmart.com)、Shopee(shopee.com)、Lazada(lazada.com)
-7. **二手/回收**：爱回收(aihuishou.com)、找靓机(zhaoliangji.com)
+不要局限于以上分类，请根据"${productQuery}"的实际品类，搜索该领域最权威、最活跃的价格信息源。
 
-请提供一份结构清晰的【市场分析报告】，包含以下 Markdown 章节：
+## 输出要求
+请提供结构清晰的市场分析报告：
 
 ### 1. 📊 价格行情
-- **最低价**：[平台] ￥xx
-- **最高价**：[平台] ￥xx
+- **最低价**：￥xx（来源平台）
+- **最高价**：￥xx（来源平台）
 - **主流价格区间**：￥xx - ￥xx
+- 如有期货/现货行情，请单独列出
 
-### 2. 💡 销售建议 (针对卖家)
-- **定价策略**：...
-- **渠道推荐**：...
+### 2. 💡 销售建议（针对卖家）
+- 定价策略、渠道推荐
 
-### 3. 🛍️ 购买建议 (针对买家)
-- **最佳入手渠道**：...
-- **避坑指南**：...
+### 3. 🛍️ 购买建议（针对买家）
+- 最佳入手渠道、避坑指南
 
-请务必使用搜索功能获取最新数据。返回结果请尽量包含具体价格数字和来源平台。不要返回 Markdown代码块标记，直接返回内容。`;
+请务必使用搜索功能获取最新数据，尽量包含具体价格数字和来源平台名称。不要返回 Markdown 代码块标记，直接返回内容。`;
 }
 
 // ==================== Gemini Merge Prompt (server-side, tamper-proof) ====================
@@ -233,7 +227,7 @@ function buildMergePrompt(geminiRaw, braveSummary, tavilySummary) {
   return `你是一名专业的市场销售调研员。我通过三个搜索引擎查找了产品的市场价格信息，请你整合分析这些数据。
 
 ## 搜索引擎 1: Google Search(Gemini Grounding) 返回结果
-    涵盖领域：综合零售(淘宝 / 京东 / 拼多多 / 亚马逊)、B2B批发(1688 / 慧聪 / 中国制造网 / 义乌购)、内容电商(抖音 / 快手 / 小红书)、即时零售(美团 / 京东到家)、垂直行业(17网 / 3e3e / 华强电子 / 一亩田 / 惠农 / 工邦邦 / 震坤行)、二手(爱回收 / 找靓机)。
+    涵盖领域：根据产品品类自动搜索的全网渠道，包括行业垂直网站、大宗商品行情、B2B批发、零售电商、跨境平台等。
 ${geminiRaw}
 
 ## 搜索引擎 2: Brave Search 返回结果
