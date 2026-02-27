@@ -221,6 +221,38 @@ function buildGeminiSearchPrompt(productQuery) {
 请务必使用搜索功能获取最新数据，尽量包含具体价格数字和来源平台名称。不要返回 Markdown 代码块标记，直接返回内容。`;
 }
 
+// ==================== Search Query Augmentation (Brave / Tavily) ====================
+
+const COMMODITY_HINTS = [
+  // 金属
+  '钢', '铁', '铜', '铝', '锌', '镍', '锡', '铅', '金', '银',
+  // 能源
+  '煤', '油', '气', '石油', '天然气', '焦炭', '沥青',
+  // 农产品
+  '棉', '大豆', '豆粕', '玉米', '小麦', '稻', '糖', '棕榈',
+  // 化工 / 建材
+  '甲醇', '乙二醇', 'PTA', 'PE', 'PP', 'PVC', '橡胶', '纸浆',
+  '水泥', '砂', '木材', '板材',
+  // 大宗通用标记
+  '期货', '现货', '大宗', '原材料',
+];
+
+/** Build augmented search query with category-aware keywords + dynamic year */
+function buildSearchQuery(userQuery, maxLen) {
+  const year = new Date().getFullYear();
+  const isCommodity = COMMODITY_HINTS.some(h => userQuery.includes(h));
+
+  const keywords = isCommodity
+    ? `期货 现货报价 行情走势 ${year}`
+    : `最新价格 批发价 零售价 市场行情 ${year}`;
+
+  const combined = `${userQuery} ${keywords}`;
+  if (combined.length <= maxLen) return combined;
+  // 超长时截断关键词，保留用户原始查询
+  const available = maxLen - userQuery.length - 1;
+  return available > 0 ? `${userQuery} ${keywords.slice(0, available)}` : userQuery;
+}
+
 // ==================== Gemini Merge Prompt (server-side, tamper-proof) ====================
 
 function buildMergePrompt(geminiRaw, braveSummary, tavilySummary) {
@@ -558,14 +590,15 @@ export default {
         }
 
         const body = await request.json();
-        const q = safeString(body.q, 200);
+        const rawQ = safeString(body.q, 200);
         const count = Math.min(Math.max(parseInt(body.count) || 10, 1), 20);
         const freshness = safeString(body.freshness || '', 20);
 
-        if (!q) {
+        if (!rawQ) {
           return errorResponse(400, 'q: search query is required', corsHeaders);
         }
 
+        const q = buildSearchQuery(rawQ, 200);
         const queryHash = await hashQuery(`brave:${q}:${count}`);
         const cacheKey = `search:brave:${queryHash}`;
 
@@ -591,10 +624,10 @@ export default {
             return braveResponse.json();
           });
 
-          logSearch('brave', q.length, cacheHit, 200, Date.now() - startTime, null);
+          logSearch('brave', rawQ.length, cacheHit, 200, Date.now() - startTime, null);
           return jsonResponse(braveData, { ...corsHeaders, 'X-Cache': cacheHit ? 'HIT' : 'MISS' });
         } catch (err) {
-          logSearch('brave', q.length, false, 502, Date.now() - startTime, err.message);
+          logSearch('brave', rawQ.length, false, 502, Date.now() - startTime, err.message);
           return errorResponse(502, `Brave search failed: ${err.message}`, corsHeaders);
         }
       }
@@ -609,14 +642,15 @@ export default {
         }
 
         const body = await request.json();
-        const query = safeString(body.query, 500);
+        const rawQuery = safeString(body.query, 500);
         const searchDepth = body.search_depth === 'advanced' ? 'advanced' : 'basic';
         const maxResults = Math.min(Math.max(parseInt(body.max_results) || 10, 1), 20);
 
-        if (!query) {
+        if (!rawQuery) {
           return errorResponse(400, 'query: search query is required', corsHeaders);
         }
 
+        const query = buildSearchQuery(rawQuery, 500);
         const queryHash = await hashQuery(`tavily:${query}:${searchDepth}:${maxResults}`);
         const cacheKey = `search:tavily:${queryHash}`;
 
@@ -640,10 +674,10 @@ export default {
             return tavilyResponse.json();
           });
 
-          logSearch('tavily', query.length, cacheHit, 200, Date.now() - startTime, null);
+          logSearch('tavily', rawQuery.length, cacheHit, 200, Date.now() - startTime, null);
           return jsonResponse(tavilyData, { ...corsHeaders, 'X-Cache': cacheHit ? 'HIT' : 'MISS' });
         } catch (err) {
-          logSearch('tavily', query.length, false, 502, Date.now() - startTime, err.message);
+          logSearch('tavily', rawQuery.length, false, 502, Date.now() - startTime, err.message);
           return errorResponse(502, `Tavily search failed: ${err.message}`, corsHeaders);
         }
       }

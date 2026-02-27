@@ -43,7 +43,7 @@ const MarketSearchPage: React.FC = () => {
 
   const searchWithBraveProxy = async (searchQuery: string, signal: AbortSignal): Promise<SearchResult[]> => {
     const data: BraveSearchResponse = await searchBrave(
-      `${searchQuery} 最新价格 批发价 零售价 成交价 市场行情 2026`,
+      searchQuery,
       15,
       signal
     );
@@ -58,7 +58,7 @@ const MarketSearchPage: React.FC = () => {
 
   const searchWithTavilyProxy = async (searchQuery: string, signal: AbortSignal): Promise<SearchResult[]> => {
     const data = await searchTavily(
-      `${searchQuery} 最新价格 批发价 零售价 成交价 市场行情 2026`,
+      searchQuery,
       15,
       signal
     );
