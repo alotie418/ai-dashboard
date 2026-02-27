@@ -81,16 +81,14 @@ const MarketSearchPage: React.FC = () => {
     abortControllerRef.current = controller;
     const signal = controller.signal;
 
-    // Overall timeout: 60 seconds
-    const timeoutId = setTimeout(() => controller.abort(), 60000);
-
     setIsLoading(true);
     setResults(null);
     setGroundingLinks([]);
     setSourceStatus({ gemini: 'loading', brave: 'loading', tavily: 'loading', merging: 'idle' });
 
     try {
-      const [geminiResult, braveResult, tavilyResult] = await Promise.allSettled([
+      // --- Phase 1: Parallel search with 60s timeout ---
+      const searchPhase = Promise.allSettled([
         searchWithGeminiProxy(query, signal).then(r => {
           setSourceStatus(prev => ({ ...prev, gemini: 'done' }));
           return r;
@@ -105,7 +103,16 @@ const MarketSearchPage: React.FC = () => {
         }),
       ]);
 
-      // Check if aborted
+      const searchTimeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('搜索阶段超时（60秒），请重试')), 60000)
+      );
+
+      const [geminiResult, braveResult, tavilyResult] = await Promise.race([
+        searchPhase,
+        searchTimeoutPromise,
+      ]) as [PromiseSettledResult<GeminiSearchProxyResponse>, PromiseSettledResult<SearchResult[]>, PromiseSettledResult<SearchResult[]>];
+
+      // Check if user cancelled
       if (signal.aborted) return;
 
       if (geminiResult.status === 'rejected') {
@@ -134,26 +141,48 @@ const MarketSearchPage: React.FC = () => {
 
       if (signal.aborted) return;
 
+      // --- Phase 2: Merge analysis with independent 90s timeout ---
       setSourceStatus(prev => ({ ...prev, merging: 'loading' }));
-      const merged = await mergeSearch({
-        geminiRaw,
-        braveResults: braveData.map(r => ({ title: r.title, url: r.url, content: r.content })),
-        tavilyResults: tavilyData.map(r => ({ title: r.title, url: r.url, content: r.content })),
-      }, signal);
+      const mergeController = new AbortController();
+      const mergeTimeoutId = setTimeout(() => mergeController.abort(), 90000);
 
-      if (signal.aborted) return;
+      // If user cancels the main search, also abort the merge
+      const onMainAbort = () => mergeController.abort();
+      signal.addEventListener('abort', onMainAbort);
 
-      setSourceStatus(prev => ({ ...prev, merging: 'done' }));
-      setResults(merged);
-    } catch (error) {
-      if (signal.aborted) return; // Silently ignore abort errors
-      console.error("Market Search Failed:", error);
-      alert(`搜索失败：${error instanceof Error ? error.message : '未知错误'} `);
-    } finally {
-      clearTimeout(timeoutId);
-      if (!signal.aborted) {
-        setIsLoading(false);
+      try {
+        const merged = await mergeSearch({
+          geminiRaw,
+          braveResults: braveData.map(r => ({ title: r.title, url: r.url, content: r.content })),
+          tavilyResults: tavilyData.map(r => ({ title: r.title, url: r.url, content: r.content })),
+        }, mergeController.signal);
+
+        clearTimeout(mergeTimeoutId);
+        signal.removeEventListener('abort', onMainAbort);
+
+        if (signal.aborted) return;
+
+        setSourceStatus(prev => ({ ...prev, merging: 'done' }));
+        setResults(merged);
+      } catch (mergeErr) {
+        clearTimeout(mergeTimeoutId);
+        signal.removeEventListener('abort', onMainAbort);
+
+        if (!signal.aborted) {
+          console.error('Merge analysis failed:', mergeErr);
+          setSourceStatus(prev => ({ ...prev, merging: 'error' }));
+          // Don't throw — search results already fetched, show partial state
+        }
       }
+    } catch (error) {
+      if (signal.aborted) {
+        console.warn('搜索被用户取消');
+      } else {
+        console.error("Market Search Failed:", error);
+        alert(`搜索失败：${error instanceof Error ? error.message : '未知错误'}`);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 

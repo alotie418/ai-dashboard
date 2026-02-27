@@ -159,12 +159,13 @@ async function hashQuery(query) {
  * Try primary model first → on 503/timeout → retry with fallback model.
  * Returns { response, modelUsed }.
  */
-async function callGeminiWithFallback(geminiKey, requestBody) {
+async function callGeminiWithFallback(geminiKey, requestBody, timeoutOverrides = {}) {
   // Primary model: short timeout (fast-fail if unavailable)
   // Fallback model: longer timeout (allow full response time)
+  // Callers can override via timeoutOverrides: { primary, fallback }
   const modelConfig = [
-    { model: GEMINI_MODEL, timeout: 12000 },
-    { model: GEMINI_FALLBACK_MODEL, timeout: 55000 },
+    { model: GEMINI_MODEL, timeout: timeoutOverrides.primary ?? 12000 },
+    { model: GEMINI_FALLBACK_MODEL, timeout: timeoutOverrides.fallback ?? 55000 },
   ];
   let lastError;
   for (const { model, timeout } of modelConfig) {
@@ -774,7 +775,7 @@ export default {
               responseMimeType: 'application/json',
               responseSchema: MERGE_RESPONSE_SCHEMA,
             },
-          });
+          }, { primary: 12000, fallback: 75000 }); // Merge needs more time: large prompt + structured JSON output
 
           console.log(`Merge analysis used model: ${modelUsed}`);
           const result = await geminiResponse.json();
