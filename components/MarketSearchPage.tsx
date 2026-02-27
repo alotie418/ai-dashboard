@@ -339,7 +339,12 @@ const MarketSearchPage: React.FC = () => {
                           <span className="px-1.5 py-0.5 bg-teal-500/10 text-teal-400 text-[8px] font-bold rounded-full">T</span>
                         )}
                       </div>
-                      <p className="text-2xl font-bold text-[#191918] group-hover:text-[#d97757] transition-colors">¥{item.price.toLocaleString()}</p>
+                      <p className="text-2xl font-bold text-[#191918] group-hover:text-[#d97757] transition-colors">
+                        ¥{item.price.toLocaleString()}
+                        {item.priceUnit && item.priceUnit !== '元' && (
+                          <span className="text-sm font-normal text-[#7a7a78] ml-1">/{item.priceUnit.replace(/^元\/?/, '')}</span>
+                        )}
+                      </p>
                     </div>
                     <h4 className="text-sm font-medium text-[#4a4a48] line-clamp-2 mb-4 h-10 leading-snug">
                       {item.title}

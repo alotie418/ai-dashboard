@@ -79,6 +79,7 @@ export interface MarketPriceResult {
   platform: string;
   title: string;
   price: number;
+  priceUnit?: string;  // 如 "元/kg"、"元/吨"、"元/袋"、"元/台"、"元"
   link: string;
 }
 
