@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { searchBrave, searchTavily, searchGemini, mergeSearch } from '../services/api';
-import { MarketSearchResponse, MarketSummaryRow, BraveSearchResponse, GeminiSearchProxyResponse } from '../types';
+import { searchBrave, searchTavily, searchGemini, searchDirect, mergeSearch } from '../services/api';
+import { MarketSearchResponse, MarketSummaryRow, BraveSearchResponse, GeminiSearchProxyResponse, DirectSearchResponse } from '../types';
 
 interface SearchResult {
   title: string;
@@ -15,6 +15,7 @@ interface SearchSourceStatus {
   gemini: 'idle' | 'loading' | 'done' | 'error';
   brave: 'idle' | 'loading' | 'done' | 'error';
   tavily: 'idle' | 'loading' | 'done' | 'error';
+  direct: 'idle' | 'loading' | 'done' | 'error';
   merging: 'idle' | 'loading' | 'done' | 'error';
 }
 
@@ -24,7 +25,7 @@ const MarketSearchPage: React.FC = () => {
   const [results, setResults] = useState<MarketSearchResponse | null>(null);
   const [groundingLinks, setGroundingLinks] = useState<{ title: string, uri: string }[]>([]);
   const [sourceStatus, setSourceStatus] = useState<SearchSourceStatus>({
-    gemini: 'idle', brave: 'idle', tavily: 'idle', merging: 'idle'
+    gemini: 'idle', brave: 'idle', tavily: 'idle', direct: 'idle', merging: 'idle'
   });
 
   // AbortController for cancelling in-flight searches
@@ -84,10 +85,10 @@ const MarketSearchPage: React.FC = () => {
     setIsLoading(true);
     setResults(null);
     setGroundingLinks([]);
-    setSourceStatus({ gemini: 'loading', brave: 'loading', tavily: 'loading', merging: 'idle' });
+    setSourceStatus({ gemini: 'loading', brave: 'loading', tavily: 'loading', direct: 'loading', merging: 'idle' });
 
     try {
-      // --- Phase 1: Parallel search with 60s timeout ---
+      // --- Phase 1: Parallel search with 60s timeout (4 sources) ---
       const searchPhase = Promise.allSettled([
         searchWithGeminiProxy(query, signal).then(r => {
           setSourceStatus(prev => ({ ...prev, gemini: 'done' }));
@@ -101,16 +102,20 @@ const MarketSearchPage: React.FC = () => {
           setSourceStatus(prev => ({ ...prev, tavily: 'done' }));
           return r;
         }),
+        searchDirect(query, signal).then(r => {
+          setSourceStatus(prev => ({ ...prev, direct: r.matched ? 'done' : 'idle' }));
+          return r;
+        }),
       ]);
 
       const searchTimeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('搜索阶段超时（60秒），请重试')), 60000)
       );
 
-      const [geminiResult, braveResult, tavilyResult] = await Promise.race([
+      const [geminiResult, braveResult, tavilyResult, directResult] = await Promise.race([
         searchPhase,
         searchTimeoutPromise,
-      ]) as [PromiseSettledResult<GeminiSearchProxyResponse>, PromiseSettledResult<SearchResult[]>, PromiseSettledResult<SearchResult[]>];
+      ]) as [PromiseSettledResult<GeminiSearchProxyResponse>, PromiseSettledResult<SearchResult[]>, PromiseSettledResult<SearchResult[]>, PromiseSettledResult<DirectSearchResponse>];
 
       // Check if user cancelled
       if (signal.aborted) return;
@@ -127,16 +132,24 @@ const MarketSearchPage: React.FC = () => {
         console.error("Tavily search failed:", tavilyResult.reason);
         setSourceStatus(prev => ({ ...prev, tavily: 'error' }));
       }
+      if (directResult.status === 'rejected') {
+        console.error("Direct scrape failed:", directResult.reason);
+        setSourceStatus(prev => ({ ...prev, direct: 'error' }));
+      }
 
       const geminiRaw = geminiResult.status === 'fulfilled' ? geminiResult.value.text : '';
       const geminiGrounding = geminiResult.status === 'fulfilled' ? geminiResult.value.grounding : [];
       const braveData = braveResult.status === 'fulfilled' ? braveResult.value : [];
       const tavilyData = tavilyResult.status === 'fulfilled' ? tavilyResult.value : [];
+      const directData = directResult.status === 'fulfilled' && directResult.value.matched ? directResult.value.prices : [];
 
       setGroundingLinks(geminiGrounding);
 
       if (geminiResult.status === 'rejected' && braveResult.status === 'rejected' && tavilyResult.status === 'rejected') {
-        throw new Error('三个搜索引擎均失败，请检查网络或 API 配置。');
+        // Direct scrape alone is not enough for full analysis, need at least one search engine
+        if (directData.length === 0) {
+          throw new Error('所有数据源均失败，请检查网络或 API 配置。');
+        }
       }
 
       if (signal.aborted) return;
@@ -155,6 +168,7 @@ const MarketSearchPage: React.FC = () => {
           geminiRaw,
           braveResults: braveData.map(r => ({ title: r.title, url: r.url, content: r.content })),
           tavilyResults: tavilyData.map(r => ({ title: r.title, url: r.url, content: r.content })),
+          directResults: directData.length > 0 ? directData : undefined,
         }, mergeController.signal);
 
         clearTimeout(mergeTimeoutId);
@@ -223,7 +237,7 @@ const MarketSearchPage: React.FC = () => {
         <div className="absolute -top-24 -left-24 w-64 h-64 bg-[#d97757]/5 blur-[100px] rounded-full"></div>
         <div className="relative z-10">
           <h2 className="text-3xl font-semibold text-[#191918] mb-2 tracking-tight">市场聚合价格搜索</h2>
-          <p className="text-[#5c5c5a] mt-2 text-sm">三引擎驱动：Gemini 3.1 Pro + Google Search Grounding & Brave Search & Tavily，覆盖 30+ 平台</p>
+          <p className="text-[#5c5c5a] mt-2 text-sm">四引擎驱动：Gemini 3.1 Pro + Google Grounding & Brave & Tavily + 行业直连</p>
 
           <form onSubmit={handleSearch} className="max-w-2xl mx-auto relative group">
             <input
@@ -251,6 +265,9 @@ const MarketSearchPage: React.FC = () => {
             </div>
             <div className="flex items-center text-[10px] text-[#5c5c5a] font-bold uppercase tracking-widest">
               <span className="w-1.5 h-1.5 bg-teal-500 rounded-full mr-2"></span> Tavily Search
+            </div>
+            <div className="flex items-center text-[10px] text-[#5c5c5a] font-bold uppercase tracking-widest">
+              <span className="w-1.5 h-1.5 bg-violet-500 rounded-full mr-2"></span> 行业直连
             </div>
             <div className="flex items-center text-[10px] text-[#5c5c5a] font-bold uppercase tracking-widest">
               <span className="w-1.5 h-1.5 bg-amber-500 rounded-full mr-2"></span> AI 合并分析
@@ -295,6 +312,15 @@ const MarketSearchPage: React.FC = () => {
                 {sourceStatus.tavily === 'loading' ? '搜索中...' : sourceStatus.tavily === 'done' ? '已完成' : sourceStatus.tavily === 'error' ? '失败' : '等待'}
               </span>
             </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                {statusIcon(sourceStatus.direct)}
+                <span className="text-sm text-[#4a4a48]">行业权威网站直连</span>
+              </div>
+              <span className="text-[10px] text-[#5c5c5a] font-mono">
+                {sourceStatus.direct === 'loading' ? '抓取中...' : sourceStatus.direct === 'done' ? '已匹配' : sourceStatus.direct === 'error' ? '失败' : '无匹配品种'}
+              </span>
+            </div>
             <div className="border-t border-[#e0ddd5] pt-3 flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 {statusIcon(sourceStatus.merging)}
@@ -322,6 +348,7 @@ const MarketSearchPage: React.FC = () => {
                 const isGoogle = item.platform.includes('[Google]');
                 const isBrave = item.platform.includes('[Brave]');
                 const isTavily = item.platform.includes('[Tavily]');
+                const isDirect = item.platform.includes('[直连]');
                 return (
                   <div key={idx} className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl p-6 hover:border-[#d97757]/40 transition-all group">
                     <div className="flex justify-between items-start mb-4">
@@ -337,6 +364,9 @@ const MarketSearchPage: React.FC = () => {
                         )}
                         {isTavily && (
                           <span className="px-1.5 py-0.5 bg-teal-500/10 text-teal-400 text-[8px] font-bold rounded-full">T</span>
+                        )}
+                        {isDirect && (
+                          <span className="px-1.5 py-0.5 bg-violet-500/10 text-violet-500 text-[8px] font-bold rounded-full">直</span>
                         )}
                       </div>
                       <p className="text-2xl font-bold text-[#191918] group-hover:text-[#d97757] transition-colors">
@@ -370,12 +400,14 @@ const MarketSearchPage: React.FC = () => {
                 <i className="fas fa-robot text-[#d97757]"></i>
                 <h3 className="text-lg font-semibold text-[#191918]">AI 综合分析报告</h3>
               </div>
-              <div className="flex items-center space-x-2 mb-5">
+              <div className="flex items-center flex-wrap gap-1.5 mb-5">
                 <span className="px-2 py-0.5 bg-[#d97757]/10 text-[#d97757] text-[9px] font-bold rounded-full">Google</span>
                 <span className="text-[#d1cdc4] text-[10px]">+</span>
                 <span className="px-2 py-0.5 bg-blue-500/10 text-blue-500 text-[9px] font-bold rounded-full">Brave</span>
                 <span className="text-[#d1cdc4] text-[10px]">+</span>
                 <span className="px-2 py-0.5 bg-teal-500/10 text-teal-400 text-[9px] font-bold rounded-full">Tavily</span>
+                <span className="text-[#d1cdc4] text-[10px]">+</span>
+                <span className="px-2 py-0.5 bg-violet-500/10 text-violet-500 text-[9px] font-bold rounded-full">直连</span>
                 <span className="text-[#d1cdc4] text-[10px]">→</span>
                 <span className="px-2 py-0.5 bg-amber-500/10 text-amber-400 text-[9px] font-bold rounded-full">Gemini 合并</span>
               </div>

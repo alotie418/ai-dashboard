@@ -79,6 +79,75 @@ function checkRateLimit(ip) {
   return entry.count <= RATE_LIMIT_MAX;
 }
 
+// ==================== Direct Price Sources (定向抓取) ====================
+
+const PRICE_SOURCES = {
+  '软水盐': [
+    { name: '生意社', url: 'https://www.100ppi.com/mprice/plist-1-5732-1.html' },
+  ],
+  '工业盐': [
+    { name: '生意社', url: 'https://www.100ppi.com/mprice/plist-1-1963-1.html' },
+  ],
+  '甲醇': [
+    { name: '生意社', url: 'https://www.100ppi.com/mprice/plist-1-397-1.html' },
+  ],
+  '乙二醇': [
+    { name: '生意社', url: 'https://www.100ppi.com/mprice/plist-1-448-1.html' },
+  ],
+  '纯碱': [
+    { name: '生意社', url: 'https://www.100ppi.com/mprice/plist-1-533-1.html' },
+  ],
+  '片碱': [
+    { name: '生意社', url: 'https://www.100ppi.com/mprice/plist-1-4027-1.html' },
+  ],
+  '液碱': [
+    { name: '生意社', url: 'https://www.100ppi.com/mprice/plist-1-1350-1.html' },
+  ],
+  '螺纹钢': [
+    { name: '生意社', url: 'https://www.100ppi.com/mprice/plist-1-508-1.html' },
+  ],
+  '铜': [
+    { name: '生意社', url: 'https://www.100ppi.com/mprice/plist-1-61-1.html' },
+  ],
+  '锌': [
+    { name: '生意社', url: 'https://www.100ppi.com/mprice/plist-1-64-1.html' },
+  ],
+};
+
+/** Match user query to known price sources (fuzzy: mutual substring match) */
+function findPriceSources(query) {
+  const matches = [];
+  for (const [keyword, sources] of Object.entries(PRICE_SOURCES)) {
+    if (query.includes(keyword) || keyword.includes(query)) {
+      matches.push(...sources.map(s => ({ ...s, keyword })));
+    }
+  }
+  return matches;
+}
+
+const DIRECT_PRICE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    prices: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          product: { type: 'STRING', description: '产品名称' },
+          price: { type: 'NUMBER', description: '价格数值' },
+          priceUnit: { type: 'STRING', description: '完整单位如 元/吨、元/kg、元/袋' },
+          spec: { type: 'STRING', description: '规格型号' },
+          region: { type: 'STRING', description: '报价地区' },
+          date: { type: 'STRING', description: '报价日期' },
+          source: { type: 'STRING', description: '数据来源网站名称' },
+        },
+        required: ['product', 'price', 'priceUnit', 'source'],
+      },
+    },
+  },
+  required: ['prices'],
+};
+
 // ==================== Search Infrastructure ====================
 
 const CACHE_TTL_SECONDS = 1800; // 30 minutes
@@ -231,9 +300,9 @@ const COMMODITY_HINTS = [
   '煤', '油', '气', '石油', '天然气', '焦炭', '沥青',
   // 农产品
   '棉', '大豆', '豆粕', '玉米', '小麦', '稻', '糖', '棕榈',
-  // 化工 / 建材
+  // 化工 / 建材 / 盐类
   '甲醇', '乙二醇', 'PTA', 'PE', 'PP', 'PVC', '橡胶', '纸浆',
-  '水泥', '砂', '木材', '板材',
+  '水泥', '砂', '木材', '板材', '盐', '纯碱', '片碱', '液碱',
   // 大宗通用标记
   '期货', '现货', '大宗', '原材料',
 ];
@@ -256,9 +325,14 @@ function buildSearchQuery(userQuery, maxLen) {
 
 // ==================== Gemini Merge Prompt (server-side, tamper-proof) ====================
 
-function buildMergePrompt(geminiRaw, braveSummary, tavilySummary) {
-  return `你是一名专业的市场销售调研员。我通过三个搜索引擎查找了产品的市场价格信息，请你整合分析这些数据。
+function buildMergePrompt(geminiRaw, braveSummary, tavilySummary, directSummary) {
+  const directSection = directSummary
+    ? `\n## 数据源 4: 行业权威网站直连数据 [精度最高，应优先采信]
+${directSummary}\n`
+    : '';
 
+  return `你是一名专业的市场销售调研员。我通过多个渠道查找了产品的市场价格信息，请你整合分析这些数据。
+${directSection ? '\n**重要：数据源4是从行业权威网站（如生意社、卓创资讯）直接抓取的结构化报价数据，精度最高，在分析时应优先采信。**\n' : ''}
 ## 搜索引擎 1: Google Search(Gemini Grounding) 返回结果
     涵盖领域：根据产品品类自动搜索的全网渠道，包括行业垂直网站、大宗商品行情、B2B批发、零售电商、跨境平台等。
 ${geminiRaw}
@@ -268,9 +342,9 @@ ${braveSummary || '（无结果）'}
 
 ## 搜索引擎 3: Tavily 搜索引擎返回结果
 ${tavilySummary || '（无结果）'}
-
+${directSection}
 请完成以下任务：
-1. ** 合并去重 **：将三个引擎的价格数据合并，去掉明显重复的条目。
+1. ** 合并去重 **：将所有数据源的价格数据合并，去掉明显重复的条目。
    **重要：必须保留每条价格的原始计量单位**（如"元/kg"、"元/吨"、"元/袋"、"元/台"等）。
    如果原始数据只有裸数字没有单位，请根据上下文推断最可能的单位。
    不同单位的价格不要直接比较。每条 price 必须填写 priceUnit 字段。
@@ -280,14 +354,14 @@ ${tavilySummary || '（无结果）'}
    - "价格区间" → 如 "0.55 - 1.80 元/kg" 或 "30 - 50 元/袋"
    - "市场均价" → 如 "0.85 元/kg"
    - "推荐对标平台" → 综合竞争最激烈的平台
-   - "数据来源数量" → 如 "Google: 5条, Brave: 3条, Tavily: 4条"
+   - "数据来源数量" → 如 "Google: 5条, Brave: 3条, Tavily: 4条, 直连: 3条"
    如有其他有价值的统计数据也请加入。所有价格相关数值必须注明单位。
 3. ** analysis 综合分析报告 **：请生成一份结构清晰的 Markdown 格式分析报告，必须包含以下三个章节：
    - ### 📊 价格行情：简述主流价格区间和市场均价。
    - ### 💡 销售建议 (卖家)：定价策略、渠道选择、竞争对手分析。
    - ### 🛍️ 购买建议 (买家)：最佳入手渠道、避坑指南、促销建议。
    请使用列表和加粗增强可读性。禁止使用三个星号 (***)，仅使用两个星号 (**)。不要返回 Markdown代码块标记，直接返回内容。
-4. ** 输出格式 **：按指定 JSON Schema 返回，prices 数组中每条记录的 platform 字段请在平台名后标注数据来源（如 "京东 [Google]"、"Amazon [Brave]" 或 "1688 [Tavily]"）。
+4. ** 输出格式 **：按指定 JSON Schema 返回，prices 数组中每条记录的 platform 字段请在平台名后标注数据来源（如 "京东 [Google]"、"Amazon [Brave]"、"1688 [Tavily]" 或 "生意社 [直连]"）。
 
 请确保分析专业、数据准确。`;
 }
@@ -747,6 +821,130 @@ export default {
         }
       }
 
+      // ==================== SEARCH PROXY: DIRECT SCRAPING (定向抓取) ====================
+
+      if (path === '/api/search/direct' && request.method === 'POST') {
+        const startTime = Date.now();
+        const geminiKey = env.GEMINI_API_KEY;
+        if (!geminiKey) {
+          return errorResponse(500, 'Gemini API key not configured', corsHeaders);
+        }
+
+        const body = await request.json();
+        const rawQuery = safeString(body.query, 200);
+        if (!rawQuery) {
+          return errorResponse(400, 'query: search query is required', corsHeaders);
+        }
+
+        // Match query to known price sources
+        const sources = findPriceSources(rawQuery);
+        if (sources.length === 0) {
+          logSearch('direct', rawQuery.length, false, 200, Date.now() - startTime, 'no_match');
+          return jsonResponse({ prices: [], matched: false, sources: [] }, corsHeaders);
+        }
+
+        const queryHash = await hashQuery(`direct:${rawQuery}`);
+        const cacheKey = `search:direct:${queryHash}`;
+
+        try {
+          const { data: directData, cacheHit } = await getCachedOrFetch(env, cacheKey, async () => {
+            const tavilyKey = env.TAVILY_API_KEY;
+            if (!tavilyKey) throw new Error('Tavily API key not configured (needed for page extraction)');
+
+            // Use Tavily Extract API to fetch pages (handles JS rendering & anti-bot)
+            const urls = sources.map(s => s.url);
+            const extractRes = await fetchWithRetry('https://api.tavily.com/extract', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                api_key: tavilyKey,
+                urls,
+              }),
+            }, 1, 20000);
+
+            if (!extractRes.ok) {
+              throw new Error(`Tavily Extract API error: ${extractRes.status}`);
+            }
+
+            const extractData = await extractRes.json();
+            // Map extracted results back to sources by URL, extract price-relevant section
+            const pages = (extractData.results || [])
+              .map((result) => {
+                const matchedSrc = sources.find(s => s.url === result.url) || sources[0];
+                const fullContent = result.raw_content || result.content || '';
+                // Find price table section — look for header row or price keywords
+                const priceStart = fullContent.indexOf('最新报价');
+                const tableStart = priceStart >= 0 ? priceStart : fullContent.indexOf('| 商品名称');
+                const relevantContent = tableStart >= 0
+                  ? fullContent.slice(Math.max(0, tableStart - 200), tableStart + 20000)
+                  : fullContent.slice(0, 20000);
+                return {
+                  name: matchedSrc?.name || '未知',
+                  keyword: matchedSrc?.keyword || '',
+                  url: result.url,
+                  html: relevantContent,
+                };
+              })
+              .filter(p => p.html.length > 100);
+
+            if (pages.length === 0) {
+              throw new Error('All direct source fetches failed');
+            }
+
+            // Build Gemini extraction prompt
+            const pagesText = pages.map((p, i) =>
+              `--- 数据源 ${i + 1}: ${p.name} (${p.keyword}) ---\nURL: ${p.url}\n${p.html}`
+            ).join('\n\n');
+
+            const extractPrompt = `你是大宗商品价格数据提取专家。以下是从权威行业网站直接抓取的 HTML 页面内容。
+请从中提取所有能找到的产品报价信息。
+
+${pagesText}
+
+提取要求：
+1. 从表格或列表中提取每条报价，包括：产品名称、价格、单位、规格、地区、日期
+2. 价格单位必须完整保留（如"元/吨"、"元/kg"、"元/袋"），不要丢弃
+3. 如果页面包含多条不同规格/地区的报价，全部提取
+4. source 字段填写数据来源网站名称（如"生意社"）
+5. 只提取实际的价格数据，不要编造或推测`;
+
+            const { response: geminiResponse, modelUsed } = await callGeminiWithFallback(geminiKey, {
+              contents: [{ parts: [{ text: extractPrompt }] }],
+              generationConfig: {
+                responseMimeType: 'application/json',
+                responseSchema: DIRECT_PRICE_SCHEMA,
+              },
+            }, { primary: 12000, fallback: 55000 });
+
+            console.log(`Direct scrape extraction used model: ${modelUsed}`);
+            const result = await geminiResponse.json();
+            const text = result.candidates?.[0]?.content?.parts
+              ?.map(p => p.text || '')
+              .join('') || '{}';
+
+            let parsed;
+            try {
+              parsed = JSON.parse(text);
+            } catch {
+              console.error('Failed to parse direct scrape JSON:', text.slice(0, 200));
+              parsed = { prices: [] };
+            }
+
+            return {
+              prices: parsed.prices || [],
+              matched: true,
+              sources: pages.map(p => ({ name: p.name, keyword: p.keyword, url: p.url })),
+            };
+          });
+
+          logSearch('direct', rawQuery.length, cacheHit, 200, Date.now() - startTime, null);
+          return jsonResponse(directData, { ...corsHeaders, 'X-Cache': cacheHit ? 'HIT' : 'MISS' });
+        } catch (err) {
+          logSearch('direct', rawQuery.length, false, 502, Date.now() - startTime, err.message);
+          return errorResponse(502, `Direct scrape failed: ${err.message}`, corsHeaders);
+        }
+      }
+
       // ==================== SEARCH PROXY: MERGE (retry + logging, no cache) ====================
 
       if (path === '/api/search/merge' && request.method === 'POST') {
@@ -760,6 +958,7 @@ export default {
         const geminiRaw = safeString(body.geminiRaw || '', 50000);
         const braveResults = Array.isArray(body.braveResults) ? body.braveResults : [];
         const tavilyResults = Array.isArray(body.tavilyResults) ? body.tavilyResults : [];
+        const directResults = Array.isArray(body.directResults) ? body.directResults : [];
 
         const braveSummary = braveResults.map((r, i) =>
           `[Brave结果${i + 1}]标题: ${safeString(r.title, 200)}\n内容摘要: ${safeString(r.content, 1000)}\n来源: ${safeString(r.url, 500)}`
@@ -769,8 +968,14 @@ export default {
           `[Tavily结果${i + 1}]标题: ${safeString(r.title, 200)}\n内容摘要: ${safeString(r.content, 1000)}\n来源: ${safeString(r.url, 500)}`
         ).join('\n\n');
 
-        const prompt = buildMergePrompt(geminiRaw, braveSummary, tavilySummary);
-        const queryLen = (geminiRaw + braveSummary + tavilySummary).length;
+        const directSummary = directResults.length > 0
+          ? directResults.map((r, i) =>
+              `[直连数据${i + 1}] 产品: ${safeString(r.product, 200)} | 价格: ${r.price} ${safeString(r.priceUnit, 50)} | 规格: ${safeString(r.spec || '', 200)} | 地区: ${safeString(r.region || '', 100)} | 日期: ${safeString(r.date || '', 20)} | 来源: ${safeString(r.source, 100)}`
+            ).join('\n')
+          : '';
+
+        const prompt = buildMergePrompt(geminiRaw, braveSummary, tavilySummary, directSummary);
+        const queryLen = (geminiRaw + braveSummary + tavilySummary + directSummary).length;
 
         try {
           const { response: geminiResponse, modelUsed } = await callGeminiWithFallback(geminiKey, {

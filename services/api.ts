@@ -269,6 +269,14 @@ export async function searchGemini(query: string, signal?: AbortSignal): Promise
   });
 }
 
+export async function searchDirect(query: string, signal?: AbortSignal): Promise<import('../types').DirectSearchResponse> {
+  return apiFetch('/api/search/direct', {
+    method: 'POST',
+    body: JSON.stringify({ query }),
+    signal,
+  });
+}
+
 export async function mergeSearch(
   data: import('../types').MergeSearchRequest,
   signal?: AbortSignal

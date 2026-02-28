@@ -109,8 +109,25 @@ export interface GeminiSearchProxyResponse {
   grounding: { title: string; uri: string }[];
 }
 
+export interface DirectPriceResult {
+  product: string;
+  price: number;
+  priceUnit: string;
+  spec?: string;
+  region?: string;
+  date?: string;
+  source: string;
+}
+
+export interface DirectSearchResponse {
+  prices: DirectPriceResult[];
+  matched: boolean;
+  sources: { name: string; keyword: string; url: string }[];
+}
+
 export interface MergeSearchRequest {
   geminiRaw: string;
   braveResults: { title: string; url: string; content: string }[];
   tavilyResults: { title: string; url: string; content: string }[];
+  directResults?: DirectPriceResult[];
 }
