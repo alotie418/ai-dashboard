@@ -1,6 +1,6 @@
 # AI 看板 · AI-Powered Business Dashboard
 
-> 基于 Google Gemini AI 驱动的财务与供应链管理系统，集成三引擎市场搜索、语音交互、发票 OCR 识别，支持实时数据分析与智能洞察生成。
+> 基于 Google Gemini AI 驱动的财务与供应链管理系统，集成四源市场聚合搜索、语音交互、发票 OCR 识别，支持实时数据分析与智能洞察生成。
 
 [![React](https://img.shields.io/badge/React-19-blue?logo=react)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue?logo=typescript)](https://www.typescriptlang.org)
@@ -36,7 +36,7 @@
 | 📦 **发票查询** | 进项/销项发票筛选，支持日期、金额、重量、状态等高级过滤 |
 | 🛒 **采购管理** | 进项发票管理、采购订单 CRUD、OCR 发票识别、税额自动计算 |
 | 📈 **销售管理** | 销项发票管理、销售订单 CRUD、OCR 发票识别、运费核算 |
-| 🔍 **市场聚合搜索** | 三引擎并行搜索（Gemini Grounding + Brave Search + Tavily），AI 融合分析 |
+| 🔍 **市场聚合搜索** | 四源并行搜索（Gemini Grounding + Brave + Tavily + 生意社直连抓取），Gemini AI 融合分析，KV 缓存加速 |
 | ⚙️ **系统设置** | 公司信息、税率配置、AI 自动洞察、通知偏好，云端同步 |
 
 ---
@@ -62,8 +62,13 @@
                                    │  │  (SQLite)           │ │
                                    │  └─────────────────────┘ │
                                    │  ┌─────────────────────┐ │
-                                   │  │ Search Proxy        │ │
-                                   │  │ Brave + Tavily      │ │
+                                   │  │ 四源搜索引擎          │ │
+                                   │  │ Gemini Grounding     │ │
+                                   │  │ Brave + Tavily 代理   │ │
+                                   │  │ 生意社直连抓取         │ │
+                                   │  └─────────────────────┘ │
+                                   │  ┌─────────────────────┐ │
+                                   │  │ KV Cache (30min TTL) │ │
                                    │  └─────────────────────┘ │
                                    └──────────────────────────┘
                                             ↑
@@ -86,22 +91,24 @@
   ├─→ Gemini Vision（发票 OCR 识别）
   │     └─→ 提取日期、客户、数量、单价、运费、发票号
   │
-  └─→ 三引擎市场搜索
-        ├─→ Gemini Search Grounding（直连）
+  └─→ 四源市场聚合搜索（Phase 1: 并行 60s → Phase 2: 合并 90s）
+        ├─→ Gemini Search Grounding（Worker 代理）
         ├─→ Brave Search API（Worker 代理）
         ├─→ Tavily Search API（Worker 代理）
-        └─→ Gemini AI 融合分析 → 汇总报告
+        ├─→ 生意社直连抓取（Worker fetch → Gemini 结构化提取）
+        └─→ Gemini AI 四源融合分析 → 价格汇总报告
 ```
 
 ### 部署架构
 
 ```
 Google Cloud Run          Cloudflare Edge
-┌──────────────┐         ┌────────────────────┐
-│ Docker 容器   │  ──→   │ Worker (jizhang-api)│
-│ serve + dist │  HTTPS  │ + D1 Database       │
-│ Port 8080    │         │ + Brave/Tavily 代理  │
-└──────────────┘         └────────────────────┘
+┌──────────────┐         ┌─────────────────────────┐
+│ Docker 容器   │  ──→   │ Worker (jizhang-api)     │
+│ serve + dist │  HTTPS  │ + D1 Database            │
+│ Port 8080    │         │ + KV Cache               │
+│              │         │ + 四源搜索 + Gemini 双模型 │
+└──────────────┘         └─────────────────────────┘
 ```
 
 ---
@@ -116,7 +123,7 @@ ai看板/
 │   ├── InventoryPage.tsx           # 发票查询页（高级过滤）
 │   ├── SalesAndOutputPage.tsx      # 销售管理页（CRUD + OCR）
 │   ├── PurchaseAndInputPage.tsx    # 采购管理页（CRUD + OCR）
-│   ├── MarketSearchPage.tsx        # 三引擎市场聚合搜索页
+│   ├── MarketSearchPage.tsx        # 四源市场聚合搜索页（Gemini+Brave+Tavily+直连）
 │   ├── SettingsPage.tsx            # 系统设置页（云端同步）
 │   ├── Charts.tsx                  # Recharts 图表（折线/柱状/饼图/组合图）
 │   ├── AIInsights.tsx              # AI 洞察卡片展示
@@ -134,7 +141,7 @@ ai看板/
 │   └── apiKey.ts                   # 环境变量 API 密钥管理
 │
 ├── worker/                         # Cloudflare Worker 后端
-│   ├── src/index.js                # Worker 入口（REST API + 搜索代理 + 安全层）
+│   ├── src/index.js                # Worker 入口（REST API + 四源搜索 + Gemini 双模型 + KV 缓存）
 │   └── wrangler.toml               # Worker 部署配置（D1 绑定 + CORS）
 │
 ├── App.tsx                         # 主应用（路由、布局、语音、全局状态）
@@ -146,7 +153,8 @@ ai看板/
 ├── vite-env.d.ts                   # Vite 环境类型声明
 ├── vite.config.ts                  # Vite 构建配置
 ├── tsconfig.json                   # TypeScript 配置
-├── Dockerfile                      # Docker 多阶段构建（build → serve）
+├── Dockerfile                      # Docker 多阶段构建（build → serve，自动读取 .env.production）
+├── .gcloudignore                   # Cloud Build 上传过滤（确保 .env.production 被包含）
 ├── deploy.sh                       # Cloud Run 一键部署脚本
 ├── Procfile                        # 进程启动配置
 ├── metadata.json                   # 项目元数据
@@ -172,25 +180,29 @@ ai看板/
 
 | 服务 | 模型 | 用途 |
 |------|------|------|
-| Gemini Pro | `gemini-2.5-pro-preview` | 财务数据结构化分析、智能对话 |
-| Gemini Vision | `gemini-2.5-pro-preview` | 发票图片 OCR 识别 |
+| Gemini Pro | `gemini-2.5-pro-preview` | 财务数据结构化分析、智能对话（前端直连） |
+| Gemini Vision | `gemini-2.5-pro-preview` | 发票图片 OCR 识别（前端直连） |
 | Gemini TTS | `gemini-2.5-flash-preview-tts` | AI 回复语音播放（5 种音色） |
 | Gemini Audio | `gemini-2.5-flash-native-audio` | 实时语音对话 |
-| Gemini Grounding | Search Grounding | 市场行情搜索（引擎 1） |
+| Gemini 市场搜索 | `gemini-3.1-pro-preview` → `gemini-2.5-flash`（fallback） | Worker 端：Search Grounding、直连提取、四源合并分析 |
 
-### 外部搜索 API
+> 市场搜索采用**双模型降级策略**：主模型 `gemini-3.1-pro-preview`（12s 超时），若失败自动降级到 `gemini-2.5-flash`（55s 超时）。
+
+### 外部搜索 & 数据源
 
 | 服务 | 用途 | 接入方式 |
 |------|------|----------|
 | Brave Search | 网页搜索引擎 | Worker 代理（密钥存于 Worker Secrets） |
 | Tavily Search | 深度研究搜索 | Worker 代理（密钥存于 Worker Secrets） |
+| 生意社 (100ppi.com) | 大宗商品权威报价（10 个品种） | Worker fetch 直连 → Gemini 结构化提取 |
 
 ### 后端 & 基础设施
 
 | 技术 | 用途 |
 |------|------|
-| Cloudflare Workers | Serverless REST API + 搜索代理 |
+| Cloudflare Workers | Serverless REST API + 四源搜索引擎 |
 | Cloudflare D1 | SQLite 数据库（采购/销售/设置持久化） |
+| Cloudflare KV | 搜索结果缓存（30 分钟 TTL，SHA-256 哈希键） |
 | Google Cloud Run | 前端 Docker 容器部署（自动扩缩） |
 | Docker | 多阶段构建（node:20-alpine → serve） |
 | Cloud Build | CI/CD 镜像构建 |
@@ -305,14 +317,16 @@ chmod +x deploy.sh
 ### 方式二：Docker 本地运行
 
 ```bash
-docker build \
-  --build-arg VITE_API_KEY=your_key \
-  --build-arg VITE_API_BASE_URL=your_url \
-  --build-arg VITE_API_TOKEN=your_token \
-  -t ai-dashboard .
+# 1. 创建 .env.production（构建时自动读取）
+cp .env.example .env.production
+# 编辑 .env.production，填入 VITE_API_BASE_URL 和 VITE_API_TOKEN
 
+# 2. 构建并运行
+docker build -t ai-dashboard .
 docker run -p 8080:8080 ai-dashboard
 ```
+
+> 构建时 Dockerfile 会自动将 `.env.production` 复制为 `.env.local`，Vite 据此注入环境变量。
 
 ### 方式三：静态部署
 
@@ -356,12 +370,17 @@ GET    /api/settings            获取所有应用设置（JSON 对象）
 PUT    /api/settings            更新设置（单值 ≤ 10KB，跳过未知键）
 ```
 
-### 搜索代理
+### 市场聚合搜索（四源 + 合并）
 
 ```
+POST   /api/search/gemini       Gemini Search Grounding（Body: {query}）
 POST   /api/search/brave        Brave Search 代理（Body: {q, count, freshness}）
 POST   /api/search/tavily       Tavily Search 代理（Body: {query, search_depth, max_results}）
+POST   /api/search/direct       生意社直连抓取（Body: {query}）→ 匹配品种 → Gemini 提取
+POST   /api/search/merge        四源融合分析（Body: {query, geminiData, braveData, tavilyData, directResults}）
 ```
+
+> 所有搜索端点均有 **KV 缓存**（30 分钟 TTL，SHA-256 哈希键），merge 端点除外。
 
 ### 健康检查
 
@@ -403,11 +422,22 @@ interface AIAnalysis {
   anomalies: string[]        // 异常检测
 }
 
-// 三引擎搜索结果
+// 四源搜索结果
 interface MarketSearchResponse {
-  analysis: string           // AI 融合分析报告
+  analysis: string           // AI 四源融合分析报告
   prices: MarketPriceResult[] // 各平台价格数据
   summaryTable: object[]     // 汇总对比表
+}
+
+// 直连抓取结果（生意社等）
+interface DirectPriceResult {
+  product: string            // 产品名称
+  price: number              // 价格数值
+  priceUnit: string          // 完整单位（元/吨、元/kg、元/袋）
+  spec?: string              // 规格型号
+  region?: string            // 报价地区
+  date?: string              // 报价日期
+  source: string             // 数据来源网站
 }
 
 // D1 数据库表
