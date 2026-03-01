@@ -5,21 +5,16 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 COPY . .
 
-# Define build arguments for API keys
-ARG VITE_API_KEY
-ARG VITE_TAVILY_API_KEY
-ARG VITE_GOOGLE_SEARCH_API_KEY
-ARG VITE_GOOGLE_SEARCH_CX
-ARG VITE_API_BASE_URL
-ARG VITE_API_TOKEN
+# Debug: show which env files are present
+RUN ls -la .env* 2>/dev/null || echo "No .env files found"
 
-# Set environment variables from build arguments
-ENV VITE_API_KEY=$VITE_API_KEY
-ENV VITE_TAVILY_API_KEY=$VITE_TAVILY_API_KEY
-ENV VITE_GOOGLE_SEARCH_API_KEY=$VITE_GOOGLE_SEARCH_API_KEY
-ENV VITE_GOOGLE_SEARCH_CX=$VITE_GOOGLE_SEARCH_CX
-ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-ENV VITE_API_TOKEN=$VITE_API_TOKEN
+# Ensure .env.local exists for Vite build
+# .env.local may be excluded by *.local in .gitignore during gcloud upload
+# Copy .env.production to .env.local as fallback if .env.local is missing
+RUN if [ ! -f .env.local ] && [ -f .env.production ]; then \
+      cp .env.production .env.local; \
+      echo "Copied .env.production -> .env.local"; \
+    fi
 
 RUN npm run build
 
