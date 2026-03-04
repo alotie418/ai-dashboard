@@ -179,48 +179,55 @@ const AppContent: React.FC = () => {
   const [selectedQuarter, setSelectedQuarter] = useState('全年');
   const [selectedMonth, setSelectedMonth] = useState('全部');
 
+  // Ref to always hold latest data for AI analysis (avoids stale closure / infinite loop)
+  const dataRef = useRef<BusinessData>(MOCK_BUSINESS_DATA);
+
   // Load real dashboard data from API
   const loadDashboardData = useCallback(async () => {
     try {
       const dashboard = await fetchDashboardData(selectedYear);
       const m = dashboard.metrics;
-      setData(prev => ({
-        ...prev,
-        metrics: [
-          {
-            label: '库存余量 (实时)',
-            value: m.inventoryTons > 0 ? `${m.inventoryTons}吨` : '—',
-            subValue: m.inventoryTons > 0 ? `采购${m.purchaseTotalTons}吨 - 销售${m.salesTotalTons}吨` : '—',
-            icon: 'fa-boxes',
-            color: 'bg-blue-500',
-          },
-          {
-            label: `${selectedYear}年度 采购`,
-            value: m.purchaseTotalAmount > 0 ? `¥${m.purchaseTotalAmount.toLocaleString()}` : '—',
-            subValue: m.purchaseTotalTons > 0 ? `${m.purchaseTotalTons}吨` : '—',
-            icon: 'fa-truck-loading',
-            color: 'bg-purple-500',
-          },
-          {
-            label: `${selectedYear}年度 销售`,
-            value: m.salesTotalAmount > 0 ? `¥${m.salesTotalAmount.toLocaleString()}` : '—',
-            subValue: m.salesTotalTons > 0 ? `${m.salesTotalTons}吨` : '—',
-            icon: 'fa-chart-line',
-            color: 'bg-green-500',
-          },
-          {
-            label: '平均成本',
-            value: m.avgCostPerTon > 0 ? `¥${m.avgCostPerTon.toLocaleString()}/吨` : '—',
-            subValue: m.purchaseTotalTons > 0 ? `基于${m.purchaseTotalTons}吨采购` : '—',
-            icon: 'fa-tags',
-            color: 'bg-orange-500',
-          },
-        ],
-        monthlyPerformance: dashboard.monthlyPerformance,
-        financialStatement: dashboard.financialStatement,
-        vatStatistics: dashboard.vatStatistics,
-        taxInclusiveSummary: dashboard.taxInclusiveSummary,
-      }));
+      setData(prev => {
+        const next: BusinessData = {
+          ...prev,
+          metrics: [
+            {
+              label: '库存余量 (实时)',
+              value: m.inventoryTons > 0 ? `${m.inventoryTons}吨` : '—',
+              subValue: m.inventoryTons > 0 ? `采购${m.purchaseTotalTons}吨 - 销售${m.salesTotalTons}吨` : '—',
+              icon: 'fa-boxes',
+              color: 'bg-blue-500',
+            },
+            {
+              label: `${selectedYear}年度 采购`,
+              value: m.purchaseTotalAmount > 0 ? `¥${m.purchaseTotalAmount.toLocaleString()}` : '—',
+              subValue: m.purchaseTotalTons > 0 ? `${m.purchaseTotalTons}吨` : '—',
+              icon: 'fa-truck-loading',
+              color: 'bg-purple-500',
+            },
+            {
+              label: `${selectedYear}年度 销售`,
+              value: m.salesTotalAmount > 0 ? `¥${m.salesTotalAmount.toLocaleString()}` : '—',
+              subValue: m.salesTotalTons > 0 ? `${m.salesTotalTons}吨` : '—',
+              icon: 'fa-chart-line',
+              color: 'bg-green-500',
+            },
+            {
+              label: '平均成本',
+              value: m.avgCostPerTon > 0 ? `¥${m.avgCostPerTon.toLocaleString()}/吨` : '—',
+              subValue: m.purchaseTotalTons > 0 ? `基于${m.purchaseTotalTons}吨采购` : '—',
+              icon: 'fa-tags',
+              color: 'bg-orange-500',
+            },
+          ],
+          monthlyPerformance: dashboard.monthlyPerformance,
+          financialStatement: dashboard.financialStatement,
+          vatStatistics: dashboard.vatStatistics,
+          taxInclusiveSummary: dashboard.taxInclusiveSummary,
+        };
+        dataRef.current = next;
+        return next;
+      });
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
     }
@@ -261,7 +268,7 @@ const AppContent: React.FC = () => {
     setLoadingAI(true);
     setAiError(null);
     try {
-      // Refresh dashboard data first
+      // Refresh dashboard data first, then use dataRef.current (avoids stale closure)
       await loadDashboardData();
       // Build market summary if available
       let marketSummary: string | undefined;
@@ -272,7 +279,7 @@ const AppContent: React.FC = () => {
           : '';
         marketSummary = `搜索词: "${marketQuery}"\n${summaryRows}\n${priceRange}`;
       }
-      const result = await fetchAIAnalysis(data, marketSummary);
+      const result = await fetchAIAnalysis(dataRef.current, marketSummary);
       setAnalysis(result);
     } catch (err) {
       console.error("AI Analysis Failed", err);
@@ -280,7 +287,7 @@ const AppContent: React.FC = () => {
     } finally {
       setLoadingAI(false);
     }
-  }, [data, loadDashboardData, marketResults, marketQuery]);
+  }, [loadDashboardData, marketResults, marketQuery]);
 
   useEffect(() => {
     performAnalysis();
