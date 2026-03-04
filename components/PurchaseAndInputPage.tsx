@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { BusinessData } from '../types';
 import { analyzeInvoice } from '../services/ocrService';
 import { fetchPurchases, createPurchase, deletePurchase, PurchaseRecord } from '../services/api';
+import CsvImportModal from './CsvImportModal';
 
 interface Props {
   data: BusinessData;
@@ -20,6 +21,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
   const [showAddModal, setShowAddModal] = useState(false);
   const [records, setRecords] = useState<PurchaseRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showCsvImport, setShowCsvImport] = useState(false);
 
   // Load records from API on mount
   useEffect(() => {
@@ -143,6 +145,12 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
         <h1 className="text-2xl font-bold text-[#191918]">采购与进项</h1>
         <div className="flex space-x-3">
           <button
+            onClick={() => setShowCsvImport(true)}
+            className="flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors text-sm font-medium" style={{ boxShadow: '0 4px 16px rgba(16,185,129,0.15)' }}
+          >
+            <i className="fas fa-file-csv mr-2"></i> 批量导入
+          </button>
+          <button
             onClick={triggerUpload}
             disabled={isScanning}
             className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50" style={{ boxShadow: '0 4px 16px rgba(147,51,234,0.15)' }}
@@ -243,7 +251,13 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                     </span>
                   </td>
                   <td className="px-6 py-5 text-xs font-medium space-x-3">
-                    <button className="text-[#d97757] hover:text-[#c56a4a] transition-colors">编辑</button>
+                    <button
+                      onClick={() => {
+                        setNewPurchase({ date: row.date, supplier: row.supplier, quantity: row.quantity, price: row.price, taxRate: row.taxRate, invoiceNo: row.invoiceNo });
+                        setShowAddModal(true);
+                      }}
+                      className="text-[#d97757] hover:text-[#c56a4a] transition-colors"
+                    >编辑</button>
                     <button
                       onClick={async () => {
                         try {
@@ -279,6 +293,18 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
           </table>
         </div>
       </div>
+
+      {/* CSV Import Modal */}
+      {showCsvImport && (
+        <CsvImportModal
+          type="purchases"
+          onClose={() => setShowCsvImport(false)}
+          onSuccess={() => {
+            setShowCsvImport(false);
+            fetchPurchases().then(setRecords).catch(console.error);
+          }}
+        />
+      )}
 
       {/* Add Purchase Modal */}
       {showAddModal && (

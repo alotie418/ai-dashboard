@@ -8,6 +8,7 @@ import { BusinessData } from '../types';
 import { GoogleGenAI, Type } from "@google/genai";
 import { getApiKey } from '../services/apiKey';
 import { searchTavily } from '../services/api';
+import { useMarketData } from '../contexts/MarketDataContext';
 
 interface Props {
   data: BusinessData;
@@ -35,6 +36,7 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [groundingSources, setGroundingSources] = useState<{ title: string, uri: string }[]>([]);
+  const { latestQuery: marketQuery, latestResults: marketResults, searchTimestamp: marketTimestamp } = useMarketData();
 
   const stats = useMemo(() => {
     const perf = data.monthlyPerformance;
@@ -823,6 +825,82 @@ ${tavilyContext}`;
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Market Benchmark Card — shown when market search data is available */}
+      {marketResults && marketQuery && (
+        <div className="bg-white/80 border border-[#e0ddd5] rounded-xl p-8 hover:border-[#d97757]/30 transition-all" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-pink-500/10 flex items-center justify-center">
+                <i className="fas fa-search-dollar text-pink-500"></i>
+              </div>
+              <div>
+                <h4 className="text-lg font-bold text-[#191918] tracking-tight">市场基准参考</h4>
+                <p className="text-[10px] text-[#5c5c5a] uppercase font-bold tracking-[0.2em] mt-0.5">
+                  MARKET BENCHMARK — 搜索词: "{marketQuery}"
+                </p>
+              </div>
+            </div>
+            {marketTimestamp && (
+              <span className="text-[10px] text-[#7a7a78]">
+                <i className="fas fa-clock mr-1"></i>
+                {new Date(marketTimestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
+
+          {/* Summary Table */}
+          {marketResults.summaryTable && marketResults.summaryTable.length > 0 && (
+            <div className="overflow-hidden rounded-lg border border-[#e0ddd5] mb-6">
+              <table className="w-full text-sm table-fixed">
+                <thead>
+                  <tr className="bg-[#f0eeeb]">
+                    <th className="text-left px-4 py-2.5 text-[9px] font-bold text-[#4a4a48] uppercase tracking-widest w-[35%]">指标</th>
+                    <th className="text-left px-4 py-2.5 text-[9px] font-bold text-[#4a4a48] uppercase tracking-widest w-[65%]">数据</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {marketResults.summaryTable.slice(0, 6).map((row, idx) => (
+                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-[#f9f9f8]'}>
+                      <td className="px-4 py-2 text-[#4a4a48] font-medium text-xs">{row.label}</td>
+                      <td className="px-4 py-2 text-[#191918] text-xs font-semibold">{row.value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Price Stats */}
+          {marketResults.prices.length > 0 && (
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-emerald-500/5 rounded-xl p-4 text-center border border-emerald-500/10">
+                <p className="text-[10px] text-[#5c5c5a] font-bold uppercase tracking-widest mb-1">最低价</p>
+                <p className="text-xl font-bold text-emerald-600">
+                  ¥{Math.min(...marketResults.prices.map(p => p.price)).toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-[#d97757]/5 rounded-xl p-4 text-center border border-[#d97757]/10">
+                <p className="text-[10px] text-[#5c5c5a] font-bold uppercase tracking-widest mb-1">均价</p>
+                <p className="text-xl font-bold text-[#d97757]">
+                  ¥{Math.round(marketResults.prices.reduce((s, p) => s + p.price, 0) / marketResults.prices.length).toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-rose-500/5 rounded-xl p-4 text-center border border-rose-500/10">
+                <p className="text-[10px] text-[#5c5c5a] font-bold uppercase tracking-widest mb-1">最高价</p>
+                <p className="text-xl font-bold text-rose-500">
+                  ¥{Math.max(...marketResults.prices.map(p => p.price)).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <p className="text-[10px] text-[#7a7a78] mt-4 text-center">
+            <i className="fas fa-info-circle mr-1"></i>
+            数据来自市场聚合搜索（六源驱动），共 {marketResults.prices.length} 条报价
+          </p>
         </div>
       )}
     </div>

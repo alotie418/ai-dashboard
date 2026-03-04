@@ -4,13 +4,17 @@ import { AI_SYSTEM_INSTRUCTION } from "../constants";
 import { BusinessData, AIAnalysis } from "../types";
 import { getApiKey } from "./apiKey";
 
-export const fetchAIAnalysis = async (data: BusinessData): Promise<AIAnalysis> => {
+export const fetchAIAnalysis = async (data: BusinessData, marketSummary?: string): Promise<AIAnalysis> => {
   const ai = new GoogleGenAI({ apiKey: getApiKey() });
-  
+
+  const marketContext = marketSummary
+    ? `\n\n## 最新市场搜索数据\n${marketSummary}\n请将市场价格信息纳入分析，在建议中结合市场行情给出采购/销售策略。`
+    : '';
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Analyze this business data and provide insights: ${JSON.stringify(data)}`,
+      contents: `Analyze this business data and provide insights: ${JSON.stringify(data)}${marketContext}`,
       config: {
         systemInstruction: AI_SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",

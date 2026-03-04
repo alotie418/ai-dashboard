@@ -17,3 +17,6 @@ database_id = "e5ec473c-9dcb-4035-b472-ad9899ae01b3"
 [[kv_namespaces]]
 binding = "CACHE"
 id = "e4d108a2d6b54ecfbb8ef6132e9c7b77"
+
+[triggers]
+crons = ["0 0 * * *"]

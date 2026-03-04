@@ -15,6 +15,9 @@ import InventoryPage from './components/InventoryPage';
 import FinancePage from './components/FinancePage';
 import SettingsPage from './components/SettingsPage';
 import MarketSearchPage from './components/MarketSearchPage';
+import AccountsPage from './components/AccountsPage';
+import AlertCenter from './components/AlertCenter';
+import { MarketDataProvider, useMarketData } from './contexts/MarketDataContext';
 // SnowflakeEffect removed
 import { GoogleGenAI, Modality, LiveServerMessage, Blob as GenAIBlob } from "@google/genai";
 import { getApiKey } from './services/apiKey';
@@ -22,7 +25,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { analyzeInvoice } from './services/ocrService';
 
-type PageId = 'dashboard' | 'sales' | 'purchase' | 'analysis' | 'inventory' | 'finance' | 'market' | 'settings';
+type PageId = 'dashboard' | 'sales' | 'purchase' | 'analysis' | 'inventory' | 'finance' | 'market' | 'accounts' | 'settings';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -161,7 +164,7 @@ const searchTavily = async (query: string): Promise<string> => {
   } catch (e) { console.error(e); return ''; }
 };
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [data] = useState(MOCK_BUSINESS_DATA);
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [loadingAI, setLoadingAI] = useState(false);
@@ -169,6 +172,7 @@ const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentPage, setCurrentPage] = useState<PageId>('dashboard');
   const [showChat, setShowChat] = useState(false);
+  const { latestQuery: marketQuery, latestResults: marketResults, searchTimestamp: marketTimestamp } = useMarketData();
 
   const [selectedYear, setSelectedYear] = useState('2026');
   const [selectedQuarter, setSelectedQuarter] = useState('全年');
@@ -205,7 +209,16 @@ const App: React.FC = () => {
     setLoadingAI(true);
     setAiError(null);
     try {
-      const result = await fetchAIAnalysis(data);
+      // Build market summary if available
+      let marketSummary: string | undefined;
+      if (marketResults && marketQuery) {
+        const summaryRows = marketResults.summaryTable?.map(r => `${r.label}: ${r.value}`).join('\n') || '';
+        const priceRange = marketResults.prices.length > 0
+          ? `价格范围: ¥${Math.min(...marketResults.prices.map(p => p.price)).toLocaleString()} - ¥${Math.max(...marketResults.prices.map(p => p.price)).toLocaleString()}，共${marketResults.prices.length}条报价`
+          : '';
+        marketSummary = `搜索词: "${marketQuery}"\n${summaryRows}\n${priceRange}`;
+      }
+      const result = await fetchAIAnalysis(data, marketSummary);
       setAnalysis(result);
     } catch (err) {
       console.error("AI Analysis Failed", err);
@@ -213,7 +226,7 @@ const App: React.FC = () => {
     } finally {
       setLoadingAI(false);
     }
-  }, [data]);
+  }, [data, marketResults, marketQuery]);
 
   useEffect(() => {
     performAnalysis();
@@ -400,12 +413,26 @@ const App: React.FC = () => {
         `近3月销量：${perf.slice(-3).map(p => `${p.name}:${p.salesTons}t`).join('，')}。` +
         `增值税统计：进项${data.vatStatistics.cumulativeInput.toLocaleString()}，销项${data.vatStatistics.cumulativeOutput.toLocaleString()}。`;
 
+      // Inject market search context if available
+      let marketChatContext = '';
+      if (marketResults && marketQuery) {
+        const prices = marketResults.prices;
+        const minPrice = prices.length > 0 ? Math.min(...prices.map(p => p.price)) : 0;
+        const maxPrice = prices.length > 0 ? Math.max(...prices.map(p => p.price)) : 0;
+        const avgPrice = prices.length > 0 ? Math.round(prices.reduce((s, p) => s + p.price, 0) / prices.length) : 0;
+        const summaryLines = marketResults.summaryTable?.slice(0, 6).map(r => `${r.label}: ${r.value}`).join('；') || '';
+        marketChatContext = `\n\n【最新市场搜索结果】搜索词："${marketQuery}"，共${prices.length}条报价。` +
+          `最低价¥${minPrice.toLocaleString()}，最高价¥${maxPrice.toLocaleString()}，均价¥${avgPrice.toLocaleString()}。` +
+          (summaryLines ? `\n关键指标：${summaryLines}` : '') +
+          `\n请在回答中自然引用上述市场数据。`;
+      }
+
       const response = await ai.models.generateContent({
         model: "gemini-3-pro-preview",
         contents: chatHistory,
         config: {
           tools: [{ googleSearch: {} }],
-          systemInstruction: `你是一位专业的业务数据助手。以下是企业实时经营数据摘要：\n${contextSummary}\n你的职责：\n1. 基于上述数据简明扼要地回答用户关于企业内部经营的问题。\n2. 对于外部市场、竞品分析或一般性知识问题，你拥有 **Google Search Grounding** (原生联网) 和 **Tavily Context** (已注入的外部搜索结果) 双重信息源。\n3. 请综合利用这些信息，给出最准确、实时的回答。\n\n【排版要求】\n- 禁止使用三个星号 (***) 进行加粗斜体，这会导致显示异常。\n- 仅使用两个星号 (**) 进行加粗。\n- 使用清晰的列表和段落。`
+          systemInstruction: `你是一位专业的业务数据助手。以下是企业实时经营数据摘要：\n${contextSummary}${marketChatContext}\n你的职责：\n1. 基于上述数据简明扼要地回答用户关于企业内部经营的问题。\n2. 对于外部市场、竞品分析或一般性知识问题，你拥有 **Google Search Grounding** (原生联网) 和 **Tavily Context** (已注入的外部搜索结果) 双重信息源。\n3. 如果有市场搜索数据，请在回答中自然引用市场价格和趋势信息。\n4. 请综合利用这些信息，给出最准确、实时的回答。\n\n【排版要求】\n- 禁止使用三个星号 (***) 进行加粗斜体，这会导致显示异常。\n- 仅使用两个星号 (**) 进行加粗。\n- 使用清晰的列表和段落。`
         }
       });
 
@@ -505,6 +532,7 @@ const App: React.FC = () => {
       case 'inventory': return <InventoryPage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'finance': return <FinancePage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'market': return <MarketSearchPage />;
+      case 'accounts': return <AccountsPage />;
       case 'settings': return <SettingsPage />;
       default: return null;
     }
@@ -529,6 +557,7 @@ const App: React.FC = () => {
           <NavItem icon="fa-search-dollar" label="发票查询" active={currentPage === 'inventory'} expanded={sidebarOpen} onClick={() => setCurrentPage('inventory')} />
           <NavItem icon="fa-chart-pie" label="数据分析" active={currentPage === 'analysis'} expanded={sidebarOpen} onClick={() => setCurrentPage('analysis')} />
           <NavItem icon="fa-shopping-cart" label="市场聚合搜索" active={currentPage === 'market'} expanded={sidebarOpen} onClick={() => setCurrentPage('market')} />
+          <NavItem icon="fa-handshake" label="应收应付" active={currentPage === 'accounts'} expanded={sidebarOpen} onClick={() => setCurrentPage('accounts')} />
           <NavItem icon="fa-wallet" label="财务报表" active={currentPage === 'finance'} expanded={sidebarOpen} onClick={() => setCurrentPage('finance')} />
           <NavItem icon="fa-cog" label="系统设置" active={currentPage === 'settings'} expanded={sidebarOpen} onClick={() => setCurrentPage('settings')} />
         </nav>
@@ -545,7 +574,7 @@ const App: React.FC = () => {
           <header className="h-16 bg-[#f9f9f8] border-b border-[#e0ddd5] flex items-center justify-between px-8 z-10 shrink-0">
             <div className="flex items-center space-x-6">
               <h2 className="text-xl font-semibold text-[#191918]">
-                {{ dashboard: '经营数据概览', sales: '销售与销项', purchase: '采购与进项', analysis: '数据分析中心', inventory: '发票查询', finance: '财务报表', market: '市场聚合搜索', settings: '系统设置' }[currentPage]}
+                {{ dashboard: '经营数据概览', sales: '销售与销项', purchase: '采购与进项', analysis: '数据分析中心', inventory: '发票查询', finance: '财务报表', market: '市场聚合搜索', accounts: '应收应付', settings: '系统设置' }[currentPage]}
               </h2>
               <div className="hidden lg:flex items-center space-x-4 pl-4 border-l border-[#e0ddd5]">
                 <div className="flex items-center space-x-2 bg-white rounded-lg p-1 border border-[#e0ddd5]">
@@ -570,7 +599,9 @@ const App: React.FC = () => {
                 </button>
               </div>
             </div>
-            <div className="flex items-center space-x-6"></div>
+            <div className="flex items-center space-x-4">
+              <AlertCenter />
+            </div>
           </header>
         )}
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
@@ -703,6 +734,12 @@ const App: React.FC = () => {
     </div>
   );
 };
+
+const App: React.FC = () => (
+  <MarketDataProvider>
+    <AppContent />
+  </MarketDataProvider>
+);
 
 const NavItem: React.FC<{ icon: string; label: string; active?: boolean; expanded?: boolean; onClick?: () => void; }> = ({ icon, label, active = false, expanded = true, onClick }) => (
   <div onClick={onClick} className={`flex items-center p-3 rounded-lg transition-all duration-200 cursor-pointer group ${active ? 'bg-[#d97757] text-white' : 'text-[#4a4a48] hover:bg-[#f0eeeb] hover:text-[#191918]'}`} style={active ? { boxShadow: '0 4px 24px rgba(217,119,87,0.15)' } : {}}>

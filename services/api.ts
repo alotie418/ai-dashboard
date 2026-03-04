@@ -277,6 +277,22 @@ export async function searchDirect(query: string, signal?: AbortSignal): Promise
   });
 }
 
+export async function searchInternational(query: string, signal?: AbortSignal): Promise<import('../types').InternationalSearchResponse> {
+  return apiFetch('/api/search/international', {
+    method: 'POST',
+    body: JSON.stringify({ query }),
+    signal,
+  });
+}
+
+export async function searchEcommerce(query: string, signal?: AbortSignal): Promise<import('../types').EcommerceSearchResponse> {
+  return apiFetch('/api/search/ecommerce', {
+    method: 'POST',
+    body: JSON.stringify({ query }),
+    signal,
+  });
+}
+
 export async function mergeSearch(
   data: import('../types').MergeSearchRequest,
   signal?: AbortSignal
@@ -286,4 +302,83 @@ export async function mergeSearch(
     body: JSON.stringify(data),
     signal,
   });
+}
+
+// --- Batch Import (Feature 2) ---
+
+export async function batchCreateSales(records: any[]): Promise<import('../types').BatchImportResult> {
+  return apiFetch('/api/sales/batch', {
+    method: 'POST',
+    body: JSON.stringify({ records }),
+  });
+}
+
+export async function batchCreatePurchases(records: any[]): Promise<import('../types').BatchImportResult> {
+  return apiFetch('/api/purchases/batch', {
+    method: 'POST',
+    body: JSON.stringify({ records }),
+  });
+}
+
+// --- Price History (Feature 1) ---
+
+export async function savePriceHistory(query: string, prices: any[]): Promise<void> {
+  await apiFetch('/api/price-history', {
+    method: 'POST',
+    body: JSON.stringify({
+      query,
+      search_date: new Date().toISOString().split('T')[0],
+      prices,
+    }),
+  });
+}
+
+export async function fetchPriceHistory(query: string, days = 30): Promise<import('../types').PriceHistoryResponse> {
+  return apiFetch(`/api/price-history?query=${encodeURIComponent(query)}&days=${days}`);
+}
+
+// --- Payment Tracking (Feature 3) ---
+
+export async function recordSalePayment(id: string, data: import('../types').PaymentUpdate): Promise<void> {
+  await apiFetch(`/api/sales/${encodeURIComponent(id)}/payment`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function recordPurchasePayment(id: string, data: import('../types').PaymentUpdate): Promise<void> {
+  await apiFetch(`/api/purchases/${encodeURIComponent(id)}/payment`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchReceivablesSummary(): Promise<import('../types').ReceivablesSummary> {
+  return apiFetch('/api/receivables/summary');
+}
+
+export async function fetchPayablesSummary(): Promise<import('../types').PayablesSummary> {
+  return apiFetch('/api/payables/summary');
+}
+
+// --- Alerts (Feature 4) ---
+
+export async function fetchAlerts(unreadOnly = false, limit = 20): Promise<import('../types').Alert[]> {
+  return apiFetch(`/api/alerts?unread_only=${unreadOnly}&limit=${limit}`);
+}
+
+export async function fetchAlertCount(): Promise<import('../types').AlertsCountResponse> {
+  return apiFetch('/api/alerts/count');
+}
+
+export async function markAlertRead(id: number): Promise<void> {
+  await apiFetch(`/api/alerts/${id}/read`, { method: 'PUT' });
+}
+
+export async function markAllAlertsRead(): Promise<void> {
+  await apiFetch('/api/alerts/read-all', { method: 'PUT' });
+}
+
+export async function dismissAlert(id: number): Promise<void> {
+  await apiFetch(`/api/alerts/${id}`, { method: 'DELETE' });
 }
