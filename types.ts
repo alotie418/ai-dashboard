@@ -54,6 +54,11 @@ export interface CategoryData {
 
 export interface BusinessData {
   metrics: Metric[];
+  rawMetrics?: {
+    inventoryTons: number;
+    purchaseTotalTons: number;
+    salesTotalTons: number;
+  };
   monthlyPerformance: ChartData[];
   categoryDistribution: CategoryData[];
   financialStatement: FinancialStatementData;

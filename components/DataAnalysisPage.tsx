@@ -294,7 +294,7 @@ ${tavilyContext}`;
       // STEP 6: AI synthesis with Google Search grounding
       const ai = new GoogleGenAI({ apiKey: getApiKey() });
       const response = await ai.models.generateContent({
-        model: "gemini-3-pro-preview",
+        model: "gemini-3.1-flash-Lite-preview",
         contents: prompt,
         config: {
           tools: [{ googleSearch: {} }],

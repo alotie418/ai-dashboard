@@ -220,6 +220,11 @@ const AppContent: React.FC = () => {
               color: 'bg-orange-500',
             },
           ],
+          rawMetrics: {
+            inventoryTons: m.inventoryTons,
+            purchaseTotalTons: m.purchaseTotalTons,
+            salesTotalTons: m.salesTotalTons,
+          },
           monthlyPerformance: dashboard.monthlyPerformance,
           financialStatement: dashboard.financialStatement,
           vatStatistics: dashboard.vatStatistics,
@@ -489,7 +494,7 @@ const AppContent: React.FC = () => {
       }
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-pro-preview",
+        model: "gemini-3.1-flash-Lite-preview",
         contents: chatHistory,
         config: {
           tools: [{ googleSearch: {} }],

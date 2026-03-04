@@ -162,22 +162,35 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
         </div>
       </div>
 
-      {/* Warning Banner */}
-      <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="text-rose-500 bg-rose-500/20 w-8 h-8 rounded-full flex items-center justify-center">
-            <i className="fas fa-exclamation-triangle"></i>
+      {/* Inventory Banner */}
+      {(() => {
+        const purchaseTons = data.rawMetrics?.purchaseTotalTons ?? 0;
+        const salesTons = data.rawMetrics?.salesTotalTons ?? 0;
+        const inventoryTons = purchaseTons - salesTons;
+        const inventoryBags = Math.round(inventoryTons * 100); // 1吨=100袋(10kg/袋)
+        const isLow = inventoryTons <= 0;
+        return (
+          <div className={`${isLow ? 'bg-rose-500/10 border-rose-500/20' : 'bg-blue-500/10 border-blue-500/20'} border rounded-xl p-4 flex items-center justify-between`}>
+            <div className="flex items-center space-x-3">
+              <div className={`${isLow ? 'text-rose-500 bg-rose-500/20' : 'text-blue-500 bg-blue-500/20'} w-8 h-8 rounded-full flex items-center justify-center`}>
+                <i className={`fas ${isLow ? 'fa-exclamation-triangle' : 'fa-boxes'}`}></i>
+              </div>
+              <div>
+                <p className={`${isLow ? 'text-rose-500' : 'text-blue-500'} font-bold text-sm`}>
+                  当前库存: {inventoryTons.toFixed(2)} 吨 ({inventoryBags} 袋)
+                </p>
+                <p className={`${isLow ? 'text-rose-400' : 'text-blue-400'} text-xs`}>
+                  {isLow ? '库存不足，销售将导致库存为负' : '库存充足'}
+                </p>
+              </div>
+            </div>
+            <div className="text-right text-[#5c5c5a] text-xs space-y-0.5">
+              <p>总采购: {purchaseTons.toFixed(2)} 吨</p>
+              <p>总销售: {salesTons.toFixed(2)} 吨</p>
+            </div>
           </div>
-          <div>
-            <p className="text-rose-500 font-bold text-sm">当前库存: 0.00 吨 (0 袋)</p>
-            <p className="text-rose-400 text-xs">库存不足，销售将导致库存为负</p>
-          </div>
-        </div>
-        <div className="text-right text-[#5c5c5a] text-xs space-y-0.5">
-          <p>总采购: 236.50 吨</p>
-          <p>总销售: 236.50 吨</p>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Recognition Mode Selector */}
       <div className="flex items-center justify-between py-2">

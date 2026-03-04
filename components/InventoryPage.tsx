@@ -1,6 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { BusinessData } from '../types';
+import { fetchSales, fetchPurchases, SalesRecord, PurchaseRecord } from '../services/api';
 
 interface Props {
   data: BusinessData;
@@ -11,10 +12,20 @@ interface Props {
 
 type InvoiceType = 'all' | 'input' | 'output';
 
+const parseTons = (qty: string) => { const m = qty.match(/[\d.]+/); return m ? parseFloat(m[0]) : 0; };
+const parseTaxRate = (s: string) => { const m = s.match(/[\d.]+/); return m ? parseFloat(m[0]) / 100 : 0.13; };
+
 const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<InvoiceType>('all');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [salesRecords, setSalesRecords] = useState<SalesRecord[]>([]);
+  const [purchaseRecords, setPurchaseRecords] = useState<PurchaseRecord[]>([]);
+
+  useEffect(() => {
+    fetchSales().then(setSalesRecords).catch(console.error);
+    fetchPurchases().then(setPurchaseRecords).catch(console.error);
+  }, []);
 
   // Advanced filter state
   const [dateFrom, setDateFrom] = useState('');
@@ -34,12 +45,29 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
 
   const hasAdvancedFilters = dateFrom || dateTo || amountMin || amountMax || weightMin || weightMax || statusFilter !== 'all';
 
-  // Simulated combined invoice list based on mock business data logic
   const allInvoices = useMemo(() => {
-    const output: any[] = [];
-    const input: any[] = [];
-    return [...output, ...input];
-  }, []);
+    const output = salesRecords.map(r => {
+      const rate = 0.13;
+      const amountNoTax = Math.round(r.price / (1 + rate) * 100) / 100;
+      const taxAmt = Math.round((r.price - amountNoTax) * 100) / 100;
+      return {
+        date: r.date, type: '销项', partner: r.customer,
+        weight: `${parseTons(r.quantity)}t`, amount: amountNoTax, tax: taxAmt,
+        invoiceNo: r.invoiceNo, status: r.status === '已开' ? '已验真' : '待开票',
+      };
+    });
+    const input = purchaseRecords.map(r => {
+      const rate = parseTaxRate(r.taxRate);
+      const amountNoTax = Math.round(r.price / (1 + rate) * 100) / 100;
+      const taxAmt = Math.round((r.price - amountNoTax) * 100) / 100;
+      return {
+        date: r.date, type: '进项', partner: r.supplier,
+        weight: `${parseTons(r.quantity)}t`, amount: amountNoTax, tax: taxAmt,
+        invoiceNo: r.invoiceNo, status: r.status === '已收' ? '已认证' : '待认证',
+      };
+    });
+    return [...output, ...input].sort((a, b) => b.date.localeCompare(a.date));
+  }, [salesRecords, purchaseRecords]);
 
   const filteredInvoices = useMemo(() => {
     return allInvoices.filter(inv => {
@@ -67,12 +95,26 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
     });
   }, [allInvoices, searchTerm, filterType, dateFrom, dateTo, amountMin, amountMax, weightMin, weightMax, statusFilter]);
 
-  const stats = {
-    currentStock: "0.00t",
-    totalInputWeight: "0.0t",
-    totalOutputWeight: "0.0t",
-    pendingCertification: "¥0.00"
-  };
+  const stats = useMemo(() => {
+    const totalInputTons = purchaseRecords.reduce((s, r) => s + parseTons(r.quantity), 0);
+    const totalOutputTons = salesRecords.reduce((s, r) => s + parseTons(r.quantity), 0);
+    const inventoryTons = totalInputTons - totalOutputTons;
+    const pendingTax = purchaseRecords
+      .filter(r => r.status !== '已收')
+      .reduce((s, r) => {
+        const rate = parseTaxRate(r.taxRate);
+        return s + Math.round(r.price / (1 + rate) * rate * 100) / 100;
+      }, 0);
+    return {
+      currentStock: `${inventoryTons.toFixed(2)}t`,
+      currentStockSub: inventoryTons > 0 ? '库存正常' : '库存警戒：低',
+      totalInputWeight: `${totalInputTons.toFixed(1)}t`,
+      totalInputSub: purchaseRecords.length > 0 ? `共 ${purchaseRecords.length} 条进项记录` : '暂无进项记录',
+      totalOutputWeight: `${totalOutputTons.toFixed(1)}t`,
+      totalOutputSub: salesRecords.length > 0 ? `共 ${salesRecords.length} 条销售记录` : '暂无销售记录',
+      pendingCertification: `¥${pendingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    };
+  }, [salesRecords, purchaseRecords]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -81,7 +123,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
         <StatCard
           title="实时库存量"
           value={stats.currentStock}
-          sub="库存警戒：低"
+          sub={stats.currentStockSub}
           icon="fa-warehouse"
           color="text-amber-500"
           bg="bg-amber-500/10"
@@ -89,7 +131,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
         <StatCard
           title="累计进项吨数"
           value={stats.totalInputWeight}
-          sub="暂无进项记录"
+          sub={stats.totalInputSub}
           icon="fa-file-import"
           color="text-[#d97757]"
           bg="bg-[#d97757]/10"
@@ -97,7 +139,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
         <StatCard
           title="累计销项吨数"
           value={stats.totalOutputWeight}
-          sub="暂无销售记录"
+          sub={stats.totalOutputSub}
           icon="fa-file-export"
           color="text-emerald-600"
           bg="bg-emerald-500/10"

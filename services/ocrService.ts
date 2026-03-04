@@ -28,7 +28,7 @@ export const analyzeInvoice = async (base64Data: string, mimeType: string): Prom
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3.1-flash-Lite-preview",
       contents: [
         {
           parts: [
