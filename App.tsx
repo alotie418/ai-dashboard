@@ -494,7 +494,7 @@ const AppContent: React.FC = () => {
       }
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-Lite-preview",
+        model: "gemini-3.1-flash-lite-preview",
         contents: chatHistory,
         config: {
           tools: [{ googleSearch: {} }],

@@ -205,10 +205,10 @@ ai看板/
 
 | 用途 | 模型 | 说明 |
 |------|------|------|
-| 财务分析 / 对话 / OCR | `gemini-3.1-flash-Lite-preview` | 前端直连，结构化 JSON 输出 |
+| 财务分析 / 对话 / OCR | `gemini-3.1-flash-lite-preview` | 前端直连，结构化 JSON 输出 |
 | 语音播报（TTS） | `gemini-2.5-flash-preview-tts` | 5 种音色可选 |
 | 实时语音对话 | `gemini-2.5-flash-native-audio-preview-12-2025` | 流式麦克风交互 |
-| 市场搜索主模型 | `gemini-3.1-flash-Lite-preview`（12s 超时） | Worker 端六源搜索与融合分析 |
+| 市场搜索主模型 | `gemini-3.1-flash-lite-preview`（12s 超时） | Worker 端六源搜索与融合分析 |
 | 市场搜索降级模型 | `gemini-2.5-flash`（55s 超时） | 主模型失败时自动切换 |
 
 ### 后端 & 基础设施
