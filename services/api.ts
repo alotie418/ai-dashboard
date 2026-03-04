@@ -230,6 +230,28 @@ export async function deletePurchase(id: string): Promise<void> {
   });
 }
 
+// --- Dashboard ---
+
+export interface DashboardResponse {
+  metrics: {
+    inventoryTons: number;
+    purchaseTotalTons: number;
+    purchaseTotalAmount: number;
+    salesTotalTons: number;
+    salesTotalAmount: number;
+    avgCostPerTon: number;
+  };
+  monthlyPerformance: import('../types').ChartData[];
+  financialStatement: import('../types').FinancialStatementData;
+  vatStatistics: import('../types').VATData;
+  taxInclusiveSummary: import('../types').TaxInclusiveSummaryData;
+}
+
+export async function fetchDashboardData(year?: string): Promise<DashboardResponse> {
+  const params = year ? `?year=${year}` : '';
+  return apiFetch<DashboardResponse>(`/api/dashboard${params}`);
+}
+
 // --- Settings ---
 
 export async function fetchSettings(): Promise<AppSettings> {

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MOCK_BUSINESS_DATA } from './constants';
 import { fetchAIAnalysis } from './services/geminiService';
-import { AIAnalysis } from './types';
+import { AIAnalysis, BusinessData } from './types';
+import { fetchDashboardData } from './services/api';
 import MetricCard from './components/MetricCard';
 import AIInsights from './components/AIInsights';
 import FinancialStatementTable from './components/FinancialStatementTable';
@@ -165,7 +166,7 @@ const searchTavily = async (query: string): Promise<string> => {
 };
 
 const AppContent: React.FC = () => {
-  const [data] = useState(MOCK_BUSINESS_DATA);
+  const [data, setData] = useState<BusinessData>(MOCK_BUSINESS_DATA);
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [loadingAI, setLoadingAI] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -177,6 +178,57 @@ const AppContent: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState('2026');
   const [selectedQuarter, setSelectedQuarter] = useState('全年');
   const [selectedMonth, setSelectedMonth] = useState('全部');
+
+  // Load real dashboard data from API
+  const loadDashboardData = useCallback(async () => {
+    try {
+      const dashboard = await fetchDashboardData(selectedYear);
+      const m = dashboard.metrics;
+      setData(prev => ({
+        ...prev,
+        metrics: [
+          {
+            label: '库存余量 (实时)',
+            value: m.inventoryTons > 0 ? `${m.inventoryTons}吨` : '—',
+            subValue: m.inventoryTons > 0 ? `采购${m.purchaseTotalTons}吨 - 销售${m.salesTotalTons}吨` : '—',
+            icon: 'fa-boxes',
+            color: 'bg-blue-500',
+          },
+          {
+            label: `${selectedYear}年度 采购`,
+            value: m.purchaseTotalAmount > 0 ? `¥${m.purchaseTotalAmount.toLocaleString()}` : '—',
+            subValue: m.purchaseTotalTons > 0 ? `${m.purchaseTotalTons}吨` : '—',
+            icon: 'fa-truck-loading',
+            color: 'bg-purple-500',
+          },
+          {
+            label: `${selectedYear}年度 销售`,
+            value: m.salesTotalAmount > 0 ? `¥${m.salesTotalAmount.toLocaleString()}` : '—',
+            subValue: m.salesTotalTons > 0 ? `${m.salesTotalTons}吨` : '—',
+            icon: 'fa-chart-line',
+            color: 'bg-green-500',
+          },
+          {
+            label: '平均成本',
+            value: m.avgCostPerTon > 0 ? `¥${m.avgCostPerTon.toLocaleString()}/吨` : '—',
+            subValue: m.purchaseTotalTons > 0 ? `基于${m.purchaseTotalTons}吨采购` : '—',
+            icon: 'fa-tags',
+            color: 'bg-orange-500',
+          },
+        ],
+        monthlyPerformance: dashboard.monthlyPerformance,
+        financialStatement: dashboard.financialStatement,
+        vatStatistics: dashboard.vatStatistics,
+        taxInclusiveSummary: dashboard.taxInclusiveSummary,
+      }));
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+    }
+  }, [selectedYear]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -209,6 +261,8 @@ const AppContent: React.FC = () => {
     setLoadingAI(true);
     setAiError(null);
     try {
+      // Refresh dashboard data first
+      await loadDashboardData();
       // Build market summary if available
       let marketSummary: string | undefined;
       if (marketResults && marketQuery) {
@@ -226,7 +280,7 @@ const AppContent: React.FC = () => {
     } finally {
       setLoadingAI(false);
     }
-  }, [data, marketResults, marketQuery]);
+  }, [data, loadDashboardData, marketResults, marketQuery]);
 
   useEffect(() => {
     performAnalysis();

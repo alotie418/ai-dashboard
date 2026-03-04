@@ -1688,6 +1688,159 @@ ${pagesText}
         return jsonResponse({ success: true }, corsHeaders);
       }
 
+      // ==================== DASHBOARD (aggregated metrics) ====================
+
+      if (path === '/api/dashboard' && request.method === 'GET') {
+        const year = url.searchParams.get('year') || new Date().getFullYear().toString();
+        const dateStart = `${year}-01-01`;
+        const dateEnd = `${year}-12-31`;
+
+        // --- Aggregated purchase totals ---
+        const { results: [purchaseAgg] } = await env.DB.prepare(`
+          SELECT
+            COALESCE(SUM(tons), 0) as totalTons,
+            COALESCE(SUM(totalAmount), 0) as totalAmount,
+            COALESCE(SUM(amountWithoutTax), 0) as totalAmountWithoutTax,
+            COALESCE(SUM(taxAmount), 0) as totalTaxAmount,
+            COUNT(*) as recordCount
+          FROM purchases WHERE date >= ? AND date <= ?
+        `).bind(dateStart, dateEnd).all();
+
+        // --- Aggregated sales totals ---
+        const { results: [salesAgg] } = await env.DB.prepare(`
+          SELECT
+            COALESCE(SUM(tons), 0) as totalTons,
+            COALESCE(SUM(totalAmount), 0) as totalAmount,
+            COALESCE(SUM(amountWithoutTax), 0) as totalAmountWithoutTax,
+            COALESCE(SUM(taxAmount), 0) as totalTaxAmount,
+            COALESCE(SUM(shippingCost), 0) as totalShipping,
+            COUNT(*) as recordCount
+          FROM sales WHERE date >= ? AND date <= ?
+        `).bind(dateStart, dateEnd).all();
+
+        // --- Average cost per ton (purchase) ---
+        const avgCostPerTon = purchaseAgg.totalTons > 0
+          ? Math.round(purchaseAgg.totalAmountWithoutTax / purchaseAgg.totalTons * 100) / 100
+          : 0;
+
+        // --- Inventory balance (all time: total purchased - total sold) ---
+        const { results: [invAll] } = await env.DB.prepare(`
+          SELECT
+            COALESCE((SELECT SUM(tons) FROM purchases), 0) -
+            COALESCE((SELECT SUM(tons) FROM sales), 0) as inventoryTons
+        `).all();
+
+        // --- Monthly breakdown ---
+        const { results: monthlyPurchases } = await env.DB.prepare(`
+          SELECT
+            CAST(strftime('%m', date) AS INTEGER) as month,
+            COALESCE(SUM(tons), 0) as purchaseTons,
+            COALESCE(SUM(totalAmount), 0) as purchaseAmount,
+            COALESCE(SUM(amountWithoutTax), 0) as purchaseAmountNoTax,
+            COALESCE(SUM(taxAmount), 0) as purchaseTax
+          FROM purchases WHERE date >= ? AND date <= ?
+          GROUP BY strftime('%m', date)
+        `).bind(dateStart, dateEnd).all();
+
+        const { results: monthlySales } = await env.DB.prepare(`
+          SELECT
+            CAST(strftime('%m', date) AS INTEGER) as month,
+            COALESCE(SUM(tons), 0) as salesTons,
+            COALESCE(SUM(totalAmount), 0) as salesAmount,
+            COALESCE(SUM(amountWithoutTax), 0) as salesAmountNoTax,
+            COALESCE(SUM(taxAmount), 0) as salesTax,
+            COALESCE(SUM(shippingCost), 0) as salesShipping
+          FROM sales WHERE date >= ? AND date <= ?
+          GROUP BY strftime('%m', date)
+        `).bind(dateStart, dateEnd).all();
+
+        // Build monthly map
+        const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+        const pMap = {};
+        for (const r of monthlyPurchases) pMap[r.month] = r;
+        const sMap = {};
+        for (const r of monthlySales) sMap[r.month] = r;
+
+        const monthlyPerformance = [];
+        for (let m = 1; m <= 12; m++) {
+          const p = pMap[m] || {};
+          const s = sMap[m] || {};
+          const revenue = s.salesAmountNoTax || 0;
+          const cost = p.purchaseAmountNoTax || 0;
+          const shipping = s.salesShipping || 0;
+          const grossProfit = revenue - cost;
+          monthlyPerformance.push({
+            name: monthNames[m - 1],
+            revenue,
+            cost,
+            profit: grossProfit,
+            purchaseTons: p.purchaseTons || 0,
+            salesTons: s.salesTons || 0,
+            netProfit: grossProfit - shipping,
+            yoy: 0,
+            mom: 0,
+            deflator: 0,
+          });
+        }
+
+        // --- Financial statement (不含税口径) ---
+        const salesRevenue = salesAgg.totalAmountWithoutTax || 0;
+        const costOfSales = purchaseAgg.totalAmountWithoutTax || 0;
+        const grossProfit = salesRevenue - costOfSales;
+        const grossMargin = salesRevenue > 0 ? Math.round(grossProfit / salesRevenue * 10000) / 100 : 0;
+        const shippingFee = salesAgg.totalShipping || 0;
+        const taxSurcharge = 0; // Placeholder: computed from VAT
+        const adminExpense = 0;
+        const incomeTax = 0;
+        const netProfit = grossProfit - taxSurcharge - shippingFee - adminExpense - incomeTax;
+        const netMargin = salesRevenue > 0 ? Math.round(netProfit / salesRevenue * 10000) / 100 : 0;
+
+        // --- VAT statistics ---
+        const cumulativeInput = purchaseAgg.totalTaxAmount || 0;
+        const cumulativeOutput = salesAgg.totalTaxAmount || 0;
+        const estimatedPayable = cumulativeOutput - cumulativeInput;
+
+        // --- Tax inclusive summary ---
+        const purchaseTotal = purchaseAgg.totalAmount || 0;
+        const salesTotal = salesAgg.totalAmount || 0;
+
+        return jsonResponse({
+          metrics: {
+            inventoryTons: Math.round((invAll.inventoryTons || 0) * 100) / 100,
+            purchaseTotalTons: Math.round((purchaseAgg.totalTons || 0) * 100) / 100,
+            purchaseTotalAmount: Math.round((purchaseAgg.totalAmount || 0) * 100) / 100,
+            salesTotalTons: Math.round((salesAgg.totalTons || 0) * 100) / 100,
+            salesTotalAmount: Math.round((salesAgg.totalAmount || 0) * 100) / 100,
+            avgCostPerTon,
+          },
+          monthlyPerformance,
+          financialStatement: {
+            salesRevenue: Math.round(salesRevenue * 100) / 100,
+            costOfSales: Math.round(costOfSales * 100) / 100,
+            taxSurcharge,
+            shippingFee: Math.round(shippingFee * 100) / 100,
+            adminExpense,
+            incomeTax,
+            grossProfit: Math.round(grossProfit * 100) / 100,
+            grossMargin,
+            netProfit: Math.round(netProfit * 100) / 100,
+            netMargin,
+          },
+          vatStatistics: {
+            cumulativeInput: Math.round(cumulativeInput * 100) / 100,
+            cumulativeOutput: Math.round(cumulativeOutput * 100) / 100,
+            certifiedInput: Math.round(cumulativeInput * 100) / 100,
+            invoicedOutput: Math.round(cumulativeOutput * 100) / 100,
+            estimatedPayable: Math.round(estimatedPayable * 100) / 100,
+          },
+          taxInclusiveSummary: {
+            purchaseTotal: Math.round(purchaseTotal * 100) / 100,
+            salesTotal: Math.round(salesTotal * 100) / 100,
+            difference: Math.round((salesTotal - purchaseTotal) * 100) / 100,
+          },
+        }, corsHeaders);
+      }
+
       // ==================== SYNC (disabled for safety) ====================
 
       if (path === '/api/sync') {
