@@ -1718,9 +1718,14 @@ ${pagesText}
           FROM sales WHERE date >= ? AND date <= ?
         `).bind(dateStart, dateEnd).all();
 
-        // --- Average cost per ton (purchase) ---
+        // --- Average cost per ton (purchase, tax-inclusive for KPI display) ---
         const avgCostPerTon = purchaseAgg.totalTons > 0
-          ? Math.round(purchaseAgg.totalAmountWithoutTax / purchaseAgg.totalTons * 100) / 100
+          ? Math.round(purchaseAgg.totalAmount / purchaseAgg.totalTons * 100) / 100
+          : 0;
+
+        // --- Average cost per ton (tax-exclusive, for P&L COGS calculation) ---
+        const avgCostPerTonNoTax = purchaseAgg.totalTons > 0
+          ? purchaseAgg.totalAmountWithoutTax / purchaseAgg.totalTons
           : 0;
 
         // --- Inventory balance (all time: total purchased - total sold) ---
@@ -1766,7 +1771,9 @@ ${pagesText}
           const p = pMap[m] || {};
           const s = sMap[m] || {};
           const revenue = s.salesAmountNoTax || 0;
-          const cost = p.purchaseAmountNoTax || 0;
+          const cost = (s.salesTons || 0) > 0 && avgCostPerTonNoTax > 0
+            ? Math.round(avgCostPerTonNoTax * (s.salesTons || 0) * 100) / 100
+            : 0;
           const shipping = s.salesShipping || 0;
           const grossProfit = revenue - cost;
           monthlyPerformance.push({
@@ -1785,7 +1792,9 @@ ${pagesText}
 
         // --- Financial statement (不含税口径) ---
         const salesRevenue = salesAgg.totalAmountWithoutTax || 0;
-        const costOfSales = purchaseAgg.totalAmountWithoutTax || 0;
+        const costOfSales = salesAgg.totalTons > 0 && avgCostPerTonNoTax > 0
+          ? Math.round(avgCostPerTonNoTax * salesAgg.totalTons * 100) / 100
+          : 0;
         const grossProfit = salesRevenue - costOfSales;
         const grossMargin = salesRevenue > 0 ? Math.round(grossProfit / salesRevenue * 10000) / 100 : 0;
         const shippingFee = salesAgg.totalShipping || 0;
