@@ -1,13 +1,13 @@
 # AI 看板 — 智能经营管理系统
 
-基于 Google Gemini 驱动的全链路经营管理平台。覆盖采购、销售、库存、财务、发票、应收应付、市场行情、智能预警八大核心场景，支持语音交互、发票 OCR、CSV/Excel 批量导入和六源市场聚合搜索。
+基于 Google Gemini 驱动的全链路经营管理平台。覆盖采购、销售、库存、财务、发票、应收应付、市场行情、智能预警八大核心场景，支持 Agentic RAG 深度研究、语音交互、发票 OCR 和六源市场聚合搜索。
 
 [![React 19](https://img.shields.io/badge/React-19-61dafb?logo=react)](https://react.dev)
 [![TypeScript 5.8](https://img.shields.io/badge/TypeScript-5.8-3178c6?logo=typescript)](https://www.typescriptlang.org)
 [![Vite 6](https://img.shields.io/badge/Vite-6-646cff?logo=vite)](https://vite.dev)
 [![Gemini AI](https://img.shields.io/badge/Gemini-Multi--Modal-f29900?logo=google)](https://ai.google.dev)
-[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers_+_D1-f38020?logo=cloudflare)](https://workers.cloudflare.com)
 [![Cloud Run](https://img.shields.io/badge/Google-Cloud_Run-4285f4?logo=googlecloud)](https://cloud.google.com/run)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers_+_D1-f38020?logo=cloudflare)](https://workers.cloudflare.com)
 
 ---
 
@@ -16,13 +16,13 @@
 | 模块 | 说明 |
 |------|------|
 | 📊 经营看板 | 实时库存、年度采购/销售总额、平均成本、月度趋势——全部从 D1 聚合，零硬编码 |
+| 🔍 Agentic RAG | 六源并行搜索 → 智能排序 → 证据提取 → AI 综合分析 → 评审迭代，最多 3 轮自动优化 |
 | 🤖 AI 分析 | Gemini 多维分析（财务/销量/效率）、Monte Carlo 模拟、VAR 风险预测 |
 | 🗣️ 语音交互 | TTS 播报（5 种音色）+ Native Audio 实时对话 |
 | 💰 财务报表 | 损益表、增值税统计、税费汇总、利润率指标 |
 | 🧾 发票查询 | 进项/销项发票汇总，支持日期·金额·重量·状态多维过滤 |
 | 🛒 采购管理 | CRUD + 发票 OCR + 税额自动计算 + CSV/Excel 批量导入 |
 | 📈 销售管理 | CRUD + 发票 OCR + 运费核算 + 实时库存（10 kg/袋） |
-| 🔍 市场聚合搜索 | 六源并行（Gemini Grounding · Brave · Tavily · 生意社 · 国际 · 电商）+ AI 融合分析 + KV 缓存 |
 | 📉 价格趋势 | 搜索价格自动入库，趋势折线图，7/30/90 天涨跌统计 |
 | 💳 应收应付 | 客户/供应商维度汇总，30/60/90/180 天账龄分析，收付款率 |
 | 🔔 智能预警 | 逾期付款 + 价格异动，Cron 每日自动检查，未读计数 |
@@ -33,33 +33,85 @@
 ## 架构
 
 ```
-浏览器 (React 19 + TS + Vite 6)
-├── Gemini flash-lite ─ 财务分析 / OCR / 对话
-├── Gemini TTS ─────── 语音播报 (5 音色)
-├── Gemini Native Audio 实时语音对话
+浏览器 (React 19 + TypeScript + Vite 6)
 │
-▼  HTTPS + Bearer Token
-Cloudflare Worker (jizhang-api)
-├── D1 SQLite (purchases · sales · price_history · alerts · settings)
-├── KV Cache (搜索结果, 30 min TTL)
-├── 六源搜索引擎 (Gemini Grounding / Brave / Tavily / 生意社 / 国际 / 电商)
-├── Gemini 双模型降级 (lite 12s → flash 55s)
-└── Cron Trigger (每日 00:00 UTC)
-
-前端部署: Google Cloud Run (Docker, port 8080)
+│  前端直连 Gemini
+├── gemini-3.1-flash-lite ─ 财务分析 / OCR / 对话
+├── gemini-2.5-flash-tts ── 语音播报 (5 音色)
+├── gemini-2.5-flash-native-audio ── 实时语音对话
+│
+▼  同源请求 /api/*
+Google Cloud Run (Express, port 8080)
+├── 静态前端 (dist/)
+├── Agentic RAG Agent 端点 ← Gemini API (同 GCP 内网, 低延迟)
+│   ├── /api/agent/plan         规划 (问题分类 + 子查询)
+│   ├── /api/agent/rank         排序去重 (纯 JS, 无 API)
+│   ├── /api/agent/extract      证据提取
+│   ├── /api/agent/synthesize   综合分析 (flash, 120s)
+│   └── /api/agent/critique     评审 (flash, 120s)
+│
+├── 反向代理 /api/* ──────────────► Cloudflare Worker
+│                                   ├── D1 SQLite (5 表)
+│                                   ├── KV Cache (搜索结果, 30 min TTL)
+│                                   ├── 六源搜索引擎
+│                                   ├── CRUD (采购/销售/设置/预警)
+│                                   └── Cron (每日 00:00 UTC)
 ```
+
+### 为什么 Agent 端点在 Cloud Run？
+
+Cloudflare Worker 有 **30 秒硬超时**，而 RAG 的 Extract/Synthesize 阶段处理 30-50 条证据时需要 40-120 秒。Cloud Run 与 Gemini API 同属 GCP，内网通信延迟更低，且超时可配置至 300 秒。
+
+---
+
+## Agentic RAG 流水线
+
+```
+用户查询
+  │
+  ▼
+Plan ─── 分析问题类型 (price_comparison / market_trend / ...)，生成子查询
+  │
+  ▼
+Search ─ 六源并行搜索 (Gemini Grounding · Brave · Tavily · 生意社 · 国际 · 电商)
+  │
+  ▼
+Rank ─── 去重 + 多因子排序 (相关性 · 权威性 · 时效性 · 多样性)
+  │
+  ▼
+Extract ─ 从排序结果中提取结构化证据 (价格/趋势/观点)
+  │
+  ▼
+Synthesize ─ AI 综合分析: 价格卡片 + 共识 + 矛盾 + 深度报告
+  │
+  ▼
+Critique ─── 评审: 信息充分 → 完成 / 不足 → 生成补充查询 → 回到 Search
+  │
+  └──── 最多 3 轮迭代，证据池上限 50 条
+```
+
+### 关键参数
+
+| 参数 | 值 | 说明 |
+|------|----|------|
+| 最大迭代 | 3 轮 | 每轮新增搜索→提取→综合→评审 |
+| 证据池上限 | 50 条 | 超出时截断，保留高置信度证据 |
+| 前端阶段超时 | 30-180s | Plan 30s / Rank 30s / Synthesize 180s / Critique 60s |
+| 服务端模型超时 | 120s | Synthesize/Critique 使用 `gemini-2.5-flash` |
+| 搜索缓存 | 30 min | KV 存储，SHA-256(source:query) 为键 |
 
 ---
 
 ## AI 模型
 
-| 用途 | 模型 | 备注 |
-|------|------|------|
-| 财务分析 / 对话 / OCR | `gemini-3.1-flash-lite-preview` | 前端直连，结构化 JSON |
-| 语音播报 TTS | `gemini-2.5-flash-preview-tts` | 5 种音色 |
-| 实时语音对话 | `gemini-2.5-flash-native-audio-preview-12-2025` | 流式麦克风 |
-| 市场搜索（主） | `gemini-3.1-flash-lite-preview` | Worker 端，12 s 超时 |
-| 市场搜索（降级） | `gemini-2.5-flash` | 主模型超时后自动切换，55 s |
+| 用途 | 模型 | 位置 | 备注 |
+|------|------|------|------|
+| 财务分析 / 对话 / OCR | `gemini-3.1-flash-lite-preview` | 前端直连 | 结构化 JSON |
+| 语音播报 TTS | `gemini-2.5-flash-preview-tts` | 前端直连 | 5 种音色 |
+| 实时语音对话 | `gemini-2.5-flash-native-audio-preview` | 前端直连 | 流式麦克风 |
+| RAG Plan / Extract | `gemini-3.1-pro` → `gemini-2.5-flash` | Cloud Run | 双模型降级 |
+| RAG Synthesize / Critique | `gemini-2.5-flash` | Cloud Run | 单模型，120s 超时 |
+| 六源搜索 (Worker) | `gemini-3.1-flash-lite` → `gemini-2.5-flash` | Worker | 双模型降级 |
 
 ---
 
@@ -70,6 +122,7 @@ Cloudflare Worker (jizhang-api)
 - Node.js ≥ 20
 - Gemini API Key — [申请](https://aistudio.google.com/apikey)
 - Cloudflare 账号（Workers + D1 + KV）
+- Google Cloud 账号（Cloud Run）
 
 ### 安装 & 开发
 
@@ -95,17 +148,27 @@ npx wrangler secret put TAVILY_API_KEY
 npx wrangler deploy
 ```
 
-### 部署前端
+### 部署前端 + RAG (Cloud Run)
 
 ```bash
-# 方式一：Cloud Run（推荐）
+# 方式一：一键部署脚本
 chmod +x deploy.sh && ./deploy.sh
 
-# 方式二：Docker
-docker build -t ai-dashboard . && docker run -p 8080:8080 ai-dashboard
+# 方式二：gcloud CLI
+gcloud run deploy ai-dashboard \
+  --source . \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --timeout=300 \
+  --set-env-vars "GEMINI_API_KEY=xxx,WORKER_API_URL=https://your-worker.workers.dev,API_TOKEN=xxx"
 
-# 方式三：静态
-npm run build   # dist/ → Vercel / Netlify / Cloudflare Pages
+# 方式三：Docker 本地
+docker build -t ai-dashboard .
+docker run -p 8080:8080 \
+  -e GEMINI_API_KEY=xxx \
+  -e WORKER_API_URL=https://your-worker.workers.dev \
+  -e API_TOKEN=xxx \
+  ai-dashboard
 ```
 
 ---
@@ -116,10 +179,17 @@ npm run build   # dist/ → Vercel / Netlify / Cloudflare Pages
 
 | 变量 | 必填 | 说明 |
 |------|:----:|------|
-| `VITE_API_KEY` | ✅ | Gemini API Key |
-| `VITE_API_BASE_URL` | ✅ | Worker 地址 `https://jizhang-api.xxx.workers.dev` |
+| `VITE_API_KEY` | ✅ | Gemini API Key（前端直连用） |
+| `VITE_API_BASE_URL` | ✅ | Worker 地址（开发模式用） |
 | `VITE_API_TOKEN` | ✅ | Bearer Token（与 Worker 一致） |
-| `VITE_TAVILY_API_KEY` | — | Tavily 前端备用（推荐走 Worker 代理） |
+
+### Cloud Run 环境变量
+
+| 变量 | 说明 |
+|------|------|
+| `GEMINI_API_KEY` | Gemini 密钥（Agent 端点调用用） |
+| `WORKER_API_URL` | Worker 地址（反向代理目标） |
+| `API_TOKEN` | Bearer Token（与 Worker 一致） |
 
 ### Worker Secrets
 
@@ -134,51 +204,31 @@ npm run build   # dist/ → Vercel / Netlify / Cloudflare Pages
 
 ## API 端点
 
-所有 `/api/*` 需 `Authorization: Bearer <TOKEN>`。限流 120 次/IP/60 s。
+所有 `/api/*` 需 `Authorization: Bearer <TOKEN>`。Worker 端限流 120 次/IP/60 s。
 
-### 经营看板
+### Agent 端点 (Cloud Run 本地处理)
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/agent/plan` | 查询规划：问题类型 + 子查询 |
+| POST | `/api/agent/rank` | 排序去重（纯 JS，无 API 调用） |
+| POST | `/api/agent/extract` | 证据提取 |
+| POST | `/api/agent/synthesize` | 综合分析（价格卡片 + 报告） |
+| POST | `/api/agent/critique` | 质量评审 + 迭代决策 |
+
+### 业务 CRUD (代理至 Worker)
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/dashboard?year=2026` | 全量聚合：库存、月度趋势、损益表、增值税 |
+| GET/POST/PUT/DELETE | `/api/purchases[/:id]` | 采购 CRUD |
+| POST | `/api/purchases/batch` | 采购批量导入（≤ 500） |
+| GET/POST/PUT/DELETE | `/api/sales[/:id]` | 销售 CRUD |
+| POST | `/api/sales/batch` | 销售批量导入 |
+| GET | `/api/receivables/summary` | 应收汇总 + 账龄 |
+| GET | `/api/payables/summary` | 应付汇总 + 账龄 |
 
-### 采购 & 销售
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/purchases` | 列表 |
-| POST | `/api/purchases` | 新增 |
-| PUT | `/api/purchases/:id` | 更新 |
-| DELETE | `/api/purchases/:id` | 删除 |
-| POST | `/api/purchases/batch` | 批量（≤ 500） |
-| PUT | `/api/purchases/:id/payment` | 记录付款 |
-| GET / POST / PUT / DELETE | `/api/sales/...` | 同上 |
-
-### 应收应付
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/receivables/summary` | 应收汇总 + 账龄 + Top 客户 |
-| GET | `/api/payables/summary` | 应付汇总 + 账龄 + Top 供应商 |
-
-### 价格历史
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/price-history` | 保存搜索价格 |
-| GET | `/api/price-history?query=&days=30` | 趋势查询 |
-
-### 预警
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/alerts` | 列表 |
-| GET | `/api/alerts/count` | 未读数 |
-| PUT | `/api/alerts/:id/read` | 标记已读 |
-| PUT | `/api/alerts/read-all` | 全部已读 |
-| DELETE | `/api/alerts/:id` | 删除 |
-
-### 六源搜索
+### 六源搜索 (代理至 Worker)
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -188,15 +238,19 @@ npm run build   # dist/ → Vercel / Netlify / Cloudflare Pages
 | POST | `/api/search/direct` | 生意社直连 → Gemini 提取 |
 | POST | `/api/search/international` | 国际源 |
 | POST | `/api/search/ecommerce` | 电商源 |
-| POST | `/api/search/merge` | 六源融合分析（双模型降级） |
 
-> 搜索结果（merge 除外）缓存在 KV，TTL 30 min，键 = SHA-256(source:query)。
+> 搜索结果缓存在 KV，TTL 30 min，键 = SHA-256(source:query)。
 
-### 其他
+### 其他 (代理至 Worker)
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET / PUT | `/api/settings` | 应用设置 |
+| GET/PUT | `/api/settings` | 应用设置 |
+| POST | `/api/price-history` | 保存搜索价格 |
+| GET | `/api/price-history?query=&days=30` | 趋势查询 |
+| GET | `/api/alerts` | 预警列表 |
+| GET | `/api/alerts/count` | 未读数 |
+| PUT | `/api/alerts/read-all` | 全部已读 |
 | GET | `/health` | 健康检查 |
 
 ---
@@ -225,62 +279,42 @@ alerts    (id, type, title, message, severity, is_read, is_dismissed,
 
 ---
 
-## 核心类型
-
-```typescript
-interface BusinessData {
-  metrics: Metric[]
-  rawMetrics?: {               // /api/dashboard 返回的原始数值
-    inventoryTons: number      // 实时库存 = 采购总量 − 销售总量
-    purchaseTotalTons: number
-    salesTotalTons: number
-  }
-  monthlyPerformance: ChartData[]
-  financialStatement: FinancialStatementData
-  vatStatistics: VATData
-  taxInclusiveSummary: TaxInclusiveSummaryData
-}
-
-interface Alert {
-  id: number
-  type: 'overdue_payment' | 'price_change'
-  severity: 'critical' | 'warning' | 'info'
-  is_read: number
-  created_at: string
-}
-```
-
----
-
 ## 目录结构
 
 ```
 ├── App.tsx                      # 主应用（路由/布局/语音/全局状态）
 ├── types.ts                     # TypeScript 类型（25+ 接口）
 ├── constants.ts                 # 初始数据模板 + AI 提示词
+├── server.js                    # Cloud Run 入口 (Express)
+├── Dockerfile                   # 多阶段构建 (build → serve)
+├── deploy.sh                    # Cloud Run 一键部署
 ├── components/
-│   ├── DataAnalysisPage.tsx     # AI 多维分析
+│   ├── DataAnalysisPage.tsx     # AI 多维分析 + Monte Carlo + VAR
+│   ├── MarketSearchPage.tsx     # Agentic RAG UI + 价格趋势图
+│   ├── PurchaseAndInputPage.tsx # 采购管理
+│   ├── SalesAndOutputPage.tsx   # 销售管理
 │   ├── FinancePage.tsx          # 财务报表
 │   ├── InventoryPage.tsx        # 发票查询
-│   ├── SalesAndOutputPage.tsx   # 销售管理
-│   ├── PurchaseAndInputPage.tsx # 采购管理
-│   ├── MarketSearchPage.tsx     # 六源市场搜索 + 趋势图
 │   ├── AccountsPage.tsx         # 应收应付
 │   ├── AlertCenter.tsx          # 预警中心
-│   ├── CsvImportModal.tsx       # 批量导入弹窗
+│   ├── CsvImportModal.tsx       # CSV/Excel 批量导入
 │   └── SettingsPage.tsx         # 系统设置
+├── hooks/
+│   └── useAgenticSearch.ts      # RAG 流水线编排 (Plan→Search→Rank→Extract→Synthesize→Critique)
 ├── services/
-│   ├── api.ts                   # Worker API 客户端
-│   ├── geminiService.ts         # Gemini AI 分析
+│   ├── api.ts                   # API 客户端 (CRUD + Search + Agent)
+│   ├── geminiService.ts         # Gemini AI 分析 (前端直连)
 │   └── ocrService.ts            # 发票 OCR
 ├── contexts/
 │   └── MarketDataContext.tsx     # 市场数据跨组件共享
-├── worker/
-│   ├── src/index.js             # Worker 入口（API + 搜索 + Cron）
-│   └── wrangler.toml            # D1 + KV + Cron 配置
-├── Dockerfile                   # 多阶段构建
-├── deploy.sh                    # Cloud Run 一键部署
-└── package.json
+├── server/                      # Cloud Run Agent 后端
+│   ├── gemini.js                # Gemini API 调用 + 双模型降级
+│   ├── prompts.js               # RAG 提示词构建器
+│   ├── schemas.js               # 响应 Schema 校验
+│   └── ranking.js               # 多因子排序算法
+└── worker/
+    ├── src/index.js             # Cloudflare Worker (CRUD + 搜索 + Cron)
+    └── wrangler.toml            # D1 + KV + Cron 配置
 ```
 
 ---
@@ -300,9 +334,9 @@ interface Alert {
 
 ```bash
 npm run dev       # 开发（端口 3000）
-npm run build     # 生产构建
+npm run build     # 生产构建 → dist/
 npm run preview   # 本地预览
-npm run start     # 生产启动（serve dist/，端口 8080）
+npm start         # Cloud Run 生产启动（Express, 端口 8080）
 ```
 
 ---
