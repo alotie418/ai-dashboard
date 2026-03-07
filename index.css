@@ -87,7 +87,32 @@
 .markdown-body a {
   color: #d97757;
   text-decoration: underline;
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 .markdown-body a:hover {
   text-decoration: none;
+}
+
+/* Prevent any long text/URL from overflowing */
+.markdown-body {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+/* Inline markdown in consensus/contradictions bullets —
+   standalone (no .markdown-body) so parent color is inherited naturally */
+.markdown-inline p {
+  margin: 0;
+  display: inline;
+}
+.markdown-inline a {
+  color: inherit;
+  opacity: 0.55;
+  font-size: 0.65rem;
+  text-decoration: underline;
+  word-break: break-all;
+}
+.markdown-inline a:hover {
+  opacity: 1;
 }

@@ -64,7 +64,7 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `AI看板_${activeTab}_${selectedYear}_${selectedQuarter !== '全年' ? selectedQuarter : selectedMonth}.csv`);
+    link.setAttribute("download", `AI_Dashboard_${activeTab}_${selectedYear}_${selectedQuarter !== '全年' ? selectedQuarter : selectedMonth}.csv`);
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };

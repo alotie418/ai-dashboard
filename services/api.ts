@@ -1,7 +1,7 @@
 // API client for Cloudflare Worker + D1 persistence
 // Handles field mapping between frontend interfaces and D1 schema
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'https://api.randomabc987.icu';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || '';
 const API_TOKEN = (import.meta.env.VITE_API_TOKEN as string) || '';
 
 // ==================== Types ====================
@@ -168,6 +168,8 @@ function fromApiPurchase(a: ApiPurchaseRecord): PurchaseRecord {
 
 // ==================== API Calls ====================
 
+const API_TIMEOUT_MS = 90000; // #8: 90s default request timeout
+
 async function apiFetch<T>(path: string, options?: RequestInit & { signal?: AbortSignal }): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -175,19 +177,42 @@ async function apiFetch<T>(path: string, options?: RequestInit & { signal?: Abor
   if (API_TOKEN) {
     headers['Authorization'] = `Bearer ${API_TOKEN}`;
   }
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    signal: options?.signal,
-    headers: {
-      ...headers,
-      ...(options?.headers || {}),
-    },
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`API error ${res.status}: ${err}`);
+
+  // #8: Compose user signal with timeout signal
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), API_TIMEOUT_MS);
+
+  // If user provided a signal, abort on either user cancel OR timeout
+  const userSignal = options?.signal;
+  const onUserAbort = () => timeoutController.abort();
+  if (userSignal) {
+    if (userSignal.aborted) { clearTimeout(timeoutId); throw new Error('cancelled'); }
+    userSignal.addEventListener('abort', onUserAbort, { once: true });
   }
-  return res.json() as Promise<T>;
+
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      signal: timeoutController.signal,
+      headers: {
+        ...headers,
+        ...(options?.headers || {}),
+      },
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`API ${options?.method || 'GET'} ${path} failed (${res.status}): ${err.slice(0, 300)}`);
+    }
+    return res.json() as Promise<T>;
+  } catch (err: any) {
+    // Distinguish timeout from user cancel
+    if (userSignal?.aborted) throw new Error('cancelled');
+    if (err?.name === 'AbortError') throw new Error(`请求超时 (${API_TIMEOUT_MS / 1000}s): ${path}`);
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+    if (userSignal) userSignal.removeEventListener('abort', onUserAbort);
+  }
 }
 
 // --- Sales ---
@@ -403,4 +428,78 @@ export async function markAllAlertsRead(): Promise<void> {
 
 export async function dismissAlert(id: number): Promise<void> {
   await apiFetch(`/api/alerts/${id}`, { method: 'DELETE' });
+}
+
+// --- Agentic RAG (Market Research) ---
+
+export async function agentPlan(
+  query: string,
+  signal?: AbortSignal
+): Promise<import('../types').PlanResult> {
+  return apiFetch('/api/agent/plan', {
+    method: 'POST',
+    body: JSON.stringify({ query }),
+    signal,
+  });
+}
+
+export async function agentRank(
+  query: string,
+  results: any[],
+  signal?: AbortSignal
+): Promise<import('../types').RankResult> {
+  return apiFetch('/api/agent/rank', {
+    method: 'POST',
+    body: JSON.stringify({ query, results }),
+    signal,
+  });
+}
+
+export async function agentExtract(
+  query: string,
+  searchResults: any[],
+  signal?: AbortSignal
+): Promise<import('../types').ExtractResult> {
+  return apiFetch('/api/agent/extract', {
+    method: 'POST',
+    body: JSON.stringify({ query, search_results: searchResults }),
+    signal,
+  });
+}
+
+export async function agentSynthesize(
+  query: string,
+  questionType: string,
+  evidencePool: import('../types').Evidence[],
+  iteration: number,
+  signal?: AbortSignal
+): Promise<import('../types').SynthesisResult> {
+  return apiFetch('/api/agent/synthesize', {
+    method: 'POST',
+    body: JSON.stringify({ query, question_type: questionType, evidence_pool: evidencePool, iteration }),
+    signal,
+  });
+}
+
+export async function agentCritique(
+  query: string,
+  questionType: string,
+  synthesis: import('../types').SynthesisResult,
+  evidencePool: import('../types').Evidence[],
+  iteration: number,
+  maxIterations: number,
+  signal?: AbortSignal
+): Promise<import('../types').CritiqueResult> {
+  return apiFetch('/api/agent/critique', {
+    method: 'POST',
+    body: JSON.stringify({
+      query,
+      question_type: questionType,
+      synthesis,
+      evidence_pool: evidencePool,
+      iteration,
+      max_iterations: maxIterations,
+    }),
+    signal,
+  });
 }

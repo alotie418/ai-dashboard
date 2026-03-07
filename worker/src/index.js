@@ -197,7 +197,7 @@ const DIRECT_PRICE_SCHEMA = {
 // ==================== Search Infrastructure ====================
 
 const CACHE_TTL_SECONDS = 1800; // 30 minutes
-const GEMINI_MODEL = 'gemini-3.1-flash-lite-preview';
+const GEMINI_MODEL = 'gemini-3.1-pro';
 const GEMINI_FALLBACK_MODEL = 'gemini-2.5-flash';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const FETCH_TIMEOUT_MS = 25000; // 25s per-request timeout (Worker has 30s wall limit)
@@ -274,11 +274,12 @@ async function hashQuery(query) {
  * Try primary model first → on 503/timeout → retry with fallback model.
  * Returns { response, modelUsed }.
  */
-async function callGeminiWithFallback(geminiKey, requestBody, timeoutOverrides = {}) {
+async function callGeminiWithFallback(geminiKey, requestBody, timeoutOverrides = {}, customModels = null) {
   // Primary model: short timeout (fast-fail if unavailable)
   // Fallback model: longer timeout (allow full response time)
   // Callers can override via timeoutOverrides: { primary, fallback }
-  const modelConfig = [
+  // Or pass customModels: [{ model, timeout }] to fully control which models to try
+  const modelConfig = customModels || [
     { model: GEMINI_MODEL, timeout: timeoutOverrides.primary ?? 12000 },
     { model: GEMINI_FALLBACK_MODEL, timeout: timeoutOverrides.fallback ?? 55000 },
   ];
@@ -302,6 +303,52 @@ async function callGeminiWithFallback(geminiKey, requestBody, timeoutOverrides =
     }
   }
   throw lastError;
+}
+
+/**
+ * Call Gemini streaming API — avoids fetch timeout on slow generateContent.
+ * streamGenerateContent returns headers quickly (~1-3s), then streams the body.
+ * The timeoutMs only covers the initial fetch (headers), not body reading.
+ * Body reading is bounded by Worker wall-time (30s).
+ */
+async function callGeminiStream(geminiKey, model, requestBody, timeoutMs = 25000) {
+  const url = `${GEMINI_API_BASE}/${model}:streamGenerateContent?key=${geminiKey}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    });
+    clearTimeout(timer); // Headers received — stop the timeout timer
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errText.slice(0, 200)}`);
+    }
+
+    // streamGenerateContent returns a JSON array of chunk objects
+    const rawText = await res.text();
+    let chunks;
+    try {
+      chunks = JSON.parse(rawText);
+    } catch {
+      // If not valid JSON array, treat raw text as the response
+      return { text: rawText, modelUsed: model };
+    }
+    const fullText = (Array.isArray(chunks) ? chunks : [chunks])
+      .map(c => c.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '')
+      .join('');
+
+    return { text: fullText, modelUsed: model };
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === 'AbortError') throw new Error(`Stream timeout after ${timeoutMs}ms`);
+    throw err;
+  }
 }
 
 // ==================== Gemini Search Prompt (server-side, tamper-proof) ====================
@@ -353,14 +400,16 @@ const COMMODITY_HINTS = [
   '期货', '现货', '大宗', '原材料',
 ];
 
-/** Build augmented search query with category-aware keywords + dynamic year */
+/** Build augmented search query with category-aware keywords + dynamic year.
+ *  #12: Keep expansion short to maintain search precision (max 3 extra keywords). */
 function buildSearchQuery(userQuery, maxLen) {
   const year = new Date().getFullYear();
   const isCommodity = COMMODITY_HINTS.some(h => userQuery.includes(h));
 
+  // Shorter, more targeted keywords — avoid bloating the query
   const keywords = isCommodity
-    ? `期货 现货报价 行情走势 ${year}`
-    : `最新价格 批发价 零售价 市场行情 ${year}`;
+    ? `现货报价 行情 ${year}`
+    : `最新价格 市场行情 ${year}`;
 
   const combined = `${userQuery} ${keywords}`;
   if (combined.length <= maxLen) return combined;
@@ -544,6 +593,401 @@ const MERGE_RESPONSE_SCHEMA = {
   },
   required: ['analysis', 'prices', 'summaryTable'],
 };
+
+// ==================== Agentic RAG: Schemas ====================
+
+const PLAN_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    question_type: { type: 'STRING', description: 'factual|causal|predictive|comparative|evaluative' },
+    multi_hop_required: { type: 'BOOLEAN' },
+    sub_queries: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          type: { type: 'STRING', description: 'factual|context|quantitative|counter' },
+          query: { type: 'STRING' },
+        },
+        required: ['type', 'query'],
+      },
+    },
+  },
+  required: ['question_type', 'multi_hop_required', 'sub_queries'],
+};
+
+const EXTRACT_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    evidence: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          claim_id: { type: 'STRING' },
+          text: { type: 'STRING', description: '论断原文' },
+          type: { type: 'STRING', description: 'price_claim|supply_demand|trend|opinion|fact' },
+          numbers: {
+            type: 'ARRAY',
+            items: {
+              type: 'OBJECT',
+              properties: {
+                value: { type: 'NUMBER' },
+                unit: { type: 'STRING' },
+                context: { type: 'STRING' },
+              },
+              required: ['value', 'unit', 'context'],
+            },
+          },
+          entities: { type: 'ARRAY', items: { type: 'STRING' } },
+          viewpoints: { type: 'ARRAY', items: { type: 'STRING' } },
+          uncertainty: { type: 'ARRAY', items: { type: 'STRING' } },
+          source_url: { type: 'STRING' },
+          confidence: { type: 'NUMBER', description: '0.0-1.0' },
+        },
+        required: ['claim_id', 'text', 'type', 'numbers', 'entities', 'source_url', 'confidence'],
+      },
+    },
+  },
+  required: ['evidence'],
+};
+
+/** Validate & sanitize extract response when responseSchema is not used */
+const VALID_EVIDENCE_TYPES = new Set(['price_claim', 'supply_demand', 'trend', 'opinion', 'fact']);
+function validateExtractResponse(raw) {
+  if (!raw || typeof raw !== 'object') return { evidence: [] };
+  const evidence = Array.isArray(raw.evidence) ? raw.evidence : [];
+  const validated = evidence
+    .filter(e => e && typeof e === 'object' && e.claim_id && e.text && e.source_url)
+    .map(e => ({
+      claim_id: String(e.claim_id),
+      text: String(e.text).slice(0, 500),
+      type: VALID_EVIDENCE_TYPES.has(e.type) ? e.type : 'fact',
+      numbers: Array.isArray(e.numbers) ? e.numbers.filter(n => n && typeof n.value === 'number').map(n => ({
+        value: n.value,
+        unit: String(n.unit || ''),
+        context: String(n.context || ''),
+      })) : [],
+      entities: Array.isArray(e.entities) ? e.entities.filter(x => typeof x === 'string') : [],
+      viewpoints: Array.isArray(e.viewpoints) ? e.viewpoints.filter(x => typeof x === 'string') : [],
+      uncertainty: Array.isArray(e.uncertainty) ? e.uncertainty.filter(x => typeof x === 'string') : [],
+      source_url: String(e.source_url),
+      confidence: typeof e.confidence === 'number' ? Math.min(1, Math.max(0, e.confidence)) : 0.5,
+    }))
+    .slice(0, 30); // hard cap
+  return { evidence: validated };
+}
+
+const SYNTHESIS_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    analysis: { type: 'STRING', description: '结构化Markdown分析报告' },
+    summaryTable: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          label: { type: 'STRING' },
+          value: { type: 'STRING' },
+        },
+        required: ['label', 'value'],
+      },
+    },
+    prices: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          platform: { type: 'STRING' },
+          title: { type: 'STRING' },
+          price: { type: 'NUMBER' },
+          priceUnit: { type: 'STRING' },
+          link: { type: 'STRING' },
+          platformCategory: { type: 'STRING' },
+        },
+        required: ['platform', 'title', 'price', 'priceUnit', 'link', 'platformCategory'],
+      },
+    },
+    consensus: { type: 'ARRAY', items: { type: 'STRING' }, description: '多源一致的共识结论' },
+    contradictions: { type: 'ARRAY', items: { type: 'STRING' }, description: '不同来源的矛盾发现' },
+    confidence_score: { type: 'NUMBER', description: '综合信心评分 0.0-1.0' },
+  },
+  required: ['analysis', 'prices', 'summaryTable', 'consensus', 'contradictions', 'confidence_score'],
+};
+
+const CRITIQUE_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    needs_more_search: { type: 'BOOLEAN' },
+    missing_aspects: { type: 'ARRAY', items: { type: 'STRING' } },
+    new_queries: { type: 'ARRAY', items: { type: 'STRING' } },
+    confidence_score: { type: 'NUMBER', description: '0.0-1.0' },
+    reasoning: { type: 'STRING' },
+  },
+  required: ['needs_more_search', 'missing_aspects', 'new_queries', 'confidence_score', 'reasoning'],
+};
+
+// ==================== Agentic RAG: Prompt Builders ====================
+
+function buildPlanPrompt(query) {
+  const year = new Date().getFullYear();
+  return `你是一名专业的市场研究策略规划师。用户提出了一个市场调研问题，请分析并制定搜索策略。
+
+用户查询: "${query}"
+
+请完成以下任务：
+1. **分类问题类型**（只选一个）：
+   - factual: 事实查询（如"XX价格是多少"）
+   - causal: 因果分析（如"为什么XX涨价"）
+   - predictive: 预测类（如"XX价格走势预测"）
+   - comparative: 对比类（如"A和B哪个更划算"）
+   - evaluative: 评估类（如"XX值不值得买"、"采购建议"）
+
+2. **判断是否需要 multi-hop 推理**：问题是否需要综合多条独立信息才能回答？
+
+3. **生成子查询**（3-5条），每条标注类型：
+   - **factual**: 直接获取核心事实数据的查询（如当前价格、规格参数）
+   - **context**: 补充背景上下文的查询（如产业链、供需、行业动态）
+   - **quantitative**: 获取定量统计数据的查询（如产量、进出口量、历史价格）
+   - **counter**: 获取反面/风险视角的查询（如替代品、价格下跌因素）
+
+要求：
+- 子查询应该覆盖中文搜索和英文搜索场景
+- 每条查询简洁明确，适合搜索引擎
+- 包含时效性关键词（如"${year}年"、"最新"、"近期"）
+- 返回纯 JSON，不要解释`;
+}
+
+function buildExtractPrompt(query, searchResults) {
+  const formatted = searchResults.map((r, i) =>
+    `[结果${i + 1}] 来源: ${r.source || 'unknown'}\n标题: ${r.title}\n链接: ${r.url}\n内容: ${(r.content || '').slice(0, 800)}`
+  ).join('\n\n');
+
+  return `你是一个证据提取引擎。从以下搜索结果中提取与查询"${query}"相关的结构化证据。
+
+搜索结果：
+${formatted}
+
+请提取以下信息：
+1. **claims (论断)**: 每条数据点或观点作为一条独立论断
+2. **numbers (定量数据)**: 提取所有数值及其单位和上下文（价格、产量、百分比等）
+3. **entities (命名实体)**: 产品名、公司名、地名、平台名等
+4. **viewpoints (观点)**: 市场参与者的看法或分析师观点
+5. **uncertainty (不确定信息)**: 标记不确定、可能过时或存疑的信息
+6. **confidence (置信度)**: 0.0-1.0，基于来源权威性和信息一致性
+
+为每条证据分配唯一 claim_id (格式: c1, c2, c3...)。
+type 字段取值: price_claim(价格数据) | supply_demand(供需) | trend(趋势) | opinion(观点) | fact(事实)
+
+重要：
+- 每条证据必须绑定 source_url（从搜索结果的链接中获取）
+- 价格数据必须保留原始单位（元/吨、元/kg、USD/ton等）
+- 不要编造数据，只提取搜索结果中实际存在的信息
+- 最多返回20条最重要的证据，优先保留价格数据和定量信息
+
+请严格按照以下 JSON 结构输出：
+{"evidence": [{"claim_id": "c1", "text": "论断原文摘要", "type": "price_claim", "numbers": [{"value": 280, "unit": "元/吨", "context": "软水盐出厂价"}], "entities": ["中盐"], "source_url": "https://example.com", "confidence": 0.85}]}
+
+viewpoints 和 uncertainty 字段可选，如有则添加为字符串数组。`;
+}
+
+function buildSynthesisPrompt(query, questionType, evidencePool, iteration) {
+  // Sanitize evidence text to prevent prompt injection (special chars, backticks, etc.)
+  const evidenceText = evidencePool.map((e, i) => {
+    const safeText = JSON.stringify(e.text || '').slice(1, -1); // strip outer quotes, keep escaping
+    const safeNumbers = (e.numbers || []).map(n => `${n.value}${n.unit}(${n.context})`).join(', ');
+    const safeUrl = (e.source_url || '').replace(/[<>"'`]/g, '');
+    return `[证据${i + 1}] (${e.type}, 置信度:${e.confidence})\n${safeText}\n数值: ${safeNumbers}\n来源: ${safeUrl}`;
+  }).join('\n\n');
+
+  return `你是一名专业的市场分析综合引擎。这是第 ${iteration} 轮分析。
+
+原始查询: "${query}"
+问题类型: ${questionType}
+证据数量: ${evidencePool.length} 条
+
+结构化证据池：
+${evidenceText}
+
+请完成以下任务：
+1. **聚类相似论断**: 将相关的证据聚合在一起
+2. **识别共识**: 找出多个来源一致支持的结论（填入 consensus 数组）
+3. **检测矛盾**: 找出不同来源之间冲突的数据或观点（填入 contradictions 数组）
+4. **聚合定量数据**: 计算价格区间、均值、趋势方向
+5. **标注引用**: analysis 中的关键数据用"(来源: URL)"标注
+6. **估算信心分**: 基于证据覆盖度、一致性和来源质量，给出 0.0-1.0 的 confidence_score
+
+输出要求：
+- **analysis**: Markdown 格式的分析报告，包含：
+  - ### 📊 价格行情（主流价格区间、市场均价）
+  - ### 🛒 电商平台对比（各平台报价差异）
+  - ### 💡 销售建议（卖家定价策略、渠道选择）
+  - ### 🛍️ 购买建议（买家最佳入手渠道、避坑指南）
+  禁止使用三个星号(***), 仅使用两个星号(**)。不要返回 Markdown 代码块标记。
+
+- **summaryTable**: 关键数据汇总，包含最低价、最高价、价格区间、市场均价、推荐对标平台、数据来源数量等。
+  label 简短（≤10汉字），value 格式: "数值 单位 (来源)"
+
+- **prices**: 从证据中提取的所有价格条目，每条包含 platform、title、price(数字)、priceUnit、link(真实URL)、platformCategory(B2C|B2B|industry|international)
+  link 必须是证据中的真实 URL，禁止编造。无 URL 则填空字符串 ""。
+
+- **consensus**: 多源一致的共识结论列表
+- **contradictions**: 不同来源的矛盾发现列表
+- **confidence_score**: 综合信心评分
+
+请确保分析专业、数据准确。`;
+}
+
+function buildCritiquePrompt(query, questionType, synthesis, evidencePool, iteration, maxIterations) {
+  return `你是一名严格的研究质量评审员。请评估以下市场研究的完整性和质量。
+
+原始查询: "${query}"
+问题类型: ${questionType}
+当前轮次: ${iteration}/${maxIterations}
+证据数量: ${evidencePool.length} 条
+当前信心分: ${synthesis.confidence_score || 0}
+
+共识结论: ${JSON.stringify(synthesis.consensus || [])}
+矛盾发现: ${JSON.stringify(synthesis.contradictions || [])}
+价格条目数: ${(synthesis.prices || []).length}
+
+分析报告摘要（前500字）:
+${(synthesis.analysis || '').slice(0, 500)}
+
+请严格评估以下维度：
+1. **缺失视角**: 是否有重要的分析角度被遗漏？（如供需面、政策面、国际对比、替代品分析）
+2. **定量数据充分性**: 价格数据是否覆盖了主要渠道和规格？数量是否够支撑结论？
+3. **矛盾解决**: 发现的矛盾是否已合理解释？
+4. **时效性**: 数据是否足够新？是否反映了最近的市场变动？
+5. **信心评估**: 综合以上维度，给出 0.0-1.0 的信心分
+   - ≥ 0.8: 通过，数据充分，可输出最终结果
+   - < 0.8: 不通过，需要补充搜索
+
+${iteration >= maxIterations ? '注意：这是最后一轮，即使信心不足也应设 needs_more_search=false，并在 reasoning 中说明剩余不足。' : ''}
+
+如果 needs_more_search=true，请在 new_queries 中生成 1-3 条精准的补充搜索查询，专门针对缺失的维度。
+
+返回纯 JSON。`;
+}
+
+// ==================== Agentic RAG: Rank Algorithm ====================
+
+/** Domain authority scores for ranking */
+const DOMAIN_AUTHORITY = {
+  '100ppi.com': 0.95,      // 生意社
+  'sci99.com': 0.93,       // 卓创资讯
+  'mysteel.com': 0.92,     // 我的钢铁网
+  'baiinfo.com': 0.90,     // 百川盈孚
+  'chem99.com': 0.88,      // 中化信息
+  'alibaba.com': 0.80,     // 阿里国际
+  '1688.com': 0.78,        // 1688
+  'jd.com': 0.75,          // 京东
+  'taobao.com': 0.70,      // 淘宝
+  'tmall.com': 0.72,       // 天猫
+  'pinduoduo.com': 0.68,   // 拼多多
+  'amazon.com': 0.76,      // Amazon
+  'zhihu.com': 0.50,       // 知乎
+  'baidu.com': 0.45,       // 百度
+};
+
+function getDomainAuthority(url) {
+  if (!url) return 0.3;
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, '');
+    for (const [domain, score] of Object.entries(DOMAIN_AUTHORITY)) {
+      if (hostname === domain || hostname.endsWith('.' + domain)) return score;
+    }
+  } catch {}
+  return 0.4; // default for unknown domains
+}
+
+function computeRelevance(query, title, content) {
+  const qTokens = extractTokens(query);
+  if (qTokens.length === 0) return 0.5;
+  const combined = (title || '') + ' ' + (content || '').slice(0, 500);
+  const cTokens = new Set(extractTokens(combined));
+  let hits = 0;
+  for (const t of qTokens) { if (cTokens.has(t)) hits++; }
+  return Math.min(1.0, hits / qTokens.length);
+}
+
+function computeRecency(publishedDate) {
+  if (!publishedDate) return 0.3;
+  try {
+    const d = new Date(publishedDate);
+    const now = new Date();
+    const daysDiff = (now - d) / (1000 * 60 * 60 * 24);
+    if (daysDiff <= 1) return 1.0;
+    if (daysDiff <= 7) return 0.9;
+    if (daysDiff <= 30) return 0.7;
+    if (daysDiff <= 90) return 0.5;
+    if (daysDiff <= 365) return 0.3;
+    return 0.1;
+  } catch { return 0.3; }
+}
+
+function bigramSimilarity(a, b) {
+  const tokA = extractTokens(a);
+  const tokB = extractTokens(b);
+  if (tokA.length === 0 || tokB.length === 0) return 0;
+  const setA = new Set(tokA);
+  let common = 0;
+  for (const t of tokB) { if (setA.has(t)) common++; }
+  return common / Math.max(tokA.length, tokB.length);
+}
+
+function rankAndDedup(query, results) {
+  // Step 1: URL dedup
+  const urlSeen = new Set();
+  let removedUrls = 0;
+  const urlDeduped = results.filter(r => {
+    if (!r.url) return true;
+    const norm = r.url.replace(/[?#].*$/, '').replace(/\/$/, '').toLowerCase();
+    if (urlSeen.has(norm)) { removedUrls++; return false; }
+    urlSeen.add(norm);
+    return true;
+  });
+
+  // Step 2: Title similarity dedup (>0.85)
+  let removedSimilar = 0;
+  const titleDeduped = [];
+  for (const r of urlDeduped) {
+    let isDup = false;
+    for (const kept of titleDeduped) {
+      if (bigramSimilarity(r.title || '', kept.title || '') > 0.85) {
+        isDup = true;
+        removedSimilar++;
+        break;
+      }
+    }
+    if (!isDup) titleDeduped.push(r);
+  }
+
+  // Step 3: Score and rank
+  const sourceSeen = new Set();
+  const scored = titleDeduped.map(r => {
+    const relevance = computeRelevance(query, r.title, r.content);
+    const authority = getDomainAuthority(r.url);
+    const recency = computeRecency(r.published_date);
+    const isNewSource = !sourceSeen.has(r.source);
+    if (r.source) sourceSeen.add(r.source);
+    const diversity = isNewSource ? 1.0 : 0.3;
+    const score = 0.35 * relevance + 0.25 * authority + 0.2 * recency + 0.2 * diversity;
+    return { ...r, score: Math.round(score * 1000) / 1000, relevance, authority, recency, diversity };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+
+  return {
+    ranked: scored,
+    dedup_stats: {
+      before: results.length,
+      after: scored.length,
+      removed_urls: removedUrls,
+      removed_similar: removedSimilar,
+    },
+  };
+}
 
 // ==================== Main Handler ====================
 
@@ -1059,7 +1503,7 @@ ${pagesText}
                 responseMimeType: 'application/json',
                 responseSchema: DIRECT_PRICE_SCHEMA,
               },
-            }, { primary: 12000, fallback: 55000 });
+            }, { primary: 15000, fallback: 25000 });
 
             console.log(`Direct scrape extraction used model: ${modelUsed}`);
             const result = await geminiResponse.json();
@@ -1306,7 +1750,7 @@ ${pagesText}
               responseMimeType: 'application/json',
               responseSchema: MERGE_RESPONSE_SCHEMA,
             },
-          }, { primary: 12000, fallback: 75000 }); // Merge needs more time: large prompt + structured JSON output
+          }, { primary: 20000, fallback: 25000 }); // Merge: stay within 30s Worker wall-time
 
           console.log(`Merge analysis used model: ${modelUsed}`);
           const result = await geminiResponse.json();
@@ -1347,6 +1791,261 @@ ${pagesText}
         } catch (err) {
           logSearch('merge', queryLen, false, 502, Date.now() - startTime, err.message);
           return errorResponse(502, `Merge analysis failed: ${err.message}`, corsHeaders);
+        }
+      }
+
+      // ==================== AGENTIC RAG: PLAN AGENT ====================
+
+      if (path === '/api/agent/plan' && request.method === 'POST') {
+        const startTime = Date.now();
+        const geminiKey = env.GEMINI_API_KEY;
+        if (!geminiKey) return errorResponse(500, 'Gemini API key not configured', corsHeaders);
+
+        const body = await request.json();
+        const query = safeString(body.query, 500);
+        if (!query) return errorResponse(400, 'query is required', corsHeaders);
+
+        try {
+          const prompt = buildPlanPrompt(query);
+          const { response: geminiResponse, modelUsed } = await callGeminiWithFallback(geminiKey, {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseSchema: PLAN_RESPONSE_SCHEMA,
+            },
+          }, { primary: 10000, fallback: 15000 }); // Plan: 10s+15s=25s < 30s wall-time
+
+          console.log(`Agent/plan used model: ${modelUsed}, took ${Date.now() - startTime}ms`);
+          const result = await geminiResponse.json();
+          const text = result.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '{}';
+
+          let parsed;
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            console.error('Failed to parse plan JSON:', text.slice(0, 200));
+            parsed = { question_type: 'factual', multi_hop_required: false, sub_queries: [{ type: 'factual', query }] };
+          }
+
+          // Ensure sub_queries is always an array with at least one item
+          if (!Array.isArray(parsed.sub_queries) || parsed.sub_queries.length === 0) {
+            parsed.sub_queries = [{ type: 'factual', query }];
+          }
+
+          return jsonResponse(parsed, corsHeaders);
+        } catch (err) {
+          console.error('Agent/plan error:', err.message);
+          return errorResponse(502, `Plan agent failed: ${err.message}`, corsHeaders);
+        }
+      }
+
+      // ==================== AGENTIC RAG: RANK AGENT ====================
+
+      if (path === '/api/agent/rank' && request.method === 'POST') {
+        const startTime = Date.now();
+        const body = await request.json();
+        const query = safeString(body.query, 500);
+        const results = Array.isArray(body.results) ? body.results : [];
+
+        if (!query) return errorResponse(400, 'query is required', corsHeaders);
+        if (results.length === 0) return errorResponse(400, 'results array is required and must not be empty', corsHeaders);
+
+        try {
+          const rankResult = rankAndDedup(query, results);
+          console.log(`Agent/rank: ${results.length} → ${rankResult.ranked.length} results, took ${Date.now() - startTime}ms`);
+          return jsonResponse(rankResult, corsHeaders);
+        } catch (err) {
+          console.error('Agent/rank error:', err.message);
+          return errorResponse(500, `Rank agent failed: ${err.message}`, corsHeaders);
+        }
+      }
+
+      // ==================== AGENTIC RAG: EXTRACT AGENT ====================
+
+      if (path === '/api/agent/extract' && request.method === 'POST') {
+        const startTime = Date.now();
+        const geminiKey = env.GEMINI_API_KEY;
+        if (!geminiKey) return errorResponse(500, 'Gemini API key not configured', corsHeaders);
+
+        const body = await request.json();
+        const query = safeString(body.query, 500);
+        const searchResults = Array.isArray(body.search_results) ? body.search_results : [];
+
+        if (!query) return errorResponse(400, 'query is required', corsHeaders);
+        if (searchResults.length === 0) return errorResponse(400, 'search_results array is required', corsHeaders);
+
+        // Dynamic token-aware result limiting (~4 chars per token, target 30k tokens = 120k chars)
+        const TOKEN_CHAR_RATIO = 4;
+        const MAX_PROMPT_TOKENS = 30000;
+        const MAX_PROMPT_CHARS = MAX_PROMPT_TOKENS * TOKEN_CHAR_RATIO;
+        const PROMPT_OVERHEAD_CHARS = 1500; // prompt template + query text overhead
+        let totalChars = PROMPT_OVERHEAD_CHARS;
+        const limitedResults = [];
+        for (const r of searchResults) {
+          const entryChars = (r.title || '').length + (r.url || '').length + Math.min((r.content || '').length, 800) + 80;
+          if (totalChars + entryChars > MAX_PROMPT_CHARS && limitedResults.length >= 5) break;
+          totalChars += entryChars;
+          limitedResults.push(r);
+        }
+        console.log(`Agent/extract: ${searchResults.length} results → ${limitedResults.length} after token limit (${Math.round(totalChars / TOKEN_CHAR_RATIO)} est. tokens)`);
+
+        try {
+          const prompt = buildExtractPrompt(query, limitedResults);
+          // Use streaming API: fetch resolves on headers (~1-3s), body streams without timeout.
+          // generateContent would block until full response (>25s for large prompts = timeout).
+          const { text, modelUsed } = await callGeminiStream(
+            geminiKey,
+            GEMINI_FALLBACK_MODEL, // flash for speed
+            { contents: [{ parts: [{ text: prompt }] }] }, // no generationConfig = free text, fastest
+            25000 // 25s timeout for headers only
+          );
+
+          console.log(`Agent/extract (stream) used model: ${modelUsed}, took ${Date.now() - startTime}ms`);
+
+          let parsed;
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            console.warn('Extract JSON parse failed, attempting regex extraction:', text.slice(0, 200));
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              try { parsed = JSON.parse(jsonMatch[0]); } catch { parsed = { evidence: [] }; }
+            } else {
+              parsed = { evidence: [] };
+            }
+          }
+          parsed = validateExtractResponse(parsed);
+
+          return jsonResponse(parsed, corsHeaders);
+        } catch (err) {
+          console.error('Agent/extract error:', err.message);
+          return errorResponse(502, `Extract agent failed: ${err.message}`, corsHeaders);
+        }
+      }
+
+      // ==================== AGENTIC RAG: SYNTHESIZE AGENT ====================
+
+      if (path === '/api/agent/synthesize' && request.method === 'POST') {
+        const startTime = Date.now();
+        const geminiKey = env.GEMINI_API_KEY;
+        if (!geminiKey) return errorResponse(500, 'Gemini API key not configured', corsHeaders);
+
+        const body = await request.json();
+        const query = safeString(body.query, 500);
+        const questionType = safeString(body.question_type, 50) || 'factual';
+        const evidencePool = Array.isArray(body.evidence_pool) ? body.evidence_pool : [];
+        const iteration = Number(body.iteration) || 1;
+
+        if (!query) return errorResponse(400, 'query is required', corsHeaders);
+        if (evidencePool.length === 0) return errorResponse(400, 'evidence_pool is required', corsHeaders);
+
+        try {
+          const prompt = buildSynthesisPrompt(query, questionType, evidencePool, iteration);
+          const { response: geminiResponse, modelUsed } = await callGeminiWithFallback(geminiKey, {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseSchema: SYNTHESIS_RESPONSE_SCHEMA,
+            },
+          }, { primary: 10000, fallback: 15000 }); // Synthesize: 10s+15s=25s < 30s wall-time
+
+          console.log(`Agent/synthesize used model: ${modelUsed}, took ${Date.now() - startTime}ms`);
+          const result = await geminiResponse.json();
+          const text = result.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '{}';
+
+          let parsed;
+          try {
+            parsed = JSON.parse(text);
+          } catch (parseErr) {
+            console.error('Failed to parse synthesis JSON:', text.slice(0, 500));
+            return errorResponse(502, `Synthesize agent returned invalid JSON: ${text.slice(0, 200)}`, corsHeaders);
+          }
+
+          // Validate URL format on prices (same post-processing as merge)
+          if (Array.isArray(parsed.prices)) {
+            parsed.prices = parsed.prices.map(p => {
+              if (p.link && typeof p.link === 'string') {
+                const link = p.link.trim();
+                if (link.startsWith('http://') || link.startsWith('https://')) {
+                  p.link = link;
+                } else {
+                  p.link = '';
+                }
+              } else {
+                p.link = '';
+              }
+              return p;
+            });
+          }
+
+          // Ensure arrays exist
+          if (!Array.isArray(parsed.consensus)) parsed.consensus = [];
+          if (!Array.isArray(parsed.contradictions)) parsed.contradictions = [];
+          if (!Array.isArray(parsed.summaryTable)) parsed.summaryTable = [];
+          if (!Array.isArray(parsed.prices)) parsed.prices = [];
+          if (typeof parsed.confidence_score !== 'number') parsed.confidence_score = 0;
+
+          return jsonResponse(parsed, corsHeaders);
+        } catch (err) {
+          console.error('Agent/synthesize error:', err.message);
+          return errorResponse(502, `Synthesize agent failed: ${err.message}`, corsHeaders);
+        }
+      }
+
+      // ==================== AGENTIC RAG: CRITIQUE AGENT ====================
+
+      if (path === '/api/agent/critique' && request.method === 'POST') {
+        const startTime = Date.now();
+        const geminiKey = env.GEMINI_API_KEY;
+        if (!geminiKey) return errorResponse(500, 'Gemini API key not configured', corsHeaders);
+
+        const body = await request.json();
+        const query = safeString(body.query, 500);
+        const questionType = safeString(body.question_type, 50) || 'factual';
+        const synthesis = body.synthesis || {};
+        const evidencePool = Array.isArray(body.evidence_pool) ? body.evidence_pool : [];
+        const iteration = Number(body.iteration) || 1;
+        const maxIterations = Number(body.max_iterations) || 3;
+
+        if (!query) return errorResponse(400, 'query is required', corsHeaders);
+
+        try {
+          const prompt = buildCritiquePrompt(query, questionType, synthesis, evidencePool, iteration, maxIterations);
+          const { response: geminiResponse, modelUsed } = await callGeminiWithFallback(geminiKey, {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseSchema: CRITIQUE_RESPONSE_SCHEMA,
+            },
+          }, { primary: 10000, fallback: 15000 }); // Critique: 10s+15s=25s < 30s wall-time
+
+          console.log(`Agent/critique used model: ${modelUsed}, took ${Date.now() - startTime}ms`);
+          const result = await geminiResponse.json();
+          const text = result.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '{}';
+
+          let parsed;
+          try {
+            parsed = JSON.parse(text);
+          } catch (parseErr) {
+            console.error('Failed to parse critique JSON:', text.slice(0, 500));
+            return errorResponse(502, `Critique agent returned invalid JSON: ${text.slice(0, 200)}`, corsHeaders);
+          }
+
+          // Ensure arrays exist
+          if (!Array.isArray(parsed.missing_aspects)) parsed.missing_aspects = [];
+          if (!Array.isArray(parsed.new_queries)) parsed.new_queries = [];
+          if (typeof parsed.confidence_score !== 'number') parsed.confidence_score = 0;
+          if (typeof parsed.needs_more_search !== 'boolean') parsed.needs_more_search = false;
+
+          // Force no more search on final iteration
+          if (iteration >= maxIterations) {
+            parsed.needs_more_search = false;
+          }
+
+          return jsonResponse(parsed, corsHeaders);
+        } catch (err) {
+          console.error('Agent/critique error:', err.message);
+          return errorResponse(502, `Critique agent failed: ${err.message}`, corsHeaders);
         }
       }
 
@@ -2090,7 +2789,7 @@ function matchTitleToUrl(priceTitle, urlLookup) {
       const ratio = common / Math.min(priceTokens.length, srcTokens.length);
       if (ratio > bestRatio) { bestRatio = ratio; bestUrl = item.url; }
     }
-    if (bestRatio >= 0.6) return bestUrl;
+    if (bestRatio >= 0.75) return bestUrl;
   }
 
   return '';

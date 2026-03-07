@@ -252,3 +252,104 @@ export interface BatchImportResult {
   failed: number;
   errors: { row: number; errors: string[] }[];
 }
+
+// ==================== Agentic RAG (Market Research) ====================
+
+export type AgentPhase =
+  | 'idle'
+  | 'planning'
+  | 'searching'
+  | 'ranking'
+  | 'extracting'
+  | 'synthesizing'
+  | 'critiquing'
+  | 'iterating'
+  | 'complete'
+  | 'error';
+
+export interface SubQuery {
+  type: 'factual' | 'context' | 'quantitative' | 'counter';
+  query: string;
+}
+
+export interface PlanResult {
+  question_type: 'factual' | 'causal' | 'predictive' | 'comparative' | 'evaluative';
+  multi_hop_required: boolean;
+  sub_queries: SubQuery[];
+}
+
+export interface Evidence {
+  claim_id: string;
+  text: string;
+  type: string; // price_claim | supply_demand | trend | opinion | fact
+  numbers: { value: number; unit: string; context: string }[];
+  entities: string[];
+  viewpoints?: string[];
+  uncertainty?: string[];
+  source_url: string;
+  confidence: number;
+}
+
+export interface ExtractResult {
+  evidence: Evidence[];
+}
+
+export interface RankedResult {
+  title: string;
+  url: string;
+  content: string;
+  source: string;
+  score: number;
+  relevance: number;
+  authority: number;
+  recency: number;
+  diversity: number;
+  published_date?: string;
+}
+
+export interface RankResult {
+  ranked: RankedResult[];
+  dedup_stats: {
+    before: number;
+    after: number;
+    removed_urls: number;
+    removed_similar: number;
+  };
+}
+
+export interface SynthesisResult extends MarketSearchResponse {
+  consensus: string[];
+  contradictions: string[];
+  confidence_score: number;
+}
+
+export interface CritiqueResult {
+  needs_more_search: boolean;
+  missing_aspects: string[];
+  new_queries: string[];
+  confidence_score: number;
+  reasoning: string;
+}
+
+export interface PhaseLogEntry {
+  phase: AgentPhase;
+  duration_ms: number;
+  summary: string;
+  iteration: number;
+}
+
+export interface AgenticSearchState {
+  original_query: string;
+  question_type: string;
+  multi_hop_required: boolean;
+  sub_queries: SubQuery[];
+  search_results: RankedResult[];
+  evidence_pool: Evidence[];
+  synthesis: SynthesisResult | null;
+  confidence_score: number;
+  iteration_count: number;
+  max_iterations: number;
+  critique_history: CritiqueResult[];
+  phase: AgentPhase;
+  phase_log: PhaseLogEntry[];
+}

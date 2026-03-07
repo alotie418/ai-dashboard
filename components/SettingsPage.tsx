@@ -160,7 +160,7 @@ const SettingsPage: React.FC = () => {
               <section className="space-y-6">
                 <h3 className="text-xl font-bold text-[#191918] mb-6">企业基础信息</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InputGroup label="企业全称" placeholder="AI看板 贸易有限公司" value={companyInfo.name} onChange={(v) => setCompanyInfo(prev => ({ ...prev, name: v }))} />
+                  <InputGroup label="企业全称" placeholder="AI Dashboard 贸易有限公司" value={companyInfo.name} onChange={(v) => setCompanyInfo(prev => ({ ...prev, name: v }))} />
                   <InputGroup label="统一社会信用代码" placeholder="91110000XXXXXXXXXX" value={companyInfo.creditCode} onChange={(v) => setCompanyInfo(prev => ({ ...prev, creditCode: v }))} />
                   <InputGroup label="法定代表人" placeholder="张晓明" value={companyInfo.legalPerson} onChange={(v) => setCompanyInfo(prev => ({ ...prev, legalPerson: v }))} />
                   <InputGroup label="所属行业" placeholder="通用贸易 / 供应链" value={companyInfo.industry} onChange={(v) => setCompanyInfo(prev => ({ ...prev, industry: v }))} />

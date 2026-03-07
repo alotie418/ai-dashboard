@@ -614,7 +614,7 @@ const AppContent: React.FC = () => {
           <div className="w-8 h-8 bg-[#d97757] rounded-lg flex items-center justify-center mr-3 flex-shrink-0 shadow-lg" style={{ boxShadow: '0 4px 24px rgba(217,119,87,0.2)' }}>
             <i className="fas fa-layer-group text-white text-sm"></i>
           </div>
-          {sidebarOpen && <span className="font-bold text-xl tracking-tight text-[#191918]">AI看板</span>}
+          {sidebarOpen && <span className="font-bold text-xl tracking-tight text-[#191918]">AI Dashboard</span>}
         </div>
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
           <NavItem icon="fa-th-large" label="经营看板" active={currentPage === 'dashboard'} expanded={sidebarOpen} onClick={() => setCurrentPage('dashboard')} />
@@ -622,7 +622,7 @@ const AppContent: React.FC = () => {
           <NavItem icon="fa-file-export" label="销售与销项" active={currentPage === 'sales'} expanded={sidebarOpen} onClick={() => setCurrentPage('sales')} />
           <NavItem icon="fa-search-dollar" label="发票查询" active={currentPage === 'inventory'} expanded={sidebarOpen} onClick={() => setCurrentPage('inventory')} />
           <NavItem icon="fa-chart-pie" label="数据分析" active={currentPage === 'analysis'} expanded={sidebarOpen} onClick={() => setCurrentPage('analysis')} />
-          <NavItem icon="fa-shopping-cart" label="市场聚合搜索" active={currentPage === 'market'} expanded={sidebarOpen} onClick={() => setCurrentPage('market')} />
+          <NavItem icon="fa-brain" label="Agentic RAG" active={currentPage === 'market'} expanded={sidebarOpen} onClick={() => setCurrentPage('market')} />
           <NavItem icon="fa-handshake" label="应收应付" active={currentPage === 'accounts'} expanded={sidebarOpen} onClick={() => setCurrentPage('accounts')} />
           <NavItem icon="fa-wallet" label="财务报表" active={currentPage === 'finance'} expanded={sidebarOpen} onClick={() => setCurrentPage('finance')} />
           <NavItem icon="fa-cog" label="系统设置" active={currentPage === 'settings'} expanded={sidebarOpen} onClick={() => setCurrentPage('settings')} />
@@ -640,7 +640,7 @@ const AppContent: React.FC = () => {
           <header className="h-16 bg-[#f9f9f8] border-b border-[#e0ddd5] flex items-center justify-between px-8 z-10 shrink-0">
             <div className="flex items-center space-x-6">
               <h2 className="text-xl font-semibold text-[#191918]">
-                {{ dashboard: '经营数据概览', sales: '销售与销项', purchase: '采购与进项', analysis: '数据分析中心', inventory: '发票查询', finance: '财务报表', market: '市场聚合搜索', accounts: '应收应付', settings: '系统设置' }[currentPage]}
+                {{ dashboard: '经营数据概览', sales: '销售与销项', purchase: '采购与进项', analysis: '数据分析中心', inventory: '发票查询', finance: '财务报表', market: 'Agentic RAG', accounts: '应收应付', settings: '系统设置' }[currentPage]}
               </h2>
               <div className="hidden lg:flex items-center space-x-4 pl-4 border-l border-[#e0ddd5]">
                 <div className="flex items-center space-x-2 bg-white rounded-lg p-1 border border-[#e0ddd5]">
