@@ -151,7 +151,9 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
       if (appField) {
         let val = row[csvHeader];
         if (['tons', 'pricePerTon', 'totalAmount', 'taxRate', 'shippingCost'].includes(appField)) {
-          val = parseFloat(String(val).replace(/[,，]/g, '')) || 0;
+          const cleaned = String(val).replace(/[,，]/g, '');
+          const numMatch = cleaned.match(/[\d.]+/);
+          val = numMatch ? parseFloat(numMatch[0]) : 0;
         }
         record[appField] = val;
       }

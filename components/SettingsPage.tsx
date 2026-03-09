@@ -25,6 +25,8 @@ const SettingsPage: React.FC = () => {
     priceVolatility: false,
     monthlyReport: true,
   });
+  const [vatRate, setVatRate] = useState('13');
+  const [aiModel, setAiModel] = useState('gemini-3.1-pro');
 
   // Apply fetched settings to state
   const applySettings = (s: any) => {
@@ -32,6 +34,8 @@ const SettingsPage: React.FC = () => {
     if (s.tax_auto_auth !== undefined) setTaxAutoAuth(s.tax_auto_auth);
     if (s.ai_auto_insight !== undefined) setAiAutoInsight(s.ai_auto_insight);
     if (s.notifications) setNotifications(s.notifications);
+    if (s.vat_rate !== undefined) setVatRate(String(s.vat_rate));
+    if (s.ai_model !== undefined) setAiModel(s.ai_model);
   };
 
   // Load settings from API on mount
@@ -55,6 +59,8 @@ const SettingsPage: React.FC = () => {
         tax_auto_auth: taxAutoAuth,
         ai_auto_insight: aiAutoInsight,
         notifications,
+        vat_rate: vatRate,
+        ai_model: aiModel,
       };
       await saveSettings(payload);
 
@@ -180,7 +186,7 @@ const SettingsPage: React.FC = () => {
                       <p className="text-sm font-bold text-[#191918]">增值税标准税率 (VAT)</p>
                       <p className="text-xs text-[#5c5c5a]">用于 OCR 识别和财务预测的默认计算标准</p>
                     </div>
-                    <select className="bg-white border border-[#d1cdc4] rounded-lg px-3 py-1 text-sm outline-none">
+                    <select value={vatRate} onChange={e => setVatRate(e.target.value)} className="bg-white border border-[#d1cdc4] rounded-lg px-3 py-1 text-sm outline-none">
                       <option value="13">13% (标准货物)</option>
                       <option value="9">9% (农产品/交通)</option>
                       <option value="6">6% (服务业)</option>
@@ -206,7 +212,7 @@ const SettingsPage: React.FC = () => {
                       <span className="text-sm font-bold text-[#d97757]">分析模型选择</span>
                       <span className="text-[10px] font-bold bg-[#d97757] px-2 py-0.5 rounded text-white uppercase">PREVIEW</span>
                     </div>
-                    <select className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#d97757] outline-none">
+                    <select value={aiModel} onChange={e => setAiModel(e.target.value)} className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#d97757] outline-none">
                       <option value="gemini-3-pro">Gemini 3 Pro (推荐 - 高精度分析)</option>
                       <option value="gemini-3.1-pro">Gemini 3.1 Pro (增强版 - 更强推理)</option>
                       <option value="gemini-3-flash">Gemini 3 Flash (响应极快 - 轻量任务)</option>

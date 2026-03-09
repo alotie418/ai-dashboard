@@ -9,7 +9,18 @@ import { ChartData, CategoryData } from '../types';
 // Anthropic-style warm color palette
 const COLORS = ['#d97757', '#10b981', '#8b5cf6', '#f59e0b', '#3b82f6'];
 
-export const PLStatementChart: React.FC<{ data: ChartData[] }> = ({ data }) => (
+const EmptyChartPlaceholder: React.FC<{ height?: string }> = ({ height = 'h-80' }) => (
+  <div className={`${height} w-full flex items-center justify-center text-sm text-[#5c5c5a]`}>
+    <div className="text-center">
+      <i className="fas fa-chart-bar text-2xl text-[#d1cdc4] mb-2 block"></i>
+      暂无图表数据
+    </div>
+  </div>
+);
+
+export const PLStatementChart: React.FC<{ data: ChartData[] }> = ({ data }) => {
+  if (!data || data.length === 0) return <EmptyChartPlaceholder />;
+  return (
   <div className="h-80 w-full">
     <ResponsiveContainer width="100%" height="100%">
       <ComposedChart data={data} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
@@ -44,9 +55,12 @@ export const PLStatementChart: React.FC<{ data: ChartData[] }> = ({ data }) => (
       </ComposedChart>
     </ResponsiveContainer>
   </div>
-);
+  );
+};
 
-export const ProfitBarChart: React.FC<{ data: ChartData[] }> = ({ data }) => (
+export const ProfitBarChart: React.FC<{ data: ChartData[] }> = ({ data }) => {
+  if (!data || data.length === 0) return <EmptyChartPlaceholder />;
+  return (
   <div className="h-80 w-full">
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
@@ -61,9 +75,12 @@ export const ProfitBarChart: React.FC<{ data: ChartData[] }> = ({ data }) => (
       </BarChart>
     </ResponsiveContainer>
   </div>
-);
+  );
+};
 
-export const ProfitabilityBarChart: React.FC<{ data: ChartData[] }> = ({ data }) => (
+export const ProfitabilityBarChart: React.FC<{ data: ChartData[] }> = ({ data }) => {
+  if (!data || data.length === 0) return <EmptyChartPlaceholder />;
+  return (
   <div className="h-80 w-full">
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data}>
@@ -85,9 +102,12 @@ export const ProfitabilityBarChart: React.FC<{ data: ChartData[] }> = ({ data })
       </BarChart>
     </ResponsiveContainer>
   </div>
-);
+  );
+};
 
-export const DistributionPieChart: React.FC<{ data: CategoryData[] }> = ({ data }) => (
+export const DistributionPieChart: React.FC<{ data: CategoryData[] }> = ({ data }) => {
+  if (!data || data.length === 0) return <EmptyChartPlaceholder height="h-64" />;
+  return (
   <div className="h-64 w-full">
     <ResponsiveContainer width="100%" height="100%">
       <PieChart>
@@ -117,4 +137,5 @@ export const DistributionPieChart: React.FC<{ data: CategoryData[] }> = ({ data 
       </PieChart>
     </ResponsiveContainer>
   </div>
-);
+  );
+};

@@ -1105,7 +1105,7 @@ export default {
         if (errors.length > 0) {
           return errorResponse(400, errors.join('; '), corsHeaders);
         }
-        await env.DB.prepare(`
+        const updateResult = await env.DB.prepare(`
           UPDATE purchases SET date=?, supplier=?, tons=?, pricePerTon=?, totalAmount=?,
           amountWithoutTax=?, taxAmount=?, taxRate=?, invoiceNumber=?, invoiceStatus=?
           WHERE id=?
@@ -1122,6 +1122,7 @@ export default {
           safeString(data.invoiceStatus, 20),
           id
         ).run();
+        if (updateResult.meta?.changes === 0) return errorResponse(404, 'Purchase not found', corsHeaders);
         return jsonResponse({ success: true }, corsHeaders);
       }
 
@@ -1182,7 +1183,7 @@ export default {
         if (errors.length > 0) {
           return errorResponse(400, errors.join('; '), corsHeaders);
         }
-        await env.DB.prepare(`
+        const updateResult = await env.DB.prepare(`
           UPDATE sales SET date=?, customer=?, tons=?, pricePerTon=?, totalAmount=?,
           amountWithoutTax=?, taxAmount=?, taxRate=?, shippingCost=?, invoiceNumber=?, invoiceStatus=?
           WHERE id=?
@@ -1200,6 +1201,7 @@ export default {
           safeString(data.invoiceStatus, 20),
           id
         ).run();
+        if (updateResult.meta?.changes === 0) return errorResponse(404, 'Sale not found', corsHeaders);
         return jsonResponse({ success: true }, corsHeaders);
       }
 
@@ -1232,10 +1234,11 @@ export default {
           return errorResponse(400, 'Request body must be a JSON object', corsHeaders);
         }
         const stmts = [];
+        const skippedKeys = [];
         for (const [key, value] of Object.entries(data)) {
           if (!SETTINGS_ALLOWED_KEYS.has(key)) continue; // silently skip disallowed keys
           const serialized = JSON.stringify(value);
-          if (serialized.length > 10000) continue; // value too large
+          if (serialized.length > 10000) { skippedKeys.push(key); continue; }
           stmts.push(
             env.DB.prepare(
               "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))"
@@ -1245,7 +1248,10 @@ export default {
         if (stmts.length > 0) {
           await env.DB.batch(stmts);
         }
-        return jsonResponse({ success: true }, corsHeaders);
+        return jsonResponse({
+          success: true,
+          ...(skippedKeys.length > 0 ? { warnings: `以下设置值过大被跳过: ${skippedKeys.join(', ')}` } : {}),
+        }, corsHeaders);
       }
 
       // ==================== SEARCH PROXY: BRAVE (with cache + retry + logging) ====================
@@ -2198,7 +2204,7 @@ ${pagesText}
         if (!id) return errorResponse(400, 'Invalid ID', corsHeaders);
 
         const body = await request.json();
-        const paidAmount = Number(body.paid_amount);
+        const paidAmount = Math.round(Number(body.paid_amount) * 100) / 100;
         if (!isFiniteNumber(paidAmount) || paidAmount < 0) {
           return errorResponse(400, 'paid_amount must be a non-negative number', corsHeaders);
         }
@@ -2225,7 +2231,7 @@ ${pagesText}
         if (!id) return errorResponse(400, 'Invalid ID', corsHeaders);
 
         const body = await request.json();
-        const paidAmount = Number(body.paid_amount);
+        const paidAmount = Math.round(Number(body.paid_amount) * 100) / 100;
         if (!isFiniteNumber(paidAmount) || paidAmount < 0) {
           return errorResponse(400, 'paid_amount must be a non-negative number', corsHeaders);
         }

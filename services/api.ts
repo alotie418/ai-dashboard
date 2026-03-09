@@ -16,6 +16,14 @@ export interface SalesRecord {
   shipping: number;
   invoiceNo: string;
   status: '已开' | '待开';
+  taxRate?: string;
+  amountWithoutTax?: number;
+  taxAmount?: number;
+  pricePerTon?: number;
+  paymentStatus?: string;
+  paidAmount?: number;
+  dueDate?: string;
+  paymentDate?: string;
 }
 
 export interface PurchaseRecord {
@@ -27,6 +35,13 @@ export interface PurchaseRecord {
   taxRate: string;
   invoiceNo: string;
   status: string;
+  amountWithoutTax?: number;
+  taxAmount?: number;
+  pricePerTon?: number;
+  paymentStatus?: string;
+  paidAmount?: number;
+  dueDate?: string;
+  paymentDate?: string;
 }
 
 export interface AppSettings {
@@ -62,6 +77,10 @@ interface ApiSalesRecord {
   invoiceNumber: string;
   invoiceStatus: string;
   created_at?: string;
+  payment_status?: string;
+  paid_amount?: number;
+  due_date?: string;
+  payment_date?: string;
 }
 
 interface ApiPurchaseRecord {
@@ -77,6 +96,10 @@ interface ApiPurchaseRecord {
   invoiceNumber: string;
   invoiceStatus: string;
   created_at?: string;
+  payment_status?: string;
+  paid_amount?: number;
+  due_date?: string;
+  payment_date?: string;
 }
 
 // ==================== Helpers ====================
@@ -127,6 +150,14 @@ function fromApiSales(a: ApiSalesRecord): SalesRecord {
     shipping: a.shippingCost || 0,
     invoiceNo: a.invoiceNumber || '',
     status: (a.invoiceStatus === '已开' ? '已开' : '待开') as '已开' | '待开',
+    taxRate: `${a.taxRate || 13}%`,
+    amountWithoutTax: a.amountWithoutTax,
+    taxAmount: a.taxAmount,
+    pricePerTon: a.pricePerTon,
+    paymentStatus: a.payment_status || 'unpaid',
+    paidAmount: a.paid_amount || 0,
+    dueDate: a.due_date || '',
+    paymentDate: a.payment_date || '',
   };
 }
 
@@ -163,6 +194,13 @@ function fromApiPurchase(a: ApiPurchaseRecord): PurchaseRecord {
     taxRate: `${a.taxRate || 13}%`,
     invoiceNo: a.invoiceNumber || '',
     status: a.invoiceStatus || '已收',
+    amountWithoutTax: a.amountWithoutTax,
+    taxAmount: a.taxAmount,
+    pricePerTon: a.pricePerTon,
+    paymentStatus: a.payment_status || 'unpaid',
+    paidAmount: a.paid_amount || 0,
+    dueDate: a.due_date || '',
+    paymentDate: a.payment_date || '',
   };
 }
 
@@ -229,6 +267,13 @@ export async function createSale(record: SalesRecord): Promise<void> {
   });
 }
 
+export async function updateSale(id: string, record: SalesRecord): Promise<void> {
+  await apiFetch(`/api/sales/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(toApiSales(record)),
+  });
+}
+
 export async function deleteSale(id: string): Promise<void> {
   await apiFetch(`/api/sales/${encodeURIComponent(id)}`, {
     method: 'DELETE',
@@ -245,6 +290,13 @@ export async function fetchPurchases(): Promise<PurchaseRecord[]> {
 export async function createPurchase(record: PurchaseRecord): Promise<void> {
   await apiFetch('/api/purchases', {
     method: 'POST',
+    body: JSON.stringify(toApiPurchase(record)),
+  });
+}
+
+export async function updatePurchase(id: string, record: PurchaseRecord): Promise<void> {
+  await apiFetch(`/api/purchases/${encodeURIComponent(id)}`, {
+    method: 'PUT',
     body: JSON.stringify(toApiPurchase(record)),
   });
 }

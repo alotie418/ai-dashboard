@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { BusinessData } from '../types';
 import { analyzeInvoice } from '../services/ocrService';
-import { fetchSales, createSale, deleteSale, SalesRecord } from '../services/api';
+import { fetchSales, createSale, updateSale, deleteSale, SalesRecord } from '../services/api';
 import CsvImportModal from './CsvImportModal';
 
 interface Props {
@@ -22,6 +22,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
   const [records, setRecords] = useState<SalesRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCsvImport, setShowCsvImport] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Load records from API on mount
   useEffect(() => {
@@ -102,11 +103,20 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
       alert("请填写必要的客户和数量信息");
       return;
     }
-    const recordToAdd: SalesRecord = { id: nextSalesId(), ...newSale, status: '已开' };
     try {
-      await createSale(recordToAdd);
-      setRecords(prev => [recordToAdd, ...prev]);
+      if (editingId) {
+        // Update existing record
+        const recordToUpdate: SalesRecord = { id: editingId, ...newSale, status: '已开' };
+        await updateSale(editingId, recordToUpdate);
+        setRecords(prev => prev.map(r => r.id === editingId ? recordToUpdate : r));
+      } else {
+        // Create new record
+        const recordToAdd: SalesRecord = { id: nextSalesId(), ...newSale, status: '已开' };
+        await createSale(recordToAdd);
+        setRecords(prev => [recordToAdd, ...prev]);
+      }
       setShowAddModal(false);
+      setEditingId(null);
       setNewSale({
         date: new Date().toISOString().split('T')[0],
         customer: '',
@@ -117,7 +127,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
       });
     } catch (err) {
       console.error(err);
-      alert('保存失败，请重试');
+      alert(editingId ? '更新失败，请重试' : '保存失败，请重试');
     }
   };
 
@@ -154,7 +164,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
             {isScanning ? '正在识别...' : '扫描发票'}
           </button>
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => { setEditingId(null); setShowAddModal(true); }}
             className="flex items-center px-4 py-2 bg-[#d97757] hover:bg-[#c56a4a] text-white rounded-lg transition-colors text-sm font-medium" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}
           >
             <i className="fas fa-plus mr-2"></i> 新增销售
@@ -278,6 +288,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                   <td className="px-6 py-5 text-xs font-medium space-x-3">
                     <button
                       onClick={() => {
+                        setEditingId(row.id);
                         setNewSale({ date: row.date, customer: row.customer, quantity: row.quantity, price: row.price, shipping: row.shipping, invoiceNo: row.invoiceNo });
                         setShowAddModal(true);
                       }}
@@ -334,12 +345,12 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
       {/* Add Sales Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAddModal(false)}></div>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setShowAddModal(false); setEditingId(null); }}></div>
           <div className="relative w-full max-w-lg bg-white border border-[#e0ddd5] rounded-xl overflow-hidden animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
             <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold text-[#191918]">新增销售记录</h2>
-                <p className="text-xs text-[#5c5c5a] mt-1">手动录入销售交易明细</p>
+                <h2 className="text-xl font-bold text-[#191918]">{editingId ? '编辑销售记录' : '新增销售记录'}</h2>
+                <p className="text-xs text-[#5c5c5a] mt-1">{editingId ? '修改已有的销售交易明细' : '手动录入销售交易明细'}</p>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-[#5c5c5a] hover:text-[#191918] transition-colors">
                 <i className="fas fa-times text-xl"></i>
@@ -436,7 +447,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                   type="submit"
                   className="flex-2 px-10 py-4 bg-[#d97757] hover:bg-[#c56a4a] text-white font-bold rounded-xl transition-all active:scale-95" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}
                 >
-                  确认新增
+                  {editingId ? '确认修改' : '确认新增'}
                 </button>
               </div>
             </form>

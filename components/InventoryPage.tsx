@@ -47,7 +47,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
 
   const allInvoices = useMemo(() => {
     const output = salesRecords.map(r => {
-      const rate = 0.13;
+      const rate = parseTaxRate((r as any).taxRate || '13%');
       const amountNoTax = Math.round(r.price / (1 + rate) * 100) / 100;
       const taxAmt = Math.round((r.price - amountNoTax) * 100) / 100;
       return {
