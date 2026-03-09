@@ -1,7 +1,7 @@
 // Gemini API caller for Cloud Run — no 30s wall-time limit
 // Uses raw fetch for full control over timeouts
 
-const GEMINI_MODEL = 'gemini-3.1-pro';
+const GEMINI_MODEL = 'gemini-2.5-pro';
 const GEMINI_FALLBACK_MODEL = 'gemini-2.5-flash';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const DEFAULT_TIMEOUT_MS = 60000; // 60s — generous since Cloud Run has no wall-time limit
