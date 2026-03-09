@@ -197,7 +197,7 @@ const DIRECT_PRICE_SCHEMA = {
 // ==================== Search Infrastructure ====================
 
 const CACHE_TTL_SECONDS = 1800; // 30 minutes
-const GEMINI_MODEL = 'gemini-2.5-pro';
+const GEMINI_MODEL = 'gemini-3.1-pro-preview';
 const GEMINI_FALLBACK_MODEL = 'gemini-2.5-flash';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const FETCH_TIMEOUT_MS = 25000; // 25s per-request timeout (Worker has 30s wall limit)
