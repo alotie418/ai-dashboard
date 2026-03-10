@@ -18,11 +18,12 @@ export const analyzeInvoice = async (base64Data: string, mimeType: string): Prom
     你是一位专业的财务审计员。请从这张发票图片中提取以下信息：
     - date: 开票日期 (格式: YYYY-MM-DD)
     - customer: 客户名称/购方名称
-    - quantity: 货物数量及单位 (例如: "36.5吨 / 3650袋")
-    - price: 成交价/总计金额 (不含税数字)
+    - quantity: 货物总数量及单位 (例如: "36.5吨 / 3650袋")
+    - price: 价税合计金额 (含税总金额数字)
     - shipping: 运费/物流费用 (如果没找到则为 0)
     - invoiceNo: 发票号码 (20位数字左右)
 
+    重要提示：price 字段请填写发票上的"价税合计"金额（含税），不要填写"合计金额"（不含税）。
     请以 JSON 格式返回结果。
   `;
 

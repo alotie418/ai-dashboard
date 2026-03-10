@@ -2495,6 +2495,11 @@ ${pagesText}
           });
         }
 
+        // --- VAT statistics ---
+        const cumulativeInput = purchaseAgg.totalTaxAmount || 0;
+        const cumulativeOutput = salesAgg.totalTaxAmount || 0;
+        const estimatedPayable = cumulativeOutput - cumulativeInput;
+
         // --- Financial statement (不含税口径) ---
         const salesRevenue = salesAgg.totalAmountWithoutTax || 0;
         const costOfSales = salesAgg.totalTons > 0 && avgCostPerTonNoTax > 0
@@ -2503,18 +2508,15 @@ ${pagesText}
         const grossProfit = salesRevenue - costOfSales;
         const grossMargin = salesRevenue > 0 ? Math.round(grossProfit / salesRevenue * 10000) / 100 : 0;
         const shippingFee = salesAgg.totalShipping || 0;
-        const taxSurcharge = 0; // Placeholder: computed from VAT
+        // 税金及附加 = 应交增值税 × 12% (城建税7% + 教育费附加3% + 地方教育附加2%)
+        const vatPayable = Math.max(estimatedPayable, 0);
+        const taxSurcharge = Math.round(vatPayable * 0.12 * 100) / 100;
         const adminExpense = 0;
         const incomeTax = 0;
         const netProfit = grossProfit - taxSurcharge - shippingFee - adminExpense - incomeTax;
         const netMargin = salesRevenue > 0 ? Math.round(netProfit / salesRevenue * 10000) / 100 : 0;
 
-        // --- VAT statistics ---
-        const cumulativeInput = purchaseAgg.totalTaxAmount || 0;
-        const cumulativeOutput = salesAgg.totalTaxAmount || 0;
-        const estimatedPayable = cumulativeOutput - cumulativeInput;
-
-        // --- Tax inclusive summary ---
+        // --- Tax inclusive summary (totalAmount is now tax-inclusive / 价税合计) ---
         const purchaseTotal = purchaseAgg.totalAmount || 0;
         const salesTotal = salesAgg.totalAmount || 0;
 

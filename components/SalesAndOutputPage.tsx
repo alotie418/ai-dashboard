@@ -264,7 +264,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                 <th className="px-6 py-4 font-medium">日期</th>
                 <th className="px-6 py-4 font-medium">客户</th>
                 <th className="px-6 py-4 font-medium">数量</th>
-                <th className="px-6 py-4 font-medium">成交价</th>
+                <th className="px-6 py-4 font-medium">成交价 (含税)</th>
                 <th className="px-6 py-4 font-medium">运费</th>
                 <th className="px-6 py-4 font-medium">发票号码</th>
                 <th className="px-6 py-4 font-medium">发票状态</th>
@@ -407,7 +407,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">成交总价 (不含税)</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">成交总价 (含税)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
                     <input

@@ -229,7 +229,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                 <th className="px-6 py-4 font-medium">日期</th>
                 <th className="px-6 py-4 font-medium">供应商</th>
                 <th className="px-6 py-4 font-medium">数量</th>
-                <th className="px-6 py-4 font-medium">进价</th>
+                <th className="px-6 py-4 font-medium">进价 (含税)</th>
                 <th className="px-6 py-4 font-medium">税率</th>
                 <th className="px-6 py-4 font-medium">发票号码</th>
                 <th className="px-6 py-4 font-medium">发票状态</th>
@@ -371,7 +371,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">进价 (不含税)</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">价税合计 (含税)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
                     <input
