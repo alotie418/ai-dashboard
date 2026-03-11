@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MOCK_BUSINESS_DATA } from './constants';
 import { fetchAIAnalysis } from './services/geminiService';
 import { AIAnalysis, BusinessData } from './types';
-import { fetchDashboardData } from './services/api';
+import { fetchDashboardData, fetchSales, fetchPurchases } from './services/api';
 import MetricCard from './components/MetricCard';
 import AIInsights from './components/AIInsights';
 import FinancialStatementTable from './components/FinancialStatementTable';
@@ -187,6 +187,43 @@ const AppContent: React.FC = () => {
     try {
       const dashboard = await fetchDashboardData(selectedYear);
       const m = dashboard.metrics;
+
+      // Enrich financialStatement with computed expense fields
+      const fs = dashboard.financialStatement;
+      let shippingFee = fs.shippingFee;
+      let taxSurcharge = fs.taxSurcharge;
+
+      // If Worker didn't compute shippingFee, derive from sales records
+      if (shippingFee === 0) {
+        try {
+          const salesRecords = await fetchSales();
+          shippingFee = Math.round(salesRecords.reduce((sum, s) => sum + (s.shipping || 0), 0) * 100) / 100;
+        } catch { /* fallback to 0 */ }
+      }
+
+      // 税金及附加 = (应交增值税) × 12% (城建税7% + 教育费附加3% + 地方教育附加2%)
+      if (taxSurcharge === 0 && dashboard.vatStatistics) {
+        const vatPayable = Math.max(0, dashboard.vatStatistics.cumulativeOutput - dashboard.vatStatistics.cumulativeInput);
+        taxSurcharge = Math.round(vatPayable * 0.12 * 100) / 100;
+      }
+
+      const revenue = fs.salesRevenue;
+      const cost = fs.costOfSales;
+      const grossProfit = Math.round((revenue - cost) * 100) / 100;
+      const netProfit = Math.round((revenue - cost - taxSurcharge - shippingFee - fs.adminExpense - fs.incomeTax) * 100) / 100;
+      const grossMargin = revenue === 0 ? 0 : +(grossProfit / revenue * 100).toFixed(2);
+      const netMargin = revenue === 0 ? 0 : +(netProfit / revenue * 100).toFixed(2);
+
+      const enrichedFS = {
+        ...fs,
+        shippingFee,
+        taxSurcharge,
+        grossProfit,
+        netProfit,
+        grossMargin,
+        netMargin,
+      };
+
       const next: BusinessData = {
         ...dataRef.current,
         metrics: [
@@ -225,7 +262,7 @@ const AppContent: React.FC = () => {
           salesTotalTons: m.salesTotalTons,
         },
         monthlyPerformance: dashboard.monthlyPerformance,
-        financialStatement: dashboard.financialStatement,
+        financialStatement: enrichedFS,
         vatStatistics: dashboard.vatStatistics,
         taxInclusiveSummary: dashboard.taxInclusiveSummary,
       };
@@ -494,7 +531,7 @@ const AppContent: React.FC = () => {
       }
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite-preview",
+        model: "gemini-2.0-flash",
         contents: chatHistory,
         config: {
           tools: [{ googleSearch: {} }],

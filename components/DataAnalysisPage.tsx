@@ -294,7 +294,7 @@ ${tavilyContext}`;
       // STEP 6: AI synthesis with Google Search grounding
       const ai = new GoogleGenAI({ apiKey: getApiKey() });
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite-preview",
+        model: "gemini-3-flash-preview",
         contents: prompt,
         config: {
           tools: [{ googleSearch: {} }],
@@ -406,7 +406,7 @@ ${tavilyContext}`;
               </div>
             ) : (
               <div className="group">
-                <p className="text-[#191918] text-2xl font-light leading-snug max-w-2xl">
+                <p className="text-[#191918] text-2xl font-light leading-snug max-w-2xl" style={{ whiteSpace: 'pre-wrap' }}>
                   {salesForecast || "正在等待数据注入..."}
                 </p>
                 <div className="mt-8 flex items-center space-x-6">

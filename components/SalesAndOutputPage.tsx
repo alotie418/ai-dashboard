@@ -39,10 +39,40 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
     quantity: '',
     price: 0,
     shipping: 0,
-    invoiceNo: ''
+    invoiceNo: '',
+    totalWithTax: 0,
+    unitPriceWithoutTax: 0,
+    taxAmount: 0
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-calculate: when totalWithTax + quantity change, compute price/unitPrice/taxAmount
+  useEffect(() => {
+    const { totalWithTax, quantity, taxRate } = newSale;
+    if (!totalWithTax || totalWithTax <= 0) return;
+
+    const rateNum = parseFloat((taxRate || '13%').replace('%', '')) || 13;
+    const amountWithoutTax = Math.round((totalWithTax / (1 + rateNum / 100)) * 100) / 100;
+    const taxAmount = Math.round((totalWithTax - amountWithoutTax) * 100) / 100;
+
+    const tonsMatch = quantity.match(/[\d.]+/);
+    const tons = tonsMatch ? parseFloat(tonsMatch[0]) : 0;
+    const unitPrice = tons > 0 ? Math.round((amountWithoutTax / tons) * 100) / 100 : 0;
+
+    if (
+      newSale.price !== amountWithoutTax ||
+      newSale.unitPriceWithoutTax !== unitPrice ||
+      newSale.taxAmount !== taxAmount
+    ) {
+      setNewSale(prev => ({
+        ...prev,
+        price: amountWithoutTax,
+        unitPriceWithoutTax: unitPrice,
+        taxAmount
+      }));
+    }
+  }, [newSale.totalWithTax, newSale.quantity, newSale.taxRate]);
 
   const formatCurrency = (val: number) => `¥${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -79,10 +109,24 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
 
       const extracted = await analyzeInvoice(base64, file.type);
 
+      const taxRate = extracted.price > 0 && extracted.taxAmount > 0
+        ? `${Math.round((extracted.taxAmount / extracted.price) * 100)}%`
+        : '13%';
+
       const newRecord: SalesRecord = {
         id: nextSalesId(),
-        ...extracted,
-        status: '已开'
+        date: extracted.date,
+        customer: extracted.customer,
+        quantity: extracted.quantity,
+        price: extracted.price,
+        shipping: extracted.shipping,
+        invoiceNo: extracted.invoiceNo,
+        status: '已开',
+        taxRate,
+        totalWithTax: extracted.totalWithTax || 0,
+        unitPriceWithoutTax: extracted.unitPriceWithoutTax || 0,
+        taxAmount: extracted.taxAmount || 0,
+        amountWithoutTax: extracted.price
       };
 
       await createSale(newRecord);
@@ -123,7 +167,10 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
         quantity: '',
         price: 0,
         shipping: 0,
-        invoiceNo: ''
+        invoiceNo: '',
+        totalWithTax: 0,
+        unitPriceWithoutTax: 0,
+        taxAmount: 0
       });
     } catch (err) {
       console.error(err);
@@ -261,35 +308,46 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-[#e0ddd5] text-[#5c5c5a] text-xs">
-                <th className="px-6 py-4 font-medium">日期</th>
-                <th className="px-6 py-4 font-medium">客户</th>
-                <th className="px-6 py-4 font-medium">数量</th>
-                <th className="px-6 py-4 font-medium">成交价</th>
-                <th className="px-6 py-4 font-medium">运费</th>
-                <th className="px-6 py-4 font-medium">发票号码</th>
-                <th className="px-6 py-4 font-medium">发票状态</th>
-                <th className="px-6 py-4 font-medium">操作</th>
+                <th className="px-5 py-4 font-medium">日期</th>
+                <th className="px-5 py-4 font-medium">客户</th>
+                <th className="px-5 py-4 font-medium">数量</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">无税单价</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">合计无税金额</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">合计税额</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">价税合计</th>
+                <th className="px-5 py-4 font-medium">运费</th>
+                <th className="px-5 py-4 font-medium">发票号码</th>
+                <th className="px-5 py-4 font-medium">状态</th>
+                <th className="px-5 py-4 font-medium">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e0ddd5]/50">
-              {records.map((row) => (
+              {records.map((row) => {
+                const unitPrice = row.unitPriceWithoutTax || (row.pricePerTon || 0);
+                const amtWithoutTax = row.amountWithoutTax || row.price;
+                const taxAmt = row.taxAmount || 0;
+                const totalWT = row.totalWithTax || (amtWithoutTax + taxAmt);
+                return (
                 <tr key={row.id} className="hover:bg-[#f9f9f8]/30 transition-colors">
-                  <td className="px-6 py-5 text-sm text-[#4a4a48]">{row.date}</td>
-                  <td className="px-6 py-5 text-sm text-[#191918] font-medium">{row.customer}</td>
-                  <td className="px-6 py-5 text-sm text-[#4a4a48]">{row.quantity}</td>
-                  <td className="px-6 py-5 text-sm text-[#191918] font-medium">{formatCurrency(row.price)}</td>
-                  <td className="px-6 py-5 text-sm text-[#4a4a48]">{formatCurrency(row.shipping)}</td>
-                  <td className="px-6 py-5 text-sm font-mono text-[#4a4a48] tracking-tight">{row.invoiceNo}</td>
-                  <td className="px-6 py-5">
+                  <td className="px-5 py-5 text-sm text-[#4a4a48] whitespace-nowrap">{row.date}</td>
+                  <td className="px-5 py-5 text-sm text-[#191918] font-medium">{row.customer}</td>
+                  <td className="px-5 py-5 text-sm text-[#4a4a48]">{row.quantity}</td>
+                  <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{formatCurrency(unitPrice)}</td>
+                  <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{formatCurrency(amtWithoutTax)}</td>
+                  <td className="px-5 py-5 text-sm text-rose-600 font-medium whitespace-nowrap">{formatCurrency(taxAmt)}</td>
+                  <td className="px-5 py-5 text-sm text-[#191918] font-bold whitespace-nowrap">{formatCurrency(totalWT)}</td>
+                  <td className="px-5 py-5 text-sm text-[#4a4a48]">{formatCurrency(row.shipping)}</td>
+                  <td className="px-5 py-5 text-sm font-mono text-[#4a4a48] tracking-tight">{row.invoiceNo}</td>
+                  <td className="px-5 py-5">
                     <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-md text-[10px] font-bold">
                       {row.status}
                     </span>
                   </td>
-                  <td className="px-6 py-5 text-xs font-medium space-x-3">
+                  <td className="px-5 py-5 text-xs font-medium space-x-3">
                     <button
                       onClick={() => {
                         setEditingId(row.id);
-                        setNewSale({ date: row.date, customer: row.customer, quantity: row.quantity, price: row.price, shipping: row.shipping, invoiceNo: row.invoiceNo });
+                        setNewSale({ date: row.date, customer: row.customer, quantity: row.quantity, price: row.price, shipping: row.shipping, invoiceNo: row.invoiceNo, totalWithTax: row.totalWithTax || 0, unitPriceWithoutTax: row.unitPriceWithoutTax || 0, taxAmount: row.taxAmount || 0 });
                         setShowAddModal(true);
                       }}
                       className="text-[#d97757] hover:text-[#c56a4a] transition-colors"
@@ -310,19 +368,54 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {isLoading && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-[#5c5c5a] text-sm">
+                  <td colSpan={11} className="px-6 py-12 text-center text-[#5c5c5a] text-sm">
                     <i className="fas fa-spinner animate-spin mr-2"></i>正在加载数据...
                   </td>
                 </tr>
               )}
               {!isLoading && records.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-[#5c5c5a] text-sm italic">
+                  <td colSpan={11} className="px-6 py-12 text-center text-[#5c5c5a] text-sm italic">
                     暂无销售记录，请上传发票或手动新增。
                   </td>
+                </tr>
+              )}
+              {/* Summary row */}
+              {!isLoading && records.length > 0 && (
+                <tr className="bg-[#f9f9f8] border-t-2 border-[#e0ddd5] font-semibold">
+                  <td className="px-5 py-4 text-sm text-[#191918]" colSpan={2}>合计</td>
+                  <td className="px-5 py-4 text-sm text-[#191918]">
+                    {(() => {
+                      const total = records.reduce((sum, r) => {
+                        const match = r.quantity.match(/[\d.]+/);
+                        return sum + (match ? parseFloat(match[0]) : 0);
+                      }, 0);
+                      const unit = records[0]?.quantity.replace(/[\d.\s]+/g, '') || '';
+                      return `${total}${unit}`;
+                    })()}
+                  </td>
+                  <td className="px-5 py-4 text-sm text-[#4a4a48]">—</td>
+                  <td className="px-5 py-4 text-sm text-[#191918] whitespace-nowrap">
+                    {formatCurrency(records.reduce((s, r) => s + (r.amountWithoutTax || r.price), 0))}
+                  </td>
+                  <td className="px-5 py-4 text-sm text-rose-600 whitespace-nowrap">
+                    {formatCurrency(records.reduce((s, r) => s + (r.taxAmount || 0), 0))}
+                  </td>
+                  <td className="px-5 py-4 text-sm text-[#191918] font-bold whitespace-nowrap">
+                    {formatCurrency(records.reduce((s, r) => {
+                      const amt = r.amountWithoutTax || r.price;
+                      const tax = r.taxAmount || 0;
+                      return s + (r.totalWithTax || (amt + tax));
+                    }, 0))}
+                  </td>
+                  <td className="px-5 py-4 text-sm text-[#4a4a48] whitespace-nowrap">
+                    {formatCurrency(records.reduce((s, r) => s + (r.shipping || 0), 0))}
+                  </td>
+                  <td colSpan={3}></td>
                 </tr>
               )}
             </tbody>
@@ -434,6 +527,52 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                   </div>
                 </div>
               </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">无税单价</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newSale.unitPriceWithoutTax || ''}
+                      onChange={(e) => setNewSale({ ...newSale, unitPriceWithoutTax: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+                      placeholder="可选"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">合计税额</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newSale.taxAmount || ''}
+                      onChange={(e) => setNewSale({ ...newSale, taxAmount: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+                      placeholder="可选"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">价税合计</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newSale.totalWithTax || ''}
+                      onChange={(e) => setNewSale({ ...newSale, totalWithTax: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+                      placeholder="可选"
+                    />
+                  </div>
+                </div>
+              </div>
+
 
               <div className="pt-4 flex space-x-3">
                 <button

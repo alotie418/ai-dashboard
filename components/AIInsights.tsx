@@ -36,7 +36,7 @@ const AIInsights: React.FC<AIInsightsProps> = ({ analysis, loading, error, onRef
           <>
             <section>
               <h4 className="text-xs font-semibold text-[#d97757] uppercase tracking-widest mb-2">执行摘要</h4>
-              <p className="text-[#4a4a48] leading-relaxed italic border-l-2 border-[#d97757]/50 pl-4 bg-[#d97757]/5 py-2 rounded-r-lg">
+              <p className="text-[#4a4a48] leading-relaxed italic border-l-2 border-[#d97757]/50 pl-4 bg-[#d97757]/5 py-2 rounded-r-lg" style={{ whiteSpace: 'pre-wrap' }}>
                 "{analysis.summary}"
               </p>
             </section>
@@ -47,7 +47,7 @@ const AIInsights: React.FC<AIInsightsProps> = ({ analysis, loading, error, onRef
                 {analysis.topInsights.map((insight, idx) => (
                   <li key={idx} className="flex items-start">
                     <span className="flex-shrink-0 w-1.5 h-1.5 mt-2 rounded-full bg-emerald-500 mr-3"></span>
-                    <span className="text-[#4a4a48] text-sm">{insight}</span>
+                    <span className="text-[#4a4a48] text-sm" style={{ whiteSpace: 'pre-wrap' }}>{insight}</span>
                   </li>
                 ))}
               </ul>
@@ -60,7 +60,7 @@ const AIInsights: React.FC<AIInsightsProps> = ({ analysis, loading, error, onRef
                   {analysis.anomalies.map((anomaly, idx) => (
                     <li key={idx} className="flex items-start bg-rose-500/5 border border-rose-500/20 p-3 rounded-xl">
                       <i className="fas fa-exclamation-triangle text-rose-500 mt-0.5 mr-3 text-sm"></i>
-                      <span className="text-[#4a4a48] text-sm">{anomaly}</span>
+                      <span className="text-[#4a4a48] text-sm" style={{ whiteSpace: 'pre-wrap' }}>{anomaly}</span>
                     </li>
                   ))}
                 </ul>
@@ -75,7 +75,7 @@ const AIInsights: React.FC<AIInsightsProps> = ({ analysis, loading, error, onRef
                     <div className="flex items-center mb-1">
                       <span className="bg-[#d97757]/20 text-[#d97757] text-[10px] px-2 py-0.5 rounded-full mr-2">建议 {idx + 1}</span>
                     </div>
-                    <p className="text-[#4a4a48] text-sm group-hover:text-[#191918] transition-colors">{rec}</p>
+                    <p className="text-[#4a4a48] text-sm group-hover:text-[#191918] transition-colors" style={{ whiteSpace: 'pre-wrap' }}>{rec}</p>
                   </div>
                 ))}
               </div>

@@ -10,22 +10,20 @@ interface Props {
   selectedMonth: string;
 }
 
+
 type InvoiceType = 'all' | 'input' | 'output';
 
 const parseTons = (qty: string) => { const m = qty.match(/[\d.]+/); return m ? parseFloat(m[0]) : 0; };
 const parseTaxRate = (s: string) => { const m = s.match(/[\d.]+/); return m ? parseFloat(m[0]) / 100 : 0.13; };
 
+
 const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<InvoiceType>('all');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [salesRecords, setSalesRecords] = useState<SalesRecord[]>([]);
   const [purchaseRecords, setPurchaseRecords] = useState<PurchaseRecord[]>([]);
-
-  useEffect(() => {
-    fetchSales().then(setSalesRecords).catch(console.error);
-    fetchPurchases().then(setPurchaseRecords).catch(console.error);
-  }, []);
 
   // Advanced filter state
   const [dateFrom, setDateFrom] = useState('');
@@ -35,6 +33,16 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
   const [weightMin, setWeightMin] = useState('');
   const [weightMax, setWeightMax] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  useEffect(() => {
+    Promise.all([fetchSales(), fetchPurchases()])
+      .then(([sales, purchases]) => {
+        setSalesRecords(sales);
+        setPurchaseRecords(purchases);
+      })
+      .catch((err) => console.error('Failed to load invoice data:', err))
+      .finally(() => setIsLoadingData(false));
+  }, []);
 
   const clearAdvancedFilters = () => {
     setDateFrom(''); setDateTo('');
@@ -47,13 +55,13 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
 
   const allInvoices = useMemo(() => {
     const output = salesRecords.map(r => {
-      const rate = parseTaxRate((r as any).taxRate || '13%');
-      const amountNoTax = Math.round(r.price / (1 + rate) * 100) / 100;
+      const taxRate = 0.13;
+      const amountNoTax = Math.round(r.price / (1 + taxRate) * 100) / 100;
       const taxAmt = Math.round((r.price - amountNoTax) * 100) / 100;
       return {
         date: r.date, type: '销项', partner: r.customer,
         weight: `${parseTons(r.quantity)}t`, amount: amountNoTax, tax: taxAmt,
-        invoiceNo: r.invoiceNo, status: r.status === '已开' ? '已验真' : '待开票',
+        invoiceNo: r.invoiceNo, status: r.status === '已开' ? '已开票' : '待开票',
       };
     });
     const input = purchaseRecords.map(r => {
@@ -68,6 +76,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
     });
     return [...output, ...input].sort((a, b) => b.date.localeCompare(a.date));
   }, [salesRecords, purchaseRecords]);
+
 
   const filteredInvoices = useMemo(() => {
     return allInvoices.filter(inv => {

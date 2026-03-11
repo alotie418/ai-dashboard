@@ -15,7 +15,8 @@ import {
   validateExtractResponse,
   parseGeminiJSON,
 } from './server/schemas.js';
-import { rankAndDedup } from './server/ranking.js';
+import { rankAndDedup, rankAndDedupSemantic } from './server/ranking.js';
+import { embedTexts, cosineSimilarity, mmrSelect } from './server/embedding.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -112,15 +113,20 @@ app.post('/api/agent/plan', async (req, res) => {
   }
 });
 
-// --- Rank Agent (pure JS, no Gemini) ---
+// --- Rank Agent (Semantic with Embedding 2, fallback to keyword) ---
 app.post('/api/agent/rank', async (req, res) => {
   const start = Date.now();
   try {
     const { query, results } = req.body;
     if (!query || !results) return res.status(400).json({ error: 'Missing query or results' });
 
-    const result = rankAndDedup(query, results);
-    console.log(`[Rank] ${Date.now() - start}ms, before=${result.dedup_stats.before}, after=${result.dedup_stats.after}`);
+    let result;
+    if (GEMINI_API_KEY) {
+      result = await rankAndDedupSemantic(GEMINI_API_KEY, query, results);
+    } else {
+      result = rankAndDedup(query, results);
+    }
+    console.log(`[Rank] ${Date.now() - start}ms, method=${result.dedup_stats.method || 'keyword'}, before=${result.dedup_stats.before}, after=${result.dedup_stats.after}`);
     res.json(result);
   } catch (err) {
     console.error(`[Rank] Error (${Date.now() - start}ms):`, err.message);
@@ -128,7 +134,7 @@ app.post('/api/agent/rank', async (req, res) => {
   }
 });
 
-// --- Extract Agent ---
+// --- Extract Agent (with MMR evidence re-ranking) ---
 app.post('/api/agent/extract', async (req, res) => {
   const start = Date.now();
   try {
@@ -146,8 +152,42 @@ app.post('/api/agent/extract', async (req, res) => {
     const parsed = parseGeminiJSON(text);
     const validated = validateExtractResponse(parsed);
 
-    console.log(`[Extract] ${Date.now() - start}ms, model=${modelUsed}, evidence=${validated.evidence.length}`);
-    res.json(validated);
+    // MMR re-ranking: embed query + evidence, re-order by relevance × diversity
+    let finalEvidence = validated.evidence;
+    if (finalEvidence.length > 2) {
+      try {
+        const evidenceTexts = finalEvidence.map(e => e.text);
+        const allTexts = [query, ...evidenceTexts];
+        const embeddings = await embedTexts(GEMINI_API_KEY, allTexts, 'RETRIEVAL_DOCUMENT');
+
+        if (embeddings.length === allTexts.length) {
+          const queryEmb = embeddings[0];
+          const evidenceEmbs = embeddings.slice(1);
+
+          // MMR selection: λ=0.7 balances relevance (70%) with diversity (30%)
+          const mmrIndices = mmrSelect(queryEmb, evidenceEmbs, finalEvidence.length, 0.7);
+
+          // Re-order evidence by MMR ranking
+          const reranked = mmrIndices.map(idx => {
+            const e = finalEvidence[idx];
+            const sim = cosineSimilarity(queryEmb, evidenceEmbs[idx]);
+            // Penalize low-relevance evidence
+            if (sim < 0.3) {
+              e.confidence = Math.round(e.confidence * 0.5 * 100) / 100;
+            }
+            return { ...e, semantic_relevance: Math.round(sim * 1000) / 1000 };
+          });
+
+          finalEvidence = reranked;
+          console.log(`[Extract] MMR re-ranked ${reranked.length} evidence items`);
+        }
+      } catch (embErr) {
+        console.warn(`[Extract] MMR re-ranking skipped: ${embErr.message}`);
+      }
+    }
+
+    console.log(`[Extract] ${Date.now() - start}ms, model=${modelUsed}, evidence=${finalEvidence.length}`);
+    res.json({ evidence: finalEvidence });
   } catch (err) {
     console.error(`[Extract] Error (${Date.now() - start}ms):`, err.message);
     res.status(502).json({ error: err.message });
@@ -172,7 +212,7 @@ app.post('/api/agent/synthesize', async (req, res) => {
         responseSchema: SYNTHESIS_RESPONSE_SCHEMA,
       },
     }, [
-      { model: 'gemini-2.5-flash', timeout: 120000 },
+      { model: 'gemini-3-flash-preview', timeout: 120000 },
     ]);
 
     const parsed = parseGeminiJSON(text);
@@ -213,7 +253,7 @@ app.post('/api/agent/critique', async (req, res) => {
         responseSchema: CRITIQUE_RESPONSE_SCHEMA,
       },
     }, [
-      { model: 'gemini-2.5-flash', timeout: 120000 },
+      { model: 'gemini-3-flash-preview', timeout: 120000 },
     ]);
 
     const parsed = parseGeminiJSON(text);

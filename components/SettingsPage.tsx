@@ -26,7 +26,7 @@ const SettingsPage: React.FC = () => {
     monthlyReport: true,
   });
   const [vatRate, setVatRate] = useState('13');
-  const [aiModel, setAiModel] = useState('gemini-3.1-pro');
+  const [aiModel, setAiModel] = useState('gemini-3-flash-preview');
 
   // Apply fetched settings to state
   const applySettings = (s: any) => {
@@ -213,9 +213,9 @@ const SettingsPage: React.FC = () => {
                       <span className="text-[10px] font-bold bg-[#d97757] px-2 py-0.5 rounded text-white uppercase">PREVIEW</span>
                     </div>
                     <select value={aiModel} onChange={e => setAiModel(e.target.value)} className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#d97757] outline-none">
-                      <option value="gemini-3-pro">Gemini 3 Pro (推荐 - 高精度分析)</option>
-                      <option value="gemini-3.1-pro">Gemini 3.1 Pro (增强版 - 更强推理)</option>
-                      <option value="gemini-3-flash">Gemini 3 Flash (响应极快 - 轻量任务)</option>
+                      <option value="gemini-3-flash-preview">Gemini 3 Flash (推荐 - 高速高质)</option>
+                      <option value="gemini-3-pro">Gemini 3 Pro (高精度分析)</option>
+                      <option value="gemini-2.5-flash">Gemini 2.5 Flash (备选)</option>
                     </select>
                   </div>
                   <div className="flex items-center justify-between p-4 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5]">

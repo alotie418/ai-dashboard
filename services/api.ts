@@ -20,6 +20,8 @@ export interface SalesRecord {
   amountWithoutTax?: number;
   taxAmount?: number;
   pricePerTon?: number;
+  totalWithTax?: number;
+  unitPriceWithoutTax?: number;
   paymentStatus?: string;
   paidAmount?: number;
   dueDate?: string;
@@ -38,6 +40,8 @@ export interface PurchaseRecord {
   amountWithoutTax?: number;
   taxAmount?: number;
   pricePerTon?: number;
+  totalWithTax?: number;
+  unitPriceWithoutTax?: number;
   paymentStatus?: string;
   paidAmount?: number;
   dueDate?: string;
@@ -118,21 +122,22 @@ function parseTaxRatePercent(taxRate: string): number {
 
 function toApiSales(r: SalesRecord): ApiSalesRecord {
   const tons = parseTons(r.quantity);
-  const totalAmount = r.price;
   const taxRate = parseTaxRatePercent((r as any).taxRate || '13%');
-  const amountWithoutTax = totalAmount / (1 + taxRate / 100);
-  const taxAmount = totalAmount - amountWithoutTax;
-  const pricePerTon = tons > 0 ? totalAmount / tons : 0;
+  const amountWithoutTax = r.amountWithoutTax || r.price;
+  // Prefer actual values from OCR/manual entry over computed
+  const taxAmount = r.taxAmount || Math.round(amountWithoutTax * (taxRate / 100) * 100) / 100;
+  const totalAmount = r.totalWithTax || Math.round((amountWithoutTax + taxAmount) * 100) / 100;
+  const pricePerTon = r.unitPriceWithoutTax || (tons > 0 ? Math.round((amountWithoutTax / tons) * 100) / 100 : 0);
 
   return {
     id: r.id,
     date: r.date,
     customer: r.customer,
     tons,
-    pricePerTon: Math.round(pricePerTon * 100) / 100,
+    pricePerTon,
     totalAmount,
     amountWithoutTax: Math.round(amountWithoutTax * 100) / 100,
-    taxAmount: Math.round(taxAmount * 100) / 100,
+    taxAmount,
     taxRate,
     shippingCost: r.shipping,
     invoiceNumber: r.invoiceNo,
@@ -146,7 +151,7 @@ function fromApiSales(a: ApiSalesRecord): SalesRecord {
     date: a.date,
     customer: a.customer || '',
     quantity: a.tons ? `${a.tons}吨` : '0吨',
-    price: a.totalAmount,
+    price: a.amountWithoutTax || a.totalAmount,
     shipping: a.shippingCost || 0,
     invoiceNo: a.invoiceNumber || '',
     status: (a.invoiceStatus === '已开' ? '已开' : '待开') as '已开' | '待开',
@@ -154,6 +159,8 @@ function fromApiSales(a: ApiSalesRecord): SalesRecord {
     amountWithoutTax: a.amountWithoutTax,
     taxAmount: a.taxAmount,
     pricePerTon: a.pricePerTon,
+    totalWithTax: a.totalAmount,
+    unitPriceWithoutTax: a.pricePerTon,
     paymentStatus: a.payment_status || 'unpaid',
     paidAmount: a.paid_amount || 0,
     dueDate: a.due_date || '',
@@ -163,21 +170,22 @@ function fromApiSales(a: ApiSalesRecord): SalesRecord {
 
 function toApiPurchase(r: PurchaseRecord): ApiPurchaseRecord {
   const tons = parseTons(r.quantity);
-  const totalAmount = r.price;
   const taxRate = parseTaxRatePercent(r.taxRate);
-  const amountWithoutTax = totalAmount / (1 + taxRate / 100);
-  const taxAmount = totalAmount - amountWithoutTax;
-  const pricePerTon = tons > 0 ? totalAmount / tons : 0;
+  const amountWithoutTax = r.amountWithoutTax || r.price;
+  // Prefer actual values from OCR/manual entry over computed
+  const taxAmount = r.taxAmount || Math.round(amountWithoutTax * (taxRate / 100) * 100) / 100;
+  const totalAmount = r.totalWithTax || Math.round((amountWithoutTax + taxAmount) * 100) / 100;
+  const pricePerTon = r.unitPriceWithoutTax || (tons > 0 ? Math.round((amountWithoutTax / tons) * 100) / 100 : 0);
 
   return {
     id: r.id,
     date: r.date,
     supplier: r.supplier,
     tons,
-    pricePerTon: Math.round(pricePerTon * 100) / 100,
+    pricePerTon,
     totalAmount,
     amountWithoutTax: Math.round(amountWithoutTax * 100) / 100,
-    taxAmount: Math.round(taxAmount * 100) / 100,
+    taxAmount,
     taxRate,
     invoiceNumber: r.invoiceNo,
     invoiceStatus: r.status,
@@ -190,13 +198,15 @@ function fromApiPurchase(a: ApiPurchaseRecord): PurchaseRecord {
     date: a.date,
     supplier: a.supplier || '',
     quantity: a.tons ? `${a.tons}吨` : '0吨',
-    price: a.totalAmount,
+    price: a.amountWithoutTax || a.totalAmount,
     taxRate: `${a.taxRate || 13}%`,
     invoiceNo: a.invoiceNumber || '',
     status: a.invoiceStatus || '已收',
     amountWithoutTax: a.amountWithoutTax,
     taxAmount: a.taxAmount,
     pricePerTon: a.pricePerTon,
+    totalWithTax: a.totalAmount,
+    unitPriceWithoutTax: a.pricePerTon,
     paymentStatus: a.payment_status || 'unpaid',
     paidAmount: a.paid_amount || 0,
     dueDate: a.due_date || '',

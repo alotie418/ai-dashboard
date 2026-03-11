@@ -1,4 +1,5 @@
 // Ranking and deduplication logic — extracted from worker/src/index.js
+import { embedTexts, cosineSimilarity } from './embedding.js';
 
 /** Domain authority scores for ranking */
 const DOMAIN_AUTHORITY = {
@@ -132,4 +133,85 @@ export function rankAndDedup(query, results) {
       removed_similar: removedSimilar,
     },
   };
+}
+
+/**
+ * Semantic version of rankAndDedup using Gemini Embedding 2.
+ * Uses cosine similarity for dedup and relevance scoring.
+ * Falls back to keyword-based rankAndDedup on embedding API failure.
+ */
+export async function rankAndDedupSemantic(apiKey, query, results) {
+  try {
+    // Step 1: URL dedup (same as original — cheap, no API needed)
+    const urlSeen = new Set();
+    let removedUrls = 0;
+    const urlDeduped = results.filter(r => {
+      if (!r.url) return true;
+      const norm = r.url.replace(/[?#].*$/, '').replace(/\/$/, '').toLowerCase();
+      if (urlSeen.has(norm)) { removedUrls++; return false; }
+      urlSeen.add(norm);
+      return true;
+    });
+
+    // Step 2: Embed query + all document texts in one batch
+    const docTexts = urlDeduped.map(r => ((r.title || '') + ' ' + (r.content || '').slice(0, 500)).trim());
+    const allTexts = [query, ...docTexts];
+    const embeddings = await embedTexts(apiKey, allTexts, 'RETRIEVAL_DOCUMENT');
+
+    if (embeddings.length !== allTexts.length) {
+      console.warn('[Rank] Embedding count mismatch, falling back to keyword ranking');
+      return rankAndDedup(query, results);
+    }
+
+    const queryEmb = embeddings[0];
+    const docEmbs = embeddings.slice(1);
+
+    // Step 3: Semantic title dedup (cosine > 0.85)
+    let removedSimilar = 0;
+    const titleDeduped = [];
+    const titleDedupedEmbs = [];
+    for (let i = 0; i < urlDeduped.length; i++) {
+      let isDup = false;
+      for (let j = 0; j < titleDedupedEmbs.length; j++) {
+        if (cosineSimilarity(docEmbs[i], titleDedupedEmbs[j]) > 0.85) {
+          isDup = true;
+          removedSimilar++;
+          break;
+        }
+      }
+      if (!isDup) {
+        titleDeduped.push(urlDeduped[i]);
+        titleDedupedEmbs.push(docEmbs[i]);
+      }
+    }
+
+    // Step 4: Score with semantic relevance + domain authority + recency + diversity
+    const sourceSeen = new Set();
+    const scored = titleDeduped.map((r, i) => {
+      const relevance = Math.max(0, cosineSimilarity(queryEmb, titleDedupedEmbs[i]));
+      const authority = getDomainAuthority(r.url);
+      const recency = computeRecency(r.published_date);
+      const isNewSource = !sourceSeen.has(r.source);
+      if (r.source) sourceSeen.add(r.source);
+      const diversity = isNewSource ? 1.0 : 0.3;
+      const score = 0.35 * relevance + 0.25 * authority + 0.2 * recency + 0.2 * diversity;
+      return { ...r, score: Math.round(score * 1000) / 1000, relevance: Math.round(relevance * 1000) / 1000, authority, recency, diversity };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+
+    return {
+      ranked: scored,
+      dedup_stats: {
+        before: results.length,
+        after: scored.length,
+        removed_urls: removedUrls,
+        removed_similar: removedSimilar,
+        method: 'semantic',
+      },
+    };
+  } catch (err) {
+    console.warn(`[Rank] Semantic ranking failed (${err.message}), falling back to keyword ranking`);
+    return rankAndDedup(query, results);
+  }
 }

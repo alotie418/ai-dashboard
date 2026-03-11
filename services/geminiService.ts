@@ -13,7 +13,7 @@ export const fetchAIAnalysis = async (data: BusinessData, marketSummary?: string
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-lite-preview",
+      model: "gemini-2.0-flash",
       contents: `Analyze this business data and provide insights: ${JSON.stringify(data)}${marketContext}`,
       config: {
         systemInstruction: AI_SYSTEM_INSTRUCTION,

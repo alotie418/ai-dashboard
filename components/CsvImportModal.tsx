@@ -166,8 +166,9 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
     }
     const taxRate = record.taxRate || 13;
     record.taxRate = taxRate;
-    record.amountWithoutTax = Math.round((record.totalAmount / (1 + taxRate / 100)) * 100) / 100;
-    record.taxAmount = Math.round((record.totalAmount - record.amountWithoutTax) * 100) / 100;
+    record.amountWithoutTax = record.totalAmount;
+    record.taxAmount = Math.round((record.totalAmount * (taxRate / 100)) * 100) / 100;
+    record.totalAmount = Math.round((record.amountWithoutTax + record.taxAmount) * 100) / 100;
     return record;
   });
 
