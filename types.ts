@@ -85,8 +85,10 @@ export type PlatformCategory = 'B2C' | 'B2B' | 'industry' | 'international';
 export interface MarketPriceResult {
   platform: string;
   title: string;
-  price: number;
-  priceUnit?: string;  // 如 "元/kg"、"元/吨"、"元/袋"、"元/台"、"元"
+  price: number;               // 标准化后的元/吨单价
+  priceUnit?: string;          // 固定为 "元/吨"
+  original_price_str?: string; // 原始价格, 如 "¥25/10kg*2袋"
+  spec?: string;               // 包装规格, 如 "20kg (10kg×2袋)"
   link: string;
   platformCategory?: PlatformCategory;
 }

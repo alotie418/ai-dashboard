@@ -172,8 +172,11 @@ const MarketSearchPage: React.FC = () => {
   // Filtered prices
   const filteredPrices = useMemo(() => {
     if (!state.synthesis?.prices) return [];
-    if (activeCategory === 'all') return state.synthesis.prices;
-    return state.synthesis.prices.filter(p => p.platformCategory === activeCategory);
+    const filtered = activeCategory === 'all'
+      ? [...state.synthesis.prices]
+      : state.synthesis.prices.filter(p => p.platformCategory === activeCategory);
+    // Sort by standardized per-ton price ascending for meaningful comparison
+    return filtered.sort((a, b) => a.price - b.price);
   }, [state.synthesis, activeCategory]);
 
   const categoryCounts = useMemo(() => {
@@ -452,7 +455,7 @@ const MarketSearchPage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {filteredPrices.map((item, idx) => (
                 <div key={idx} className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl p-6 hover:border-[#d97757]/40 transition-all group">
-                  <div className="flex justify-between items-start mb-4">
+                  <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center space-x-2">
                       <span className="px-2 py-1 bg-[#d97757]/10 text-[#d97757] text-[10px] font-bold rounded uppercase tracking-wider">
                         {item.platform.replace(/\s*\[.*?\]\s*/, '')}
@@ -470,16 +473,26 @@ const MarketSearchPage: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <p className="text-2xl font-bold text-[#191918] group-hover:text-[#d97757] transition-colors">
-                      ¥{item.price.toLocaleString()}
-                      {item.priceUnit && item.priceUnit !== '元' && (
-                        <span className="text-sm font-normal text-[#7a7a78] ml-1">/{item.priceUnit.replace(/^元\/?/, '')}</span>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-[#191918] group-hover:text-[#d97757] transition-colors">
+                        ¥{item.price.toLocaleString()}
+                        <span className="text-sm font-normal text-[#7a7a78] ml-1">/吨</span>
+                      </p>
+                      {item.original_price_str && item.original_price_str !== `${item.price}元/吨` && (
+                        <p className="text-[10px] text-[#9a9a98] mt-0.5">原价: {item.original_price_str}</p>
                       )}
-                    </p>
+                    </div>
                   </div>
-                  <h4 className="text-sm font-medium text-[#4a4a48] line-clamp-2 mb-4 h-10 leading-snug">
+                  <h4 className="text-sm font-medium text-[#4a4a48] line-clamp-2 mb-1.5 leading-snug">
                     {item.title}
                   </h4>
+                  {item.spec && (
+                    <p className="text-[11px] text-[#7a7a78] mb-3 flex items-center">
+                      <i className="fas fa-box text-[9px] text-[#d97757]/40 mr-1.5"></i>
+                      规格: {item.spec}
+                    </p>
+                  )}
+                  {!item.spec && <div className="mb-3"></div>}
                   {item.link ? (
                     <a
                       href={item.link}

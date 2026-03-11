@@ -465,6 +465,44 @@ export function useAgenticSearch(): UseAgenticSearchReturn {
 
       // ==================== COMPLETE ====================
       setPhase('complete');
+
+      // Normalize prices to 元/吨 (client-side fallback if Gemini didn't do it)
+      if (currentSynthesis?.prices) {
+        currentSynthesis.prices = currentSynthesis.prices.map(p => {
+          // Already correct
+          if (p.priceUnit === '元/吨') return p;
+
+          let normalized = p.price;
+          const unit = (p.priceUnit || '').toLowerCase();
+
+          if (unit.includes('kg') || unit.includes('千克')) {
+            normalized = p.price * 1000;
+          } else if (unit.includes('斤') && !unit.includes('千')) {
+            normalized = p.price * 2000; // 1吨 = 2000斤
+          } else if (unit === '元' || unit === '') {
+            // Try to extract weight from spec or title
+            const weightMatch = (p.spec || p.title || '').match(/(\d+(?:\.\d+)?)\s*kg/i);
+            if (weightMatch) {
+              const kg = parseFloat(weightMatch[1]);
+              if (kg > 0 && kg < 1000) {
+                normalized = (p.price / kg) * 1000;
+              }
+            }
+          }
+          // If unit already contains '吨' or 'ton', keep as-is
+          if (unit.includes('吨') || unit.includes('ton')) {
+            normalized = p.price;
+          }
+
+          return {
+            ...p,
+            original_price_str: p.original_price_str || `${p.price}${p.priceUnit || '元'}`,
+            price: Math.round(normalized * 100) / 100,
+            priceUnit: '元/吨',
+          };
+        });
+      }
+
       setState(prev => ({
         ...prev,
         phase: 'complete',
@@ -476,7 +514,7 @@ export function useAgenticSearch(): UseAgenticSearchReturn {
       if (currentSynthesis?.prices && currentSynthesis.prices.length > 0) {
         savePriceHistory(query, currentSynthesis.prices.map(p => ({
           price: p.price,
-          priceUnit: p.priceUnit || '元',
+          priceUnit: '元/吨',
           platform: p.platform,
         }))).catch(e => console.warn('Price history save failed:', e));
       }

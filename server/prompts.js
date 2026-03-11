@@ -99,8 +99,23 @@ ${evidenceText}
 - **summaryTable**: 关键数据汇总，包含最低价、最高价、价格区间、市场均价、推荐对标平台、数据来源数量等。
   label 简短（≤10汉字），value 格式: "数值 单位 (来源)"
 
-- **prices**: 从证据中提取的所有价格条目，每条包含 platform、title、price(数字)、priceUnit、link(真实URL)、platformCategory(B2C|B2B|industry|international)
-  link 必须是证据中的真实 URL，禁止编造。无 URL 则填空字符串 ""。
+- **prices**: 从证据中提取的所有价格条目。**所有价格必须标准化为"元/吨"**：
+  **价格换算规则**（严格遵守）：
+  1. 识别包装规格总重量：10kg*2袋 = 20kg；4.5kg = 4.5kg；10kg = 10kg；25kg/袋 = 25kg；50斤 = 25kg
+  2. 换算公式：price_per_ton = (该包装总售价 / 总重量kg) × 1000
+  3. 如果原始单位已经是"吨"或"元/吨"，直接保留数值
+  4. 如果原始单位是"元/kg"，则乘以 1000
+  5. 如果是整包价格（如 ¥25/10kg），则 = (25/10) × 1000 = 2500 元/吨
+  
+  每条包含：
+  - platform: 平台名
+  - title: 商品标题
+  - price: 数字，**必须是换算后的元/吨单价**
+  - priceUnit: 固定填 "元/吨"
+  - original_price_str: 原始价格字符串，如 "¥25/10kg*2袋"、"1000元/吨"、"¥65/袋(10kg)"
+  - spec: 包装规格描述，如 "20kg (10kg×2袋)"、"10kg/袋"、"散装/吨"
+  - link: 真实URL，禁止编造。无 URL 则填空字符串 ""
+  - platformCategory: B2C|B2B|industry|international
 
 - **consensus**: 多源一致的共识结论列表
 - **contradictions**: 不同来源的矛盾发现列表
