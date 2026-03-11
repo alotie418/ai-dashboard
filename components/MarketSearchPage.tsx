@@ -129,6 +129,7 @@ const MarketSearchPage: React.FC = () => {
 
   // Timeline collapsed state
   const [timelineExpanded, setTimelineExpanded] = useState(true);
+  const [tableExpanded, setTableExpanded] = useState(false);
 
   // Agentic search hook
   const { state, isSearching, error, sourceCounts, startSearch, cancelSearch } = useAgenticSearch();
@@ -213,26 +214,13 @@ const MarketSearchPage: React.FC = () => {
     return <span className="font-semibold">{value}</span>;
   };
 
-  const renderSummaryTable = (table: MarketSummaryRow[]) => (
-    <div className="overflow-hidden rounded-lg border border-[#e0ddd5]">
-      <table className="w-full text-sm table-fixed">
-        <thead>
-          <tr className="bg-[#f0eeeb]">
-            <th className="text-left px-3 py-2 text-[9px] font-bold text-[#4a4a48] uppercase tracking-widest w-[38%]">指标</th>
-            <th className="text-left px-3 py-2 text-[9px] font-bold text-[#4a4a48] uppercase tracking-widest w-[62%]">数据</th>
-          </tr>
-        </thead>
-        <tbody>
-          {table.map((row, idx) => (
-            <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-[#f9f9f8]'}>
-              <td className="px-3 py-2 text-[#4a4a48] font-medium text-xs leading-snug">{row.label}</td>
-              <td className="px-3 py-2 text-[#191918] text-xs leading-snug">{renderValue(row.value)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  /** Pick the top N stat-card-worthy rows from summaryTable */
+  const extractStatCards = (table: MarketSummaryRow[]) => {
+    const priceKeywords = ['最低', '最高', '均价', '区间', '价格'];
+    const top = table.filter(r => priceKeywords.some(k => r.label.includes(k))).slice(0, 4);
+    if (top.length < 2) return table.slice(0, 4);
+    return top;
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -519,9 +507,9 @@ const MarketSearchPage: React.FC = () => {
           </div>
 
           {/* RIGHT: AI Analysis Report (1/3 width) */}
-          <div className="lg:col-span-1 space-y-6">
+          <div className="lg:col-span-1 space-y-5">
             {/* Confidence Score Card */}
-            <div className="bg-gradient-to-br from-[#f9f9f8] to-[#f0eeeb] border border-[#e0ddd5] rounded-xl p-6" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
+            <div className="bg-gradient-to-br from-[#f9f9f8] to-[#f0eeeb] border border-[#e0ddd5] rounded-xl p-5" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">
                   <i className="fas fa-shield-alt mr-1.5"></i>研究信心评分
@@ -555,8 +543,9 @@ const MarketSearchPage: React.FC = () => {
             {(state.synthesis.consensus?.length > 0 || state.synthesis.contradictions?.length > 0) && (
               <div className="space-y-3">
                 {state.synthesis.consensus?.length > 0 && (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                    <h4 className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest mb-2">
+                  <div className="bg-emerald-50/80 border border-emerald-200/60 rounded-xl p-4">
+                    <h4 className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest mb-2 flex items-center">
+                      <span className="w-0.5 h-3 bg-emerald-500 rounded-full mr-2"></span>
                       <i className="fas fa-check-double mr-1.5"></i>多源共识
                     </h4>
                     <ul className="space-y-1.5">
@@ -575,8 +564,9 @@ const MarketSearchPage: React.FC = () => {
                 )}
 
                 {state.synthesis.contradictions?.length > 0 && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                    <h4 className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-2">
+                  <div className="bg-amber-50/80 border border-amber-200/60 rounded-xl p-4">
+                    <h4 className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-2 flex items-center">
+                      <span className="w-0.5 h-3 bg-amber-500 rounded-full mr-2"></span>
                       <i className="fas fa-exclamation-triangle mr-1.5"></i>矛盾发现
                     </h4>
                     <ul className="space-y-1.5">
@@ -596,35 +586,101 @@ const MarketSearchPage: React.FC = () => {
               </div>
             )}
 
-            {/* Main Analysis Report */}
-            <div className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl p-8" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
-              <div className="flex items-center space-x-3 mb-5">
-                <i className="fas fa-robot text-[#d97757]"></i>
-                <h3 className="text-lg font-semibold text-[#191918]">AI 综合分析报告</h3>
+            {/* Main Analysis Report — Unified Panel */}
+            <div className="bg-white border border-[#e0ddd5] rounded-xl overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
+              {/* Panel Header */}
+              <div className="px-6 py-4 bg-gradient-to-r from-[#f9f9f8] to-white border-b border-[#e0ddd5]">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 bg-[#d97757]/10 rounded-lg flex items-center justify-center">
+                    <i className="fas fa-robot text-[#d97757] text-sm"></i>
+                  </div>
+                  <h3 className="text-base font-bold text-[#191918] tracking-tight">AI 综合分析报告</h3>
+                </div>
               </div>
 
-              {/* Summary Table */}
-              {state.synthesis.summaryTable && state.synthesis.summaryTable.length > 0 && (
-                <div className="mb-6">
-                  <h4 className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest mb-3">
-                    <i className="fas fa-table mr-1.5"></i>关键数据汇总
-                  </h4>
-                  {renderSummaryTable(state.synthesis.summaryTable)}
-                </div>
-              )}
+              <div className="p-6 space-y-6">
+                {/* Stat Cards — Top price indicators */}
+                {state.synthesis.summaryTable && state.synthesis.summaryTable.length > 0 && (() => {
+                  const cards = extractStatCards(state.synthesis.summaryTable);
+                  const remaining = state.synthesis.summaryTable.filter(r => !cards.includes(r));
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        {cards.map((row, idx) => {
+                          const valuePart = row.value.match(/^(.+?)(\s*\(.+\)\s*)?$/); 
+                          return (
+                            <div
+                              key={idx}
+                              className="bg-gradient-to-br from-[#f9f9f8] to-[#f5f4f1] border border-[#e8e5de] rounded-xl p-4 hover:border-[#d97757]/30 transition-all group"
+                            >
+                              <p className="text-[10px] font-bold text-[#7a7a78] uppercase tracking-wider mb-1.5 group-hover:text-[#d97757] transition-colors">
+                                {row.label}
+                              </p>
+                              <p className="text-sm font-bold text-[#191918] leading-snug">
+                                {valuePart?.[1] || row.value}
+                              </p>
+                              {valuePart?.[2] && (
+                                <p className="text-[10px] text-[#9a9a98] mt-0.5 leading-tight">
+                                  {valuePart[2].trim()}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
 
-              {/* Text Analysis */}
-              <div>
-                <h4 className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest mb-3">
-                  <i className="fas fa-lightbulb mr-1.5"></i>深度分析
-                </h4>
-                <AnalysisErrorBoundary>
-                  <div className="markdown-body text-sm text-[#4a4a48] leading-relaxed">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
-                      {cleanAnalysisText(state.synthesis.analysis)}
-                    </ReactMarkdown>
-                  </div>
-                </AnalysisErrorBoundary>
+                      {/* Accordion — Remaining detail rows */}
+                      {remaining.length > 0 && (
+                        <div className="border border-[#e8e5de] rounded-xl overflow-hidden">
+                          <button
+                            onClick={() => setTableExpanded(!tableExpanded)}
+                            className="w-full flex items-center justify-between px-4 py-3 bg-[#fafaf9] hover:bg-[#f5f4f1] transition-colors text-left"
+                          >
+                            <span className="text-[11px] font-bold text-[#5c5c5a] uppercase tracking-wider flex items-center">
+                              <span className="w-0.5 h-3.5 bg-[#d97757] rounded-full mr-2.5"></span>
+                              <i className="fas fa-table mr-1.5 text-[#d97757]/60"></i>
+                              完整数据明细
+                              <span className="ml-2 px-1.5 py-0.5 bg-[#e8e5de] text-[#7a7a78] rounded text-[9px] font-mono">{remaining.length}</span>
+                            </span>
+                            <i className={`fas fa-chevron-${tableExpanded ? 'up' : 'down'} text-[10px] text-[#9a9a98] transition-transform`}></i>
+                          </button>
+                          {tableExpanded && (
+                            <div className="border-t border-[#e8e5de]">
+                              <table className="w-full text-xs table-fixed">
+                                <tbody>
+                                  {remaining.map((row, idx) => (
+                                    <tr key={idx} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafaf9]'} hover:bg-[#f5f4f1] transition-colors`}>
+                                      <td className="px-4 py-2.5 text-[#5c5c5a] font-medium w-[40%] leading-snug">{row.label}</td>
+                                      <td className="px-4 py-2.5 text-[#191918] leading-snug">{renderValue(row.value)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+
+                {/* Divider */}
+                <div className="h-px bg-gradient-to-r from-transparent via-[#e0ddd5] to-transparent"></div>
+
+                {/* Text Analysis — with side decoration */}
+                <div>
+                  <h4 className="text-[11px] font-bold text-[#5c5c5a] uppercase tracking-wider mb-4 flex items-center">
+                    <span className="w-0.5 h-3.5 bg-[#d97757] rounded-full mr-2.5"></span>
+                    <i className="fas fa-lightbulb mr-1.5 text-[#d97757]/60"></i>深度分析
+                  </h4>
+                  <AnalysisErrorBoundary>
+                    <div className="markdown-body text-[13px] text-[#4a4a48] leading-[1.85] [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-[#191918] [&_h3]:mt-5 [&_h3]:mb-2 [&_h3]:flex [&_h3]:items-center [&_h3]:border-l-2 [&_h3]:border-[#d97757]/40 [&_h3]:pl-3 [&_h4]:text-[13px] [&_h4]:font-bold [&_h4]:text-[#4a4a48] [&_h4]:mt-4 [&_h4]:mb-1.5 [&_h4]:border-l-2 [&_h4]:border-[#e0ddd5] [&_h4]:pl-3 [&_p]:mb-3 [&_ul]:space-y-1 [&_ul]:mb-3 [&_li]:leading-relaxed [&_strong]:text-[#191918] [&_a]:text-[#d97757] [&_a]:underline [&_a]:underline-offset-2">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                        {cleanAnalysisText(state.synthesis.analysis)}
+                      </ReactMarkdown>
+                    </div>
+                  </AnalysisErrorBoundary>
+                </div>
               </div>
             </div>
           </div>
