@@ -78,8 +78,8 @@ export const SYNTHESIS_RESPONSE_SCHEMA = {
         properties: {
           platform: { type: 'STRING' },
           title: { type: 'STRING' },
-          price: { type: 'NUMBER', description: '标准化后的元/吨单价' },
-          priceUnit: { type: 'STRING', description: '固定为 元/吨' },
+          price: { type: 'NUMBER', description: '工业散货为换算后的元/吨单价，其他产品为原始价格' },
+          priceUnit: { type: 'STRING', description: '工业散货填 元/吨，其他产品填原始单位如 元/台、元/个' },
           original_price_str: { type: 'STRING', description: '原始价格字符串, 如 ¥25/10kg' },
           spec: { type: 'STRING', description: '包装规格, 如 20kg (10kg×2袋)' },
           link: { type: 'STRING' },

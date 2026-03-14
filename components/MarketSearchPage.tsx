@@ -476,9 +476,9 @@ const MarketSearchPage: React.FC = () => {
                     <div className="text-right">
                       <p className="text-2xl font-bold text-[#191918] group-hover:text-[#d97757] transition-colors">
                         ¥{item.price.toLocaleString()}
-                        <span className="text-sm font-normal text-[#7a7a78] ml-1">/吨</span>
+                        <span className="text-sm font-normal text-[#7a7a78] ml-1">/{(item.priceUnit || '元/吨').replace(/^元\//, '')}</span>
                       </p>
-                      {item.original_price_str && item.original_price_str !== `${item.price}元/吨` && (
+                      {item.original_price_str && item.original_price_str !== `${item.price}${item.priceUnit || '元/吨'}` && (
                         <p className="text-[10px] text-[#9a9a98] mt-0.5">原价: {item.original_price_str}</p>
                       )}
                     </div>
