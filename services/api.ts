@@ -1,8 +1,7 @@
 // API client for Cloudflare Worker + D1 persistence
 // Handles field mapping between frontend interfaces and D1 schema
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || '';
-const API_TOKEN = (import.meta.env.VITE_API_TOKEN as string) || '';
+const API_BASE = '';
 
 // ==================== Types ====================
 
@@ -222,9 +221,6 @@ async function apiFetch<T>(path: string, options?: RequestInit & { signal?: Abor
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  if (API_TOKEN) {
-    headers['Authorization'] = `Bearer ${API_TOKEN}`;
-  }
 
   // #8: Compose user signal with timeout signal
   const timeoutController = new AbortController();
@@ -242,6 +238,7 @@ async function apiFetch<T>(path: string, options?: RequestInit & { signal?: Abor
     const res = await fetch(`${API_BASE}${path}`, {
       ...options,
       signal: timeoutController.signal,
+      credentials: 'same-origin',
       headers: {
         ...headers,
         ...(options?.headers || {}),

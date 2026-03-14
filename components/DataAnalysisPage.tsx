@@ -5,8 +5,7 @@ import {
   ResponsiveContainer, BarChart, Bar, Legend, ComposedChart, Cell, ScatterChart, Scatter, ZAxis
 } from 'recharts';
 import { BusinessData } from '../types';
-import { GoogleGenAI, Type } from "@google/genai";
-import { getApiKey } from '../services/apiKey';
+// AI calls moved to server-side proxy
 import { searchTavily } from '../services/api';
 import { useMarketData } from '../contexts/MarketDataContext';
 
@@ -291,50 +290,43 @@ ${tavilyContext}`;
 3. 如果 VAR 模型预测与你自己的判断不一致，请在 insights 中说明原因和你的修正依据。
 4. 在 insights 中总结你参考了哪些市场数据源，以及主要风险因素。`;
 
-      // STEP 6: AI synthesis with Google Search grounding
-      const ai = new GoogleGenAI({ apiKey: getApiKey() });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          tools: [{ googleSearch: {} }],
+      // STEP 6: AI synthesis with Google Search grounding (via server proxy)
+      const aiResponse = await fetch('/api/ai/data-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          prompt,
           systemInstruction: "你是一位精通软水盐行业的首席财务官与市场分析师。你将收到：企业历史数据、本地统计模型（特征向量+VAR+蒙特卡洛）的计算结果、以及 Tavily 搜索到的市场情报。请结合所有信息和你自己的 Google 搜索结果，进行最终的综合预测。返回JSON，包含insights字符串和predictions数组。",
-          responseMimeType: "application/json",
           responseSchema: {
-            type: Type.OBJECT,
+            type: 'OBJECT',
             properties: {
-              insights: { type: Type.STRING },
+              insights: { type: 'STRING' },
               predictions: {
-                type: Type.ARRAY,
+                type: 'ARRAY',
                 items: {
-                  type: Type.OBJECT,
+                  type: 'OBJECT',
                   properties: {
-                    name: { type: Type.STRING },
-                    revenue: { type: Type.NUMBER },
-                    profit: { type: Type.NUMBER },
-                    confidenceUpper: { type: Type.NUMBER },
-                    confidenceLower: { type: Type.NUMBER }
+                    name: { type: 'STRING' },
+                    revenue: { type: 'NUMBER' },
+                    profit: { type: 'NUMBER' },
+                    confidenceUpper: { type: 'NUMBER' },
+                    confidenceLower: { type: 'NUMBER' }
                   }
                 }
               }
             }
           }
-        }
+        }),
       });
 
-      const result = JSON.parse(response.text || '{}');
+      if (!aiResponse.ok) throw new Error('AI analysis request failed');
+      const result = await aiResponse.json();
       setSalesForecast(result.insights || '分析完成。未来季度预计呈稳健增长趋势。');
 
-      // Extract Google Search grounding sources
-      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-      if (chunks) {
-        const sources: { title: string, uri: string }[] = [];
-        for (const chunk of chunks) {
-          if (chunk.web) {
-            sources.push({ title: chunk.web.title || '参考来源', uri: chunk.web.uri });
-          }
-        }
-        setGroundingSources(sources);
+      // Extract Google Search grounding sources from server response
+      if (result.groundingSources && result.groundingSources.length > 0) {
+        setGroundingSources(result.groundingSources);
       }
 
       // STEP 7: Final Monte Carlo on AI's predictions for confidence intervals

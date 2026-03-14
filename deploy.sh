@@ -4,11 +4,11 @@
 
 set -e
 
-echo "🚀 Starting deployment to Google Cloud Run..."
+echo "Starting deployment to Google Cloud Run..."
 
 # 1. Check for gcloud CLI
 if ! command -v gcloud &> /dev/null; then
-    echo "❌ Error: 'gcloud' CLI is not installed."
+    echo "Error: 'gcloud' CLI is not installed."
     echo "Please install it from: https://cloud.google.com/sdk/docs/install"
     exit 1
 fi
@@ -16,109 +16,88 @@ fi
 # 2. Configuration
 PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
 if [ -z "$PROJECT_ID" ]; then
-    echo "⚠️  No default Google Cloud project set."
+    echo "No default Google Cloud project set."
     read -p "Enter your Google Cloud Project ID: " INPUT_PROJECT_ID
     if [ -z "$INPUT_PROJECT_ID" ]; then
-        echo "❌ Project ID is required."
+        echo "Project ID is required."
         exit 1
     fi
     PROJECT_ID=$INPUT_PROJECT_ID
     gcloud config set project $PROJECT_ID
 fi
-echo "✅ Using Project ID: $PROJECT_ID"
+echo "Using Project ID: $PROJECT_ID"
 
-# Prompt for Service Name (to allow overwriting existing)
+# Prompt for Service Name
 read -p "Enter Cloud Run Service Name (default: ai-dashboard): " INPUT_APP_NAME
 APP_NAME=${INPUT_APP_NAME:-ai-dashboard}
-echo "✅ Target Service: $APP_NAME"
+echo "Target Service: $APP_NAME"
 
 # Prompt for Region
 read -p "Enter Region (default: us-central1): " INPUT_REGION
 REGION=${INPUT_REGION:-us-central1}
-echo "✅ Target Region: $REGION"
+echo "Target Region: $REGION"
 
 IMAGE_TAG="gcr.io/$PROJECT_ID/$APP_NAME"
 
-# 3. API Keys Handling
+# 3. Server-side API Keys
 echo ""
-echo "🔑 Configuration: API Keys"
-echo "These keys will be baked into the static build."
+echo "Configuration: Server-side environment variables"
+echo "These keys are set as Cloud Run env vars (NOT baked into the build)."
 
-# Helper to read env var or prompt
-get_key() {
-    local var_name=$1
-    local prompt_text=$2
-    local current_val=${!var_name}
-    
-    if [ -z "$current_val" ]; then
-        read -p "$prompt_text: " input_val
-        eval "$var_name=\"$input_val\""
-    else
-        echo "$prompt_text: (Using generic env var)"
-    fi
-}
-
-# Try to load from .env.local or .env if present
+# Try to load from .env.local
 if [ -f .env.local ]; then
     source .env.local
-elif [ -f .env ]; then
-    source .env
 fi
 
-if [ -z "$VITE_API_KEY" ]; then
-    read -p "Enter Gemini API Key (VITE_API_KEY): " VITE_API_KEY
+if [ -z "$GEMINI_API_KEY" ]; then
+    read -p "Enter Gemini API Key (GEMINI_API_KEY): " GEMINI_API_KEY
 fi
 
-if [ -z "$VITE_TAVILY_API_KEY" ]; then
-    read -p "Enter Tavily API Key (VITE_TAVILY_API_KEY): " VITE_TAVILY_API_KEY
+if [ -z "$TAVILY_API_KEY" ]; then
+    read -p "Enter Tavily API Key (TAVILY_API_KEY): " TAVILY_API_KEY
 fi
 
-if [ -z "$VITE_GOOGLE_SEARCH_API_KEY" ]; then
-    read -p "Enter Google Search API Key (VITE_GOOGLE_SEARCH_API_KEY, or press Enter to skip): " VITE_GOOGLE_SEARCH_API_KEY
+if [ -z "$SESSION_SECRET" ]; then
+    SESSION_SECRET=$(openssl rand -hex 32)
+    echo "Generated SESSION_SECRET: $SESSION_SECRET"
 fi
 
-if [ -z "$VITE_GOOGLE_SEARCH_CX" ]; then
-    read -p "Enter Google Search CX (VITE_GOOGLE_SEARCH_CX, or press Enter to skip): " VITE_GOOGLE_SEARCH_CX
+if [ -z "$AUTH_PASSWORD_HASH" ]; then
+    read -sp "Enter login password (will be hashed): " AUTH_PASSWORD
+    echo ""
+    AUTH_PASSWORD_HASH=$(node -e "import('bcryptjs').then(b=>b.default.hash('$AUTH_PASSWORD',12).then(console.log))")
+    echo "Generated password hash."
 fi
 
-# 4. Build & Push Image (using Cloud Build)
+AUTH_USERNAME=${AUTH_USERNAME:-admin}
+
+if [ -z "$API_TOKEN" ]; then
+    read -p "Enter Worker API Token (API_TOKEN): " API_TOKEN
+fi
+
+# 4. Build & Push Image
 echo ""
-echo "🏗️  Submitting build to Cloud Build..."
-echo "This may take a few minutes."
+echo "Submitting build to Cloud Build..."
 
-# Generate cloudbuild.yaml to pass build-args
-cat > cloudbuild.yaml <<EOF
-steps:
-- name: 'gcr.io/cloud-builders/docker'
-  args: [
-    'build',
-    '--build-arg', 'VITE_API_KEY=${VITE_API_KEY}',
-    '--build-arg', 'VITE_TAVILY_API_KEY=${VITE_TAVILY_API_KEY}',
-    '--build-arg', 'VITE_GOOGLE_SEARCH_API_KEY=${VITE_GOOGLE_SEARCH_API_KEY}',
-    '--build-arg', 'VITE_GOOGLE_SEARCH_CX=${VITE_GOOGLE_SEARCH_CX}',
-    '--build-arg', 'VITE_API_BASE_URL=${VITE_API_BASE_URL}',
-    '--build-arg', 'VITE_API_TOKEN=${VITE_API_TOKEN}',
-    '-t', '$IMAGE_TAG',
-    '.'
-  ]
-images:
-- '$IMAGE_TAG'
-EOF
+gcloud builds submit --tag $IMAGE_TAG .
 
-echo "📝 Generated temporary cloudbuild.yaml"
-gcloud builds submit --config cloudbuild.yaml .
-rm -f cloudbuild.yaml
-
-# 5. Deploy to Cloud Run
+# 5. Deploy to Cloud Run with server-side env vars
 echo ""
-echo "🚀 Deploying to Cloud Run..."
+echo "Deploying to Cloud Run..."
 
 gcloud run deploy $APP_NAME \
     --image $IMAGE_TAG \
     --platform managed \
     --region $REGION \
     --allow-unauthenticated \
-    --port 8080
+    --port 8080 \
+    --set-env-vars "GEMINI_API_KEY=$GEMINI_API_KEY" \
+    --set-env-vars "TAVILY_API_KEY=$TAVILY_API_KEY" \
+    --set-env-vars "SESSION_SECRET=$SESSION_SECRET" \
+    --set-env-vars "AUTH_USERNAME=$AUTH_USERNAME" \
+    --set-env-vars "AUTH_PASSWORD_HASH=$AUTH_PASSWORD_HASH" \
+    --set-env-vars "NODE_ENV=production" \
+    --set-env-vars "API_TOKEN=$API_TOKEN"
 
 echo ""
-echo "✅ Deployment Complete!"
+echo "Deployment Complete!"

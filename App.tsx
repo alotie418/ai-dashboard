@@ -18,10 +18,9 @@ import SettingsPage from './components/SettingsPage';
 import MarketSearchPage from './components/MarketSearchPage';
 import AccountsPage from './components/AccountsPage';
 import AlertCenter from './components/AlertCenter';
+import LoginPage from './components/LoginPage';
 import { MarketDataProvider, useMarketData } from './contexts/MarketDataContext';
-// SnowflakeEffect removed
 import { GoogleGenAI, Modality, LiveServerMessage, Blob as GenAIBlob } from "@google/genai";
-import { getApiKey } from './services/apiKey';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { analyzeInvoice } from './services/ocrService';
@@ -141,24 +140,18 @@ interface TavilyResult {
   score: number;
 }
 
+// Tavily search via server proxy
 const searchTavily = async (query: string): Promise<string> => {
-  const apiKey = import.meta.env.VITE_TAVILY_API_KEY;
-  if (!apiKey) return '';
   try {
-    const response = await fetch('https://api.tavily.com/search', {
+    const response = await fetch('/api/ai/tavily-search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        api_key: apiKey,
-        query: query,
-        search_depth: 'basic',
-        max_results: 5,
-        include_answer: false,
-      }),
+      credentials: 'same-origin',
+      body: JSON.stringify({ query }),
     });
     if (!response.ok) return '';
     const data = await response.json();
-    if (!data.results) return '';
+    if (!data.results || data.results.length === 0) return '';
     return (data.results as TavilyResult[]).map((r, i) =>
       `[Tavily Source ${i + 1}] ${r.title}\nURL: ${r.url}\nSummary: ${r.content}`
     ).join('\n\n');
@@ -201,7 +194,6 @@ const AppContent: React.FC = () => {
         } catch { /* fallback to 0 */ }
       }
 
-      // 税金及附加 = (应交增值税) × 12% (城建税7% + 教育费附加3% + 地方教育附加2%)
       if (taxSurcharge === 0 && dashboard.vatStatistics) {
         const vatPayable = Math.max(0, dashboard.vatStatistics.cumulativeOutput - dashboard.vatStatistics.cumulativeInput);
         taxSurcharge = Math.round(vatPayable * 0.12 * 100) / 100;
@@ -266,7 +258,7 @@ const AppContent: React.FC = () => {
         vatStatistics: dashboard.vatStatistics,
         taxInclusiveSummary: dashboard.taxInclusiveSummary,
       };
-      dataRef.current = next;  // Sync update ref BEFORE setData
+      dataRef.current = next;
       setData(next);
       return next;
     } catch (err) {
@@ -303,6 +295,7 @@ const AppContent: React.FC = () => {
   const [chatSize, setChatSize] = useState(DEFAULT_CHAT_SIZE);
   const isResizing = useRef(false);
   const startResizeData = useRef({ mouseX: 0, mouseY: 0, startW: 0, startH: 0 });
+  const contextCacheRef = useRef<{ text: string; ts: number } | null>(null);
 
   const resetChatSize = () => setChatSize(DEFAULT_CHAT_SIZE);
 
@@ -310,9 +303,7 @@ const AppContent: React.FC = () => {
     setLoadingAI(true);
     setAiError(null);
     try {
-      // Refresh dashboard data first; use returned value to avoid stale ref
       const freshData = await loadDashboardData();
-      // Build market summary if available
       let marketSummary: string | undefined;
       if (marketResults && marketQuery) {
         const summaryRows = marketResults.summaryTable?.map(r => `${r.label}: ${r.value}`).join('\n') || '';
@@ -358,11 +349,11 @@ const AppContent: React.FC = () => {
     setLiveStatus('idle');
   }, []);
 
-  // Cleanup live session on unmount
   useEffect(() => {
     return () => { stopLiveSession(); };
   }, [stopLiveSession]);
 
+  // Live voice session — still uses frontend SDK (WebSocket, plan for server token in v2)
   const startLiveSession = useCallback(async () => {
     setIsLiveMode(true);
     setLiveStatus('connecting');
@@ -382,7 +373,10 @@ const AppContent: React.FC = () => {
         } as any
       });
       liveStreamRef.current = stream;
-      const ai = new GoogleGenAI({ apiKey: getApiKey() });
+      // Live audio still needs direct SDK (WebSocket). API key fetched from server for this use case.
+      const keyRes = await fetch('/api/ai/live-key', { credentials: 'same-origin' });
+      const { key } = await keyRes.json();
+      const ai = new GoogleGenAI({ apiKey: key });
       if (!inputAudioCtxRef.current) inputAudioCtxRef.current = new AudioContext({ sampleRate: 16000 });
       if (!outputAudioCtxRef.current) outputAudioCtxRef.current = new AudioContext({ sampleRate: 24000 });
 
@@ -445,7 +439,7 @@ const AppContent: React.FC = () => {
           tools: [{ googleSearch: {} }],
           responseModalities: [Modality.AUDIO],
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } } },
-          systemInstruction: '你是一位精通业务看板数据的 AI 助手。对于语音交互，请保持回答**简练直接**。当用户询问商品价格或行情时：1. 优先使用 Google Search 查询最新价格。2. **直接报出价格数字**和关键趋势，不要通过长篇大论的铺垫。3. 如果有多个来源，简要概括范围（例如“目前市场价在 50 到 60 元之间”）。请像一位专业的交易员一样高效沟通。',
+          systemInstruction: '你是一位精通业务看板数据的 AI 助手。对于语音交互，请保持回答**简练直接**。当用户询问商品价格或行情时：1. 优先使用 Google Search 查询最新价格。2. **直接报出价格数字**和关键趋势，不要通过长篇大论的铺垫。3. 如果有多个来源，简要概括范围（例如"目前市场价在 50 到 60 元之间"）。请像一位专业的交易员一样高效沟通。',
         },
       });
       resolvedSession = await sessionPromise;
@@ -453,24 +447,22 @@ const AppContent: React.FC = () => {
     } catch (e) { console.error(e); setIsLiveMode(false); setLiveStatus('idle'); }
   }, [selectedVoice, stopLiveSession]);
 
+  // TTS via server proxy
   const handlePlayVoice = async (text: string, index: number) => {
     if (playingIndex !== null) return;
     setPlayingIndex(index);
     try {
-      const ai = new GoogleGenAI({ apiKey: getApiKey() });
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } } },
-        },
+      const res = await fetch('/api/ai/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ text, voiceName: selectedVoice }),
       });
-      const data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (data) {
+      const { data: audioData } = await res.json();
+      if (audioData) {
         if (!ttsAudioCtxRef.current) ttsAudioCtxRef.current = new AudioContext({ sampleRate: 24000 });
         const ctx = ttsAudioCtxRef.current;
-        const buf = await decodeAudioData(decode(data), ctx, 24000, 1);
+        const buf = await decodeAudioData(decode(audioData), ctx, 24000, 1);
         const source = ctx.createBufferSource();
         source.buffer = buf;
         source.connect(ctx.destination);
@@ -480,6 +472,7 @@ const AppContent: React.FC = () => {
     } catch (e) { setPlayingIndex(null); }
   };
 
+  // Chat via server proxy
   const handleSendMessage = async (predefinedMsg?: string) => {
     const text = predefinedMsg || chatInput;
     if (!text.trim() || isTyping || isLiveMode) return;
@@ -488,8 +481,6 @@ const AppContent: React.FC = () => {
     setChatInput('');
     setIsTyping(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: getApiKey() });
-
       // Trigger Tavily for market/news/price related queries
       let tavilyContext = '';
       if (/价格|行情|新闻|搜索|多少钱|趋势|分析|找|查/.test(text)) {
@@ -502,19 +493,34 @@ const AppContent: React.FC = () => {
         parts: [{ text: m.text }]
       }));
 
-      // Inject Tavily context into the last user message for the model configuration
+      // Inject Tavily context into the last user message
       if (tavilyContext) {
         const lastMsg = chatHistory[chatHistory.length - 1];
         lastMsg.parts[0].text += `\n\n[System Note: Additional External Search Context from Tavily]\n${tavilyContext}\n\nPlease use this context combined with Google Search to answer.`;
       }
 
-      // Compact context summary instead of full JSON dump
-      const perf = data.monthlyPerformance;
-      const fs = data.financialStatement;
-      const contextSummary = `企业概况：年营收¥${fs.salesRevenue.toLocaleString()}，毛利率${fs.grossMargin}%，净利率${fs.netMargin}%。` +
-        `近3月营收：${perf.slice(-3).map(p => `${p.name}:¥${p.revenue.toLocaleString()}`).join('，')}。` +
-        `近3月销量：${perf.slice(-3).map(p => `${p.name}:${p.salesTons}t`).join('，')}。` +
-        `增值税统计：进项${data.vatStatistics.cumulativeInput.toLocaleString()}，销项${data.vatStatistics.cumulativeOutput.toLocaleString()}。`;
+      // Fetch full business context from server (cached 60s)
+      let contextText = '';
+      try {
+        const now = Date.now();
+        if (contextCacheRef.current && now - contextCacheRef.current.ts < 60000) {
+          contextText = contextCacheRef.current.text;
+        } else {
+          const ctxRes = await fetch('/api/ai/context', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ year: selectedYear }),
+          });
+          const ctxData = await ctxRes.json();
+          contextText = ctxData.context || '';
+          contextCacheRef.current = { text: contextText, ts: now };
+        }
+      } catch {
+        // Fallback to basic summary if context endpoint fails
+        const fs = data.financialStatement;
+        contextText = `企业概况：年营收¥${fs.salesRevenue.toLocaleString()}，毛利率${fs.grossMargin}%，净利率${fs.netMargin}%。`;
+      }
 
       // Inject market search context if available
       let marketChatContext = '';
@@ -530,17 +536,30 @@ const AppContent: React.FC = () => {
           `\n请在回答中自然引用上述市场数据。`;
       }
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: chatHistory,
-        config: {
-          tools: [{ googleSearch: {} }],
-          systemInstruction: `你是一位专业的业务数据助手。以下是企业实时经营数据摘要：\n${contextSummary}${marketChatContext}\n你的职责：\n1. 基于上述数据简明扼要地回答用户关于企业内部经营的问题。\n2. 对于外部市场、竞品分析或一般性知识问题，你拥有 **Google Search Grounding** (原生联网) 和 **Tavily Context** (已注入的外部搜索结果) 双重信息源。\n3. 如果有市场搜索数据，请在回答中自然引用市场价格和趋势信息。\n4. 请综合利用这些信息，给出最准确、实时的回答。\n\n【排版要求】\n- 禁止使用三个星号 (***) 进行加粗斜体，这会导致显示异常。\n- 仅使用两个星号 (**) 进行加粗。\n- 使用清晰的列表和段落。`
-        }
-      });
+      const systemInstruction = `你是一位专业的企业经营数据助手，拥有企业全部实时经营数据的访问权限。
 
-      // Extract text from response (handle grounding metadata if needed, but for chat simple text is fine)
-      const content = response.candidates?.[0]?.content?.parts?.[0]?.text || response.text || "未能获取有效回复。";
+以下是企业各模块的完整数据：
+${contextText}${marketChatContext}
+
+你的职责：
+1. 基于上述完整数据回答用户关于企业内部经营的任何问题（经营看板、采购进项、销售销项、发票、应收应付、财务报表等）
+2. 能够进行跨模块分析（如：采购成本 vs 销售价格的利润分析、应收账款风险评估等）
+3. 对于外部市场、竞品分析或一般性知识问题，你拥有 **Google Search Grounding** 和 **Tavily Context** 双重信息源
+4. 数据分析时可以主动关联多个模块的数据给出综合建议
+
+【排版要求】
+- 禁止使用三个星号 (***) 进行加粗斜体，这会导致显示异常。
+- 仅使用两个星号 (**) 进行加粗。
+- 使用清晰的列表和段落。`;
+
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ messages: chatHistory, systemInstruction }),
+      });
+      const result = await res.json();
+      const content = result.text || "未能获取有效回复。";
       setMessages([...newMsgs, { role: 'model', text: content }]);
     } catch (e) {
       setMessages([...newMsgs, { role: 'model', text: "请求发生错误，请稍后重试。" }]);
@@ -552,7 +571,7 @@ const AppContent: React.FC = () => {
   const handleChatFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const newMsgs: ChatMessage[] = [...messages, { role: 'user', text: `📎 上传发票: ${file.name}` }];
+    const newMsgs: ChatMessage[] = [...messages, { role: 'user', text: `上传发票: ${file.name}` }];
     setMessages(newMsgs);
     setIsTyping(true);
     try {
@@ -571,10 +590,10 @@ const AppContent: React.FC = () => {
       reader.readAsDataURL(file);
       const base64 = await base64Promise;
       const extracted = await analyzeInvoice(base64, file.type);
-      const resultText = `✅ 发票识别成功！\n\n📅 日期: ${extracted.date}\n👤 客户/供应商: ${extracted.customer}\n📦 数量: ${extracted.quantity}\n💰 金额: ¥${extracted.price.toLocaleString()}\n🚚 运费: ¥${extracted.shipping.toLocaleString()}\n🔢 发票号: ${extracted.invoiceNo}\n\n以上信息已从发票中提取。如需记账，请手动前往「采购与进项」或「销售与销项」页面录入。`;
+      const resultText = `发票识别成功！\n\n日期: ${extracted.date}\n客户/供应商: ${extracted.customer}\n数量: ${extracted.quantity}\n金额: ¥${extracted.price.toLocaleString()}\n运费: ¥${extracted.shipping.toLocaleString()}\n发票号: ${extracted.invoiceNo}\n\n以上信息已从发票中提取。如需记账，请手动前往「采购与进项」或「销售与销项」页面录入。`;
       setMessages([...newMsgs, { role: 'model', text: resultText }]);
     } catch (err) {
-      setMessages([...newMsgs, { role: 'model', text: '❌ 发票识别失败，请确保上传清晰的发票图片后重试。' }]);
+      setMessages([...newMsgs, { role: 'model', text: '发票识别失败，请确保上传清晰的发票图片后重试。' }]);
     } finally {
       setIsTyping(false);
       if (chatFileInputRef.current) chatFileInputRef.current.value = '';
@@ -592,7 +611,6 @@ const AppContent: React.FC = () => {
       const dy = startResizeData.current.mouseY - me.clientY;
       const newW = Math.max(340, startResizeData.current.startW + dx);
       const newH = Math.max(450, startResizeData.current.startH + dy);
-      // Direct DOM update — no React re-render, instant feedback
       box.style.width = `${newW}px`;
       box.style.height = `${newH}px`;
     };
@@ -600,7 +618,6 @@ const AppContent: React.FC = () => {
       isResizing.current = false;
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
-      // Sync final size to React state once
       if (box) {
         setChatSize({ width: box.offsetWidth, height: box.offsetHeight });
       }
@@ -643,8 +660,6 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-white text-[#191918] font-sans relative">
-      {/* SnowflakeEffect removed */}
-
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-[#f9f9f8] border-r border-[#e0ddd5] transition-all duration-300 flex flex-col hidden md:flex z-20`}>
         <div className="p-6 flex items-center mb-8 shrink-0">
@@ -664,9 +679,20 @@ const AppContent: React.FC = () => {
           <NavItem icon="fa-wallet" label="财务报表" active={currentPage === 'finance'} expanded={sidebarOpen} onClick={() => setCurrentPage('finance')} />
           <NavItem icon="fa-cog" label="系统设置" active={currentPage === 'settings'} expanded={sidebarOpen} onClick={() => setCurrentPage('settings')} />
         </nav>
-        <div className="p-4 mt-auto border-t border-[#e0ddd5]">
+        <div className="p-4 mt-auto border-t border-[#e0ddd5] space-y-2">
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="w-full flex items-center justify-center p-2 rounded-lg bg-[#f0eeeb] hover:bg-[#e0ddd5] transition-colors text-[#6b6b69]">
             <i className={`fas ${sidebarOpen ? 'fa-angle-double-left' : 'fa-angle-double-right'}`}></i>
+          </button>
+          <button
+            onClick={async () => {
+              await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' });
+              window.location.reload();
+            }}
+            className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-red-50 transition-colors text-[#6b6b69] hover:text-red-600"
+            title="退出登录"
+          >
+            <i className="fas fa-sign-out-alt"></i>
+            {sidebarOpen && <span className="ml-2 text-sm">退出登录</span>}
           </button>
         </div>
       </aside>
@@ -719,7 +745,7 @@ const AppContent: React.FC = () => {
           className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${showChat ? 'bg-[#f0eeeb] border border-[#d1cdc4] text-[#d97757] rotate-90 scale-110' : 'bg-[#d97757] text-white hover:scale-110'}`}
           style={{ boxShadow: showChat ? 'none' : '0 4px 24px rgba(217,119,87,0.3)' }}
         >
-          {showChat ? <CloseIcon /> : <div className="text-2xl">🤖</div>}
+          {showChat ? <CloseIcon /> : <div className="text-2xl">AI</div>}
         </button>
 
         {showChat && (
@@ -766,7 +792,7 @@ const AppContent: React.FC = () => {
                 <div className="flex flex-col items-center justify-center h-full space-y-10 text-center animate-in fade-in duration-500">
                   <div className="relative">
                     <div className={`w-36 h-36 rounded-full border-4 flex items-center justify-center transition-all duration-700 ${liveStatus === 'speaking' ? 'border-emerald-500 scale-110 shadow-[0_0_40px_rgba(16,185,129,0.3)]' : liveStatus === 'listening' ? 'border-[#d97757] scale-105 shadow-[0_0_40px_rgba(217,119,87,0.3)]' : 'border-[#e0ddd5] scale-95 opacity-50'}`}>
-                      <div className="text-6xl animate-bounce">🤖</div>
+                      <div className="text-6xl animate-bounce">AI</div>
                     </div>
                   </div>
                   <div className="space-y-3">
@@ -838,11 +864,38 @@ const AppContent: React.FC = () => {
   );
 };
 
-const App: React.FC = () => (
-  <MarketDataProvider>
-    <AppContent />
-  </MarketDataProvider>
-);
+// Auth wrapper
+const AuthWrapper: React.FC = () => {
+  const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
+
+  useEffect(() => {
+    fetch('/auth/check', { credentials: 'same-origin' })
+      .then(r => r.json())
+      .then(data => setAuthState(data.authenticated ? 'authenticated' : 'unauthenticated'))
+      .catch(() => setAuthState('unauthenticated'));
+  }, []);
+
+  if (authState === 'checking') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f9f9f8]">
+        <div className="flex items-center space-x-3 text-[#6b6b69]">
+          <i className="fas fa-spinner fa-spin text-[#d97757]"></i>
+          <span className="text-sm">加载中...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (authState === 'unauthenticated') {
+    return <LoginPage onLogin={() => setAuthState('authenticated')} />;
+  }
+
+  return (
+    <MarketDataProvider>
+      <AppContent />
+    </MarketDataProvider>
+  );
+};
 
 const NavItem: React.FC<{ icon: string; label: string; active?: boolean; expanded?: boolean; onClick?: () => void; }> = ({ icon, label, active = false, expanded = true, onClick }) => (
   <div onClick={onClick} className={`flex items-center p-3 rounded-lg transition-all duration-200 cursor-pointer group ${active ? 'bg-[#d97757] text-white' : 'text-[#4a4a48] hover:bg-[#f0eeeb] hover:text-[#191918]'}`} style={active ? { boxShadow: '0 4px 24px rgba(217,119,87,0.15)' } : {}}>
@@ -851,4 +904,4 @@ const NavItem: React.FC<{ icon: string; label: string; active?: boolean; expande
   </div>
 );
 
-export default App;
+export default AuthWrapper;
