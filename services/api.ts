@@ -63,6 +63,9 @@ export interface AppSettings {
     priceVolatility: boolean;
     monthlyReport: boolean;
   };
+  admin_expense_annual?: number; // 年度管理费用 (元)
+  vat_rate?: string;
+  ai_model?: string;
 }
 
 // D1 schema types (what the Worker expects)

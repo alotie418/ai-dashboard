@@ -5,6 +5,7 @@ const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_STRING_LEN = 500;
 const SETTINGS_ALLOWED_KEYS = new Set([
   'company_info', 'tax_auto_auth', 'ai_auto_insight', 'notifications',
+  'admin_expense_annual', 'vat_rate', 'ai_model',
 ]);
 
 function isValidId(id) {
@@ -2503,10 +2504,23 @@ ${pagesText}
         const grossProfit = salesRevenue - costOfSales;
         const grossMargin = salesRevenue > 0 ? Math.round(grossProfit / salesRevenue * 10000) / 100 : 0;
         const shippingFee = salesAgg.totalShipping || 0;
-        const taxSurcharge = 0; // Placeholder: computed from VAT
-        const adminExpense = 0;
-        const incomeTax = 0;
-        const netProfit = grossProfit - taxSurcharge - shippingFee - adminExpense - incomeTax;
+
+        // 税金及附加 = 应纳增值税 × 12% (城建税7% + 教育费附加3% + 地方教育附加2%)
+        const vatPayable = Math.max(0, (salesAgg.totalTaxAmount || 0) - (purchaseAgg.totalTaxAmount || 0));
+        const taxSurcharge = Math.round(vatPayable * 0.12 * 100) / 100;
+
+        // 管理费用：从设置中读取年度管理费用
+        let adminExpense = 0;
+        try {
+          const adminSetting = await env.DB.prepare("SELECT value FROM settings WHERE key = 'admin_expense_annual'").first();
+          if (adminSetting) adminExpense = parseFloat(JSON.parse(adminSetting.value)) || 0;
+        } catch { /* fallback to 0 */ }
+
+        // 所得税 = max(0, 利润总额) × 25%
+        const profitBeforeTax = grossProfit - taxSurcharge - shippingFee - adminExpense;
+        const incomeTax = Math.round(Math.max(0, profitBeforeTax) * 0.25 * 100) / 100;
+
+        const netProfit = profitBeforeTax - incomeTax;
         const netMargin = salesRevenue > 0 ? Math.round(netProfit / salesRevenue * 10000) / 100 : 0;
 
         // --- VAT statistics ---

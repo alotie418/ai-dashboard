@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MOCK_BUSINESS_DATA } from './constants';
 import { fetchAIAnalysis } from './services/geminiService';
 import { AIAnalysis, BusinessData } from './types';
-import { fetchDashboardData, fetchSales, fetchPurchases } from './services/api';
+import { fetchDashboardData, fetchSales, fetchPurchases, fetchSettings } from './services/api';
 import MetricCard from './components/MetricCard';
 import AIInsights from './components/AIInsights';
 import FinancialStatementTable from './components/FinancialStatementTable';
@@ -194,15 +194,30 @@ const AppContent: React.FC = () => {
         } catch { /* fallback to 0 */ }
       }
 
+      // 税金及附加 = 应纳增值税 × 12%
       if (taxSurcharge === 0 && dashboard.vatStatistics) {
         const vatPayable = Math.max(0, dashboard.vatStatistics.cumulativeOutput - dashboard.vatStatistics.cumulativeInput);
         taxSurcharge = Math.round(vatPayable * 0.12 * 100) / 100;
       }
 
+      // 管理费用：从设置中读取
+      let adminExpense = fs.adminExpense;
+      if (adminExpense === 0) {
+        try {
+          const settings = await fetchSettings();
+          adminExpense = parseFloat(String((settings as any).admin_expense_annual)) || 0;
+        } catch { /* fallback to 0 */ }
+      }
+
       const revenue = fs.salesRevenue;
       const cost = fs.costOfSales;
       const grossProfit = Math.round((revenue - cost) * 100) / 100;
-      const netProfit = Math.round((revenue - cost - taxSurcharge - shippingFee - fs.adminExpense - fs.incomeTax) * 100) / 100;
+
+      // 所得税 = max(0, 利润总额) × 25%
+      const profitBeforeTax = grossProfit - taxSurcharge - shippingFee - adminExpense;
+      const incomeTax = Math.round(Math.max(0, profitBeforeTax) * 0.25 * 100) / 100;
+
+      const netProfit = Math.round((profitBeforeTax - incomeTax) * 100) / 100;
       const grossMargin = revenue === 0 ? 0 : +(grossProfit / revenue * 100).toFixed(2);
       const netMargin = revenue === 0 ? 0 : +(netProfit / revenue * 100).toFixed(2);
 
@@ -210,6 +225,8 @@ const AppContent: React.FC = () => {
         ...fs,
         shippingFee,
         taxSurcharge,
+        adminExpense,
+        incomeTax,
         grossProfit,
         netProfit,
         grossMargin,

@@ -27,6 +27,7 @@ const SettingsPage: React.FC = () => {
   });
   const [vatRate, setVatRate] = useState('13');
   const [aiModel, setAiModel] = useState('gemini-3-flash-preview');
+  const [adminExpenseAnnual, setAdminExpenseAnnual] = useState('0');
 
   // Password change state
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -88,6 +89,7 @@ const SettingsPage: React.FC = () => {
     if (s.notifications) setNotifications(s.notifications);
     if (s.vat_rate !== undefined) setVatRate(String(s.vat_rate));
     if (s.ai_model !== undefined) setAiModel(s.ai_model);
+    if (s.admin_expense_annual !== undefined) setAdminExpenseAnnual(String(s.admin_expense_annual));
   };
 
   // Load settings from API on mount
@@ -113,6 +115,7 @@ const SettingsPage: React.FC = () => {
         notifications,
         vat_rate: vatRate,
         ai_model: aiModel,
+        admin_expense_annual: parseFloat(adminExpenseAnnual) || 0,
       };
       await saveSettings(payload);
 
@@ -250,6 +253,27 @@ const SettingsPage: React.FC = () => {
                       <p className="text-xs text-[#5c5c5a]">上传后自动同步至税务系统进行认证</p>
                     </div>
                     <ToggleButton checked={taxAutoAuth} onChange={setTaxAutoAuth} />
+                  </div>
+
+                  <div className="p-4 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5] space-y-3">
+                    <div>
+                      <p className="text-sm font-bold text-[#191918]">年度管理费用</p>
+                      <p className="text-xs text-[#5c5c5a]">用于损益表净利润计算（含办公、人工、折旧等）</p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-[#5c5c5a]">¥</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={adminExpenseAnnual}
+                        onChange={e => setAdminExpenseAnnual(e.target.value)}
+                        placeholder="0"
+                        className="flex-1 bg-white border border-[#d1cdc4] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918]"
+                      />
+                      <span className="text-xs text-[#5c5c5a]">元/年</span>
+                    </div>
+                    <p className="text-[10px] text-[#8a8a88]">提示：税金及附加按增值税12%自动计算，所得税按利润总额25%自动计算</p>
                   </div>
                 </div>
               </section>
