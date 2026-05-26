@@ -57,7 +57,8 @@
       "accounting": "회계 제도",
       "categories": "회계 계정 과목",
       "notifications": "알림 및 경고",
-      "security": "계정 및 보안"
+      "security": "계정 및 보안",
+      "dataMigration": "데이터 마이그레이션"
     },
     "saveButton": "변경 사항 저장",
     "savedToast": "설정이 저장되었습니다",
@@ -130,6 +131,25 @@
         "title": "자율 인사이트 생성",
         "subtitle": "대시보드 로드 시 AI 분석을 자동 실행 (기본 서비스 사용)"
       }
+    },
+    "dataMigration": {
+      "title": "데이터 마이그레이션",
+      "subtitle": "이전 버전의 sales/purchases 데이터를 새 transactions 테이블(국제화 데이터 모델)로 원클릭 마이그레이션. 이전 테이블은 보존되며 30일 이내 롤백 가능.",
+      "noLegacy": "이 데이터베이스에는 이전 sales/purchases 테이블이 없습니다. 마이그레이션이 필요하지 않습니다.",
+      "migrated": "마이그레이션됨",
+      "pending": "대기 중",
+      "runButton": "{{count}}건의 대기 데이터 마이그레이션",
+      "running": "마이그레이션 중...",
+      "allDone": "모든 데이터 마이그레이션 완료",
+      "runSuccess": "마이그레이션 완료",
+      "errors": "개 오류",
+      "rollback": "롤백 (마이그레이션된 {{count}}건의 transactions 삭제)",
+      "rollbackConfirm": "롤백을 확인하시겠습니까? 마이그레이션된 {{count}}건의 transactions가 삭제됩니다. 이전 sales/purchases 데이터는 보존됩니다.",
+      "rollbackButton": "롤백 확인",
+      "note1": "sales → income / purchases → expense; 기본적으로 현재 회계 제도의 '수입 첫 항목 / 매출원가' 과목으로 분류",
+      "note2": "이전 테이블 데이터는 삭제되지 않습니다 — 언제든지 롤백 가능",
+      "note3": "마이그레이션 기록은 legacy_migrations 테이블에 저장되어 중복 마이그레이션 방지",
+      "note4": "이전 필드(톤수 / 단가 / 운송비)는 source_meta JSON에 저장되어 손실되지 않음"
     }
   },
   "onboarding": {

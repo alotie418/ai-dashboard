@@ -13,6 +13,8 @@ const alertsH = require('./alerts');
 const batch = require('./batch');
 const ai = require('./ai');
 const categories = require('./categories');
+const transactions = require('./transactions');
+const migrationsH = require('./migrations');
 
 const routes = [
   // ---- Dashboard ----
@@ -51,6 +53,20 @@ const routes = [
   ['POST', '/api/categories', categories.create],
   ['PUT', '/api/categories/:id', categories.update],
   ['DELETE', '/api/categories/:id', categories.remove],
+
+  // ---- Transactions（国际化数据模型 v5，C 阶段）----
+  // 具体路径排前：summary 不和 :id 冲突
+  ['GET', '/api/transactions/summary', transactions.summary],
+  ['GET', '/api/transactions', transactions.list],
+  ['POST', '/api/transactions', transactions.create],
+  ['GET', '/api/transactions/:id', transactions.get],
+  ['PUT', '/api/transactions/:id', transactions.update],
+  ['DELETE', '/api/transactions/:id', transactions.remove],
+
+  // ---- Legacy Data Migrations（sales/purchases → transactions）----
+  ['GET', '/api/migrations/detect-legacy', migrationsH.detectLegacy],
+  ['POST', '/api/migrations/run', migrationsH.migrateAll],
+  ['POST', '/api/migrations/rollback', migrationsH.rollback],
 
   // ---- Settings ----
   ['GET', '/api/settings', settings.get],

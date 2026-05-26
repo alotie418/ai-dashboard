@@ -57,7 +57,8 @@
       "accounting": "会计制度",
       "categories": "会计类别",
       "notifications": "预警与通知",
-      "security": "账户与安全"
+      "security": "账户与安全",
+      "dataMigration": "数据迁移"
     },
     "saveButton": "保存更改",
     "savedToast": "设置已成功保存！",
@@ -130,6 +131,25 @@
         "title": "自主洞察生成",
         "subtitle": "看板加载时自动运行 AI 分析（使用默认 Provider）"
       }
+    },
+    "dataMigration": {
+      "title": "数据迁移",
+      "subtitle": "把旧版本的 sales/purchases 数据一键迁移到新的 transactions 表（国际化数据模型）。旧表保留不删除，30 天内可回滚。",
+      "noLegacy": "本数据库不存在旧版 sales/purchases 表，无需迁移。",
+      "migrated": "已迁移",
+      "pending": "待迁移",
+      "runButton": "迁移 {{count}} 条待处理数据",
+      "running": "迁移中...",
+      "allDone": "所有数据已迁移",
+      "runSuccess": "迁移完成",
+      "errors": "个错误",
+      "rollback": "回滚迁移（删除已迁移的 {{count}} 条 transactions）",
+      "rollbackConfirm": "确认回滚？这将删除 {{count}} 条已迁移的 transactions，旧 sales/purchases 数据保持不变。",
+      "rollbackButton": "确认回滚",
+      "note1": "sales → income / purchases → expense；默认归到当前会计制度的\"收入第一项 / COGS\"类别",
+      "note2": "旧表数据不会删除，可随时回滚",
+      "note3": "迁移记录写入 legacy_migrations 表，避免重复迁移",
+      "note4": "旧字段（吨位 / 单价 / 运费）会保存到 source_meta JSON，不丢失"
     }
   },
   "onboarding": {

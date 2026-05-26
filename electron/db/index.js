@@ -195,6 +195,52 @@ const MIGRATIONS = [
       console.error('[db] seed categories failed:', e?.message || e);
     }
   },
+  // v5: 国际化数据模型核心 — transactions 表 + legacy_migrations 映射表
+  // 详见 docs/INTERNATIONALIZATION_PLAN.md §2.3 / §3
+  // sales / purchases 表保留只读，由迁移工具一键转入 transactions
+  (d) => {
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS transactions (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+        date TEXT NOT NULL,
+        amount REAL NOT NULL,
+        amount_net REAL,
+        tax_amount REAL DEFAULT 0,
+        tax_rate REAL DEFAULT 0,
+        currency TEXT NOT NULL DEFAULT 'CNY',
+        category_id TEXT,
+        counterparty TEXT,
+        invoice_no TEXT,
+        invoice_status TEXT DEFAULT 'n/a',
+        payment_status TEXT DEFAULT 'paid',
+        paid_amount REAL DEFAULT 0,
+        payment_date TEXT,
+        due_date TEXT,
+        description TEXT,
+        attachment_path TEXT,
+        source_meta TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (category_id) REFERENCES categories(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_txn_date ON transactions(date);
+      CREATE INDEX IF NOT EXISTS idx_txn_type_date ON transactions(type, date);
+      CREATE INDEX IF NOT EXISTS idx_txn_category ON transactions(category_id);
+      CREATE INDEX IF NOT EXISTS idx_txn_payment ON transactions(payment_status);
+
+      CREATE TABLE IF NOT EXISTS legacy_migrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        legacy_table TEXT NOT NULL CHECK (legacy_table IN ('sales', 'purchases')),
+        legacy_id TEXT NOT NULL,
+        new_id TEXT NOT NULL,
+        migrated_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(legacy_table, legacy_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_legacy_mig_new ON legacy_migrations(new_id);
+    `);
+    console.log('[db] created transactions + legacy_migrations tables');
+  },
 ];
 
 function runMigrations(d) {

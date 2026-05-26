@@ -57,7 +57,8 @@
       "accounting": "Norme comptable",
       "categories": "Catégories comptables",
       "notifications": "Alertes & notifications",
-      "security": "Compte & sécurité"
+      "security": "Compte & sécurité",
+      "dataMigration": "Migration de données"
     },
     "saveButton": "Enregistrer",
     "savedToast": "Paramètres enregistrés",
@@ -130,6 +131,25 @@
         "title": "Analyse automatique",
         "subtitle": "Lance automatiquement l'analyse IA au chargement du tableau de bord (fournisseur par défaut)"
       }
+    },
+    "dataMigration": {
+      "title": "Migration de données",
+      "subtitle": "Migrez les données sales/purchases existantes vers la nouvelle table transactions (modèle i18n). Les anciennes tables sont préservées ; rollback possible sous 30 jours.",
+      "noLegacy": "Aucune table sales/purchases existante dans cette base — rien à migrer.",
+      "migrated": "migré",
+      "pending": "en attente",
+      "runButton": "Migrer {{count}} lignes en attente",
+      "running": "Migration en cours...",
+      "allDone": "Toutes les données migrées",
+      "runSuccess": "Migration terminée",
+      "errors": "erreurs",
+      "rollback": "Annuler (supprimer {{count}} transactions migrées)",
+      "rollbackConfirm": "Confirmer l'annulation ? {{count}} transactions migrées seront supprimées. Les données sales/purchases originales sont préservées.",
+      "rollbackButton": "Confirmer l'annulation",
+      "note1": "sales → income / purchases → expense ; par défaut vers la première catégorie de revenu / COGS de la norme actuelle",
+      "note2": "Les tables anciennes ne sont PAS supprimées — rollback à tout moment",
+      "note3": "Enregistrements de migration stockés dans legacy_migrations pour éviter les doublons",
+      "note4": "Champs existants (tonnage / prix unitaire / fret) sauvegardés dans source_meta JSON — pas de perte"
     }
   },
   "onboarding": {

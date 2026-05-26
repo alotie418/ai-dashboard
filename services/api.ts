@@ -118,6 +118,125 @@ export function resetCategoriesToDefault(locale: AccountingLocale): Promise<{ su
   return apiFetch('/api/categories/reset', { method: 'POST', body: JSON.stringify({ locale }) });
 }
 
+// ==================== Transactions（国际化数据模型 v5，C 阶段）====================
+
+export type TransactionType = 'income' | 'expense';
+export type InvoiceStatus = 'issued' | 'pending' | 'n/a';
+export type TxPaymentStatus = 'paid' | 'partial' | 'unpaid';
+
+export interface Transaction {
+  id: string;
+  type: TransactionType;
+  date: string;
+  amount: number;
+  amount_net: number | null;
+  tax_amount: number;
+  tax_rate: number;
+  currency: string;
+  category_id: string | null;
+  counterparty: string;
+  invoice_no: string;
+  invoice_status: InvoiceStatus;
+  payment_status: TxPaymentStatus;
+  paid_amount: number;
+  payment_date: string | null;
+  due_date: string | null;
+  description: string;
+  attachment_path: string | null;
+  source_meta: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TransactionUpsert {
+  id: string;
+  type: TransactionType;
+  date: string;
+  amount: number;
+  amount_net?: number;
+  tax_amount?: number;
+  tax_rate?: number;
+  currency?: string;
+  category_id?: string | null;
+  counterparty?: string;
+  invoice_no?: string;
+  invoice_status?: InvoiceStatus;
+  payment_status?: TxPaymentStatus;
+  paid_amount?: number;
+  payment_date?: string;
+  due_date?: string;
+  description?: string;
+  attachment_path?: string;
+  source_meta?: any;
+}
+
+export interface TransactionSummary {
+  income: { total: number; count: number };
+  expense: { total: number; count: number };
+  net: number;
+}
+
+export function listTransactions(opts: { type?: TransactionType; from?: string; to?: string; category_id?: string; limit?: number } = {}): Promise<Transaction[]> {
+  const qs = new URLSearchParams();
+  if (opts.type) qs.set('type', opts.type);
+  if (opts.from) qs.set('from', opts.from);
+  if (opts.to) qs.set('to', opts.to);
+  if (opts.category_id) qs.set('category_id', opts.category_id);
+  if (opts.limit != null) qs.set('limit', String(opts.limit));
+  return apiFetch<Transaction[]>(`/api/transactions${qs.toString() ? '?' + qs.toString() : ''}`);
+}
+
+export function getTransaction(id: string): Promise<Transaction> {
+  return apiFetch<Transaction>(`/api/transactions/${encodeURIComponent(id)}`);
+}
+
+export function createTransaction(payload: TransactionUpsert): Promise<{ success: boolean; id: string }> {
+  return apiFetch('/api/transactions', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function updateTransaction(id: string, payload: Partial<TransactionUpsert>): Promise<{ success: boolean }> {
+  return apiFetch(`/api/transactions/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+
+export function deleteTransaction(id: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/transactions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export function fetchTransactionSummary(opts: { from?: string; to?: string } = {}): Promise<TransactionSummary> {
+  const qs = new URLSearchParams();
+  if (opts.from) qs.set('from', opts.from);
+  if (opts.to) qs.set('to', opts.to);
+  return apiFetch<TransactionSummary>(`/api/transactions/summary${qs.toString() ? '?' + qs.toString() : ''}`);
+}
+
+// ==================== Legacy Data Migrations（旧 sales/purchases → transactions）====================
+
+export interface LegacyDetectResult {
+  hasLegacy: boolean;
+  sales: { exists: boolean; total: number; migrated: number; pending: number };
+  purchases: { exists: boolean; total: number; migrated: number; pending: number };
+}
+
+export interface MigrationRunResult {
+  salesMigrated: number;
+  purchasesMigrated: number;
+  salesSkipped: number;
+  purchasesSkipped: number;
+  errors: Array<{ legacy_table: 'sales' | 'purchases'; legacy_id: string; error: string }>;
+}
+
+export function detectLegacyData(): Promise<LegacyDetectResult> {
+  return apiFetch<LegacyDetectResult>('/api/migrations/detect-legacy');
+}
+
+export function runLegacyMigration(opts: { defaultIncomeCategoryId?: string; defaultExpenseCategoryId?: string; currency?: string } = {}): Promise<MigrationRunResult> {
+  return apiFetch('/api/migrations/run', { method: 'POST', body: JSON.stringify(opts) });
+}
+
+export function rollbackLegacyMigration(): Promise<{ success: boolean; removed: number }> {
+  return apiFetch('/api/migrations/rollback', { method: 'POST', body: JSON.stringify({}) });
+}
+
 // ==================== Types ====================
 
 // Frontend interfaces (match component definitions)
