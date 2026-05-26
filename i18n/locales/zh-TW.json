@@ -1,0 +1,153 @@
+{
+  "common": {
+    "save": "儲存",
+    "cancel": "取消",
+    "delete": "刪除",
+    "confirm": "確認",
+    "edit": "編輯",
+    "loading": "載入中...",
+    "saving": "儲存中",
+    "testing": "測試中",
+    "success": "成功",
+    "error": "失敗",
+    "retry": "重試",
+    "back": "上一步",
+    "next": "下一步",
+    "skip": "略過",
+    "finish": "完成",
+    "yes": "是",
+    "no": "否",
+    "reset": "重設",
+    "search": "搜尋",
+    "settings": "設定",
+    "language": "語言",
+    "default": "預設",
+    "optional": "選用"
+  },
+  "app": {
+    "name": "SoloLedger",
+    "subtitle": "獨帳 · 一人公司的智慧帳本"
+  },
+  "nav": {
+    "dashboard": "經營看板",
+    "purchase": "採購與進項",
+    "sales": "銷售與銷項",
+    "inventory": "發票查詢",
+    "analysis": "資料分析",
+    "accounts": "應收應付",
+    "finance": "財務報表",
+    "settings": "系統設定"
+  },
+  "headerTitle": {
+    "dashboard": "經營資料概覽",
+    "sales": "銷售與銷項",
+    "purchase": "採購與進項",
+    "analysis": "資料分析中心",
+    "inventory": "發票查詢",
+    "finance": "財務報表",
+    "accounts": "應收應付",
+    "settings": "系統設定"
+  },
+  "settings": {
+    "nav": {
+      "company": "企業基礎資料",
+      "tax": "稅務規則設定",
+      "ai": "AI 服務商 (BYOK)",
+      "language": "介面語言",
+      "accounting": "會計制度",
+      "notifications": "預警與通知",
+      "security": "帳號與安全"
+    },
+    "saveButton": "儲存變更",
+    "savedToast": "設定已成功儲存！",
+    "saveError": "儲存失敗：{{msg}}",
+    "loadError": "載入設定失敗：{{msg}}",
+    "loadingHint": "正在載入設定...",
+    "language": {
+      "title": "介面語言",
+      "subtitle": "切換語言後立即生效，無需重啟",
+      "note": "翻譯品質持續優化中，發現錯誤歡迎回報"
+    },
+    "accounting": {
+      "title": "會計制度",
+      "subtitle": "選擇所在國家/地區的會計制度，決定預設稅率、幣別與報表口徑",
+      "currentLocale": "當前制度",
+      "vatRate": "標準稅率",
+      "surcharge": "附加稅率",
+      "incomeTax": "所得稅率",
+      "currency": "預設幣別",
+      "applyButton": "套用此制度",
+      "warning": "切換會計制度只更新預設稅率與幣別，既有資料不會重新計算"
+    },
+    "ai": {
+      "title": "AI 服務商 · BYOK",
+      "subtitle": "支援同時設定多個服務商，按需切換預設。API Key 使用系統 Keychain 加密儲存。",
+      "modelSection": "模型選擇",
+      "advancedInput": "進階：手動輸入 model ID",
+      "currentModelId": "目前傳送給 API 的 model ID",
+      "addKey": "新增 Key",
+      "editKey": "修改 Key",
+      "setAsDefault": "設為預設",
+      "removeConfirm": "確認?",
+      "updateBoth": "更新 Key + 模型",
+      "modelOnly": "僅更新模型 ID（沿用現有 Key）",
+      "testConnection": "測試連線",
+      "testOk": "模型可呼叫，Key 與 model ID 均通過",
+      "testFail": "測試失敗",
+      "staleModelHint": "目前使用自訂或舊版 model ID，建議重設。",
+      "resetTo": "重設為 {{model}}",
+      "configured": "已設定",
+      "notConfigured": "未設定",
+      "supportsTTS": "支援 TTS",
+      "supportsWebGrounding": "支援 Web Grounding",
+      "providerSavedToast": "{{name}} 已儲存",
+      "modelUpdatedToast": "{{name}} 模型已更新",
+      "providerRemovedToast": "{{name}} 已刪除",
+      "defaultSetToast": "已設為預設 Provider",
+      "security": {
+        "title": "關於 API Key 安全",
+        "item1": "所有 API Key 經 Electron safeStorage 加密後寫入本機 SQLite，渲染端無法讀取明文",
+        "item2": "SoloLedger 不會將 Key 上傳到任何伺服器，AI 請求由您的裝置直接發送到對應服務商",
+        "item3": "刪除 Key 後該 Provider 立即停止可用，但已產生的業務資料保留不變"
+      },
+      "autoInsight": {
+        "title": "自主洞察生成",
+        "subtitle": "看板載入時自動執行 AI 分析（使用預設 Provider）"
+      }
+    }
+  },
+  "onboarding": {
+    "welcomeTitle": "歡迎使用 SoloLedger",
+    "welcomeDescription": "SoloLedger 是為一人公司、個體戶和 Solo SaaS 創始人打造的智慧帳本應用。所有資料儲存於本機，AI 能力由您自備的 API Key 驅動 — 我們看不到您的任何資料。",
+    "feature1": "本機 SQLite 儲存，所有資料保存在您的 Mac 上",
+    "feature2": "支援 Claude · ChatGPT · Gemini，可設定多個，按需切換預設",
+    "feature3": "API Key 使用系統 Keychain 加密，永遠不離開您的裝置",
+    "feature4": "支援發票 OCR、經營分析、智慧告警、應收應付管理",
+    "startConfig": "開始設定",
+    "providerTitle": "設定 AI 服務商",
+    "providerSubtitle": "至少設定一個即可開始使用。設定多個時可在設定中切換預設。",
+    "loadingProviders": "正在載入 Provider 清單...",
+    "atLeastOneRequired": "至少設定一個服務商",
+    "configuredCount": "下一步（已設定 {{count}} 個）",
+    "companyTitle": "填寫公司資訊",
+    "companySubtitle": "用於 AI 分析時提供企業上下文，可隨時在系統設定中修改。",
+    "companyName": "公司名稱",
+    "companyNamePlaceholder": "例如：台北獨角獸貿易有限公司",
+    "industry": "所屬行業",
+    "industryPlaceholder": "例如：化工貿易 / 軟體開發 / 設計顧問",
+    "finishAndEnter": "完成並進入應用",
+    "skipCompany": "暫時略過公司資訊，稍後在設定中填寫"
+  },
+  "byok": {
+    "howToGetKey": "如何取得 {{provider}} Key",
+    "apiKey": "API Key",
+    "modelHelp": "如果測試回報 model_not_found，請到服務商官網查最新可用 ID",
+    "customMarker": "自訂",
+    "supportsTTSHint": "支援 TTS"
+  },
+  "providers": {
+    "anthropic": "Claude · Anthropic",
+    "openai": "ChatGPT · OpenAI",
+    "gemini": "Gemini · Google"
+  }
+}

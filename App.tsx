@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MOCK_BUSINESS_DATA } from './constants';
 import { fetchAIAnalysis } from './services/geminiService';
 import { AIAnalysis, BusinessData } from './types';
@@ -15,17 +16,16 @@ import DataAnalysisPage from './components/DataAnalysisPage';
 import InventoryPage from './components/InventoryPage';
 import FinancePage from './components/FinancePage';
 import SettingsPage from './components/SettingsPage';
-import MarketSearchPage from './components/MarketSearchPage';
 import AccountsPage from './components/AccountsPage';
 import AlertCenter from './components/AlertCenter';
 import LoginPage from './components/LoginPage';
-import { MarketDataProvider, useMarketData } from './contexts/MarketDataContext';
+import OnboardingWizard from './components/OnboardingWizard';
 import { GoogleGenAI, Modality, LiveServerMessage, Blob as GenAIBlob } from "@google/genai";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { analyzeInvoice } from './services/ocrService';
 
-type PageId = 'dashboard' | 'sales' | 'purchase' | 'analysis' | 'inventory' | 'finance' | 'market' | 'accounts' | 'settings';
+type PageId = 'dashboard' | 'sales' | 'purchase' | 'analysis' | 'inventory' | 'finance' | 'accounts' | 'settings';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -133,32 +133,8 @@ function createBlob(data: Float32Array): GenAIBlob {
   };
 }
 
-interface TavilyResult {
-  title: string;
-  url: string;
-  content: string;
-  score: number;
-}
-
-// Tavily search via server proxy
-const searchTavily = async (query: string): Promise<string> => {
-  try {
-    const response = await fetch('/api/ai/tavily-search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ query }),
-    });
-    if (!response.ok) return '';
-    const data = await response.json();
-    if (!data.results || data.results.length === 0) return '';
-    return (data.results as TavilyResult[]).map((r, i) =>
-      `[Tavily Source ${i + 1}] ${r.title}\nURL: ${r.url}\nSummary: ${r.content}`
-    ).join('\n\n');
-  } catch (e) { console.error(e); return ''; }
-};
-
 const AppContent: React.FC = () => {
+  const { t } = useTranslation();
   const [data, setData] = useState<BusinessData>(MOCK_BUSINESS_DATA);
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [loadingAI, setLoadingAI] = useState(false);
@@ -166,7 +142,6 @@ const AppContent: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentPage, setCurrentPage] = useState<PageId>('dashboard');
   const [showChat, setShowChat] = useState(false);
-  const { latestQuery: marketQuery, latestResults: marketResults, searchTimestamp: marketTimestamp } = useMarketData();
 
   const [selectedYear, setSelectedYear] = useState('2026');
   const [selectedQuarter, setSelectedQuarter] = useState('全年');
@@ -321,15 +296,7 @@ const AppContent: React.FC = () => {
     setAiError(null);
     try {
       const freshData = await loadDashboardData();
-      let marketSummary: string | undefined;
-      if (marketResults && marketQuery) {
-        const summaryRows = marketResults.summaryTable?.map(r => `${r.label}: ${r.value}`).join('\n') || '';
-        const priceRange = marketResults.prices.length > 0
-          ? `价格范围: ¥${Math.min(...marketResults.prices.map(p => p.price)).toLocaleString()} - ¥${Math.max(...marketResults.prices.map(p => p.price)).toLocaleString()}，共${marketResults.prices.length}条报价`
-          : '';
-        marketSummary = `搜索词: "${marketQuery}"\n${summaryRows}\n${priceRange}`;
-      }
-      const result = await fetchAIAnalysis(freshData || dataRef.current, marketSummary);
+      const result = await fetchAIAnalysis(freshData || dataRef.current);
       setAnalysis(result);
     } catch (err) {
       console.error("AI Analysis Failed", err);
@@ -337,7 +304,7 @@ const AppContent: React.FC = () => {
     } finally {
       setLoadingAI(false);
     }
-  }, [loadDashboardData, marketResults, marketQuery]);
+  }, [loadDashboardData]);
 
   useEffect(() => {
     performAnalysis();
@@ -498,23 +465,11 @@ const AppContent: React.FC = () => {
     setChatInput('');
     setIsTyping(true);
     try {
-      // Trigger Tavily for market/news/price related queries
-      let tavilyContext = '';
-      if (/价格|行情|新闻|搜索|多少钱|趋势|分析|找|查/.test(text)) {
-        tavilyContext = await searchTavily(text);
-      }
-
       // Build conversation history for multi-turn context
       const chatHistory = newMsgs.map(m => ({
         role: m.role,
         parts: [{ text: m.text }]
       }));
-
-      // Inject Tavily context into the last user message
-      if (tavilyContext) {
-        const lastMsg = chatHistory[chatHistory.length - 1];
-        lastMsg.parts[0].text += `\n\n[System Note: Additional External Search Context from Tavily]\n${tavilyContext}\n\nPlease use this context combined with Google Search to answer.`;
-      }
 
       // Fetch full business context from server (cached 60s)
       let contextText = '';
@@ -539,24 +494,10 @@ const AppContent: React.FC = () => {
         contextText = `企业概况：年营收¥${fs.salesRevenue.toLocaleString()}，毛利率${fs.grossMargin}%，净利率${fs.netMargin}%。`;
       }
 
-      // Inject market search context if available
-      let marketChatContext = '';
-      if (marketResults && marketQuery) {
-        const prices = marketResults.prices;
-        const minPrice = prices.length > 0 ? Math.min(...prices.map(p => p.price)) : 0;
-        const maxPrice = prices.length > 0 ? Math.max(...prices.map(p => p.price)) : 0;
-        const avgPrice = prices.length > 0 ? Math.round(prices.reduce((s, p) => s + p.price, 0) / prices.length) : 0;
-        const summaryLines = marketResults.summaryTable?.slice(0, 6).map(r => `${r.label}: ${r.value}`).join('；') || '';
-        marketChatContext = `\n\n【最新市场搜索结果】搜索词："${marketQuery}"，共${prices.length}条报价。` +
-          `最低价¥${minPrice.toLocaleString()}，最高价¥${maxPrice.toLocaleString()}，均价¥${avgPrice.toLocaleString()}。` +
-          (summaryLines ? `\n关键指标：${summaryLines}` : '') +
-          `\n请在回答中自然引用上述市场数据。`;
-      }
-
       const systemInstruction = `你是一位专业的企业经营数据助手，拥有企业全部实时经营数据的访问权限。
 
 以下是企业各模块的完整数据：
-${contextText}${marketChatContext}
+${contextText}
 
 你的职责：
 1. 基于上述完整数据回答用户关于企业内部经营的任何问题（经营看板、采购进项、销售销项、发票、应收应付、财务报表等）
@@ -668,7 +609,6 @@ ${contextText}${marketChatContext}
       case 'analysis': return <DataAnalysisPage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'inventory': return <InventoryPage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'finance': return <FinancePage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
-      case 'market': return <MarketSearchPage />;
       case 'accounts': return <AccountsPage />;
       case 'settings': return <SettingsPage />;
       default: return null;
@@ -679,48 +619,65 @@ ${contextText}${marketChatContext}
     <div className="flex h-screen overflow-hidden bg-white text-[#191918] font-sans relative">
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-[#f9f9f8] border-r border-[#e0ddd5] transition-all duration-300 flex flex-col hidden md:flex z-20`}>
-        <div className="p-6 flex items-center mb-8 shrink-0">
+        {/* macOS 红绿灯避让区 + 可拖动 + 可双击最大化（仅 Electron 桌面版生效）*/}
+        {isElectronEnv && (
+          <div
+            className="h-7 shrink-0"
+            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+          />
+        )}
+        <div
+          className={`p-6 flex items-center mb-8 shrink-0 ${isElectronEnv ? 'pt-2' : ''}`}
+          style={isElectronEnv ? ({ WebkitAppRegion: 'drag' } as React.CSSProperties) : undefined}
+        >
           <div className="w-8 h-8 bg-[#d97757] rounded-lg flex items-center justify-center mr-3 flex-shrink-0 shadow-lg" style={{ boxShadow: '0 4px 24px rgba(217,119,87,0.2)' }}>
             <i className="fas fa-layer-group text-white text-sm"></i>
           </div>
-          {sidebarOpen && <span className="font-bold text-xl tracking-tight text-[#191918]">AI Dashboard</span>}
+          {sidebarOpen && <span className="font-bold text-xl tracking-tight text-[#191918]">SoloLedger<span className="text-[#6b6b69] text-sm font-normal ml-1.5">独账</span></span>}
         </div>
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
-          <NavItem icon="fa-th-large" label="经营看板" active={currentPage === 'dashboard'} expanded={sidebarOpen} onClick={() => setCurrentPage('dashboard')} />
-          <NavItem icon="fa-file-import" label="采购与进项" active={currentPage === 'purchase'} expanded={sidebarOpen} onClick={() => setCurrentPage('purchase')} />
-          <NavItem icon="fa-file-export" label="销售与销项" active={currentPage === 'sales'} expanded={sidebarOpen} onClick={() => setCurrentPage('sales')} />
-          <NavItem icon="fa-search-dollar" label="发票查询" active={currentPage === 'inventory'} expanded={sidebarOpen} onClick={() => setCurrentPage('inventory')} />
-          <NavItem icon="fa-chart-pie" label="数据分析" active={currentPage === 'analysis'} expanded={sidebarOpen} onClick={() => setCurrentPage('analysis')} />
-          <NavItem icon="fa-brain" label="Agentic RAG" active={currentPage === 'market'} expanded={sidebarOpen} onClick={() => setCurrentPage('market')} />
-          <NavItem icon="fa-handshake" label="应收应付" active={currentPage === 'accounts'} expanded={sidebarOpen} onClick={() => setCurrentPage('accounts')} />
-          <NavItem icon="fa-wallet" label="财务报表" active={currentPage === 'finance'} expanded={sidebarOpen} onClick={() => setCurrentPage('finance')} />
-          <NavItem icon="fa-cog" label="系统设置" active={currentPage === 'settings'} expanded={sidebarOpen} onClick={() => setCurrentPage('settings')} />
+          <NavItem icon="fa-th-large" label={t('nav.dashboard')} active={currentPage === 'dashboard'} expanded={sidebarOpen} onClick={() => setCurrentPage('dashboard')} />
+          <NavItem icon="fa-file-import" label={t('nav.purchase')} active={currentPage === 'purchase'} expanded={sidebarOpen} onClick={() => setCurrentPage('purchase')} />
+          <NavItem icon="fa-file-export" label={t('nav.sales')} active={currentPage === 'sales'} expanded={sidebarOpen} onClick={() => setCurrentPage('sales')} />
+          <NavItem icon="fa-search-dollar" label={t('nav.inventory')} active={currentPage === 'inventory'} expanded={sidebarOpen} onClick={() => setCurrentPage('inventory')} />
+          <NavItem icon="fa-chart-pie" label={t('nav.analysis')} active={currentPage === 'analysis'} expanded={sidebarOpen} onClick={() => setCurrentPage('analysis')} />
+          <NavItem icon="fa-handshake" label={t('nav.accounts')} active={currentPage === 'accounts'} expanded={sidebarOpen} onClick={() => setCurrentPage('accounts')} />
+          <NavItem icon="fa-wallet" label={t('nav.finance')} active={currentPage === 'finance'} expanded={sidebarOpen} onClick={() => setCurrentPage('finance')} />
+          <NavItem icon="fa-cog" label={t('nav.settings')} active={currentPage === 'settings'} expanded={sidebarOpen} onClick={() => setCurrentPage('settings')} />
         </nav>
         <div className="p-4 mt-auto border-t border-[#e0ddd5] space-y-2">
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="w-full flex items-center justify-center p-2 rounded-lg bg-[#f0eeeb] hover:bg-[#e0ddd5] transition-colors text-[#6b6b69]">
             <i className={`fas ${sidebarOpen ? 'fa-angle-double-left' : 'fa-angle-double-right'}`}></i>
           </button>
-          <button
-            onClick={async () => {
-              await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' });
-              window.location.reload();
-            }}
-            className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-red-50 transition-colors text-[#6b6b69] hover:text-red-600"
-            title="退出登录"
-          >
-            <i className="fas fa-sign-out-alt"></i>
-            {sidebarOpen && <span className="ml-2 text-sm">退出登录</span>}
-          </button>
+          {!isElectronEnv && (
+            <button
+              onClick={async () => {
+                await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' });
+                window.location.reload();
+              }}
+              className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-red-50 transition-colors text-[#6b6b69] hover:text-red-600"
+              title="退出登录"
+            >
+              <i className="fas fa-sign-out-alt"></i>
+              {sidebarOpen && <span className="ml-2 text-sm">退出登录</span>}
+            </button>
+          )}
         </div>
       </aside>
 
       {/* Main */}
       <main className="flex-1 flex flex-col overflow-hidden relative z-10">
-        {currentPage !== 'market' && (
-          <header className="h-16 bg-[#f9f9f8] border-b border-[#e0ddd5] flex items-center justify-between px-8 z-10 shrink-0">
-            <div className="flex items-center space-x-6">
+        {(
+          <header
+            className="h-16 bg-[#f9f9f8] border-b border-[#e0ddd5] flex items-center justify-between px-8 z-10 shrink-0"
+            style={isElectronEnv ? ({ WebkitAppRegion: 'drag' } as React.CSSProperties) : undefined}
+          >
+            <div
+              className="flex items-center space-x-6"
+              style={isElectronEnv ? ({ WebkitAppRegion: 'no-drag' } as React.CSSProperties) : undefined}
+            >
               <h2 className="text-xl font-semibold text-[#191918]">
-                {{ dashboard: '经营数据概览', sales: '销售与销项', purchase: '采购与进项', analysis: '数据分析中心', inventory: '发票查询', finance: '财务报表', market: 'Agentic RAG', accounts: '应收应付', settings: '系统设置' }[currentPage]}
+                {t(`headerTitle.${currentPage}`)}
               </h2>
               <div className="hidden lg:flex items-center space-x-4 pl-4 border-l border-[#e0ddd5]">
                 <div className="flex items-center space-x-2 bg-white rounded-lg p-1 border border-[#e0ddd5]">
@@ -745,7 +702,10 @@ ${contextText}${marketChatContext}
                 </button>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div
+              className="flex items-center space-x-4"
+              style={isElectronEnv ? ({ WebkitAppRegion: 'no-drag' } as React.CSSProperties) : undefined}
+            >
               <AlertCenter />
             </div>
           </header>
@@ -881,11 +841,26 @@ ${contextText}${marketChatContext}
   );
 };
 
-// Auth wrapper
+// Auth wrapper — 桌面版默认无需登录，Web 版保持后端 session 校验
+const isElectronEnv = typeof window !== 'undefined' && !!(window as any).electronAPI?.isElectron;
+
 const AuthWrapper: React.FC = () => {
-  const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
+  const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'unauthenticated'>(
+    isElectronEnv ? 'authenticated' : 'checking'
+  );
+  // 桌面版需要 BYOK：启动时检测是否已配置 API Key，未配置时显示 Onboarding
+  const [onboardingState, setOnboardingState] = useState<'checking' | 'needed' | 'done'>(
+    isElectronEnv ? 'checking' : 'done'
+  );
 
   useEffect(() => {
+    if (isElectronEnv) {
+      const electronAPI = (window as any).electronAPI;
+      electronAPI.invoke('providers:hasAny')
+        .then((has: boolean) => setOnboardingState(has ? 'done' : 'needed'))
+        .catch(() => setOnboardingState('needed'));
+      return; // 桌面版跳过远程 session 校验
+    }
     fetch('/auth/check', { credentials: 'same-origin' })
       .then(r => r.json())
       .then(data => setAuthState(data.authenticated ? 'authenticated' : 'unauthenticated'))
@@ -907,11 +882,22 @@ const AuthWrapper: React.FC = () => {
     return <LoginPage onLogin={() => setAuthState('authenticated')} />;
   }
 
-  return (
-    <MarketDataProvider>
-      <AppContent />
-    </MarketDataProvider>
-  );
+  if (onboardingState === 'checking') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f9f9f8]">
+        <div className="flex items-center space-x-3 text-[#6b6b69]">
+          <i className="fas fa-spinner fa-spin text-[#d97757]"></i>
+          <span className="text-sm">加载中...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (onboardingState === 'needed') {
+    return <OnboardingWizard onComplete={() => setOnboardingState('done')} />;
+  }
+
+  return <AppContent />;
 };
 
 const NavItem: React.FC<{ icon: string; label: string; active?: boolean; expanded?: boolean; onClick?: () => void; }> = ({ icon, label, active = false, expanded = true, onClick }) => (

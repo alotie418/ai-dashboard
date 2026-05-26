@@ -1,6 +1,6 @@
 {
-  "name": "AI Dashboard",
-  "description": "基于 Gemini 3 Pro 的高性能 AI 驱动业务运营看板，提供实时数据可视化、预测性洞察及深度性能分析。",
+  "name": "SoloLedger",
+  "description": "为一人公司打造的智能账本与经营管理桌面应用：本地存储、离线可用、自带 Gemini Key。",
   "requestFramePermissions": [
     "microphone"
   ]

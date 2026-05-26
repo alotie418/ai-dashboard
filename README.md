@@ -1,13 +1,46 @@
-# AI 看板 — 智能经营管理系统
+# SoloLedger 独账
 
-基于 Google Gemini 驱动的全链路经营管理平台。覆盖采购、销售、库存、财务、发票、应收应付、市场行情、智能预警八大核心场景，支持 Agentic RAG 深度研究（含 Gemini Embedding 2 语义精排）、语音交互、发票 OCR 和六源市场聚合搜索。
+一人公司的智能账本与经营管理桌面应用。覆盖采购、销售、库存、财务、发票、应收应付、智能预警等核心场景，所有数据存储在本地，AI 能力由你自带的 API Key 驱动。
 
+[![macOS](https://img.shields.io/badge/macOS-14+-000000?logo=apple)](https://www.apple.com/macos/)
+[![Electron 33](https://img.shields.io/badge/Electron-33-47848f?logo=electron)](https://www.electronjs.org)
 [![React 19](https://img.shields.io/badge/React-19-61dafb?logo=react)](https://react.dev)
 [![TypeScript 5.8](https://img.shields.io/badge/TypeScript-5.8-3178c6?logo=typescript)](https://www.typescriptlang.org)
-[![Vite 6](https://img.shields.io/badge/Vite-6-646cff?logo=vite)](https://vite.dev)
-[![Gemini AI](https://img.shields.io/badge/Gemini-Multi--Modal-f29900?logo=google)](https://ai.google.dev)
-[![Cloud Run](https://img.shields.io/badge/Google-Cloud_Run-4285f4?logo=googlecloud)](https://cloud.google.com/run)
-[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers_+_D1-f38020?logo=cloudflare)](https://workers.cloudflare.com)
+[![SQLite](https://img.shields.io/badge/SQLite-better--sqlite3-003b57?logo=sqlite)](https://github.com/WiseLibs/better-sqlite3)
+
+---
+
+## BYOK — 自带 API Key，支持多服务商
+
+SoloLedger 不内置任何 AI 后端，所有 AI 能力由你自己的 API Key 驱动。**同时支持三家服务商，可任意组合**：
+
+| Provider | 用途 | 默认 model ID（可改） | 调用端点 | 获取 Key |
+|---|---|---|---|---|
+| **Claude (Anthropic)** | 分析、对话、发票 OCR | `claude-sonnet-4-6` | `/v1/messages` | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
+| **ChatGPT (OpenAI)** | 分析、对话、发票 OCR | `gpt-5.5` | `/v1/responses` | [platform.openai.com](https://platform.openai.com/api-keys) |
+| **Gemini (Google)** | 分析、对话、OCR、**TTS 语音**、Web Grounding | `gemini-3.5-flash` | `@google/genai` SDK | [aistudio.google.com](https://aistudio.google.com/app/apikey) |
+
+> **关于 model ID**：上表是 SoloLedger 出厂默认填的字符串，**并不保证一定对应你账号下当前可用的模型**。
+> 各家服务商会持续发布、下线、改名模型。如果「测试连接」报 `model_not_found` / `invalid_model` / `HTTP 404`，请：
+> 1. 去对应服务商官网查你当前可调用的精确 model ID（通常带日期后缀，如 `claude-sonnet-4-6-20251030`）
+> 2. 在 SoloLedger「系统设置 → AI 服务商」里直接修改 model ID（输入框可自由输入任何字符串）
+> 3. 点「仅更新模型 ID」（沿用现有 Key），重新测试连接
+>
+> 也可以填入第三方代理网关的模型 ID（如部分公司内部 OpenAI 兼容网关），只要响应格式与官方一致即可工作。
+
+**关键能力差异：**
+- 只有 **Gemini** 支持 TTS 语音合成和 Google Search Web Grounding
+- Claude / OpenAI / Gemini 都支持 Vision OCR
+
+**安全保证：**
+- API Key 经 Electron `safeStorage` 加密后写入本地 SQLite，渲染端无法读到明文
+- AI 请求由你的 Mac 直接发往对应服务商，**SoloLedger 服务器不参与任何转发**
+- 删除 Key 后该 Provider 立即停止可用，已生成的业务数据保留
+
+**配置方式：**
+- 首次启动会弹出 Onboarding 向导，可一次性配置一个或多个 Provider
+- 后续在「系统设置 → AI 服务商」可随时新增、修改、删除 API Key，或切换默认 Provider
+- 没有配置 Provider 时，AI 功能会显示「请在设置中配置 API Key」提示，不会直接报错
 
 ---
 

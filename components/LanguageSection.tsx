@@ -1,0 +1,49 @@
+import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { SUPPORTED_LANGUAGES, setLanguage, type LangCode } from '../i18n';
+
+const LanguageSection: React.FC = () => {
+  const { t, i18n } = useTranslation();
+  const current = i18n.language as LangCode;
+
+  return (
+    <section className="space-y-6">
+      <div>
+        <h3 className="text-xl font-bold text-[#191918]">{t('settings.language.title')}</h3>
+        <p className="text-xs text-[#6b6b69] mt-1">{t('settings.language.subtitle')}</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {SUPPORTED_LANGUAGES.map(lang => {
+          const selected = current === lang.code;
+          return (
+            <button
+              key={lang.code}
+              type="button"
+              onClick={() => setLanguage(lang.code as LangCode)}
+              className={`flex items-center p-4 rounded-xl border transition-all ${
+                selected
+                  ? 'border-[#d97757] bg-[#d97757]/5'
+                  : 'border-[#e0ddd5] bg-white hover:bg-[#f0eeeb]'
+              }`}
+            >
+              <span className="text-2xl mr-3">{lang.flag}</span>
+              <div className="flex-1 text-left">
+                <div className="text-sm font-semibold text-[#191918]">{lang.label}</div>
+                <div className="text-[10px] text-[#7a7a78] mt-0.5 font-mono">{lang.code}</div>
+              </div>
+              {selected && <i className="fas fa-check-circle text-[#d97757] text-lg"></i>}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="text-[11px] text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3">
+        <i className="fas fa-info-circle mr-1.5 text-[#d97757]"></i>
+        {t('settings.language.note')}
+      </div>
+    </section>
+  );
+};
+
+export default LanguageSection;

@@ -1,0 +1,153 @@
+{
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "confirm": "Confirmer",
+    "edit": "Modifier",
+    "loading": "Chargement...",
+    "saving": "Enregistrement",
+    "testing": "Test en cours",
+    "success": "Succès",
+    "error": "Échec",
+    "retry": "Réessayer",
+    "back": "Précédent",
+    "next": "Suivant",
+    "skip": "Ignorer",
+    "finish": "Terminer",
+    "yes": "Oui",
+    "no": "Non",
+    "reset": "Réinitialiser",
+    "search": "Rechercher",
+    "settings": "Paramètres",
+    "language": "Langue",
+    "default": "Par défaut",
+    "optional": "Optionnel"
+  },
+  "app": {
+    "name": "SoloLedger",
+    "subtitle": "Comptabilité intelligente pour entrepreneurs solo"
+  },
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "purchase": "Achats / TVA déductible",
+    "sales": "Ventes / TVA collectée",
+    "inventory": "Recherche factures",
+    "analysis": "Analyse de données",
+    "accounts": "Créances / Dettes",
+    "finance": "États financiers",
+    "settings": "Paramètres système"
+  },
+  "headerTitle": {
+    "dashboard": "Aperçu d'activité",
+    "sales": "Ventes / TVA collectée",
+    "purchase": "Achats / TVA déductible",
+    "analysis": "Centre d'analyse",
+    "inventory": "Recherche factures",
+    "finance": "États financiers",
+    "accounts": "Créances / Dettes",
+    "settings": "Paramètres système"
+  },
+  "settings": {
+    "nav": {
+      "company": "Informations entreprise",
+      "tax": "Règles fiscales",
+      "ai": "Fournisseurs IA (BYOK)",
+      "language": "Langue",
+      "accounting": "Norme comptable",
+      "notifications": "Alertes & notifications",
+      "security": "Compte & sécurité"
+    },
+    "saveButton": "Enregistrer",
+    "savedToast": "Paramètres enregistrés",
+    "saveError": "Échec : {{msg}}",
+    "loadError": "Échec du chargement : {{msg}}",
+    "loadingHint": "Chargement des paramètres...",
+    "language": {
+      "title": "Langue de l'interface",
+      "subtitle": "Le changement s'applique immédiatement, sans redémarrage",
+      "note": "La qualité de traduction s'améliore en continu. Signalez toute erreur"
+    },
+    "accounting": {
+      "title": "Norme comptable",
+      "subtitle": "Sélectionnez la norme comptable de votre pays/région pour configurer les taux par défaut, la devise et le format de rapport",
+      "currentLocale": "Norme actuelle",
+      "vatRate": "Taux standard",
+      "surcharge": "Taux additionnel",
+      "incomeTax": "Impôt sur le revenu",
+      "currency": "Devise par défaut",
+      "applyButton": "Appliquer cette norme",
+      "warning": "Changer de norme comptable ne met à jour que les taux et la devise par défaut. Les données existantes ne sont pas recalculées"
+    },
+    "ai": {
+      "title": "Fournisseurs IA · BYOK",
+      "subtitle": "Configurez plusieurs fournisseurs et basculez à la demande. Les clés API sont chiffrées via le trousseau système.",
+      "modelSection": "Sélection du modèle",
+      "advancedInput": "Avancé : saisir le model ID manuellement",
+      "currentModelId": "model ID actuellement envoyé à l'API",
+      "addKey": "Ajouter une clé",
+      "editKey": "Modifier la clé",
+      "setAsDefault": "Définir par défaut",
+      "removeConfirm": "Confirmer ?",
+      "updateBoth": "Mettre à jour clé + modèle",
+      "modelOnly": "Mettre à jour le model ID uniquement (conserver la clé)",
+      "testConnection": "Tester la connexion",
+      "testOk": "Modèle accessible, clé et ID validés",
+      "testFail": "Test échoué",
+      "staleModelHint": "Utilisation d'un model ID personnalisé ou obsolète — réinitialisation recommandée.",
+      "resetTo": "Réinitialiser à {{model}}",
+      "configured": "Configuré",
+      "notConfigured": "Non configuré",
+      "supportsTTS": "Supporte TTS",
+      "supportsWebGrounding": "Supporte Web Grounding",
+      "providerSavedToast": "{{name}} enregistré",
+      "modelUpdatedToast": "Modèle {{name}} mis à jour",
+      "providerRemovedToast": "{{name}} supprimé",
+      "defaultSetToast": "Fournisseur par défaut mis à jour",
+      "security": {
+        "title": "À propos de la sécurité des clés API",
+        "item1": "Toutes les clés API sont chiffrées via Electron safeStorage dans SQLite local ; le rendu n'a jamais accès au texte clair",
+        "item2": "SoloLedger n'envoie jamais votre clé à aucun serveur. Les requêtes IA partent directement de votre appareil vers le fournisseur",
+        "item3": "Supprimer une clé désactive immédiatement ce fournisseur. Les données métier existantes sont préservées."
+      },
+      "autoInsight": {
+        "title": "Analyse automatique",
+        "subtitle": "Lance automatiquement l'analyse IA au chargement du tableau de bord (fournisseur par défaut)"
+      }
+    }
+  },
+  "onboarding": {
+    "welcomeTitle": "Bienvenue dans SoloLedger",
+    "welcomeDescription": "SoloLedger est une application de comptabilité intelligente conçue pour les entrepreneurs solo, micro-entreprises et fondateurs de Solo SaaS. Toutes les données restent sur votre appareil, l'IA fonctionne avec votre propre clé API — nous ne voyons aucune de vos données.",
+    "feature1": "Stockage SQLite local — toutes les données restent sur votre Mac",
+    "feature2": "Claude · ChatGPT · Gemini supportés ; configurez plusieurs, basculez à volonté",
+    "feature3": "Les clés API sont chiffrées par le trousseau système et ne quittent jamais votre appareil",
+    "feature4": "OCR factures, analyse d'activité, alertes intelligentes, gestion créances/dettes",
+    "startConfig": "Démarrer la configuration",
+    "providerTitle": "Configurer les fournisseurs IA",
+    "providerSubtitle": "Au moins un fournisseur est requis pour commencer. Vous pourrez basculer plus tard.",
+    "loadingProviders": "Chargement des fournisseurs...",
+    "atLeastOneRequired": "Configurez au moins un fournisseur",
+    "configuredCount": "Suivant ({{count}} configuré)",
+    "companyTitle": "Informations entreprise",
+    "companySubtitle": "Contexte utilisé pour l'analyse IA. Modifiable à tout moment dans les paramètres.",
+    "companyName": "Nom de l'entreprise",
+    "companyNamePlaceholder": "ex. Acme Trading SAS",
+    "industry": "Secteur",
+    "industryPlaceholder": "ex. Commerce chimique / Logiciel / Conseil",
+    "finishAndEnter": "Terminer et entrer dans l'app",
+    "skipCompany": "Ignorer pour l'instant, remplir plus tard"
+  },
+  "byok": {
+    "howToGetKey": "Comment obtenir une clé {{provider}}",
+    "apiKey": "Clé API",
+    "modelHelp": "Si vous obtenez model_not_found, consultez la documentation du fournisseur pour les IDs disponibles",
+    "customMarker": "personnalisé",
+    "supportsTTSHint": "Supporte TTS"
+  },
+  "providers": {
+    "anthropic": "Claude · Anthropic",
+    "openai": "ChatGPT · OpenAI",
+    "gemini": "Gemini · Google"
+  }
+}

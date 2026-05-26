@@ -1,8 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fetchSettings, saveSettings } from '../services/api';
+import ProvidersSection from './ProvidersSection';
+import LanguageSection from './LanguageSection';
+import AccountingSection from './AccountingSection';
 
 const SettingsPage: React.FC = () => {
+  const { t } = useTranslation();
   const [activeSection, setActiveSection] = useState('company');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,7 +31,6 @@ const SettingsPage: React.FC = () => {
     monthlyReport: true,
   });
   const [vatRate, setVatRate] = useState('13');
-  const [aiModel, setAiModel] = useState('gemini-3-flash-preview');
   const [adminExpenseAnnual, setAdminExpenseAnnual] = useState('0');
 
   // Password change state
@@ -88,7 +92,6 @@ const SettingsPage: React.FC = () => {
     if (s.ai_auto_insight !== undefined) setAiAutoInsight(s.ai_auto_insight);
     if (s.notifications) setNotifications(s.notifications);
     if (s.vat_rate !== undefined) setVatRate(String(s.vat_rate));
-    if (s.ai_model !== undefined) setAiModel(s.ai_model);
     if (s.admin_expense_annual !== undefined) setAdminExpenseAnnual(String(s.admin_expense_annual));
   };
 
@@ -114,7 +117,6 @@ const SettingsPage: React.FC = () => {
         ai_auto_insight: aiAutoInsight,
         notifications,
         vat_rate: vatRate,
-        ai_model: aiModel,
         admin_expense_annual: parseFloat(adminExpenseAnnual) || 0,
       };
       await saveSettings(payload);
@@ -138,36 +140,13 @@ const SettingsPage: React.FC = () => {
       <div className="flex flex-col md:flex-row gap-8">
         {/* Sidebar Nav */}
         <div className="w-full md:w-64 space-y-2">
-          <SettingsNavLink
-            active={activeSection === 'company'}
-            onClick={() => setActiveSection('company')}
-            icon="fa-building"
-            label="企业基础信息"
-          />
-          <SettingsNavLink
-            active={activeSection === 'tax'}
-            onClick={() => setActiveSection('tax')}
-            icon="fa-percent"
-            label="税务规则配置"
-          />
-          <SettingsNavLink
-            active={activeSection === 'ai'}
-            onClick={() => setActiveSection('ai')}
-            icon="fa-microchip"
-            label="AI 引擎偏好"
-          />
-          <SettingsNavLink
-            active={activeSection === 'notifications'}
-            onClick={() => setActiveSection('notifications')}
-            icon="fa-bell"
-            label="预警与通知"
-          />
-          <SettingsNavLink
-            active={activeSection === 'security'}
-            onClick={() => setActiveSection('security')}
-            icon="fa-shield-halved"
-            label="账户与安全"
-          />
+          <SettingsNavLink active={activeSection === 'company'} onClick={() => setActiveSection('company')} icon="fa-building" label={t('settings.nav.company')} />
+          <SettingsNavLink active={activeSection === 'tax'} onClick={() => setActiveSection('tax')} icon="fa-percent" label={t('settings.nav.tax')} />
+          <SettingsNavLink active={activeSection === 'ai'} onClick={() => setActiveSection('ai')} icon="fa-microchip" label={t('settings.nav.ai')} />
+          <SettingsNavLink active={activeSection === 'language'} onClick={() => setActiveSection('language')} icon="fa-language" label={t('settings.nav.language')} />
+          <SettingsNavLink active={activeSection === 'accounting'} onClick={() => setActiveSection('accounting')} icon="fa-balance-scale" label={t('settings.nav.accounting')} />
+          <SettingsNavLink active={activeSection === 'notifications'} onClick={() => setActiveSection('notifications')} icon="fa-bell" label={t('settings.nav.notifications')} />
+          <SettingsNavLink active={activeSection === 'security'} onClick={() => setActiveSection('security')} icon="fa-shield-halved" label={t('settings.nav.security')} />
         </div>
 
         {/* Content Area */}
@@ -280,30 +259,20 @@ const SettingsPage: React.FC = () => {
             )}
 
             {!isLoading && !loadError && activeSection === 'ai' && (
-              <section className="space-y-6">
-                <h3 className="text-xl font-bold text-[#191918] mb-6">AI 引擎偏好</h3>
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="p-5 border border-[#d97757]/30 bg-[#d97757]/5 rounded-xl">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-[#d97757]">分析模型选择</span>
-                      <span className="text-[10px] font-bold bg-[#d97757] px-2 py-0.5 rounded text-white uppercase">PREVIEW</span>
-                    </div>
-                    <select value={aiModel} onChange={e => setAiModel(e.target.value)} className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#d97757] outline-none">
-                      <option value="gemini-3-flash-preview">Gemini 3 Flash (推荐 - 高速高质)</option>
-                      <option value="gemini-3-pro">Gemini 3 Pro (高精度分析)</option>
-                      <option value="gemini-2.5-flash">Gemini 2.5 Flash (备选)</option>
-                    </select>
+              <div className="space-y-8">
+                <ProvidersSection />
+                <div className="flex items-center justify-between p-4 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5]">
+                  <div>
+                    <p className="text-sm font-bold text-[#191918]">{t('settings.ai.autoInsight.title')}</p>
+                    <p className="text-xs text-[#5c5c5a]">{t('settings.ai.autoInsight.subtitle')}</p>
                   </div>
-                  <div className="flex items-center justify-between p-4 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5]">
-                    <div>
-                      <p className="text-sm font-bold text-[#191918]">自主洞察生成</p>
-                      <p className="text-xs text-[#5c5c5a]">看板加载时自动运行 AI 分析</p>
-                    </div>
-                    <ToggleButton checked={aiAutoInsight} onChange={setAiAutoInsight} />
-                  </div>
+                  <ToggleButton checked={aiAutoInsight} onChange={setAiAutoInsight} />
                 </div>
-              </section>
+              </div>
             )}
+
+            {!isLoading && !loadError && activeSection === 'language' && <LanguageSection />}
+            {!isLoading && !loadError && activeSection === 'accounting' && <AccountingSection />}
 
             {!isLoading && !loadError && activeSection === 'notifications' && (
               <section className="space-y-6">

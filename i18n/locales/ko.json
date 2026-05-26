@@ -1,0 +1,153 @@
+{
+  "common": {
+    "save": "저장",
+    "cancel": "취소",
+    "delete": "삭제",
+    "confirm": "확인",
+    "edit": "편집",
+    "loading": "로드 중...",
+    "saving": "저장 중",
+    "testing": "테스트 중",
+    "success": "성공",
+    "error": "실패",
+    "retry": "재시도",
+    "back": "이전",
+    "next": "다음",
+    "skip": "건너뛰기",
+    "finish": "완료",
+    "yes": "예",
+    "no": "아니오",
+    "reset": "재설정",
+    "search": "검색",
+    "settings": "설정",
+    "language": "언어",
+    "default": "기본",
+    "optional": "선택"
+  },
+  "app": {
+    "name": "SoloLedger",
+    "subtitle": "1인 회사를 위한 스마트 장부"
+  },
+  "nav": {
+    "dashboard": "대시보드",
+    "purchase": "매입 · 매입세액",
+    "sales": "매출 · 매출세액",
+    "inventory": "세금계산서 조회",
+    "analysis": "데이터 분석",
+    "accounts": "채권/채무",
+    "finance": "재무제표",
+    "settings": "시스템 설정"
+  },
+  "headerTitle": {
+    "dashboard": "경영 데이터 개요",
+    "sales": "매출 · 매출세액",
+    "purchase": "매입 · 매입세액",
+    "analysis": "데이터 분석 센터",
+    "inventory": "세금계산서 조회",
+    "finance": "재무제표",
+    "accounts": "채권/채무",
+    "settings": "시스템 설정"
+  },
+  "settings": {
+    "nav": {
+      "company": "기업 기본 정보",
+      "tax": "세무 규칙 설정",
+      "ai": "AI 서비스 (BYOK)",
+      "language": "언어",
+      "accounting": "회계 제도",
+      "notifications": "알림 및 경고",
+      "security": "계정 및 보안"
+    },
+    "saveButton": "변경 사항 저장",
+    "savedToast": "설정이 저장되었습니다",
+    "saveError": "저장 실패: {{msg}}",
+    "loadError": "설정 로드 실패: {{msg}}",
+    "loadingHint": "설정 로드 중...",
+    "language": {
+      "title": "인터페이스 언어",
+      "subtitle": "전환 후 즉시 적용, 재시작 불필요",
+      "note": "번역 품질은 지속 개선 중입니다. 오류 발견 시 알려주세요"
+    },
+    "accounting": {
+      "title": "회계 제도",
+      "subtitle": "국가/지역의 회계 제도를 선택하면 기본 세율·통화·보고 양식이 설정됩니다",
+      "currentLocale": "현재 제도",
+      "vatRate": "표준 세율",
+      "surcharge": "부가 세율",
+      "incomeTax": "소득세율",
+      "currency": "기본 통화",
+      "applyButton": "이 제도 적용",
+      "warning": "회계 제도 전환은 기본 세율과 통화만 업데이트합니다. 기존 데이터는 재계산되지 않습니다"
+    },
+    "ai": {
+      "title": "AI 서비스 · BYOK",
+      "subtitle": "여러 서비스를 동시에 구성하고 기본값을 전환할 수 있습니다. API Key는 시스템 키체인으로 암호화 저장됩니다.",
+      "modelSection": "모델 선택",
+      "advancedInput": "고급: 직접 model ID 입력",
+      "currentModelId": "현재 API에 전송하는 model ID",
+      "addKey": "Key 추가",
+      "editKey": "Key 편집",
+      "setAsDefault": "기본으로 설정",
+      "removeConfirm": "확인?",
+      "updateBoth": "Key + 모델 업데이트",
+      "modelOnly": "모델 ID만 업데이트 (기존 Key 유지)",
+      "testConnection": "연결 테스트",
+      "testOk": "모델 호출 성공, Key와 ID 모두 유효",
+      "testFail": "테스트 실패",
+      "staleModelHint": "현재 사용자 정의 또는 이전 model ID 사용 중. 재설정 권장.",
+      "resetTo": "{{model}}으로 재설정",
+      "configured": "구성됨",
+      "notConfigured": "미구성",
+      "supportsTTS": "TTS 지원",
+      "supportsWebGrounding": "Web Grounding 지원",
+      "providerSavedToast": "{{name}} 저장됨",
+      "modelUpdatedToast": "{{name}} 모델 업데이트됨",
+      "providerRemovedToast": "{{name}} 삭제됨",
+      "defaultSetToast": "기본 서비스 업데이트됨",
+      "security": {
+        "title": "API Key 보안에 대하여",
+        "item1": "모든 API Key는 Electron safeStorage로 암호화되어 로컬 SQLite에 저장되며, 렌더러는 평문을 볼 수 없습니다",
+        "item2": "SoloLedger는 Key를 서버로 업로드하지 않습니다. AI 요청은 사용자 기기에서 직접 서비스 제공자로 전송됩니다",
+        "item3": "Key를 삭제하면 해당 서비스가 즉시 비활성화되지만 기존 비즈니스 데이터는 보존됩니다"
+      },
+      "autoInsight": {
+        "title": "자율 인사이트 생성",
+        "subtitle": "대시보드 로드 시 AI 분석을 자동 실행 (기본 서비스 사용)"
+      }
+    }
+  },
+  "onboarding": {
+    "welcomeTitle": "SoloLedger에 오신 것을 환영합니다",
+    "welcomeDescription": "SoloLedger는 1인 회사, 개인 사업자, Solo SaaS 창업자를 위한 스마트 장부 앱입니다. 모든 데이터는 로컬에 저장되며 AI 기능은 사용자의 API Key로 구동됩니다 — 저희는 사용자의 데이터를 볼 수 없습니다.",
+    "feature1": "로컬 SQLite 저장소, 모든 데이터가 사용자의 Mac에 보관됩니다",
+    "feature2": "Claude · ChatGPT · Gemini 지원, 다중 구성 가능, 기본값 자유 전환",
+    "feature3": "API Key는 시스템 키체인으로 암호화되어 장치를 떠나지 않습니다",
+    "feature4": "송장 OCR, 경영 분석, 스마트 알림, 채권/채무 관리",
+    "startConfig": "구성 시작",
+    "providerTitle": "AI 서비스 구성",
+    "providerSubtitle": "최소 하나만 구성하면 사용 시작 가능. 여러 개 구성 시 설정에서 기본값 전환 가능.",
+    "loadingProviders": "서비스 목록 로드 중...",
+    "atLeastOneRequired": "최소 하나의 서비스 구성 필요",
+    "configuredCount": "다음 ({{count}}개 구성됨)",
+    "companyTitle": "회사 정보 입력",
+    "companySubtitle": "AI 분석 시 기업 컨텍스트로 사용됩니다. 설정에서 언제든 수정 가능.",
+    "companyName": "회사명",
+    "companyNamePlaceholder": "예: 서울 유니콘 무역 주식회사",
+    "industry": "업종",
+    "industryPlaceholder": "예: 화학 무역 / 소프트웨어 / 컨설팅",
+    "finishAndEnter": "완료하고 앱 진입",
+    "skipCompany": "회사 정보 건너뛰기, 나중에 설정에서 입력"
+  },
+  "byok": {
+    "howToGetKey": "{{provider}} Key 발급 방법",
+    "apiKey": "API Key",
+    "modelHelp": "model_not_found 오류 시 서비스 공식 사이트에서 최신 사용 가능 ID 확인",
+    "customMarker": "사용자 정의",
+    "supportsTTSHint": "TTS 지원"
+  },
+  "providers": {
+    "anthropic": "Claude · Anthropic",
+    "openai": "ChatGPT · OpenAI",
+    "gemini": "Gemini · Google"
+  }
+}

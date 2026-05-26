@@ -1,0 +1,153 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "edit": "Edit",
+    "loading": "Loading...",
+    "saving": "Saving",
+    "testing": "Testing",
+    "success": "Success",
+    "error": "Error",
+    "retry": "Retry",
+    "back": "Back",
+    "next": "Next",
+    "skip": "Skip",
+    "finish": "Finish",
+    "yes": "Yes",
+    "no": "No",
+    "reset": "Reset",
+    "search": "Search",
+    "settings": "Settings",
+    "language": "Language",
+    "default": "Default",
+    "optional": "Optional"
+  },
+  "app": {
+    "name": "SoloLedger",
+    "subtitle": "Smart ledger for one-person companies"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "purchase": "Purchases",
+    "sales": "Sales",
+    "inventory": "Invoices",
+    "analysis": "Analysis",
+    "accounts": "Receivables / Payables",
+    "finance": "Financial Reports",
+    "settings": "Settings"
+  },
+  "headerTitle": {
+    "dashboard": "Business Overview",
+    "sales": "Sales & Output Tax",
+    "purchase": "Purchases & Input Tax",
+    "analysis": "Data Analysis",
+    "inventory": "Invoice Search",
+    "finance": "Financial Statements",
+    "accounts": "Receivables / Payables",
+    "settings": "System Settings"
+  },
+  "settings": {
+    "nav": {
+      "company": "Company Info",
+      "tax": "Tax Rules",
+      "ai": "AI Providers (BYOK)",
+      "language": "Language",
+      "accounting": "Accounting Standard",
+      "notifications": "Alerts & Notifications",
+      "security": "Account & Security"
+    },
+    "saveButton": "Save Changes",
+    "savedToast": "Settings saved successfully",
+    "saveError": "Save failed: {{msg}}",
+    "loadError": "Failed to load settings: {{msg}}",
+    "loadingHint": "Loading settings...",
+    "language": {
+      "title": "Interface Language",
+      "subtitle": "Changes apply immediately, no restart needed",
+      "note": "Translations are being improved. Please report any inaccuracies."
+    },
+    "accounting": {
+      "title": "Accounting Standard",
+      "subtitle": "Select your country/region's accounting standard to set default tax rates, currency, and reporting format",
+      "currentLocale": "Current standard",
+      "vatRate": "Standard tax rate",
+      "surcharge": "Surcharge rate",
+      "incomeTax": "Income tax rate",
+      "currency": "Default currency",
+      "applyButton": "Apply this standard",
+      "warning": "Switching accounting standard only updates default tax rates and currency. Existing data will not be recalculated."
+    },
+    "ai": {
+      "title": "AI Providers · BYOK",
+      "subtitle": "Configure multiple providers and switch defaults. API Keys are encrypted via system Keychain.",
+      "modelSection": "Model Selection",
+      "advancedInput": "Advanced: enter model ID manually",
+      "currentModelId": "Current model ID sent to API",
+      "addKey": "Add Key",
+      "editKey": "Edit Key",
+      "setAsDefault": "Set as default",
+      "removeConfirm": "Confirm?",
+      "updateBoth": "Update Key + Model",
+      "modelOnly": "Update model ID only (keep existing Key)",
+      "testConnection": "Test connection",
+      "testOk": "Model callable, Key and ID both verified",
+      "testFail": "Test failed",
+      "staleModelHint": "Currently using a custom or legacy model ID — reset recommended.",
+      "resetTo": "Reset to {{model}}",
+      "configured": "Configured",
+      "notConfigured": "Not configured",
+      "supportsTTS": "Supports TTS",
+      "supportsWebGrounding": "Supports Web Grounding",
+      "providerSavedToast": "{{name}} saved",
+      "modelUpdatedToast": "{{name}} model updated",
+      "providerRemovedToast": "{{name}} removed",
+      "defaultSetToast": "Default provider updated",
+      "security": {
+        "title": "About API Key Security",
+        "item1": "All API Keys are encrypted via Electron safeStorage into local SQLite; the renderer never sees plaintext",
+        "item2": "SoloLedger never uploads your Key. AI requests go directly from your device to the provider.",
+        "item3": "Deleting a Key immediately disables that provider. Existing business data is preserved."
+      },
+      "autoInsight": {
+        "title": "Autonomous Insight",
+        "subtitle": "Automatically run AI analysis on dashboard load (uses default provider)"
+      }
+    }
+  },
+  "onboarding": {
+    "welcomeTitle": "Welcome to SoloLedger",
+    "welcomeDescription": "SoloLedger is a smart ledger app built for one-person companies, sole proprietors, and solo SaaS founders. All data stays on your device, AI is powered by your own API Key — we never see your data.",
+    "feature1": "Local SQLite storage — all data lives on your Mac",
+    "feature2": "Claude · ChatGPT · Gemini supported; configure multiple, switch defaults",
+    "feature3": "API Keys encrypted by system Keychain, never leave your device",
+    "feature4": "Invoice OCR, business analysis, smart alerts, receivables/payables",
+    "startConfig": "Start configuration",
+    "providerTitle": "Configure AI Providers",
+    "providerSubtitle": "At least one provider is required to get started. You can switch defaults in settings later.",
+    "loadingProviders": "Loading providers...",
+    "atLeastOneRequired": "Configure at least one provider",
+    "configuredCount": "Next ({{count}} configured)",
+    "companyTitle": "Company Information",
+    "companySubtitle": "Used as context for AI analysis. Editable anytime in settings.",
+    "companyName": "Company name",
+    "companyNamePlaceholder": "e.g. Acme Trading Co., Ltd",
+    "industry": "Industry",
+    "industryPlaceholder": "e.g. Chemical trade / Software / Consulting",
+    "finishAndEnter": "Finish and enter app",
+    "skipCompany": "Skip for now; fill in settings later"
+  },
+  "byok": {
+    "howToGetKey": "How to get a {{provider}} Key",
+    "apiKey": "API Key",
+    "modelHelp": "If you get model_not_found, check the provider's docs for current available IDs",
+    "customMarker": "custom",
+    "supportsTTSHint": "Supports TTS"
+  },
+  "providers": {
+    "anthropic": "Claude · Anthropic",
+    "openai": "ChatGPT · OpenAI",
+    "gemini": "Gemini · Google"
+  }
+}

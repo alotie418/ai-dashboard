@@ -1,0 +1,153 @@
+{
+  "common": {
+    "save": "保存",
+    "cancel": "キャンセル",
+    "delete": "削除",
+    "confirm": "確認",
+    "edit": "編集",
+    "loading": "読み込み中...",
+    "saving": "保存中",
+    "testing": "テスト中",
+    "success": "成功",
+    "error": "失敗",
+    "retry": "再試行",
+    "back": "戻る",
+    "next": "次へ",
+    "skip": "スキップ",
+    "finish": "完了",
+    "yes": "はい",
+    "no": "いいえ",
+    "reset": "リセット",
+    "search": "検索",
+    "settings": "設定",
+    "language": "言語",
+    "default": "デフォルト",
+    "optional": "任意"
+  },
+  "app": {
+    "name": "SoloLedger",
+    "subtitle": "ひとり会社のためのスマート帳簿"
+  },
+  "nav": {
+    "dashboard": "ダッシュボード",
+    "purchase": "仕入・仮払消費税",
+    "sales": "売上・仮受消費税",
+    "inventory": "請求書検索",
+    "analysis": "データ分析",
+    "accounts": "売掛金・買掛金",
+    "finance": "財務諸表",
+    "settings": "システム設定"
+  },
+  "headerTitle": {
+    "dashboard": "経営データ概要",
+    "sales": "売上・仮受消費税",
+    "purchase": "仕入・仮払消費税",
+    "analysis": "データ分析センター",
+    "inventory": "請求書検索",
+    "finance": "財務諸表",
+    "accounts": "売掛金・買掛金",
+    "settings": "システム設定"
+  },
+  "settings": {
+    "nav": {
+      "company": "企業基本情報",
+      "tax": "税務ルール設定",
+      "ai": "AIプロバイダー (BYOK)",
+      "language": "表示言語",
+      "accounting": "会計制度",
+      "notifications": "アラートと通知",
+      "security": "アカウントとセキュリティ"
+    },
+    "saveButton": "変更を保存",
+    "savedToast": "設定を保存しました",
+    "saveError": "保存に失敗：{{msg}}",
+    "loadError": "設定の読み込みに失敗：{{msg}}",
+    "loadingHint": "設定を読み込み中...",
+    "language": {
+      "title": "表示言語",
+      "subtitle": "切り替え後すぐに反映されます。再起動不要",
+      "note": "翻訳品質は継続的に改善中です。問題があればご報告ください"
+    },
+    "accounting": {
+      "title": "会計制度",
+      "subtitle": "国/地域の会計制度を選択して、デフォルト税率・通貨・帳票形式を設定します",
+      "currentLocale": "現在の制度",
+      "vatRate": "標準税率",
+      "surcharge": "附加税率",
+      "incomeTax": "所得税率",
+      "currency": "デフォルト通貨",
+      "applyButton": "この制度を適用",
+      "warning": "会計制度の切り替えはデフォルト税率と通貨のみを更新します。既存データは再計算されません"
+    },
+    "ai": {
+      "title": "AIプロバイダー · BYOK",
+      "subtitle": "複数のプロバイダーを設定してデフォルトを切り替えられます。API Keyはシステムキーチェーンで暗号化されます。",
+      "modelSection": "モデル選択",
+      "advancedInput": "詳細：手動でmodel IDを入力",
+      "currentModelId": "現在APIに送信するmodel ID",
+      "addKey": "Keyを追加",
+      "editKey": "Keyを編集",
+      "setAsDefault": "デフォルトに設定",
+      "removeConfirm": "確認?",
+      "updateBoth": "Key + モデルを更新",
+      "modelOnly": "モデルIDのみ更新（既存Keyを保持）",
+      "testConnection": "接続テスト",
+      "testOk": "モデル呼び出し成功、KeyとIDともに有効",
+      "testFail": "テスト失敗",
+      "staleModelHint": "現在カスタムまたは旧版model IDを使用中。リセットを推奨。",
+      "resetTo": "{{model}}にリセット",
+      "configured": "設定済み",
+      "notConfigured": "未設定",
+      "supportsTTS": "TTS対応",
+      "supportsWebGrounding": "Web Grounding対応",
+      "providerSavedToast": "{{name}} 保存しました",
+      "modelUpdatedToast": "{{name}} モデルを更新しました",
+      "providerRemovedToast": "{{name}} 削除しました",
+      "defaultSetToast": "デフォルトプロバイダーを更新しました",
+      "security": {
+        "title": "API Keyのセキュリティについて",
+        "item1": "すべてのAPI KeyはElectron safeStorageで暗号化してローカルSQLiteに保存。レンダラーは平文を見ることができません",
+        "item2": "SoloLedgerはKeyをサーバーにアップロードしません。AIリクエストはお使いのデバイスから直接プロバイダーへ送信されます",
+        "item3": "Keyを削除するとそのプロバイダーは即座に無効化されますが、既存の業務データは保持されます"
+      },
+      "autoInsight": {
+        "title": "自律的なインサイト生成",
+        "subtitle": "ダッシュボード読み込み時にAI分析を自動実行（デフォルトプロバイダー使用）"
+      }
+    }
+  },
+  "onboarding": {
+    "welcomeTitle": "SoloLedgerへようこそ",
+    "welcomeDescription": "SoloLedgerはひとり会社、個人事業主、Solo SaaSファウンダー向けに作られたスマート帳簿アプリです。すべてのデータはローカルに保存され、AI機能はあなたのAPI Keyで動作します — 私たちはあなたのデータを見ることができません。",
+    "feature1": "ローカルSQLiteストレージ、すべてのデータはあなたのMac上に",
+    "feature2": "Claude · ChatGPT · Gemini対応、複数設定可、デフォルト切り替え自由",
+    "feature3": "API Keyはシステムキーチェーンで暗号化され、デバイスから出ることはありません",
+    "feature4": "請求書OCR、経営分析、スマートアラート、売掛買掛管理",
+    "startConfig": "設定を開始",
+    "providerTitle": "AIプロバイダーを設定",
+    "providerSubtitle": "1つ以上設定すれば使い始められます。複数設定する場合は設定でデフォルトを切り替えられます。",
+    "loadingProviders": "プロバイダーリストを読み込み中...",
+    "atLeastOneRequired": "1つ以上のプロバイダーを設定してください",
+    "configuredCount": "次へ（{{count}}件設定済み）",
+    "companyTitle": "会社情報の入力",
+    "companySubtitle": "AI分析時の企業コンテキストとして使用されます。設定で随時変更可能。",
+    "companyName": "会社名",
+    "companyNamePlaceholder": "例：株式会社サンプル",
+    "industry": "業界",
+    "industryPlaceholder": "例：化学品商社 / ソフトウェア開発 / コンサルティング",
+    "finishAndEnter": "完了してアプリに入る",
+    "skipCompany": "後でスキップ、設定で後ほど記入"
+  },
+  "byok": {
+    "howToGetKey": "{{provider}} Keyの取得方法",
+    "apiKey": "API Key",
+    "modelHelp": "model_not_foundエラーが出た場合は、プロバイダー公式サイトで最新の利用可能IDを確認してください",
+    "customMarker": "カスタム",
+    "supportsTTSHint": "TTS対応"
+  },
+  "providers": {
+    "anthropic": "Claude · Anthropic",
+    "openai": "ChatGPT · OpenAI",
+    "gemini": "Gemini · Google"
+  }
+}

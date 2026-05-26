@@ -80,123 +80,6 @@ export interface AIAnalysis {
   anomalies: string[];
 }
 
-export type PlatformCategory = 'B2C' | 'B2B' | 'industry' | 'international';
-
-export interface MarketPriceResult {
-  platform: string;
-  title: string;
-  price: number;               // 标准化后的元/吨单价
-  priceUnit?: string;          // 固定为 "元/吨"
-  original_price_str?: string; // 原始价格, 如 "¥25/10kg*2袋"
-  spec?: string;               // 包装规格, 如 "20kg (10kg×2袋)"
-  link: string;
-  platformCategory?: PlatformCategory;
-}
-
-export interface MarketSummaryRow {
-  label: string;
-  value: string;
-}
-
-export interface MarketSearchResponse {
-  analysis: string;
-  prices: MarketPriceResult[];
-  summaryTable?: MarketSummaryRow[];
-}
-
-export interface BraveSearchResult {
-  title: string;
-  url: string;
-  description: string;
-}
-
-export interface BraveSearchResponse {
-  web?: { results: BraveSearchResult[] };
-}
-
-export interface GeminiSearchProxyResponse {
-  text: string;
-  grounding: { title: string; uri: string }[];
-}
-
-export interface DirectPriceResult {
-  product: string;
-  price: number;
-  priceUnit: string;
-  spec?: string;
-  region?: string;
-  date?: string;
-  source: string;
-}
-
-export interface DirectSearchResponse {
-  prices: DirectPriceResult[];
-  matched: boolean;
-  sources: { name: string; keyword: string; url: string }[];
-}
-
-export interface InternationalSearchResult {
-  title: string;
-  url: string;
-  description: string;
-}
-
-export interface InternationalSearchResponse {
-  results: InternationalSearchResult[];
-  translatedQuery: string;
-  translationMethod: 'static' | 'static_partial' | 'gemini' | 'fallback_original';
-  originalQuery: string;
-}
-
-export interface EcommerceSearchResult {
-  title: string;
-  url: string;
-  description: string;
-  category: string;
-  categoryLabel: string;
-}
-
-export interface EcommerceSearchCategory {
-  category: string;
-  label: string;
-  results: EcommerceSearchResult[];
-}
-
-export interface EcommerceSearchResponse {
-  categories: EcommerceSearchCategory[];
-  query: string;
-}
-
-export interface MergeSearchRequest {
-  geminiRaw: string;
-  braveResults: { title: string; url: string; content: string }[];
-  tavilyResults: { title: string; url: string; content: string }[];
-  directResults?: DirectPriceResult[];
-  internationalResults?: { title: string; url: string; description: string }[];
-  ecommerceResults?: EcommerceSearchCategory[];
-}
-
-// ==================== Price History (Feature 1) ====================
-
-export interface PriceHistoryPoint {
-  id: number;
-  query: string;
-  query_normalized: string;
-  search_date: string;
-  min_price: number;
-  max_price: number;
-  avg_price: number;
-  price_count: number;
-  price_unit: string;
-  source_breakdown: string;
-}
-
-export interface PriceHistoryResponse {
-  query: string;
-  days: number;
-  history: PriceHistoryPoint[];
-}
-
 // ==================== Accounts Receivable/Payable (Feature 3) ====================
 
 export interface PaymentUpdate {
@@ -255,103 +138,54 @@ export interface BatchImportResult {
   errors: { row: number; errors: string[] }[];
 }
 
-// ==================== Agentic RAG (Market Research) ====================
+// (Agentic RAG / Market Research types removed — feature dropped for desktop)
 
-export type AgentPhase =
-  | 'idle'
-  | 'planning'
-  | 'searching'
-  | 'ranking'
-  | 'extracting'
-  | 'synthesizing'
-  | 'critiquing'
-  | 'iterating'
-  | 'complete'
-  | 'error';
+// ==================== AI Providers (BYOK 多服务商) ====================
 
-export interface SubQuery {
-  type: 'factual' | 'context' | 'quantitative' | 'counter';
-  query: string;
+export type AIProviderId = 'anthropic' | 'openai' | 'gemini';
+
+// 主进程内部使用（带 apiKey）
+export interface AIProviderRecord {
+  provider: AIProviderId;
+  apiKey: string;
+  model: string;
+  enabled: boolean;
+  isDefault: boolean;
 }
 
-export interface PlanResult {
-  question_type: 'factual' | 'causal' | 'predictive' | 'comparative' | 'evaluative';
-  multi_hop_required: boolean;
-  sub_queries: SubQuery[];
+// 单个推荐模型条目：label 给用户看，value 给 API 用
+export interface ModelOption {
+  label: string;
+  value: string;
 }
 
-export interface Evidence {
-  claim_id: string;
-  text: string;
-  type: string; // price_claim | supply_demand | trend | opinion | fact
-  numbers: { value: number; unit: string; context: string }[];
-  entities: string[];
-  viewpoints?: string[];
-  uncertainty?: string[];
-  source_url: string;
-  confidence: number;
+// 暴露给渲染端的（不含明文 apiKey，仅含 hasKey 标记）
+export interface AIProviderConfig {
+  provider: AIProviderId;
+  name: string;            // 展示名（"Claude (Anthropic)" 等）
+  hasKey: boolean;         // 是否已配置 Key
+  model: string;           // 当前选中的 model ID（value）
+  modelLabel: string;      // 当前 model 对应的展示名（不在白名单里时显示 "(自定义)"）
+  modelIsKnown: boolean;   // 当前 model 是否在 availableModels 白名单内
+  availableModels: ModelOption[];
+  defaultModel: string;
+  enabled: boolean;
+  isDefault: boolean;
+  supportsOCR: boolean;
+  supportsTTS: boolean;
+  supportsWebGrounding: boolean;
 }
 
-export interface ExtractResult {
-  evidence: Evidence[];
+export interface SaveProviderRequest {
+  provider: AIProviderId;
+  apiKey: string;
+  model?: string;
+  enabled?: boolean;
+  setAsDefault?: boolean;
 }
 
-export interface RankedResult {
-  title: string;
-  url: string;
-  content: string;
-  source: string;
-  score: number;
-  relevance: number;
-  authority: number;
-  recency: number;
-  diversity: number;
-  published_date?: string;
-}
-
-export interface RankResult {
-  ranked: RankedResult[];
-  dedup_stats: {
-    before: number;
-    after: number;
-    removed_urls: number;
-    removed_similar: number;
-  };
-}
-
-export interface SynthesisResult extends MarketSearchResponse {
-  consensus: string[];
-  contradictions: string[];
-  confidence_score: number;
-}
-
-export interface CritiqueResult {
-  needs_more_search: boolean;
-  missing_aspects: string[];
-  new_queries: string[];
-  confidence_score: number;
-  reasoning: string;
-}
-
-export interface PhaseLogEntry {
-  phase: AgentPhase;
-  duration_ms: number;
-  summary: string;
-  iteration: number;
-}
-
-export interface AgenticSearchState {
-  original_query: string;
-  question_type: string;
-  multi_hop_required: boolean;
-  sub_queries: SubQuery[];
-  search_results: RankedResult[];
-  evidence_pool: Evidence[];
-  synthesis: SynthesisResult | null;
-  confidence_score: number;
-  iteration_count: number;
-  max_iterations: number;
-  critique_history: CritiqueResult[];
-  phase: AgentPhase;
-  phase_log: PhaseLogEntry[];
+export interface TestProviderRequest {
+  provider: AIProviderId;
+  apiKey: string;
+  model?: string;
 }

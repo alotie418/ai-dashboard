@@ -1,7 +1,54 @@
-// API client for Cloudflare Worker + D1 persistence
-// Handles field mapping between frontend interfaces and D1 schema
+// API client — 桌面版走 Electron IPC，Web 版仍走 fetch（开发兼容）
+// Field mapping 在下方保持不变
 
 const API_BASE = '';
+
+// 判断是否运行在 Electron 桌面壳内
+function isElectron(): boolean {
+  return typeof window !== 'undefined' && !!(window as any).electronAPI?.isElectron;
+}
+
+function electronInvoke<T = any>(channel: string, payload?: any): Promise<T> {
+  if (!isElectron()) throw new Error('该接口仅在桌面版可用');
+  return (window as any).electronAPI.invoke(channel, payload);
+}
+
+// ==================== AI Providers 管理（仅桌面版）====================
+
+import type { AIProviderConfig, AIProviderId, SaveProviderRequest, TestProviderRequest } from '../types';
+
+export function listProviders(): Promise<AIProviderConfig[]> {
+  return electronInvoke<AIProviderConfig[]>('providers:list');
+}
+
+export function hasAnyProvider(): Promise<boolean> {
+  return electronInvoke<boolean>('providers:hasAny');
+}
+
+export function saveProvider(payload: SaveProviderRequest): Promise<{ success: boolean }> {
+  return electronInvoke('providers:save', payload);
+}
+
+export function removeProvider(provider: AIProviderId): Promise<{ success: boolean }> {
+  return electronInvoke('providers:remove', { provider });
+}
+
+export function setDefaultProvider(provider: AIProviderId): Promise<{ success: boolean }> {
+  return electronInvoke('providers:setDefault', { provider });
+}
+
+export interface TestProviderResult {
+  ok: boolean;
+  error?: string;
+  status?: number;     // HTTP 状态码（如 401/403/404/429）
+  code?: string;       // 服务商错误码（如 invalid_api_key / model_not_found）
+  providerMessage?: string; // 服务商原始 message
+  rawMessage?: string; // 完整错误字符串（含状态码、code、friendly）
+}
+
+export function testProvider(payload: TestProviderRequest): Promise<TestProviderResult> {
+  return electronInvoke<TestProviderResult>('providers:test', payload);
+}
 
 // ==================== Types ====================
 
@@ -221,16 +268,34 @@ function fromApiPurchase(a: ApiPurchaseRecord): PurchaseRecord {
 const API_TIMEOUT_MS = 90000; // #8: 90s default request timeout
 
 async function apiFetch<T>(path: string, options?: RequestInit & { signal?: AbortSignal }): Promise<T> {
+  const method = (options?.method || 'GET').toUpperCase();
+  const body = options?.body ? JSON.parse(options.body as string) : undefined;
+  const userSignal = options?.signal;
+
+  // ===== Electron 桌面版：走 IPC，跳过 HTTP =====
+  if (isElectron()) {
+    if (userSignal?.aborted) throw new Error('cancelled');
+    const electronAPI = (window as any).electronAPI;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(`请求超时 (${API_TIMEOUT_MS / 1000}s): ${path}`)), API_TIMEOUT_MS);
+    });
+    const cancelPromise = new Promise<never>((_, reject) => {
+      userSignal?.addEventListener('abort', () => reject(new Error('cancelled')), { once: true });
+    });
+    const invokePromise = electronAPI.invoke('api:request', { method, path, body });
+
+    return Promise.race([invokePromise, timeoutPromise, cancelPromise]) as Promise<T>;
+  }
+
+  // ===== Web 版：保留原 fetch 逻辑 =====
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
 
-  // #8: Compose user signal with timeout signal
   const timeoutController = new AbortController();
   const timeoutId = setTimeout(() => timeoutController.abort(), API_TIMEOUT_MS);
 
-  // If user provided a signal, abort on either user cancel OR timeout
-  const userSignal = options?.signal;
   const onUserAbort = () => timeoutController.abort();
   if (userSignal) {
     if (userSignal.aborted) { clearTimeout(timeoutId); throw new Error('cancelled'); }
@@ -249,11 +314,10 @@ async function apiFetch<T>(path: string, options?: RequestInit & { signal?: Abor
     });
     if (!res.ok) {
       const err = await res.text();
-      throw new Error(`API ${options?.method || 'GET'} ${path} failed (${res.status}): ${err.slice(0, 300)}`);
+      throw new Error(`API ${method} ${path} failed (${res.status}): ${err.slice(0, 300)}`);
     }
     return res.json() as Promise<T>;
   } catch (err: any) {
-    // Distinguish timeout from user cancel
     if (userSignal?.aborted) throw new Error('cancelled');
     if (err?.name === 'AbortError') throw new Error(`请求超时 (${API_TIMEOUT_MS / 1000}s): ${path}`);
     throw err;
@@ -352,67 +416,6 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
   });
 }
 
-// --- Search Proxy ---
-
-export async function searchBrave(q: string, count = 15, signal?: AbortSignal): Promise<any> {
-  return apiFetch('/api/search/brave', {
-    method: 'POST',
-    body: JSON.stringify({ q, count }),
-    signal,
-  });
-}
-
-export async function searchTavily(query: string, maxResults = 15, signal?: AbortSignal): Promise<any> {
-  return apiFetch('/api/search/tavily', {
-    method: 'POST',
-    body: JSON.stringify({ query, search_depth: 'advanced', max_results: maxResults }),
-    signal,
-  });
-}
-
-export async function searchGemini(query: string, signal?: AbortSignal): Promise<import('../types').GeminiSearchProxyResponse> {
-  return apiFetch('/api/search/gemini', {
-    method: 'POST',
-    body: JSON.stringify({ query }),
-    signal,
-  });
-}
-
-export async function searchDirect(query: string, signal?: AbortSignal): Promise<import('../types').DirectSearchResponse> {
-  return apiFetch('/api/search/direct', {
-    method: 'POST',
-    body: JSON.stringify({ query }),
-    signal,
-  });
-}
-
-export async function searchInternational(query: string, signal?: AbortSignal): Promise<import('../types').InternationalSearchResponse> {
-  return apiFetch('/api/search/international', {
-    method: 'POST',
-    body: JSON.stringify({ query }),
-    signal,
-  });
-}
-
-export async function searchEcommerce(query: string, signal?: AbortSignal): Promise<import('../types').EcommerceSearchResponse> {
-  return apiFetch('/api/search/ecommerce', {
-    method: 'POST',
-    body: JSON.stringify({ query }),
-    signal,
-  });
-}
-
-export async function mergeSearch(
-  data: import('../types').MergeSearchRequest,
-  signal?: AbortSignal
-): Promise<import('../types').MarketSearchResponse> {
-  return apiFetch('/api/search/merge', {
-    method: 'POST',
-    body: JSON.stringify(data),
-    signal,
-  });
-}
-
 // --- Batch Import (Feature 2) ---
 
 export async function batchCreateSales(records: any[]): Promise<import('../types').BatchImportResult> {
@@ -427,23 +430,6 @@ export async function batchCreatePurchases(records: any[]): Promise<import('../t
     method: 'POST',
     body: JSON.stringify({ records }),
   });
-}
-
-// --- Price History (Feature 1) ---
-
-export async function savePriceHistory(query: string, prices: any[]): Promise<void> {
-  await apiFetch('/api/price-history', {
-    method: 'POST',
-    body: JSON.stringify({
-      query,
-      search_date: new Date().toISOString().split('T')[0],
-      prices,
-    }),
-  });
-}
-
-export async function fetchPriceHistory(query: string, days = 30): Promise<import('../types').PriceHistoryResponse> {
-  return apiFetch(`/api/price-history?query=${encodeURIComponent(query)}&days=${days}`);
 }
 
 // --- Payment Tracking (Feature 3) ---
@@ -492,76 +478,3 @@ export async function dismissAlert(id: number): Promise<void> {
   await apiFetch(`/api/alerts/${id}`, { method: 'DELETE' });
 }
 
-// --- Agentic RAG (Market Research) ---
-
-export async function agentPlan(
-  query: string,
-  signal?: AbortSignal
-): Promise<import('../types').PlanResult> {
-  return apiFetch('/api/agent/plan', {
-    method: 'POST',
-    body: JSON.stringify({ query }),
-    signal,
-  });
-}
-
-export async function agentRank(
-  query: string,
-  results: any[],
-  signal?: AbortSignal
-): Promise<import('../types').RankResult> {
-  return apiFetch('/api/agent/rank', {
-    method: 'POST',
-    body: JSON.stringify({ query, results }),
-    signal,
-  });
-}
-
-export async function agentExtract(
-  query: string,
-  searchResults: any[],
-  signal?: AbortSignal
-): Promise<import('../types').ExtractResult> {
-  return apiFetch('/api/agent/extract', {
-    method: 'POST',
-    body: JSON.stringify({ query, search_results: searchResults }),
-    signal,
-  });
-}
-
-export async function agentSynthesize(
-  query: string,
-  questionType: string,
-  evidencePool: import('../types').Evidence[],
-  iteration: number,
-  signal?: AbortSignal
-): Promise<import('../types').SynthesisResult> {
-  return apiFetch('/api/agent/synthesize', {
-    method: 'POST',
-    body: JSON.stringify({ query, question_type: questionType, evidence_pool: evidencePool, iteration }),
-    signal,
-  });
-}
-
-export async function agentCritique(
-  query: string,
-  questionType: string,
-  synthesis: import('../types').SynthesisResult,
-  evidencePool: import('../types').Evidence[],
-  iteration: number,
-  maxIterations: number,
-  signal?: AbortSignal
-): Promise<import('../types').CritiqueResult> {
-  return apiFetch('/api/agent/critique', {
-    method: 'POST',
-    body: JSON.stringify({
-      query,
-      question_type: questionType,
-      synthesis,
-      evidence_pool: evidencePool,
-      iteration,
-      max_iterations: maxIterations,
-    }),
-    signal,
-  });
-}
