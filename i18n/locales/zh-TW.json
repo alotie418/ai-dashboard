@@ -55,6 +55,7 @@
       "ai": "AI 服務商 (BYOK)",
       "language": "介面語言",
       "accounting": "會計制度",
+      "categories": "會計類別",
       "notifications": "預警與通知",
       "security": "帳號與安全"
     },
@@ -78,6 +79,21 @@
       "currency": "預設幣別",
       "applyButton": "套用此制度",
       "warning": "切換會計制度只更新預設稅率與幣別，既有資料不會重新計算"
+    },
+    "categories": {
+      "title": "會計類別",
+      "subtitle": "依當前會計制度展示預置類別。可新增自訂類別，但系統預置類別不能刪除。",
+      "expense": "支出",
+      "income": "收入",
+      "label": "名稱",
+      "scheduleLine": "報表行",
+      "deductible": "可抵扣",
+      "deductiblePct": "可抵扣比例 (%)",
+      "userMade": "自建",
+      "empty": "該制度暫無此類型的類別",
+      "addNew": "新增類別",
+      "addNewButton": "新增自訂類別",
+      "systemNote": "系統預置類別由 SoloLedger 維護，與官方報表行對應，不可刪除（但可改名）。自訂類別完全由您掌控。"
     },
     "ai": {
       "title": "AI 服務商 · BYOK",

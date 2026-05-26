@@ -55,6 +55,7 @@
       "ai": "AI Providers (BYOK)",
       "language": "Language",
       "accounting": "Accounting Standard",
+      "categories": "Categories",
       "notifications": "Alerts & Notifications",
       "security": "Account & Security"
     },
@@ -78,6 +79,21 @@
       "currency": "Default currency",
       "applyButton": "Apply this standard",
       "warning": "Switching accounting standard only updates default tax rates and currency. Existing data will not be recalculated."
+    },
+    "categories": {
+      "title": "Accounting Categories",
+      "subtitle": "Pre-defined categories for the current accounting standard. You can add custom categories; system categories cannot be deleted.",
+      "expense": "Expense",
+      "income": "Income",
+      "label": "Name",
+      "scheduleLine": "Schedule Line",
+      "deductible": "Deductible",
+      "deductiblePct": "Deductible % (0-100)",
+      "userMade": "User",
+      "empty": "No categories of this type for this accounting standard",
+      "addNew": "Add Category",
+      "addNewButton": "Add custom category",
+      "systemNote": "System categories are maintained by SoloLedger and mapped to official report lines. They cannot be deleted but can be renamed. Custom categories are fully under your control."
     },
     "ai": {
       "title": "AI Providers · BYOK",

@@ -141,6 +141,60 @@ const MIGRATIONS = [
       d.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('accounting_locale', ?, datetime('now'))").run(JSON.stringify('CN'));
     }
   },
+  // v4: 国际化数据模型第一步 — categories 表 + 6 国预置种子数据
+  // 详见 docs/INTERNATIONALIZATION_PLAN.md §2.2 / §4
+  (d) => {
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id TEXT PRIMARY KEY,
+        locale TEXT NOT NULL,
+        type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+        slug TEXT NOT NULL,
+        label_zh_cn TEXT NOT NULL,
+        label_zh_tw TEXT,
+        label_en TEXT NOT NULL,
+        label_ja TEXT,
+        label_ko TEXT,
+        label_fr TEXT,
+        schedule_line TEXT,
+        is_deductible INTEGER DEFAULT 1,
+        deductible_pct REAL DEFAULT 100,
+        parent_id TEXT,
+        sort_order INTEGER DEFAULT 0,
+        is_system INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(locale, type, slug)
+      );
+      CREATE INDEX IF NOT EXISTS idx_categories_locale_type ON categories(locale, type);
+    `);
+    // Seed 6 国预置类别（首次跑 v4 时插入；已有则 UNIQUE 约束跳过）
+    try {
+      const { SEEDS } = require('./seedCategories');
+      const insert = d.prepare(`
+        INSERT OR IGNORE INTO categories
+          (id, locale, type, slug, label_zh_cn, label_zh_tw, label_en, label_ja, label_ko, label_fr,
+           schedule_line, is_deductible, deductible_pct, sort_order, is_system)
+        VALUES
+          (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+      `);
+      const tx = d.transaction((rows) => {
+        for (const r of rows) {
+          insert.run(
+            r.id, r.locale, r.type, r.slug,
+            r.label_zh_cn, r.label_zh_tw || null, r.label_en, r.label_ja || null, r.label_ko || null, r.label_fr || null,
+            r.schedule_line || null,
+            r.is_deductible == null ? 1 : r.is_deductible,
+            r.deductible_pct == null ? 100 : r.deductible_pct,
+            r.sort_order || 0,
+          );
+        }
+      });
+      tx(SEEDS);
+      console.log(`[db] seeded ${SEEDS.length} categories across 6 locales`);
+    } catch (e) {
+      console.error('[db] seed categories failed:', e?.message || e);
+    }
+  },
 ];
 
 function runMigrations(d) {

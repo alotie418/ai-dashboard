@@ -50,6 +50,74 @@ export function testProvider(payload: TestProviderRequest): Promise<TestProvider
   return electronInvoke<TestProviderResult>('providers:test', payload);
 }
 
+// ==================== Categories（国际化数据模型 v4）====================
+
+import type { AIProviderId } from '../types';
+
+export type AccountingLocale = 'CN' | 'US' | 'JP' | 'EU' | 'KR' | 'TW';
+export type CategoryType = 'income' | 'expense';
+
+export interface Category {
+  id: string;
+  locale: AccountingLocale;
+  type: CategoryType;
+  slug: string;
+  label_zh_cn: string;
+  label_zh_tw: string | null;
+  label_en: string;
+  label_ja: string | null;
+  label_ko: string | null;
+  label_fr: string | null;
+  schedule_line: string | null;
+  is_deductible: boolean;
+  deductible_pct: number;
+  parent_id: string | null;
+  sort_order: number;
+  is_system: boolean;
+  displayLabel: string; // 由后端按当前 lang 计算填入
+}
+
+export interface CategoryUpsert {
+  locale: AccountingLocale;
+  type: CategoryType;
+  slug: string;
+  label_zh_cn?: string;
+  label_zh_tw?: string;
+  label_en: string;
+  label_ja?: string;
+  label_ko?: string;
+  label_fr?: string;
+  schedule_line?: string;
+  is_deductible?: boolean;
+  deductible_pct?: number;
+  parent_id?: string;
+  sort_order?: number;
+}
+
+export function listCategories(opts: { locale?: AccountingLocale; type?: CategoryType; lang?: string } = {}): Promise<Category[]> {
+  const qs = new URLSearchParams();
+  if (opts.locale) qs.set('locale', opts.locale);
+  if (opts.type) qs.set('type', opts.type);
+  if (opts.lang) qs.set('lang', opts.lang);
+  return apiFetch<Category[]>(`/api/categories${qs.toString() ? '?' + qs.toString() : ''}`);
+}
+
+export function createCategory(payload: CategoryUpsert): Promise<{ success: boolean; id: string }> {
+  return apiFetch('/api/categories', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function updateCategory(id: string, payload: Partial<CategoryUpsert>): Promise<{ success: boolean }> {
+  return apiFetch(`/api/categories/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+
+export function deleteCategory(id: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/categories/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export function resetCategoriesToDefault(locale: AccountingLocale): Promise<{ success: boolean; removedUserCategories: number }> {
+  return apiFetch('/api/categories/reset', { method: 'POST', body: JSON.stringify({ locale }) });
+}
+
 // ==================== Types ====================
 
 // Frontend interfaces (match component definitions)

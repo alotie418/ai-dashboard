@@ -55,6 +55,7 @@
       "ai": "Fournisseurs IA (BYOK)",
       "language": "Langue",
       "accounting": "Norme comptable",
+      "categories": "Catégories comptables",
       "notifications": "Alertes & notifications",
       "security": "Compte & sécurité"
     },
@@ -78,6 +79,21 @@
       "currency": "Devise par défaut",
       "applyButton": "Appliquer cette norme",
       "warning": "Changer de norme comptable ne met à jour que les taux et la devise par défaut. Les données existantes ne sont pas recalculées"
+    },
+    "categories": {
+      "title": "Catégories comptables",
+      "subtitle": "Catégories prédéfinies selon la norme comptable actuelle. Vous pouvez ajouter des catégories personnalisées ; les catégories système ne sont pas supprimables.",
+      "expense": "Dépense",
+      "income": "Revenu",
+      "label": "Nom",
+      "scheduleLine": "Ligne du rapport",
+      "deductible": "Déductible",
+      "deductiblePct": "Pourcentage déductible (%)",
+      "userMade": "Personnalisé",
+      "empty": "Aucune catégorie de ce type pour cette norme",
+      "addNew": "Ajouter une catégorie",
+      "addNewButton": "Ajouter une catégorie personnalisée",
+      "systemNote": "Les catégories système sont maintenues par SoloLedger et mappées aux lignes officielles de rapport. Elles ne peuvent être supprimées, seulement renommées. Les catégories personnalisées sont entièrement sous votre contrôle."
     },
     "ai": {
       "title": "Fournisseurs IA · BYOK",

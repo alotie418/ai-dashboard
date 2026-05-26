@@ -12,6 +12,7 @@ const accounts = require('./receivables');
 const alertsH = require('./alerts');
 const batch = require('./batch');
 const ai = require('./ai');
+const categories = require('./categories');
 
 const routes = [
   // ---- Dashboard ----
@@ -43,6 +44,13 @@ const routes = [
   ['PUT', '/api/alerts/:id/read', alertsH.markRead],
   ['DELETE', '/api/alerts/:id', alertsH.dismiss],
   ['GET', '/api/alerts', alertsH.list],
+
+  // ---- Categories（国际化数据模型 v4）----
+  ['POST', '/api/categories/reset', categories.resetToDefault],
+  ['GET', '/api/categories', categories.list],
+  ['POST', '/api/categories', categories.create],
+  ['PUT', '/api/categories/:id', categories.update],
+  ['DELETE', '/api/categories/:id', categories.remove],
 
   // ---- Settings ----
   ['GET', '/api/settings', settings.get],

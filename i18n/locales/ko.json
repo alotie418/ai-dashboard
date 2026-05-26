@@ -55,6 +55,7 @@
       "ai": "AI 서비스 (BYOK)",
       "language": "언어",
       "accounting": "회계 제도",
+      "categories": "회계 계정 과목",
       "notifications": "알림 및 경고",
       "security": "계정 및 보안"
     },
@@ -78,6 +79,21 @@
       "currency": "기본 통화",
       "applyButton": "이 제도 적용",
       "warning": "회계 제도 전환은 기본 세율과 통화만 업데이트합니다. 기존 데이터는 재계산되지 않습니다"
+    },
+    "categories": {
+      "title": "회계 계정 과목",
+      "subtitle": "현재 회계 제도에 따른 기본 계정 과목을 표시합니다. 사용자 정의 과목을 추가할 수 있지만 시스템 기본 과목은 삭제할 수 없습니다.",
+      "expense": "지출",
+      "income": "수입",
+      "label": "이름",
+      "scheduleLine": "보고서 행",
+      "deductible": "공제 가능",
+      "deductiblePct": "공제 비율 (%)",
+      "userMade": "사용자",
+      "empty": "이 제도에는 해당 유형의 과목이 없습니다",
+      "addNew": "과목 추가",
+      "addNewButton": "사용자 정의 과목 추가",
+      "systemNote": "시스템 기본 과목은 SoloLedger가 관리하며 공식 보고서 행에 매핑됩니다. 삭제할 수 없지만 이름은 변경할 수 있습니다. 사용자 정의 과목은 완전히 본인이 관리합니다."
     },
     "ai": {
       "title": "AI 서비스 · BYOK",

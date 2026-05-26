@@ -5,6 +5,7 @@ import { fetchSettings, saveSettings } from '../services/api';
 import ProvidersSection from './ProvidersSection';
 import LanguageSection from './LanguageSection';
 import AccountingSection from './AccountingSection';
+import CategoriesSection from './CategoriesSection';
 
 const SettingsPage: React.FC = () => {
   const { t } = useTranslation();
@@ -145,6 +146,7 @@ const SettingsPage: React.FC = () => {
           <SettingsNavLink active={activeSection === 'ai'} onClick={() => setActiveSection('ai')} icon="fa-microchip" label={t('settings.nav.ai')} />
           <SettingsNavLink active={activeSection === 'language'} onClick={() => setActiveSection('language')} icon="fa-language" label={t('settings.nav.language')} />
           <SettingsNavLink active={activeSection === 'accounting'} onClick={() => setActiveSection('accounting')} icon="fa-balance-scale" label={t('settings.nav.accounting')} />
+          <SettingsNavLink active={activeSection === 'categories'} onClick={() => setActiveSection('categories')} icon="fa-tags" label={t('settings.nav.categories')} />
           <SettingsNavLink active={activeSection === 'notifications'} onClick={() => setActiveSection('notifications')} icon="fa-bell" label={t('settings.nav.notifications')} />
           <SettingsNavLink active={activeSection === 'security'} onClick={() => setActiveSection('security')} icon="fa-shield-halved" label={t('settings.nav.security')} />
         </div>
@@ -273,6 +275,7 @@ const SettingsPage: React.FC = () => {
 
             {!isLoading && !loadError && activeSection === 'language' && <LanguageSection />}
             {!isLoading && !loadError && activeSection === 'accounting' && <AccountingSection />}
+            {!isLoading && !loadError && activeSection === 'categories' && <CategoriesSection />}
 
             {!isLoading && !loadError && activeSection === 'notifications' && (
               <section className="space-y-6">

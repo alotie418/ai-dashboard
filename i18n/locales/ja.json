@@ -55,6 +55,7 @@
       "ai": "AIプロバイダー (BYOK)",
       "language": "表示言語",
       "accounting": "会計制度",
+      "categories": "勘定科目",
       "notifications": "アラートと通知",
       "security": "アカウントとセキュリティ"
     },
@@ -78,6 +79,21 @@
       "currency": "デフォルト通貨",
       "applyButton": "この制度を適用",
       "warning": "会計制度の切り替えはデフォルト税率と通貨のみを更新します。既存データは再計算されません"
+    },
+    "categories": {
+      "title": "勘定科目",
+      "subtitle": "現在の会計制度に対応した既定の勘定科目を表示します。カスタム科目を追加できますが、システム既定の科目は削除できません。",
+      "expense": "支出",
+      "income": "収入",
+      "label": "名称",
+      "scheduleLine": "報告書の行",
+      "deductible": "控除可",
+      "deductiblePct": "控除率 (%)",
+      "userMade": "カスタム",
+      "empty": "この制度には該当する科目がありません",
+      "addNew": "科目を追加",
+      "addNewButton": "カスタム科目を追加",
+      "systemNote": "システム既定の科目は SoloLedger によって管理され、公式報告書の行にマッピングされています。削除はできませんが、名前変更は可能です。カスタム科目は完全にあなたが管理できます。"
     },
     "ai": {
       "title": "AIプロバイダー · BYOK",
