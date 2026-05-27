@@ -122,7 +122,11 @@
     "language": {
       "title": "Langue de l'interface",
       "subtitle": "Le changement s'applique immédiatement, sans redémarrage",
-      "note": "La qualité de traduction s'améliore en continu. Signalez toute erreur"
+      "note": "La qualité de traduction s'améliore en continu. Signalez toute erreur",
+      "scopeTitle": "Ce que cela change",
+      "scopeYes1": "Menus, boutons, libellés, aide",
+      "scopeYes2": "Langue des réponses IA",
+      "scopeNo": "Ne change PAS les règles fiscales, la devise, la structure des rapports ou les catégories comptables. Ceux-ci sont contrôlés par la Norme comptable."
     },
     "accounting": {
       "title": "Norme comptable",
@@ -133,7 +137,12 @@
       "incomeTax": "Impôt sur le revenu",
       "currency": "Devise par défaut",
       "applyButton": "Appliquer cette norme",
-      "warning": "Changer de norme comptable ne met à jour que les taux et la devise par défaut. Les données existantes ne sont pas recalculées"
+      "warning": "Changer de norme comptable ne met à jour que les taux et la devise par défaut. Les données existantes ne sont pas recalculées",
+      "scopeTitle": "Ce que cela change",
+      "scopeYes1": "Régime fiscal, taux, concepts fiscaux",
+      "scopeYes2": "Devise et structure des rapports",
+      "scopeYes3": "Indicateurs tableau de bord, catégories, contexte IA financier",
+      "scopeNo": "Ne change PAS la langue d'affichage. Les menus et libellés restent dans votre langue UI."
     },
     "categories": {
       "title": "Catégories comptables",
@@ -236,7 +245,8 @@
     "industry": "Secteur",
     "industryPlaceholder": "ex. Commerce chimique / Logiciel / Conseil",
     "finishAndEnter": "Terminer et entrer dans l'app",
-    "skipCompany": "Ignorer pour l'instant, remplir plus tard"
+    "skipCompany": "Ignorer pour l'instant, remplir plus tard",
+    "localeDesc": "Ces deux paramètres sont indépendants. La langue UI contrôle les menus et libellés. La norme comptable contrôle les règles fiscales, devise et rapports."
   },
   "byok": {
     "howToGetKey": "Comment obtenir une clé {{provider}}",

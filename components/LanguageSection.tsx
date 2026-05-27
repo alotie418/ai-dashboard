@@ -13,6 +13,19 @@ const LanguageSection: React.FC = () => {
         <p className="text-xs text-[#6b6b69] mt-1">{t('settings.language.subtitle')}</p>
       </div>
 
+      {/* Clarification banner */}
+      <div className="text-xs text-[#4a4a48] bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1">
+        <div className="font-semibold"><i className="fas fa-language mr-1.5 text-blue-500"></i>{t('settings.language.scopeTitle', 'What this changes')}</div>
+        <ul className="list-disc list-inside text-[11px] text-[#5c5c5a] space-y-0.5">
+          <li>{t('settings.language.scopeYes1', 'Menus, buttons, labels, help text')}</li>
+          <li>{t('settings.language.scopeYes2', 'AI response language')}</li>
+        </ul>
+        <div className="text-[11px] text-[#7a7a78] mt-1">
+          <i className="fas fa-exclamation-circle mr-1 text-amber-500"></i>
+          {t('settings.language.scopeNo', 'Does NOT change tax rules, currency, report structure, or accounting categories. Those are controlled by Accounting Standard.')}
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         {SUPPORTED_LANGUAGES.map(lang => {
           const selected = current === lang.code;

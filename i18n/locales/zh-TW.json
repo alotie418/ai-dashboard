@@ -122,7 +122,11 @@
     "language": {
       "title": "介面語言",
       "subtitle": "切換語言後立即生效，無需重啟",
-      "note": "翻譯品質持續優化中，發現錯誤歡迎回報"
+      "note": "翻譯品質持續優化中，發現錯誤歡迎回報",
+      "scopeTitle": "此設定影響的範圍",
+      "scopeYes1": "選單、按鈕、標籤、幫助文案",
+      "scopeYes2": "AI 回覆語言",
+      "scopeNo": "不會改變稅制、幣種、報表結構或會計類別。這些由「會計制度」控制。"
     },
     "accounting": {
       "title": "會計制度",
@@ -133,7 +137,12 @@
       "incomeTax": "所得稅率",
       "currency": "預設幣別",
       "applyButton": "套用此制度",
-      "warning": "切換會計制度只更新預設稅率與幣別，既有資料不會重新計算"
+      "warning": "切換會計制度只更新預設稅率與幣別，既有資料不會重新計算",
+      "scopeTitle": "此設定影響的範圍",
+      "scopeYes1": "稅制、稅率、稅種概念",
+      "scopeYes2": "預設幣種與報表結構",
+      "scopeYes3": "看板指標、會計類別、AI 財務分析上下文",
+      "scopeNo": "不會改變介面顯示語言。選單和標籤保持您選擇的 UI 語言。"
     },
     "categories": {
       "title": "會計類別",
@@ -236,7 +245,8 @@
     "industry": "所屬行業",
     "industryPlaceholder": "例如：化工貿易 / 軟體開發 / 設計顧問",
     "finishAndEnter": "完成並進入應用",
-    "skipCompany": "暫時略過公司資訊，稍後在設定中填寫"
+    "skipCompany": "暫時略過公司資訊，稍後在設定中填寫",
+    "localeDesc": "這兩個設定互相獨立。介面語言控制選單和標籤。會計制度控制稅制、幣種和報表。"
   },
   "byok": {
     "howToGetKey": "如何取得 {{provider}} Key",

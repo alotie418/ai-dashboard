@@ -122,7 +122,11 @@
     "language": {
       "title": "Interface Language",
       "subtitle": "Changes apply immediately, no restart needed",
-      "note": "Translations are being improved. Please report any inaccuracies."
+      "note": "Translations are being improved. Please report any inaccuracies.",
+      "scopeTitle": "What this changes",
+      "scopeYes1": "Menus, buttons, labels, help text",
+      "scopeYes2": "AI response language",
+      "scopeNo": "Does NOT change tax rules, currency, report structure, or accounting categories. Those are controlled by Accounting Standard."
     },
     "accounting": {
       "title": "Accounting Standard",
@@ -133,7 +137,12 @@
       "incomeTax": "Income tax rate",
       "currency": "Default currency",
       "applyButton": "Apply this standard",
-      "warning": "Switching accounting standard only updates default tax rates and currency. Existing data will not be recalculated."
+      "warning": "Switching accounting standard only updates default tax rates and currency. Existing data will not be recalculated.",
+      "scopeTitle": "What this changes",
+      "scopeYes1": "Tax regime, tax rates, and tax concepts",
+      "scopeYes2": "Default currency and report structure",
+      "scopeYes3": "Dashboard metrics, accounting categories, and AI finance context",
+      "scopeNo": "Does NOT change the display language. Menus and labels stay in your chosen UI Language."
     },
     "categories": {
       "title": "Accounting Categories",
@@ -236,7 +245,8 @@
     "industry": "Industry",
     "industryPlaceholder": "e.g. Chemical trade / Software / Consulting",
     "finishAndEnter": "Finish and enter app",
-    "skipCompany": "Skip for now; fill in settings later"
+    "skipCompany": "Skip for now; fill in settings later",
+    "localeDesc": "These are independent settings. UI language controls menus and labels. Accounting standard controls tax rules, currency, and reports."
   },
   "byok": {
     "howToGetKey": "How to get a {{provider}} Key",
