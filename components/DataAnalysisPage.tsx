@@ -18,7 +18,7 @@ type AnalysisDimension = 'financial' | 'volume' | 'efficiency';
 
 const LOADING_MESSAGES = [
   '① 提取历史业绩特征向量（移动平均/趋势/季节性）...',
-  '② 构建 VAR(1) 多变量自回归模型...',
+  '② 构建趋势预测模型...',
   '③ 运行蒙特卡洛模拟 (1000次) 计算置信区间...',
   '④ Gemini + Google Search 综合分析...',
   '⑤ 融合全部数据源生成最终预测...'
@@ -36,13 +36,16 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
   const stats = useMemo(() => {
     const perf = data.monthlyPerformance;
     if (!perf.length) return { yoy: 0, mom: 0, deflator: 0, avgProfit: 0, avgRevenue: 0 };
-    const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
+    const safeAvg = (arr: number[]) => {
+      const valid = arr.filter(v => Number.isFinite(v));
+      return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : 0;
+    };
     return {
-      yoy: avg(perf.map(p => p.yoy)),
-      mom: avg(perf.map(p => p.mom)),
-      deflator: avg(perf.map(p => p.deflator)),
-      avgProfit: avg(perf.map(p => p.profit)),
-      avgRevenue: avg(perf.map(p => p.revenue))
+      yoy: safeAvg(perf.map(p => p.yoy)),
+      mom: safeAvg(perf.map(p => p.mom)),
+      deflator: safeAvg(perf.map(p => p.deflator)),
+      avgProfit: safeAvg(perf.map(p => p.profit)),
+      avgRevenue: safeAvg(perf.map(p => p.revenue))
     };
   }, [data.monthlyPerformance]);
 
@@ -132,7 +135,7 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
     };
   };
 
-  // ② VAR(1) Model: independent AR(1) for [revenue, cost, salesTons]
+  // ② Trend Forecast: independent AR(1) per series [revenue, cost, salesTons]
   const varForecast = (perf: typeof data.monthlyPerformance) => {
     const nonZero = perf.filter(p => p.revenue > 0);
     if (nonZero.length < 4) return null;
@@ -173,12 +176,12 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
     if (nonZero.length < 3) return null;
 
     const mean = nonZero.reduce((a, b) => a + b, 0) / nonZero.length;
-    const variance = nonZero.reduce((a, b) => a + (b - mean) ** 2, 0) / nonZero.length;
+    const variance = nonZero.reduce((a, b) => a + (b - mean) ** 2, 0) / (nonZero.length - 1);
     const cv = mean === 0 ? 0 : Math.sqrt(variance) / mean;
     const SIMULATIONS = 1000;
 
     return pointEstimates.map((predicted, month) => {
-      const horizonFactor = 1 + month * 0.15;
+      const horizonFactor = Math.sqrt(1 + month);
       const simValues: number[] = [];
       for (let i = 0; i < SIMULATIONS; i++) {
         simValues.push(predicted * (1 + gaussianRandom() * cv * horizonFactor));
@@ -206,10 +209,10 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
       // STEP 1: Local feature extraction
       const features = extractFeatures(perf);
 
-      // STEP 2: VAR forecast
+      // STEP 2: Trend forecast (AR(1) per series)
       const varPred = varForecast(perf);
 
-      // STEP 3: Monte Carlo on VAR predictions (if available)
+      // STEP 3: Monte Carlo on trend predictions (if available)
       const historicalRevenues = perf.map(m => m.revenue);
       const mcOnVar = varPred
         ? monteCarloSimulation(historicalRevenues, varPred.map(v => v.revenue))
@@ -247,7 +250,7 @@ ${JSON.stringify(features)}
       if (varPred) {
         prompt += `
 
-## 四、VAR(1) 自回归模型预测
+## 四、趋势预测模型
 ${JSON.stringify(varPred)}
 说明：基于 revenue/cost/salesTons 三变量 AR(1) 拟合的纯统计预测。`;
       }
@@ -265,7 +268,7 @@ ${JSON.stringify(mcOnVar)}
 ## 分析要求
 1. 请同时使用 Google 搜索功能查找最新的【软水盐】市场行情、原盐价格走势和宏观经济指标。
 2. 综合以上全部信息（企业数据 + 统计模型 + 蒙特卡洛区间 + 双引擎市场搜索），给出科学预测。
-3. 如果 VAR 模型预测与你自己的判断不一致，请在 insights 中说明原因和你的修正依据。
+3. 如果趋势模型预测与你自己的判断不一致，请在 insights 中说明原因和你的修正依据。
 4. 在 insights 中总结你参考了哪些市场数据源，以及主要风险因素。`;
 
       // STEP 6: AI synthesis (走 IPC 统一通道，桌面版不走 HTTP)
@@ -619,7 +622,7 @@ ${JSON.stringify(mcOnVar)}
                   // 营收/吨位偏离度：各月单吨营收的变异系数
                   const unitRevenues = perf.filter(p => p.salesTons > 0).map(p => p.revenue / p.salesTons);
                   const meanUR = unitRevenues.length > 0 ? unitRevenues.reduce((a, b) => a + b, 0) / unitRevenues.length : 0;
-                  const stdUR = unitRevenues.length > 1 ? Math.sqrt(unitRevenues.reduce((a, b) => a + (b - meanUR) ** 2, 0) / unitRevenues.length) : 0;
+                  const stdUR = unitRevenues.length > 1 ? Math.sqrt(unitRevenues.reduce((a, b) => a + (b - meanUR) ** 2, 0) / (unitRevenues.length - 1)) : 0;
                   const cvUR = meanUR === 0 ? 0 : (stdUR / meanUR * 100);
                   const cvLabel = cvUR < 5 ? 'Low' : cvUR < 15 ? 'Mid' : 'High';
                   const cvColor = cvUR < 5 ? 'text-emerald-600' : cvUR < 15 ? 'text-amber-500' : 'text-rose-500';
@@ -631,9 +634,11 @@ ${JSON.stringify(mcOnVar)}
                   const cov = profits.reduce((a, b, i) => a + (b - meanP) * (deflators[i] - meanD), 0);
                   const stdP = Math.sqrt(profits.reduce((a, b) => a + (b - meanP) ** 2, 0));
                   const stdD = Math.sqrt(deflators.reduce((a, b) => a + (b - meanD) ** 2, 0));
-                  const corr = (stdP === 0 || stdD === 0) ? 0 : Math.abs(cov / (stdP * stdD)) * 100;
-                  const corrLabel = corr > 70 ? 'High' : corr > 40 ? 'Mid' : 'Low';
-                  const corrColor = corr > 70 ? 'text-[#d97757]' : corr > 40 ? 'text-amber-500' : 'text-emerald-600';
+                  const corr = (stdP === 0 || stdD === 0) ? 0 : (cov / (stdP * stdD)) * 100;
+                  const absCorr = Math.abs(corr);
+                  const corrSign = corr >= 0 ? '+' : '−';
+                  const corrLabel = absCorr > 70 ? 'Strong' : absCorr > 40 ? 'Moderate' : 'Weak';
+                  const corrColor = absCorr > 70 ? 'text-[#d97757]' : absCorr > 40 ? 'text-amber-500' : 'text-emerald-600';
                   return (
                     <>
                       <div className="flex justify-between items-center text-xs">
@@ -642,7 +647,7 @@ ${JSON.stringify(mcOnVar)}
                       </div>
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-[#4a4a48]">价格指数关联</span>
-                        <span className={`${corrColor} font-mono font-bold`}>{corr.toFixed(1)}% {corrLabel}</span>
+                        <span className={`${corrColor} font-mono font-bold`}>{corrSign}{absCorr.toFixed(1)}% {corrLabel}</span>
                       </div>
                       <div className="pt-4 border-t border-[#e0ddd5]">
                         <p className="text-[10px] text-[#5c5c5a] leading-relaxed italic">
