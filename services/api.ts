@@ -237,6 +237,48 @@ export function rollbackLegacyMigration(): Promise<{ success: boolean; removed: 
   return apiFetch('/api/migrations/rollback', { method: 'POST', body: JSON.stringify({}) });
 }
 
+// ==================== Reports（D 阶段 — 6 国报表引擎）====================
+
+export interface ReportResult {
+  locale: string;
+  period: { from: string; to: string; year: string };
+  currency: string;
+  reportTypes: Array<{ id: string; name: Record<string, string> }>;
+  // CN
+  incomeStatement?: any;
+  vatSummary?: any;
+  taxInclusiveSummary?: any;
+  // US
+  scheduleC?: any;
+  selfEmploymentTax?: any;
+  estimatedTax?: any;
+  // JP
+  consumptionTax?: any;
+  // EU
+  profitLoss?: any;
+  vatReturn?: any;
+  // KR (same as incomeStatement + vatSummary)
+  // TW
+  businessTax?: any;
+  // Common
+  monthlyBreakdown?: Array<{ month: number; revenue: number; cost: number; profit: number }>;
+  warnings: string[];
+}
+
+export function generateReport(opts: { locale?: string; year?: string; from?: string; to?: string } = {}): Promise<ReportResult> {
+  const qs = new URLSearchParams();
+  if (opts.locale) qs.set('locale', opts.locale);
+  if (opts.year) qs.set('year', opts.year);
+  if (opts.from) qs.set('from', opts.from);
+  if (opts.to) qs.set('to', opts.to);
+  return apiFetch<ReportResult>(`/api/reports/generate${qs.toString() ? '?' + qs.toString() : ''}`);
+}
+
+export function getReportTypes(locale?: string): Promise<Array<{ id: string; name: Record<string, string> }>> {
+  const qs = locale ? `?locale=${locale}` : '';
+  return apiFetch(`/api/reports/types${qs}`);
+}
+
 // ==================== Types ====================
 
 // Frontend interfaces (match component definitions)
