@@ -702,7 +702,7 @@
     "totalTax": "Total Tax",
     "totalWithTax": "Total (Incl. Tax)",
     "actions": "Action",
-    "taxAmount": "Tax Amount"
+    "taxAmount": "Total Tax"
   },
   "common2": {
     "edit": "Edit",

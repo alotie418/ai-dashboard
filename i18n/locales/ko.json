@@ -702,7 +702,7 @@
     "totalTax": "세액 합계",
     "totalWithTax": "세포함 합계",
     "actions": "작업",
-    "taxAmount": "세액"
+    "taxAmount": "세액 합계"
   },
   "common2": {
     "edit": "Edit",

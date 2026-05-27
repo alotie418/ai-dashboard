@@ -702,7 +702,7 @@
     "totalTax": "合计税额",
     "totalWithTax": "价税合计",
     "actions": "操作",
-    "taxAmount": "税额"
+    "taxAmount": "合计税额"
   },
   "common2": {
     "edit": "编辑",
