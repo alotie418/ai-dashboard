@@ -101,18 +101,19 @@ async function chat(apiKey, model, { messages, systemInstruction }) {
   return { text: extractText(json) };
 }
 
-async function analyze(apiKey, model, { data, marketSummary, languageHint }) {
-  const marketContext = marketSummary ? `\n\n## 最新市场搜索数据\n${marketSummary}` : '';
-  const sys = `你是一位专业的商业分析师。请分析企业经营数据并按 JSON 输出：
+async function analyze(apiKey, model, { data, marketSummary, languageHint, analyzeSystemPrompt }) {
+  const marketContext = marketSummary ? `\n\n${marketSummary}` : '';
+  const fallbackSys = `你是一位专业的商业分析师。请分析企业经营数据并按 JSON 输出：
 {
   "summary": "一段简要的经营概况总结",
   "topInsights": ["3-5条关键洞察"],
   "recommendations": ["3-5条改进建议"],
   "anomalies": ["异常指标列表"]
 }`;
+  const sys = analyzeSystemPrompt || fallbackSys;
   const json = await callResponses(apiKey, {
     model: model || META.defaultModel,
-    instructions: sys + (languageHint ? `\n\n${languageHint}` : ''),
+    instructions: sys,
     input: `Analyze this business data: ${JSON.stringify(data)}${marketContext}`,
     text: { format: { type: 'json_object' } },
   });

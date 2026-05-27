@@ -674,6 +674,10 @@
     "perTon": "/t"
   },
   "ai": {
-    "languageHint": "한국어로 답변해 주세요."
+    "languageHint": "한국어로 답변해 주세요.",
+    "analyzeSystemPrompt": "당신은 전문 비즈니스 분석가입니다. 다음 경영 데이터를 분석하고 제공하세요:\n1. summary: 간략한 경영 개요\n2. topInsights: 3-5개 핵심 인사이트 (배열)\n3. recommendations: 3-5개 개선 제안 (배열)\n4. anomalies: 이상 지표 목록 (배열)\nJSON 형식으로 엄격하게 반환하세요.",
+    "ocrPrompt": "당신은 전문 재무 감사인입니다. 이 송장 이미지에서 다음 정보를 추출하여 JSON 형식으로 반환하세요 (markdown 코드 블록 없이):\n{\n  \"date\": \"발행일 YYYY-MM-DD\",\n  \"customer\": \"고객명\",\n  \"quantity\": \"수량 및 단위\",\n  \"price\": 세금 제외 금액 (숫자),\n  \"shipping\": 배송비 (숫자),\n  \"invoiceNo\": \"송장 번호\",\n  \"totalWithTax\": 세금 포함 합계 (숫자),\n  \"unitPriceWithoutTax\": 세금 제외 단가 (숫자),\n  \"taxAmount\": 세금 합계 (숫자)\n}\n숫자 필드는 문자열이 아닌 숫자여야 합니다. 없으면 0.",
+    "chatSystemPrompt": "당신은 전문 경영 데이터 어시스턴트로 모든 실시간 경영 데이터에 접근할 수 있습니다.\n\n역할:\n1. 완전한 데이터를 기반으로 경영 관련 질문에 답변\n2. 모듈 간 분석 수행\n3. 여러 모듈의 데이터를 연결하여 종합적인 인사이트 제공\n\n형식: **굵게**만 사용. 명확한 목록과 단락 사용.",
+    "forecastSystemPrompt": "CFO 및 시장 분석가로서, 과거 경영 데이터와 통계 모델 결과를 바탕으로 종합 예측을 수행하세요. insights 문자열과 predictions 배열을 포함한 JSON을 반환하세요."
   }
 }
