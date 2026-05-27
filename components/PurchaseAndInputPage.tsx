@@ -3,7 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { analyzeInvoice } from '../services/ocrService';
-import { fetchPurchases, createPurchase, deletePurchase, PurchaseRecord } from '../services/api';
+import { fetchPurchases, createPurchase, deletePurchase, fetchSettings, PurchaseRecord } from '../services/api';
+import { formatMoney, getCurrencySymbol, getTaxLabel } from './accountingHelpers';
 import CsvImportModal from './CsvImportModal';
 
 interface Props {
@@ -16,8 +17,45 @@ interface Props {
 let purchaseIdCounter = 0;
 const nextPurchaseId = () => `purchase-${++purchaseIdCounter}-${Date.now()}`;
 
+const TAX_RATE_OPTIONS: Record<string, { value: string; labelKey: string }[]> = {
+  CN: [
+    { value: '13%', labelKey: 'purchases.taxStandard' },
+    { value: '9%', labelKey: 'purchases.taxTransport' },
+    { value: '6%', labelKey: 'purchases.taxService' },
+    { value: '3%', labelKey: 'purchases.taxSmall' },
+  ],
+  US: [
+    { value: '0%', labelKey: 'purchases.taxNone' },
+    { value: '7%', labelKey: 'purchases.taxSalesTax' },
+    { value: '10%', labelKey: 'purchases.taxSalesTax10' },
+  ],
+  JP: [
+    { value: '10%', labelKey: 'purchases.taxJpStandard' },
+    { value: '8%', labelKey: 'purchases.taxJpReduced' },
+  ],
+  EU: [
+    { value: '20%', labelKey: 'purchases.taxEuStandard' },
+    { value: '10%', labelKey: 'purchases.taxEuReduced' },
+    { value: '5%', labelKey: 'purchases.taxEuSuperReduced' },
+  ],
+  KR: [
+    { value: '10%', labelKey: 'purchases.taxKrStandard' },
+  ],
+  TW: [
+    { value: '5%', labelKey: 'purchases.taxTwStandard' },
+  ],
+};
+
 const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [accLocale, setAccLocale] = useState('CN');
+  useEffect(() => { fetchSettings().then((s: any) => { if (s.accounting_locale) setAccLocale(s.accounting_locale); }).catch(() => {}); }, []);
+  const uiLang = i18n.language;
+  const currSym = getCurrencySymbol(accLocale);
+  const fmtMoney = (val: number) => formatMoney(val, accLocale, uiLang);
+  const taxRateOptions = TAX_RATE_OPTIONS[accLocale] || TAX_RATE_OPTIONS.CN;
+  const defaultTaxRate = taxRateOptions[0]?.value || '13%';
+
   const [recognitionMode, setRecognitionMode] = useState<'ai' | 'ocr'>('ai');
   const [isScanning, setIsScanning] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -39,7 +77,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
     supplier: '',
     quantity: '',
     price: 0,
-    taxRate: '13%',
+    taxRate: defaultTaxRate,
     invoiceNo: '',
     totalWithTax: 0,
     unitPriceWithoutTax: 0,
@@ -76,7 +114,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
     }
   }, [newPurchase.totalWithTax, newPurchase.quantity, newPurchase.taxRate]);
 
-  const formatCurrency = (val: number) => `¥${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatCurrency = (val: number) => fmtMoney(val);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -113,7 +151,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
 
       const taxRate = extracted.price > 0 && extracted.taxAmount > 0
         ? `${Math.round((extracted.taxAmount / extracted.price) * 100)}%`
-        : '13%';
+        : defaultTaxRate;
 
       const newRecord: PurchaseRecord = {
         id: nextPurchaseId(),
@@ -158,7 +196,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
         supplier: '',
         quantity: '',
         price: 0,
-        taxRate: '13%',
+        taxRate: defaultTaxRate,
         invoiceNo: '',
         totalWithTax: 0,
         unitPriceWithoutTax: 0,
@@ -460,7 +498,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formPrice')}</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
                     <input
                       type="number"
                       required
@@ -478,10 +516,9 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                     onChange={(e) => setNewPurchase({ ...newPurchase, taxRate: e.target.value })}
                     className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all appearance-none"
                   >
-                    <option value="13%">{t('purchases.tax13')}</option>
-                    <option value="9%">{t('purchases.tax9')}</option>
-                    <option value="6%">{t('purchases.tax6')}</option>
-                    <option value="3%">{t('purchases.tax3')}</option>
+                    {taxRateOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -490,7 +527,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formUnitPrice')}</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
                     <input
                       type="number"
                       step="0.01"
@@ -504,7 +541,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formTaxAmount')}</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
                     <input
                       type="number"
                       step="0.01"
@@ -518,7 +555,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formTotalWithTax')}</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
                     <input
                       type="number"
                       step="0.01"

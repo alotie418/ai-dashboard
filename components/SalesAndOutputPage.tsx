@@ -3,7 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { analyzeInvoice } from '../services/ocrService';
-import { fetchSales, createSale, updateSale, deleteSale, SalesRecord } from '../services/api';
+import { fetchSales, createSale, updateSale, deleteSale, fetchSettings, SalesRecord } from '../services/api';
+import { formatMoney, getCurrencySymbol } from './accountingHelpers';
 import CsvImportModal from './CsvImportModal';
 
 interface Props {
@@ -17,7 +18,12 @@ let salesIdCounter = 0;
 const nextSalesId = () => `sale-${++salesIdCounter}-${Date.now()}`;
 
 const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [accLocale, setAccLocale] = useState('CN');
+  useEffect(() => { fetchSettings().then((s: any) => { if (s.accounting_locale) setAccLocale(s.accounting_locale); }).catch(() => {}); }, []);
+  const uiLang = i18n.language;
+  const currSym = getCurrencySymbol(accLocale);
+  const fmtMoney = (val: number) => formatMoney(val, accLocale, uiLang);
   const [recognitionMode, setRecognitionMode] = useState<'ai' | 'ocr'>('ai');
   const [isScanning, setIsScanning] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -76,7 +82,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
     }
   }, [newSale.totalWithTax, newSale.quantity, newSale.taxRate]);
 
-  const formatCurrency = (val: number) => `¥${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatCurrency = (val: number) => fmtMoney(val);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -113,7 +119,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
 
       const taxRate = extracted.price > 0 && extracted.taxAmount > 0
         ? `${Math.round((extracted.taxAmount / extracted.price) * 100)}%`
-        : '13%';
+        : '13%'; // OCR fallback — will be overridden by user
 
       const newRecord: SalesRecord = {
         id: nextSalesId(),
@@ -468,7 +474,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                   <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formInvoiceNo')}</label>
                   <input
                     type="text"
-                    placeholder={t('sales.formOptional')}
+                    placeholder={t('common2.optional')}
                     value={newSale.invoiceNo}
                     onChange={(e) => setNewSale({ ...newSale, invoiceNo: e.target.value })}
                     className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
@@ -502,9 +508,9 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formPriceWithoutTax')}</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formPrice')}</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
                     <input
                       type="number"
                       required
@@ -518,7 +524,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formShipping')}</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
                     <input
                       type="number"
                       step="0.01"
@@ -534,42 +540,42 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formUnitPrice')}</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
                     <input
                       type="number"
                       step="0.01"
                       value={newSale.unitPriceWithoutTax || ''}
                       onChange={(e) => setNewSale({ ...newSale, unitPriceWithoutTax: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
-                      placeholder={t('sales.formOptional')}
+                      placeholder={t('common2.optional')}
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formTaxAmount')}</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
                     <input
                       type="number"
                       step="0.01"
                       value={newSale.taxAmount || ''}
                       onChange={(e) => setNewSale({ ...newSale, taxAmount: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
-                      placeholder={t('sales.formOptional')}
+                      placeholder={t('common2.optional')}
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formTotalWithTax')}</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
                     <input
                       type="number"
                       step="0.01"
                       value={newSale.totalWithTax || ''}
                       onChange={(e) => setNewSale({ ...newSale, totalWithTax: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
-                      placeholder={t('sales.formOptional')}
+                      placeholder={t('common2.optional')}
                     />
                   </div>
                 </div>
@@ -588,7 +594,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                   type="submit"
                   className="flex-2 px-10 py-4 bg-[#d97757] hover:bg-[#c56a4a] text-white font-bold rounded-xl transition-all active:scale-95" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}
                 >
-                  {editingId ? t('sales.formConfirmEdit') : t('sales.formConfirmAdd')}
+                  {editingId ? t('sales.formSubmitEdit') : t('sales.formSubmitNew')}
                 </button>
               </div>
             </form>
