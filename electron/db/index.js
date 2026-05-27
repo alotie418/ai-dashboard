@@ -275,6 +275,29 @@ const MIGRATIONS = [
     `);
     console.log('[db] created mileage_logs + home_office tables');
   },
+  // v7: Fix alerts table schema — add is_read + is_dismissed if missing
+  // Root cause: v1 migration was edited in-place after initial run,
+  // so DBs created before the edit have `read` column instead of `is_read`
+  (d) => {
+    const cols = d.prepare("PRAGMA table_info(alerts)").all().map(c => c.name);
+    let fixed = 0;
+    if (!cols.includes('is_read')) {
+      d.exec('ALTER TABLE alerts ADD COLUMN is_read INTEGER DEFAULT 0');
+      // Copy from old `read` column if it exists
+      if (cols.includes('read')) {
+        d.exec('UPDATE alerts SET is_read = "read"');
+      }
+      fixed++;
+    }
+    if (!cols.includes('is_dismissed')) {
+      d.exec('ALTER TABLE alerts ADD COLUMN is_dismissed INTEGER DEFAULT 0');
+      fixed++;
+    }
+    // Ensure index exists
+    d.exec('CREATE INDEX IF NOT EXISTS idx_alerts_read ON alerts(is_read)');
+    if (fixed > 0) console.log(`[db] v7: fixed alerts schema — added ${fixed} missing column(s)`);
+    else console.log('[db] v7: alerts schema OK, no fix needed');
+  },
 ];
 
 function runMigrations(d) {
