@@ -33,7 +33,7 @@ interface ChatMessage {
 }
 
 const VOICE_OPTIONS = [
-  { id: 'Aoede', name: 'Aoede (温柔女声)' },
+  { id: 'Aoede', nameKey: 'voice.aoede' },
   { id: 'Puck', name: 'Puck (活泼男声)' },
   { id: 'Charon', name: 'Charon (深沉男声)' },
   { id: 'Kore', name: 'Kore (清新女声)' },
@@ -41,11 +41,11 @@ const VOICE_OPTIONS = [
 ];
 
 const QUICK_FUNCTIONS = [
-  { label: '上传发票', icon: 'fa-camera', prompt: '我想上传一张发票进行记账' },
-  { label: '财报查询', icon: 'fa-file-invoice-dollar', prompt: '帮我查询最新的财务报表摘要' },
-  { label: '历史趋势', icon: 'fa-chart-area', prompt: '分析一下过去几个月的业务历史趋势' },
-  { label: '市场分析', icon: 'fa-globe-asia', prompt: '搜索中国软水盐/工业盐最新市场价格和行情，简要分析：请回答：\n1. 当前市场价格区间\n2. 主要产区和供应商\n3. 近期价格趋势\n4. 对企业的建议（包括成本评估、库存管理、销售策略）' },
-  { label: '库存查询', icon: 'fa-boxes', prompt: '查询当前库存余量和风险' },
+  { labelKey: 'chat.uploadInvoice', icon: 'fa-camera', prompt: '我想上传一张发票进行记账' },
+  { labelKey: 'chat.financeQuery', icon: 'fa-file-invoice-dollar', prompt: '帮我查询最新的财务报表摘要' },
+  { labelKey: 'chat.trendAnalysis', icon: 'fa-chart-area', prompt: '分析一下过去几个月的业务历史趋势' },
+  { labelKey: 'chat.marketAnalysis', icon: 'fa-globe-asia', prompt: '搜索最新市场价格和行情' },
+  { labelKey: 'chat.inventoryQuery', icon: 'fa-boxes', prompt: '查询当前库存余量和风险' },
 ];
 
 const YEARS = ['2026', '2025', '2024'];
@@ -663,7 +663,7 @@ ${contextText}
           <div className="w-8 h-8 bg-[#d97757] rounded-lg flex items-center justify-center mr-3 flex-shrink-0 shadow-lg" style={{ boxShadow: '0 4px 24px rgba(217,119,87,0.2)' }}>
             <i className="fas fa-layer-group text-white text-sm"></i>
           </div>
-          {sidebarOpen && <span className="font-bold text-xl tracking-tight text-[#191918]">SoloLedger<span className="text-[#6b6b69] text-sm font-normal ml-1.5">独账</span></span>}
+          {sidebarOpen && <span className="font-bold text-xl tracking-tight text-[#191918]">SoloLedger<span className="text-[#6b6b69] text-sm font-normal ml-1.5">{t('app.subtitle').split('·')[0]?.trim()}</span></span>}
         </div>
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
           <NavItem icon="fa-th-large" label={t('nav.dashboard')} active={currentPage === 'dashboard'} expanded={sidebarOpen} onClick={() => setCurrentPage('dashboard')} />
@@ -712,13 +712,13 @@ ${contextText}
               <div className="hidden lg:flex items-center space-x-4 pl-4 border-l border-[#e0ddd5]">
                 <div className="flex items-center space-x-2 bg-white rounded-lg p-1 border border-[#e0ddd5]">
                   <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="bg-transparent text-xs font-medium text-[#6b6b69] outline-none px-2 py-1.5 cursor-pointer hover:text-[#d97757]">
-                    {YEARS.map(y => <option key={y} value={y} className="bg-white">{y} 年度</option>)}
+                    {YEARS.map(y => <option key={y} value={y} className="bg-white">{y}{t('header.yearSuffix') ? ' ' + t('header.yearSuffix') : ''}</option>)}
                   </select>
                   {FILTER_SUPPORTED_PAGES.includes(currentPage) && (
                     <>
                       <div className="w-px h-3 bg-[#e0ddd5]"></div>
                       <select value={selectedQuarter} onChange={(e) => { setSelectedQuarter(e.target.value); if (e.target.value !== '全年') setSelectedMonth('全部'); }} className="bg-transparent text-xs font-medium text-[#6b6b69] outline-none px-2 py-1.5 cursor-pointer hover:text-[#d97757]">
-                        {QUARTERS.map(q => <option key={q} value={q} className="bg-white">{q === '全年' ? '全年' : `第${q.replace('Q', '')}季度`}</option>)}
+                        {QUARTERS.map(q => <option key={q} value={q} className="bg-white">{q === '全年' ? t('header.allYear') : `${t('header.quarterPrefix')}${q.replace('Q', '')}${t('header.quarterSuffix')}`}</option>)}
                       </select>
                     </>
                   )}
@@ -770,8 +770,8 @@ ${contextText}
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center text-white"><i className="fas fa-robot text-sm"></i></div>
                 <div>
-                  <h3 className="text-sm font-semibold text-white tracking-tight">AI 助手</h3>
-                  <p className="text-[10px] text-white/60">数据实时同步中</p>
+                  <h3 className="text-sm font-semibold text-white tracking-tight">{t('chat.title')}</h3>
+                  <p className="text-[10px] text-white/60">{t('chat.status')}</p>
                 </div>
               </div>
               <div className="flex items-center space-x-3">
@@ -780,7 +780,7 @@ ${contextText}
                   className={`flex items-center space-x-2 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase transition-all duration-300 border ${isLiveMode ? 'bg-red-600 border-red-400 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
                 >
                   {isLiveMode ? <WaveformIcon /> : <LiveIcon />}
-                  <span>{isLiveMode ? '退出语音' : '实时通话'}</span>
+                  <span>{isLiveMode ? t('chat.liveStop') : t('chat.liveStart')}</span>
                 </button>
                 <select
                   value={selectedVoice}
@@ -788,7 +788,7 @@ ${contextText}
                   className="text-[10px] text-white/80 bg-white/10 px-3 py-1.5 rounded-full border border-white/10 outline-none cursor-pointer appearance-none"
                 >
                   {VOICE_OPTIONS.map(v => (
-                    <option key={v.id} value={v.id} className="bg-[#333] text-white">{v.name}</option>
+                    <option key={v.id} value={v.id} className="bg-[#333] text-white">{t((v as any).nameKey || 'voice.aoede')}</option>
                   ))}
                 </select>
               </div>
@@ -811,7 +811,7 @@ ${contextText}
                 <>
                   {messages.length === 0 && (
                     <div className="bg-white p-6 rounded-xl text-[#4a4a48] text-sm leading-relaxed border border-[#e0ddd5]">
-                      <p className="font-semibold text-[#d97757] mb-2 flex items-center"><i className="fas fa-hand-sparkles mr-2"></i> 您好，我是 AI 助手</p>
+                      <p className="font-semibold text-[#d97757] mb-2 flex items-center"><i className="fas fa-hand-sparkles mr-2"></i> {t('chat.welcome')}</p>
                       <p className="text-[#6b6b69]">我可以为您提供实时的经营分析和建议。您可以直接提问，或点击下方的功能快捷键。</p>
                     </div>
                   )}
@@ -837,8 +837,8 @@ ${contextText}
               <div className="px-5 py-3 bg-[#f9f9f8] border-t border-[#e0ddd5] flex space-x-2 overflow-x-auto shrink-0 no-scrollbar items-center">
                 <input type="file" ref={chatFileInputRef} onChange={handleChatFileUpload} className="hidden" accept="image/*,application/pdf" />
                 {QUICK_FUNCTIONS.map((fn) => (
-                  <button key={fn.label} onClick={() => fn.label === '上传发票' ? chatFileInputRef.current?.click() : handleSendMessage(fn.prompt)} className="whitespace-nowrap flex items-center space-x-2 px-4 py-2 bg-white border border-[#e0ddd5] rounded-full text-[10px] font-bold text-[#4a4a48] hover:text-[#d97757] hover:border-[#d97757]/40 transition-all active:scale-95">
-                    <i className={`fas ${fn.icon} text-[10px]`}></i><span>{fn.label}</span>
+                  <button key={(fn as any).labelKey} onClick={() => (fn as any).labelKey === 'chat.uploadInvoice' ? chatFileInputRef.current?.click() : handleSendMessage(fn.prompt)} className="whitespace-nowrap flex items-center space-x-2 px-4 py-2 bg-white border border-[#e0ddd5] rounded-full text-[10px] font-bold text-[#4a4a48] hover:text-[#d97757] hover:border-[#d97757]/40 transition-all active:scale-95">
+                    <i className={`fas ${fn.icon} text-[10px]`}></i><span>{t((fn as any).labelKey)}</span>
                   </button>
                 ))}
               </div>
@@ -850,7 +850,7 @@ ${contextText}
                   type="text"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  placeholder={isLiveMode ? "实时语音模式..." : "请输入您的问题..."}
+                  placeholder={isLiveMode ? t('chat.livePlaceholder') : t('chat.placeholder')}
                   disabled={isLiveMode}
                   className="flex-1 bg-white border border-[#e0ddd5] rounded-xl px-5 py-3.5 text-xs outline-none focus:border-[#d97757] text-[#191918] disabled:opacity-30 placeholder:text-[#7a7a78] transition-all"
                 />

@@ -185,5 +185,30 @@
     "anthropic": "Claude · Anthropic",
     "openai": "ChatGPT · OpenAI",
     "gemini": "Gemini · Google"
+  },
+  "header": {
+    "yearSuffix": "年度",
+    "allYear": "全年",
+    "allMonths": "全部",
+    "quarterPrefix": "第",
+    "quarterSuffix": "四半期"
+  },
+  "chat": {
+    "title": "AIアシスタント",
+    "status": "データリアルタイム同期中",
+    "welcome": "こんにちは、AIアシスタントです",
+    "welcomeDesc": "リアルタイムの経営分析とアドバイスを提供します。質問を入力するか、下のショートカットをご利用ください。",
+    "placeholder": "質問を入力...",
+    "livePlaceholder": "ライブ音声モード...",
+    "liveStart": "ライブ通話",
+    "liveStop": "通話終了",
+    "uploadInvoice": "請求書アップ",
+    "financeQuery": "財務レポート",
+    "trendAnalysis": "トレンド",
+    "marketAnalysis": "市場分析",
+    "inventoryQuery": "在庫照会"
+  },
+  "voice": {
+    "aoede": "Aoede (やさしい声)"
   }
 }

@@ -185,5 +185,30 @@
     "anthropic": "Claude · Anthropic",
     "openai": "ChatGPT · OpenAI",
     "gemini": "Gemini · Google"
+  },
+  "header": {
+    "yearSuffix": "년도",
+    "allYear": "전체",
+    "allMonths": "전체",
+    "quarterPrefix": "",
+    "quarterSuffix": "분기"
+  },
+  "chat": {
+    "title": "AI 어시스턴트",
+    "status": "데이터 실시간 동기화",
+    "welcome": "안녕하세요, AI 어시스턴트입니다",
+    "welcomeDesc": "실시간 경영 분석과 조언을 제공합니다. 질문을 입력하거나 아래 바로가기를 이용하세요.",
+    "placeholder": "질문을 입력하세요...",
+    "livePlaceholder": "실시간 음성 모드...",
+    "liveStart": "실시간 통화",
+    "liveStop": "통화 종료",
+    "uploadInvoice": "송장 업로드",
+    "financeQuery": "재무 보고서",
+    "trendAnalysis": "추세 분석",
+    "marketAnalysis": "시장 분석",
+    "inventoryQuery": "재고 조회"
+  },
+  "voice": {
+    "aoede": "Aoede (부드러운 목소리)"
   }
 }

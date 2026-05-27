@@ -185,5 +185,30 @@
     "anthropic": "Claude · Anthropic",
     "openai": "ChatGPT · OpenAI",
     "gemini": "Gemini · Google"
+  },
+  "header": {
+    "yearSuffix": "年度",
+    "allYear": "全年",
+    "allMonths": "全部",
+    "quarterPrefix": "第",
+    "quarterSuffix": "季度"
+  },
+  "chat": {
+    "title": "AI 助手",
+    "status": "資料即時同步中",
+    "welcome": "您好，我是 AI 助手",
+    "welcomeDesc": "我可以為您提供即時的經營分析和建議。您可以直接提問，或點擊下方的功能快捷鍵。",
+    "placeholder": "請輸入您的問題...",
+    "livePlaceholder": "即時語音模式...",
+    "liveStart": "即時通話",
+    "liveStop": "退出語音",
+    "uploadInvoice": "上傳發票",
+    "financeQuery": "財報查詢",
+    "trendAnalysis": "歷史趨勢",
+    "marketAnalysis": "市場分析",
+    "inventoryQuery": "庫存查詢"
+  },
+  "voice": {
+    "aoede": "Aoede (溫柔女聲)"
   }
 }
