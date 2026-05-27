@@ -86,7 +86,7 @@ async function chat(apiKey, model, { messages, systemInstruction }) {
   }
 }
 
-async function analyze(apiKey, model, { data, marketSummary }) {
+async function analyze(apiKey, model, { data, marketSummary, languageHint }) {
   try {
     const { GoogleGenAI, Type } = await loadSDK();
     const ai = new GoogleGenAI({ apiKey });
@@ -105,7 +105,7 @@ async function analyze(apiKey, model, { data, marketSummary }) {
       model: model || META.defaultModel,
       contents: `Analyze this business data and provide insights: ${JSON.stringify(data)}${marketContext}`,
       config: {
-        systemInstruction,
+        systemInstruction: systemInstruction + (languageHint ? `\n\n${languageHint}` : ''),
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
