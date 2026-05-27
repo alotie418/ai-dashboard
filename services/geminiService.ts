@@ -31,8 +31,8 @@ async function aiApiFetch<T>(path: string, body: any): Promise<T> {
   return response.json();
 }
 
-export const fetchAIAnalysis = async (data: BusinessData, marketSummary?: string): Promise<AIAnalysis> => {
-  const result = await aiApiFetch<any>('/api/ai/analyze', { data, marketSummary });
+export const fetchAIAnalysis = async (data: BusinessData, marketSummary?: string, languageHint?: string): Promise<AIAnalysis> => {
+  const result = await aiApiFetch<any>('/api/ai/analyze', { data, marketSummary, languageHint });
 
   if (!result.summary || !Array.isArray(result.topInsights) || !Array.isArray(result.recommendations) || !Array.isArray(result.anomalies)) {
     throw new Error('AI 返回的数据格式不完整');

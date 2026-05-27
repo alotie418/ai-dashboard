@@ -204,7 +204,8 @@
     "month09": "Sep",
     "month10": "Oct",
     "month11": "Nov",
-    "month12": "Dec"
+    "month12": "Dec",
+    "yearLabel": "{{year}}년도"
   },
   "chat": {
     "title": "AI 어시스턴트",
@@ -611,5 +612,8 @@
     "tonSuffix": "t",
     "bagSuffix": "개",
     "perTon": "/t"
+  },
+  "ai": {
+    "languageHint": "한국어로 답변해 주세요."
   }
 }

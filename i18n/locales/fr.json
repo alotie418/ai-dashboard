@@ -204,7 +204,8 @@
     "month09": "Sep",
     "month10": "Oct",
     "month11": "Nov",
-    "month12": "Déc"
+    "month12": "Déc",
+    "yearLabel": "{{year}}"
   },
   "chat": {
     "title": "Assistant IA",
@@ -611,5 +612,8 @@
     "tonSuffix": "t",
     "bagSuffix": "sacs",
     "perTon": "/t"
+  },
+  "ai": {
+    "languageHint": "Veuillez répondre en français."
   }
 }

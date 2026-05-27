@@ -219,14 +219,14 @@ const AppContent: React.FC = () => {
             color: 'bg-blue-500',
           },
           {
-            label: `${selectedYear}${t('header.yearSuffix') ? ' ' + t('header.yearSuffix') : ''} ${t('dashboard.purchasesLabel')}`,
+            label: `${t('header.yearLabel', { year: selectedYear })} ${t('dashboard.purchasesLabel')}`,
             value: m.purchaseTotalAmount > 0 ? `¥${m.purchaseTotalAmount.toLocaleString()}` : '—',
             subValue: m.purchaseTotalTons > 0 ? `${m.purchaseTotalTons}${t('units.tonSuffix')}` : '—',
             icon: 'fa-truck-loading',
             color: 'bg-purple-500',
           },
           {
-            label: `${selectedYear}${t('header.yearSuffix') ? ' ' + t('header.yearSuffix') : ''} ${t('dashboard.salesLabel')}`,
+            label: `${t('header.yearLabel', { year: selectedYear })} ${t('dashboard.salesLabel')}`,
             value: m.salesTotalAmount > 0 ? `¥${m.salesTotalAmount.toLocaleString()}` : '—',
             subValue: m.salesTotalTons > 0 ? `${m.salesTotalTons}${t('units.tonSuffix')}` : '—',
             icon: 'fa-chart-line',
@@ -296,7 +296,7 @@ const AppContent: React.FC = () => {
     setAiError(null);
     try {
       const freshData = await loadDashboardData();
-      const result = await fetchAIAnalysis(freshData || dataRef.current);
+      const result = await fetchAIAnalysis(freshData || dataRef.current, undefined, t('ai.languageHint'));
       setAnalysis(result);
     } catch (err) {
       console.error("AI Analysis Failed", err);
@@ -712,7 +712,7 @@ ${contextText}
               <div className="hidden lg:flex items-center space-x-4 pl-4 border-l border-[#e0ddd5]">
                 <div className="flex items-center space-x-2 bg-white rounded-lg p-1 border border-[#e0ddd5]">
                   <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="bg-transparent text-xs font-medium text-[#6b6b69] outline-none px-2 py-1.5 cursor-pointer hover:text-[#d97757]">
-                    {YEARS.map(y => <option key={y} value={y} className="bg-white">{y}{t('header.yearSuffix') ? ' ' + t('header.yearSuffix') : ''}</option>)}
+                    {YEARS.map(y => <option key={y} value={y} className="bg-white">{t('header.yearLabel', { year: y })}</option>)}
                   </select>
                   {FILTER_SUPPORTED_PAGES.includes(currentPage) && (
                     <>

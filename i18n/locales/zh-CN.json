@@ -204,7 +204,8 @@
     "month09": "09月",
     "month10": "10月",
     "month11": "11月",
-    "month12": "12月"
+    "month12": "12月",
+    "yearLabel": "{{year}} 年度"
   },
   "chat": {
     "title": "AI 助手",
@@ -611,5 +612,8 @@
     "tonSuffix": "吨",
     "bagSuffix": "袋",
     "perTon": "/吨"
+  },
+  "ai": {
+    "languageHint": "请使用中文回答。"
   }
 }
