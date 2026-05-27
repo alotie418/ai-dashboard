@@ -138,7 +138,7 @@ function createBlob(data: Float32Array): GenAIBlob {
 }
 
 const AppContent: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [data, setData] = useState<BusinessData>(MOCK_BUSINESS_DATA);
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [loadingAI, setLoadingAI] = useState(false);
