@@ -301,6 +301,19 @@ const MIGRATIONS = [
     if (fixed > 0) console.log(`[db] v7: fixed alerts schema — added ${fixed} missing column(s)`);
     else console.log('[db] v7: alerts schema OK');
   },
+  // v8: Repair corrupted is_read data from v7 (may have string "read" instead of integer)
+  (d) => {
+    const tableExists = d.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='alerts'").get();
+    if (!tableExists) return;
+    // Fix any non-integer values in is_read (v7 bug set it to string "read")
+    try {
+      d.exec("UPDATE alerts SET is_read = 0 WHERE typeof(is_read) != 'integer'");
+      d.exec("UPDATE alerts SET is_dismissed = 0 WHERE typeof(is_dismissed) != 'integer'");
+      console.log('[db] v8: alerts data repaired');
+    } catch (e) {
+      console.warn('[db] v8: alerts repair skipped:', e?.message);
+    }
+  },
 ];
 
 function runMigrations(d) {
