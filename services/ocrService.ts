@@ -11,7 +11,19 @@ export interface ExtractedInvoice {
   taxAmount: number;
 }
 
+function isElectron(): boolean {
+  return typeof window !== 'undefined' && !!(window as any).electronAPI?.isElectron;
+}
+
 export const analyzeInvoice = async (base64Data: string, mimeType: string): Promise<ExtractedInvoice> => {
+  if (isElectron()) {
+    return (window as any).electronAPI.invoke('api:request', {
+      method: 'POST',
+      path: '/api/ai/ocr',
+      body: { base64Data, mimeType },
+    });
+  }
+
   const response = await fetch('/api/ai/ocr', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

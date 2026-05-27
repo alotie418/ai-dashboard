@@ -358,8 +358,15 @@ const AppContent: React.FC = () => {
       });
       liveStreamRef.current = stream;
       // Live audio still needs direct SDK (WebSocket). API key fetched from server for this use case.
-      const keyRes = await fetch('/api/ai/live-key', { credentials: 'same-origin' });
-      const { key } = await keyRes.json();
+      let key: string;
+      if (isElectronEnv) {
+        const r = await (window as any).electronAPI.invoke('api:request', { method: 'GET', path: '/api/ai/live-key' });
+        key = r.key;
+      } else {
+        const keyRes = await fetch('/api/ai/live-key', { credentials: 'same-origin' });
+        const keyData = await keyRes.json();
+        key = keyData.key;
+      }
       const ai = new GoogleGenAI({ apiKey: key });
       if (!inputAudioCtxRef.current) inputAudioCtxRef.current = new AudioContext({ sampleRate: 16000 });
       if (!outputAudioCtxRef.current) outputAudioCtxRef.current = new AudioContext({ sampleRate: 24000 });
@@ -436,13 +443,22 @@ const AppContent: React.FC = () => {
     if (playingIndex !== null) return;
     setPlayingIndex(index);
     try {
-      const res = await fetch('/api/ai/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ text, voiceName: selectedVoice }),
-      });
-      const { data: audioData } = await res.json();
+      let audioData: string | null;
+      if (isElectronEnv) {
+        const r = await (window as any).electronAPI.invoke('api:request', {
+          method: 'POST', path: '/api/ai/tts', body: { text, voiceName: selectedVoice },
+        });
+        audioData = r.data;
+      } else {
+        const res = await fetch('/api/ai/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ text, voiceName: selectedVoice }),
+        });
+        const ttsResult = await res.json();
+        audioData = ttsResult.data;
+      }
       if (audioData) {
         if (!ttsAudioCtxRef.current) ttsAudioCtxRef.current = new AudioContext({ sampleRate: 24000 });
         const ctx = ttsAudioCtxRef.current;
@@ -478,13 +494,20 @@ const AppContent: React.FC = () => {
         if (contextCacheRef.current && now - contextCacheRef.current.ts < 60000) {
           contextText = contextCacheRef.current.text;
         } else {
-          const ctxRes = await fetch('/api/ai/context', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({ year: selectedYear }),
-          });
-          const ctxData = await ctxRes.json();
+          let ctxData: any;
+          if (isElectronEnv) {
+            ctxData = await (window as any).electronAPI.invoke('api:request', {
+              method: 'POST', path: '/api/ai/context', body: { year: selectedYear },
+            });
+          } else {
+            const ctxRes = await fetch('/api/ai/context', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({ year: selectedYear }),
+            });
+            ctxData = await ctxRes.json();
+          }
           contextText = ctxData.context || '';
           contextCacheRef.current = { text: contextText, ts: now };
         }
@@ -510,13 +533,20 @@ ${contextText}
 - 仅使用两个星号 (**) 进行加粗。
 - 使用清晰的列表和段落。`;
 
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ messages: chatHistory, systemInstruction }),
-      });
-      const result = await res.json();
+      let result: any;
+      if (isElectronEnv) {
+        result = await (window as any).electronAPI.invoke('api:request', {
+          method: 'POST', path: '/api/ai/chat', body: { messages: chatHistory, systemInstruction },
+        });
+      } else {
+        const res = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ messages: chatHistory, systemInstruction }),
+        });
+        result = await res.json();
+      }
       const content = result.text || "未能获取有效回复。";
       setMessages([...newMsgs, { role: 'model', text: content }]);
     } catch (e) {

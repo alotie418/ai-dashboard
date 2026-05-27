@@ -268,38 +268,69 @@ ${JSON.stringify(mcOnVar)}
 3. 如果 VAR 模型预测与你自己的判断不一致，请在 insights 中说明原因和你的修正依据。
 4. 在 insights 中总结你参考了哪些市场数据源，以及主要风险因素。`;
 
-      // STEP 6: AI synthesis with Google Search grounding (via server proxy)
-      const aiResponse = await fetch('/api/ai/data-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({
-          prompt,
-          systemInstruction: "你是一位精通软水盐行业的首席财务官与市场分析师。你将收到：企业历史数据、本地统计模型（特征向量+VAR+蒙特卡洛）的计算结果、以及 Tavily 搜索到的市场情报。请结合所有信息和你自己的 Google 搜索结果，进行最终的综合预测。返回JSON，包含insights字符串和predictions数组。",
-          responseSchema: {
-            type: 'OBJECT',
-            properties: {
-              insights: { type: 'STRING' },
-              predictions: {
-                type: 'ARRAY',
-                items: {
-                  type: 'OBJECT',
-                  properties: {
-                    name: { type: 'STRING' },
-                    revenue: { type: 'NUMBER' },
-                    profit: { type: 'NUMBER' },
-                    confidenceUpper: { type: 'NUMBER' },
-                    confidenceLower: { type: 'NUMBER' }
+      // STEP 6: AI synthesis (走 IPC 统一通道，桌面版不走 HTTP)
+      const isElectronEnv = typeof window !== 'undefined' && !!(window as any).electronAPI?.isElectron;
+      let result: any;
+      if (isElectronEnv) {
+        result = await (window as any).electronAPI.invoke('api:request', {
+          method: 'POST',
+          path: '/api/ai/data-analysis',
+          body: {
+            prompt,
+            systemInstruction: "你是一位精通行业的首席财务官与市场分析师。请结合企业历史数据和统计模型结果进行综合预测。返回JSON，包含insights字符串和predictions数组。",
+            responseSchema: {
+              type: 'OBJECT',
+              properties: {
+                insights: { type: 'STRING' },
+                predictions: {
+                  type: 'ARRAY',
+                  items: {
+                    type: 'OBJECT',
+                    properties: {
+                      name: { type: 'STRING' },
+                      revenue: { type: 'NUMBER' },
+                      profit: { type: 'NUMBER' },
+                      confidenceUpper: { type: 'NUMBER' },
+                      confidenceLower: { type: 'NUMBER' }
+                    }
                   }
                 }
               }
             }
-          }
-        }),
-      });
-
-      if (!aiResponse.ok) throw new Error('AI analysis request failed');
-      const result = await aiResponse.json();
+          },
+        });
+      } else {
+        const aiResponse = await fetch('/api/ai/data-analysis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            prompt,
+            systemInstruction: "你是一位精通行业的首席财务官与市场分析师。请结合企业历史数据和统计模型结果进行综合预测。返回JSON，包含insights字符串和predictions数组。",
+            responseSchema: {
+              type: 'OBJECT',
+              properties: {
+                insights: { type: 'STRING' },
+                predictions: {
+                  type: 'ARRAY',
+                  items: {
+                    type: 'OBJECT',
+                    properties: {
+                      name: { type: 'STRING' },
+                      revenue: { type: 'NUMBER' },
+                      profit: { type: 'NUMBER' },
+                      confidenceUpper: { type: 'NUMBER' },
+                      confidenceLower: { type: 'NUMBER' }
+                    }
+                  }
+                }
+              }
+            }
+          }),
+        });
+        if (!aiResponse.ok) throw new Error('AI analysis request failed');
+        result = await aiResponse.json();
+      }
       setSalesForecast(result.insights || '分析完成。未来季度预计呈稳健增长趋势。');
 
       // Extract Google Search grounding sources from server response
