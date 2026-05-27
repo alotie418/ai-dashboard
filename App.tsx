@@ -637,14 +637,14 @@ ${contextText}`;
                   />
                 ) : (
                   <>
-                    {/* P&L + Profit Margins — all non-US locales */}
-                    {sections.includes('profit_loss') && <FinancialStatementTable data={data.financialStatement} />}
-                    {sections.includes('profit_margins') && <ProfitMarginIndicators data={data.financialStatement} />}
-                    {/* Tax summary — locale-aware: CN=VAT, JP=消費税, EU=VAT, KR=VAT, TW=營業稅 */}
+                    {/* P&L + Profit Margins — all non-US locales, locale-aware */}
+                    {sections.includes('profit_loss') && <FinancialStatementTable data={data.financialStatement} accountingLocale={accLocale} />}
+                    {sections.includes('profit_margins') && <ProfitMarginIndicators data={data.financialStatement} accountingLocale={accLocale} />}
+                    {/* Tax summary — locale-aware labels + currency */}
                     {(sections.includes('vat_summary') || sections.includes('consumption_tax_summary') || sections.includes('business_tax_summary')) && (
-                      <VATStatistics data={data.vatStatistics} />
+                      <VATStatistics data={data.vatStatistics} accountingLocale={accLocale} />
                     )}
-                    {sections.includes('tax_inclusive_summary') && <TaxInclusiveSummary data={data.taxInclusiveSummary} />}
+                    {sections.includes('tax_inclusive_summary') && <TaxInclusiveSummary data={data.taxInclusiveSummary} accountingLocale={accLocale} />}
                   </>
                 )}
               </div>
