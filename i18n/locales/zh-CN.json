@@ -36,7 +36,8 @@
     "analysis": "数据分析",
     "accounts": "应收应付",
     "finance": "财务报表",
-    "settings": "系统设置"
+    "settings": "系统设置",
+    "transactions": "收支记录"
   },
   "headerTitle": {
     "dashboard": "经营数据概览",
@@ -46,7 +47,8 @@
     "inventory": "发票查询",
     "finance": "财务报表",
     "accounts": "应收应付",
-    "settings": "系统设置"
+    "settings": "系统设置",
+    "transactions": "收支记录管理"
   },
   "settings": {
     "nav": {
@@ -680,5 +682,28 @@
     "ocrPrompt": "你是一位专业的财务审计员。请从这张发票图片中提取以下信息，严格按 JSON 格式返回（不要 markdown 代码块）：\n{\n  \"date\": \"开票日期 YYYY-MM-DD\",\n  \"customer\": \"客户名称/购方名称\",\n  \"quantity\": \"货物总数量及单位\",\n  \"price\": 合计不含税金额数字,\n  \"shipping\": 运费数字,\n  \"invoiceNo\": \"发票号码\",\n  \"totalWithTax\": 价税合计数字,\n  \"unitPriceWithoutTax\": 不含税单价数字,\n  \"taxAmount\": 合计税额数字\n}\n数字字段必须是数字而非字符串，没有则填 0。",
     "chatSystemPrompt": "你是一位专业的企业经营数据助手，拥有企业全部实时经营数据的访问权限。\n\n你的职责：\n1. 基于完整数据回答用户关于企业内部经营的任何问题\n2. 能够进行跨模块分析\n3. 数据分析时可以主动关联多个模块的数据给出综合建议\n\n排版要求：仅使用两个星号(**)进行加粗，使用清晰的列表和段落。",
     "forecastSystemPrompt": "你是一位精通行业的首席财务官与市场分析师。请结合企业历史数据和统计模型结果进行综合预测。返回JSON，包含insights字符串和predictions数组。"
+  },
+  "transactions": {
+    "title": "收支记录",
+    "add": "新增记录",
+    "totalIncome": "总收入",
+    "totalExpense": "总支出",
+    "netIncome": "净收入",
+    "items": "笔",
+    "expense": "支出",
+    "income": "收入",
+    "category": "分类",
+    "scheduleLine": "报表行",
+    "amount": "金额",
+    "empty": "暂无记录。点击\"新增记录\"开始。",
+    "editTitle": "编辑记录",
+    "addTitle": "新增记录",
+    "description": "备注说明",
+    "descPlaceholder": "可选备注...",
+    "noCategory": "无分类",
+    "mapsToLine": "对应报表行",
+    "paid": "已付",
+    "partial": "部分",
+    "unpaid": "未付"
   }
 }

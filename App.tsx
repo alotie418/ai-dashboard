@@ -17,6 +17,7 @@ import InventoryPage from './components/InventoryPage';
 import FinancePage from './components/FinancePage';
 import SettingsPage from './components/SettingsPage';
 import AccountsPage from './components/AccountsPage';
+import TransactionsPage from './components/TransactionsPage';
 import AlertCenter from './components/AlertCenter';
 import LoginPage from './components/LoginPage';
 import OnboardingWizard from './components/OnboardingWizard';
@@ -25,7 +26,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { analyzeInvoice } from './services/ocrService';
 
-type PageId = 'dashboard' | 'sales' | 'purchase' | 'analysis' | 'inventory' | 'finance' | 'accounts' | 'settings';
+type PageId = 'dashboard' | 'sales' | 'purchase' | 'analysis' | 'inventory' | 'finance' | 'accounts' | 'transactions' | 'settings';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -628,6 +629,7 @@ ${contextText}`;
       case 'inventory': return <InventoryPage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'finance': return <FinancePage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'accounts': return <AccountsPage />;
+      case 'transactions': return <TransactionsPage />;
       case 'settings': return <SettingsPage />;
       default: return null;
     }
@@ -661,6 +663,7 @@ ${contextText}`;
           <NavItem icon="fa-chart-pie" label={t('nav.analysis')} active={currentPage === 'analysis'} expanded={sidebarOpen} onClick={() => setCurrentPage('analysis')} />
           <NavItem icon="fa-handshake" label={t('nav.accounts')} active={currentPage === 'accounts'} expanded={sidebarOpen} onClick={() => setCurrentPage('accounts')} />
           <NavItem icon="fa-wallet" label={t('nav.finance')} active={currentPage === 'finance'} expanded={sidebarOpen} onClick={() => setCurrentPage('finance')} />
+          <NavItem icon="fa-exchange-alt" label={t('nav.transactions')} active={currentPage === 'transactions'} expanded={sidebarOpen} onClick={() => setCurrentPage('transactions')} />
           <NavItem icon="fa-cog" label={t('nav.settings')} active={currentPage === 'settings'} expanded={sidebarOpen} onClick={() => setCurrentPage('settings')} />
         </nav>
         <div className="p-4 mt-auto border-t border-[#e0ddd5] space-y-2">
