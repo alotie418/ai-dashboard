@@ -122,7 +122,11 @@
     "language": {
       "title": "Interface Language",
       "subtitle": "Changes apply immediately, no restart needed",
-      "note": "Translations are being improved. Please report any inaccuracies."
+      "note": "Translations are being improved. Please report any inaccuracies.",
+      "scopeTitle": "What this changes",
+      "scopeYes1": "Menus, buttons, labels, help text",
+      "scopeYes2": "AI response language",
+      "scopeNo": "Does NOT change tax rules, currency, report structure, or accounting categories. Those are controlled by Accounting Standard."
     },
     "accounting": {
       "title": "Accounting Standard",
@@ -133,7 +137,12 @@
       "incomeTax": "Income tax rate",
       "currency": "Default currency",
       "applyButton": "Apply this standard",
-      "warning": "Switching accounting standard only updates default tax rates and currency. Existing data will not be recalculated."
+      "warning": "Switching accounting standard only updates default tax rates and currency. Existing data will not be recalculated.",
+      "scopeTitle": "What this changes",
+      "scopeYes1": "Tax regime, tax rates, and tax concepts",
+      "scopeYes2": "Default currency and report structure",
+      "scopeYes3": "Dashboard metrics, accounting categories, and AI finance context",
+      "scopeNo": "Does NOT change the display language. Menus and labels stay in your chosen UI Language."
     },
     "categories": {
       "title": "Accounting Categories",
@@ -236,7 +245,8 @@
     "industry": "Industry",
     "industryPlaceholder": "e.g. Chemical trade / Software / Consulting",
     "finishAndEnter": "Finish and enter app",
-    "skipCompany": "Skip for now; fill in settings later"
+    "skipCompany": "Skip for now; fill in settings later",
+    "localeDesc": "These are independent settings. UI language controls menus and labels. Accounting standard controls tax rules, currency, and reports."
   },
   "byok": {
     "howToGetKey": "How to get a {{provider}} Key",
@@ -357,7 +367,7 @@
     "formSupplier": "Supplier",
     "formSupplierPlaceholder": "Enter supplier name",
     "formQuantity": "Quantity",
-    "formQuantityPlaceholder": "e.g. 100 tons / 1000 bags",
+    "formQuantityPlaceholder": "e.g. 100 units",
     "formPrice": "Price (Excl. Tax)",
     "formTaxRate": "Tax Rate",
     "formUnitPrice": "Unit Price (Excl. Tax)",
@@ -373,7 +383,26 @@
     "taxStandard": "13% (Standard)",
     "taxTransport": "9% (Transport)",
     "taxService": "6% (Service)",
-    "taxSmall": "3% (Small-scale)"
+    "taxSmall": "3% (Small-scale)",
+    "taxNone": "0% (Tax-exempt)",
+    "taxSalesTax": "7% (Sales Tax)",
+    "taxSalesTax10": "10% (Sales Tax)",
+    "taxJpStandard": "10% (Standard Consumption Tax)",
+    "taxJpReduced": "8% (Reduced Rate)",
+    "taxEuStandard": "20% (Standard VAT)",
+    "taxEuReduced": "10% (Reduced VAT)",
+    "taxEuSuperReduced": "5% (Super-reduced VAT)",
+    "taxKrStandard": "10% (Standard VAT)",
+    "taxTwStandard": "5% (Standard Business Tax)",
+    "recognitionMode": "Recognition Mode",
+    "loading": "Loading...",
+    "errorRequiredFields": "Please fill in supplier and quantity",
+    "errorSaveFailed": "Save failed",
+    "errorDeleteFailed": "Delete failed",
+    "errorFileTimeout": "File read timeout",
+    "errorFileFormat": "Unsupported file format",
+    "errorFileRead": "File read failed",
+    "notInvoiceWarning": "This file does not appear to be an invoice or receipt (detected: {{type}}). Please verify the file or fill in manually."
   },
   "sales": {
     "title": "Sales & Output Tax",
@@ -406,7 +435,7 @@
     "formCustomer": "Customer",
     "formCustomerPlaceholder": "Enter customer name",
     "formQuantity": "Quantity",
-    "formQuantityPlaceholder": "e.g. 36.5 tons / 3650 bags",
+    "formQuantityPlaceholder": "e.g. 100 units",
     "formPrice": "Amount (Excl. Tax)",
     "formShipping": "Shipping Cost",
     "formUnitPrice": "Unit Price (Excl. Tax)",
@@ -420,7 +449,26 @@
     "alertRequired": "Please fill in customer and quantity",
     "alertSaveFailed": "Save failed, please retry",
     "alertUpdateFailed": "Update failed, please retry",
-    "alertDeleteFailed": "Delete failed, please retry"
+    "alertDeleteFailed": "Delete failed, please retry",
+    "recognitionMode": "Recognition Mode",
+    "loading": "Loading...",
+    "inventoryCurrent": "Current Inventory",
+    "inventoryTon": "tons",
+    "inventoryBag": "bags",
+    "inventoryLow": "Low inventory — sales will cause negative stock",
+    "inventoryTotalPurchase": "Total Purchased",
+    "inventoryTotalSales": "Total Sold",
+    "formValidation": "Please fill in customer and quantity",
+    "deleteFailed": "Delete failed, please retry",
+    "saveFailed": "Save failed, please retry",
+    "updateFailed": "Update failed, please retry",
+    "recognizeFailed": "Recognition failed. Upload a clear invoice image.",
+    "recognizeSuccess": "Recognition successful! Added to list.",
+    "fileReadTimeout": "File read timeout",
+    "fileFormatUnsupported": "Unsupported file format",
+    "fileReadFailed": "File read failed",
+    "uploadExtracting": "AI extracting date, amount, invoice number...",
+    "notInvoiceWarning": "This file does not appear to be an invoice or receipt (detected: {{type}}). Please verify the file or fill in manually."
   },
   "invoices": {
     "currentStock": "Real-time Inventory",
@@ -617,7 +665,22 @@
     "balanceTotalLiab": "Total Liabilities & Equity",
     "cashflowTitle": "Cash Flow Analysis",
     "cashflowSubtitle": "Connecting to accounting software API for cash flow data. Preview mode only.",
-    "cashflowSync": "Sync Now"
+    "cashflowSync": "Sync Now",
+    "balanceReceivables": "Accounts Receivable",
+    "balancePayables": "Accounts Payable",
+    "balanceTaxPayable": "Tax Payable",
+    "balanceTotalAssets": "Total Assets",
+    "balanceTotalLiabilities": "Total Liabilities",
+    "balanceTotalLiabilitiesEquity": "Total Liabilities & Equity",
+    "cashflowDesc": "Connecting to accounting API for cash flow data. Preview mode only.",
+    "balanceCurrentAssets": "Current Assets",
+    "balanceNonCurrentAssets": "Non-current Assets",
+    "balanceFixedAssets": "Fixed Assets",
+    "balanceCurrentAssetsTotal": "Total Current Assets",
+    "balanceCurrentLiabilities": "Current Liabilities",
+    "balancePaidInCapital": "Paid-in Capital",
+    "balanceRetainedEarnings": "Retained Earnings",
+    "balanceLiabilitiesEquity": "Liabilities & Equity"
   },
   "aiInsights": {
     "title": "AI Brief",
@@ -657,7 +720,14 @@
     "invoiceNo": "Invoice No.",
     "status": "Status",
     "action": "Action",
-    "shipping": "Shipping"
+    "shipping": "Shipping",
+    "unitPriceWithoutTax": "Unit Price (Excl. Tax)",
+    "totalAmountWithoutTax": "Amount (Excl. Tax)",
+    "amountWithoutTax": "Amount (Excl. Tax)",
+    "totalTax": "Total Tax",
+    "totalWithTax": "Total (Incl. Tax)",
+    "actions": "Action",
+    "taxAmount": "Total Tax"
   },
   "common2": {
     "edit": "Edit",

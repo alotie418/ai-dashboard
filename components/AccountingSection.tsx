@@ -59,6 +59,20 @@ const AccountingSection: React.FC = () => {
         <p className="text-xs text-[#6b6b69] mt-1">{t('settings.accounting.subtitle')}</p>
       </div>
 
+      {/* Clarification banner */}
+      <div className="text-xs text-[#4a4a48] bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1">
+        <div className="font-semibold"><i className="fas fa-balance-scale mr-1.5 text-blue-500"></i>{t('settings.accounting.scopeTitle', 'What this changes')}</div>
+        <ul className="list-disc list-inside text-[11px] text-[#5c5c5a] space-y-0.5">
+          <li>{t('settings.accounting.scopeYes1', 'Tax regime, tax rates, and tax concepts')}</li>
+          <li>{t('settings.accounting.scopeYes2', 'Default currency and report structure')}</li>
+          <li>{t('settings.accounting.scopeYes3', 'Dashboard metrics, accounting categories, and AI finance context')}</li>
+        </ul>
+        <div className="text-[11px] text-[#7a7a78] mt-1">
+          <i className="fas fa-exclamation-circle mr-1 text-amber-500"></i>
+          {t('settings.accounting.scopeNo', 'Does NOT change the display language. Menus and labels stay in your chosen UI Language.')}
+        </div>
+      </div>
+
       {toast && (
         <div className={`px-4 py-2.5 rounded-lg text-sm ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
           <i className={`fas ${toast.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2`}></i>

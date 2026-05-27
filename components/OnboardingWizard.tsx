@@ -1,13 +1,17 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { AIProviderConfig, AIProviderId } from '../types';
-import { listProviders, saveProvider, setDefaultProvider, testProvider } from '../services/api';
+import { listProviders, saveProvider, setDefaultProvider, testProvider, saveSettings } from '../services/api';
 import { KNOWN_MODELS, DEFAULT_MODEL } from './aiProviderModels';
+import { SUPPORTED_LANGUAGES, setLanguage, type LangCode } from '../i18n';
+import { ACCOUNTING_LOCALES, type AccountingLocaleId } from './accountingLocaleConfig';
+import { ACCOUNTING_PROFILES } from './accountingProfiles';
 
 interface Props {
   onComplete: () => void;
 }
 
-type Step = 'welcome' | 'providers' | 'company';
+type Step = 'welcome' | 'locale' | 'providers' | 'company';
 
 const electronAPI = typeof window !== 'undefined' ? (window as any).electronAPI : null;
 
@@ -59,11 +63,16 @@ const PROVIDER_DOCS: Record<AIProviderId, { label: string; getKeyUrl: string; pl
 };
 
 const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
+  const { t, i18n } = useTranslation();
   const [step, setStep] = useState<Step>('welcome');
   const [providers, setProviders] = useState<AIProviderConfig[]>([]);
   const [forms, setForms] = useState<Record<AIProviderId, ProviderFormState>>({} as any);
   const [expandedProvider, setExpandedProvider] = useState<AIProviderId | null>(null);
   const [defaultProvider, setDefaultProviderState] = useState<AIProviderId | null>(null);
+
+  // Locale step state — UI Language and Accounting Locale are independent
+  const [selectedUILang, setSelectedUILang] = useState<string>(i18n.language || 'zh-CN');
+  const [selectedAccLocale, setSelectedAccLocale] = useState<string>('CN');
 
   const [companyName, setCompanyName] = useState('');
   const [industry, setIndustry] = useState('');
@@ -193,10 +202,10 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
 
         {/* Progress dots */}
         <div className="flex items-center justify-center mb-8 space-x-2">
-          {(['welcome', 'providers', 'company'] as Step[]).map((s, i) => (
+          {(['welcome', 'locale', 'providers', 'company'] as Step[]).map((s, i) => (
             <React.Fragment key={s}>
-              <div className={`w-2 h-2 rounded-full transition-all ${s === step ? 'bg-[#d97757] w-6' : (['welcome', 'providers', 'company'].indexOf(step) > i ? 'bg-[#d97757]/40' : 'bg-[#e0ddd5]')}`}></div>
-              {i < 2 && <div className="w-4 h-px bg-[#e0ddd5]"></div>}
+              <div className={`w-2 h-2 rounded-full transition-all ${s === step ? 'bg-[#d97757] w-6' : (['welcome', 'locale', 'providers', 'company'].indexOf(step) > i ? 'bg-[#d97757]/40' : 'bg-[#e0ddd5]')}`}></div>
+              {i < 3 && <div className="w-4 h-px bg-[#e0ddd5]"></div>}
             </React.Fragment>
           ))}
         </div>
@@ -226,11 +235,97 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
               </li>
             </ul>
             <button
-              onClick={() => setStep('providers')}
+              onClick={() => setStep('locale')}
               className="w-full bg-[#d97757] text-white py-3 rounded-lg font-medium hover:bg-[#c4694d] transition-colors"
             >
-              开始配置
+              {t('onboarding.startConfig')}
             </button>
+          </div>
+        )}
+
+        {/* Step: Language + Accounting Locale (independent) */}
+        {step === 'locale' && (
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-xl font-semibold text-[#191918] mb-2">{t('settings.language.title', 'Interface Language')} & {t('settings.accounting.title', 'Accounting Standard')}</h2>
+              <p className="text-sm text-[#6b6b69]">{t('onboarding.localeDesc', 'These are independent settings. UI language controls menus and labels. Accounting standard controls tax rules, currency, and reports.')}</p>
+            </div>
+
+            {/* UI Language */}
+            <div>
+              <label className="block text-xs font-semibold text-[#4a4a48] mb-2">
+                <i className="fas fa-language mr-1.5 text-blue-500"></i>
+                {t('settings.language.title', 'Interface Language')}
+                <span className="text-[#7a7a78] font-normal ml-2">— {t('settings.language.scopeNo', 'Only affects menus, buttons, labels')}</span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {SUPPORTED_LANGUAGES.map(lang => {
+                  const sel = selectedUILang === lang.code;
+                  return (
+                    <button key={lang.code} type="button"
+                      onClick={() => { setSelectedUILang(lang.code); setLanguage(lang.code as LangCode); }}
+                      className={`flex items-center p-3 rounded-lg border text-sm transition-all ${sel ? 'border-[#d97757] bg-[#d97757]/5' : 'border-[#e0ddd5] bg-white hover:bg-[#f0eeeb]'}`}>
+                      <span className="text-lg mr-2">{lang.flag}</span>
+                      <span className="font-medium text-[#191918]">{lang.label}</span>
+                      {sel && <i className="fas fa-check-circle text-[#d97757] ml-auto"></i>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Accounting Locale */}
+            <div>
+              <label className="block text-xs font-semibold text-[#4a4a48] mb-2">
+                <i className="fas fa-balance-scale mr-1.5 text-emerald-500"></i>
+                {t('settings.accounting.title', 'Accounting Standard')}
+                <span className="text-[#7a7a78] font-normal ml-2">— {t('settings.accounting.scopeNo', 'Controls tax rules, currency, reports')}</span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(Object.keys(ACCOUNTING_PROFILES) as string[]).map(code => {
+                  const p = ACCOUNTING_PROFILES[code as keyof typeof ACCOUNTING_PROFILES];
+                  const sel = selectedAccLocale === code;
+                  const name = p.name[selectedUILang] || p.name['en'] || code;
+                  return (
+                    <button key={code} type="button"
+                      onClick={() => setSelectedAccLocale(code)}
+                      className={`flex items-center p-3 rounded-lg border text-sm transition-all ${sel ? 'border-emerald-500 bg-emerald-50' : 'border-[#e0ddd5] bg-white hover:bg-[#f0eeeb]'}`}>
+                      <span className="text-lg mr-2">{p.flag}</span>
+                      <div className="flex-1 text-left">
+                        <span className="font-medium text-[#191918]">{name}</span>
+                        <div className="text-[10px] text-[#7a7a78]">{p.currency} {p.currencySymbol}</div>
+                      </div>
+                      {sel && <i className="fas fa-check-circle text-emerald-500 ml-auto"></i>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex space-x-3 pt-2">
+              <button onClick={() => setStep('welcome')} className="px-5 border border-[#e0ddd5] text-[#4a4a48] py-2.5 rounded-lg font-medium hover:bg-[#f0eeeb] transition-colors">
+                {t('common.back')}
+              </button>
+              <button
+                onClick={async () => {
+                  // Save accounting locale to DB (UI language already saved via setLanguage)
+                  try {
+                    const p = ACCOUNTING_PROFILES[selectedAccLocale as keyof typeof ACCOUNTING_PROFILES];
+                    await saveSettings({
+                      accounting_locale: selectedAccLocale,
+                      vat_rate: p.vatRate,
+                      surcharge_rate: p.surchargeRate,
+                      income_tax_rate: p.incomeTaxRate,
+                      currency: p.currency,
+                    } as any);
+                  } catch { /* ignore */ }
+                  setStep('providers');
+                }}
+                className="flex-1 bg-[#d97757] text-white py-2.5 rounded-lg font-medium hover:bg-[#c4694d] transition-colors"
+              >
+                {t('common.next')}
+              </button>
+            </div>
           </div>
         )}
 

@@ -123,20 +123,8 @@ async function analyze(apiKey, model, { data, marketSummary, languageHint, analy
   return parsed;
 }
 
-async function ocr(apiKey, model, { base64Data, mimeType }) {
-  const prompt = `你是一位专业的财务审计员。请从这张发票图片中提取信息，按 JSON 格式输出：
-{
-  "date": "开票日期 YYYY-MM-DD",
-  "customer": "客户名称/购方名称",
-  "quantity": "货物总数量及单位",
-  "price": 合计不含税金额数字,
-  "shipping": 运费数字,
-  "invoiceNo": "发票号码",
-  "totalWithTax": 价税合计数字,
-  "unitPriceWithoutTax": 不含税单价数字,
-  "taxAmount": 合计税额数字
-}
-数字字段必须是数字而非字符串，没有则填 0。`;
+async function ocr(apiKey, model, { base64Data, mimeType, ocrPrompt }) {
+  const prompt = ocrPrompt || 'Extract invoice data as JSON.';
   const json = await callResponses(apiKey, {
     model: model || META.defaultModel,
     input: [{

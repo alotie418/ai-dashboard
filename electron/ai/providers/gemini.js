@@ -127,25 +127,11 @@ async function analyze(apiKey, model, { data, marketSummary, languageHint, analy
   }
 }
 
-async function ocr(apiKey, model, { base64Data, mimeType }) {
+async function ocr(apiKey, model, { base64Data, mimeType, ocrPrompt }) {
   try {
     const { GoogleGenAI } = await loadSDK();
     const ai = new GoogleGenAI({ apiKey });
-
-    const prompt = `
-你是一位专业的财务审计员。请从这张发票图片中提取以下信息，并严格以 JSON 格式返回（不要包含 markdown 代码块标记）：
-{
-  "date": "开票日期，格式 YYYY-MM-DD",
-  "customer": "客户名称/购方名称",
-  "quantity": "货物总数量及单位",
-  "price": 合计不含税金额数字,
-  "shipping": 运费数字,
-  "invoiceNo": "发票号码",
-  "totalWithTax": 价税合计金额数字,
-  "unitPriceWithoutTax": 不含税单价数字,
-  "taxAmount": 合计税额数字
-}
-注意：数字字段必须是数字，没有则填 0。`;
+    const prompt = ocrPrompt || 'Extract invoice data as JSON.';
 
     const response = await ai.models.generateContent({
       model: model || META.defaultModel,

@@ -122,7 +122,11 @@
     "language": {
       "title": "界面语言",
       "subtitle": "切换语言后立即生效，无需重启",
-      "note": "翻译质量持续优化中，发现错误欢迎反馈"
+      "note": "翻译质量持续优化中，发现错误欢迎反馈",
+      "scopeTitle": "此设置影响的范围",
+      "scopeYes1": "菜单、按钮、标签、帮助文案",
+      "scopeYes2": "AI 回复语言",
+      "scopeNo": "不会改变税制、币种、报表结构或会计类别。这些由「会计制度」控制。"
     },
     "accounting": {
       "title": "会计制度",
@@ -133,7 +137,12 @@
       "incomeTax": "所得税率",
       "currency": "默认币种",
       "applyButton": "应用此制度",
-      "warning": "切换会计制度只更新默认税率与币种，已有数据不会重新计算"
+      "warning": "切换会计制度只更新默认税率与币种，已有数据不会重新计算",
+      "scopeTitle": "此设置影响的范围",
+      "scopeYes1": "税制、税率、税种概念",
+      "scopeYes2": "默认币种与报表结构",
+      "scopeYes3": "看板指标、会计类别、AI 财务分析上下文",
+      "scopeNo": "不会改变界面显示语言。菜单和标签保持你选择的 UI 语言。"
     },
     "categories": {
       "title": "会计类别",
@@ -236,7 +245,8 @@
     "industry": "所属行业",
     "industryPlaceholder": "例如：化工贸易 / 软件开发 / 设计咨询",
     "finishAndEnter": "完成并进入应用",
-    "skipCompany": "暂时跳过公司信息，稍后在设置中填写"
+    "skipCompany": "暂时跳过公司信息，稍后在设置中填写",
+    "localeDesc": "这两个设置互相独立。界面语言控制菜单和标签。会计制度控制税制、币种和报表。"
   },
   "byok": {
     "howToGetKey": "如何获取 {{provider}} Key",
@@ -357,7 +367,7 @@
     "formSupplier": "供应商名称",
     "formSupplierPlaceholder": "请输入供应商全称",
     "formQuantity": "采购数量",
-    "formQuantityPlaceholder": "例如: 100吨 / 1000袋",
+    "formQuantityPlaceholder": "例如: 100 单位",
     "formPrice": "进价 (不含税)",
     "formTaxRate": "增值税率",
     "formUnitPrice": "无税单价",
@@ -373,7 +383,26 @@
     "taxStandard": "13% (标准货物)",
     "taxTransport": "9% (交通运输/低税)",
     "taxService": "6% (现代服务)",
-    "taxSmall": "3% (小规模/简易)"
+    "taxSmall": "3% (小规模/简易)",
+    "taxNone": "0% (免税)",
+    "taxSalesTax": "7% (Sales Tax)",
+    "taxSalesTax10": "10% (Sales Tax)",
+    "taxJpStandard": "10% (标准消费税)",
+    "taxJpReduced": "8% (轻减税率)",
+    "taxEuStandard": "20% (标准 VAT)",
+    "taxEuReduced": "10% (减免 VAT)",
+    "taxEuSuperReduced": "5% (超低 VAT)",
+    "taxKrStandard": "10% (标准附加价值税)",
+    "taxTwStandard": "5% (标准营业税)",
+    "recognitionMode": "识别模式",
+    "loading": "正在加载数据...",
+    "errorRequiredFields": "请填写必要的供应商和数量信息",
+    "errorSaveFailed": "保存失败，请重试",
+    "errorDeleteFailed": "删除失败，请重试",
+    "errorFileTimeout": "文件读取超时",
+    "errorFileFormat": "不支持的文件格式",
+    "errorFileRead": "文件读取失败",
+    "notInvoiceWarning": "当前文件看起来不像发票或收据（检测为：{{type}}）。请确认文件是否正确，或手动填写。"
   },
   "sales": {
     "title": "销售与销项",
@@ -406,7 +435,7 @@
     "formCustomer": "客户名称",
     "formCustomerPlaceholder": "请输入购方全称",
     "formQuantity": "销售数量",
-    "formQuantityPlaceholder": "例如: 36.5吨 / 3650袋",
+    "formQuantityPlaceholder": "例如: 100 单位",
     "formPrice": "成交总价 (不含税)",
     "formShipping": "运费支出",
     "formUnitPrice": "无税单价",
@@ -420,7 +449,26 @@
     "alertRequired": "请填写必要的客户和数量信息",
     "alertSaveFailed": "保存失败，请重试",
     "alertUpdateFailed": "更新失败，请重试",
-    "alertDeleteFailed": "删除失败，请重试"
+    "alertDeleteFailed": "删除失败，请重试",
+    "recognitionMode": "识别模式",
+    "loading": "正在加载数据...",
+    "inventoryCurrent": "当前库存",
+    "inventoryTon": "吨",
+    "inventoryBag": "袋",
+    "inventoryLow": "库存不足，销售将导致库存为负",
+    "inventoryTotalPurchase": "总采购",
+    "inventoryTotalSales": "总销售",
+    "formValidation": "请填写必要的客户和数量信息",
+    "deleteFailed": "删除失败，请重试",
+    "saveFailed": "保存失败，请重试",
+    "updateFailed": "更新失败，请重试",
+    "recognizeFailed": "识别失败，请确保上传清晰的发票图片。",
+    "recognizeSuccess": "识别成功！已添加到列表。",
+    "fileReadTimeout": "文件读取超时",
+    "fileFormatUnsupported": "不支持的文件格式",
+    "fileReadFailed": "文件读取失败",
+    "uploadExtracting": "AI 正在提取日期、金额、发票号等关键信息",
+    "notInvoiceWarning": "当前文件看起来不像发票或收据（检测为：{{type}}）。请确认文件是否正确，或手动填写。"
   },
   "invoices": {
     "currentStock": "实时库存量",
@@ -617,7 +665,22 @@
     "balanceTotalLiab": "负债及所有者权益总计",
     "cashflowTitle": "现金流量表深度分析",
     "cashflowSubtitle": "正在连接财务软件 API 同步现金流数据。当前仅支持模拟预览。",
-    "cashflowSync": "立即同步"
+    "cashflowSync": "立即同步",
+    "balanceReceivables": "应收账款",
+    "balancePayables": "应付账款",
+    "balanceTaxPayable": "应交税费",
+    "balanceTotalAssets": "资产总计",
+    "balanceTotalLiabilities": "负债合计",
+    "balanceTotalLiabilitiesEquity": "负债及所有者权益总计",
+    "cashflowDesc": "正在连接财务软件 API 同步现金流数据。当前仅支持模拟预览。",
+    "balanceCurrentAssets": "流动资产",
+    "balanceNonCurrentAssets": "非流动资产",
+    "balanceFixedAssets": "固定资产",
+    "balanceCurrentAssetsTotal": "流动资产合计",
+    "balanceCurrentLiabilities": "流动负债",
+    "balancePaidInCapital": "实收资本",
+    "balanceRetainedEarnings": "未分配利润",
+    "balanceLiabilitiesEquity": "负债与权益"
   },
   "aiInsights": {
     "title": "AI 简报",
@@ -657,7 +720,14 @@
     "invoiceNo": "发票号码",
     "status": "状态",
     "action": "操作",
-    "shipping": "运费"
+    "shipping": "运费",
+    "unitPriceWithoutTax": "无税单价",
+    "totalAmountWithoutTax": "合计无税金额",
+    "amountWithoutTax": "合计无税金额",
+    "totalTax": "合计税额",
+    "totalWithTax": "价税合计",
+    "actions": "操作",
+    "taxAmount": "合计税额"
   },
   "common2": {
     "edit": "编辑",

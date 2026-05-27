@@ -1,20 +1,22 @@
-// US-specific dashboard cards — replaces VATStatistics + TaxInclusiveSummary for US locale
+// US-specific dashboard cards — Schedule C + Deductions + SE Tax + Margins
+// Labels follow uiLanguage; financial logic follows accountingLocale (always US here)
 import React from 'react';
-import { useTranslation } from 'react-i18next';
+import { formatMoney, getTaxLabel } from './accountingHelpers';
 
 interface Props {
   report: any;
   mileageSummary: any;
   homeOffice: any;
+  accountingLocale: string;
+  uiLanguage: string;
 }
 
-const fmt = (v: number) => `$${Math.abs(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice }) => {
-  const { t } = useTranslation();
+const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice, accountingLocale, uiLanguage }) => {
   const sc = report?.scheduleC || {};
   const se = report?.selfEmploymentTax || {};
   const est = report?.estimatedTax || {};
+  const label = (key: string) => getTaxLabel(accountingLocale, uiLanguage, key);
+  const fmt = (v: number) => formatMoney(v, accountingLocale, uiLanguage);
 
   return (
     <>
@@ -22,12 +24,12 @@ const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice 
       <div className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl overflow-hidden h-full flex flex-col" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
         <div className="p-6 border-b border-[#e0ddd5] flex items-center space-x-3">
           <i className="fas fa-file-invoice-dollar text-lg text-[#d97757]"></i>
-          <h3 className="text-lg font-bold text-[#191918]">Schedule C Summary</h3>
+          <h3 className="text-lg font-bold text-[#191918]">{label('taxTitle')}</h3>
         </div>
         <div className="flex flex-col flex-1 justify-around py-2">
-          <Row label="Gross Receipts (Line 1)" value={fmt(sc.line1_grossReceipts)} primary />
-          <Row label="Total Expenses (Line 28)" value={fmt(sc.line28_totalExpenses)} />
-          <Row label="Net Profit (Line 31)" value={fmt(sc.line31_netProfit)} bold success={sc.line31_netProfit >= 0} />
+          <Row label={label('grossReceipts')} value={fmt(sc.line1_grossReceipts)} primary />
+          <Row label={label('totalExpenses')} value={fmt(sc.line28_totalExpenses)} />
+          <Row label={label('netProfit')} value={fmt(sc.line31_netProfit)} bold success={sc.line31_netProfit >= 0} />
         </div>
       </div>
 
@@ -35,14 +37,14 @@ const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice 
       <div className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl overflow-hidden h-full flex flex-col" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
         <div className="p-6 border-b border-[#e0ddd5] flex items-center space-x-3">
           <i className="fas fa-receipt text-lg text-emerald-500"></i>
-          <h3 className="text-lg font-bold text-[#191918]">{t('usTax.deductions', 'Deductions')}</h3>
+          <h3 className="text-lg font-bold text-[#191918]">{label('totalExpenses')}</h3>
         </div>
         <div className="flex flex-col flex-1 justify-around py-2">
-          {mileageSummary && (
-            <Row label={`🚗 Mileage (${mileageSummary.trips} trips, ${mileageSummary.totalMiles} mi)`} value={fmt(mileageSummary.totalDeduction)} />
+          {mileageSummary && mileageSummary.totalDeduction > 0 && (
+            <Row label={`🚗 ${label('mileage')} (${mileageSummary.trips} trips)`} value={fmt(mileageSummary.totalDeduction)} />
           )}
           {homeOffice && homeOffice.deduction > 0 && (
-            <Row label={`🏠 Home Office (${homeOffice.method === 'simplified' ? 'Simplified' : 'Actual'})`} value={fmt(homeOffice.deduction)} />
+            <Row label={`🏠 ${label('homeOffice')}`} value={fmt(homeOffice.deduction)} />
           )}
           {sc.line24b_meals > 0 && <Row label="🍽️ Meals (50%)" value={fmt(sc.line24b_meals)} />}
           {sc.line9_car > 0 && <Row label="🚙 Car & Truck" value={fmt(sc.line9_car)} />}
@@ -54,16 +56,15 @@ const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice 
       <div className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl overflow-hidden h-full flex flex-col" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
         <div className="p-6 border-b border-[#e0ddd5] flex items-center space-x-3">
           <i className="fas fa-landmark text-lg text-rose-400"></i>
-          <h3 className="text-lg font-bold text-[#191918]">{t('usTax.taxEstimates', 'Tax Estimates')}</h3>
+          <h3 className="text-lg font-bold text-[#191918]">{label('seTax')}</h3>
         </div>
         <div className="flex flex-col flex-1 justify-around py-2">
-          <Row label="Self-Employment Tax" value={fmt(se.totalSETax)} />
+          <Row label={label('seTax')} value={fmt(se.totalSETax)} />
           <Row label="├ Social Security (12.4%)" value={fmt(se.socialSecurityTax)} indent />
           <Row label="├ Medicare (2.9%)" value={fmt(se.medicareTax)} indent />
           {se.additionalMedicare > 0 && <Row label="└ Additional Medicare (0.9%)" value={fmt(se.additionalMedicare)} indent />}
           <div className="border-t border-[#e0ddd5] mx-4 my-1"></div>
-          <Row label="Est. Annual Tax" value={fmt(est.totalAnnual)} bold />
-          <Row label="Est. Quarterly Payment" value={fmt(est.quarterlyPayment)} bold primary />
+          <Row label={label('quarterlyTax')} value={fmt(est.quarterlyPayment)} bold primary />
           {est.dueDates && (
             <div className="px-6 py-1 text-[10px] text-[#7a7a78]">
               Due: {est.dueDates.join(' · ')}
@@ -72,7 +73,7 @@ const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice 
         </div>
       </div>
 
-      {/* Profit Margins (simplified for US) */}
+      {/* Profit Margins */}
       <div className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl p-6 h-full flex flex-col" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
         <div className="flex items-center space-x-3 mb-6">
           <i className="fas fa-chart-line text-lg text-rose-400"></i>

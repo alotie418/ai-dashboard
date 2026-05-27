@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { fetchReceivablesSummary, fetchPayablesSummary, recordSalePayment, recordPurchasePayment } from '../services/api';
+import { fetchReceivablesSummary, fetchPayablesSummary, recordSalePayment, recordPurchasePayment, fetchSettings } from '../services/api';
 import { ReceivablesSummary, PayablesSummary } from '../types';
+import { formatMoney } from './accountingHelpers';
 
 type TabType = 'receivable' | 'payable';
 
@@ -36,7 +37,7 @@ const AccountsPage: React.FC = () => {
     if (isNaN(amount) || amount <= 0) return;
     const remaining = paymentModal.total - paymentModal.paid;
     if (amount > remaining) {
-      alert(t('accounts.alertExceeded', { amount: `¥${remaining.toLocaleString()}` }));
+      alert(t('accounts.alertExceeded', { amount: formatMoney(remaining, accLocale) }));
       return;
     }
 
@@ -55,7 +56,9 @@ const AccountsPage: React.FC = () => {
     }
   };
 
-  const formatCurrency = (val: number) => `¥${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const [accLocale, setAccLocale] = useState('CN');
+  useEffect(() => { fetchSettings().then((s: any) => { if (s.accounting_locale) setAccLocale(s.accounting_locale); }).catch(() => {}); }, []);
+  const formatCurrency = (val: number) => formatMoney(val, accLocale);
 
   const data = activeTab === 'receivable' ? receivables : payables;
   const agingData = data ? [

@@ -2,14 +2,18 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { FinancialStatementData } from '../types';
+import { getTaxLabel } from './accountingHelpers';
 
 interface Props {
   data: FinancialStatementData;
+  accountingLocale?: string;
 }
 
-const ProfitMarginIndicators: React.FC<Props> = ({ data }) => {
-  const { t } = useTranslation();
+const ProfitMarginIndicators: React.FC<Props> = ({ data, accountingLocale = 'CN' }) => {
+  const { t, i18n } = useTranslation();
   if (!data) return null;
+  const uiLang = i18n.language;
+
   const recompute = () => {
     const revenue = data.salesRevenue;
     const cost = data.costOfSales;
@@ -24,6 +28,7 @@ const ProfitMarginIndicators: React.FC<Props> = ({ data }) => {
     return { grossMargin, netMargin };
   };
   const { grossMargin, netMargin } = recompute();
+
   return (
     <div className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl p-6 h-full flex flex-col" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
       <div className="flex items-center space-x-3 mb-8">

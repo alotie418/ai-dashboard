@@ -20,6 +20,7 @@ import AccountsPage from './components/AccountsPage';
 import TransactionsPage from './components/TransactionsPage';
 import USTaxToolsPage from './components/USTaxToolsPage';
 import USDashboardCards from './components/USDashboardCards';
+import { formatMoney, getTaxLabel, getDashboardSections, getCurrencySymbol } from './components/accountingHelpers';
 import AlertCenter from './components/AlertCenter';
 import LoginPage from './components/LoginPage';
 import OnboardingWizard from './components/OnboardingWizard';
@@ -137,7 +138,7 @@ function createBlob(data: Float32Array): GenAIBlob {
 }
 
 const AppContent: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [data, setData] = useState<BusinessData>(MOCK_BUSINESS_DATA);
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [loadingAI, setLoadingAI] = useState(false);
@@ -211,8 +212,13 @@ const AppContent: React.FC = () => {
         netMargin,
       };
 
+      // accountingLocale from dashboard response (or fallback to CN)
+      const accLocale = dashboard.locale || 'CN';
+      const sym = getCurrencySymbol(accLocale);
+
       const next: BusinessData = {
         ...dataRef.current,
+        locale: accLocale, // pass through for dashboard rendering
         metrics: [
           {
             label: t('dashboard.inventory'),
@@ -223,21 +229,21 @@ const AppContent: React.FC = () => {
           },
           {
             label: `${t('header.yearLabel', { year: selectedYear })} ${t('dashboard.purchasesLabel')}`,
-            value: m.purchaseTotalAmount > 0 ? `¥${m.purchaseTotalAmount.toLocaleString()}` : '—',
+            value: m.purchaseTotalAmount > 0 ? formatMoney(m.purchaseTotalAmount, accLocale) : '—',
             subValue: m.purchaseTotalTons > 0 ? `${m.purchaseTotalTons}${t('units.tonSuffix')}` : '—',
             icon: 'fa-truck-loading',
             color: 'bg-purple-500',
           },
           {
             label: `${t('header.yearLabel', { year: selectedYear })} ${t('dashboard.salesLabel')}`,
-            value: m.salesTotalAmount > 0 ? `¥${m.salesTotalAmount.toLocaleString()}` : '—',
+            value: m.salesTotalAmount > 0 ? formatMoney(m.salesTotalAmount, accLocale) : '—',
             subValue: m.salesTotalTons > 0 ? `${m.salesTotalTons}${t('units.tonSuffix')}` : '—',
             icon: 'fa-chart-line',
             color: 'bg-green-500',
           },
           {
             label: t('dashboard.avgCost'),
-            value: m.avgCostPerTon > 0 ? `¥${m.avgCostPerTon.toLocaleString()}${t('units.perTon')}` : '—',
+            value: m.avgCostPerTon > 0 ? `${sym}${m.avgCostPerTon.toLocaleString()}${t('units.perTon')}` : '—',
             subValue: m.purchaseTotalTons > 0 ? `${m.purchaseTotalTons}${t('units.tonSuffix')} ${t('dashboard.purchasesLabel')}` : '—',
             icon: 'fa-tags',
             color: 'bg-orange-500',
@@ -608,8 +614,11 @@ ${contextText}`;
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard': {
-        const dashLocale = (data as any).locale || 'CN';
-        const isUS = dashLocale === 'US';
+        const accLocale = (data as any).locale || 'CN';
+        const uiLang = i18n.language;
+        const sections = getDashboardSections(accLocale);
+        // sections determine which cards to show — driven by accountingLocale
+        // labels on those cards are in uiLanguage via getTaxLabel()
         return (
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
             <div className="xl:col-span-3 space-y-8">
@@ -617,18 +626,25 @@ ${contextText}`;
                 {data.metrics.map((m, i) => <MetricCard key={i} metric={m} />)}
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch [grid-auto-rows:1fr]">
-                {isUS ? (
+                {/* US: Schedule C + Deductions + SE Tax + Margins */}
+                {sections.includes('schedule_c_summary') ? (
                   <USDashboardCards
                     report={(data as any).report}
                     mileageSummary={(data as any).mileageSummary}
                     homeOffice={(data as any).homeOffice}
+                    accountingLocale={accLocale}
+                    uiLanguage={uiLang}
                   />
                 ) : (
                   <>
-                    <FinancialStatementTable data={data.financialStatement} />
-                    <ProfitMarginIndicators data={data.financialStatement} />
-                    <VATStatistics data={data.vatStatistics} />
-                    <TaxInclusiveSummary data={data.taxInclusiveSummary} />
+                    {/* P&L + Profit Margins — all non-US locales, locale-aware */}
+                    {sections.includes('profit_loss') && <FinancialStatementTable data={data.financialStatement} accountingLocale={accLocale} />}
+                    {sections.includes('profit_margins') && <ProfitMarginIndicators data={data.financialStatement} accountingLocale={accLocale} />}
+                    {/* Tax summary — locale-aware labels + currency */}
+                    {(sections.includes('vat_summary') || sections.includes('consumption_tax_summary') || sections.includes('business_tax_summary')) && (
+                      <VATStatistics data={data.vatStatistics} accountingLocale={accLocale} />
+                    )}
+                    {sections.includes('tax_inclusive_summary') && <TaxInclusiveSummary data={data.taxInclusiveSummary} accountingLocale={accLocale} />}
                   </>
                 )}
               </div>
