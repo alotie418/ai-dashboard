@@ -47,9 +47,10 @@ export function getTaxLabel(
   uiLanguage: string,
   key: string,
 ): string {
-  const config = getAccountingLocale(accountingLocale);
-  const concept = config.taxConcepts[key];
-  if (!concept) return key;
+  const config = getAccountingLocale(accountingLocale) as any;
+  // Search in taxConcepts first, then at config root (for invoice labels that may be at either level)
+  const concept = config.taxConcepts?.[key] || config[key];
+  if (!concept || typeof concept !== 'object') return key;
 
   // Lookup chain: exact lang → base lang (e.g. zh-TW → zh-CN) → en → first available
   return concept[uiLanguage]

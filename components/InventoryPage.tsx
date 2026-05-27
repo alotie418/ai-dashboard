@@ -2,7 +2,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
-import { fetchSales, fetchPurchases, SalesRecord, PurchaseRecord } from '../services/api';
+import { fetchSales, fetchPurchases, fetchSettings, SalesRecord, PurchaseRecord } from '../services/api';
+import { formatMoney, getTaxLabel } from './accountingHelpers';
 
 interface Props {
   data: BusinessData;
@@ -19,7 +20,13 @@ const parseTaxRate = (s: string) => { const m = s.match(/[\d.]+/); return m ? pa
 
 
 const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [accLocale, setAccLocale] = useState('CN');
+  useEffect(() => { fetchSettings().then((s: any) => { if (s.accounting_locale) setAccLocale(s.accounting_locale); }).catch(() => {}); }, []);
+  const uiLang = i18n.language;
+  const taxLabel = (key: string) => getTaxLabel(accLocale, uiLang, key);
+  const fmtMoney = (val: number) => formatMoney(val, accLocale, uiLang);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<InvoiceType>('all');
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -61,9 +68,9 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
       const amountNoTax = Math.round(r.price / (1 + taxRate) * 100) / 100;
       const taxAmt = Math.round((r.price - amountNoTax) * 100) / 100;
       return {
-        date: r.date, type: '销项', partner: r.customer,
+        date: r.date, typeKey: 'output' as const, partner: r.customer,
         weight: `${parseTons(r.quantity)}t`, amount: amountNoTax, tax: taxAmt,
-        invoiceNo: r.invoiceNo, status: r.status === '已开' ? '已开票' : '待开票',
+        invoiceNo: r.invoiceNo, statusKey: r.status === '已开' ? 'issued' : 'pendingIssue',
       };
     });
     const input = purchaseRecords.map(r => {
@@ -71,9 +78,9 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
       const amountNoTax = Math.round(r.price / (1 + rate) * 100) / 100;
       const taxAmt = Math.round((r.price - amountNoTax) * 100) / 100;
       return {
-        date: r.date, type: '进项', partner: r.supplier,
+        date: r.date, typeKey: 'input' as const, partner: r.supplier,
         weight: `${parseTons(r.quantity)}t`, amount: amountNoTax, tax: taxAmt,
-        invoiceNo: r.invoiceNo, status: r.status === '已收' ? '已认证' : '待认证',
+        invoiceNo: r.invoiceNo, statusKey: r.status === '已收' ? 'certified' : 'pendingCert',
       };
     });
     return [...output, ...input].sort((a, b) => b.date.localeCompare(a.date));
@@ -84,9 +91,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
     return allInvoices.filter(inv => {
       const matchesSearch = inv.partner.toLowerCase().includes(searchTerm.toLowerCase()) ||
         inv.invoiceNo.includes(searchTerm);
-      const matchesType = filterType === 'all' ||
-        (filterType === 'input' && inv.type === '进项') ||
-        (filterType === 'output' && inv.type === '销项');
+      const matchesType = filterType === 'all' || filterType === inv.typeKey;
 
       // Advanced filters
       const matchesDateFrom = !dateFrom || inv.date >= dateFrom;
@@ -96,7 +101,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
       const invWeight = parseFloat(String(inv.weight).replace(/[^0-9.]/g, '')) || 0;
       const matchesWeightMin = !weightMin || invWeight >= parseFloat(weightMin);
       const matchesWeightMax = !weightMax || invWeight <= parseFloat(weightMax);
-      const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || inv.statusKey === statusFilter;
 
       return matchesSearch && matchesType &&
         matchesDateFrom && matchesDateTo &&
@@ -123,7 +128,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
       totalInputSub: purchaseRecords.length > 0 ? t('invoices.inputRecordCount', { count: purchaseRecords.length }) : t('invoices.noInput'),
       totalOutputWeight: `${totalOutputTons.toFixed(1)}t`,
       totalOutputSub: salesRecords.length > 0 ? t('invoices.outputRecordCount', { count: salesRecords.length }) : t('invoices.noOutput'),
-      pendingCertification: `¥${pendingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      pendingCertification: fmtMoney(pendingTax),
     };
   }, [salesRecords, purchaseRecords]);
 
@@ -254,11 +259,12 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                   className="w-full bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all appearance-none cursor-pointer"
                   style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}>
                   <option value="all">{t('invoices.allStatus')}</option>
-                  <option value="已验真">{t('invoices.statusVerified')}</option>
-                  <option value="已认证">{t('invoices.statusCertified')}</option>
-                  <option value="已抵扣">{t('invoices.statusDeducted')}</option>
-                  <option value="待认证">{t('invoices.statusPendingCert')}</option>
-                  <option value="待开票">{t('invoices.statusPendingInvoice')}</option>
+                  <option value="verified">{t('invoices.statusVerified')}</option>
+                  <option value="certified">{t('invoices.statusCertified')}</option>
+                  <option value="deducted">{t('invoices.statusDeducted')}</option>
+                  <option value="pendingCert">{t('invoices.statusPendingCert')}</option>
+                  <option value="pendingIssue">{t('invoices.statusPendingInvoice')}</option>
+                  <option value="issued">{t('invoices.statusIssued')}</option>
                 </select>
               </div>
             </div>
@@ -303,17 +309,17 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                 <tr key={inv.invoiceNo || inv.date + inv.partner} className="group hover:bg-[#f9f9f8]/40 transition-all">
                   <td className="px-8 py-5 text-sm text-[#4a4a48]">{inv.date}</td>
                   <td className="px-8 py-5">
-                    <span className={`px-2 py-1 rounded text-[10px] font-bold ${inv.type === '销项' ? 'bg-[#d97757]/10 text-[#d97757]' : 'bg-amber-500/10 text-amber-400'}`}>
-                      {inv.type === '销项' ? t('invoices.typeOutput') : t('invoices.typeInput')}
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold ${inv.typeKey === 'output' ? 'bg-[#d97757]/10 text-[#d97757]' : 'bg-amber-500/10 text-amber-400'}`}>
+                      {taxLabel(inv.typeKey === 'output' ? 'invoiceTypeOutput' : 'invoiceTypeInput')}
                     </span>
                   </td>
                   <td className="px-8 py-5 text-sm font-bold text-[#191918] group-hover:text-[#191918] transition-colors">{inv.partner}</td>
                   <td className="px-8 py-5 text-sm font-mono text-[#5c5c5a]">{inv.weight}</td>
-                  <td className="px-8 py-5 text-sm text-right font-bold text-[#191918]">¥{inv.amount.toLocaleString()}</td>
-                  <td className="px-8 py-5 text-sm text-right text-[#4a4a48]">¥{inv.tax.toLocaleString()}</td>
+                  <td className="px-8 py-5 text-sm text-right font-bold text-[#191918]">{fmtMoney(inv.amount)}</td>
+                  <td className="px-8 py-5 text-sm text-right text-[#4a4a48]">{fmtMoney(inv.tax)}</td>
                   <td className="px-8 py-5 text-sm font-mono text-[#5c5c5a] tracking-tighter">{inv.invoiceNo}</td>
                   <td className="px-8 py-5 text-center">
-                    <StatusBadge status={inv.status} />
+                    <StatusBadge statusKey={inv.statusKey} />
                   </td>
                 </tr>
               ))}
@@ -366,23 +372,25 @@ const FilterTab: React.FC<{ active: boolean, onClick: () => void, label: string 
 );
 
 const statusI18nMap: Record<string, string> = {
-  '已验真': 'invoices.statusVerified',
-  '已认证': 'invoices.statusCertified',
-  '已抵扣': 'invoices.statusDeducted',
-  '待认证': 'invoices.statusPendingCert',
-  '待开票': 'invoices.statusPendingInvoice',
+  verified: 'invoices.statusVerified',
+  certified: 'invoices.statusCertified',
+  deducted: 'invoices.statusDeducted',
+  pendingCert: 'invoices.statusPendingCert',
+  pendingIssue: 'invoices.statusPendingInvoice',
+  issued: 'invoices.statusIssued',
 };
 
-const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+const StatusBadge: React.FC<{ statusKey: string }> = ({ statusKey }) => {
   const { t } = useTranslation();
   const colors: Record<string, string> = {
-    '已验真': 'bg-[#d97757]/10 text-[#d97757] border-[#d97757]/20',
-    '已认证': 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
-    '已抵扣': 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+    verified: 'bg-[#d97757]/10 text-[#d97757] border-[#d97757]/20',
+    certified: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+    deducted: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+    issued: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
   };
   return (
-    <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${colors[status] || 'bg-[#f0eeeb]/10 text-[#4a4a48] border-[#e0ddd5]/20'}`}>
-      {statusI18nMap[status] ? t(statusI18nMap[status]) : status}
+    <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${colors[statusKey] || 'bg-[#f0eeeb]/10 text-[#4a4a48] border-[#e0ddd5]/20'}`}>
+      {statusI18nMap[statusKey] ? t(statusI18nMap[statusKey]) : statusKey}
     </span>
   );
 };
