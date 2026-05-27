@@ -53,6 +53,7 @@ export interface CategoryData {
 }
 
 export interface BusinessData {
+  locale?: string; // accountingLocale from dashboard handler
   metrics: Metric[];
   rawMetrics?: {
     inventoryTons: number;
