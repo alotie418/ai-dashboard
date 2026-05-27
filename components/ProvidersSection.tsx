@@ -1,6 +1,7 @@
 // AI 服务商管理面板 — 给 SettingsPage 用
 // 支持增删改、测试连接、切换默认 provider
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { AIProviderConfig, AIProviderId } from '../types';
 import {
   listProviders,
@@ -34,6 +35,7 @@ const initRow = (model: string): RowState => ({
 });
 
 const ProvidersSection: React.FC = () => {
+  const { t } = useTranslation();
   const [providers, setProviders] = useState<AIProviderConfig[]>([]);
   const [rowStates, setRowStates] = useState<Record<AIProviderId, RowState>>({} as any);
   const [globalMessage, setGlobalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -67,7 +69,7 @@ const ProvidersSection: React.FC = () => {
         return next as Record<AIProviderId, RowState>;
       });
     } catch (e: any) {
-      setGlobalMessage({ type: 'error', text: e?.message || '加载失败' });
+      setGlobalMessage({ type: 'error', text: e?.message || t('settings.ai.loadError') });
     }
   };
 
@@ -102,14 +104,14 @@ const ProvidersSection: React.FC = () => {
       } else {
         updateRow(id, {
           testResult: 'fail',
-          errorMsg: result.error || result.providerMessage || '连接失败',
+          errorMsg: result.error || result.providerMessage || t('settings.ai.connectionError'),
           errorStatus: result.status,
           errorCode: result.code,
           testing: false,
         });
       }
     } catch (e: any) {
-      updateRow(id, { testResult: 'fail', errorMsg: e?.message || '连接失败', testing: false });
+      updateRow(id, { testResult: 'fail', errorMsg: e?.message || t('settings.ai.connectionError'), testing: false });
     }
   };
 
@@ -130,22 +132,22 @@ const ProvidersSection: React.FC = () => {
         enabled: true,
       });
       flash('success', saveMode === 'full'
-        ? `${PROVIDER_DOCS[id].label} 已保存`
-        : `${PROVIDER_DOCS[id].label} 模型已更新`);
+        ? t('settings.ai.providerSavedToast', { name: PROVIDER_DOCS[id].label })
+        : t('settings.ai.modelUpdatedToast', { name: PROVIDER_DOCS[id].label }));
       await reload();
       updateRow(id, { editing: false, apiKey: '', testResult: null, saving: false });
     } catch (e: any) {
-      updateRow(id, { errorMsg: e?.message || '保存失败', saving: false });
+      updateRow(id, { errorMsg: e?.message || t('settings.ai.saveError'), saving: false });
     }
   };
 
   const handleDelete = async (id: AIProviderId) => {
     try {
       await removeProvider(id);
-      flash('success', `${PROVIDER_DOCS[id].label} 已删除`);
+      flash('success', t('settings.ai.providerRemovedToast', { name: PROVIDER_DOCS[id].label }));
       await reload();
     } catch (e: any) {
-      flash('error', e?.message || '删除失败');
+      flash('error', e?.message || t('settings.ai.deleteError'));
     } finally {
       setConfirmDelete(null);
     }
@@ -154,18 +156,18 @@ const ProvidersSection: React.FC = () => {
   const handleSetDefault = async (id: AIProviderId) => {
     try {
       await setDefaultProvider(id);
-      flash('success', `已设为默认 Provider`);
+      flash('success', t('settings.ai.defaultSetToast'));
       await reload();
     } catch (e: any) {
-      flash('error', e?.message || '设置失败');
+      flash('error', e?.message || t('settings.ai.setDefaultError'));
     }
   };
 
   return (
     <section className="space-y-6">
       <div>
-        <h3 className="text-xl font-bold text-[#191918]">AI 服务商 · BYOK</h3>
-        <p className="text-xs text-[#6b6b69] mt-1">支持同时配置多个服务商，按需切换默认。API Key 使用系统 Keychain 加密保存。</p>
+        <h3 className="text-xl font-bold text-[#191918]">{t('settings.ai.title')}</h3>
+        <p className="text-xs text-[#6b6b69] mt-1">{t('settings.ai.subtitle')}</p>
       </div>
 
       {globalMessage && (
@@ -191,9 +193,9 @@ const ProvidersSection: React.FC = () => {
                     <div>
                       <div className="flex items-center space-x-2">
                         <h4 className="text-sm font-semibold text-[#191918]">{doc.label}</h4>
-                        {p.isDefault && <span className="text-[10px] font-bold bg-[#d97757] text-white px-2 py-0.5 rounded uppercase">默认</span>}
-                        {p.hasKey && !p.isDefault && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded uppercase">已配置</span>}
-                        {!p.hasKey && <span className="text-[10px] font-bold text-[#7a7a78] bg-[#f0eeeb] px-2 py-0.5 rounded uppercase">未配置</span>}
+                        {p.isDefault && <span className="text-[10px] font-bold bg-[#d97757] text-white px-2 py-0.5 rounded uppercase">{t('common.default')}</span>}
+                        {p.hasKey && !p.isDefault && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded uppercase">{t('settings.ai.configured')}</span>}
+                        {!p.hasKey && <span className="text-[10px] font-bold text-[#7a7a78] bg-[#f0eeeb] px-2 py-0.5 rounded uppercase">{t('settings.ai.notConfigured')}</span>}
                       </div>
                       {/* 用前端白名单解析 label，与 chip 渲染同源 */}
                       {(() => {
@@ -204,23 +206,23 @@ const ProvidersSection: React.FC = () => {
                         return (
                           <>
                             <div className="text-[11px] text-[#7a7a78] mt-0.5">
-                              模型: <span className="font-medium text-[#4a4a48]">{label}</span>
+                              {t('settings.ai.modelLabel')} <span className="font-medium text-[#4a4a48]">{label}</span>
                               {isKnown && (
                                 <code className="ml-1.5 bg-[#f0eeeb] px-1.5 py-0.5 rounded text-[10px]">{p.model}</code>
                               )}
-                              {p.supportsTTS && <span className="ml-2 text-[#d97757]">支持 TTS</span>}
-                              {p.supportsWebGrounding && <span className="ml-2 text-[#d97757]">支持 Web Grounding</span>}
+                              {p.supportsTTS && <span className="ml-2 text-[#d97757]">{t('settings.ai.supportsTTS')}</span>}
+                              {p.supportsWebGrounding && <span className="ml-2 text-[#d97757]">{t('settings.ai.supportsWebGrounding')}</span>}
                             </div>
                             {!isKnown && p.hasKey && (
                               <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1.5">
                                 <i className="fas fa-info-circle mr-1"></i>
-                                当前使用自定义或旧版 model ID，建议重置。
+                                {t('settings.ai.staleModelHint')}
                                 <button
                                   onClick={() => handleSave(p.provider, 'modelOnly', fallbackDefault)}
                                   disabled={row.saving}
                                   className="ml-1 underline hover:text-amber-900"
                                 >
-                                  重置为 {fallbackDefault}
+                                  {t('settings.ai.resetTo', { model: fallbackDefault })}
                                 </button>
                               </div>
                             )}
@@ -233,29 +235,29 @@ const ProvidersSection: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     {p.hasKey && !p.isDefault && (
                       <button onClick={() => handleSetDefault(p.provider)} className="text-xs px-3 py-1.5 border border-[#d97757] text-[#d97757] rounded-lg hover:bg-[#d97757]/5">
-                        设为默认
+                        {t('settings.ai.setAsDefault')}
                       </button>
                     )}
                     {!row.editing ? (
                       <button onClick={() => startEdit(p)} className="text-xs px-3 py-1.5 border border-[#e0ddd5] text-[#4a4a48] rounded-lg hover:bg-[#f0eeeb]">
                         <i className={`fas ${p.hasKey ? 'fa-edit' : 'fa-plus'} mr-1.5`}></i>
-                        {p.hasKey ? '修改 Key' : '添加 Key'}
+                        {p.hasKey ? t('settings.ai.editKey') : t('settings.ai.addKey')}
                       </button>
                     ) : (
                       <button onClick={() => cancelEdit(p.provider)} className="text-xs px-3 py-1.5 border border-[#e0ddd5] text-[#4a4a48] rounded-lg hover:bg-[#f0eeeb]">
-                        取消
+                        {t('common.cancel')}
                       </button>
                     )}
                     {p.hasKey && !row.editing && (
                       confirmDelete === p.provider ? (
                         <div className="flex items-center space-x-1.5 bg-rose-50 px-2 py-1 rounded-lg">
-                          <span className="text-xs text-rose-600">确认?</span>
-                          <button onClick={() => handleDelete(p.provider)} className="text-xs px-2 py-0.5 bg-rose-600 text-white rounded">删除</button>
-                          <button onClick={() => setConfirmDelete(null)} className="text-xs px-2 py-0.5 border border-rose-300 text-rose-600 rounded">取消</button>
+                          <span className="text-xs text-rose-600">{t('settings.ai.removeConfirm')}</span>
+                          <button onClick={() => handleDelete(p.provider)} className="text-xs px-2 py-0.5 bg-rose-600 text-white rounded">{t('common.delete')}</button>
+                          <button onClick={() => setConfirmDelete(null)} className="text-xs px-2 py-0.5 border border-rose-300 text-rose-600 rounded">{t('common.cancel')}</button>
                         </div>
                       ) : (
                         <button onClick={() => setConfirmDelete(p.provider)} className="text-xs px-3 py-1.5 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50">
-                          <i className="fas fa-trash mr-1.5"></i>删除
+                          <i className="fas fa-trash mr-1.5"></i>{t('common.delete')}
                         </button>
                       )
                     )}
@@ -266,7 +268,7 @@ const ProvidersSection: React.FC = () => {
                   <div className="space-y-3 pt-3 border-t border-[#e0ddd5]/60">
                     <div>
                       <label className="block text-xs font-medium text-[#4a4a48] mb-2">
-                        API Key {p.hasKey && <span className="text-[#7a7a78] font-normal">（重新输入以覆盖现有 Key）</span>}
+                        {t('settings.ai.apiKeyLabel')} {p.hasKey && <span className="text-[#7a7a78] font-normal">{t('settings.ai.apiKeyOverrideHint')}</span>}
                       </label>
                       <input
                         type="password"
@@ -277,12 +279,12 @@ const ProvidersSection: React.FC = () => {
                       />
                       <a href={doc.getKeyUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-[11px] mt-1.5 hover:underline" style={{ color: doc.color }}>
                         <i className="fas fa-external-link-alt mr-1 text-[9px]"></i>
-                        如何获取 Key
+                        {t('settings.ai.getKeyLink')}
                       </a>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-[#4a4a48] mb-2">模型选择</label>
+                      <label className="block text-xs font-medium text-[#4a4a48] mb-2">{t('settings.ai.modelSection')}</label>
                       {/* 数据源：前端白名单 KNOWN_MODELS，不依赖主进程 META */}
                       <div className="flex flex-wrap gap-2 mb-2">
                         {KNOWN_MODELS[p.provider].map(opt => {
@@ -308,7 +310,7 @@ const ProvidersSection: React.FC = () => {
                       <details className="text-xs">
                         <summary className="text-[#7a7a78] cursor-pointer hover:text-[#4a4a48] select-none">
                           <i className="fas fa-code text-[10px] mr-1"></i>
-                          高级：手动输入 model ID
+                          {t('settings.ai.advancedInput')}
                         </summary>
                         <input
                           type="text"
@@ -318,21 +320,21 @@ const ProvidersSection: React.FC = () => {
                           className="w-full mt-2 px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm bg-white focus:outline-none focus:border-[#d97757] font-mono"
                         />
                         <p className="text-[10px] text-[#7a7a78] mt-1">
-                          当前传给 API 的 model ID: <code className="bg-[#f0eeeb] px-1.5 py-0.5 rounded">{row.model}</code>
+                          {t('settings.ai.currentModelId')}: <code className="bg-[#f0eeeb] px-1.5 py-0.5 rounded">{row.model}</code>
                         </p>
                       </details>
                     </div>
 
                     {row.testResult === 'ok' && (
                       <div className="flex items-center text-xs text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg">
-                        <i className="fas fa-check-circle mr-2"></i>模型可调用，Key 与 model ID 均通过
+                        <i className="fas fa-check-circle mr-2"></i>{t('settings.ai.testOk')}
                       </div>
                     )}
                     {row.testResult === 'fail' && (
                       <div className="text-xs text-rose-600 bg-rose-50 px-3 py-2 rounded-lg">
                         <div className="font-medium">
                           <i className="fas fa-exclamation-circle mr-1.5"></i>
-                          测试失败
+                          {t('settings.ai.testFail')}
                           {row.errorStatus ? ` · HTTP ${row.errorStatus}` : ''}
                           {row.errorCode ? ` · ${row.errorCode}` : ''}
                         </div>
@@ -348,9 +350,9 @@ const ProvidersSection: React.FC = () => {
                         onClick={() => handleTest(p.provider)}
                         disabled={!row.apiKey.trim() || row.testing}
                         className="flex-1 border border-[#e0ddd5] text-[#4a4a48] py-2 rounded-lg text-sm font-medium hover:bg-[#f0eeeb] disabled:opacity-50"
-                        title={!row.apiKey.trim() ? '请先输入 Key 才能测试' : ''}
+                        title={!row.apiKey.trim() ? t('settings.ai.enterKeyFirst') : ''}
                       >
-                        {row.testing ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>测试中</> : '测试连接'}
+                        {row.testing ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('common.testing')}</> : t('settings.ai.testConnection')}
                       </button>
                       <button
                         onClick={() => handleSave(p.provider, 'full')}
@@ -358,7 +360,7 @@ const ProvidersSection: React.FC = () => {
                         className="flex-1 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50"
                         style={{ backgroundColor: doc.color }}
                       >
-                        {row.saving ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>保存中</> : (p.hasKey ? '更新 Key + 模型' : '保存')}
+                        {row.saving ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('common.saving')}</> : (p.hasKey ? t('settings.ai.updateBoth') : t('common.save'))}
                       </button>
                     </div>
                     {p.hasKey && (
@@ -367,7 +369,7 @@ const ProvidersSection: React.FC = () => {
                         disabled={row.saving || row.model.trim() === p.model}
                         className="w-full text-xs text-[#7a7a78] hover:text-[#4a4a48] disabled:opacity-40 py-1"
                       >
-                        仅更新模型 ID（沿用现有 Key）
+                        {t('settings.ai.modelOnly')}
                       </button>
                     )}
                   </div>
@@ -381,12 +383,12 @@ const ProvidersSection: React.FC = () => {
       <div className="text-xs text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl p-4">
         <div className="font-semibold text-[#4a4a48] mb-2">
           <i className="fas fa-shield-alt mr-1.5 text-[#d97757]"></i>
-          关于 API Key 安全
+          {t('settings.ai.security.title')}
         </div>
         <ul className="space-y-1 list-disc list-inside">
-          <li>所有 API Key 经 Electron <code>safeStorage</code> 加密后写入本地 SQLite，渲染端无法读到明文</li>
-          <li>SoloLedger 不会将 Key 上传到任何服务器，AI 请求由你的设备直接发往对应服务商</li>
-          <li>删除 Key 后该 Provider 立即停止可用，但已生成的业务数据保留不变</li>
+          <li>{t('settings.ai.security.item1')}</li>
+          <li>{t('settings.ai.security.item2')}</li>
+          <li>{t('settings.ai.security.item3')}</li>
         </ul>
       </div>
     </section>
