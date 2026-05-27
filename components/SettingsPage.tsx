@@ -48,15 +48,15 @@ const SettingsPage: React.FC = () => {
     setPasswordError('');
     setPasswordSuccess('');
     if (!currentPassword || !newPassword || !confirmPassword) {
-      setPasswordError('请填写所有密码字段');
+      setPasswordError(t('settings.security.errorAllFields'));
       return;
     }
     if (newPassword.length < 6) {
-      setPasswordError('新密码至少 6 个字符');
+      setPasswordError(t('settings.security.errorMinLength'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordError('两次输入的新密码不一致');
+      setPasswordError(t('settings.security.errorMismatch'));
       return;
     }
     setChangingPassword(true);
@@ -69,10 +69,10 @@ const SettingsPage: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) {
-        setPasswordError(data.error || '修改失败');
+        setPasswordError(data.error || t('settings.security.errorChangeFailed'));
         return;
       }
-      setPasswordSuccess('密码修改成功！');
+      setPasswordSuccess(t('settings.security.passwordChanged'));
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -81,7 +81,7 @@ const SettingsPage: React.FC = () => {
         setPasswordSuccess('');
       }, 1500);
     } catch {
-      setPasswordError('网络错误，请稍后重试');
+      setPasswordError(t('settings.security.errorNetwork'));
     } finally {
       setChangingPassword(false);
     }
@@ -104,10 +104,10 @@ const SettingsPage: React.FC = () => {
       .then(applySettings)
       .catch((err) => {
         console.error('Failed to load settings:', err);
-        setLoadError(`加载设置失败：${err.message || '网络错误'}`);
+        setLoadError(t('settings.loadError', { msg: err.message || t('common.error') }));
       })
       .finally(() => setIsLoading(false));
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -127,11 +127,11 @@ const SettingsPage: React.FC = () => {
       const verified = await fetchSettings();
       applySettings(verified);
 
-      setSaveMessage({ type: 'success', text: '设置已成功保存！' });
+      setSaveMessage({ type: 'success', text: t('settings.savedToast') });
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (err: any) {
       console.error(err);
-      setSaveMessage({ type: 'error', text: `保存失败：${err.message || '请重试'}` });
+      setSaveMessage({ type: 'error', text: t('settings.saveError', { msg: err.message || t('common.retry') }) });
     } finally {
       setIsSaving(false);
     }
@@ -173,7 +173,7 @@ const SettingsPage: React.FC = () => {
             {isLoading && (
               <div className="flex flex-col items-center justify-center py-16 space-y-4">
                 <div className="w-10 h-10 border-3 border-[#d97757]/20 border-t-[#d97757] rounded-full animate-spin"></div>
-                <p className="text-sm text-[#5c5c5a]">正在加载设置...</p>
+                <p className="text-sm text-[#5c5c5a]">{t('settings.loadingHint')}</p>
               </div>
             )}
 
@@ -190,58 +190,58 @@ const SettingsPage: React.FC = () => {
                     setLoadError(null);
                     fetchSettings()
                       .then(applySettings)
-                      .catch((err) => setLoadError(`加载失败：${err.message || '网络错误'}`))
+                      .catch((err) => setLoadError(t('settings.loadError', { msg: err.message || t('common.error') })))
                       .finally(() => setIsLoading(false));
                   }}
                   className="px-5 py-2 bg-[#f9f9f8] hover:bg-[#f0eeeb] text-[#191918] border border-[#e0ddd5] rounded-xl text-sm transition-all"
                 >
-                  <i className="fas fa-redo mr-2"></i>重试
+                  <i className="fas fa-redo mr-2"></i>{t('common.retry')}
                 </button>
               </div>
             )}
 
             {!isLoading && !loadError && activeSection === 'company' && (
               <section className="space-y-6">
-                <h3 className="text-xl font-bold text-[#191918] mb-6">企业基础信息</h3>
+                <h3 className="text-xl font-bold text-[#191918] mb-6">{t('settings.company.title')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InputGroup label="企业全称" placeholder="AI Dashboard 贸易有限公司" value={companyInfo.name} onChange={(v) => setCompanyInfo(prev => ({ ...prev, name: v }))} />
-                  <InputGroup label="统一社会信用代码" placeholder="91110000XXXXXXXXXX" value={companyInfo.creditCode} onChange={(v) => setCompanyInfo(prev => ({ ...prev, creditCode: v }))} />
-                  <InputGroup label="法定代表人" placeholder="张晓明" value={companyInfo.legalPerson} onChange={(v) => setCompanyInfo(prev => ({ ...prev, legalPerson: v }))} />
-                  <InputGroup label="所属行业" placeholder="通用贸易 / 供应链" value={companyInfo.industry} onChange={(v) => setCompanyInfo(prev => ({ ...prev, industry: v }))} />
+                  <InputGroup label={t('settings.company.name')} placeholder="AI Dashboard 贸易有限公司" value={companyInfo.name} onChange={(v) => setCompanyInfo(prev => ({ ...prev, name: v }))} />
+                  <InputGroup label={t('settings.company.creditCode')} placeholder="91110000XXXXXXXXXX" value={companyInfo.creditCode} onChange={(v) => setCompanyInfo(prev => ({ ...prev, creditCode: v }))} />
+                  <InputGroup label={t('settings.company.legalPerson')} placeholder="张晓明" value={companyInfo.legalPerson} onChange={(v) => setCompanyInfo(prev => ({ ...prev, legalPerson: v }))} />
+                  <InputGroup label={t('settings.company.industry')} placeholder="通用贸易 / 供应链" value={companyInfo.industry} onChange={(v) => setCompanyInfo(prev => ({ ...prev, industry: v }))} />
                 </div>
                 <div className="pt-4">
-                  <InputGroup label="注册地址" placeholder="北京市朝阳区..." value={companyInfo.address} onChange={(v) => setCompanyInfo(prev => ({ ...prev, address: v }))} />
+                  <InputGroup label={t('settings.company.address')} placeholder="北京市朝阳区..." value={companyInfo.address} onChange={(v) => setCompanyInfo(prev => ({ ...prev, address: v }))} />
                 </div>
               </section>
             )}
 
             {!isLoading && !loadError && activeSection === 'tax' && (
               <section className="space-y-6">
-                <h3 className="text-xl font-bold text-[#191918] mb-6">税务规则配置</h3>
+                <h3 className="text-xl font-bold text-[#191918] mb-6">{t('settings.tax.title')}</h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-4 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5]">
                     <div>
-                      <p className="text-sm font-bold text-[#191918]">增值税标准税率 (VAT)</p>
-                      <p className="text-xs text-[#5c5c5a]">用于 OCR 识别和财务预测的默认计算标准</p>
+                      <p className="text-sm font-bold text-[#191918]">{t('settings.tax.vatRate')}</p>
+                      <p className="text-xs text-[#5c5c5a]">{t('settings.tax.vatRateDesc')}</p>
                     </div>
                     <select value={vatRate} onChange={e => setVatRate(e.target.value)} className="bg-white border border-[#d1cdc4] rounded-lg px-3 py-1 text-sm outline-none">
-                      <option value="13">13% (标准货物)</option>
-                      <option value="9">9% (农产品/交通)</option>
-                      <option value="6">6% (服务业)</option>
+                      <option value="13">{t('settings.tax.rate13')}</option>
+                      <option value="9">{t('settings.tax.rate9')}</option>
+                      <option value="6">{t('settings.tax.rate6')}</option>
                     </select>
                   </div>
                   <div className="flex items-center justify-between p-4 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5]">
                     <div>
-                      <p className="text-sm font-bold text-[#191918]">进项发票自动认证</p>
-                      <p className="text-xs text-[#5c5c5a]">上传后自动同步至税务系统进行认证</p>
+                      <p className="text-sm font-bold text-[#191918]">{t('settings.tax.autoAuth')}</p>
+                      <p className="text-xs text-[#5c5c5a]">{t('settings.tax.autoAuthDesc')}</p>
                     </div>
                     <ToggleButton checked={taxAutoAuth} onChange={setTaxAutoAuth} />
                   </div>
 
                   <div className="p-4 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5] space-y-3">
                     <div>
-                      <p className="text-sm font-bold text-[#191918]">年度管理费用</p>
-                      <p className="text-xs text-[#5c5c5a]">用于损益表净利润计算（含办公、人工、折旧等）</p>
+                      <p className="text-sm font-bold text-[#191918]">{t('settings.tax.adminExpense')}</p>
+                      <p className="text-xs text-[#5c5c5a]">{t('settings.tax.adminExpenseDesc')}</p>
                     </div>
                     <div className="flex items-center space-x-2">
                       <span className="text-sm text-[#5c5c5a]">¥</span>
@@ -254,9 +254,9 @@ const SettingsPage: React.FC = () => {
                         placeholder="0"
                         className="flex-1 bg-white border border-[#d1cdc4] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918]"
                       />
-                      <span className="text-xs text-[#5c5c5a]">元/年</span>
+                      <span className="text-xs text-[#5c5c5a]">{t('settings.tax.perYear')}</span>
                     </div>
-                    <p className="text-[10px] text-[#8a8a88]">提示：税金及附加按增值税12%自动计算，所得税按利润总额25%自动计算</p>
+                    <p className="text-[10px] text-[#8a8a88]">{t('settings.tax.hint')}</p>
                   </div>
                 </div>
               </section>
@@ -282,35 +282,35 @@ const SettingsPage: React.FC = () => {
 
             {!isLoading && !loadError && activeSection === 'notifications' && (
               <section className="space-y-6">
-                <h3 className="text-xl font-bold text-[#191918] mb-6">预警与通知</h3>
+                <h3 className="text-xl font-bold text-[#191918] mb-6">{t('settings.notifications.title')}</h3>
                 <div className="space-y-4">
-                  <NotificationToggle label="库存跌至零值提醒" checked={notifications.stockZero} onChange={(v) => setNotifications(prev => ({ ...prev, stockZero: v }))} />
-                  <NotificationToggle label="税收偏差超过 15% 预警" checked={notifications.taxDeviation} onChange={(v) => setNotifications(prev => ({ ...prev, taxDeviation: v }))} />
-                  <NotificationToggle label="异常价格波动监测" checked={notifications.priceVolatility} onChange={(v) => setNotifications(prev => ({ ...prev, priceVolatility: v }))} />
-                  <NotificationToggle label="月度财务报告推送" checked={notifications.monthlyReport} onChange={(v) => setNotifications(prev => ({ ...prev, monthlyReport: v }))} />
+                  <NotificationToggle label={t('settings.notifications.stockZero')} checked={notifications.stockZero} onChange={(v) => setNotifications(prev => ({ ...prev, stockZero: v }))} />
+                  <NotificationToggle label={t('settings.notifications.taxDeviation')} checked={notifications.taxDeviation} onChange={(v) => setNotifications(prev => ({ ...prev, taxDeviation: v }))} />
+                  <NotificationToggle label={t('settings.notifications.priceVolatility')} checked={notifications.priceVolatility} onChange={(v) => setNotifications(prev => ({ ...prev, priceVolatility: v }))} />
+                  <NotificationToggle label={t('settings.notifications.monthlyReport')} checked={notifications.monthlyReport} onChange={(v) => setNotifications(prev => ({ ...prev, monthlyReport: v }))} />
                 </div>
               </section>
             )}
 
             {!isLoading && !loadError && activeSection === 'security' && (
               <section className="space-y-6">
-                <h3 className="text-xl font-bold text-[#191918] mb-6">账户与安全</h3>
+                <h3 className="text-xl font-bold text-[#191918] mb-6">{t('settings.security.title')}</h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-5 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5]">
                     <div>
-                      <p className="text-sm font-bold text-[#191918]">登录密码</p>
-                      <p className="text-xs text-[#5c5c5a]">定期修改密码以确保账户安全</p>
+                      <p className="text-sm font-bold text-[#191918]">{t('settings.security.password')}</p>
+                      <p className="text-xs text-[#5c5c5a]">{t('settings.security.passwordDesc')}</p>
                     </div>
                     <button
                       onClick={() => { setShowPasswordModal(true); setPasswordError(''); setPasswordSuccess(''); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }}
                       className="px-5 py-2 bg-[#d97757] hover:bg-[#c56a4a] text-white text-sm font-medium rounded-xl transition-all active:scale-95"
                     >
-                      修改密码
+                      {t('settings.security.changePassword')}
                     </button>
                   </div>
                   <div className="p-5 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5]">
-                    <p className="text-sm font-bold text-[#191918] mb-1">数据加密</p>
-                    <p className="text-xs text-[#5c5c5a]">所有数据传输均通过 HTTPS 加密，Session Cookie 启用 HttpOnly + Secure + SameSite 防护。</p>
+                    <p className="text-sm font-bold text-[#191918] mb-1">{t('settings.security.encryption')}</p>
+                    <p className="text-xs text-[#5c5c5a]">{t('settings.security.encryptionDesc')}</p>
                   </div>
                 </div>
 
@@ -318,27 +318,27 @@ const SettingsPage: React.FC = () => {
                 {showPasswordModal && (
                   <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/30" onClick={() => setShowPasswordModal(false)}>
                     <div className="bg-white rounded-2xl border border-[#e0ddd5] p-8 w-full max-w-sm" style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }} onClick={e => e.stopPropagation()}>
-                      <h4 className="text-lg font-bold text-[#191918] mb-6">修改登录密码</h4>
+                      <h4 className="text-lg font-bold text-[#191918] mb-6">{t('settings.security.modalTitle')}</h4>
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-xs font-medium text-[#4a4a48] mb-1.5">当前密码</label>
+                          <label className="block text-xs font-medium text-[#4a4a48] mb-1.5">{t('settings.security.currentPassword')}</label>
                           <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="w-full px-4 py-3 bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl text-sm outline-none focus:border-[#d97757] transition-colors" autoComplete="current-password" />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-[#4a4a48] mb-1.5">新密码</label>
+                          <label className="block text-xs font-medium text-[#4a4a48] mb-1.5">{t('settings.security.newPassword')}</label>
                           <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full px-4 py-3 bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl text-sm outline-none focus:border-[#d97757] transition-colors" autoComplete="new-password" />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-[#4a4a48] mb-1.5">确认新密码</label>
+                          <label className="block text-xs font-medium text-[#4a4a48] mb-1.5">{t('settings.security.confirmPassword')}</label>
                           <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-4 py-3 bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl text-sm outline-none focus:border-[#d97757] transition-colors" autoComplete="new-password" />
                         </div>
                         {passwordError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{passwordError}</p>}
                         {passwordSuccess && <p className="text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2">{passwordSuccess}</p>}
                       </div>
                       <div className="flex space-x-3 mt-6">
-                        <button onClick={() => setShowPasswordModal(false)} className="flex-1 py-3 bg-[#f9f9f8] text-[#4a4a48] border border-[#e0ddd5] rounded-xl text-sm font-medium hover:bg-[#f0eeeb] transition-all">取消</button>
+                        <button onClick={() => setShowPasswordModal(false)} className="flex-1 py-3 bg-[#f9f9f8] text-[#4a4a48] border border-[#e0ddd5] rounded-xl text-sm font-medium hover:bg-[#f0eeeb] transition-all">{t('common.cancel')}</button>
                         <button onClick={handleChangePassword} disabled={changingPassword} className="flex-1 py-3 bg-[#d97757] text-white rounded-xl text-sm font-medium hover:bg-[#c56a4a] disabled:opacity-40 transition-all">
-                          {changingPassword ? <><i className="fas fa-spinner fa-spin mr-2"></i>修改中...</> : '确认修改'}
+                          {changingPassword ? <><i className="fas fa-spinner fa-spin mr-2"></i>{t('settings.security.changing')}</> : t('settings.security.confirmChange')}
                         </button>
                       </div>
                     </div>
