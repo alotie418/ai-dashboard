@@ -355,7 +355,7 @@ const SettingsPage: React.FC = () => {
                   className="px-10 py-3 bg-[#d97757] hover:bg-[#c56a4a] text-white font-bold rounded-xl transition-all active:scale-95 disabled:opacity-50 flex items-center" style={{boxShadow: '0 4px 16px rgba(217,119,87,0.15)'}}
                 >
                   {isSaving ? <i className="fas fa-spinner animate-spin mr-2"></i> : <i className="fas fa-save mr-2"></i>}
-                  保存更改
+                  {t('settings.saveButton')}
                 </button>
               </div>
             )}

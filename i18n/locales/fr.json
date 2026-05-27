@@ -185,5 +185,30 @@
     "anthropic": "Claude · Anthropic",
     "openai": "ChatGPT · OpenAI",
     "gemini": "Gemini · Google"
+  },
+  "header": {
+    "yearSuffix": "",
+    "allYear": "Année",
+    "allMonths": "Tous",
+    "quarterPrefix": "T",
+    "quarterSuffix": ""
+  },
+  "chat": {
+    "title": "Assistant IA",
+    "status": "Synchronisation en temps réel",
+    "welcome": "Bonjour, je suis votre assistant IA",
+    "welcomeDesc": "Je peux fournir des analyses et recommandations en temps réel. Posez une question ou utilisez les raccourcis ci-dessous.",
+    "placeholder": "Posez une question...",
+    "livePlaceholder": "Mode vocal en direct...",
+    "liveStart": "Appel direct",
+    "liveStop": "Fin d'appel",
+    "uploadInvoice": "Facture",
+    "financeQuery": "Rapport financier",
+    "trendAnalysis": "Tendances",
+    "marketAnalysis": "Marché",
+    "inventoryQuery": "Inventaire"
+  },
+  "voice": {
+    "aoede": "Aoede (Douce)"
   }
 }
