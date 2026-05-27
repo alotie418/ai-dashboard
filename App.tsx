@@ -724,7 +724,7 @@ ${contextText}
                   )}
                   <div className="w-px h-3 bg-[#e0ddd5]"></div>
                   <select value={selectedMonth} onChange={(e) => { setSelectedMonth(e.target.value); if (e.target.value !== '全部') setSelectedQuarter('全年'); }} className="bg-transparent text-xs font-medium text-[#6b6b69] outline-none px-2 py-1.5 cursor-pointer hover:text-[#d97757]">
-                    {MONTHS.map(m => <option key={m} value={m} className="bg-white">{m}</option>)}
+                    {MONTHS.map((m, i) => <option key={m} value={m} className="bg-white">{i === 0 ? t('header.monthAll') : t(`header.month${m.replace('月', '').padStart(2, '0')}`)}</option>)}
                   </select>
                 </div>
                 <button onClick={performAnalysis} className="p-2 text-[#d97757] hover:text-[#c4694d] transition-colors" title="立即刷新数据">
