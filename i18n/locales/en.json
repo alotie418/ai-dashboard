@@ -401,7 +401,8 @@
     "errorDeleteFailed": "Delete failed",
     "errorFileTimeout": "File read timeout",
     "errorFileFormat": "Unsupported file format",
-    "errorFileRead": "File read failed"
+    "errorFileRead": "File read failed",
+    "notInvoiceWarning": "This file does not appear to be an invoice or receipt (detected: {{type}}). Please verify the file or fill in manually."
   },
   "sales": {
     "title": "Sales & Output Tax",
@@ -466,7 +467,8 @@
     "fileReadTimeout": "File read timeout",
     "fileFormatUnsupported": "Unsupported file format",
     "fileReadFailed": "File read failed",
-    "uploadExtracting": "AI extracting date, amount, invoice number..."
+    "uploadExtracting": "AI extracting date, amount, invoice number...",
+    "notInvoiceWarning": "This file does not appear to be an invoice or receipt (detected: {{type}}). Please verify the file or fill in manually."
   },
   "invoices": {
     "currentStock": "Real-time Inventory",

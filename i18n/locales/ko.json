@@ -401,7 +401,8 @@
     "errorDeleteFailed": "Delete failed",
     "errorFileTimeout": "파일 읽기 시간 초과",
     "errorFileFormat": "지원하지 않는 파일 형식",
-    "errorFileRead": "파일 읽기 실패"
+    "errorFileRead": "파일 읽기 실패",
+    "notInvoiceWarning": "이 파일은 세금계산서나 영수증이 아닌 것 같습니다 (감지: {{type}}). 파일을 확인하거나 수동으로 입력하세요."
   },
   "sales": {
     "title": "Sales & Output Tax",
@@ -466,7 +467,8 @@
     "fileReadTimeout": "파일 읽기 시간 초과",
     "fileFormatUnsupported": "지원하지 않는 파일 형식",
     "fileReadFailed": "파일 읽기 실패",
-    "uploadExtracting": "AI가 날짜, 금액, 세금계산서 번호를 추출 중..."
+    "uploadExtracting": "AI가 날짜, 금액, 세금계산서 번호를 추출 중...",
+    "notInvoiceWarning": "이 파일은 세금계산서나 영수증이 아닌 것 같습니다 (감지: {{type}}). 파일을 확인하거나 수동으로 입력하세요."
   },
   "invoices": {
     "currentStock": "Real-time Inventory",

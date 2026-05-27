@@ -401,7 +401,8 @@
     "errorDeleteFailed": "删除失败，请重试",
     "errorFileTimeout": "文件读取超时",
     "errorFileFormat": "不支持的文件格式",
-    "errorFileRead": "文件读取失败"
+    "errorFileRead": "文件读取失败",
+    "notInvoiceWarning": "当前文件看起来不像发票或收据（检测为：{{type}}）。请确认文件是否正确，或手动填写。"
   },
   "sales": {
     "title": "销售与销项",
@@ -466,7 +467,8 @@
     "fileReadTimeout": "文件读取超时",
     "fileFormatUnsupported": "不支持的文件格式",
     "fileReadFailed": "文件读取失败",
-    "uploadExtracting": "AI 正在提取日期、金额、发票号等关键信息"
+    "uploadExtracting": "AI 正在提取日期、金额、发票号等关键信息",
+    "notInvoiceWarning": "当前文件看起来不像发票或收据（检测为：{{type}}）。请确认文件是否正确，或手动填写。"
   },
   "invoices": {
     "currentStock": "实时库存量",

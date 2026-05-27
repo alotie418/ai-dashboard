@@ -115,19 +115,25 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
       reader.readAsDataURL(file);
       const base64 = await base64Promise;
 
-      const extracted = await analyzeInvoice(base64, file.type);
+      const extracted = await analyzeInvoice(base64, file.type, accLocale, uiLang);
+
+      if (!extracted.isInvoiceLike) {
+        const docType = extracted.documentType || 'unknown';
+        alert(t('sales.notInvoiceWarning', { type: docType }));
+        return;
+      }
 
       const taxRate = extracted.price > 0 && extracted.taxAmount > 0
         ? `${Math.round((extracted.taxAmount / extracted.price) * 100)}%`
-        : '13%'; // OCR fallback — will be overridden by user
+        : '13%';
 
       const newRecord: SalesRecord = {
         id: nextSalesId(),
         date: extracted.date,
         customer: extracted.customer,
-        quantity: extracted.quantity,
+        quantity: extracted.quantity || '',
         price: extracted.price,
-        shipping: extracted.shipping,
+        shipping: extracted.shipping || 0,
         invoiceNo: extracted.invoiceNo,
         status: '已开',
         taxRate,

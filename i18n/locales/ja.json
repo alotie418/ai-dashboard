@@ -401,7 +401,8 @@
     "errorDeleteFailed": "Delete failed",
     "errorFileTimeout": "ファイル読み込みタイムアウト",
     "errorFileFormat": "対応していないファイル形式",
-    "errorFileRead": "ファイル読み込み失敗"
+    "errorFileRead": "ファイル読み込み失敗",
+    "notInvoiceWarning": "このファイルは請求書や領収書ではないようです（検出：{{type}}）。ファイルを確認するか、手動で入力してください。"
   },
   "sales": {
     "title": "Sales & Output Tax",
@@ -466,7 +467,8 @@
     "fileReadTimeout": "ファイル読み込みタイムアウト",
     "fileFormatUnsupported": "対応していないファイル形式",
     "fileReadFailed": "ファイル読み込み失敗",
-    "uploadExtracting": "AI が日付・金額・請求書番号を抽出中..."
+    "uploadExtracting": "AI が日付・金額・請求書番号を抽出中...",
+    "notInvoiceWarning": "このファイルは請求書や領収書ではないようです（検出：{{type}}）。ファイルを確認するか、手動で入力してください。"
   },
   "invoices": {
     "currentStock": "Real-time Inventory",

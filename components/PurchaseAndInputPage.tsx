@@ -147,7 +147,13 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
       reader.readAsDataURL(file);
       const base64 = await base64Promise;
 
-      const extracted = await analyzeInvoice(base64, file.type);
+      const extracted = await analyzeInvoice(base64, file.type, accLocale, uiLang);
+
+      if (!extracted.isInvoiceLike) {
+        const docType = extracted.documentType || 'unknown';
+        alert(t('purchases.notInvoiceWarning', { type: docType }));
+        return;
+      }
 
       const taxRate = extracted.price > 0 && extracted.taxAmount > 0
         ? `${Math.round((extracted.taxAmount / extracted.price) * 100)}%`
@@ -157,7 +163,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
         id: nextPurchaseId(),
         date: extracted.date,
         supplier: extracted.customer,
-        quantity: extracted.quantity,
+        quantity: extracted.quantity || '',
         price: extracted.price,
         taxRate,
         invoiceNo: extracted.invoiceNo,

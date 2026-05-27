@@ -274,7 +274,9 @@ async function analyze(body) {
 
 async function ocr(body) {
   const rec = getDefaultRecord();
-  return PROVIDERS[rec.provider].ocr(rec.apiKey, rec.model, body);
+  const { buildPrompt } = require('./ocrPromptBuilder');
+  const prompt = buildPrompt(body.accountingLocale || 'CN', body.uiLanguage || 'zh-CN');
+  return PROVIDERS[rec.provider].ocr(rec.apiKey, rec.model, { ...body, ocrPrompt: prompt });
 }
 
 async function chat(body) {

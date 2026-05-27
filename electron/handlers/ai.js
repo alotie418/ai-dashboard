@@ -14,6 +14,13 @@ async function analyze({ body }) {
 // /api/ai/ocr — 发票识别
 async function ocr({ body }) {
   if (!body?.base64Data || !body?.mimeType) throw new Error('Missing base64Data or mimeType');
+  // Inject locale from request body or fall back to DB settings
+  if (!body.accountingLocale || !body.uiLanguage) {
+    const db = getDb();
+    const row = db.prepare("SELECT value FROM settings WHERE key = 'accounting_locale'").get();
+    if (!body.accountingLocale) body.accountingLocale = row?.value || 'CN';
+    if (!body.uiLanguage) body.uiLanguage = 'zh-CN';
+  }
   return aiCore.ocr(body);
 }
 

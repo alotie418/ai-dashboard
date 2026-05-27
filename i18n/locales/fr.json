@@ -401,7 +401,8 @@
     "errorDeleteFailed": "Delete failed",
     "errorFileTimeout": "Délai de lecture du fichier dépassé",
     "errorFileFormat": "Format de fichier non pris en charge",
-    "errorFileRead": "Échec de la lecture du fichier"
+    "errorFileRead": "Échec de la lecture du fichier",
+    "notInvoiceWarning": "Ce fichier ne semble pas être une facture ou un reçu (détecté : {{type}}). Veuillez vérifier le fichier ou saisir manuellement."
   },
   "sales": {
     "title": "Sales & Output Tax",
@@ -466,7 +467,8 @@
     "fileReadTimeout": "Délai de lecture du fichier dépassé",
     "fileFormatUnsupported": "Format de fichier non pris en charge",
     "fileReadFailed": "Échec de la lecture du fichier",
-    "uploadExtracting": "IA en cours d'extraction des données..."
+    "uploadExtracting": "IA en cours d'extraction des données...",
+    "notInvoiceWarning": "Ce fichier ne semble pas être une facture ou un reçu (détecté : {{type}}). Veuillez vérifier le fichier ou saisir manuellement."
   },
   "invoices": {
     "currentStock": "Real-time Inventory",
