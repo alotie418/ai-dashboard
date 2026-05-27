@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { fetchReceivablesSummary, fetchPayablesSummary, recordSalePayment, recordPurchasePayment } from '../services/api';
 import { ReceivablesSummary, PayablesSummary } from '../types';
@@ -6,6 +7,7 @@ import { ReceivablesSummary, PayablesSummary } from '../types';
 type TabType = 'receivable' | 'payable';
 
 const AccountsPage: React.FC = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabType>('receivable');
   const [receivables, setReceivables] = useState<ReceivablesSummary | null>(null);
   const [payables, setPayables] = useState<PayablesSummary | null>(null);
@@ -34,7 +36,7 @@ const AccountsPage: React.FC = () => {
     if (isNaN(amount) || amount <= 0) return;
     const remaining = paymentModal.total - paymentModal.paid;
     if (amount > remaining) {
-      alert(`付款金额不能超过剩余欠款 ¥${remaining.toLocaleString()}`);
+      alert(t('accounts.alertExceeded', { amount: `¥${remaining.toLocaleString()}` }));
       return;
     }
 
@@ -49,7 +51,7 @@ const AccountsPage: React.FC = () => {
       loadData();
     } catch (err) {
       console.error('Payment failed:', err);
-      alert('付款记录失败，请重试');
+      alert(t('accounts.alertFailed'));
     }
   };
 
@@ -57,10 +59,10 @@ const AccountsPage: React.FC = () => {
 
   const data = activeTab === 'receivable' ? receivables : payables;
   const agingData = data ? [
-    { name: '0-30天', amount: data.agingBuckets['0-30'] },
-    { name: '31-60天', amount: data.agingBuckets['31-60'] },
-    { name: '61-90天', amount: data.agingBuckets['61-90'] },
-    { name: '90天+', amount: data.agingBuckets['90+'] },
+    { name: t('accounts.aging0_30'), amount: data.agingBuckets['0-30'] },
+    { name: t('accounts.aging31_60'), amount: data.agingBuckets['31-60'] },
+    { name: t('accounts.aging61_90'), amount: data.agingBuckets['61-90'] },
+    { name: t('accounts.aging90plus'), amount: data.agingBuckets['90+'] },
   ] : [];
 
   const ranking = activeTab === 'receivable'
@@ -80,13 +82,13 @@ const AccountsPage: React.FC = () => {
           onClick={() => setActiveTab('receivable')}
           className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'receivable' ? 'bg-white text-[#d97757] shadow-sm' : 'text-[#7a7a78] hover:text-[#191918]'}`}
         >
-          <i className="fas fa-arrow-circle-down mr-1.5"></i>应收账款
+          <i className="fas fa-arrow-circle-down mr-1.5"></i>{t('accounts.receivable')}
         </button>
         <button
           onClick={() => setActiveTab('payable')}
           className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'payable' ? 'bg-white text-[#d97757] shadow-sm' : 'text-[#7a7a78] hover:text-[#191918]'}`}
         >
-          <i className="fas fa-arrow-circle-up mr-1.5"></i>应付账款
+          <i className="fas fa-arrow-circle-up mr-1.5"></i>{t('accounts.payable')}
         </button>
       </div>
 
@@ -99,21 +101,21 @@ const AccountsPage: React.FC = () => {
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-xl p-4 border border-[#e0ddd5]">
-              <p className="text-xs text-[#7a7a78] mb-1">{activeTab === 'receivable' ? '应收总额' : '应付总额'}</p>
+              <p className="text-xs text-[#7a7a78] mb-1">{activeTab === 'receivable' ? t('accounts.totalReceivable') : t('accounts.totalPayable')}</p>
               <p className="text-xl font-bold text-[#191918]">{formatCurrency(totalAmount || 0)}</p>
             </div>
             <div className="bg-white rounded-xl p-4 border border-[#e0ddd5]">
-              <p className="text-xs text-[#7a7a78] mb-1">逾期金额</p>
+              <p className="text-xs text-[#7a7a78] mb-1">{t('accounts.overdueAmount')}</p>
               <p className={`text-xl font-bold ${(overdueAmount || 0) > 0 ? 'text-red-500' : 'text-green-500'}`}>
                 {formatCurrency(overdueAmount || 0)}
               </p>
             </div>
             <div className="bg-white rounded-xl p-4 border border-[#e0ddd5]">
-              <p className="text-xs text-[#7a7a78] mb-1">未付笔数</p>
+              <p className="text-xs text-[#7a7a78] mb-1">{t('accounts.unpaidCount')}</p>
               <p className="text-xl font-bold text-[#191918]">{details.length}</p>
             </div>
             <div className="bg-white rounded-xl p-4 border border-[#e0ddd5]">
-              <p className="text-xs text-[#7a7a78] mb-1">{activeTab === 'receivable' ? '回款率' : '付款率'}</p>
+              <p className="text-xs text-[#7a7a78] mb-1">{activeTab === 'receivable' ? t('accounts.collectionRate') : t('accounts.paymentRate')}</p>
               <p className={`text-xl font-bold ${(rate || 0) >= 80 ? 'text-green-500' : (rate || 0) >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>
                 {rate?.toFixed(1)}%
               </p>
@@ -125,7 +127,7 @@ const AccountsPage: React.FC = () => {
             {/* Aging Analysis */}
             <div className="bg-white rounded-xl p-5 border border-[#e0ddd5]">
               <h4 className="text-sm font-bold text-[#191918] mb-4">
-                <i className="fas fa-chart-bar mr-2 text-[#d97757]"></i>账龄分析
+                <i className="fas fa-chart-bar mr-2 text-[#d97757]"></i>{t('accounts.agingTitle')}
               </h4>
               {agingData.some(d => d.amount > 0) ? (
                 <ResponsiveContainer width="100%" height={200}>
@@ -134,11 +136,11 @@ const AccountsPage: React.FC = () => {
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#7a7a78' }} />
                     <YAxis tick={{ fontSize: 11, fill: '#7a7a78' }} />
                     <Tooltip formatter={(val: number) => formatCurrency(val)} />
-                    <Bar dataKey="amount" fill="#d97757" radius={[4, 4, 0, 0]} name="金额" />
+                    <Bar dataKey="amount" fill="#d97757" radius={[4, 4, 0, 0]} name={t('accounts.headerTotal')} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-[200px] text-[#7a7a78] text-sm">暂无逾期数据</div>
+                <div className="flex items-center justify-center h-[200px] text-[#7a7a78] text-sm">{t('accounts.emptyAging')}</div>
               )}
             </div>
 
@@ -146,7 +148,7 @@ const AccountsPage: React.FC = () => {
             <div className="bg-white rounded-xl p-5 border border-[#e0ddd5]">
               <h4 className="text-sm font-bold text-[#191918] mb-4">
                 <i className="fas fa-ranking-star mr-2 text-[#d97757]"></i>
-                {activeTab === 'receivable' ? '客户欠款排名' : '供应商欠款排名'}
+                {activeTab === 'receivable' ? t('accounts.rankingReceivable') : t('accounts.rankingPayable')}
               </h4>
               {ranking.length > 0 ? (
                 <div className="space-y-2">
@@ -161,7 +163,7 @@ const AccountsPage: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-[200px] text-[#7a7a78] text-sm">暂无数据</div>
+                <div className="flex items-center justify-center h-[200px] text-[#7a7a78] text-sm">{t('accounts.emptyRanking')}</div>
               )}
             </div>
           </div>
@@ -170,23 +172,23 @@ const AccountsPage: React.FC = () => {
           <div className="bg-white rounded-xl border border-[#e0ddd5] overflow-hidden">
             <div className="px-5 py-3 border-b border-[#e0ddd5] flex items-center justify-between">
               <h4 className="text-sm font-bold text-[#191918]">
-                <i className="fas fa-list-alt mr-2 text-[#d97757]"></i>未结清明细
+                <i className="fas fa-list-alt mr-2 text-[#d97757]"></i>{t('accounts.details')}
               </h4>
-              <span className="text-xs text-[#7a7a78]">共 {details.length} 笔</span>
+              <span className="text-xs text-[#7a7a78]">{t('accounts.count')} {details.length} {t('accounts.unit')}</span>
             </div>
             {details.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-[#f9f9f8] text-[#7a7a78] text-xs">
-                      <th className="px-4 py-2 text-left">日期</th>
-                      <th className="px-4 py-2 text-left">{activeTab === 'receivable' ? '客户' : '供应商'}</th>
-                      <th className="px-4 py-2 text-right">总金额</th>
-                      <th className="px-4 py-2 text-right">已付</th>
-                      <th className="px-4 py-2 text-right">欠款</th>
-                      <th className="px-4 py-2 text-center">到期日</th>
-                      <th className="px-4 py-2 text-center">状态</th>
-                      <th className="px-4 py-2 text-center">操作</th>
+                      <th className="px-4 py-2 text-left">{t('accounts.headerDate')}</th>
+                      <th className="px-4 py-2 text-left">{activeTab === 'receivable' ? t('accounts.headerCustomer') : t('accounts.headerSupplier')}</th>
+                      <th className="px-4 py-2 text-right">{t('accounts.headerTotal')}</th>
+                      <th className="px-4 py-2 text-right">{t('accounts.headerPaid')}</th>
+                      <th className="px-4 py-2 text-right">{t('accounts.headerOwed')}</th>
+                      <th className="px-4 py-2 text-center">{t('accounts.headerDue')}</th>
+                      <th className="px-4 py-2 text-center">{t('accounts.headerStatus')}</th>
+                      <th className="px-4 py-2 text-center">{t('accounts.headerAction')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -207,7 +209,7 @@ const AccountsPage: React.FC = () => {
                               item.payment_status === 'partial' ? 'bg-yellow-100 text-yellow-700' :
                               'bg-gray-100 text-gray-600'
                             }`}>
-                              {isOverdue ? '已逾期' : item.payment_status === 'partial' ? '部分付款' : '未付'}
+                              {isOverdue ? t('accounts.statusOverdue') : item.payment_status === 'partial' ? t('accounts.statusPartial') : t('accounts.statusUnpaid')}
                             </span>
                           </td>
                           <td className="px-4 py-2.5 text-center">
@@ -222,7 +224,7 @@ const AccountsPage: React.FC = () => {
                               className="text-xs text-[#d97757] hover:text-[#c56646] font-medium"
                             >
                               <i className="fas fa-money-bill-wave mr-1"></i>
-                              {activeTab === 'receivable' ? '记录收款' : '记录付款'}
+                              {activeTab === 'receivable' ? t('accounts.recordPayment') : t('accounts.recordPaymentPay')}
                             </button>
                           </td>
                         </tr>
@@ -235,7 +237,7 @@ const AccountsPage: React.FC = () => {
               <div className="flex items-center justify-center py-16 text-[#7a7a78]">
                 <div className="text-center">
                   <i className="fas fa-check-circle text-3xl text-green-400 mb-2"></i>
-                  <p className="text-sm">所有款项已结清</p>
+                  <p className="text-sm">{t('accounts.allCleared')}</p>
                 </div>
               </div>
             )}
@@ -249,32 +251,32 @@ const AccountsPage: React.FC = () => {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
             <h3 className="text-lg font-bold text-[#191918] mb-4">
               <i className="fas fa-money-bill-wave mr-2 text-[#d97757]"></i>
-              {paymentModal.type === 'sale' ? '记录收款' : '记录付款'}
+              {paymentModal.type === 'sale' ? t('accounts.recordPayment') : t('accounts.recordPaymentPay')}
             </h3>
             <div className="space-y-3 mb-6">
               <div className="flex justify-between text-sm">
-                <span className="text-[#7a7a78]">{paymentModal.type === 'sale' ? '客户' : '供应商'}</span>
+                <span className="text-[#7a7a78]">{paymentModal.type === 'sale' ? t('accounts.headerCustomer') : t('accounts.headerSupplier')}</span>
                 <span className="font-medium">{paymentModal.name}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-[#7a7a78]">总金额</span>
+                <span className="text-[#7a7a78]">{t('accounts.headerTotal')}</span>
                 <span className="font-medium">{formatCurrency(paymentModal.total)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-[#7a7a78]">已付金额</span>
+                <span className="text-[#7a7a78]">{t('accounts.modalPaidAmount')}</span>
                 <span className="font-medium text-green-600">{formatCurrency(paymentModal.paid)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-[#7a7a78]">剩余欠款</span>
+                <span className="text-[#7a7a78]">{t('accounts.modalRemaining')}</span>
                 <span className="font-medium text-red-500">{formatCurrency(paymentModal.total - paymentModal.paid)}</span>
               </div>
               <div className="pt-2">
-                <label className="block text-xs text-[#7a7a78] mb-1">本次{paymentModal.type === 'sale' ? '收款' : '付款'}金额</label>
+                <label className="block text-xs text-[#7a7a78] mb-1">{t('accounts.modalThisPayment', { type: paymentModal.type === 'sale' ? t('accounts.modalReceive') : t('accounts.modalPay') })}</label>
                 <input
                   type="number"
                   value={paymentAmount}
                   onChange={e => setPaymentAmount(e.target.value)}
-                  placeholder={`最多 ${formatCurrency(paymentModal.total - paymentModal.paid)}`}
+                  placeholder={`${t('accounts.modalMax')} ${formatCurrency(paymentModal.total - paymentModal.paid)}`}
                   className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm focus:ring-2 focus:ring-[#d97757] focus:border-transparent"
                 />
               </div>
@@ -282,12 +284,12 @@ const AccountsPage: React.FC = () => {
                 <button
                   onClick={() => setPaymentAmount(String(paymentModal.total - paymentModal.paid))}
                   className="text-xs px-3 py-1 bg-[#f0eeeb] text-[#7a7a78] rounded-lg hover:bg-[#e0ddd5]"
-                >全额结清</button>
+                >{t('accounts.modalFullPayment')}</button>
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => { setPaymentModal(null); setPaymentAmount(''); }} className="flex-1 py-2 text-sm text-[#7a7a78] border border-[#e0ddd5] rounded-lg hover:bg-[#f0eeeb]">取消</button>
-              <button onClick={handlePayment} disabled={!paymentAmount || parseFloat(paymentAmount) <= 0} className="flex-1 py-2 text-sm bg-[#d97757] text-white rounded-lg hover:bg-[#c56646] disabled:opacity-50">确认</button>
+              <button onClick={() => { setPaymentModal(null); setPaymentAmount(''); }} className="flex-1 py-2 text-sm text-[#7a7a78] border border-[#e0ddd5] rounded-lg hover:bg-[#f0eeeb]">{t('accounts.modalCancel')}</button>
+              <button onClick={handlePayment} disabled={!paymentAmount || parseFloat(paymentAmount) <= 0} className="flex-1 py-2 text-sm bg-[#d97757] text-white rounded-lg hover:bg-[#c56646] disabled:opacity-50">{t('accounts.modalConfirm')}</button>
             </div>
           </div>
         </div>

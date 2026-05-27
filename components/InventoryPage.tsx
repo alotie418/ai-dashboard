@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { fetchSales, fetchPurchases, SalesRecord, PurchaseRecord } from '../services/api';
 
@@ -18,6 +19,7 @@ const parseTaxRate = (s: string) => { const m = s.match(/[\d.]+/); return m ? pa
 
 
 const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<InvoiceType>('all');
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -116,11 +118,11 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
       }, 0);
     return {
       currentStock: `${inventoryTons.toFixed(2)}t`,
-      currentStockSub: inventoryTons > 0 ? '库存正常' : '库存警戒：低',
+      currentStockSub: t('invoices.stockNormal'),
       totalInputWeight: `${totalInputTons.toFixed(1)}t`,
-      totalInputSub: purchaseRecords.length > 0 ? `共 ${purchaseRecords.length} 条进项记录` : '暂无进项记录',
+      totalInputSub: purchaseRecords.length > 0 ? t('invoices.inputRecordCount', { count: purchaseRecords.length }) : t('invoices.noInput'),
       totalOutputWeight: `${totalOutputTons.toFixed(1)}t`,
-      totalOutputSub: salesRecords.length > 0 ? `共 ${salesRecords.length} 条销售记录` : '暂无销售记录',
+      totalOutputSub: salesRecords.length > 0 ? t('invoices.outputRecordCount', { count: salesRecords.length }) : t('invoices.noOutput'),
       pendingCertification: `¥${pendingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     };
   }, [salesRecords, purchaseRecords]);
@@ -130,7 +132,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
       {/* Header Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
-          title="实时库存量"
+          title={t('invoices.currentStock')}
           value={stats.currentStock}
           sub={stats.currentStockSub}
           icon="fa-warehouse"
@@ -138,7 +140,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           bg="bg-amber-500/10"
         />
         <StatCard
-          title="累计进项吨数"
+          title={t('invoices.totalInput')}
           value={stats.totalInputWeight}
           sub={stats.totalInputSub}
           icon="fa-file-import"
@@ -146,7 +148,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           bg="bg-[#d97757]/10"
         />
         <StatCard
-          title="累计销项吨数"
+          title={t('invoices.totalOutput')}
           value={stats.totalOutputWeight}
           sub={stats.totalOutputSub}
           icon="fa-file-export"
@@ -154,9 +156,9 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           bg="bg-emerald-500/10"
         />
         <StatCard
-          title="待认证进项额"
+          title={t('invoices.pendingTax')}
           value={stats.pendingCertification}
-          sub="预计可抵扣税额"
+          sub={t('invoices.deductible')}
           icon="fa-clock"
           color="text-[#d97757]"
           bg="bg-[#d97757]/10"
@@ -169,7 +171,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a]"></i>
           <input
             type="text"
-            placeholder="搜索发票号或往来单位..."
+            placeholder={t('invoices.searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-white border border-[#e0ddd5] rounded-xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] transition-all"
@@ -177,9 +179,9 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
         </div>
 
         <div className="flex items-center space-x-2 bg-white p-1.5 rounded-xl border border-[#e0ddd5]">
-          <FilterTab active={filterType === 'all'} onClick={() => setFilterType('all')} label="全部发票" />
-          <FilterTab active={filterType === 'input'} onClick={() => setFilterType('input')} label="进项明细" />
-          <FilterTab active={filterType === 'output'} onClick={() => setFilterType('output')} label="销项明细" />
+          <FilterTab active={filterType === 'all'} onClick={() => setFilterType('all')} label={t('invoices.filterAll')} />
+          <FilterTab active={filterType === 'input'} onClick={() => setFilterType('input')} label={t('invoices.filterInput')} />
+          <FilterTab active={filterType === 'output'} onClick={() => setFilterType('output')} label={t('invoices.filterOutput')} />
         </div>
       </div>
 
@@ -187,8 +189,8 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
       <div className="bg-white/80 border border-[#e0ddd5] rounded-xl overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
         <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center bg-[#f9f9f8]/20">
           <div>
-            <h3 className="text-xl font-bold text-[#191918]">发票流转全景视图</h3>
-            <p className="text-sm text-[#5c5c5a] mt-1">核对发票流与物流的一致性 (Inventory vs Invoices)</p>
+            <h3 className="text-xl font-bold text-[#191918]">{t('invoices.tableTitle')}</h3>
+            <p className="text-sm text-[#5c5c5a] mt-1">{t('invoices.tableSubtitle')}</p>
           </div>
           <div className="flex space-x-3">
             <button
@@ -196,11 +198,11 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
               className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center ${showAdvanced || hasAdvancedFilters ? 'bg-[#d97757]/10 text-[#d97757] border border-[#d97757]/30' : 'text-[#4a4a48] hover:text-[#191918] hover:bg-[#f0eeeb] border border-transparent'}`}
             >
               <i className={`fas fa-filter mr-2 ${hasAdvancedFilters ? 'text-[#d97757]' : ''}`}></i>
-              高级过滤
+              {t('invoices.advancedFilter')}
               {hasAdvancedFilters && <span className="ml-2 w-2 h-2 bg-[#d97757] rounded-full"></span>}
             </button>
             <button className="px-4 py-2 bg-[#d97757] text-white rounded-xl text-xs font-bold hover:bg-[#c56a4a] transition-all" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}>
-              <i className="fas fa-download mr-2"></i> 导出报表
+              <i className="fas fa-download mr-2"></i> {t('invoices.export')}
             </button>
           </div>
         </div>
@@ -211,7 +213,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Date Range */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">开票日期范围</label>
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('invoices.dateRange')}</label>
                 <div className="flex items-center space-x-2">
                   <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
                     className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />
@@ -223,40 +225,40 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
 
               {/* Amount Range */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">金额范围 (不含税)</label>
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('invoices.amountRange')}</label>
                 <div className="flex items-center space-x-2">
-                  <input type="number" placeholder="最低" value={amountMin} onChange={e => setAmountMin(e.target.value)}
+                  <input type="number" placeholder={t('invoices.min')} value={amountMin} onChange={e => setAmountMin(e.target.value)}
                     className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />
                   <span className="text-[#5c5c5a] text-xs">—</span>
-                  <input type="number" placeholder="最高" value={amountMax} onChange={e => setAmountMax(e.target.value)}
+                  <input type="number" placeholder={t('invoices.max')} value={amountMax} onChange={e => setAmountMax(e.target.value)}
                     className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />
                 </div>
               </div>
 
               {/* Weight Range */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">重量范围 (吨)</label>
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('invoices.weightRange')}</label>
                 <div className="flex items-center space-x-2">
-                  <input type="number" placeholder="最低" value={weightMin} onChange={e => setWeightMin(e.target.value)}
+                  <input type="number" placeholder={t('invoices.min')} value={weightMin} onChange={e => setWeightMin(e.target.value)}
                     className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />
                   <span className="text-[#5c5c5a] text-xs">—</span>
-                  <input type="number" placeholder="最高" value={weightMax} onChange={e => setWeightMax(e.target.value)}
+                  <input type="number" placeholder={t('invoices.max')} value={weightMax} onChange={e => setWeightMax(e.target.value)}
                     className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />
                 </div>
               </div>
 
               {/* Status Filter */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">发票状态</label>
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('invoices.statusFilter')}</label>
                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
                   className="w-full bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all appearance-none cursor-pointer"
                   style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}>
-                  <option value="all">全部状态</option>
-                  <option value="已验真">已验真</option>
-                  <option value="已认证">已认证</option>
-                  <option value="已抵扣">已抵扣</option>
-                  <option value="待认证">待认证</option>
-                  <option value="待开票">待开票</option>
+                  <option value="all">{t('invoices.allStatus')}</option>
+                  <option value="已验真">{t('invoices.statusVerified')}</option>
+                  <option value="已认证">{t('invoices.statusCertified')}</option>
+                  <option value="已抵扣">{t('invoices.statusDeducted')}</option>
+                  <option value="待认证">{t('invoices.statusPendingCert')}</option>
+                  <option value="待开票">{t('invoices.statusPendingInvoice')}</option>
                 </select>
               </div>
             </div>
@@ -267,7 +269,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                 {hasAdvancedFilters && (
                   <span className="flex items-center">
                     <i className="fas fa-info-circle mr-1.5 text-[#d97757]"></i>
-                    已启用高级过滤条件，共 {filteredInvoices.length} 条匹配记录
+                    {t('invoices.advancedFilterActive', { count: filteredInvoices.length })}
                   </span>
                 )}
               </div>
@@ -276,7 +278,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                 disabled={!hasAdvancedFilters}
                 className="px-4 py-2 text-xs font-bold text-[#5c5c5a] hover:text-[#d97757] disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center"
               >
-                <i className="fas fa-times mr-1.5"></i> 清除所有过滤
+                <i className="fas fa-times mr-1.5"></i> {t('invoices.clearAll')}
               </button>
             </div>
           </div>
@@ -286,14 +288,14 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="bg-[#f9f9f8]/30 text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest">
-                <th className="px-8 py-5">开票日期</th>
-                <th className="px-8 py-5">类型</th>
-                <th className="px-8 py-5">往来单位</th>
-                <th className="px-8 py-5">实物重量</th>
-                <th className="px-8 py-5 text-right">金额 (不含税)</th>
-                <th className="px-8 py-5 text-right">税额</th>
-                <th className="px-8 py-5">发票号码</th>
-                <th className="px-8 py-5 text-center">状态</th>
+                <th className="px-8 py-5">{t('invoices.headerDate')}</th>
+                <th className="px-8 py-5">{t('invoices.headerType')}</th>
+                <th className="px-8 py-5">{t('invoices.headerPartner')}</th>
+                <th className="px-8 py-5">{t('invoices.headerWeight')}</th>
+                <th className="px-8 py-5 text-right">{t('invoices.headerAmount')}</th>
+                <th className="px-8 py-5 text-right">{t('invoices.headerTax')}</th>
+                <th className="px-8 py-5">{t('invoices.headerInvoiceNo')}</th>
+                <th className="px-8 py-5 text-center">{t('invoices.headerStatus')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e0ddd5]">
@@ -302,7 +304,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                   <td className="px-8 py-5 text-sm text-[#4a4a48]">{inv.date}</td>
                   <td className="px-8 py-5">
                     <span className={`px-2 py-1 rounded text-[10px] font-bold ${inv.type === '销项' ? 'bg-[#d97757]/10 text-[#d97757]' : 'bg-amber-500/10 text-amber-400'}`}>
-                      {inv.type}
+                      {inv.type === '销项' ? t('invoices.typeOutput') : t('invoices.typeInput')}
                     </span>
                   </td>
                   <td className="px-8 py-5 text-sm font-bold text-[#191918] group-hover:text-[#191918] transition-colors">{inv.partner}</td>
@@ -320,10 +322,10 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                   <td colSpan={8} className="px-8 py-20 text-center text-[#5c5c5a] italic">
                     <div className="flex flex-col items-center">
                       <i className="fas fa-search text-4xl mb-4 opacity-20"></i>
-                      <p>未找到匹配的发票记录</p>
+                      <p>{t('invoices.empty')}</p>
                       {hasAdvancedFilters && (
                         <button onClick={clearAdvancedFilters} className="mt-3 text-[#d97757] text-xs font-bold hover:underline">
-                          <i className="fas fa-times mr-1"></i> 清除过滤条件重试
+                          <i className="fas fa-times mr-1"></i> {t('invoices.clearRetry')}
                         </button>
                       )}
                     </div>
@@ -363,7 +365,16 @@ const FilterTab: React.FC<{ active: boolean, onClick: () => void, label: string 
   </button>
 );
 
+const statusI18nMap: Record<string, string> = {
+  '已验真': 'invoices.statusVerified',
+  '已认证': 'invoices.statusCertified',
+  '已抵扣': 'invoices.statusDeducted',
+  '待认证': 'invoices.statusPendingCert',
+  '待开票': 'invoices.statusPendingInvoice',
+};
+
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const { t } = useTranslation();
   const colors: Record<string, string> = {
     '已验真': 'bg-[#d97757]/10 text-[#d97757] border-[#d97757]/20',
     '已认证': 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
@@ -371,7 +382,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   };
   return (
     <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${colors[status] || 'bg-[#f0eeeb]/10 text-[#4a4a48] border-[#e0ddd5]/20'}`}>
-      {status}
+      {statusI18nMap[status] ? t(statusI18nMap[status]) : status}
     </span>
   );
 };

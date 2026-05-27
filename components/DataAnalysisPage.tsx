@@ -4,6 +4,7 @@ import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, Legend, ComposedChart, Cell, ScatterChart, Scatter, ZAxis
 } from 'recharts';
+import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 // AI calls moved to server-side proxy
 
@@ -16,15 +17,16 @@ interface Props {
 
 type AnalysisDimension = 'financial' | 'volume' | 'efficiency';
 
-const LOADING_MESSAGES = [
-  '① 提取历史业绩特征向量（移动平均/趋势/季节性）...',
-  '② 构建趋势预测模型...',
-  '③ 运行蒙特卡洛模拟 (1000次) 计算置信区间...',
-  '④ Gemini + Google Search 综合分析...',
-  '⑤ 融合全部数据源生成最终预测...'
-];
-
 const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
+  const { t } = useTranslation();
+
+  const LOADING_MESSAGES = useMemo(() => [
+    t('analysis.loading1'),
+    t('analysis.loading2'),
+    t('analysis.loading3'),
+    t('analysis.loading4'),
+    t('analysis.loading5'),
+  ], [t]);
   const [activeTab, setActiveTab] = useState<'trends' | 'table' | 'forecast' | 'panorama'>('panorama');
   const [salesForecast, setSalesForecast] = useState<string>('');
   const [predictedData, setPredictedData] = useState<any[]>([]);
@@ -342,7 +344,7 @@ ${JSON.stringify(mcOnVar)}
         if (!aiResponse.ok) throw new Error('AI analysis request failed');
         result = await aiResponse.json();
       }
-      setSalesForecast(result.insights || '分析完成。未来季度预计呈稳健增长趋势。');
+      setSalesForecast(result.insights || t('analysis.forecastDefault'));
 
       // Extract Google Search grounding sources from server response
       if (result.groundingSources && result.groundingSources.length > 0) {
@@ -367,7 +369,7 @@ ${JSON.stringify(mcOnVar)}
       ]);
     } catch (err) {
       console.error(err);
-      setSalesForecast("无法连接到预测引擎，请检查网络或 API 配置。");
+      setSalesForecast(t('analysis.aiError'));
     } finally {
       isAnalysingRef.current = false;
       setIsAnalysing(false);
@@ -419,11 +421,11 @@ ${JSON.stringify(mcOnVar)}
             ) : (
               <div className="group">
                 <p className="text-[#191918] text-2xl font-light leading-snug max-w-2xl" style={{ whiteSpace: 'pre-wrap' }}>
-                  {salesForecast || "正在等待数据注入..."}
+                  {salesForecast || t('analysis.waitingData')}
                 </p>
                 <div className="mt-8 flex items-center space-x-6">
                   <button onClick={runAnalysis} className="px-6 py-2.5 bg-[#d97757]/10 hover:bg-[#d97757]/20 border border-[#d97757]/30 rounded-full text-[10px] text-[#d97757] font-bold uppercase tracking-widest flex items-center transition-all active:scale-95">
-                    <i className="fas fa-sync-alt mr-2"></i> 重新运行预测
+                    <i className="fas fa-sync-alt mr-2"></i> {t('analysis.rerun')}
                   </button>
                 </div>
               </div>
@@ -432,7 +434,7 @@ ${JSON.stringify(mcOnVar)}
           <div className="hidden lg:grid grid-cols-3 gap-8 border-l border-[#e0ddd5] pl-12 shrink-0">
             <StatsIndicator label="Avg YoY" value={`${stats.yoy.toFixed(1)}%`} trend={stats.yoy >= 0 ? 'up' : 'down'} />
             <StatsIndicator label="Avg MoM" value={`${stats.mom.toFixed(1)}%`} trend={stats.mom >= 0 ? 'up' : 'down'} />
-            <StatsIndicator label="平减指数" value={stats.deflator.toFixed(1)} trend="neutral" color="text-amber-500" />
+            <StatsIndicator label={t('analysis.deflator')} value={stats.deflator.toFixed(1)} trend="neutral" color="text-amber-500" />
           </div>
         </div>
       </div>
@@ -440,19 +442,19 @@ ${JSON.stringify(mcOnVar)}
       {/* Navigation Tabs */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white/60 p-3 rounded-xl border border-[#e0ddd5]/70 backdrop-blur-md">
         <div className="flex p-1 bg-[#f9f9f8]/80 rounded-xl w-fit">
-          <TabButton active={activeTab === 'panorama'} onClick={() => setActiveTab('panorama')} label="年度全景图" icon="fa-globe-asia" />
-          <TabButton active={activeTab === 'trends'} onClick={() => setActiveTab('trends')} label="趋势分析" icon="fa-chart-area" />
-          <TabButton active={activeTab === 'forecast'} onClick={() => setActiveTab('forecast')} label="预测未来" icon="fa-bolt-lightning" />
-          <TabButton active={activeTab === 'table'} onClick={() => setActiveTab('table')} label="明细数据" icon="fa-table" />
+          <TabButton active={activeTab === 'panorama'} onClick={() => setActiveTab('panorama')} label={t('analysis.panorama')} icon="fa-globe-asia" />
+          <TabButton active={activeTab === 'trends'} onClick={() => setActiveTab('trends')} label={t('analysis.trends')} icon="fa-chart-area" />
+          <TabButton active={activeTab === 'forecast'} onClick={() => setActiveTab('forecast')} label={t('analysis.forecast')} icon="fa-bolt-lightning" />
+          <TabButton active={activeTab === 'table'} onClick={() => setActiveTab('table')} label={t('analysis.table')} icon="fa-table" />
         </div>
 
         {activeTab === 'trends' && (
           <div className="flex items-center space-x-2 px-6">
-            <span className="text-[10px] text-[#5c5c5a] font-bold uppercase tracking-widest mr-2">维度切换:</span>
+            <span className="text-[10px] text-[#5c5c5a] font-bold uppercase tracking-widest mr-2">{t('analysis.dimSwitch')}:</span>
             <div className="flex bg-[#f9f9f8] rounded-xl p-1">
-              <DimButton active={dimension === 'financial'} onClick={() => setDimension('financial')} label="金额" />
-              <DimButton active={dimension === 'volume'} onClick={() => setDimension('volume')} label="吨位" />
-              <DimButton active={dimension === 'efficiency'} onClick={() => setDimension('efficiency')} label="效率" />
+              <DimButton active={dimension === 'financial'} onClick={() => setDimension('financial')} label={t('analysis.dimAmount')} />
+              <DimButton active={dimension === 'volume'} onClick={() => setDimension('volume')} label={t('analysis.dimVolume')} />
+              <DimButton active={dimension === 'efficiency'} onClick={() => setDimension('efficiency')} label={t('analysis.dimEfficiency')} />
             </div>
           </div>
         )}
@@ -462,7 +464,7 @@ ${JSON.stringify(mcOnVar)}
       {activeTab === 'panorama' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 animate-in fade-in duration-1000">
           {/* Revenue vs Cost Stacked Area */}
-          <PanoramaCard title="营收与成本结构" subtitle="Revenue vs Cost Structure">
+          <PanoramaCard title={t('analysis.revenueStructure')} subtitle="Revenue vs Cost Structure">
             <ResponsiveContainer width="100%" height={260}>
               <AreaChart data={data.monthlyPerformance}>
                 <defs>
@@ -482,40 +484,40 @@ ${JSON.stringify(mcOnVar)}
           </PanoramaCard>
 
           {/* Monthly Growth Compare */}
-          <PanoramaCard title="增长动态对比" subtitle="YoY & MoM Trajectory">
+          <PanoramaCard title={t('analysis.growthTrend')} subtitle="YoY & MoM Trajectory">
             <ResponsiveContainer width="100%" height={260}>
               <ComposedChart data={data.monthlyPerformance}>
                 <XAxis dataKey="name" hide />
                 <YAxis hide />
                 <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} />
-                <Bar dataKey="mom" name="环比" fill="#d97757" radius={[4, 4, 0, 0]} barSize={8} />
-                <Line type="monotone" dataKey="yoy" name="同比" stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} />
+                <Bar dataKey="mom" name={t('analysis.chartMom')} fill="#d97757" radius={[4, 4, 0, 0]} barSize={8} />
+                <Line type="monotone" dataKey="yoy" name={t('analysis.chartYoy')} stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </PanoramaCard>
 
           {/* Unit Profit Contribution */}
-          <PanoramaCard title="物流量流转平衡" subtitle="Purchase vs Sales Tons">
+          <PanoramaCard title={t('analysis.logistics')} subtitle="Purchase vs Sales Tons">
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={data.monthlyPerformance}>
                 <XAxis dataKey="name" hide />
                 <YAxis hide />
                 <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} />
-                <Bar dataKey="purchaseTons" name="进货" fill="#e8956e" opacity={0.6} radius={[2, 2, 0, 0]} />
-                <Bar dataKey="salesTons" name="出货" fill="#10b981" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="purchaseTons" name={t('analysis.chartPurchase')} fill="#e8956e" opacity={0.6} radius={[2, 2, 0, 0]} />
+                <Bar dataKey="salesTons" name={t('analysis.chartSales')} fill="#10b981" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </PanoramaCard>
 
           {/* Profitability Index Scatter */}
-          <PanoramaCard title="盈利效率偏离度" subtitle="Efficiency Scatter Matrix">
+          <PanoramaCard title={t('analysis.efficiency')} subtitle="Efficiency Scatter Matrix">
             <ResponsiveContainer width="100%" height={260}>
               <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                <XAxis type="number" dataKey="revenue" name="营收" hide />
-                <YAxis type="number" dataKey="profit" name="利润" hide />
-                <ZAxis type="number" dataKey="deflator" range={[50, 400]} name="平减指数" />
+                <XAxis type="number" dataKey="revenue" name={t('analysis.chartRevenue')} hide />
+                <YAxis type="number" dataKey="profit" name={t('analysis.chartProfit')} hide />
+                <ZAxis type="number" dataKey="deflator" range={[50, 400]} name={t('analysis.deflator')} />
                 <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} />
-                <Scatter name="月度数据" data={data.monthlyPerformance} fill="#d97757">
+                <Scatter name={t('analysis.chartMonthlyData')} data={data.monthlyPerformance} fill="#d97757">
                   {data.monthlyPerformance.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.profit > stats.avgProfit ? '#10b981' : '#d97757'} />
                   ))}
@@ -529,12 +531,12 @@ ${JSON.stringify(mcOnVar)}
             <div className="absolute -top-24 -right-24 w-64 h-64 bg-[#d97757]/5 blur-[80px] rounded-full pointer-events-none"></div>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
               <div>
-                <h4 className="text-xl font-bold text-[#191918] tracking-tight">年度数据全景矩阵 (2026)</h4>
-                <p className="text-[#5c5c5a] text-xs mt-1">整合金额、吨数与宏观指数的深度聚类分析</p>
+                <h4 className="text-xl font-bold text-[#191918] tracking-tight">{t('analysis.matrixTitle')}</h4>
+                <p className="text-[#5c5c5a] text-xs mt-1">{t('analysis.matrixSubtitle')}</p>
               </div>
               <div className="flex space-x-2">
-                <span className="px-3 py-1 bg-emerald-500/10 text-emerald-600 text-[10px] font-bold rounded-full border border-emerald-500/20">稳健增长</span>
-                <span className="px-3 py-1 bg-[#d97757]/10 text-[#d97757] text-[10px] font-bold rounded-full border border-[#d97757]/20">供需平衡</span>
+                <span className="px-3 py-1 bg-emerald-500/10 text-emerald-600 text-[10px] font-bold rounded-full border border-emerald-500/20">{t('analysis.matrixBadgeSteady')}</span>
+                <span className="px-3 py-1 bg-[#d97757]/10 text-[#d97757] text-[10px] font-bold rounded-full border border-[#d97757]/20">{t('analysis.matrixBadgeBalance')}</span>
               </div>
             </div>
 
@@ -545,18 +547,18 @@ ${JSON.stringify(mcOnVar)}
                   <p className="text-[#191918] text-lg font-bold">¥{(item.revenue / 1000).toFixed(0)}k</p>
                   <div className="mt-3 space-y-1">
                     <div className="flex justify-between text-[9px]">
-                      <span className="text-[#5c5c5a]">利润</span>
+                      <span className="text-[#5c5c5a]">{t('analysis.chartProfit')}</span>
                       <span className="text-emerald-600 font-bold">¥{(item.profit / 1000).toFixed(1)}k</span>
                     </div>
                     <div className="flex justify-between text-[9px]">
-                      <span className="text-[#5c5c5a]">吨数</span>
+                      <span className="text-[#5c5c5a]">{t('analysis.chartTons')}</span>
                       <span className="text-[#4a4a48]">{item.salesTons}t</span>
                     </div>
                   </div>
                 </div>
               ))}
               <div className="bg-[#d97757] border border-[#d97757] p-4 rounded-xl flex flex-col justify-center items-center cursor-pointer hover:scale-105 transition-transform" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}>
-                <p className="text-white/80 text-[10px] font-bold uppercase mb-1">月均营收</p>
+                <p className="text-white/80 text-[10px] font-bold uppercase mb-1">{t('analysis.chartAvgRevenue')}</p>
                 <p className="text-white text-xl font-bold">¥{(stats.avgRevenue / 1000).toFixed(1)}k</p>
               </div>
             </div>
@@ -570,11 +572,11 @@ ${JSON.stringify(mcOnVar)}
             <div className="flex items-center justify-between mb-12">
               <div>
                 <h3 className="text-2xl font-bold text-[#191918]">
-                  {dimension === 'financial' && '营收与利润动态趋势'}
-                  {dimension === 'volume' && '吨位流转与库存消耗'}
-                  {dimension === 'efficiency' && '毛利率与平减指数关联分析'}
+                  {dimension === 'financial' && t('analysis.trendFinancial')}
+                  {dimension === 'volume' && t('analysis.trendVolume')}
+                  {dimension === 'efficiency' && t('analysis.trendEfficiency')}
                 </h3>
-                <p className="text-[#5c5c5a] text-sm mt-1 italic">多变量复合坐标系分析模型</p>
+                <p className="text-[#5c5c5a] text-sm mt-1 italic">{t('analysis.trendSubtitle')}</p>
               </div>
             </div>
             <div className="h-[400px]">
@@ -590,8 +592,8 @@ ${JSON.stringify(mcOnVar)}
                   <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: '30px' }} />
                   {dimension === 'financial' && (
                     <>
-                      <Area yAxisId="left" type="monotone" dataKey="revenue" name="营业收入" stroke="#d97757" fill="url(#colorRev)" strokeWidth={3} />
-                      <Line yAxisId="left" type="monotone" dataKey="profit" name="营业利润" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} />
+                      <Area yAxisId="left" type="monotone" dataKey="revenue" name={t('analysis.chartRevenueLabel')} stroke="#d97757" fill="url(#colorRev)" strokeWidth={3} />
+                      <Line yAxisId="left" type="monotone" dataKey="profit" name={t('analysis.chartProfitLabel')} stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} />
                       <defs>
                         <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#d97757" stopOpacity={0.2} />
@@ -602,15 +604,15 @@ ${JSON.stringify(mcOnVar)}
                   )}
                   {dimension === 'volume' && (
                     <>
-                      <Bar yAxisId="left" dataKey="purchaseTons" name="采购吨数" fill="#e8956e" radius={[6, 6, 0, 0]} barSize={20} />
-                      <Bar yAxisId="left" dataKey="salesTons" name="销售吨数" fill="#d97757" radius={[6, 6, 0, 0]} barSize={20} />
+                      <Bar yAxisId="left" dataKey="purchaseTons" name={t('analysis.chartPurchaseTons')} fill="#e8956e" radius={[6, 6, 0, 0]} barSize={20} />
+                      <Bar yAxisId="left" dataKey="salesTons" name={t('analysis.chartSalesTons')} fill="#d97757" radius={[6, 6, 0, 0]} barSize={20} />
                     </>
                   )}
                   {dimension === 'efficiency' && (
                     <>
                       <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={11} tickLine={false} axisLine={false} domain={['auto', 'auto']} />
-                      <Line yAxisId="right" type="step" dataKey="deflator" name="平减指数" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
-                      <Area yAxisId="left" type="monotone" dataKey="profit" name="单位利润贡献" fill="#10b981" fillOpacity={0.1} stroke="#10b981" />
+                      <Line yAxisId="right" type="step" dataKey="deflator" name={t('analysis.deflator')} stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                      <Area yAxisId="left" type="monotone" dataKey="profit" name={t('analysis.chartUnitProfit')} fill="#10b981" fillOpacity={0.1} stroke="#10b981" />
                     </>
                   )}
                 </ComposedChart>
@@ -619,14 +621,14 @@ ${JSON.stringify(mcOnVar)}
           </div>
 
           <div className="space-y-6">
-            <SummaryMiniCard title="峰值月份" value={data.monthlyPerformance.length > 0 ? [...data.monthlyPerformance].sort((a, b) => b.revenue - a.revenue)[0].name : '—'} sub="年度最高营收记录" icon="fa-crown" color="text-amber-600" />
-            <SummaryMiniCard title="增长最快" value={data.monthlyPerformance.length > 0 ? [...data.monthlyPerformance].sort((a, b) => b.mom - a.mom)[0].name : '—'} sub="单月环比增长领先" icon="fa-bolt" color="text-[#d97757]" />
+            <SummaryMiniCard title={t('analysis.peakMonth')} value={data.monthlyPerformance.length > 0 ? [...data.monthlyPerformance].sort((a, b) => b.revenue - a.revenue)[0].name : '—'} sub={t('analysis.peakMonthSub')} icon="fa-crown" color="text-amber-600" />
+            <SummaryMiniCard title={t('analysis.fastest')} value={data.monthlyPerformance.length > 0 ? [...data.monthlyPerformance].sort((a, b) => b.mom - a.mom)[0].name : '—'} sub={t('analysis.fastestSub')} icon="fa-bolt" color="text-[#d97757]" />
             <div className="bg-white/80 border border-[#e0ddd5] rounded-xl p-8" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
-              <h4 className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-[0.2em] mb-6">异常偏离度分析</h4>
+              <h4 className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-[0.2em] mb-6">{t('analysis.anomalyTitle')}</h4>
               <div className="space-y-5">
                 {(() => {
                   const perf = data.monthlyPerformance;
-                  if (!perf.length) return <p className="text-[10px] text-[#5c5c5a] italic">暂无数据</p>;
+                  if (!perf.length) return <p className="text-[10px] text-[#5c5c5a] italic">{t('analysis.anomalyNoData')}</p>;
                   // 营收/吨位偏离度：各月单吨营收的变异系数
                   const unitRevenues = perf.filter(p => p.salesTons > 0).map(p => p.revenue / p.salesTons);
                   const meanUR = unitRevenues.length > 0 ? unitRevenues.reduce((a, b) => a + b, 0) / unitRevenues.length : 0;
@@ -650,16 +652,16 @@ ${JSON.stringify(mcOnVar)}
                   return (
                     <>
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-[#4a4a48]">营收/吨位偏离</span>
+                        <span className="text-[#4a4a48]">{t('analysis.anomalyRevTon')}</span>
                         <span className={`${cvColor} font-mono font-bold`}>{cvUR.toFixed(1)}% {cvLabel}</span>
                       </div>
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-[#4a4a48]">价格指数关联</span>
+                        <span className="text-[#4a4a48]">{t('analysis.anomalyPriceCorr')}</span>
                         <span className={`${corrColor} font-mono font-bold`}>{corrSign}{absCorr.toFixed(1)}% {corrLabel}</span>
                       </div>
                       <div className="pt-4 border-t border-[#e0ddd5]">
                         <p className="text-[10px] text-[#5c5c5a] leading-relaxed italic">
-                          {cvUR < 5 ? '单吨营收波动极低，定价策略稳定。' : cvUR < 15 ? '单吨营收存在一定波动，建议关注价格变动。' : '单吨营收波动较大，建议排查异常月份。'}
+                          {cvUR < 5 ? t('analysis.anomalyLow') : cvUR < 15 ? t('analysis.anomalyMid') : t('analysis.anomalyHigh')}
                         </p>
                       </div>
                     </>
@@ -677,10 +679,10 @@ ${JSON.stringify(mcOnVar)}
           <div className="flex items-center justify-between mb-12">
             <div>
               <h3 className="text-2xl font-bold text-[#191918] flex items-center">
-                智能业务增长预测
+                {t('analysis.forecastTitle')}
                 <span className="ml-4 px-3 py-1 bg-[#d97757]/10 text-[#d97757] text-[10px] rounded-full border border-[#d97757]/20 font-bold uppercase tracking-wider">Next 90 Days</span>
               </h3>
-              <p className="text-[#5c5c5a] text-sm mt-1 italic">基于历史销量与宏观平减指数的深度学习模型推演</p>
+              <p className="text-[#5c5c5a] text-sm mt-1 italic">{t('analysis.forecastSubtitle')}</p>
             </div>
           </div>
 
@@ -694,7 +696,7 @@ ${JSON.stringify(mcOnVar)}
               </div>
               <div className="text-center space-y-3">
                 <p className="text-[#191918] text-xl font-medium tracking-tight">{loadingMessage}</p>
-                <p className="text-[#5c5c5a] text-sm">正在整合全量业务指标进行回归分析...</p>
+                <p className="text-[#5c5c5a] text-sm">{t('analysis.forecastLoading')}</p>
               </div>
             </div>
           ) : (
@@ -716,16 +718,16 @@ ${JSON.stringify(mcOnVar)}
                         const d = payload[0].payload;
                         return (
                           <div className="bg-white border border-[#e0ddd5] p-6 rounded-xl backdrop-blur-xl ring-1 ring-[#e0ddd5]" style={{ boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}>
-                            <p className="text-[#5c5c5a] text-[10px] font-bold uppercase mb-3 tracking-[0.2em]">{label} {d.isForecast ? '预测值' : '实际值'}</p>
+                            <p className="text-[#5c5c5a] text-[10px] font-bold uppercase mb-3 tracking-[0.2em]">{label} {d.isForecast ? t('analysis.forecastValue') : t('analysis.forecastActual')}</p>
                             <div className="space-y-3">
                               <p className="text-[#191918] text-2xl font-bold">¥{formatNum(d.revenue)}</p>
                               {d.isForecast && (
                                 <p className="text-[#d97757] text-xs font-medium border-t border-[#e0ddd5] pt-2">
-                                  置信范围: ¥{formatNum(d.confidenceLower)} - ¥{formatNum(d.confidenceUpper)}
+                                  {t('analysis.forecastConfidence')}: ¥{formatNum(d.confidenceLower)} - ¥{formatNum(d.confidenceUpper)}
                                 </p>
                               )}
                               <p className="text-emerald-600 text-sm flex items-center">
-                                <i className="fas fa-chart-line mr-2"></i> 预估利润: ¥{formatNum(d.profit)}
+                                <i className="fas fa-chart-line mr-2"></i> {t('analysis.forecastEstProfit')}: ¥{formatNum(d.profit)}
                               </p>
                             </div>
                           </div>
@@ -734,17 +736,17 @@ ${JSON.stringify(mcOnVar)}
                       return null;
                     }}
                   />
-                  <Area type="monotone" dataKey="confidenceUpper" stroke="none" fill="#d97757" fillOpacity={0.12} name="置信上界" />
-                  <Area type="monotone" dataKey="confidenceLower" stroke="none" fill="#d97757" fillOpacity={0.12} name="置信下界" />
+                  <Area type="monotone" dataKey="confidenceUpper" stroke="none" fill="#d97757" fillOpacity={0.12} name={t('analysis.forecastUpperBound')} />
+                  <Area type="monotone" dataKey="confidenceLower" stroke="none" fill="#d97757" fillOpacity={0.12} name={t('analysis.forecastLowerBound')} />
                   <Area
                     type="monotone"
                     dataKey="revenue"
-                    name="营业收入"
+                    name={t('analysis.chartRevenueLabel')}
                     stroke="#d97757"
                     strokeWidth={4}
                     fill="url(#colorForecast)"
                   />
-                  <Line type="monotone" dataKey="profit" name="营业利润" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 4" />
+                  <Line type="monotone" dataKey="profit" name={t('analysis.chartProfitLabel')} stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 4" />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -755,7 +757,7 @@ ${JSON.stringify(mcOnVar)}
             <div className="mt-6 bg-white/60 border border-[#e0ddd5] rounded-xl p-6" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
               <h4 className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest mb-4 flex items-center">
                 <i className="fas fa-globe mr-2 text-[#d97757]"></i>
-                AI 预测参考的市场数据来源
+                {t('analysis.forecastSources')}
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {groundingSources.map((src, idx) => (
@@ -780,39 +782,40 @@ ${JSON.stringify(mcOnVar)}
         <div className="bg-white/80 border border-[#e0ddd5] rounded-xl overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
           <div className="p-10 border-b border-[#e0ddd5] bg-[#f9f9f8]/50 flex justify-between items-center">
             <div>
-              <h3 className="text-2xl font-bold text-[#191918] tracking-tight">2026年度业务数据全景表</h3>
-              <p className="text-[#5c5c5a] text-sm mt-1">包含金额、吨位、增长率与价格指数的完整明细</p>
+              <h3 className="text-2xl font-bold text-[#191918] tracking-tight">{t('analysis.tableTitle')}</h3>
+              <p className="text-[#5c5c5a] text-sm mt-1">{t('analysis.tableSubtitle')}</p>
             </div>
             <button
               onClick={() => {
                 const rows = data.monthlyPerformance;
-                let csv = '\uFEFF月份,采购量(t),销售量(t),营业收入,成本,毛利,净利润,同比(%),环比(%),价格指数\n';
+                const csvHeader = [t('analysis.tableMonth'),t('analysis.tableHeaderPurchase'),t('analysis.tableHeaderSales'),t('analysis.tableHeaderRevenue'),t('analysis.tableHeaderCost'),t('analysis.tableHeaderGross'),t('analysis.tableHeaderNet'),t('analysis.tableHeaderYoy'),t('analysis.tableHeaderMom'),t('analysis.tableHeaderPrice')].join(',');
+                let csv = '﻿' + csvHeader + '\n';
                 rows.forEach(r => {
                   csv += `${r.name},${r.purchaseTons},${r.salesTons},${r.revenue},${r.cost},${r.profit},${r.netProfit},${r.yoy},${r.mom},${r.deflator}\n`;
                 });
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = url; a.download = '2026年度业务数据明细.csv'; a.click();
+                a.href = url; a.download = t('analysis.tableExportFilename'); a.click();
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
               }}
               className="px-6 py-2.5 bg-[#f9f9f8] text-[#4a4a48] rounded-xl text-xs font-bold border border-[#e0ddd5] hover:text-[#191918] hover:bg-[#f0eeeb] transition-all flex items-center"
             >
-              <i className="fas fa-file-csv mr-2"></i> 导出 CSV 明细
+              <i className="fas fa-file-csv mr-2"></i> {t('analysis.tableExport')}
             </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[1400px]">
               <thead>
                 <tr className="bg-[#f9f9f8]/70 text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest">
-                  <th className="px-10 py-6 border-r border-[#e0ddd5]/70 sticky left-0 bg-white">月份</th>
-                  <th className="px-10 py-6 text-center border-r border-[#e0ddd5]/70">采购量 (t)</th>
-                  <th className="px-10 py-6 text-center border-r border-[#e0ddd5]/70">销售量 (t)</th>
-                  <th className="px-10 py-6 text-right border-r border-[#e0ddd5]/70">营业收入 (¥)</th>
-                  <th className="px-10 py-6 text-right border-r border-[#e0ddd5]/70">净利润 (¥)</th>
-                  <th className="px-10 py-6 text-center border-r border-[#e0ddd5]/70">同比 (YoY)</th>
-                  <th className="px-10 py-6 text-center border-r border-[#e0ddd5]/70">环比 (MoM)</th>
-                  <th className="px-10 py-6 text-center bg-amber-500/5">价格指数</th>
+                  <th className="px-10 py-6 border-r border-[#e0ddd5]/70 sticky left-0 bg-white">{t('analysis.tableMonth')}</th>
+                  <th className="px-10 py-6 text-center border-r border-[#e0ddd5]/70">{t('analysis.tableHeaderPurchase')}</th>
+                  <th className="px-10 py-6 text-center border-r border-[#e0ddd5]/70">{t('analysis.tableHeaderSales')}</th>
+                  <th className="px-10 py-6 text-right border-r border-[#e0ddd5]/70">{t('analysis.tableHeaderRevenue')}</th>
+                  <th className="px-10 py-6 text-right border-r border-[#e0ddd5]/70">{t('analysis.tableHeaderNet')}</th>
+                  <th className="px-10 py-6 text-center border-r border-[#e0ddd5]/70">{t('analysis.tableHeaderYoy')}</th>
+                  <th className="px-10 py-6 text-center border-r border-[#e0ddd5]/70">{t('analysis.tableHeaderMom')}</th>
+                  <th className="px-10 py-6 text-center bg-amber-500/5">{t('analysis.tableHeaderPrice')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e0ddd5]">

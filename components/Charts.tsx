@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ComposedChart, Area, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Legend, Cell, PieChart, Pie, BarChart
@@ -9,16 +10,20 @@ import { ChartData, CategoryData } from '../types';
 // Anthropic-style warm color palette
 const COLORS = ['#d97757', '#10b981', '#8b5cf6', '#f59e0b', '#3b82f6'];
 
-const EmptyChartPlaceholder: React.FC<{ height?: string }> = ({ height = 'h-80' }) => (
-  <div className={`${height} w-full flex items-center justify-center text-sm text-[#5c5c5a]`}>
-    <div className="text-center">
-      <i className="fas fa-chart-bar text-2xl text-[#d1cdc4] mb-2 block"></i>
-      暂无图表数据
+const EmptyChartPlaceholder: React.FC<{ height?: string }> = ({ height = 'h-80' }) => {
+  const { t } = useTranslation();
+  return (
+    <div className={`${height} w-full flex items-center justify-center text-sm text-[#5c5c5a]`}>
+      <div className="text-center">
+        <i className="fas fa-chart-bar text-2xl text-[#d1cdc4] mb-2 block"></i>
+        {t('charts.empty')}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export const PLStatementChart: React.FC<{ data: ChartData[] }> = ({ data }) => {
+  const { t } = useTranslation();
   if (!data || data.length === 0) return <EmptyChartPlaceholder />;
   return (
   <div className="h-80 w-full">
@@ -49,9 +54,9 @@ export const PLStatementChart: React.FC<{ data: ChartData[] }> = ({ data }) => {
           align="right"
           wrapperStyle={{ paddingBottom: '20px', fontSize: '12px', color: '#4a4a48' }}
         />
-        <Bar dataKey="revenue" name="营业收入" fill="#d97757" radius={[4, 4, 0, 0]} barSize={30} />
-        <Bar dataKey="cost" name="营业成本" fill="#e8956e" radius={[4, 4, 0, 0]} barSize={30} opacity={0.6} />
-        <Line type="monotone" dataKey="profit" name="营业利润" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4 }} />
+        <Bar dataKey="revenue" name={t('analysis.chartRevenue')} fill="#d97757" radius={[4, 4, 0, 0]} barSize={30} />
+        <Bar dataKey="cost" name={t('analysis.chartCost')} fill="#e8956e" radius={[4, 4, 0, 0]} barSize={30} opacity={0.6} />
+        <Line type="monotone" dataKey="profit" name={t('analysis.chartProfit')} stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4 }} />
       </ComposedChart>
     </ResponsiveContainer>
   </div>

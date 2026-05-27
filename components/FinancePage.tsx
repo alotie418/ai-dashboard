@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
 type StatementType = 'pl' | 'balance' | 'cashflow';
 
 const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<StatementType>('pl');
 
   // Construct display period string
@@ -81,10 +83,10 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
             onClick={exportToCSV}
             className="flex items-center px-4 py-2 bg-[#f9f9f8] hover:bg-[#f0eeeb] text-[#191918] rounded-xl text-sm font-medium border border-[#e0ddd5] transition-all"
           >
-            <i className="fas fa-file-export mr-2 text-[#d97757]"></i> 导出报表
+            <i className="fas fa-file-export mr-2 text-[#d97757]"></i> {t('finance.export')}
           </button>
           <button className="flex items-center px-4 py-2 bg-[#d97757] hover:bg-[#c56a4a] text-white rounded-xl text-sm font-medium transition-all" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}>
-            <i className="fas fa-print mr-2"></i> 打印存档
+            <i className="fas fa-print mr-2"></i> {t('finance.print')}
           </button>
         </div>
       </div>
@@ -92,19 +94,19 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
       {/* Quick KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white/80 border border-[#e0ddd5] p-6 rounded-xl">
-          <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">本期净资产</p>
+          <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">{t('finance.kpiNetAssets')}</p>
           <h4 className="text-2xl font-bold text-[#191918] tracking-tight">¥0.00</h4>
-          <p className="text-[#5c5c5a] text-xs mt-2 italic">暂无数据</p>
+          <p className="text-[#5c5c5a] text-xs mt-2 italic">{t('finance.kpiNoData')}</p>
         </div>
         <div className="bg-white/80 border border-[#e0ddd5] p-6 rounded-xl">
-          <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">资产负债率</p>
+          <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">{t('finance.kpiDebtRatio')}</p>
           <h4 className="text-2xl font-bold text-[#191918] tracking-tight">0.0%</h4>
-          <p className="text-[#5c5c5a] text-xs mt-2 italic">暂无数据</p>
+          <p className="text-[#5c5c5a] text-xs mt-2 italic">{t('finance.kpiNoData')}</p>
         </div>
         <div className="bg-white/80 border border-[#e0ddd5] p-6 rounded-xl">
-          <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">流动比率</p>
+          <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">{t('finance.kpiCurrentRatio')}</p>
           <h4 className="text-2xl font-bold text-[#191918] tracking-tight">0.0</h4>
-          <p className="text-[#5c5c5a] text-xs mt-2 italic">暂无数据</p>
+          <p className="text-[#5c5c5a] text-xs mt-2 italic">{t('finance.kpiNoData')}</p>
         </div>
       </div>
 
@@ -115,21 +117,21 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
           className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'pl' ? 'bg-[#d97757] text-white' : 'text-[#4a4a48] hover:text-[#191918]'}`}
           style={activeTab === 'pl' ? { boxShadow: '0 4px 16px rgba(217,119,87,0.15)' } : {}}
         >
-          利润表 (P&L)
+          {t('finance.tabPl')}
         </button>
         <button
           onClick={() => setActiveTab('balance')}
           className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'balance' ? 'bg-[#d97757] text-white' : 'text-[#4a4a48] hover:text-[#191918]'}`}
           style={activeTab === 'balance' ? { boxShadow: '0 4px 16px rgba(217,119,87,0.15)' } : {}}
         >
-          资产负债表
+          {t('finance.tabBalance')}
         </button>
         <button
           onClick={() => setActiveTab('cashflow')}
           className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'cashflow' ? 'bg-[#d97757] text-white' : 'text-[#4a4a48] hover:text-[#191918]'}`}
           style={activeTab === 'cashflow' ? { boxShadow: '0 4px 16px rgba(217,119,87,0.15)' } : {}}
         >
-          现金流量表
+          {t('finance.tabCashflow')}
         </button>
       </div>
 
@@ -139,22 +141,22 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
           <div className="p-10">
             <div className="max-w-4xl mx-auto space-y-6">
               <div className="text-center mb-10">
-                <h2 className="text-2xl font-bold text-[#191918]">利润表</h2>
-                <p className="text-[#5c5c5a] text-sm">单位：人民币元 | 会计期间：{periodDisplay}</p>
+                <h2 className="text-2xl font-bold text-[#191918]">{t('finance.plTitle')}</h2>
+                <p className="text-[#5c5c5a] text-sm">{t('finance.plPeriod')}{periodDisplay}</p>
               </div>
               {(() => {
                 const pl = recomputePL();
                 return (
                   <div className="space-y-1">
-                    <LineItem label="一、营业收入" value={data.financialStatement.salesRevenue} bold primary />
-                    <LineItem label="减：营业成本" value={data.financialStatement.costOfSales} indent />
-                    <LineItem label="二、毛利" value={pl.grossProfit} bold primary />
-                    <LineItem label="减：税金及附加" value={data.financialStatement.taxSurcharge} indent />
-                    <LineItem label="减：销售费用 (运费等)" value={data.financialStatement.shippingFee} indent />
-                    <LineItem label="减：管理费用" value={data.financialStatement.adminExpense} indent />
-                    <LineItem label="减：所得税费用" value={data.financialStatement.incomeTax} indent />
-                    <LineItem label="三、净利润" value={pl.netProfit} bold success />
-                    <LineItem label="净利率" value={`${pl.netMargin.toFixed(2)}%`} indent />
+                    <LineItem label={t('finance.plRevenue')} value={data.financialStatement.salesRevenue} bold primary />
+                    <LineItem label={t('finance.plCost')} value={data.financialStatement.costOfSales} indent />
+                    <LineItem label={t('finance.plGrossProfit')} value={pl.grossProfit} bold primary />
+                    <LineItem label={t('finance.plTaxSurcharge')} value={data.financialStatement.taxSurcharge} indent />
+                    <LineItem label={t('finance.plShipping')} value={data.financialStatement.shippingFee} indent />
+                    <LineItem label={t('finance.plAdmin')} value={data.financialStatement.adminExpense} indent />
+                    <LineItem label={t('finance.plIncomeTax')} value={data.financialStatement.incomeTax} indent />
+                    <LineItem label={t('finance.plNetProfit')} value={pl.netProfit} bold success />
+                    <LineItem label={t('finance.plNetMargin')} value={`${pl.netMargin.toFixed(2)}%`} indent />
                   </div>
                 );
               })()}
@@ -166,36 +168,36 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
           <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-[#e0ddd5]">
             <div className="p-10">
               <h3 className="text-lg font-bold text-[#191918] mb-6 flex items-center">
-                <i className="fas fa-coins mr-3 text-amber-500"></i> 资产 (Assets)
+                <i className="fas fa-coins mr-3 text-amber-500"></i> {t('finance.balanceAssets')}
               </h3>
               <div className="space-y-1">
-                <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2">流动资产</h4>
-                <LineItem label="货币资金" value={0.0} />
-                <LineItem label="应收账款" value={0.0} />
-                <LineItem label="存货" value={0.0} />
+                <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2">{t('finance.balanceCurrentAssets')}</h4>
+                <LineItem label={t('finance.balanceCash')} value={0.0} />
+                <LineItem label={t('finance.balanceReceivables')} value={0.0} />
+                <LineItem label={t('finance.balanceInventory')} value={0.0} />
                 <div className="border-t border-[#e0ddd5] my-4"></div>
-                <LineItem label="流动资产合计" value={0.0} bold />
-                <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2 mt-4">非流动资产</h4>
-                <LineItem label="固定资产" value={0.0} />
+                <LineItem label={t('finance.balanceCurrentAssetsTotal')} value={0.0} bold />
+                <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2 mt-4">{t('finance.balanceNonCurrentAssets')}</h4>
+                <LineItem label={t('finance.balanceFixedAssets')} value={0.0} />
                 <div className="border-t border-[#e0ddd5] my-4"></div>
-                <LineItem label="资产总计" value={0.0} bold primary />
+                <LineItem label={t('finance.balanceTotalAssets')} value={0.0} bold primary />
               </div>
             </div>
             <div className="p-10 bg-[#f9f9f8]/20">
               <h3 className="text-lg font-bold text-[#191918] mb-6 flex items-center">
-                <i className="fas fa-hand-holding-dollar mr-3 text-rose-500"></i> 负债与权益
+                <i className="fas fa-hand-holding-dollar mr-3 text-rose-500"></i> {t('finance.balanceLiabilitiesEquity')}
               </h3>
               <div className="space-y-1">
-                <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2">流动负债</h4>
-                <LineItem label="应付账款" value={0.0} />
-                <LineItem label="应交税费" value={0.0} />
+                <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2">{t('finance.balanceCurrentLiabilities')}</h4>
+                <LineItem label={t('finance.balancePayables')} value={0.0} />
+                <LineItem label={t('finance.balanceTaxPayable')} value={0.0} />
                 <div className="border-t border-[#e0ddd5] my-4"></div>
-                <LineItem label="负债合计" value={0.0} bold />
-                <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2 mt-4">所有者权益</h4>
-                <LineItem label="实收资本" value={0.0} />
-                <LineItem label="未分配利润" value={0.0} />
+                <LineItem label={t('finance.balanceTotalLiabilities')} value={0.0} bold />
+                <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2 mt-4">{t('finance.balanceEquity')}</h4>
+                <LineItem label={t('finance.balancePaidInCapital')} value={0.0} />
+                <LineItem label={t('finance.balanceRetainedEarnings')} value={0.0} />
                 <div className="border-t border-[#e0ddd5] my-4"></div>
-                <LineItem label="负债及所有者权益总计" value={0.0} bold primary />
+                <LineItem label={t('finance.balanceTotalLiabilitiesEquity')} value={0.0} bold primary />
               </div>
             </div>
           </div>
@@ -204,10 +206,10 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
         {activeTab === 'cashflow' && (
           <div className="p-20 text-center text-[#5c5c5a] flex flex-col items-center">
             <i className="fas fa-faucet-drip text-6xl mb-6 opacity-20"></i>
-            <h3 className="text-xl font-medium">现金流量表深度分析</h3>
-            <p className="mt-2 text-sm max-w-md">正在连接财务软件 API 同步现金流数据。当前仅支持模拟预览。</p>
+            <h3 className="text-xl font-medium">{t('finance.cashflowTitle')}</h3>
+            <p className="mt-2 text-sm max-w-md">{t('finance.cashflowDesc')}</p>
             <button className="mt-8 px-6 py-2 bg-[#f9f9f8] rounded-xl text-sm hover:text-[#191918] transition-colors border border-[#e0ddd5]">
-              立即同步
+              {t('finance.cashflowSync')}
             </button>
           </div>
         )}
