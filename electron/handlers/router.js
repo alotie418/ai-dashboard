@@ -15,6 +15,7 @@ const ai = require('./ai');
 const categories = require('./categories');
 const transactions = require('./transactions');
 const migrationsH = require('./migrations');
+const reportsH = require('./reports');
 
 const routes = [
   // ---- Dashboard ----
@@ -62,6 +63,10 @@ const routes = [
   ['GET', '/api/transactions/:id', transactions.get],
   ['PUT', '/api/transactions/:id', transactions.update],
   ['DELETE', '/api/transactions/:id', transactions.remove],
+
+  // ---- Reports（D 阶段 — 6 国报表引擎）----
+  ['GET', '/api/reports/generate', reportsH.generate],
+  ['GET', '/api/reports/types', reportsH.types],
 
   // ---- Legacy Data Migrations（sales/purchases → transactions）----
   ['GET', '/api/migrations/detect-legacy', migrationsH.detectLegacy],
