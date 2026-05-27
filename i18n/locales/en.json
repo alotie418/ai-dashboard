@@ -701,7 +701,8 @@
     "amountWithoutTax": "Amount (Excl. Tax)",
     "totalTax": "Total Tax",
     "totalWithTax": "Total (Incl. Tax)",
-    "actions": "Action"
+    "actions": "Action",
+    "taxAmount": "Tax Amount"
   },
   "common2": {
     "edit": "Edit",
