@@ -78,6 +78,12 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
     return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
   };
 
+  // ── LOCAL FORECAST MODELS ──
+  // TODO [future-forecast]: Replace these 3 functions with a pluggable forecast engine.
+  //   Candidates: real VAR / ARIMA / exponential smoothing / ML regression.
+  //   Keep the same function signatures so the pipeline (STEP 1-3) doesn't change.
+  //   Add backtesting + accuracy metrics when the engine is swapped.
+
   // ① Feature Vector Extraction
   const extractFeatures = (perf: typeof data.monthlyPerformance) => {
     const nonZero = perf.filter(p => p.revenue > 0);
@@ -136,6 +142,7 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
   };
 
   // ② Trend Forecast: independent AR(1) per series [revenue, cost, salesTons]
+  // TODO [future-forecast]: Replace with real multivariate model (VAR/VECM) that captures cross-series correlation.
   const varForecast = (perf: typeof data.monthlyPerformance) => {
     const nonZero = perf.filter(p => p.revenue > 0);
     if (nonZero.length < 4) return null;
@@ -171,6 +178,7 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
   };
 
   // ③ Monte Carlo Simulation: P5/P95 confidence intervals
+  // TODO [future-forecast]: Use model-specific residual distribution instead of historical CV.
   const monteCarloSimulation = (historicalRevenues: number[], pointEstimates: number[]) => {
     const nonZero = historicalRevenues.filter(r => r > 0);
     if (nonZero.length < 3) return null;
