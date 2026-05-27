@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fetchAlerts, fetchAlertCount, markAlertRead, markAllAlertsRead, dismissAlert } from '../services/api';
 import { Alert } from '../types';
 
@@ -8,14 +9,15 @@ const SEVERITY_STYLES: Record<string, { bg: string; text: string; icon: string; 
   info: { bg: 'bg-blue-50', text: 'text-blue-600', icon: 'fa-info-circle', border: 'border-blue-200' },
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  inventory_zero: '库存预警',
-  receivable_overdue: '应收逾期',
-  payable_upcoming: '应付到期',
-  price_volatility: '价格波动',
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  inventory_zero: 'alerts.typeInventory',
+  receivable_overdue: 'alerts.typeReceivable',
+  payable_upcoming: 'alerts.typePayable',
+  price_volatility: 'alerts.typePrice',
 };
 
 const AlertCenter: React.FC = () => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -102,11 +104,11 @@ const AlertCenter: React.FC = () => {
     const now = new Date();
     const diff = now.getTime() - d.getTime();
     const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins}分钟前`;
+    if (mins < 60) return t('common2.minutesAgo', { count: mins });
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}小时前`;
+    if (hours < 24) return t('common2.hoursAgo', { count: hours });
     const days = Math.floor(hours / 24);
-    if (days < 7) return `${days}天前`;
+    if (days < 7) return t('common2.daysAgo', { count: days });
     return d.toLocaleDateString('zh-CN');
   };
 
@@ -116,7 +118,7 @@ const AlertCenter: React.FC = () => {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 rounded-lg hover:bg-[#f0eeeb] transition-colors text-[#7a7a78] hover:text-[#191918]"
-        title="预警通知"
+        title={t('alerts.notifications')}
       >
         <i className="fas fa-bell text-lg"></i>
         {unreadCount > 0 && (
@@ -133,12 +135,12 @@ const AlertCenter: React.FC = () => {
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#e0ddd5] bg-[#f9f9f8]">
             <h4 className="text-sm font-bold text-[#191918]">
               <i className="fas fa-bell mr-1.5 text-[#d97757]"></i>
-              预警中心
-              {unreadCount > 0 && <span className="ml-2 text-xs text-[#7a7a78]">({unreadCount} 未读)</span>}
+              {t('alerts.title')}
+              {unreadCount > 0 && <span className="ml-2 text-xs text-[#7a7a78]">({unreadCount} {t('alerts.unread')})</span>}
             </h4>
             {unreadCount > 0 && (
               <button onClick={handleMarkAllRead} className="text-xs text-[#d97757] hover:text-[#c56646]">
-                全部已读
+                {t('alerts.markAllRead')}
               </button>
             )}
           </div>
@@ -152,7 +154,7 @@ const AlertCenter: React.FC = () => {
             ) : alerts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-[#7a7a78]">
                 <i className="fas fa-check-circle text-3xl text-green-400 mb-2"></i>
-                <p className="text-sm">暂无预警</p>
+                <p className="text-sm">{t('alerts.empty')}</p>
               </div>
             ) : (
               alerts.map(alert => {
@@ -170,7 +172,7 @@ const AlertCenter: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${style.bg} ${style.text}`}>
-                            {TYPE_LABELS[alert.type] || alert.type}
+                            {TYPE_LABEL_KEYS[alert.type] ? t(TYPE_LABEL_KEYS[alert.type]) : alert.type}
                           </span>
                           {!alert.is_read && <span className="w-1.5 h-1.5 rounded-full bg-[#d97757]"></span>}
                         </div>
@@ -181,7 +183,7 @@ const AlertCenter: React.FC = () => {
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDismiss(alert.id); }}
                         className="text-[#b0b0ae] hover:text-red-400 p-1 flex-shrink-0"
-                        title="忽略"
+                        title={t('alerts.dismiss')}
                       >
                         <i className="fas fa-times text-xs"></i>
                       </button>

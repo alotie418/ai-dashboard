@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { analyzeInvoice } from '../services/ocrService';
 import { fetchSales, createSale, updateSale, deleteSale, SalesRecord } from '../services/api';
@@ -16,6 +17,7 @@ let salesIdCounter = 0;
 const nextSalesId = () => `sale-${++salesIdCounter}-${Date.now()}`;
 
 const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
+  const { t } = useTranslation();
   const [recognitionMode, setRecognitionMode] = useState<'ai' | 'ocr'>('ai');
   const [isScanning, setIsScanning] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -88,20 +90,20 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
     try {
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('文件读取超时')), 30000);
+        const timeout = setTimeout(() => reject(new Error(t('sales.fileReadTimeout'))), 30000);
         reader.onload = () => {
           clearTimeout(timeout);
           const result = reader.result as string;
           const parts = result.split(',');
           if (parts.length < 2) {
-            reject(new Error('文件格式不支持'));
+            reject(new Error(t('sales.fileFormatUnsupported')));
             return;
           }
           resolve(parts[1]);
         };
         reader.onerror = () => {
           clearTimeout(timeout);
-          reject(new Error('文件读取失败'));
+          reject(new Error(t('sales.fileReadFailed')));
         };
       });
       reader.readAsDataURL(file);
@@ -131,10 +133,10 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
 
       await createSale(newRecord);
       setRecords(prev => [newRecord, ...prev]);
-      alert("识别成功！已添加到列表。");
+      alert(t('sales.recognizeSuccess'));
     } catch (err) {
       console.error(err);
-      alert("识别失败，请确保上传的是清晰的发票图片。");
+      alert(t('sales.recognizeFailed'));
     } finally {
       setIsScanning(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -144,7 +146,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSale.customer || !newSale.quantity) {
-      alert("请填写必要的客户和数量信息");
+      alert(t('sales.formValidation'));
       return;
     }
     try {
@@ -174,7 +176,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
       });
     } catch (err) {
       console.error(err);
-      alert(editingId ? '更新失败，请重试' : '保存失败，请重试');
+      alert(editingId ? t('sales.updateFailed') : t('sales.saveFailed'));
     }
   };
 
@@ -194,13 +196,13 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
 
       {/* Header Section */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[#191918]">销售与销项</h1>
+        <h1 className="text-2xl font-bold text-[#191918]">{t('sales.title')}</h1>
         <div className="flex space-x-3">
           <button
             onClick={() => setShowCsvImport(true)}
             className="flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors text-sm font-medium" style={{ boxShadow: '0 4px 16px rgba(16,185,129,0.15)' }}
           >
-            <i className="fas fa-file-csv mr-2"></i> 批量导入
+            <i className="fas fa-file-csv mr-2"></i> {t('sales.batchImport')}
           </button>
           <button
             onClick={triggerUpload}
@@ -208,13 +210,13 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
             className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50" style={{ boxShadow: '0 4px 16px rgba(147,51,234,0.15)' }}
           >
             <i className={`fas ${isScanning ? 'fa-spinner animate-spin' : 'fa-camera'} mr-2`}></i>
-            {isScanning ? '正在识别...' : '扫描发票'}
+            {isScanning ? t('sales.scanning') : t('sales.scanInvoice')}
           </button>
           <button
             onClick={() => { setEditingId(null); setShowAddModal(true); }}
             className="flex items-center px-4 py-2 bg-[#d97757] hover:bg-[#c56a4a] text-white rounded-lg transition-colors text-sm font-medium" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}
           >
-            <i className="fas fa-plus mr-2"></i> 新增销售
+            <i className="fas fa-plus mr-2"></i> {t('sales.newSale')}
           </button>
         </div>
       </div>
@@ -234,16 +236,16 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
               </div>
               <div>
                 <p className={`${isLow ? 'text-rose-500' : 'text-blue-500'} font-bold text-sm`}>
-                  当前库存: {inventoryTons.toFixed(2)} 吨 ({inventoryBags} 袋)
+                  {t('sales.inventoryCurrent')}: {inventoryTons.toFixed(2)} {t('sales.inventoryTon')} ({inventoryBags} {t('sales.inventoryBag')})
                 </p>
                 <p className={`${isLow ? 'text-rose-400' : 'text-blue-400'} text-xs`}>
-                  {isLow ? '库存不足，销售将导致库存为负' : '库存充足'}
+                  {isLow ? t('sales.inventoryLow') : t('sales.inventorySufficient')}
                 </p>
               </div>
             </div>
             <div className="text-right text-[#5c5c5a] text-xs space-y-0.5">
-              <p>总采购: {purchaseTons.toFixed(2)} 吨</p>
-              <p>总销售: {salesTons.toFixed(2)} 吨</p>
+              <p>{t('sales.inventoryTotalPurchase')}: {purchaseTons.toFixed(2)} {t('sales.inventoryTon')}</p>
+              <p>{t('sales.inventoryTotalSales')}: {salesTons.toFixed(2)} {t('sales.inventoryTon')}</p>
             </div>
           </div>
         );
@@ -252,25 +254,25 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
       {/* Recognition Mode Selector */}
       <div className="flex items-center justify-between py-2">
         <div className="flex items-center space-x-4">
-          <span className="text-[#4a4a48] text-sm">识别模式:</span>
+          <span className="text-[#4a4a48] text-sm">{t('sales.recognitionMode')}:</span>
           <div className="flex bg-[#f9f9f8] rounded-lg p-1 border border-[#e0ddd5]">
             <button
               onClick={() => setRecognitionMode('ai')}
               className={`flex items-center px-3 py-1.5 rounded-md text-xs transition-all ${recognitionMode === 'ai' ? 'bg-[#d97757] text-white shadow-sm' : 'text-[#4a4a48] hover:text-[#191918]'}`}
             >
-              <i className="fas fa-robot mr-2"></i> AI 智能识别 (Gemini)
+              <i className="fas fa-robot mr-2"></i> {t('sales.modeAi')}
             </button>
             <button
               onClick={() => setRecognitionMode('ocr')}
               className={`flex items-center px-3 py-1.5 rounded-md text-xs transition-all ${recognitionMode === 'ocr' ? 'bg-[#f0eeeb] text-[#191918]' : 'text-[#4a4a48] hover:text-[#191918]'}`}
             >
-              <i className="fas fa-file-invoice mr-2"></i> 本地 OCR 识别
+              <i className="fas fa-file-invoice mr-2"></i> {t('sales.modeOcr')}
             </button>
           </div>
         </div>
         <div className="flex items-center space-x-2 text-xs text-[#5c5c5a]">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>AI 服务: 已在线 ({recognitionMode === 'ai' ? 'Gemini 3 Flash' : 'Local OCR Engine'})</span>
+          <span>{t('sales.aiStatus', { engine: recognitionMode === 'ai' ? 'Gemini 3 Flash' : 'Local OCR Engine' })}</span>
         </div>
       </div>
 
@@ -295,10 +297,10 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
           )}
         </div>
         <h3 className="text-[#4a4a48] font-medium text-base mb-1">
-          {isScanning ? '正在分析发票数据...' : '拖放或点击上传电子发票'}
+          {isScanning ? t('sales.uploadAnalyzing') : t('sales.uploadTitle')}
         </h3>
         <p className="text-[#5c5c5a] text-xs">
-          {isScanning ? 'AI 正在提取日期、金额、发票号等关键信息' : '支持图片或 PDF，使用 Gemini 智能识别，识别更准确'}
+          {isScanning ? t('sales.uploadExtracting') : t('sales.uploadSubtitle')}
         </p>
       </div>
 
@@ -308,17 +310,17 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-[#e0ddd5] text-[#5c5c5a] text-xs">
-                <th className="px-5 py-4 font-medium">日期</th>
-                <th className="px-5 py-4 font-medium">客户</th>
-                <th className="px-5 py-4 font-medium">数量</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">无税单价</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">合计无税金额</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">合计税额</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">价税合计</th>
-                <th className="px-5 py-4 font-medium">运费</th>
-                <th className="px-5 py-4 font-medium">发票号码</th>
-                <th className="px-5 py-4 font-medium">状态</th>
-                <th className="px-5 py-4 font-medium">操作</th>
+                <th className="px-5 py-4 font-medium">{t('tableHeaders.date')}</th>
+                <th className="px-5 py-4 font-medium">{t('tableHeaders.customer')}</th>
+                <th className="px-5 py-4 font-medium">{t('tableHeaders.quantity')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{t('tableHeaders.unitPriceWithoutTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{t('tableHeaders.amountWithoutTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{t('tableHeaders.taxAmount')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{t('tableHeaders.totalWithTax')}</th>
+                <th className="px-5 py-4 font-medium">{t('tableHeaders.shipping')}</th>
+                <th className="px-5 py-4 font-medium">{t('tableHeaders.invoiceNo')}</th>
+                <th className="px-5 py-4 font-medium">{t('tableHeaders.status')}</th>
+                <th className="px-5 py-4 font-medium">{t('tableHeaders.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e0ddd5]/50">
@@ -351,7 +353,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                         setShowAddModal(true);
                       }}
                       className="text-[#d97757] hover:text-[#c56a4a] transition-colors"
-                    >编辑</button>
+                    >{t('common2.edit')}</button>
                     <button
                       onClick={async () => {
                         try {
@@ -359,12 +361,12 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                           setRecords(prev => prev.filter(r => r.id !== row.id));
                         } catch (err) {
                           console.error(err);
-                          alert('删除失败，请重试');
+                          alert(t('sales.deleteFailed'));
                         }
                       }}
                       className="text-rose-500 hover:text-rose-400 transition-colors"
                     >
-                      删除
+                      {t('common2.delete')}
                     </button>
                   </td>
                 </tr>
@@ -373,21 +375,21 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
               {isLoading && (
                 <tr>
                   <td colSpan={11} className="px-6 py-12 text-center text-[#5c5c5a] text-sm">
-                    <i className="fas fa-spinner animate-spin mr-2"></i>正在加载数据...
+                    <i className="fas fa-spinner animate-spin mr-2"></i>{t('sales.loading')}
                   </td>
                 </tr>
               )}
               {!isLoading && records.length === 0 && (
                 <tr>
                   <td colSpan={11} className="px-6 py-12 text-center text-[#5c5c5a] text-sm italic">
-                    暂无销售记录，请上传发票或手动新增。
+                    {t('sales.empty')}
                   </td>
                 </tr>
               )}
               {/* Summary row */}
               {!isLoading && records.length > 0 && (
                 <tr className="bg-[#f9f9f8] border-t-2 border-[#e0ddd5] font-semibold">
-                  <td className="px-5 py-4 text-sm text-[#191918]" colSpan={2}>合计</td>
+                  <td className="px-5 py-4 text-sm text-[#191918]" colSpan={2}>{t('sales.summary')}</td>
                   <td className="px-5 py-4 text-sm text-[#191918]">
                     {(() => {
                       const total = records.reduce((sum, r) => {
@@ -442,8 +444,8 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
           <div className="relative w-full max-w-lg bg-white border border-[#e0ddd5] rounded-xl overflow-hidden animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
             <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold text-[#191918]">{editingId ? '编辑销售记录' : '新增销售记录'}</h2>
-                <p className="text-xs text-[#5c5c5a] mt-1">{editingId ? '修改已有的销售交易明细' : '手动录入销售交易明细'}</p>
+                <h2 className="text-xl font-bold text-[#191918]">{editingId ? t('sales.modalTitleEdit') : t('sales.modalTitle')}</h2>
+                <p className="text-xs text-[#5c5c5a] mt-1">{editingId ? t('sales.modalSubtitleEdit') : t('sales.modalSubtitle')}</p>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-[#5c5c5a] hover:text-[#191918] transition-colors">
                 <i className="fas fa-times text-xl"></i>
@@ -453,7 +455,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
             <form onSubmit={handleAddSubmit} className="p-8 space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">业务日期</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formDate')}</label>
                   <input
                     type="date"
                     required
@@ -463,10 +465,10 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">发票号码</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formInvoiceNo')}</label>
                   <input
                     type="text"
-                    placeholder="可选"
+                    placeholder={t('sales.formOptional')}
                     value={newSale.invoiceNo}
                     onChange={(e) => setNewSale({ ...newSale, invoiceNo: e.target.value })}
                     className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
@@ -475,11 +477,11 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">客户名称</label>
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formCustomer')}</label>
                 <input
                   type="text"
                   required
-                  placeholder="请输入购方全称"
+                  placeholder={t('sales.formCustomerPlaceholder')}
                   value={newSale.customer}
                   onChange={(e) => setNewSale({ ...newSale, customer: e.target.value })}
                   className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
@@ -487,11 +489,11 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">销售数量</label>
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formQuantity')}</label>
                 <input
                   type="text"
                   required
-                  placeholder="例如: 36.5吨 / 3650袋"
+                  placeholder={t('sales.formQuantityPlaceholder')}
                   value={newSale.quantity}
                   onChange={(e) => setNewSale({ ...newSale, quantity: e.target.value })}
                   className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
@@ -500,7 +502,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">成交总价 (不含税)</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formPriceWithoutTax')}</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
                     <input
@@ -514,7 +516,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">运费支出</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formShipping')}</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
                     <input
@@ -530,7 +532,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">无税单价</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formUnitPrice')}</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
                     <input
@@ -539,12 +541,12 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                       value={newSale.unitPriceWithoutTax || ''}
                       onChange={(e) => setNewSale({ ...newSale, unitPriceWithoutTax: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
-                      placeholder="可选"
+                      placeholder={t('sales.formOptional')}
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">合计税额</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formTaxAmount')}</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
                     <input
@@ -553,12 +555,12 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                       value={newSale.taxAmount || ''}
                       onChange={(e) => setNewSale({ ...newSale, taxAmount: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
-                      placeholder="可选"
+                      placeholder={t('sales.formOptional')}
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">价税合计</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formTotalWithTax')}</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
                     <input
@@ -567,7 +569,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                       value={newSale.totalWithTax || ''}
                       onChange={(e) => setNewSale({ ...newSale, totalWithTax: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
-                      placeholder="可选"
+                      placeholder={t('sales.formOptional')}
                     />
                   </div>
                 </div>
@@ -580,13 +582,13 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                   onClick={() => setShowAddModal(false)}
                   className="flex-1 py-4 bg-[#f0eeeb] hover:bg-[#e0ddd5] text-[#4a4a48] font-bold rounded-xl transition-all"
                 >
-                  取消
+                  {t('sales.formCancel')}
                 </button>
                 <button
                   type="submit"
                   className="flex-2 px-10 py-4 bg-[#d97757] hover:bg-[#c56a4a] text-white font-bold rounded-xl transition-all active:scale-95" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}
                 >
-                  {editingId ? '确认修改' : '确认新增'}
+                  {editingId ? t('sales.formConfirmEdit') : t('sales.formConfirmAdd')}
                 </button>
               </div>
             </form>

@@ -34,10 +34,10 @@ interface ChatMessage {
 
 const VOICE_OPTIONS = [
   { id: 'Aoede', nameKey: 'voice.aoede' },
-  { id: 'Puck', name: 'Puck (活泼男声)' },
-  { id: 'Charon', name: 'Charon (深沉男声)' },
-  { id: 'Kore', name: 'Kore (清新女声)' },
-  { id: 'Fenrir', name: 'Fenrir (激情男声)' },
+  { id: 'Puck', nameKey: 'voice.puck' },
+  { id: 'Charon', nameKey: 'voice.charon' },
+  { id: 'Kore', nameKey: 'voice.kore' },
+  { id: 'Fenrir', nameKey: 'voice.fenrir' },
 ];
 
 const QUICK_FUNCTIONS = [
@@ -212,30 +212,30 @@ const AppContent: React.FC = () => {
         ...dataRef.current,
         metrics: [
           {
-            label: '库存余量 (实时)',
-            value: m.inventoryTons > 0 ? `${m.inventoryTons}吨` : '—',
-            subValue: m.inventoryTons > 0 ? `采购${m.purchaseTotalTons}吨 - 销售${m.salesTotalTons}吨` : '—',
+            label: t('dashboard.inventory'),
+            value: m.inventoryTons > 0 ? `${m.inventoryTons}${t('units.tonSuffix')}` : '—',
+            subValue: m.inventoryTons > 0 ? `${t('dashboard.purchasesLabel')}${m.purchaseTotalTons}${t('units.tonSuffix')} - ${t('dashboard.salesLabel')}${m.salesTotalTons}${t('units.tonSuffix')}` : '—',
             icon: 'fa-boxes',
             color: 'bg-blue-500',
           },
           {
-            label: `${selectedYear}年度 采购`,
+            label: `${selectedYear}${t('header.yearSuffix') ? ' ' + t('header.yearSuffix') : ''} ${t('dashboard.purchasesLabel')}`,
             value: m.purchaseTotalAmount > 0 ? `¥${m.purchaseTotalAmount.toLocaleString()}` : '—',
-            subValue: m.purchaseTotalTons > 0 ? `${m.purchaseTotalTons}吨` : '—',
+            subValue: m.purchaseTotalTons > 0 ? `${m.purchaseTotalTons}${t('units.tonSuffix')}` : '—',
             icon: 'fa-truck-loading',
             color: 'bg-purple-500',
           },
           {
-            label: `${selectedYear}年度 销售`,
+            label: `${selectedYear}${t('header.yearSuffix') ? ' ' + t('header.yearSuffix') : ''} ${t('dashboard.salesLabel')}`,
             value: m.salesTotalAmount > 0 ? `¥${m.salesTotalAmount.toLocaleString()}` : '—',
-            subValue: m.salesTotalTons > 0 ? `${m.salesTotalTons}吨` : '—',
+            subValue: m.salesTotalTons > 0 ? `${m.salesTotalTons}${t('units.tonSuffix')}` : '—',
             icon: 'fa-chart-line',
             color: 'bg-green-500',
           },
           {
-            label: '平均成本',
-            value: m.avgCostPerTon > 0 ? `¥${m.avgCostPerTon.toLocaleString()}/吨` : '—',
-            subValue: m.purchaseTotalTons > 0 ? `基于${m.purchaseTotalTons}吨采购` : '—',
+            label: t('dashboard.avgCost'),
+            value: m.avgCostPerTon > 0 ? `¥${m.avgCostPerTon.toLocaleString()}${t('units.perTon')}` : '—',
+            subValue: m.purchaseTotalTons > 0 ? `${m.purchaseTotalTons}${t('units.tonSuffix')} ${t('dashboard.purchasesLabel')}` : '—',
             icon: 'fa-tags',
             color: 'bg-orange-500',
           },
@@ -300,7 +300,7 @@ const AppContent: React.FC = () => {
       setAnalysis(result);
     } catch (err) {
       console.error("AI Analysis Failed", err);
-      setAiError("AI 分析失败，请检查网络连接或 API 配置后重试。");
+      setAiError(t('aiInsights.error'));
     } finally {
       setLoadingAI(false);
     }

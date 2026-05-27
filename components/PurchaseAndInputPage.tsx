@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { analyzeInvoice } from '../services/ocrService';
 import { fetchPurchases, createPurchase, deletePurchase, PurchaseRecord } from '../services/api';
@@ -16,6 +17,7 @@ let purchaseIdCounter = 0;
 const nextPurchaseId = () => `purchase-${++purchaseIdCounter}-${Date.now()}`;
 
 const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
+  const { t } = useTranslation();
   const [recognitionMode, setRecognitionMode] = useState<'ai' | 'ocr'>('ai');
   const [isScanning, setIsScanning] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -88,20 +90,20 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
     try {
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('文件读取超时')), 30000);
+        const timeout = setTimeout(() => reject(new Error(t('purchases.errorFileTimeout'))), 30000);
         reader.onload = () => {
           clearTimeout(timeout);
           const result = reader.result as string;
           const parts = result.split(',');
           if (parts.length < 2) {
-            reject(new Error('文件格式不支持'));
+            reject(new Error(t('purchases.errorFileFormat')));
             return;
           }
           resolve(parts[1]);
         };
         reader.onerror = () => {
           clearTimeout(timeout);
-          reject(new Error('文件读取失败'));
+          reject(new Error(t('purchases.errorFileRead')));
         };
       });
       reader.readAsDataURL(file);
@@ -130,10 +132,10 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
 
       await createPurchase(newRecord);
       setRecords(prev => [newRecord, ...prev]);
-      alert("识别成功！已添加到列表。");
+      alert(t('purchases.successRecognition'));
     } catch (err) {
       console.error(err);
-      alert("识别失败，请确保上传的是清晰的发票图片。");
+      alert(t('purchases.errorFailed'));
     } finally {
       setIsScanning(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -143,7 +145,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPurchase.supplier || !newPurchase.quantity) {
-      alert("请填写必要的供应商和数量信息");
+      alert(t('purchases.errorRequiredFields'));
       return;
     }
     const recordToAdd: PurchaseRecord = { id: nextPurchaseId(), ...newPurchase, status: '已收' };
@@ -164,7 +166,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
       });
     } catch (err) {
       console.error(err);
-      alert('保存失败，请重试');
+      alert(t('purchases.errorSaveFailed'));
     }
   };
 
@@ -184,13 +186,13 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
 
       {/* Header Section */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[#191918]">采购与进项</h1>
+        <h1 className="text-2xl font-bold text-[#191918]">{t('purchases.title')}</h1>
         <div className="flex space-x-3">
           <button
             onClick={() => setShowCsvImport(true)}
             className="flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors text-sm font-medium" style={{ boxShadow: '0 4px 16px rgba(16,185,129,0.15)' }}
           >
-            <i className="fas fa-file-csv mr-2"></i> 批量导入
+            <i className="fas fa-file-csv mr-2"></i> {t('purchases.batchImport')}
           </button>
           <button
             onClick={triggerUpload}
@@ -198,13 +200,13 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
             className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50" style={{ boxShadow: '0 4px 16px rgba(147,51,234,0.15)' }}
           >
             <i className={`fas ${isScanning ? 'fa-spinner animate-spin' : 'fa-camera'} mr-2`}></i>
-            {isScanning ? '正在识别...' : '扫描发票'}
+            {isScanning ? t('purchases.scanning') : t('purchases.scanInvoice')}
           </button>
           <button
             onClick={() => setShowAddModal(true)}
             className="flex items-center px-4 py-2 bg-[#d97757] hover:bg-[#c56a4a] text-white rounded-lg transition-colors text-sm font-medium" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}
           >
-            <i className="fas fa-plus mr-2"></i> 新增采购
+            <i className="fas fa-plus mr-2"></i> {t('purchases.newPurchase')}
           </button>
         </div>
       </div>
@@ -212,25 +214,25 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
       {/* Recognition Mode Selector */}
       <div className="flex items-center justify-between py-2">
         <div className="flex items-center space-x-4">
-          <span className="text-[#4a4a48] text-sm">识别模式:</span>
+          <span className="text-[#4a4a48] text-sm">{t('purchases.recognitionMode')}:</span>
           <div className="flex bg-[#f9f9f8] rounded-lg p-1 border border-[#e0ddd5]">
             <button
               onClick={() => setRecognitionMode('ai')}
               className={`flex items-center px-3 py-1.5 rounded-md text-xs transition-all ${recognitionMode === 'ai' ? 'bg-[#d97757] text-white shadow-sm' : 'text-[#4a4a48] hover:text-[#191918]'}`}
             >
-              <i className="fas fa-robot mr-2"></i> AI 智能识别 (Gemini)
+              <i className="fas fa-robot mr-2"></i> {t('purchases.modeAi')}
             </button>
             <button
               onClick={() => setRecognitionMode('ocr')}
               className={`flex items-center px-3 py-1.5 rounded-md text-xs transition-all ${recognitionMode === 'ocr' ? 'bg-[#f0eeeb] text-[#191918]' : 'text-[#4a4a48] hover:text-[#191918]'}`}
             >
-              <i className="fas fa-file-invoice mr-2"></i> 本地 OCR 识别
+              <i className="fas fa-file-invoice mr-2"></i> {t('purchases.modeOcr')}
             </button>
           </div>
         </div>
         <div className="flex items-center space-x-2 text-xs text-[#5c5c5a]">
           <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-          <span>AI 服务: 已在线 (Gemini 3 Flash)</span>
+          <span>{t('purchases.aiStatus')}</span>
         </div>
       </div>
 
@@ -255,10 +257,10 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
           )}
         </div>
         <h3 className="text-[#4a4a48] font-medium text-base mb-1">
-          {isScanning ? '正在分析进项发票...' : '拖放或点击上传电子发票'}
+          {isScanning ? t('purchases.uploadScanning') : t('purchases.uploadTitle')}
         </h3>
         <p className="text-[#5c5c5a] text-xs">
-          {isScanning ? 'AI 正在核对供应商、进价及进项税率' : '自动提取日期、金额、供应商及发票号码'}
+          {isScanning ? t('purchases.uploadAnalyzing') : t('purchases.uploadSubtitle')}
         </p>
       </div>
 
@@ -268,17 +270,17 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-[#e0ddd5] text-[#5c5c5a] text-xs">
-                <th className="px-5 py-4 font-medium">日期</th>
-                <th className="px-5 py-4 font-medium">供应商</th>
-                <th className="px-5 py-4 font-medium">数量</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">无税单价</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">合计无税金额</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">合计税额</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">价税合计</th>
-                <th className="px-5 py-4 font-medium">税率</th>
-                <th className="px-5 py-4 font-medium">发票号码</th>
-                <th className="px-5 py-4 font-medium">状态</th>
-                <th className="px-5 py-4 font-medium">操作</th>
+                <th className="px-5 py-4 font-medium">{t('tableHeaders.date')}</th>
+                <th className="px-5 py-4 font-medium">{t('tableHeaders.supplier')}</th>
+                <th className="px-5 py-4 font-medium">{t('tableHeaders.quantity')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{t('tableHeaders.unitPriceWithoutTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{t('tableHeaders.totalAmountWithoutTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{t('tableHeaders.totalTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{t('tableHeaders.totalWithTax')}</th>
+                <th className="px-5 py-4 font-medium">{t('tableHeaders.taxRate')}</th>
+                <th className="px-5 py-4 font-medium">{t('tableHeaders.invoiceNo')}</th>
+                <th className="px-5 py-4 font-medium">{t('tableHeaders.status')}</th>
+                <th className="px-5 py-4 font-medium">{t('tableHeaders.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e0ddd5]/50">
@@ -310,7 +312,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                         setShowAddModal(true);
                       }}
                       className="text-[#d97757] hover:text-[#c56a4a] transition-colors"
-                    >编辑</button>
+                    >{t('common2.edit')}</button>
                     <button
                       onClick={async () => {
                         try {
@@ -318,12 +320,12 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                           setRecords(prev => prev.filter(r => r.id !== row.id));
                         } catch (err) {
                           console.error(err);
-                          alert('删除失败，请重试');
+                          alert(t('purchases.errorDeleteFailed'));
                         }
                       }}
                       className="text-rose-500 hover:text-rose-400 transition-colors"
                     >
-                      删除
+                      {t('common2.delete')}
                     </button>
                   </td>
                 </tr>
@@ -332,21 +334,21 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
               {isLoading && (
                 <tr>
                   <td colSpan={11} className="px-6 py-12 text-center text-[#5c5c5a] text-sm">
-                    <i className="fas fa-spinner animate-spin mr-2"></i>正在加载数据...
+                    <i className="fas fa-spinner animate-spin mr-2"></i>{t('purchases.loading')}
                   </td>
                 </tr>
               )}
               {!isLoading && records.length === 0 && (
                 <tr>
                   <td colSpan={11} className="px-6 py-12 text-center text-[#5c5c5a] text-sm italic">
-                    暂无采购记录。
+                    {t('purchases.empty')}
                   </td>
                 </tr>
               )}
               {/* Summary row */}
               {!isLoading && records.length > 0 && (
                 <tr className="bg-[#f9f9f8] border-t-2 border-[#e0ddd5] font-semibold">
-                  <td className="px-5 py-4 text-sm text-[#191918]" colSpan={2}>合计</td>
+                  <td className="px-5 py-4 text-sm text-[#191918]" colSpan={2}>{t('purchases.summary')}</td>
                   <td className="px-5 py-4 text-sm text-[#191918]">
                     {(() => {
                       const total = records.reduce((sum, r) => {
@@ -398,8 +400,8 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
           <div className="relative w-full max-w-lg bg-white border border-[#e0ddd5] rounded-xl overflow-hidden animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
             <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold text-[#191918]">新增采购记录</h2>
-                <p className="text-xs text-[#5c5c5a] mt-1">请手动输入采购交易详情</p>
+                <h2 className="text-xl font-bold text-[#191918]">{t('purchases.modalTitle')}</h2>
+                <p className="text-xs text-[#5c5c5a] mt-1">{t('purchases.modalSubtitle')}</p>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-[#5c5c5a] hover:text-[#191918] transition-colors">
                 <i className="fas fa-times text-xl"></i>
@@ -409,7 +411,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
             <form onSubmit={handleAddSubmit} className="p-8 space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">业务日期</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formDate')}</label>
                   <input
                     type="date"
                     required
@@ -419,10 +421,10 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">发票号码</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formInvoiceNo')}</label>
                   <input
                     type="text"
-                    placeholder="可选"
+                    placeholder={t('common2.optional')}
                     value={newPurchase.invoiceNo}
                     onChange={(e) => setNewPurchase({ ...newPurchase, invoiceNo: e.target.value })}
                     className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
@@ -431,11 +433,11 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">供应商名称</label>
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formSupplier')}</label>
                 <input
                   type="text"
                   required
-                  placeholder="请输入供应商全称"
+                  placeholder={t('purchases.formSupplierPlaceholder')}
                   value={newPurchase.supplier}
                   onChange={(e) => setNewPurchase({ ...newPurchase, supplier: e.target.value })}
                   className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
@@ -443,11 +445,11 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">采购数量</label>
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formQuantity')}</label>
                 <input
                   type="text"
                   required
-                  placeholder="例如: 100吨 / 1000袋"
+                  placeholder={t('purchases.formQuantityPlaceholder')}
                   value={newPurchase.quantity}
                   onChange={(e) => setNewPurchase({ ...newPurchase, quantity: e.target.value })}
                   className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
@@ -456,7 +458,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">进价 (不含税)</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formPrice')}</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
                     <input
@@ -470,23 +472,23 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">增值税率</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formTaxRate')}</label>
                   <select
                     value={newPurchase.taxRate}
                     onChange={(e) => setNewPurchase({ ...newPurchase, taxRate: e.target.value })}
                     className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all appearance-none"
                   >
-                    <option value="13%">13% (标准货物)</option>
-                    <option value="9%">9% (交通运输/低税)</option>
-                    <option value="6%">6% (现代服务)</option>
-                    <option value="3%">3% (小规模/简易)</option>
+                    <option value="13%">{t('purchases.tax13')}</option>
+                    <option value="9%">{t('purchases.tax9')}</option>
+                    <option value="6%">{t('purchases.tax6')}</option>
+                    <option value="3%">{t('purchases.tax3')}</option>
                   </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">无税单价</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formUnitPrice')}</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
                     <input
@@ -495,12 +497,12 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                       value={newPurchase.unitPriceWithoutTax || ''}
                       onChange={(e) => setNewPurchase({ ...newPurchase, unitPriceWithoutTax: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
-                      placeholder="可选"
+                      placeholder={t('common2.optional')}
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">合计税额</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formTaxAmount')}</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
                     <input
@@ -509,12 +511,12 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                       value={newPurchase.taxAmount || ''}
                       onChange={(e) => setNewPurchase({ ...newPurchase, taxAmount: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
-                      placeholder="可选"
+                      placeholder={t('common2.optional')}
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">价税合计</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formTotalWithTax')}</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">¥</span>
                     <input
@@ -523,7 +525,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                       value={newPurchase.totalWithTax || ''}
                       onChange={(e) => setNewPurchase({ ...newPurchase, totalWithTax: parseFloat(e.target.value) || 0 })}
                       className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
-                      placeholder="可选"
+                      placeholder={t('common2.optional')}
                     />
                   </div>
                 </div>
@@ -535,13 +537,13 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                   onClick={() => setShowAddModal(false)}
                   className="flex-1 py-4 bg-[#f0eeeb] hover:bg-[#e0ddd5] text-[#4a4a48] font-bold rounded-xl transition-all"
                 >
-                  取消
+                  {t('purchases.formCancel')}
                 </button>
                 <button
                   type="submit"
                   className="flex-2 px-10 py-4 bg-[#d97757] hover:bg-[#c56a4a] text-white font-bold rounded-xl transition-all active:scale-95" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}
                 >
-                  确认新增
+                  {t('purchases.formSubmit')}
                 </button>
               </div>
             </form>
