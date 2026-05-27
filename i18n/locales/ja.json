@@ -55,8 +55,10 @@
       "ai": "AIプロバイダー (BYOK)",
       "language": "表示言語",
       "accounting": "会計制度",
+      "categories": "勘定科目",
       "notifications": "アラートと通知",
-      "security": "アカウントとセキュリティ"
+      "security": "アカウントとセキュリティ",
+      "dataMigration": "データ移行"
     },
     "saveButton": "変更を保存",
     "savedToast": "設定を保存しました",
@@ -78,6 +80,21 @@
       "currency": "デフォルト通貨",
       "applyButton": "この制度を適用",
       "warning": "会計制度の切り替えはデフォルト税率と通貨のみを更新します。既存データは再計算されません"
+    },
+    "categories": {
+      "title": "勘定科目",
+      "subtitle": "現在の会計制度に対応した既定の勘定科目を表示します。カスタム科目を追加できますが、システム既定の科目は削除できません。",
+      "expense": "支出",
+      "income": "収入",
+      "label": "名称",
+      "scheduleLine": "報告書の行",
+      "deductible": "控除可",
+      "deductiblePct": "控除率 (%)",
+      "userMade": "カスタム",
+      "empty": "この制度には該当する科目がありません",
+      "addNew": "科目を追加",
+      "addNewButton": "カスタム科目を追加",
+      "systemNote": "システム既定の科目は SoloLedger によって管理され、公式報告書の行にマッピングされています。削除はできませんが、名前変更は可能です。カスタム科目は完全にあなたが管理できます。"
     },
     "ai": {
       "title": "AIプロバイダー · BYOK",
@@ -114,6 +131,25 @@
         "title": "自律的なインサイト生成",
         "subtitle": "ダッシュボード読み込み時にAI分析を自動実行（デフォルトプロバイダー使用）"
       }
+    },
+    "dataMigration": {
+      "title": "データ移行",
+      "subtitle": "旧版の sales/purchases データを新しい transactions テーブル（国際化データモデル）にワンクリックで移行します。旧テーブルは保持され、30 日以内ならロールバック可能です。",
+      "noLegacy": "このデータベースに旧版 sales/purchases テーブルは存在しません。移行は不要です。",
+      "migrated": "移行済み",
+      "pending": "未移行",
+      "runButton": "{{count}} 件の未処理データを移行",
+      "running": "移行中...",
+      "allDone": "すべて移行済み",
+      "runSuccess": "移行完了",
+      "errors": "件のエラー",
+      "rollback": "ロールバック（移行済み {{count}} 件の transactions を削除）",
+      "rollbackConfirm": "ロールバックを確認しますか？{{count}} 件の移行済み transactions を削除します。旧 sales/purchases データは保持されます。",
+      "rollbackButton": "ロールバックを実行",
+      "note1": "sales → income / purchases → expense；既定では現在の会計制度の\"収入第一項 / 売上原価\"科目に振り分け",
+      "note2": "旧テーブルのデータは削除されません — いつでもロールバック可能",
+      "note3": "移行記録は legacy_migrations テーブルに保存され、重複移行を防止",
+      "note4": "旧フィールド（トン数 / 単価 / 運送費）は source_meta JSON に保存され、失われません"
     }
   },
   "onboarding": {

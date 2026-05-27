@@ -55,8 +55,10 @@
       "ai": "AI Providers (BYOK)",
       "language": "Language",
       "accounting": "Accounting Standard",
+      "categories": "Categories",
       "notifications": "Alerts & Notifications",
-      "security": "Account & Security"
+      "security": "Account & Security",
+      "dataMigration": "Data Migration"
     },
     "saveButton": "Save Changes",
     "savedToast": "Settings saved successfully",
@@ -78,6 +80,21 @@
       "currency": "Default currency",
       "applyButton": "Apply this standard",
       "warning": "Switching accounting standard only updates default tax rates and currency. Existing data will not be recalculated."
+    },
+    "categories": {
+      "title": "Accounting Categories",
+      "subtitle": "Pre-defined categories for the current accounting standard. You can add custom categories; system categories cannot be deleted.",
+      "expense": "Expense",
+      "income": "Income",
+      "label": "Name",
+      "scheduleLine": "Schedule Line",
+      "deductible": "Deductible",
+      "deductiblePct": "Deductible % (0-100)",
+      "userMade": "User",
+      "empty": "No categories of this type for this accounting standard",
+      "addNew": "Add Category",
+      "addNewButton": "Add custom category",
+      "systemNote": "System categories are maintained by SoloLedger and mapped to official report lines. They cannot be deleted but can be renamed. Custom categories are fully under your control."
     },
     "ai": {
       "title": "AI Providers · BYOK",
@@ -114,6 +131,25 @@
         "title": "Autonomous Insight",
         "subtitle": "Automatically run AI analysis on dashboard load (uses default provider)"
       }
+    },
+    "dataMigration": {
+      "title": "Data Migration",
+      "subtitle": "Migrate legacy sales/purchases data to the new transactions table (i18n data model). Old tables are preserved; rollback available for 30 days.",
+      "noLegacy": "No legacy sales/purchases tables in this database — nothing to migrate.",
+      "migrated": "migrated",
+      "pending": "pending",
+      "runButton": "Migrate {{count}} pending rows",
+      "running": "Migrating...",
+      "allDone": "All data migrated",
+      "runSuccess": "Migration complete",
+      "errors": "errors",
+      "rollback": "Roll back (delete {{count}} migrated transactions)",
+      "rollbackConfirm": "Confirm rollback? This will delete {{count}} migrated transactions. Original sales/purchases data is preserved.",
+      "rollbackButton": "Confirm rollback",
+      "note1": "sales → income / purchases → expense; defaults to the current locale's first income / COGS category",
+      "note2": "Legacy tables are NOT deleted — rollback anytime",
+      "note3": "Migration records stored in legacy_migrations table to prevent duplicate runs",
+      "note4": "Legacy fields (tons / unit price / shipping) saved to source_meta JSON — no data loss"
     }
   },
   "onboarding": {

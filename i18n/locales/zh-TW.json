@@ -55,8 +55,10 @@
       "ai": "AI 服務商 (BYOK)",
       "language": "介面語言",
       "accounting": "會計制度",
+      "categories": "會計類別",
       "notifications": "預警與通知",
-      "security": "帳號與安全"
+      "security": "帳號與安全",
+      "dataMigration": "資料遷移"
     },
     "saveButton": "儲存變更",
     "savedToast": "設定已成功儲存！",
@@ -78,6 +80,21 @@
       "currency": "預設幣別",
       "applyButton": "套用此制度",
       "warning": "切換會計制度只更新預設稅率與幣別，既有資料不會重新計算"
+    },
+    "categories": {
+      "title": "會計類別",
+      "subtitle": "依當前會計制度展示預置類別。可新增自訂類別，但系統預置類別不能刪除。",
+      "expense": "支出",
+      "income": "收入",
+      "label": "名稱",
+      "scheduleLine": "報表行",
+      "deductible": "可抵扣",
+      "deductiblePct": "可抵扣比例 (%)",
+      "userMade": "自建",
+      "empty": "該制度暫無此類型的類別",
+      "addNew": "新增類別",
+      "addNewButton": "新增自訂類別",
+      "systemNote": "系統預置類別由 SoloLedger 維護，與官方報表行對應，不可刪除（但可改名）。自訂類別完全由您掌控。"
     },
     "ai": {
       "title": "AI 服務商 · BYOK",
@@ -114,6 +131,25 @@
         "title": "自主洞察生成",
         "subtitle": "看板載入時自動執行 AI 分析（使用預設 Provider）"
       }
+    },
+    "dataMigration": {
+      "title": "資料遷移",
+      "subtitle": "把舊版本的 sales/purchases 資料一鍵遷移到新的 transactions 表（國際化資料模型）。舊表保留不刪除，30 天內可回滾。",
+      "noLegacy": "本資料庫不存在舊版 sales/purchases 表，無需遷移。",
+      "migrated": "已遷移",
+      "pending": "待遷移",
+      "runButton": "遷移 {{count}} 筆待處理資料",
+      "running": "遷移中...",
+      "allDone": "所有資料已遷移",
+      "runSuccess": "遷移完成",
+      "errors": "個錯誤",
+      "rollback": "回滾遷移（刪除已遷移的 {{count}} 筆 transactions）",
+      "rollbackConfirm": "確認回滾？這將刪除 {{count}} 筆已遷移的 transactions，舊 sales/purchases 資料保持不變。",
+      "rollbackButton": "確認回滾",
+      "note1": "sales → income / purchases → expense；預設歸到目前會計制度的「收入第一項 / COGS」類別",
+      "note2": "舊表資料不會刪除，可隨時回滾",
+      "note3": "遷移記錄寫入 legacy_migrations 表，避免重複遷移",
+      "note4": "舊欄位（噸位 / 單價 / 運費）會保存到 source_meta JSON，不丟失"
     }
   },
   "onboarding": {

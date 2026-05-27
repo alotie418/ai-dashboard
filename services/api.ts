@@ -50,6 +50,193 @@ export function testProvider(payload: TestProviderRequest): Promise<TestProvider
   return electronInvoke<TestProviderResult>('providers:test', payload);
 }
 
+// ==================== Categories（国际化数据模型 v4）====================
+
+import type { AIProviderId } from '../types';
+
+export type AccountingLocale = 'CN' | 'US' | 'JP' | 'EU' | 'KR' | 'TW';
+export type CategoryType = 'income' | 'expense';
+
+export interface Category {
+  id: string;
+  locale: AccountingLocale;
+  type: CategoryType;
+  slug: string;
+  label_zh_cn: string;
+  label_zh_tw: string | null;
+  label_en: string;
+  label_ja: string | null;
+  label_ko: string | null;
+  label_fr: string | null;
+  schedule_line: string | null;
+  is_deductible: boolean;
+  deductible_pct: number;
+  parent_id: string | null;
+  sort_order: number;
+  is_system: boolean;
+  displayLabel: string; // 由后端按当前 lang 计算填入
+}
+
+export interface CategoryUpsert {
+  locale: AccountingLocale;
+  type: CategoryType;
+  slug: string;
+  label_zh_cn?: string;
+  label_zh_tw?: string;
+  label_en: string;
+  label_ja?: string;
+  label_ko?: string;
+  label_fr?: string;
+  schedule_line?: string;
+  is_deductible?: boolean;
+  deductible_pct?: number;
+  parent_id?: string;
+  sort_order?: number;
+}
+
+export function listCategories(opts: { locale?: AccountingLocale; type?: CategoryType; lang?: string } = {}): Promise<Category[]> {
+  const qs = new URLSearchParams();
+  if (opts.locale) qs.set('locale', opts.locale);
+  if (opts.type) qs.set('type', opts.type);
+  if (opts.lang) qs.set('lang', opts.lang);
+  return apiFetch<Category[]>(`/api/categories${qs.toString() ? '?' + qs.toString() : ''}`);
+}
+
+export function createCategory(payload: CategoryUpsert): Promise<{ success: boolean; id: string }> {
+  return apiFetch('/api/categories', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function updateCategory(id: string, payload: Partial<CategoryUpsert>): Promise<{ success: boolean }> {
+  return apiFetch(`/api/categories/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+
+export function deleteCategory(id: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/categories/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export function resetCategoriesToDefault(locale: AccountingLocale): Promise<{ success: boolean; removedUserCategories: number }> {
+  return apiFetch('/api/categories/reset', { method: 'POST', body: JSON.stringify({ locale }) });
+}
+
+// ==================== Transactions（国际化数据模型 v5，C 阶段）====================
+
+export type TransactionType = 'income' | 'expense';
+export type InvoiceStatus = 'issued' | 'pending' | 'n/a';
+export type TxPaymentStatus = 'paid' | 'partial' | 'unpaid';
+
+export interface Transaction {
+  id: string;
+  type: TransactionType;
+  date: string;
+  amount: number;
+  amount_net: number | null;
+  tax_amount: number;
+  tax_rate: number;
+  currency: string;
+  category_id: string | null;
+  counterparty: string;
+  invoice_no: string;
+  invoice_status: InvoiceStatus;
+  payment_status: TxPaymentStatus;
+  paid_amount: number;
+  payment_date: string | null;
+  due_date: string | null;
+  description: string;
+  attachment_path: string | null;
+  source_meta: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TransactionUpsert {
+  id: string;
+  type: TransactionType;
+  date: string;
+  amount: number;
+  amount_net?: number;
+  tax_amount?: number;
+  tax_rate?: number;
+  currency?: string;
+  category_id?: string | null;
+  counterparty?: string;
+  invoice_no?: string;
+  invoice_status?: InvoiceStatus;
+  payment_status?: TxPaymentStatus;
+  paid_amount?: number;
+  payment_date?: string;
+  due_date?: string;
+  description?: string;
+  attachment_path?: string;
+  source_meta?: any;
+}
+
+export interface TransactionSummary {
+  income: { total: number; count: number };
+  expense: { total: number; count: number };
+  net: number;
+}
+
+export function listTransactions(opts: { type?: TransactionType; from?: string; to?: string; category_id?: string; limit?: number } = {}): Promise<Transaction[]> {
+  const qs = new URLSearchParams();
+  if (opts.type) qs.set('type', opts.type);
+  if (opts.from) qs.set('from', opts.from);
+  if (opts.to) qs.set('to', opts.to);
+  if (opts.category_id) qs.set('category_id', opts.category_id);
+  if (opts.limit != null) qs.set('limit', String(opts.limit));
+  return apiFetch<Transaction[]>(`/api/transactions${qs.toString() ? '?' + qs.toString() : ''}`);
+}
+
+export function getTransaction(id: string): Promise<Transaction> {
+  return apiFetch<Transaction>(`/api/transactions/${encodeURIComponent(id)}`);
+}
+
+export function createTransaction(payload: TransactionUpsert): Promise<{ success: boolean; id: string }> {
+  return apiFetch('/api/transactions', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function updateTransaction(id: string, payload: Partial<TransactionUpsert>): Promise<{ success: boolean }> {
+  return apiFetch(`/api/transactions/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+
+export function deleteTransaction(id: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/transactions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export function fetchTransactionSummary(opts: { from?: string; to?: string } = {}): Promise<TransactionSummary> {
+  const qs = new URLSearchParams();
+  if (opts.from) qs.set('from', opts.from);
+  if (opts.to) qs.set('to', opts.to);
+  return apiFetch<TransactionSummary>(`/api/transactions/summary${qs.toString() ? '?' + qs.toString() : ''}`);
+}
+
+// ==================== Legacy Data Migrations（旧 sales/purchases → transactions）====================
+
+export interface LegacyDetectResult {
+  hasLegacy: boolean;
+  sales: { exists: boolean; total: number; migrated: number; pending: number };
+  purchases: { exists: boolean; total: number; migrated: number; pending: number };
+}
+
+export interface MigrationRunResult {
+  salesMigrated: number;
+  purchasesMigrated: number;
+  salesSkipped: number;
+  purchasesSkipped: number;
+  errors: Array<{ legacy_table: 'sales' | 'purchases'; legacy_id: string; error: string }>;
+}
+
+export function detectLegacyData(): Promise<LegacyDetectResult> {
+  return apiFetch<LegacyDetectResult>('/api/migrations/detect-legacy');
+}
+
+export function runLegacyMigration(opts: { defaultIncomeCategoryId?: string; defaultExpenseCategoryId?: string; currency?: string } = {}): Promise<MigrationRunResult> {
+  return apiFetch('/api/migrations/run', { method: 'POST', body: JSON.stringify(opts) });
+}
+
+export function rollbackLegacyMigration(): Promise<{ success: boolean; removed: number }> {
+  return apiFetch('/api/migrations/rollback', { method: 'POST', body: JSON.stringify({}) });
+}
+
 // ==================== Types ====================
 
 // Frontend interfaces (match component definitions)
