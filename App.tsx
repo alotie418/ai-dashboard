@@ -706,7 +706,7 @@ ${contextText}`;
                     <>
                       <div className="w-px h-3 bg-[#e0ddd5]"></div>
                       <select value={selectedQuarter} onChange={(e) => { setSelectedQuarter(e.target.value); if (e.target.value !== '全年') setSelectedMonth('全部'); }} className="bg-transparent text-xs font-medium text-[#6b6b69] outline-none px-2 py-1.5 cursor-pointer hover:text-[#d97757]">
-                        {QUARTERS.map(q => <option key={q} value={q} className="bg-white">{q === '全年' ? t('header.allYear') : `${t('header.quarterPrefix')}${q.replace('Q', '')}${t('header.quarterSuffix')}`}</option>)}
+                        {QUARTERS.map(q => <option key={q} value={q} className="bg-white">{q === '全年' ? t('header.allYear') : t('header.quarterLabel', { n: q.replace('Q', '') })}</option>)}
                       </select>
                     </>
                   )}
