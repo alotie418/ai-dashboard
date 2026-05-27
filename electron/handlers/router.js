@@ -67,7 +67,7 @@ const routes = [
   ['DELETE', '/api/transactions/:id', transactions.remove],
 
   // ---- Reports（D 阶段 — 6 国报表引擎）----
-  ['GET', '/api/reports/generate', reportsH.generate],
+  ['POST', '/api/reports/generate', reportsH.generate],
   ['GET', '/api/reports/types', reportsH.types],
 
   // ---- US: Mileage Tracking（F 阶段）----

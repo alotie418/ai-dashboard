@@ -266,12 +266,10 @@ export interface ReportResult {
 }
 
 export function generateReport(opts: { locale?: string; year?: string; from?: string; to?: string } = {}): Promise<ReportResult> {
-  const qs = new URLSearchParams();
-  if (opts.locale) qs.set('locale', opts.locale);
-  if (opts.year) qs.set('year', opts.year);
-  if (opts.from) qs.set('from', opts.from);
-  if (opts.to) qs.set('to', opts.to);
-  return apiFetch<ReportResult>(`/api/reports/generate${qs.toString() ? '?' + qs.toString() : ''}`);
+  return apiFetch<ReportResult>('/api/reports/generate', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
 }
 
 export function getReportTypes(locale?: string): Promise<Array<{ id: string; name: Record<string, string> }>> {
