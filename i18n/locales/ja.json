@@ -36,7 +36,8 @@
     "analysis": "データ分析",
     "accounts": "売掛金・買掛金",
     "finance": "財務諸表",
-    "settings": "システム設定"
+    "settings": "システム設定",
+    "transactions": "取引記録"
   },
   "headerTitle": {
     "dashboard": "経営データ概要",
@@ -46,7 +47,8 @@
     "inventory": "請求書検索",
     "finance": "財務諸表",
     "accounts": "売掛金・買掛金",
-    "settings": "システム設定"
+    "settings": "システム設定",
+    "transactions": "取引記録管理"
   },
   "settings": {
     "nav": {
@@ -680,5 +682,28 @@
     "ocrPrompt": "あなたはプロの財務監査人です。この請求書画像から以下の情報を抽出し、JSON形式で返してください（markdownコードブロック不要）：\n{\n  \"date\": \"請求日 YYYY-MM-DD\",\n  \"customer\": \"顧客名\",\n  \"quantity\": \"数量と単位\",\n  \"price\": 税抜金額（数値）,\n  \"shipping\": 送料（数値）,\n  \"invoiceNo\": \"請求書番号\",\n  \"totalWithTax\": 税込合計（数値）,\n  \"unitPriceWithoutTax\": 税抜単価（数値）,\n  \"taxAmount\": 税額合計（数値）\n}\n数値フィールドは文字列ではなく数値で。該当なしは0。",
     "chatSystemPrompt": "あなたはプロの経営データアシスタントで、すべてのリアルタイム経営データにアクセスできます。\n\n職責：\n1. 完全なデータに基づいて経営に関する質問に回答\n2. モジュール横断分析が可能\n3. 複数モジュールのデータを関連付けて総合的なアドバイスを提供\n\nフォーマット：**太字**のみ使用。明確なリストと段落を使用。",
     "forecastSystemPrompt": "あなたはCFOおよび市場アナリストです。過去の経営データと統計モデルの結果に基づき、総合的な予測を行ってください。insightsの文字列とpredictions配列を含むJSONを返してください。"
+  },
+  "transactions": {
+    "title": "取引記録",
+    "add": "新規追加",
+    "totalIncome": "総収入",
+    "totalExpense": "総支出",
+    "netIncome": "純利益",
+    "items": "件",
+    "expense": "支出",
+    "income": "収入",
+    "category": "科目",
+    "scheduleLine": "報告書行",
+    "amount": "金額",
+    "empty": "取引記録がありません。「新規追加」をクリックして開始。",
+    "editTitle": "取引を編集",
+    "addTitle": "新規取引",
+    "description": "説明",
+    "descPlaceholder": "メモ（任意）...",
+    "noCategory": "科目なし",
+    "mapsToLine": "報告書の行",
+    "paid": "支払済",
+    "partial": "一部",
+    "unpaid": "未払"
   }
 }

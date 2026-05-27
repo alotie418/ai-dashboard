@@ -36,7 +36,8 @@
     "analysis": "Analysis",
     "accounts": "Receivables / Payables",
     "finance": "Financial Reports",
-    "settings": "Settings"
+    "settings": "Settings",
+    "transactions": "Transactions"
   },
   "headerTitle": {
     "dashboard": "Business Overview",
@@ -46,7 +47,8 @@
     "inventory": "Invoice Search",
     "finance": "Financial Statements",
     "accounts": "Receivables / Payables",
-    "settings": "System Settings"
+    "settings": "System Settings",
+    "transactions": "Transaction Records"
   },
   "settings": {
     "nav": {
@@ -680,5 +682,28 @@
     "ocrPrompt": "You are a professional financial auditor. Extract the following information from this invoice image, return strictly in JSON format (no markdown code blocks):\n{\n  \"date\": \"Invoice date YYYY-MM-DD\",\n  \"customer\": \"Customer / buyer name\",\n  \"quantity\": \"Total quantity with unit\",\n  \"price\": total amount excluding tax (number),\n  \"shipping\": shipping cost (number),\n  \"invoiceNo\": \"Invoice number\",\n  \"totalWithTax\": total amount including tax (number),\n  \"unitPriceWithoutTax\": unit price excluding tax (number),\n  \"taxAmount\": total tax amount (number)\n}\nNumeric fields must be numbers not strings. Use 0 if not found.",
     "chatSystemPrompt": "You are a professional business data assistant with access to all real-time business data.\n\nYour responsibilities:\n1. Answer questions about internal operations using the complete data\n2. Perform cross-module analysis\n3. Proactively correlate data from multiple modules for comprehensive insights\n\nFormatting: Use **bold** only (not ***). Use clear lists and paragraphs.",
     "forecastSystemPrompt": "You are a CFO and market analyst. Based on historical business data and statistical model results, provide a comprehensive forecast. Return JSON with an insights string and predictions array."
+  },
+  "transactions": {
+    "title": "Transactions",
+    "add": "New Transaction",
+    "totalIncome": "Total Income",
+    "totalExpense": "Total Expense",
+    "netIncome": "Net Income",
+    "items": "items",
+    "expense": "Expenses",
+    "income": "Income",
+    "category": "Category",
+    "scheduleLine": "Report Line",
+    "amount": "Amount",
+    "empty": "No transactions yet. Click \"New Transaction\" to add one.",
+    "editTitle": "Edit Transaction",
+    "addTitle": "New Transaction",
+    "description": "Description",
+    "descPlaceholder": "Optional notes...",
+    "noCategory": "No category",
+    "mapsToLine": "Maps to report line",
+    "paid": "Paid",
+    "partial": "Partial",
+    "unpaid": "Unpaid"
   }
 }
