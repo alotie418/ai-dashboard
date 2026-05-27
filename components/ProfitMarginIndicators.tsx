@@ -9,6 +9,7 @@ interface Props {
 
 const ProfitMarginIndicators: React.FC<Props> = ({ data }) => {
   const { t } = useTranslation();
+  if (!data) return null;
   const recompute = () => {
     const revenue = data.salesRevenue;
     const cost = data.costOfSales;

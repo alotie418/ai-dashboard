@@ -9,7 +9,8 @@ interface Props {
 
 const FinancialStatementTable: React.FC<Props> = ({ data }) => {
   const { t } = useTranslation();
-  const formatCurrency = (val: number) => `¥${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (!data) return null;
+  const formatCurrency = (val: number) => `¥${(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const recompute = () => {
     const revenue = data.salesRevenue;
     const cost = data.costOfSales;

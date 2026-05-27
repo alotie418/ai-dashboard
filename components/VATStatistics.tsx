@@ -9,7 +9,8 @@ interface Props {
 
 const VATStatistics: React.FC<Props> = ({ data }) => {
   const { t } = useTranslation();
-  const formatVal = (val: number) => `¥${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (!data) return null;
+  const formatVal = (val: number) => `¥${(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl overflow-hidden flex flex-col h-full" style={{boxShadow: '0 4px 24px rgba(0,0,0,0.06)'}}>

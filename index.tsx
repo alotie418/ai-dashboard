@@ -3,7 +3,40 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-import './i18n'; // 进 App 之前先 init i18next（注册资源 + 检测初始语言）
+import './i18n';
+
+// Error Boundary — catches React render crashes and shows the error instead of white screen
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[ErrorBoundary] React crashed:', error, info.componentStack);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: '40px', fontFamily: 'monospace', background: '#1a1a1a', color: '#ff6b6b', minHeight: '100vh' }}>
+          <h1 style={{ fontSize: '24px', marginBottom: '16px' }}>⚠️ SoloLedger crashed</h1>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: '14px', color: '#ffa07a', background: '#2a2a2a', padding: '16px', borderRadius: '8px', overflow: 'auto' }}>
+            {this.state.error.message}
+            {'\n\n'}
+            {this.state.error.stack}
+          </pre>
+          <button onClick={() => { this.setState({ error: null }); window.location.reload(); }}
+            style={{ marginTop: '16px', padding: '8px 16px', background: '#d97757', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+            Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -13,6 +46,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 );
