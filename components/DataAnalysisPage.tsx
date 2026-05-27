@@ -290,7 +290,7 @@ ${JSON.stringify(mcOnVar)}
           path: '/api/ai/data-analysis',
           body: {
             prompt,
-            systemInstruction: "你是一位精通行业的首席财务官与市场分析师。请结合企业历史数据和统计模型结果进行综合预测。返回JSON，包含insights字符串和predictions数组。",
+            systemInstruction: t('ai.forecastSystemPrompt'),
             responseSchema: {
               type: 'OBJECT',
               properties: {
@@ -319,7 +319,7 @@ ${JSON.stringify(mcOnVar)}
           credentials: 'same-origin',
           body: JSON.stringify({
             prompt,
-            systemInstruction: "你是一位精通行业的首席财务官与市场分析师。请结合企业历史数据和统计模型结果进行综合预测。返回JSON，包含insights字符串和predictions数组。",
+            systemInstruction: t('ai.forecastSystemPrompt'),
             responseSchema: {
               type: 'OBJECT',
               properties: {

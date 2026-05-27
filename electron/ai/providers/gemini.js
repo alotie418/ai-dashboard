@@ -86,26 +86,28 @@ async function chat(apiKey, model, { messages, systemInstruction }) {
   }
 }
 
-async function analyze(apiKey, model, { data, marketSummary, languageHint }) {
+async function analyze(apiKey, model, { data, marketSummary, languageHint, analyzeSystemPrompt }) {
   try {
     const { GoogleGenAI, Type } = await loadSDK();
     const ai = new GoogleGenAI({ apiKey });
 
     const marketContext = marketSummary
-      ? `\n\n## 最新市场搜索数据\n${marketSummary}\n请将市场价格信息纳入分析，在建议中结合市场行情给出采购/销售策略。`
+      ? `\n\n${marketSummary}`
       : '';
 
-    const systemInstruction = `你是一位专业的商业分析师。请分析以下企业经营数据，给出：
+    const fallbackPrompt = `你是一位专业的商业分析师。请分析以下企业经营数据，给出：
 1. summary: 一段简要的经营概况总结
 2. topInsights: 3-5条关键洞察（数组）
 3. recommendations: 3-5条改进建议（数组）
 4. anomalies: 异常指标列表（数组）`;
 
+    const systemInstruction = analyzeSystemPrompt || fallbackPrompt;
+
     const response = await ai.models.generateContent({
       model: model || META.defaultModel,
       contents: `Analyze this business data and provide insights: ${JSON.stringify(data)}${marketContext}`,
       config: {
-        systemInstruction: systemInstruction + (languageHint ? `\n\n${languageHint}` : ''),
+        systemInstruction,
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,

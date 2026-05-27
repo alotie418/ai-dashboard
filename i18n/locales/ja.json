@@ -674,6 +674,10 @@
     "perTon": "/t"
   },
   "ai": {
-    "languageHint": "日本語で回答してください。"
+    "languageHint": "日本語で回答してください。",
+    "analyzeSystemPrompt": "あなたはプロのビジネスアナリストです。以下の経営データを分析し、以下を提供してください：\n1. summary: 簡潔な経営概要\n2. topInsights: 3-5つの重要な洞察（配列）\n3. recommendations: 3-5つの改善提案（配列）\n4. anomalies: 異常指標のリスト（配列）\nJSON形式で厳密に返してください。",
+    "ocrPrompt": "あなたはプロの財務監査人です。この請求書画像から以下の情報を抽出し、JSON形式で返してください（markdownコードブロック不要）：\n{\n  \"date\": \"請求日 YYYY-MM-DD\",\n  \"customer\": \"顧客名\",\n  \"quantity\": \"数量と単位\",\n  \"price\": 税抜金額（数値）,\n  \"shipping\": 送料（数値）,\n  \"invoiceNo\": \"請求書番号\",\n  \"totalWithTax\": 税込合計（数値）,\n  \"unitPriceWithoutTax\": 税抜単価（数値）,\n  \"taxAmount\": 税額合計（数値）\n}\n数値フィールドは文字列ではなく数値で。該当なしは0。",
+    "chatSystemPrompt": "あなたはプロの経営データアシスタントで、すべてのリアルタイム経営データにアクセスできます。\n\n職責：\n1. 完全なデータに基づいて経営に関する質問に回答\n2. モジュール横断分析が可能\n3. 複数モジュールのデータを関連付けて総合的なアドバイスを提供\n\nフォーマット：**太字**のみ使用。明確なリストと段落を使用。",
+    "forecastSystemPrompt": "あなたはCFOおよび市場アナリストです。過去の経営データと統計モデルの結果に基づき、総合的な予測を行ってください。insightsの文字列とpredictions配列を含むJSONを返してください。"
   }
 }

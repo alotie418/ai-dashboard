@@ -296,7 +296,7 @@ const AppContent: React.FC = () => {
     setAiError(null);
     try {
       const freshData = await loadDashboardData();
-      const result = await fetchAIAnalysis(freshData || dataRef.current, undefined, t('ai.languageHint'));
+      const result = await fetchAIAnalysis(freshData || dataRef.current, undefined, t('ai.languageHint'), t('ai.analyzeSystemPrompt'));
       setAnalysis(result);
     } catch (err) {
       console.error("AI Analysis Failed", err);
@@ -517,21 +517,9 @@ const AppContent: React.FC = () => {
         contextText = `企业概况：年营收¥${fs.salesRevenue.toLocaleString()}，毛利率${fs.grossMargin}%，净利率${fs.netMargin}%。`;
       }
 
-      const systemInstruction = `你是一位专业的企业经营数据助手，拥有企业全部实时经营数据的访问权限。
+      const systemInstruction = `${t('ai.chatSystemPrompt')}
 
-以下是企业各模块的完整数据：
-${contextText}
-
-你的职责：
-1. 基于上述完整数据回答用户关于企业内部经营的任何问题（经营看板、采购进项、销售销项、发票、应收应付、财务报表等）
-2. 能够进行跨模块分析（如：采购成本 vs 销售价格的利润分析、应收账款风险评估等）
-3. 对于外部市场、竞品分析或一般性知识问题，你拥有 **Google Search Grounding** 和 **Tavily Context** 双重信息源
-4. 数据分析时可以主动关联多个模块的数据给出综合建议
-
-【排版要求】
-- 禁止使用三个星号 (***) 进行加粗斜体，这会导致显示异常。
-- 仅使用两个星号 (**) 进行加粗。
-- 使用清晰的列表和段落。`;
+${contextText}`;
 
       let result: any;
       if (isElectronEnv) {

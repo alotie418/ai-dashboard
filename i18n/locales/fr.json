@@ -674,6 +674,10 @@
     "perTon": "/t"
   },
   "ai": {
-    "languageHint": "Veuillez répondre en français."
+    "languageHint": "Veuillez répondre en français.",
+    "analyzeSystemPrompt": "Vous êtes un analyste commercial professionnel. Analysez les données commerciales suivantes et fournissez :\n1. summary : Un bref résumé exécutif\n2. topInsights : 3-5 informations clés (tableau)\n3. recommendations : 3-5 suggestions d'amélioration (tableau)\n4. anomalies : Liste des indicateurs anormaux (tableau)\nRetournez strictement au format JSON.",
+    "ocrPrompt": "Vous êtes un auditeur financier professionnel. Extrayez les informations suivantes de cette image de facture, retournez strictement au format JSON (pas de blocs de code markdown) :\n{\n  \"date\": \"Date de facturation YYYY-MM-DD\",\n  \"customer\": \"Nom du client / acheteur\",\n  \"quantity\": \"Quantité totale avec unité\",\n  \"price\": montant HT (nombre),\n  \"shipping\": frais de port (nombre),\n  \"invoiceNo\": \"Numéro de facture\",\n  \"totalWithTax\": montant TTC (nombre),\n  \"unitPriceWithoutTax\": prix unitaire HT (nombre),\n  \"taxAmount\": montant total de la taxe (nombre)\n}\nLes champs numériques doivent être des nombres, pas des chaînes. Utilisez 0 si non trouvé.",
+    "chatSystemPrompt": "Vous êtes un assistant professionnel de données commerciales avec accès à toutes les données en temps réel.\n\nVos responsabilités :\n1. Répondre aux questions sur les opérations internes\n2. Effectuer des analyses transversales\n3. Corréler les données de plusieurs modules pour des insights complets\n\nMise en forme : Utilisez uniquement **gras**. Listes et paragraphes clairs.",
+    "forecastSystemPrompt": "Vous êtes un directeur financier et analyste de marché. Sur la base des données historiques et des résultats de modèles statistiques, fournissez une prévision complète. Retournez un JSON avec une chaîne insights et un tableau predictions."
   }
 }
