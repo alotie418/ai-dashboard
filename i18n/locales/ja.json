@@ -37,7 +37,8 @@
     "accounts": "売掛金・買掛金",
     "finance": "財務諸表",
     "settings": "システム設定",
-    "transactions": "取引記録"
+    "transactions": "取引記録",
+    "usTax": "米国税務ツール"
   },
   "headerTitle": {
     "dashboard": "経営データ概要",
@@ -48,7 +49,8 @@
     "finance": "財務諸表",
     "accounts": "売掛金・買掛金",
     "settings": "システム設定",
-    "transactions": "取引記録管理"
+    "transactions": "取引記録管理",
+    "ustax": "米国税務ツール"
   },
   "settings": {
     "nav": {

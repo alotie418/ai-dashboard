@@ -37,7 +37,8 @@
     "accounts": "应收应付",
     "finance": "财务报表",
     "settings": "系统设置",
-    "transactions": "收支记录"
+    "transactions": "收支记录",
+    "usTax": "美国税务工具"
   },
   "headerTitle": {
     "dashboard": "经营数据概览",
@@ -48,7 +49,8 @@
     "finance": "财务报表",
     "accounts": "应收应付",
     "settings": "系统设置",
-    "transactions": "收支记录管理"
+    "transactions": "收支记录管理",
+    "ustax": "美国税务工具"
   },
   "settings": {
     "nav": {
