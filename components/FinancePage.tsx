@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { generateReport, fetchSettings, type ReportResult } from '../services/api';
+import { formatMoney, getTaxLabel } from './accountingHelpers';
 
 interface Props {
   data: BusinessData;
@@ -59,10 +60,7 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
       ? `${selectedYear} ${selectedMonth}`
       : t('header.yearLabel', { year: selectedYear });
 
-  const currency = report?.currency || '¥';
-  const sym = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'JPY' ? '¥' : currency === 'KRW' ? '₩' : currency === 'TWD' ? 'NT$' : '¥';
-
-  const fmt = (v: number) => `${sym}${Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmt = (v: number) => formatMoney(v, locale, i18n.language);
 
   // Export CSV
   const exportCSV = () => {
@@ -166,7 +164,7 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
                 <h2 className="text-2xl font-bold text-[#191918]">
                   {locale === 'US' ? 'Schedule C — Profit or Loss From Business' : t('finance.plTitle')}
                 </h2>
-                <p className="text-[#5c5c5a] text-sm">{t('finance.plPeriod')}{periodDisplay}</p>
+                <p className="text-[#5c5c5a] text-sm">{getTaxLabel(locale, i18n.language, 'plPeriodPrefix')}{periodDisplay}</p>
                 {report?.warnings && report.warnings.length > 0 && (
                   <div className="mt-3 space-y-1">
                     {report.warnings.map((w, i) => (

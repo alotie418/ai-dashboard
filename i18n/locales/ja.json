@@ -383,7 +383,12 @@
     "taxStandard": "13% (Standard)",
     "taxTransport": "9% (Transport)",
     "taxService": "6% (Service)",
-    "taxSmall": "3% (Small-scale)"
+    "taxSmall": "3% (Small-scale)",
+    "recognitionMode": "Recognition Mode",
+    "loading": "Loading...",
+    "errorRequiredFields": "Please fill in supplier and quantity",
+    "errorSaveFailed": "Save failed",
+    "errorDeleteFailed": "Delete failed"
   },
   "sales": {
     "title": "Sales & Output Tax",
@@ -430,7 +435,15 @@
     "alertRequired": "Please fill in customer and quantity",
     "alertSaveFailed": "Save failed, please retry",
     "alertUpdateFailed": "Update failed, please retry",
-    "alertDeleteFailed": "Delete failed, please retry"
+    "alertDeleteFailed": "Delete failed, please retry",
+    "recognitionMode": "Recognition Mode",
+    "loading": "Loading...",
+    "inventoryCurrent": "Current Inventory",
+    "inventoryTon": "tons",
+    "inventoryBag": "bags",
+    "inventoryLow": "Low inventory — sales will cause negative stock",
+    "inventoryTotalPurchase": "Total Purchased",
+    "inventoryTotalSales": "Total Sold"
   },
   "invoices": {
     "currentStock": "Real-time Inventory",
@@ -627,7 +640,22 @@
     "balanceTotalLiab": "Total Liabilities & Equity",
     "cashflowTitle": "Cash Flow Analysis",
     "cashflowSubtitle": "Connecting to accounting software API for cash flow data. Preview mode only.",
-    "cashflowSync": "Sync Now"
+    "cashflowSync": "Sync Now",
+    "balanceReceivables": "Accounts Receivable",
+    "balancePayables": "Accounts Payable",
+    "balanceTaxPayable": "Tax Payable",
+    "balanceTotalAssets": "Total Assets",
+    "balanceTotalLiabilities": "Total Liabilities",
+    "balanceTotalLiabilitiesEquity": "Total Liabilities & Equity",
+    "cashflowDesc": "Connecting to accounting API for cash flow data. Preview mode only.",
+    "balanceCurrentAssets": "Current Assets",
+    "balanceNonCurrentAssets": "Non-current Assets",
+    "balanceFixedAssets": "Fixed Assets",
+    "balanceCurrentAssetsTotal": "Total Current Assets",
+    "balanceCurrentLiabilities": "Current Liabilities",
+    "balancePaidInCapital": "Paid-in Capital",
+    "balanceRetainedEarnings": "Retained Earnings",
+    "balanceLiabilitiesEquity": "Liabilities & Equity"
   },
   "aiInsights": {
     "title": "AIブリーフ",
@@ -667,7 +695,13 @@
     "invoiceNo": "Invoice No.",
     "status": "Status",
     "action": "Action",
-    "shipping": "Shipping"
+    "shipping": "Shipping",
+    "unitPriceWithoutTax": "Unit Price (Excl. Tax)",
+    "totalAmountWithoutTax": "Amount (Excl. Tax)",
+    "amountWithoutTax": "Amount (Excl. Tax)",
+    "totalTax": "Total Tax",
+    "totalWithTax": "Total (Incl. Tax)",
+    "actions": "Action"
   },
   "common2": {
     "edit": "Edit",

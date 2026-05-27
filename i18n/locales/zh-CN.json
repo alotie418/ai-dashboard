@@ -383,7 +383,12 @@
     "taxStandard": "13% (标准货物)",
     "taxTransport": "9% (交通运输/低税)",
     "taxService": "6% (现代服务)",
-    "taxSmall": "3% (小规模/简易)"
+    "taxSmall": "3% (小规模/简易)",
+    "recognitionMode": "识别模式",
+    "loading": "正在加载数据...",
+    "errorRequiredFields": "请填写必要的供应商和数量信息",
+    "errorSaveFailed": "保存失败，请重试",
+    "errorDeleteFailed": "删除失败，请重试"
   },
   "sales": {
     "title": "销售与销项",
@@ -430,7 +435,15 @@
     "alertRequired": "请填写必要的客户和数量信息",
     "alertSaveFailed": "保存失败，请重试",
     "alertUpdateFailed": "更新失败，请重试",
-    "alertDeleteFailed": "删除失败，请重试"
+    "alertDeleteFailed": "删除失败，请重试",
+    "recognitionMode": "识别模式",
+    "loading": "正在加载数据...",
+    "inventoryCurrent": "当前库存",
+    "inventoryTon": "吨",
+    "inventoryBag": "袋",
+    "inventoryLow": "库存不足，销售将导致库存为负",
+    "inventoryTotalPurchase": "总采购",
+    "inventoryTotalSales": "总销售"
   },
   "invoices": {
     "currentStock": "实时库存量",
@@ -627,7 +640,22 @@
     "balanceTotalLiab": "负债及所有者权益总计",
     "cashflowTitle": "现金流量表深度分析",
     "cashflowSubtitle": "正在连接财务软件 API 同步现金流数据。当前仅支持模拟预览。",
-    "cashflowSync": "立即同步"
+    "cashflowSync": "立即同步",
+    "balanceReceivables": "应收账款",
+    "balancePayables": "应付账款",
+    "balanceTaxPayable": "应交税费",
+    "balanceTotalAssets": "资产总计",
+    "balanceTotalLiabilities": "负债合计",
+    "balanceTotalLiabilitiesEquity": "负债及所有者权益总计",
+    "cashflowDesc": "正在连接财务软件 API 同步现金流数据。当前仅支持模拟预览。",
+    "balanceCurrentAssets": "流动资产",
+    "balanceNonCurrentAssets": "非流动资产",
+    "balanceFixedAssets": "固定资产",
+    "balanceCurrentAssetsTotal": "流动资产合计",
+    "balanceCurrentLiabilities": "流动负债",
+    "balancePaidInCapital": "实收资本",
+    "balanceRetainedEarnings": "未分配利润",
+    "balanceLiabilitiesEquity": "负债与权益"
   },
   "aiInsights": {
     "title": "AI 简报",
@@ -667,7 +695,13 @@
     "invoiceNo": "发票号码",
     "status": "状态",
     "action": "操作",
-    "shipping": "运费"
+    "shipping": "运费",
+    "unitPriceWithoutTax": "无税单价",
+    "totalAmountWithoutTax": "合计无税金额",
+    "amountWithoutTax": "合计无税金额",
+    "totalTax": "合计税额",
+    "totalWithTax": "价税合计",
+    "actions": "操作"
   },
   "common2": {
     "edit": "编辑",
