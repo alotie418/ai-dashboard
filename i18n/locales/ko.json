@@ -265,7 +265,8 @@
     "month10": "Oct",
     "month11": "Nov",
     "month12": "Dec",
-    "yearLabel": "{{year}}년도"
+    "yearLabel": "{{year}}년도",
+    "quarterLabel": "{{n}}분기"
   },
   "chat": {
     "title": "AI 어시스턴트",
