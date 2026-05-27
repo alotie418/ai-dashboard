@@ -279,6 +279,56 @@ export function getReportTypes(locale?: string): Promise<Array<{ id: string; nam
   return apiFetch(`/api/reports/types${qs}`);
 }
 
+// ==================== US: Mileage Tracking（F 阶段）====================
+
+export interface MileageLog {
+  id: string; date: string; start_location: string; end_location: string;
+  miles: number; purpose: string; round_trip: number; rate_per_mile: number;
+  deduction: number; created_at: string;
+}
+
+export interface MileageSummary { year: string; trips: number; totalMiles: number; totalDeduction: number; }
+
+export function listMileage(opts: { from?: string; to?: string } = {}): Promise<MileageLog[]> {
+  const qs = new URLSearchParams();
+  if (opts.from) qs.set('from', opts.from);
+  if (opts.to) qs.set('to', opts.to);
+  return apiFetch(`/api/mileage${qs.toString() ? '?' + qs.toString() : ''}`);
+}
+
+export function createMileage(body: Partial<MileageLog>): Promise<{ success: boolean; id: string }> {
+  return apiFetch('/api/mileage', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function updateMileage(id: string, body: Partial<MileageLog>): Promise<{ success: boolean }> {
+  return apiFetch(`/api/mileage/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) });
+}
+
+export function deleteMileage(id: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/mileage/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export function fetchMileageSummary(year?: string): Promise<MileageSummary> {
+  const qs = year ? `?year=${year}` : '';
+  return apiFetch(`/api/mileage/summary${qs}`);
+}
+
+// ==================== US: Home Office（F 阶段）====================
+
+export interface HomeOfficeData {
+  method: 'simplified' | 'actual'; sqft: number; rate_per_sqft: number; max_sqft: number;
+  total_home_sqft: number; annual_rent: number; annual_utilities: number;
+  annual_insurance: number; annual_depreciation: number; deduction: number;
+}
+
+export function fetchHomeOffice(): Promise<HomeOfficeData> {
+  return apiFetch('/api/home-office');
+}
+
+export function saveHomeOffice(body: Partial<HomeOfficeData>): Promise<HomeOfficeData> {
+  return apiFetch('/api/home-office', { method: 'PUT', body: JSON.stringify(body) });
+}
+
 // ==================== Types ====================
 
 // Frontend interfaces (match component definitions)

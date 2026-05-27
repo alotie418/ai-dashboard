@@ -241,6 +241,40 @@ const MIGRATIONS = [
     `);
     console.log('[db] created transactions + legacy_migrations tables');
   },
+  // v6: US-specific — mileage_logs + home_office_settings (F stage)
+  (d) => {
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS mileage_logs (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        start_location TEXT,
+        end_location TEXT,
+        miles REAL NOT NULL,
+        purpose TEXT,
+        round_trip INTEGER DEFAULT 0,
+        rate_per_mile REAL DEFAULT 0.67,
+        deduction REAL GENERATED ALWAYS AS (miles * rate_per_mile * (1 + round_trip)) STORED,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_mileage_date ON mileage_logs(date);
+
+      CREATE TABLE IF NOT EXISTS home_office (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        method TEXT DEFAULT 'simplified' CHECK (method IN ('simplified', 'actual')),
+        sqft REAL DEFAULT 0,
+        rate_per_sqft REAL DEFAULT 5.0,
+        max_sqft REAL DEFAULT 300,
+        total_home_sqft REAL DEFAULT 0,
+        annual_rent REAL DEFAULT 0,
+        annual_utilities REAL DEFAULT 0,
+        annual_insurance REAL DEFAULT 0,
+        annual_depreciation REAL DEFAULT 0,
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+      INSERT OR IGNORE INTO home_office (id) VALUES (1);
+    `);
+    console.log('[db] created mileage_logs + home_office tables');
+  },
 ];
 
 function runMigrations(d) {

@@ -37,7 +37,8 @@
     "accounts": "Créances / Dettes",
     "finance": "États financiers",
     "settings": "Paramètres système",
-    "transactions": "Transactions"
+    "transactions": "Transactions",
+    "usTax": "Outils fiscaux US"
   },
   "headerTitle": {
     "dashboard": "Aperçu d'activité",
@@ -48,7 +49,8 @@
     "finance": "États financiers",
     "accounts": "Créances / Dettes",
     "settings": "Paramètres système",
-    "transactions": "Gestion des transactions"
+    "transactions": "Gestion des transactions",
+    "ustax": "Outils fiscaux US"
   },
   "settings": {
     "nav": {

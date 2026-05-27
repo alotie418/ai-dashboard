@@ -37,7 +37,8 @@
     "accounts": "채권/채무",
     "finance": "재무제표",
     "settings": "시스템 설정",
-    "transactions": "거래 기록"
+    "transactions": "거래 기록",
+    "usTax": "미국 세무 도구"
   },
   "headerTitle": {
     "dashboard": "경영 데이터 개요",
@@ -48,7 +49,8 @@
     "finance": "재무제표",
     "accounts": "채권/채무",
     "settings": "시스템 설정",
-    "transactions": "거래 기록 관리"
+    "transactions": "거래 기록 관리",
+    "ustax": "미국 세무 도구"
   },
   "settings": {
     "nav": {

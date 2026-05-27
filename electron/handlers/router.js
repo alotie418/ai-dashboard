@@ -16,6 +16,8 @@ const categories = require('./categories');
 const transactions = require('./transactions');
 const migrationsH = require('./migrations');
 const reportsH = require('./reports');
+const mileageH = require('./mileage');
+const homeOfficeH = require('./homeOffice');
 
 const routes = [
   // ---- Dashboard ----
@@ -67,6 +69,17 @@ const routes = [
   // ---- Reports（D 阶段 — 6 国报表引擎）----
   ['GET', '/api/reports/generate', reportsH.generate],
   ['GET', '/api/reports/types', reportsH.types],
+
+  // ---- US: Mileage Tracking（F 阶段）----
+  ['GET', '/api/mileage/summary', mileageH.summary],
+  ['GET', '/api/mileage', mileageH.list],
+  ['POST', '/api/mileage', mileageH.create],
+  ['PUT', '/api/mileage/:id', mileageH.update],
+  ['DELETE', '/api/mileage/:id', mileageH.remove],
+
+  // ---- US: Home Office（F 阶段）----
+  ['GET', '/api/home-office', homeOfficeH.get],
+  ['PUT', '/api/home-office', homeOfficeH.save],
 
   // ---- Legacy Data Migrations（sales/purchases → transactions）----
   ['GET', '/api/migrations/detect-legacy', migrationsH.detectLegacy],

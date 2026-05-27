@@ -37,7 +37,8 @@
     "accounts": "Receivables / Payables",
     "finance": "Financial Reports",
     "settings": "Settings",
-    "transactions": "Transactions"
+    "transactions": "Transactions",
+    "usTax": "US Tax Tools"
   },
   "headerTitle": {
     "dashboard": "Business Overview",
@@ -48,7 +49,8 @@
     "finance": "Financial Statements",
     "accounts": "Receivables / Payables",
     "settings": "System Settings",
-    "transactions": "Transaction Records"
+    "transactions": "Transaction Records",
+    "ustax": "US Tax Tools"
   },
   "settings": {
     "nav": {
