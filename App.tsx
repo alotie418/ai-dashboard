@@ -19,6 +19,7 @@ import SettingsPage from './components/SettingsPage';
 import AccountsPage from './components/AccountsPage';
 import TransactionsPage from './components/TransactionsPage';
 import USTaxToolsPage from './components/USTaxToolsPage';
+import USDashboardCards from './components/USDashboardCards';
 import AlertCenter from './components/AlertCenter';
 import LoginPage from './components/LoginPage';
 import OnboardingWizard from './components/OnboardingWizard';
@@ -606,24 +607,38 @@ ${contextText}`;
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'dashboard': return (
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-          <div className="xl:col-span-3 space-y-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {data.metrics.map((m, i) => <MetricCard key={i} metric={m} />)}
+      case 'dashboard': {
+        const dashLocale = (data as any).locale || 'CN';
+        const isUS = dashLocale === 'US';
+        return (
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+            <div className="xl:col-span-3 space-y-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {data.metrics.map((m, i) => <MetricCard key={i} metric={m} />)}
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch [grid-auto-rows:1fr]">
+                {isUS ? (
+                  <USDashboardCards
+                    report={(data as any).report}
+                    mileageSummary={(data as any).mileageSummary}
+                    homeOffice={(data as any).homeOffice}
+                  />
+                ) : (
+                  <>
+                    <FinancialStatementTable data={data.financialStatement} />
+                    <ProfitMarginIndicators data={data.financialStatement} />
+                    <VATStatistics data={data.vatStatistics} />
+                    <TaxInclusiveSummary data={data.taxInclusiveSummary} />
+                  </>
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch [grid-auto-rows:1fr]">
-              <FinancialStatementTable data={data.financialStatement} />
-              <ProfitMarginIndicators data={data.financialStatement} />
-              <VATStatistics data={data.vatStatistics} />
-              <TaxInclusiveSummary data={data.taxInclusiveSummary} />
+            <div className="xl:col-span-1 h-full min-h-[600px] xl:sticky xl:top-0 xl:h-[calc(100vh-120px)]">
+              <AIInsights analysis={analysis} loading={loadingAI} error={aiError} onRefresh={performAnalysis} />
             </div>
           </div>
-          <div className="xl:col-span-1 h-full min-h-[600px] xl:sticky xl:top-0 xl:h-[calc(100vh-120px)]">
-            <AIInsights analysis={analysis} loading={loadingAI} error={aiError} onRefresh={performAnalysis} />
-          </div>
-        </div>
-      );
+        );
+      }
       case 'sales': return <SalesAndOutputPage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'purchase': return <PurchaseAndInputPage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'analysis': return <DataAnalysisPage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
