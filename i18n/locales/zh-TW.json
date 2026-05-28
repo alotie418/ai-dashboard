@@ -413,7 +413,7 @@
     "taxEuStandard": "20% (標準 VAT)",
     "taxEuReduced": "10% (減免 VAT)",
     "taxEuSuperReduced": "5% (超低 VAT)",
-    "taxKrStandard": "10% (標準附加價值稅)",
+    "taxKrStandard": "10%（韓國 VAT 標準稅率）",
     "taxTwStandard": "5% (標準營業稅)",
     "recognitionMode": "識別模式",
     "loading": "正在載入資料...",
