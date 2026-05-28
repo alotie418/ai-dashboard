@@ -331,7 +331,12 @@ const AppContent: React.FC = () => {
     setAiError(null);
     try {
       const freshData = await loadDashboardData();
-      const result = await fetchAIAnalysis(freshData || dataRef.current, undefined, t('ai.languageHint'), t('ai.analyzeSystemPrompt'));
+      // Inject both accountingLocale (tax/currency/regime context) and
+      // uiLanguage (response language) into the system prompt, so the AI
+      // briefing follows the same separation rules as the chat assistant.
+      const localeForAI = (freshData as any)?.locale || assistantAccLocale || 'CN';
+      const systemPrompt = `${t('ai.analyzeSystemPrompt')}\n\n${buildAIFinanceContext(localeForAI, i18n.language)}`;
+      const result = await fetchAIAnalysis(freshData || dataRef.current, undefined, t('ai.languageHint'), systemPrompt);
       setAnalysis(result);
     } catch (err) {
       console.error("AI Analysis Failed", err);
@@ -339,7 +344,7 @@ const AppContent: React.FC = () => {
     } finally {
       setLoadingAI(false);
     }
-  }, [loadDashboardData]);
+  }, [loadDashboardData, assistantAccLocale, i18n.language]);
 
   useEffect(() => {
     performAnalysis();

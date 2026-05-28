@@ -18,9 +18,26 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
   const { t, i18n } = useTranslation();
   const [activeTab, setActiveTab] = useState<StatementType>('pl');
   const [report, setReport] = useState<ReportResult | null>(null);
-  const [locale, setLocale] = useState<string>('CN');
+  // Initialize locale from parent BusinessData if available, so first render
+  // uses the correct currency symbol instead of defaulting to CN.
+  const [locale, setLocale] = useState<string>((data as any)?.locale || 'CN');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Eagerly hydrate locale from settings on mount, independent of report fetch.
+  // This guarantees the KPI cards render with the correct currency even if
+  // generateReport() later fails.
+  useEffect(() => {
+    fetchSettings().then((s: any) => {
+      if (s?.accounting_locale) setLocale(s.accounting_locale);
+    }).catch(() => {});
+  }, []);
+
+  // Keep locale in sync with parent data when it changes (e.g. after onboarding)
+  useEffect(() => {
+    const parentLocale = (data as any)?.locale;
+    if (parentLocale && parentLocale !== locale) setLocale(parentLocale);
+  }, [data]);
 
   const loadReport = useCallback(async () => {
     setLoading(true);

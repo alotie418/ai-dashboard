@@ -1,7 +1,8 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import Papa from 'papaparse';
-import { batchCreateSales, batchCreatePurchases } from '../services/api';
+import { batchCreateSales, batchCreatePurchases, fetchSettings } from '../services/api';
+import { getCurrencySymbol } from './accountingHelpers';
 
 interface Props {
   type: 'sales' | 'purchases';
@@ -69,6 +70,13 @@ function autoMapHeaders(headers: string[], fields: { key: string; label: string 
 
 const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
   const { t } = useTranslation();
+  const [accLocale, setAccLocale] = useState<string>('CN');
+  useEffect(() => {
+    fetchSettings().then((s: any) => {
+      if (s?.accounting_locale) setAccLocale(s.accounting_locale);
+    }).catch(() => {});
+  }, []);
+  const currSym = getCurrencySymbol(accLocale);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [csvData, setCsvData] = useState<any[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -317,7 +325,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
                           <td className="px-2 py-1.5">{r.date}</td>
                           <td className="px-2 py-1.5">{type === 'sales' ? r.customer : r.supplier}</td>
                           <td className="px-2 py-1.5 text-right">{r.tons}</td>
-                          <td className="px-2 py-1.5 text-right">¥{(r.totalAmount || 0).toLocaleString()}</td>
+                          <td className="px-2 py-1.5 text-right">{currSym}{(r.totalAmount || 0).toLocaleString()}</td>
                           <td className="px-2 py-1.5 text-center">
                             {errs.length === 0
                               ? <span className="text-green-600"><i className="fas fa-check-circle"></i></span>

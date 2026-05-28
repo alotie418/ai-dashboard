@@ -33,7 +33,7 @@ const EXPECTED_CURRENCY = {
 };
 
 // Tax keys each accountingLocale should provide in taxConcepts
-const COMMON_TAX_KEYS = ['plRevenue', 'plCost', 'plNetProfit', 'plTitle', 'tabPlLabel', 'taxSummaryTitle', 'purchaseTotal', 'salesTotal', 'taxDifference', 'invoiceTypeOutput', 'invoiceTypeInput'];
+const COMMON_TAX_KEYS = ['plRevenue', 'plCost', 'plNetProfit', 'plTitle', 'tabPlLabel', 'taxSummaryTitle', 'purchaseTotal', 'salesTotal', 'taxDifference', 'invoiceTypeOutput', 'invoiceTypeInput', 'formTaxRate'];
 const VAT_FAMILY_KEYS = ['taxTitle', 'inputTax', 'outputTax', 'estimatedTax', 'certifiedInput', 'invoicedOutput'];
 const REQUIRED_TAX_KEYS_BY_LOCALE = {
   CN: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
@@ -273,6 +273,14 @@ async function main() {
       } else {
         pass(`formatMoney:${accId}+${uiLang}`);
       }
+      // Also verify zero values render with currency symbol (regression guard
+      // for finance summary cards which often show 0 before data loads)
+      const zeroFmt = helpers.formatMoney(0, accId, uiLang);
+      if (!zeroFmt.includes(expected)) {
+        fail(`formatMoney(0):${accId}+${uiLang}`, `zero-value formatting missing symbol "${expected}": "${zeroFmt}"`);
+      } else {
+        pass(`formatMoney(0):${accId}+${uiLang}`);
+      }
     }
   }
 
@@ -299,6 +307,33 @@ async function main() {
       reasons.push(`null fallback expected "${unitExpectations[uiLang].unit}", got "${nullFallback}"`);
     }
     if (reasons.length) fail(`inventoryUnit:${uiLang}`, reasons); else pass(`inventoryUnit:${uiLang}`);
+  }
+
+  // ────────────────────────────────────────────────
+  // PART E0: AI briefing prompt construction
+  //   Verifies the wire-up in App.tsx — performAnalysis() must construct
+  //   systemPrompt as `${t('ai.analyzeSystemPrompt')}\n\n${buildAIFinanceContext(...)}`.
+  //   Static check: ensure App.tsx invokes buildAIFinanceContext() in the
+  //   analysis path so the AI briefing receives accountingLocale + uiLanguage.
+  // ────────────────────────────────────────────────
+  {
+    const { readFile: rf } = await import('node:fs/promises');
+    const appTsx = await rf(join(ROOT, 'App.tsx'), 'utf8');
+    const reasons = [];
+    // performAnalysis must build systemPrompt via buildAIFinanceContext
+    const m = appTsx.match(/performAnalysis\s*=\s*useCallback[\s\S]{0,2000}?fetchAIAnalysis/);
+    if (!m) {
+      reasons.push('Could not locate performAnalysis → fetchAIAnalysis block in App.tsx');
+    } else {
+      const block = m[0];
+      if (!/buildAIFinanceContext\s*\(/.test(block)) {
+        reasons.push('performAnalysis does not call buildAIFinanceContext; AI briefing missing accountingLocale context');
+      }
+      if (!/i18n\.language|uiLanguage/.test(block)) {
+        reasons.push('performAnalysis does not include uiLanguage in the AI briefing prompt');
+      }
+    }
+    if (reasons.length) fail(`aiBriefingWiring`, reasons); else pass(`aiBriefingWiring`);
   }
 
   // ────────────────────────────────────────────────
@@ -410,6 +445,34 @@ async function main() {
         const t = helpers.getTaxLabel(accId, uiLang, 'taxTitle');
         const expected = { 'zh-CN': /增值税/, 'zh-TW': /增值稅/, en: /VAT/i };
         if (expected[uiLang] && !expected[uiLang].test(t)) reasons.push(`CN taxTitle missing expected term in ${uiLang}: "${t}"`);
+        // formTaxRate for CN must say 增值税率 (Chinese VAT context)
+        const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
+        if (uiLang === 'zh-CN' && !/增值税/.test(rateLabel)) reasons.push(`CN formTaxRate zh-CN should say 增值税率: "${rateLabel}"`);
+      }
+      // formTaxRate cross-regime checks: non-CN locales must NOT say "增值税率"
+      if (accId !== 'CN') {
+        const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
+        if (uiLang === 'zh-CN' && /增值税率/.test(rateLabel)) {
+          reasons.push(`${accId} formTaxRate zh-CN incorrectly uses 中国增值税率: "${rateLabel}"`);
+        }
+      }
+      // formTaxRate per-regime expected terms
+      if (accId === 'US') {
+        const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
+        if (!/Sales Tax|sales tax/i.test(rateLabel)) reasons.push(`US formTaxRate missing Sales Tax in ${uiLang}: "${rateLabel}"`);
+      }
+      if (accId === 'EU') {
+        const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
+        if (!/VAT|TVA/i.test(rateLabel)) reasons.push(`EU formTaxRate missing VAT/TVA in ${uiLang}: "${rateLabel}"`);
+      }
+      if (accId === 'KR') {
+        const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
+        if (!/VAT|TVA|부가가치세/i.test(rateLabel)) reasons.push(`KR formTaxRate missing VAT/TVA in ${uiLang}: "${rateLabel}"`);
+      }
+      if (accId === 'TW') {
+        const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
+        const expected = { 'zh-CN': /营业税率/, 'zh-TW': /營業稅率/ };
+        if (expected[uiLang] && !expected[uiLang].test(rateLabel)) reasons.push(`TW formTaxRate missing 营业税率 in ${uiLang}: "${rateLabel}"`);
       }
       if (accId === 'JP') {
         const t = helpers.getTaxLabel(accId, uiLang, 'taxTitle');

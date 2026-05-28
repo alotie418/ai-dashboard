@@ -59,6 +59,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
   const uiLang = i18n.language;
   const currSym = getCurrencySymbol(accLocale);
   const fmtMoney = (val: number) => formatMoney(val, accLocale, uiLang);
+  const taxLabel = (key: string) => getTaxLabel(accLocale, uiLang, key);
   const taxRateOptions = TAX_RATE_OPTIONS[accLocale] || TAX_RATE_OPTIONS.CN;
   const defaultTaxRate = taxRateOptions[0]?.value || '13%';
 
@@ -522,7 +523,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formTaxRate')}</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{taxLabel('formTaxRate')}</label>
                   <select
                     value={newPurchase.taxRate}
                     onChange={(e) => setNewPurchase({ ...newPurchase, taxRate: e.target.value })}

@@ -65,24 +65,17 @@ function isAllowedContext(line, fullMatch, ns, key) {
   return false;
 }
 
-const HARDCODED_PATTERNS = [
-  // Currency symbols hardcoded in JSX (should go through formatMoney/getCurrencySymbol)
-  // We allow $ and £ since they conflict with JSX/regex too much; focus on ¥ and €
-  { name: 'hardcoded ¥', pattern: /(?<!\w)¥(?!\s*\}|\s*['"`])/g, applies: (line) => {
-    // In JSX literal context: `¥{val}` or `¥${val}`
-    return /[`"']\s*¥|>\s*¥/.test(line);
-  }},
-  { name: 'hardcoded €', pattern: /(?<!\w)€(?!\s*\}|\s*['"`])/g, applies: (line) => {
-    return /[`"']\s*€|>\s*€/.test(line);
-  }},
-];
-
 const PROBLEM_HARDCODES = [
   // Hardcoded inventory units in JSX
-  // `${value}吨` or `>吨<` or `>袋<` patterns
   { name: 'hardcoded 吨 in JSX', pattern: /['"`][^'"`]*吨[^'"`]*['"`]|>\s*吨\s*</g },
   { name: 'hardcoded 袋 in JSX', pattern: /['"`][^'"`]*袋[^'"`]*['"`]|>\s*袋\s*</g },
   { name: 'hardcoded ton unit suffix', pattern: /\$\{[^}]+\}t['"`]|\.toFixed\([^)]*\)\s*\+\s*['"`]t['"`]/g },
+  // Currency symbols hardcoded in template literals or JSX text content
+  // Catches things like `¥${val}` / `>¥{val}<` — money should go through formatMoney().
+  { name: 'hardcoded ¥ currency', pattern: /`[^`]*¥\$\{[^}]+\}[^`]*`|>\s*¥\s*\{/g },
+  { name: 'hardcoded € currency', pattern: /`[^`]*€\$\{[^}]+\}[^`]*`|>\s*€\s*\{/g },
+  { name: 'hardcoded ₩ currency', pattern: /`[^`]*₩\$\{[^}]+\}[^`]*`|>\s*₩\s*\{/g },
+  { name: 'hardcoded NT$ currency', pattern: /`[^`]*NT\$\$\{[^}]+\}[^`]*`|>\s*NT\$\s*\{/g },
 ];
 
 const findings = [];
