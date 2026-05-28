@@ -75,45 +75,51 @@ async function context({ body }) {
 
   const sections = [];
 
+  // Context text is locale-neutral (numeric only). The AI knows
+  // the actual currency / tax regime from the system prompt
+  // (buildAIFinanceContext) provided by the frontend, and renders
+  // its response in the user's uiLanguage.
+  const num = (v) => Number(v || 0).toLocaleString();
+
   if (dash) {
     const fs = dash.financialStatement || {};
     const metrics = dash.metrics || {};
     const perf = dash.monthlyPerformance || [];
     const vat = dash.vatStatistics || {};
     const monthlyStr = perf
-      .map(p => `${p.name}:营收¥${(p.revenue || 0).toLocaleString()}/利润¥${(p.profit || 0).toLocaleString()}/销量${p.salesTons || 0}t`)
-      .join('；');
-    sections.push(`【经营看板】
-年度营收: ¥${(fs.salesRevenue || 0).toLocaleString()}, 毛利率: ${fs.grossMargin || 0}%, 净利率: ${fs.netMargin || 0}%
-库存余量: ${(metrics.inventoryTons || 0).toLocaleString()}吨, 采购总量: ${(metrics.purchaseTotalTons || 0).toLocaleString()}吨, 销售总量: ${(metrics.salesTotalTons || 0).toLocaleString()}吨
-月度趋势: ${monthlyStr}
-增值税统计: 累计进项¥${(vat.cumulativeInput || 0).toLocaleString()}, 累计销项¥${(vat.cumulativeOutput || 0).toLocaleString()}, 估算应纳增值税¥${(vat.estimatedPayable || 0).toLocaleString()}`);
+      .map(p => `${p.name}: revenue=${num(p.revenue)} / profit=${num(p.profit)} / volume=${num(p.salesTons)}`)
+      .join('; ');
+    sections.push(`[Dashboard]
+Annual revenue: ${num(fs.salesRevenue)}, gross margin: ${fs.grossMargin || 0}%, net margin: ${fs.netMargin || 0}%
+Inventory on hand: ${num(metrics.inventoryTons)}, total purchases: ${num(metrics.purchaseTotalTons)}, total sales: ${num(metrics.salesTotalTons)}
+Monthly trend: ${monthlyStr}
+Tax summary: cumulative input=${num(vat.cumulativeInput)}, cumulative output=${num(vat.cumulativeOutput)}, estimated payable=${num(vat.estimatedPayable)}`);
   }
 
   if (purchases) {
     const totalAmount = purchases.reduce((s, r) => s + (r.totalAmount || 0), 0);
     const totalTax = purchases.reduce((s, r) => s + (r.taxAmount || 0), 0);
     const recent = purchases.slice(0, 20).map(r =>
-      `  ${r.date || ''} ${r.supplier || ''} ${r.tons || 0}吨 ¥${(r.pricePerTon || 0).toLocaleString()}/吨 总额¥${(r.totalAmount || 0).toLocaleString()} 发票:${r.invoiceStatus || '未知'}`
+      `  ${r.date || ''} ${r.supplier || ''} qty=${num(r.tons)} unit_price=${num(r.pricePerTon)} total=${num(r.totalAmount)} invoice=${r.invoiceStatus || 'unknown'}`
     ).join('\n');
-    sections.push(`【采购与进项】
-采购总额: ¥${totalAmount.toLocaleString()}, 共${purchases.length}笔
-进项税合计: ¥${totalTax.toLocaleString()}
-最近采购记录:
-${recent || '  无记录'}`);
+    sections.push(`[Purchases]
+Total purchases: ${num(totalAmount)} (${purchases.length} records)
+Total input tax: ${num(totalTax)}
+Recent purchases:
+${recent || '  (none)'}`);
   }
 
   if (sales) {
     const totalAmount = sales.reduce((s, r) => s + (r.totalAmount || 0), 0);
     const totalTax = sales.reduce((s, r) => s + (r.taxAmount || 0), 0);
     const recent = sales.slice(0, 20).map(r =>
-      `  ${r.date || ''} ${r.customer || ''} ${r.tons || 0}吨 ¥${(r.pricePerTon || 0).toLocaleString()}/吨 总额¥${(r.totalAmount || 0).toLocaleString()} 发票:${r.invoiceStatus || '未知'}`
+      `  ${r.date || ''} ${r.customer || ''} qty=${num(r.tons)} unit_price=${num(r.pricePerTon)} total=${num(r.totalAmount)} invoice=${r.invoiceStatus || 'unknown'}`
     ).join('\n');
-    sections.push(`【销售与销项】
-销售总额: ¥${totalAmount.toLocaleString()}, 共${sales.length}笔
-销项税合计: ¥${totalTax.toLocaleString()}
-最近销售记录:
-${recent || '  无记录'}`);
+    sections.push(`[Sales]
+Total sales: ${num(totalAmount)} (${sales.length} records)
+Total output tax: ${num(totalTax)}
+Recent sales:
+${recent || '  (none)'}`);
   }
 
   if (sales || purchases) {
@@ -121,34 +127,34 @@ ${recent || '  无记录'}`);
     const purchL = purchases || [];
     const salesInvoiced = salesL.filter(r => r.invoiceStatus === '已开').length;
     const purchaseInvoiced = purchL.filter(r => r.invoiceStatus === '已收').length;
-    sections.push(`【发票查询】
-销项发票: 已开${salesInvoiced}张, 待开${salesL.length - salesInvoiced}张
-进项发票: 已收${purchaseInvoiced}张, 待收${purchL.length - purchaseInvoiced}张`);
+    sections.push(`[Invoices]
+Output invoices: ${salesInvoiced} issued, ${salesL.length - salesInvoiced} pending
+Input invoices: ${purchaseInvoiced} received, ${purchL.length - purchaseInvoiced} pending`);
   }
 
   if (receivables) {
-    sections.push(`【应收账款】
-应收总额: ¥${(receivables.totalReceivable || 0).toLocaleString()}, 逾期金额: ¥${(receivables.totalOverdue || 0).toLocaleString()}
-回款率: ${receivables.collectionRate || 0}%${receivables.topCustomers?.[0] ? `, 最大客户: ${receivables.topCustomers[0].name} (¥${(receivables.topCustomers[0].amount || 0).toLocaleString()})` : ''}`);
+    sections.push(`[Receivables]
+Total receivable: ${num(receivables.totalReceivable)}, overdue: ${num(receivables.totalOverdue)}
+Collection rate: ${receivables.collectionRate || 0}%${receivables.topCustomers?.[0] ? `, top customer: ${receivables.topCustomers[0].name} (${num(receivables.topCustomers[0].amount)})` : ''}`);
   }
 
   if (payables) {
-    sections.push(`【应付账款】
-应付总额: ¥${(payables.totalPayable || 0).toLocaleString()}, 逾期金额: ¥${(payables.totalOverdue || 0).toLocaleString()}
-付款率: ${payables.paymentRate || 0}%${payables.topSuppliers?.[0] ? `, 最大供应商: ${payables.topSuppliers[0].name} (¥${(payables.topSuppliers[0].amount || 0).toLocaleString()})` : ''}`);
+    sections.push(`[Payables]
+Total payable: ${num(payables.totalPayable)}, overdue: ${num(payables.totalOverdue)}
+Payment rate: ${payables.paymentRate || 0}%${payables.topSuppliers?.[0] ? `, top supplier: ${payables.topSuppliers[0].name} (${num(payables.topSuppliers[0].amount)})` : ''}`);
   }
 
   if (dash?.financialStatement) {
     const f = dash.financialStatement;
-    sections.push(`【财务报表】
-营业收入: ¥${(f.salesRevenue || 0).toLocaleString()}, 营业成本: ¥${(f.costOfSales || 0).toLocaleString()}
-毛利润: ¥${(f.grossProfit || 0).toLocaleString()}, 净利润: ¥${(f.netProfit || 0).toLocaleString()}
-税金及附加: ¥${(f.taxSurcharge || 0).toLocaleString()}, 管理费用: ¥${(f.adminExpense || 0).toLocaleString()}, 运费: ¥${(f.shippingFee || 0).toLocaleString()}`);
+    sections.push(`[Financial statement]
+Revenue: ${num(f.salesRevenue)}, COGS: ${num(f.costOfSales)}
+Gross profit: ${num(f.grossProfit)}, net profit: ${num(f.netProfit)}
+Tax surcharge: ${num(f.taxSurcharge)}, admin expense: ${num(f.adminExpense)}, shipping: ${num(f.shippingFee)}`);
   }
 
   if (alerts && alerts.length > 0) {
     const alertStr = alerts.slice(0, 10).map(a => `  [${a.type || ''}] ${a.title || ''}`).join('\n');
-    sections.push(`【系统告警】\n${alerts.length}条告警:\n${alertStr}`);
+    sections.push(`[Alerts]\n${alerts.length} active:\n${alertStr}`);
   } else {
     sections.push(`【系统告警】\n无告警`);
   }

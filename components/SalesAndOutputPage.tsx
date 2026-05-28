@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { analyzeInvoice } from '../services/ocrService';
 import { fetchSales, createSale, updateSale, deleteSale, fetchSettings, SalesRecord } from '../services/api';
-import { formatMoney, getCurrencySymbol, formatQuantity } from './accountingHelpers';
+import { formatMoney, getCurrencySymbol, formatQuantity, formatLegacyQuantity } from './accountingHelpers';
 import CsvImportModal from './CsvImportModal';
 
 interface Props {
@@ -351,7 +351,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                 <tr key={row.id} className="hover:bg-[#f9f9f8]/30 transition-colors">
                   <td className="px-5 py-5 text-sm text-[#4a4a48] whitespace-nowrap">{row.date}</td>
                   <td className="px-5 py-5 text-sm text-[#191918] font-medium">{row.customer}</td>
-                  <td className="px-5 py-5 text-sm text-[#4a4a48]">{row.quantity}</td>
+                  <td className="px-5 py-5 text-sm text-[#4a4a48]">{formatLegacyQuantity(row.quantity, productUnit, uiLang)}</td>
                   <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{formatCurrency(unitPrice)}</td>
                   <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{formatCurrency(amtWithoutTax)}</td>
                   <td className="px-5 py-5 text-sm text-rose-600 font-medium whitespace-nowrap">{formatCurrency(taxAmt)}</td>

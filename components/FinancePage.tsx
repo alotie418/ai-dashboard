@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { generateReport, fetchSettings, type ReportResult } from '../services/api';
-import { formatMoney, getTaxLabel } from './accountingHelpers';
+import { formatMoney, getTaxLabel, shouldShowTaxModule, shouldShowTaxInclusiveSummary } from './accountingHelpers';
 
 interface Props {
   data: BusinessData;
@@ -91,8 +91,8 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
     return report.incomeStatement || report.profitLoss || null;
   };
 
-  // Tab label for P&L varies by locale
-  const plTabLabel = locale === 'US' ? 'Schedule C' : t('finance.tabPl');
+  // Tab labels driven by accountingLocale + uiLanguage
+  const plTabLabel = getTaxLabel(locale, i18n.language, 'tabPlLabel');
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -113,14 +113,14 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
           <h4 className="text-2xl font-bold text-[#191918] tracking-tight">{fmt(report?.incomeStatement?.netProfit || report?.profitLoss?.netProfit || report?.scheduleC?.line31_netProfit || 0)}</h4>
         </div>
         <div className="bg-white/80 border border-[#e0ddd5] p-6 rounded-xl">
-          <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">{locale === 'US' ? 'Gross Income' : t('finance.kpiDebtRatio')}</p>
+          <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">{locale === 'US' ? getTaxLabel(locale, i18n.language, 'kpiGrossIncome') : t('finance.kpiDebtRatio')}</p>
           <h4 className="text-2xl font-bold text-[#191918] tracking-tight">
             {locale === 'US' ? fmt(report?.scheduleC?.line7_grossIncome || 0) : `${getIncomeStatement()?.grossMargin || 0}%`}
           </h4>
         </div>
         <div className="bg-white/80 border border-[#e0ddd5] p-6 rounded-xl">
           <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">
-            {locale === 'US' ? 'Est. Quarterly Tax' : t('finance.kpiCurrentRatio')}
+            {locale === 'US' ? getTaxLabel(locale, i18n.language, 'kpiQuarterlyTax') : t('finance.kpiCurrentRatio')}
           </p>
           <h4 className="text-2xl font-bold text-[#191918] tracking-tight">
             {locale === 'US' ? fmt(report?.estimatedTax?.quarterlyPayment || 0) : '0.0'}
@@ -162,7 +162,7 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
             <div className="max-w-4xl mx-auto space-y-6">
               <div className="text-center mb-10">
                 <h2 className="text-2xl font-bold text-[#191918]">
-                  {locale === 'US' ? 'Schedule C — Profit or Loss From Business' : t('finance.plTitle')}
+                  {getTaxLabel(locale, i18n.language, 'plTitle')}
                 </h2>
                 <p className="text-[#5c5c5a] text-sm">{getTaxLabel(locale, i18n.language, 'plPeriodPrefix')}{periodDisplay}</p>
                 {report?.warnings && report.warnings.length > 0 && (
@@ -175,7 +175,7 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
               </div>
 
               {locale === 'US' && report?.scheduleC ? (
-                <USScheduleC data={report.scheduleC} fmt={fmt} />
+                <USScheduleC data={report.scheduleC} fmt={fmt} t={t} />
               ) : (
                 <GenericPL
                   is={getIncomeStatement()}
@@ -183,9 +183,10 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
                   fallbackPL={fallbackPL}
                   fmt={fmt}
                   t={t}
+                  i18n={i18n}
                   locale={locale}
-                  vatSummary={report?.vatSummary || report?.consumptionTax || report?.vatReturn || report?.businessTax}
-                  taxIncSummary={report?.taxInclusiveSummary}
+                  vatSummary={shouldShowTaxModule(locale) ? (report?.vatSummary || report?.consumptionTax || report?.vatReturn || report?.businessTax) : null}
+                  taxIncSummary={shouldShowTaxInclusiveSummary(locale) ? report?.taxInclusiveSummary : null}
                 />
               )}
             </div>
@@ -249,35 +250,37 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
 };
 
 // ─── US Schedule C Renderer ───
-const USScheduleC: React.FC<{ data: any; fmt: (v: number) => string }> = ({ data, fmt }) => {
-  const lines = [
-    { label: 'Line 1 — Gross Receipts', key: 'line1_grossReceipts', bold: true },
-    { label: 'Line 2 — Returns & Allowances', key: 'line2_returns', indent: true },
-    { label: 'Line 6 — Other Income', key: 'line6_otherIncome', indent: true },
-    { label: 'Line 7 — Gross Income', key: 'line7_grossIncome', bold: true, primary: true },
-    { label: '', key: '_sep1', separator: true },
-    { label: 'Line 8 — Advertising', key: 'line8_advertising', indent: true },
-    { label: 'Line 9 — Car & Truck', key: 'line9_car', indent: true },
-    { label: 'Line 10 — Commissions', key: 'line10_commissions', indent: true },
-    { label: 'Line 11 — Contract Labor', key: 'line11_contract', indent: true },
-    { label: 'Line 13 — Depreciation', key: 'line13_depreciation', indent: true },
-    { label: 'Line 15 — Insurance', key: 'line15_insurance', indent: true },
-    { label: 'Line 16b — Interest', key: 'line16b_interest', indent: true },
-    { label: 'Line 17 — Legal & Professional', key: 'line17_legal', indent: true },
-    { label: 'Line 18 — Office Expense', key: 'line18_office', indent: true },
-    { label: 'Line 20 — Rent', key: 'line20_rent', indent: true },
-    { label: 'Line 21 — Repairs', key: 'line21_repairs', indent: true },
-    { label: 'Line 22 — Supplies', key: 'line22_supplies', indent: true },
-    { label: 'Line 23 — Taxes & Licenses', key: 'line23_taxes', indent: true },
-    { label: 'Line 24a — Travel', key: 'line24a_travel', indent: true },
-    { label: 'Line 24b — Meals (50%)', key: 'line24b_meals', indent: true },
-    { label: 'Line 25 — Utilities', key: 'line25_utilities', indent: true },
-    { label: 'Line 26 — Wages', key: 'line26_wages', indent: true },
-    { label: 'Line 27a — Other', key: 'line27a_other', indent: true },
-    { label: 'Line 30 — Home Office', key: 'line30_homeOffice', indent: true },
-    { label: '', key: '_sep2', separator: true },
-    { label: 'Line 28 — Total Expenses', key: 'line28_totalExpenses', bold: true },
-    { label: 'Line 31 — Net Profit (or Loss)', key: 'line31_netProfit', bold: true, success: true },
+// Schedule C is the IRS form name; line numbers are official.
+// Line descriptions follow uiLanguage via usSchedule.* i18n keys.
+const USScheduleC: React.FC<{ data: any; fmt: (v: number) => string; t: (key: string) => string }> = ({ data, fmt, t }) => {
+  const lines: Array<{ i18nKey?: string; key: string; bold?: boolean; indent?: boolean; primary?: boolean; success?: boolean; separator?: boolean }> = [
+    { i18nKey: 'usSchedule.line1', key: 'line1_grossReceipts', bold: true },
+    { i18nKey: 'usSchedule.line2', key: 'line2_returns', indent: true },
+    { i18nKey: 'usSchedule.line6', key: 'line6_otherIncome', indent: true },
+    { i18nKey: 'usSchedule.line7', key: 'line7_grossIncome', bold: true, primary: true },
+    { key: '_sep1', separator: true },
+    { i18nKey: 'usSchedule.line8', key: 'line8_advertising', indent: true },
+    { i18nKey: 'usSchedule.line9', key: 'line9_car', indent: true },
+    { i18nKey: 'usSchedule.line10', key: 'line10_commissions', indent: true },
+    { i18nKey: 'usSchedule.line11', key: 'line11_contract', indent: true },
+    { i18nKey: 'usSchedule.line13', key: 'line13_depreciation', indent: true },
+    { i18nKey: 'usSchedule.line15', key: 'line15_insurance', indent: true },
+    { i18nKey: 'usSchedule.line16b', key: 'line16b_interest', indent: true },
+    { i18nKey: 'usSchedule.line17', key: 'line17_legal', indent: true },
+    { i18nKey: 'usSchedule.line18', key: 'line18_office', indent: true },
+    { i18nKey: 'usSchedule.line20', key: 'line20_rent', indent: true },
+    { i18nKey: 'usSchedule.line21', key: 'line21_repairs', indent: true },
+    { i18nKey: 'usSchedule.line22', key: 'line22_supplies', indent: true },
+    { i18nKey: 'usSchedule.line23', key: 'line23_taxes', indent: true },
+    { i18nKey: 'usSchedule.line24a', key: 'line24a_travel', indent: true },
+    { i18nKey: 'usSchedule.line24b', key: 'line24b_meals', indent: true },
+    { i18nKey: 'usSchedule.line25', key: 'line25_utilities', indent: true },
+    { i18nKey: 'usSchedule.line26', key: 'line26_wages', indent: true },
+    { i18nKey: 'usSchedule.line27a', key: 'line27a_other', indent: true },
+    { i18nKey: 'usSchedule.line30', key: 'line30_homeOffice', indent: true },
+    { key: '_sep2', separator: true },
+    { i18nKey: 'usSchedule.line28', key: 'line28_totalExpenses', bold: true },
+    { i18nKey: 'usSchedule.line31', key: 'line31_netProfit', bold: true, success: true },
   ];
 
   return (
@@ -285,8 +288,8 @@ const USScheduleC: React.FC<{ data: any; fmt: (v: number) => string }> = ({ data
       {lines.map((l) => {
         if (l.separator) return <div key={l.key} className="border-t border-[#e0ddd5] my-3"></div>;
         const val = data[l.key] || 0;
-        if (!l.bold && val === 0) return null; // Hide zero expense lines
-        return <LineItem key={l.key} label={l.label} value={val} bold={l.bold} indent={l.indent} primary={l.primary} success={l.success} />;
+        if (!l.bold && val === 0) return null;
+        return <LineItem key={l.key} label={l.i18nKey ? t(l.i18nKey) : l.key} value={fmt(val)} bold={l.bold} indent={l.indent} primary={l.primary} success={l.success} />;
       })}
     </div>
   );
@@ -295,9 +298,9 @@ const USScheduleC: React.FC<{ data: any; fmt: (v: number) => string }> = ({ data
 // ─── Generic P&L Renderer (CN/JP/EU/KR/TW) ───
 const GenericPL: React.FC<{
   is: any; fs: any; fallbackPL: any; fmt: (v: number) => string;
-  t: (key: string) => string; locale: string;
+  t: (key: string) => string; i18n: any; locale: string;
   vatSummary?: any; taxIncSummary?: any;
-}> = ({ is, fs, fallbackPL, fmt, t, locale, vatSummary, taxIncSummary }) => {
+}> = ({ is, fs, fallbackPL, fmt, t, i18n, locale, vatSummary, taxIncSummary }) => {
   const pl = is || {
     salesRevenue: fs.salesRevenue,
     costOfSales: fs.costOfSales,
@@ -310,45 +313,47 @@ const GenericPL: React.FC<{
     netProfit: fallbackPL.netProfit,
     netMargin: fallbackPL.netMargin,
   };
+  // Pull P&L line labels from the accounting locale (per-locale, per-language)
+  const lbl = (key: string) => getTaxLabel(locale, i18n.language, key);
 
   return (
     <div className="space-y-8">
-      {/* P&L */}
+      {/* P&L — labels driven by accountingLocale.taxConcepts */}
       <div className="space-y-1">
-        <LineItem label={t('finance.plRevenue')} value={pl.salesRevenue || pl.revenue || 0} bold primary />
-        <LineItem label={t('finance.plCost')} value={pl.costOfSales || pl.costOfSales || 0} indent />
-        <LineItem label={t('finance.plGrossProfit')} value={pl.grossProfit || 0} bold primary />
-        {pl.taxSurcharge != null && <LineItem label={t('finance.plTaxSurcharge')} value={pl.taxSurcharge} indent />}
-        {pl.shippingFee != null && <LineItem label={t('finance.plShipping')} value={pl.shippingFee} indent />}
-        <LineItem label={t('finance.plAdmin')} value={pl.adminExpense || pl.operatingProfit != null ? (pl.adminExpense || 0) : 0} indent />
-        <LineItem label={t('finance.plIncomeTax')} value={pl.incomeTax || 0} indent />
-        <LineItem label={t('finance.plNetProfit')} value={pl.netProfit || 0} bold success />
+        <LineItem label={lbl('plRevenue')} value={fmt(pl.salesRevenue || pl.revenue || 0)} bold primary />
+        <LineItem label={lbl('plCost')} value={fmt(pl.costOfSales || 0)} indent />
+        <LineItem label={lbl('plGrossProfit')} value={fmt(pl.grossProfit || 0)} bold primary />
+        {pl.taxSurcharge != null && <LineItem label={lbl('plTaxSurcharge')} value={fmt(pl.taxSurcharge)} indent />}
+        {pl.shippingFee != null && <LineItem label={lbl('plShipping')} value={fmt(pl.shippingFee)} indent />}
+        <LineItem label={lbl('plAdmin')} value={fmt(pl.adminExpense || pl.operatingProfit != null ? (pl.adminExpense || 0) : 0)} indent />
+        <LineItem label={lbl('plIncomeTax')} value={fmt(pl.incomeTax || 0)} indent />
+        <LineItem label={lbl('plNetProfit')} value={fmt(pl.netProfit || 0)} bold success />
         <LineItem label={t('finance.plNetMargin')} value={`${(pl.netMargin || 0).toFixed(2)}%`} indent />
       </div>
 
-      {/* VAT / Consumption Tax / Business Tax */}
+      {/* VAT / Consumption Tax / Business Tax — labels per accountingLocale */}
       {vatSummary && (
         <div className="border-t border-[#e0ddd5] pt-6 space-y-1">
           <h3 className="text-lg font-bold text-[#191918] mb-4 flex items-center">
             <i className="fas fa-calculator mr-3 text-[#4a4a48]"></i>
-            {t('dashboard.vatTitle')}
+            {lbl('taxTitle')}
           </h3>
-          <LineItem label={t('dashboard.vatInputTotal')} value={vatSummary.cumulativeInput || vatSummary.paid || vatSummary.inputVAT || 0} />
-          <LineItem label={t('dashboard.vatOutputTotal')} value={vatSummary.cumulativeOutput || vatSummary.collected || vatSummary.outputVAT || 0} />
-          <LineItem label={t('dashboard.vatEstimated')} value={vatSummary.estimatedPayable || vatSummary.payable || vatSummary.vatPayable || 0} bold primary />
+          <LineItem label={lbl('inputTax')} value={fmt(vatSummary.cumulativeInput || vatSummary.paid || vatSummary.inputVAT || 0)} />
+          <LineItem label={lbl('outputTax')} value={fmt(vatSummary.cumulativeOutput || vatSummary.collected || vatSummary.outputVAT || 0)} />
+          <LineItem label={lbl('estimatedTax')} value={fmt(vatSummary.estimatedPayable || vatSummary.payable || vatSummary.vatPayable || 0)} bold primary />
         </div>
       )}
 
-      {/* Tax-inclusive summary */}
+      {/* Tax-inclusive summary — labels per accountingLocale */}
       {taxIncSummary && (
         <div className="border-t border-[#e0ddd5] pt-6 space-y-1">
           <h3 className="text-lg font-bold text-[#191918] mb-4 flex items-center">
             <i className="fas fa-balance-scale mr-3 text-emerald-400"></i>
-            {t('dashboard.taxSummaryTitle')}
+            {lbl('taxSummaryTitle')}
           </h3>
-          <LineItem label={t('dashboard.taxSummaryPurchase')} value={taxIncSummary.purchaseTotal || 0} />
-          <LineItem label={t('dashboard.taxSummarySales')} value={taxIncSummary.salesTotal || 0} />
-          <LineItem label={t('dashboard.taxSummaryDiff')} value={taxIncSummary.difference || 0} bold success />
+          <LineItem label={lbl('purchaseTotal')} value={fmt(taxIncSummary.purchaseTotal || 0)} />
+          <LineItem label={lbl('salesTotal')} value={fmt(taxIncSummary.salesTotal || 0)} />
+          <LineItem label={lbl('taxDifference')} value={fmt(taxIncSummary.difference || 0)} bold success />
         </div>
       )}
     </div>
@@ -369,6 +374,7 @@ const LineItem: React.FC<LineItemProps> = ({ label, value, bold, indent, primary
   <div className={`flex justify-between items-center py-3 px-4 rounded-xl transition-colors hover:bg-[#f0eeeb]/50 ${bold ? 'font-bold' : ''} ${primary ? 'bg-[#d97757]/5' : ''} ${success ? 'bg-emerald-500/5' : ''}`}>
     <span className={`text-sm ${indent ? 'pl-8 text-[#4a4a48]' : 'text-[#191918]'}`}>{label}</span>
     <span className={`text-base font-mono ${primary ? 'text-[#d97757]' : success ? 'text-emerald-600' : 'text-[#4a4a48]'}`}>
+      {/* Callers pre-format numeric values via formatMoney(); plain numbers render with default locale */}
       {typeof value === 'number' ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value}
     </span>
   </div>

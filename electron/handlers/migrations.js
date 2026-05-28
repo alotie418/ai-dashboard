@@ -105,10 +105,12 @@ async function migrateAll({ body }) {
       for (const r of rows) {
         try {
           const newId = `txn-mig-sales-${r.id}-${Date.now().toString(36)}`;
+          // Legacy-data migration: keep description language-neutral.
+          // Raw legacy fields are preserved in source_meta below.
           const desc = [
-            r.tons ? `${r.tons}吨` : null,
-            r.pricePerTon ? `@¥${r.pricePerTon}/吨` : null,
-            r.shippingCost ? `运费 ¥${r.shippingCost}` : null,
+            r.tons ? `qty=${r.tons}` : null,
+            r.pricePerTon ? `unit=${r.pricePerTon}` : null,
+            r.shippingCost ? `shipping=${r.shippingCost}` : null,
           ].filter(Boolean).join(' · ');
 
           insertTxn.run(
@@ -144,8 +146,8 @@ async function migrateAll({ body }) {
         try {
           const newId = `txn-mig-purch-${r.id}-${Date.now().toString(36)}`;
           const desc = [
-            r.tons ? `${r.tons}吨` : null,
-            r.pricePerTon ? `@¥${r.pricePerTon}/吨` : null,
+            r.tons ? `qty=${r.tons}` : null,
+            r.pricePerTon ? `unit=${r.pricePerTon}` : null,
           ].filter(Boolean).join(' · ');
 
           insertTxn.run(
