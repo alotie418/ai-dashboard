@@ -41,7 +41,9 @@ const REQUIRED_TAX_KEYS_BY_LOCALE = {
   JP: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
   KR: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
   TW: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
-  US: [...COMMON_TAX_KEYS, 'grossReceipts', 'totalExpenses', 'netProfit', 'taxTitle', 'kpiGrossIncome', 'kpiQuarterlyTax'],
+  US: [...COMMON_TAX_KEYS, 'grossReceipts', 'totalExpenses', 'netProfit', 'taxTitle', 'kpiGrossIncome', 'kpiQuarterlyTax',
+    'profitMargins', 'grossMargin', 'netMargin',
+    'socialSecurity', 'medicare', 'additionalMedicare', 'dueLabel'],
 };
 
 // Banned cross-regime terminology
@@ -275,6 +277,34 @@ async function main() {
           for (const pattern of BANNED_TERMS_BY_LOCALE.US.forbidden) {
             if (pattern.test(label)) {
               reasons.push(`US tax label "${key}" contains forbidden ${pattern}: "${label}"`);
+            }
+          }
+        }
+        // "Schedule C" is the official IRS form name and must be exactly
+        // capitalized — never "schedule C", "schedule c", "SCHEDULE C", etc.
+        // Applies to any taxConcept value that mentions Schedule C.
+        for (const key of Object.keys(cfg.taxConcepts)) {
+          const label = helpers.getTaxLabel(accId, uiLang, key);
+          if (/schedule\s+c|SCHEDULE\s+C/i.test(label) && !/Schedule C/.test(label)) {
+            reasons.push(`US ${key}[${uiLang}] uses non-canonical Schedule C capitalization: "${label}"`);
+          }
+        }
+        // US dashboard cards: profitMargins / grossMargin / netMargin must
+        // contain native script when uiLanguage is CJK (not be plain English).
+        if (['zh-CN', 'zh-TW', 'ja', 'ko'].includes(uiLang)) {
+          for (const key of ['profitMargins', 'grossMargin', 'netMargin']) {
+            const v = helpers.getTaxLabel(accId, uiLang, key);
+            if (/^[A-Za-z\s&]+$/.test(v)) {
+              reasons.push(`US ${key} in ${uiLang} is plain English: "${v}"`);
+            }
+          }
+          // socialSecurity / medicare / additionalMedicare must include native
+          // script after the official English name (parenthetical explanation).
+          for (const key of ['socialSecurity', 'medicare', 'additionalMedicare']) {
+            const v = helpers.getTaxLabel(accId, uiLang, key);
+            // Require non-Latin char (kanji/hangul) somewhere in the label
+            if (!/[　-鿿가-힯]/.test(v)) {
+              reasons.push(`US ${key} in ${uiLang} should include native-language explanation: "${v}"`);
             }
           }
         }
