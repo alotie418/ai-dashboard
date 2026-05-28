@@ -125,4 +125,38 @@ export function getLocaleConfig(accountingLocale: string): AccountingLocaleConfi
   return getAccountingLocale(accountingLocale);
 }
 
+// ─── Inventory Unit Labels ───
+// 库存单位由产品/业务设置决定，不绑定 accountingLocale
+// uiLanguage 只决定单位名称的显示语言
+
+const INVENTORY_UNIT_LABELS: Record<string, Record<string, string>> = {
+  unit:  { 'zh-CN': '单位', 'zh-TW': '單位', en: 'units',  ja: '単位',  ko: '단위',  fr: 'unités' },
+  kg:    { 'zh-CN': '千克', 'zh-TW': '公斤', en: 'kg',     ja: 'kg',    ko: 'kg',    fr: 'kg' },
+  ton:   { 'zh-CN': '吨',   'zh-TW': '噸',   en: 'tons',   ja: 'トン',  ko: '톤',    fr: 'tonnes' },
+  piece: { 'zh-CN': '件',   'zh-TW': '件',   en: 'pcs',    ja: '個',    ko: '개',    fr: 'pièces' },
+  box:   { 'zh-CN': '箱',   'zh-TW': '箱',   en: 'boxes',  ja: '箱',    ko: '상자',  fr: 'cartons' },
+  bag:   { 'zh-CN': '袋',   'zh-TW': '袋',   en: 'bags',   ja: '袋',    ko: '포대',  fr: 'sacs' },
+  liter: { 'zh-CN': '升',   'zh-TW': '公升', en: 'L',      ja: 'L',     ko: 'L',     fr: 'L' },
+};
+
+export type InventoryUnitKey = 'unit' | 'kg' | 'ton' | 'piece' | 'box' | 'bag' | 'liter';
+
+export function getInventoryUnitLabel(unitKey: string | null | undefined, uiLanguage: string): string {
+  const key = unitKey || 'unit';
+  const entry = INVENTORY_UNIT_LABELS[key] || INVENTORY_UNIT_LABELS.unit;
+  return entry[uiLanguage] || entry[uiLanguage.split('-')[0]] || entry.en || 'units';
+}
+
+// 格式化数量 + 单位，例如 "0.00 單位" / "100 tons"
+export function formatQuantity(
+  amount: number,
+  unitKey: string | null | undefined,
+  uiLanguage: string,
+  decimals: number = 2,
+): string {
+  const label = getInventoryUnitLabel(unitKey, uiLanguage);
+  const n = (amount || 0).toFixed(decimals);
+  return `${n} ${label}`;
+}
+
 export { ACCOUNTING_LOCALES, type AccountingLocaleId, type UILanguageCode };
