@@ -310,6 +310,33 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART E0: AI briefing prompt construction
+  //   Verifies the wire-up in App.tsx — performAnalysis() must construct
+  //   systemPrompt as `${t('ai.analyzeSystemPrompt')}\n\n${buildAIFinanceContext(...)}`.
+  //   Static check: ensure App.tsx invokes buildAIFinanceContext() in the
+  //   analysis path so the AI briefing receives accountingLocale + uiLanguage.
+  // ────────────────────────────────────────────────
+  {
+    const { readFile: rf } = await import('node:fs/promises');
+    const appTsx = await rf(join(ROOT, 'App.tsx'), 'utf8');
+    const reasons = [];
+    // performAnalysis must build systemPrompt via buildAIFinanceContext
+    const m = appTsx.match(/performAnalysis\s*=\s*useCallback[\s\S]{0,2000}?fetchAIAnalysis/);
+    if (!m) {
+      reasons.push('Could not locate performAnalysis → fetchAIAnalysis block in App.tsx');
+    } else {
+      const block = m[0];
+      if (!/buildAIFinanceContext\s*\(/.test(block)) {
+        reasons.push('performAnalysis does not call buildAIFinanceContext; AI briefing missing accountingLocale context');
+      }
+      if (!/i18n\.language|uiLanguage/.test(block)) {
+        reasons.push('performAnalysis does not include uiLanguage in the AI briefing prompt');
+      }
+    }
+    if (reasons.length) fail(`aiBriefingWiring`, reasons); else pass(`aiBriefingWiring`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART E: buildAIFinanceContext includes both accountingLocale + uiLanguage
   // ────────────────────────────────────────────────
   for (const accId of ACCOUNTING_LOCALES) {
