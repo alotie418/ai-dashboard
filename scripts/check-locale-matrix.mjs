@@ -97,6 +97,17 @@ const REQUIRED_I18N_KEYS = [
   'finance.tabBalance', 'finance.tabCashflow', 'finance.tabPl',
   // cashflow empty state
   'finance.cashflowTitle', 'finance.cashflowDesc', 'finance.cashflowSync',
+  // US Tax Tools — required in all 6 locales (page may render under US locale + any uiLanguage)
+  'usTax.title', 'usTax.notApplicable', 'usTax.mileage', 'usTax.homeOffice',
+  'usTax.totalTrips', 'usTax.totalMiles', 'usTax.deduction', 'usTax.addTrip',
+  'usTax.newTrip', 'usTax.miles', 'usTax.from', 'usTax.to', 'usTax.purpose',
+  'usTax.roundTrip', 'usTax.route', 'usTax.deductionShort', 'usTax.noTrips',
+  'usTax.mileageNote', 'usTax.homeOfficeDeduction', 'usTax.scheduleC30',
+  'usTax.simplified', 'usTax.actual', 'usTax.simplifiedTitle', 'usTax.officeSqft',
+  'usTax.ratePerSqft', 'usTax.simplifiedCalc', 'usTax.actualTitle',
+  'usTax.totalHomeSqft', 'usTax.annualRent', 'usTax.annualUtilities',
+  'usTax.annualInsurance', 'usTax.annualDepreciation', 'usTax.actualCalc',
+  'usTax.homeOfficeNote',
   // US Schedule C line descriptions (any uiLanguage may render US locale)
   ...US_SCHEDULE_LINE_KEYS,
 ];
