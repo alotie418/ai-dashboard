@@ -33,13 +33,15 @@ const EXPECTED_CURRENCY = {
 };
 
 // Tax keys each accountingLocale should provide in taxConcepts
+const COMMON_TAX_KEYS = ['plRevenue', 'plCost', 'plNetProfit', 'plTitle', 'tabPlLabel', 'taxSummaryTitle', 'purchaseTotal', 'salesTotal', 'taxDifference', 'invoiceTypeOutput', 'invoiceTypeInput'];
+const VAT_FAMILY_KEYS = ['taxTitle', 'inputTax', 'outputTax', 'estimatedTax', 'certifiedInput', 'invoicedOutput'];
 const REQUIRED_TAX_KEYS_BY_LOCALE = {
-  CN: ['taxTitle', 'inputTax', 'outputTax', 'estimatedTax', 'certifiedInput', 'invoicedOutput', 'plRevenue', 'plCost', 'plNetProfit', 'taxSummaryTitle', 'purchaseTotal', 'salesTotal', 'taxDifference', 'invoiceTypeOutput', 'invoiceTypeInput'],
-  EU: ['taxTitle', 'inputTax', 'outputTax', 'estimatedTax', 'certifiedInput', 'invoicedOutput', 'plRevenue', 'plCost', 'plNetProfit', 'taxSummaryTitle', 'purchaseTotal', 'salesTotal', 'taxDifference', 'invoiceTypeOutput', 'invoiceTypeInput'],
-  JP: ['taxTitle', 'inputTax', 'outputTax', 'estimatedTax', 'certifiedInput', 'invoicedOutput', 'plRevenue', 'plCost', 'plNetProfit', 'taxSummaryTitle', 'purchaseTotal', 'salesTotal', 'taxDifference', 'invoiceTypeOutput', 'invoiceTypeInput'],
-  KR: ['taxTitle', 'inputTax', 'outputTax', 'estimatedTax', 'certifiedInput', 'invoicedOutput', 'plRevenue', 'plCost', 'plNetProfit', 'taxSummaryTitle', 'purchaseTotal', 'salesTotal', 'taxDifference', 'invoiceTypeOutput', 'invoiceTypeInput'],
-  TW: ['taxTitle', 'inputTax', 'outputTax', 'estimatedTax', 'certifiedInput', 'invoicedOutput', 'plRevenue', 'plCost', 'plNetProfit', 'taxSummaryTitle', 'purchaseTotal', 'salesTotal', 'taxDifference', 'invoiceTypeOutput', 'invoiceTypeInput'],
-  US: ['taxTitle', 'grossReceipts', 'totalExpenses', 'netProfit', 'plRevenue', 'plCost', 'plNetProfit', 'taxSummaryTitle', 'purchaseTotal', 'salesTotal', 'taxDifference', 'invoiceTypeOutput', 'invoiceTypeInput'],
+  CN: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
+  EU: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
+  JP: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
+  KR: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
+  TW: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
+  US: [...COMMON_TAX_KEYS, 'grossReceipts', 'totalExpenses', 'netProfit', 'taxTitle', 'kpiGrossIncome', 'kpiQuarterlyTax'],
 };
 
 // Banned cross-regime terminology
@@ -52,6 +54,15 @@ const BANNED_TERMS_BY_LOCALE = {
     allowedExceptionFields: [],
   },
 };
+
+// usSchedule i18n keys (all locales need them; Schedule C is US-specific
+// but the user may have accountingLocale=US with any uiLanguage)
+const US_SCHEDULE_LINE_KEYS = [
+  'line1', 'line2', 'line6', 'line7', 'line8', 'line9', 'line10', 'line11',
+  'line13', 'line15', 'line16b', 'line17', 'line18', 'line20', 'line21', 'line22',
+  'line23', 'line24a', 'line24b', 'line25', 'line26', 'line27a', 'line30',
+  'line28', 'line31',
+].map(k => `usSchedule.${k}`);
 
 // i18n keys that MUST exist in every locale file
 const REQUIRED_I18N_KEYS = [
@@ -82,6 +93,10 @@ const REQUIRED_I18N_KEYS = [
   'finance.balanceAssets', 'finance.balanceLiabilities', 'finance.balanceCurrentAssets',
   'finance.balanceNonCurrentAssets', 'finance.balanceCurrentLiabilities',
   'finance.balanceEquity', 'finance.balanceTotalAssets',
+  // finance tabs
+  'finance.tabBalance', 'finance.tabCashflow', 'finance.tabPl',
+  // US Schedule C line descriptions (any uiLanguage may render US locale)
+  ...US_SCHEDULE_LINE_KEYS,
 ];
 
 // Forbid English-only labels in non-English locales for these specific keys
@@ -323,6 +338,61 @@ async function main() {
         reasons.push(`OCR prompt missing uiLanguage instruction for ${uiLang}`);
       }
       if (reasons.length) fail(`ocrPrompt:${accId}+${uiLang}`, reasons); else pass(`ocrPrompt:${accId}+${uiLang}`);
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // PART F2: Finance report — tab label + tax module visibility per locale
+  // ────────────────────────────────────────────────
+  for (const accId of ACCOUNTING_LOCALES) {
+    for (const uiLang of UI_LANGUAGES) {
+      const reasons = [];
+      // P&L tab label must resolve
+      const plTab = helpers.getTaxLabel(accId, uiLang, 'tabPlLabel');
+      if (!plTab || plTab === 'tabPlLabel') reasons.push(`tabPlLabel raw/empty`);
+      // PL title must resolve
+      const plTitle = helpers.getTaxLabel(accId, uiLang, 'plTitle');
+      if (!plTitle || plTitle === 'plTitle') reasons.push(`plTitle raw/empty`);
+
+      // US: Schedule C name should appear in plTabLabel; not include "增值税" etc.
+      if (accId === 'US') {
+        if (!/Schedule C/i.test(plTab)) reasons.push(`US plTabLabel missing "Schedule C": "${plTab}"`);
+        if (/增值税|进项税|销项税|进项 VAT|销项 VAT|VAT/i.test(plTitle)) {
+          reasons.push(`US plTitle contains VAT/进项/销项 terminology: "${plTitle}"`);
+        }
+        // shouldShowTaxModule must be false
+        if (helpers.shouldShowTaxModule(accId) !== false) {
+          reasons.push(`shouldShowTaxModule(US) should be false`);
+        }
+      } else {
+        // shouldShowTaxModule should be true for VAT-style locales
+        if (helpers.shouldShowTaxModule(accId) !== true) {
+          reasons.push(`shouldShowTaxModule(${accId}) should be true`);
+        }
+      }
+
+      // Locale-specific tax-module terminology checks (label content)
+      if (accId === 'CN') {
+        const t = helpers.getTaxLabel(accId, uiLang, 'taxTitle');
+        const expected = { 'zh-CN': /增值税/, 'zh-TW': /增值稅/, en: /VAT/i };
+        if (expected[uiLang] && !expected[uiLang].test(t)) reasons.push(`CN taxTitle missing expected term in ${uiLang}: "${t}"`);
+      }
+      if (accId === 'JP') {
+        const t = helpers.getTaxLabel(accId, uiLang, 'taxTitle');
+        const expected = { 'zh-CN': /消费税/, 'zh-TW': /消費稅/, ja: /消費税/ };
+        if (expected[uiLang] && !expected[uiLang].test(t)) reasons.push(`JP taxTitle missing 消费税 in ${uiLang}: "${t}"`);
+      }
+      if (accId === 'EU') {
+        const t = helpers.getTaxLabel(accId, uiLang, 'taxTitle');
+        if (!/VAT|TVA/i.test(t)) reasons.push(`EU taxTitle missing VAT/TVA in ${uiLang}: "${t}"`);
+      }
+      if (accId === 'TW') {
+        const t = helpers.getTaxLabel(accId, uiLang, 'taxTitle');
+        const expected = { 'zh-CN': /营业税/, 'zh-TW': /營業稅/ };
+        if (expected[uiLang] && !expected[uiLang].test(t)) reasons.push(`TW taxTitle missing 营业税 in ${uiLang}: "${t}"`);
+      }
+
+      if (reasons.length) fail(`financeReport:${accId}+${uiLang}`, reasons); else pass(`financeReport:${accId}+${uiLang}`);
     }
   }
 

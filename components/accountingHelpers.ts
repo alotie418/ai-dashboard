@@ -125,6 +125,38 @@ export function getLocaleConfig(accountingLocale: string): AccountingLocaleConfi
   return getAccountingLocale(accountingLocale);
 }
 
+// ─── Finance Report Helpers ───
+// accountingLocale 决定显示哪些 tab 和税务模块
+// uiLanguage 决定 tab 标签的语言
+
+export interface FinanceReportTab {
+  id: 'pl' | 'balance' | 'cashflow';
+  labelKey: string;       // i18n key (for common tabs like balance/cashflow)
+  localeLabelKey?: string; // taxConcepts key (for locale-specific labels like Schedule C)
+}
+
+export function getFinanceReportTabs(accountingLocale: string): FinanceReportTab[] {
+  // All locales currently share the same 3 tabs (P&L, Balance, Cashflow).
+  // The P&L tab label varies by locale (Schedule C vs 损益表 vs 損益計算書).
+  return [
+    { id: 'pl', labelKey: '', localeLabelKey: 'tabPlLabel' },
+    { id: 'balance', labelKey: 'finance.tabBalance' },
+    { id: 'cashflow', labelKey: 'finance.tabCashflow' },
+  ];
+}
+
+// Should the VAT/Consumption Tax/Business Tax module render?
+// US (Schedule C) does not use VAT-style accumulation. Other locales do.
+export function shouldShowTaxModule(accountingLocale: string): boolean {
+  return accountingLocale !== 'US';
+}
+
+// Should the tax-inclusive reconciliation section render?
+// Same rule: US uses cash basis with sales tax, not VAT reconciliation.
+export function shouldShowTaxInclusiveSummary(accountingLocale: string): boolean {
+  return accountingLocale !== 'US';
+}
+
 // ─── Inventory Unit Labels ───
 // 库存单位由产品/业务设置决定，不绑定 accountingLocale
 // uiLanguage 只决定单位名称的显示语言
