@@ -220,7 +220,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       invoiceTypeOutput: { 'zh-CN': '销项', 'zh-TW': '銷項', en: 'Sales', ja: '売上', ko: '매출', fr: 'Vente' },
       invoiceTypeInput: { 'zh-CN': '进项', 'zh-TW': '進項', en: 'Purchase', ja: '仕入', ko: '매입', fr: 'Achat' },
       inventoryUnit: { 'zh-CN': '单位', 'zh-TW': '單位', en: 'units', ja: '単位', ko: '단위', fr: 'unités' },
-      taxSummaryTitle:{ 'zh-CN': 'VAT 含税汇总 (对账用)', 'zh-TW': 'VAT 含稅匯總 (對帳用)', en: 'VAT-Inclusive Summary (Reconciliation)', ja: 'VAT税込集計（照合用）', ko: '부가가치세 포함 요약 (대조용)', fr: 'Résumé TTC TVA (rapprochement)' },
+      taxSummaryTitle:{ 'zh-CN': '韩国 VAT 含税汇总（对账用）', 'zh-TW': '韓國 VAT 含稅匯總（對帳用）', en: 'Korean VAT-Inclusive Summary (Reconciliation)', ja: '韓国VAT税込集計（照合用）', ko: '한국 부가가치세 포함 요약 (대조용)', fr: 'Résumé TTC TVA Corée (rapprochement)' },
       purchaseTotal: { 'zh-CN': '采购含税总额', 'zh-TW': '採購含稅總額', en: 'Purchase Total (Incl. VAT)', ja: '仕入VAT込合計', ko: '매입 세금포함 총액', fr: 'Total achats TTC' },
       salesTotal:    { 'zh-CN': '销售含税总额', 'zh-TW': '銷售含稅總額', en: 'Sales Total (Incl. VAT)', ja: '売上VAT込合計', ko: '매출 세금포함 총액', fr: 'Total ventes TTC' },
       taxDifference: { 'zh-CN': 'VAT 差额', 'zh-TW': 'VAT 差額', en: 'VAT Difference', ja: 'VAT差額', ko: '부가가치세 차액', fr: 'Différence TVA' },
