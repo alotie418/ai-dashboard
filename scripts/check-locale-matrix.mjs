@@ -46,7 +46,8 @@ const REQUIRED_TAX_KEYS_BY_LOCALE = {
     'socialSecurity', 'medicare', 'additionalMedicare', 'dueLabel',
     'pageTitlePurchase', 'uploadTitle', 'uploadSubtitle',
     'headerUnitPrice', 'headerAmount', 'headerTaxAmount',
-    'headerTotalWithTax', 'headerInvoiceNo'],
+    'headerTotalWithTax', 'headerInvoiceNo',
+    'modalTitlePurchase', 'modalSubtitlePurchase'],
 };
 
 // Banned cross-regime terminology
@@ -298,12 +299,50 @@ async function main() {
         const US_FORBIDDEN_CN_TERMS = [/进项/, /進項/, /销项/, /銷項/, /增值税/, /增值稅/, /电子发票/, /電子發票/];
         for (const key of ['pageTitlePurchase', 'uploadTitle', 'uploadSubtitle',
                            'headerUnitPrice', 'headerAmount', 'headerTaxAmount',
-                           'headerTotalWithTax', 'headerInvoiceNo']) {
+                           'headerTotalWithTax', 'headerInvoiceNo',
+                           'modalTitlePurchase', 'modalSubtitlePurchase']) {
           const label = helpers.getTaxLabel(accId, uiLang, key);
           for (const pattern of US_FORBIDDEN_CN_TERMS) {
             if (pattern.test(label)) {
               reasons.push(`US ${key}[${uiLang}] uses China-VAT term ${pattern}: "${label}"`);
             }
+          }
+        }
+        // US formTaxRate / modalTitlePurchase under CJK UIs must include
+        // native-script content (cannot be bare "SALES TAX 税率"-style with
+        // no Chinese explanation). Require at least one CJK Han char.
+        if (['zh-CN', 'zh-TW', 'ja', 'ko'].includes(uiLang)) {
+          for (const key of ['formTaxRate', 'modalTitlePurchase', 'modalSubtitlePurchase']) {
+            const v = helpers.getTaxLabel(accId, uiLang, key);
+            if (!/[一-鿿가-힯]/.test(v)) {
+              reasons.push(`US ${key}[${uiLang}] should include native-language explanation: "${v}"`);
+            }
+          }
+          // formTaxRate zh-CN/zh-TW must specifically include "销售税" / "銷售稅"
+          // when "Sales Tax" appears, so the term is unambiguous.
+          const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
+          if (/Sales Tax/i.test(rateLabel)) {
+            if (uiLang === 'zh-CN' && !/销售税/.test(rateLabel)) {
+              reasons.push(`US formTaxRate zh-CN should include 销售税 explanation: "${rateLabel}"`);
+            }
+            if (uiLang === 'zh-TW' && !/銷售稅/.test(rateLabel)) {
+              reasons.push(`US formTaxRate zh-TW should include 銷售稅 explanation: "${rateLabel}"`);
+            }
+            // Bare "SALES TAX" all-caps is not allowed in label data (CSS
+            // uppercasing the label is handled separately by removing the
+            // uppercase utility from that specific label).
+            if (/^SALES TAX/.test(rateLabel)) {
+              reasons.push(`US formTaxRate[${uiLang}] should use mixed-case "Sales Tax", not "SALES TAX": "${rateLabel}"`);
+            }
+          }
+          // modalTitlePurchase zh-CN/zh-TW must use "与" / "與" instead of
+          // slash "/" between 采购 and 费用 for natural Chinese reading.
+          const modalTitle = helpers.getTaxLabel(accId, uiLang, 'modalTitlePurchase');
+          if (uiLang === 'zh-CN' && /采购\/费用|采购\s*\/\s*费用/.test(modalTitle)) {
+            reasons.push(`US modalTitlePurchase zh-CN should say 采购与费用, not slash form: "${modalTitle}"`);
+          }
+          if (uiLang === 'zh-TW' && /採購\/費用|採購\s*\/\s*費用/.test(modalTitle)) {
+            reasons.push(`US modalTitlePurchase zh-TW should say 採購與費用, not slash form: "${modalTitle}"`);
           }
         }
         // US dashboard cards: profitMargins / grossMargin / netMargin must
