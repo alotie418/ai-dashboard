@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { analyzeInvoice } from '../services/ocrService';
 import { fetchSales, createSale, updateSale, deleteSale, fetchSettings, SalesRecord } from '../services/api';
-import { formatMoney, getCurrencySymbol } from './accountingHelpers';
+import { formatMoney, getCurrencySymbol, formatQuantity } from './accountingHelpers';
 import CsvImportModal from './CsvImportModal';
 
 interface Props {
@@ -20,10 +20,17 @@ const nextSalesId = () => `sale-${++salesIdCounter}-${Date.now()}`;
 const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
   const { t, i18n } = useTranslation();
   const [accLocale, setAccLocale] = useState('CN');
-  useEffect(() => { fetchSettings().then((s: any) => { if (s.accounting_locale) setAccLocale(s.accounting_locale); }).catch(() => {}); }, []);
+  const [productUnit, setProductUnit] = useState<string>('unit');
+  useEffect(() => {
+    fetchSettings().then((s: any) => {
+      if (s.accounting_locale) setAccLocale(s.accounting_locale);
+      if (s.product_unit) setProductUnit(s.product_unit);
+    }).catch(() => {});
+  }, []);
   const uiLang = i18n.language;
   const currSym = getCurrencySymbol(accLocale);
   const fmtMoney = (val: number) => formatMoney(val, accLocale, uiLang);
+  const fmtQty = (val: number, decimals = 2) => formatQuantity(val, productUnit, uiLang, decimals);
   const [recognitionMode, setRecognitionMode] = useState<'ai' | 'ocr'>('ai');
   const [isScanning, setIsScanning] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -235,11 +242,10 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
 
       {/* Inventory Banner */}
       {(() => {
-        const purchaseTons = data.rawMetrics?.purchaseTotalTons ?? 0;
-        const salesTons = data.rawMetrics?.salesTotalTons ?? 0;
-        const inventoryTons = purchaseTons - salesTons;
-        const inventoryBags = Math.round(inventoryTons * 100); // 1吨=100袋(10kg/袋)
-        const isLow = inventoryTons <= 0;
+        const purchaseQty = data.rawMetrics?.purchaseTotalTons ?? 0;
+        const salesQty = data.rawMetrics?.salesTotalTons ?? 0;
+        const inventoryQty = purchaseQty - salesQty;
+        const isLow = inventoryQty <= 0;
         return (
           <div className={`${isLow ? 'bg-rose-500/10 border-rose-500/20' : 'bg-blue-500/10 border-blue-500/20'} border rounded-xl p-4 flex items-center justify-between`}>
             <div className="flex items-center space-x-3">
@@ -248,7 +254,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
               </div>
               <div>
                 <p className={`${isLow ? 'text-rose-500' : 'text-blue-500'} font-bold text-sm`}>
-                  {t('sales.inventoryCurrent')}: {inventoryTons.toFixed(2)} {t('sales.inventoryTon')} ({inventoryBags} {t('sales.inventoryBag')})
+                  {t('sales.inventoryCurrent')}: {fmtQty(inventoryQty)}
                 </p>
                 <p className={`${isLow ? 'text-rose-400' : 'text-blue-400'} text-xs`}>
                   {isLow ? t('sales.inventoryLow') : t('sales.inventorySufficient')}
@@ -256,8 +262,8 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
               </div>
             </div>
             <div className="text-right text-[#5c5c5a] text-xs space-y-0.5">
-              <p>{t('sales.inventoryTotalPurchase')}: {purchaseTons.toFixed(2)} {t('sales.inventoryTon')}</p>
-              <p>{t('sales.inventoryTotalSales')}: {salesTons.toFixed(2)} {t('sales.inventoryTon')}</p>
+              <p>{t('sales.inventoryTotalPurchase')}: {fmtQty(purchaseQty)}</p>
+              <p>{t('sales.inventoryTotalSales')}: {fmtQty(salesQty)}</p>
             </div>
           </div>
         );

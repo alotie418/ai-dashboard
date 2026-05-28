@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { fetchSales, fetchPurchases, fetchSettings, SalesRecord, PurchaseRecord } from '../services/api';
-import { formatMoney, getTaxLabel } from './accountingHelpers';
+import { formatMoney, getTaxLabel, formatQuantity, getInventoryUnitLabel } from './accountingHelpers';
 
 interface Props {
   data: BusinessData;
@@ -22,10 +22,17 @@ const parseTaxRate = (s: string) => { const m = s.match(/[\d.]+/); return m ? pa
 const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
   const { t, i18n } = useTranslation();
   const [accLocale, setAccLocale] = useState('CN');
-  useEffect(() => { fetchSettings().then((s: any) => { if (s.accounting_locale) setAccLocale(s.accounting_locale); }).catch(() => {}); }, []);
+  const [productUnit, setProductUnit] = useState<string>('unit');
+  useEffect(() => {
+    fetchSettings().then((s: any) => {
+      if (s.accounting_locale) setAccLocale(s.accounting_locale);
+      if (s.product_unit) setProductUnit(s.product_unit);
+    }).catch(() => {});
+  }, []);
   const uiLang = i18n.language;
   const taxLabel = (key: string) => getTaxLabel(accLocale, uiLang, key);
   const fmtMoney = (val: number) => formatMoney(val, accLocale, uiLang);
+  const unitLabel = getInventoryUnitLabel(productUnit, uiLang);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<InvoiceType>('all');
@@ -69,7 +76,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
       const taxAmt = Math.round((r.price - amountNoTax) * 100) / 100;
       return {
         date: r.date, typeKey: 'output' as const, partner: r.customer,
-        weight: `${parseTons(r.quantity)}t`, amount: amountNoTax, tax: taxAmt,
+        weight: `${parseTons(r.quantity)} ${unitLabel}`, amount: amountNoTax, tax: taxAmt,
         invoiceNo: r.invoiceNo, statusKey: r.status === '已开' ? 'issued' : 'pendingIssue',
       };
     });
@@ -79,7 +86,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
       const taxAmt = Math.round((r.price - amountNoTax) * 100) / 100;
       return {
         date: r.date, typeKey: 'input' as const, partner: r.supplier,
-        weight: `${parseTons(r.quantity)}t`, amount: amountNoTax, tax: taxAmt,
+        weight: `${parseTons(r.quantity)} ${unitLabel}`, amount: amountNoTax, tax: taxAmt,
         invoiceNo: r.invoiceNo, statusKey: r.status === '已收' ? 'certified' : 'pendingCert',
       };
     });
@@ -122,11 +129,11 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
         return s + Math.round(r.price / (1 + rate) * rate * 100) / 100;
       }, 0);
     return {
-      currentStock: `${inventoryTons.toFixed(2)}t`,
+      currentStock: formatQuantity(inventoryTons, productUnit, uiLang, 2),
       currentStockSub: t('invoices.stockNormal'),
-      totalInputWeight: `${totalInputTons.toFixed(1)}t`,
+      totalInputWeight: formatQuantity(totalInputTons, productUnit, uiLang, 1),
       totalInputSub: purchaseRecords.length > 0 ? t('invoices.inputRecordCount', { count: purchaseRecords.length }) : t('invoices.noInput'),
-      totalOutputWeight: `${totalOutputTons.toFixed(1)}t`,
+      totalOutputWeight: formatQuantity(totalOutputTons, productUnit, uiLang, 1),
       totalOutputSub: salesRecords.length > 0 ? t('invoices.outputRecordCount', { count: salesRecords.length }) : t('invoices.noOutput'),
       pendingCertification: fmtMoney(pendingTax),
     };
