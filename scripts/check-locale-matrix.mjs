@@ -461,6 +461,22 @@ async function main() {
         // formTaxRate for CN must say 增值税率 (Chinese VAT context)
         const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
         if (uiLang === 'zh-CN' && !/增值税/.test(rateLabel)) reasons.push(`CN formTaxRate zh-CN should say 增值税率: "${rateLabel}"`);
+        // CN certifiedInput / invoicedOutput must use the refined wording
+        // ("已认证进项税额" / "已开票销项税额"), not the older
+        // "已收进项税额 (已认证)" / "已开销项税额 (已开票)" form.
+        const certInput = helpers.getTaxLabel(accId, uiLang, 'certifiedInput');
+        const invOutput = helpers.getTaxLabel(accId, uiLang, 'invoicedOutput');
+        if (uiLang === 'zh-CN') {
+          if (!/已认证.*进项税额|已认证进项/.test(certInput)) reasons.push(`CN certifiedInput zh-CN should say 已认证进项税额: "${certInput}"`);
+          if (!/已开票.*销项税额|已开票销项/.test(invOutput)) reasons.push(`CN invoicedOutput zh-CN should say 已开票销项税额: "${invOutput}"`);
+          if (/已收|已开销/.test(certInput) || /已收|已开销/.test(invOutput)) {
+            reasons.push(`CN labels use deprecated 已收/已开销 wording`);
+          }
+        }
+        if (uiLang === 'zh-TW') {
+          if (!/已認證.*進項稅額|已認證進項/.test(certInput)) reasons.push(`CN certifiedInput zh-TW should say 已認證進項稅額: "${certInput}"`);
+          if (!/已開票.*銷項稅額|已開票銷項/.test(invOutput)) reasons.push(`CN invoicedOutput zh-TW should say 已開票銷項稅額: "${invOutput}"`);
+        }
       }
       // formTaxRate cross-regime checks: non-CN locales must NOT say "增值税率"
       if (accId !== 'CN') {
@@ -552,6 +568,45 @@ async function main() {
       }
     }
     if (reasons.length) fail(`cashflowWording:${lang}`, reasons); else pass(`cashflowWording:${lang}`);
+  }
+
+  // ────────────────────────────────────────────────
+  // PART G3: tableHeaders amount-without-tax wording
+  //   zh-CN must say "不含税单价 / 合计不含税金额", not the older
+  //   "无税单价 / 合计无税金额". zh-TW must say "不含稅單價 /
+  //   合計不含稅金額", not "未稅單價 / 未稅合計".
+  // ────────────────────────────────────────────────
+  {
+    const zhCN = locales['zh-CN'];
+    const zhTW = locales['zh-TW'];
+    const reasonsCN = [];
+    const reasonsTW = [];
+    for (const key of ['unitPrice', 'unitPriceWithoutTax']) {
+      const v = get(zhCN, `tableHeaders.${key}`);
+      if (typeof v === 'string') {
+        if (!/不含税单价/.test(v)) reasonsCN.push(`tableHeaders.${key} should say 不含税单价: "${v}"`);
+        if (/无税单价/.test(v)) reasonsCN.push(`tableHeaders.${key} uses deprecated 无税 wording: "${v}"`);
+      }
+      const vw = get(zhTW, `tableHeaders.${key}`);
+      if (typeof vw === 'string') {
+        if (!/不含稅單價/.test(vw)) reasonsTW.push(`tableHeaders.${key} should say 不含稅單價: "${vw}"`);
+        if (/未稅單價/.test(vw)) reasonsTW.push(`tableHeaders.${key} uses deprecated 未稅 wording: "${vw}"`);
+      }
+    }
+    for (const key of ['amount', 'amountWithoutTax', 'totalAmountWithoutTax']) {
+      const v = get(zhCN, `tableHeaders.${key}`);
+      if (typeof v === 'string') {
+        if (!/合计不含税金额|不含税金额/.test(v)) reasonsCN.push(`tableHeaders.${key} should say 合计不含税金额: "${v}"`);
+        if (/合计无税金额|无税金额/.test(v)) reasonsCN.push(`tableHeaders.${key} uses deprecated 无税 wording: "${v}"`);
+      }
+      const vw = get(zhTW, `tableHeaders.${key}`);
+      if (typeof vw === 'string') {
+        if (!/合計不含稅金額|不含稅金額/.test(vw)) reasonsTW.push(`tableHeaders.${key} should say 合計不含稅金額: "${vw}"`);
+        if (/未稅合計|未稅金額/.test(vw)) reasonsTW.push(`tableHeaders.${key} uses deprecated 未稅 wording: "${vw}"`);
+      }
+    }
+    if (reasonsCN.length) fail(`tableHeadersWording:zh-CN`, reasonsCN); else pass(`tableHeadersWording:zh-CN`);
+    if (reasonsTW.length) fail(`tableHeadersWording:zh-TW`, reasonsTW); else pass(`tableHeadersWording:zh-TW`);
   }
 
   // ────────────────────────────────────────────────
