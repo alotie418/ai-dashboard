@@ -43,7 +43,10 @@ const REQUIRED_TAX_KEYS_BY_LOCALE = {
   TW: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
   US: [...COMMON_TAX_KEYS, 'grossReceipts', 'totalExpenses', 'netProfit', 'taxTitle', 'kpiGrossIncome', 'kpiQuarterlyTax',
     'profitMargins', 'grossMargin', 'netMargin',
-    'socialSecurity', 'medicare', 'additionalMedicare', 'dueLabel'],
+    'socialSecurity', 'medicare', 'additionalMedicare', 'dueLabel',
+    'pageTitlePurchase', 'uploadTitle', 'uploadSubtitle',
+    'headerUnitPrice', 'headerAmount', 'headerTaxAmount',
+    'headerTotalWithTax', 'headerInvoiceNo'],
 };
 
 // Banned cross-regime terminology
@@ -287,6 +290,20 @@ async function main() {
           const label = helpers.getTaxLabel(accId, uiLang, key);
           if (/schedule\s+c|SCHEDULE\s+C/i.test(label) && !/Schedule C/.test(label)) {
             reasons.push(`US ${key}[${uiLang}] uses non-canonical Schedule C capitalization: "${label}"`);
+          }
+        }
+        // US purchase-page labels must not import China-VAT terminology
+        // (进项 / 進項 / 电子发票 / 電子發票 / 销项 / 銷項 / 增值税 / 增值稅).
+        // These are CN-specific and inappropriate for US Schedule C context.
+        const US_FORBIDDEN_CN_TERMS = [/进项/, /進項/, /销项/, /銷項/, /增值税/, /增值稅/, /电子发票/, /電子發票/];
+        for (const key of ['pageTitlePurchase', 'uploadTitle', 'uploadSubtitle',
+                           'headerUnitPrice', 'headerAmount', 'headerTaxAmount',
+                           'headerTotalWithTax', 'headerInvoiceNo']) {
+          const label = helpers.getTaxLabel(accId, uiLang, key);
+          for (const pattern of US_FORBIDDEN_CN_TERMS) {
+            if (pattern.test(label)) {
+              reasons.push(`US ${key}[${uiLang}] uses China-VAT term ${pattern}: "${label}"`);
+            }
           }
         }
         // US dashboard cards: profitMargins / grossMargin / netMargin must
