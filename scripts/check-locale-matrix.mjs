@@ -590,6 +590,56 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G1.5: zh-CN balance sheet labels lock-in.
+  //   Pin specific Chinese-GAAP accounting terminology so future edits
+  //   can't drift to colloquial or shareholder-equity wording.
+  // ────────────────────────────────────────────────
+  {
+    const data = locales['zh-CN'];
+    const reasons = [];
+    const PINNED = {
+      'finance.balanceCash': '货币资金',
+      'finance.balanceReceivable': '应收账款',
+      'finance.balanceReceivables': '应收账款',
+      'finance.balanceInventory': '存货',
+      'finance.balanceFixed': '固定资产',
+      'finance.balanceFixedAssets': '固定资产',
+      'finance.balancePayable': '应付账款',
+      'finance.balancePayables': '应付账款',
+      'finance.balanceTax': '应交税费',
+      'finance.balanceTaxPayable': '应交税费',
+      'finance.balanceCapital': '实收资本',
+      'finance.balancePaidInCapital': '实收资本',
+      'finance.balanceRetained': '未分配利润',
+      'finance.balanceRetainedEarnings': '未分配利润',
+      'finance.balanceEquity': '所有者权益',
+      'finance.balanceTotalLiab': '负债及所有者权益总计',
+      'finance.balanceTotalLiabilitiesEquity': '负债及所有者权益总计',
+    };
+    for (const [path, expected] of Object.entries(PINNED)) {
+      const v = get(data, path);
+      if (v !== expected) reasons.push(`${path} should be "${expected}", got "${v}"`);
+    }
+    // Forbidden colloquial / corporate-only variants
+    const FORBIDDEN = [
+      { pattern: /应交税款/, msg: '应交税款 — use the GAAP-standard 应交税费 instead' },
+      { pattern: /股东权益/, msg: '股东权益 — use 所有者权益 (Chinese accounting standard) unless explicitly modeling a 公司制 entity' },
+    ];
+    for (const path of [
+      'finance.balanceTax', 'finance.balanceTaxPayable',
+      'finance.balanceEquity', 'finance.balanceLiabilitiesEquity',
+      'finance.balanceTotalLiab', 'finance.balanceTotalLiabilitiesEquity',
+    ]) {
+      const v = get(data, path);
+      if (typeof v !== 'string') continue;
+      for (const rule of FORBIDDEN) {
+        if (rule.pattern.test(v)) reasons.push(`${path} contains forbidden term: ${rule.msg} (got: "${v}")`);
+      }
+    }
+    if (reasons.length) fail(`balanceSheetLockIn:zh-CN`, reasons); else pass(`balanceSheetLockIn:zh-CN`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G2: Cashflow empty-state wording — must NOT imply third-party sync.
   //   SoloLedger is a standalone ledger; the empty state should ask the user
   //   to add records, not connect to "accounting software API".
