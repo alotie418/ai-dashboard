@@ -194,6 +194,40 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART A2: No cross-script leakage in taxConcepts
+  //   - non-ko fields must not contain Hangul (가-힯)
+  //   - non-ja fields must not contain hiragana (ぁ-ゟ) or katakana (゠-ヿ)
+  //   - non-zh-TW Chinese fields with simplified-only chars are caught in zh-TW check below
+  // ────────────────────────────────────────────────
+  const HANGUL = /[가-힯]/;
+  const HIRAGANA = /[ぁ-ゟ]/;
+  const KATAKANA = /[゠-ヿ]/;
+  // Japanese-only kanji that are NOT used in modern Chinese (simplified or traditional)
+  // - 売 is Japanese for 賣/卖
+  // - 働 (Japanese-coined kanji), 込 (Japanese-only), 畳, 駅, 嬢, 処 (Chinese uses 處/处)
+  // - 価 is Japanese for 價/价
+  // Note: 圓 圖 團 縣 are ALSO valid traditional Chinese — don't include.
+  // Note: 仕 alone exists in Chinese (仕途); detection of compounds like 仕入 needs separate logic.
+  const JA_ONLY_KANJI = /[売働込畳駅嬢処価]/;
+  for (const accId of ACCOUNTING_LOCALES) {
+    const cfg = config.getAccountingLocale(accId);
+    const reasons = [];
+    for (const [key, labels] of Object.entries(cfg.taxConcepts)) {
+      for (const lang of UI_LANGUAGES) {
+        const val = labels[lang];
+        if (typeof val !== 'string') continue;
+        if (lang !== 'ko' && HANGUL.test(val)) {
+          reasons.push(`${key}[${lang}] contains Hangul: "${val}"`);
+        }
+        if (lang !== 'ja' && (HIRAGANA.test(val) || KATAKANA.test(val) || JA_ONLY_KANJI.test(val))) {
+          reasons.push(`${key}[${lang}] contains Japanese-only script: "${val}"`);
+        }
+      }
+    }
+    if (reasons.length) fail(`crossScript:${accId}`, reasons); else pass(`crossScript:${accId}`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART B: getTaxLabel matrix (6 × 6)
   // ────────────────────────────────────────────────
   for (const accId of ACCOUNTING_LOCALES) {
