@@ -451,8 +451,8 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
           <div className="relative w-full max-w-lg bg-white border border-[#e0ddd5] rounded-xl overflow-hidden animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
             <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold text-[#191918]">{t('purchases.modalTitle')}</h2>
-                <p className="text-xs text-[#5c5c5a] mt-1">{t('purchases.modalSubtitle')}</p>
+                <h2 className="text-xl font-bold text-[#191918]">{accLocale === 'US' ? taxLabel('modalTitlePurchase') : t('purchases.modalTitle')}</h2>
+                <p className="text-xs text-[#5c5c5a] mt-1">{accLocale === 'US' ? taxLabel('modalSubtitlePurchase') : t('purchases.modalSubtitle')}</p>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-[#5c5c5a] hover:text-[#191918] transition-colors">
                 <i className="fas fa-times text-xl"></i>
@@ -523,7 +523,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{taxLabel('formTaxRate')}</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] tracking-widest">{taxLabel('formTaxRate')}</label>
                   <select
                     value={newPurchase.taxRate}
                     onChange={(e) => setNewPurchase({ ...newPurchase, taxRate: e.target.value })}
