@@ -641,7 +641,13 @@
     "tableHeaderNet": "순이익",
     "tableHeaderYoy": "전년 동기",
     "tableHeaderMom": "전월",
-    "tableHeaderPrice": "가격 지수"
+    "tableHeaderPrice": "가격 지수",
+    "severityLow": "낮음",
+    "severityMid": "중간",
+    "severityHigh": "높음",
+    "corrStrong": "강함",
+    "corrModerate": "중간",
+    "corrWeak": "약함"
   },
   "accounts": {
     "receivable": "Receivables",

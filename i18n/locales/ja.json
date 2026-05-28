@@ -641,7 +641,13 @@
     "tableHeaderNet": "純利益",
     "tableHeaderYoy": "前年同期比",
     "tableHeaderMom": "前月比",
-    "tableHeaderPrice": "価格指数"
+    "tableHeaderPrice": "価格指数",
+    "severityLow": "低",
+    "severityMid": "中",
+    "severityHigh": "高",
+    "corrStrong": "強",
+    "corrModerate": "中程度",
+    "corrWeak": "弱"
   },
   "accounts": {
     "receivable": "Receivables",

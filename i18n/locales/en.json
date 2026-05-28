@@ -641,7 +641,13 @@
     "tableHeaderNet": "Net Profit",
     "tableHeaderYoy": "YoY",
     "tableHeaderMom": "MoM",
-    "tableHeaderPrice": "Price Index"
+    "tableHeaderPrice": "Price Index",
+    "severityLow": "Low",
+    "severityMid": "Mid",
+    "severityHigh": "High",
+    "corrStrong": "Strong",
+    "corrModerate": "Moderate",
+    "corrWeak": "Weak"
   },
   "accounts": {
     "receivable": "Receivables",

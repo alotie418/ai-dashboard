@@ -647,7 +647,7 @@ ${JSON.stringify(mcOnVar)}
                   const meanUR = unitRevenues.length > 0 ? unitRevenues.reduce((a, b) => a + b, 0) / unitRevenues.length : 0;
                   const stdUR = unitRevenues.length > 1 ? Math.sqrt(unitRevenues.reduce((a, b) => a + (b - meanUR) ** 2, 0) / (unitRevenues.length - 1)) : 0;
                   const cvUR = meanUR === 0 ? 0 : (stdUR / meanUR * 100);
-                  const cvLabel = cvUR < 5 ? 'Low' : cvUR < 15 ? 'Mid' : 'High';
+                  const cvLabel = cvUR < 5 ? t('analysis.severityLow') : cvUR < 15 ? t('analysis.severityMid') : t('analysis.severityHigh');
                   const cvColor = cvUR < 5 ? 'text-emerald-600' : cvUR < 15 ? 'text-amber-500' : 'text-rose-500';
                   // 价格指数关联度：deflator 与 profit 的皮尔逊相关系数
                   const profits = perf.map(p => p.profit);
@@ -660,7 +660,7 @@ ${JSON.stringify(mcOnVar)}
                   const corr = (stdP === 0 || stdD === 0) ? 0 : (cov / (stdP * stdD)) * 100;
                   const absCorr = Math.abs(corr);
                   const corrSign = corr >= 0 ? '+' : '−';
-                  const corrLabel = absCorr > 70 ? 'Strong' : absCorr > 40 ? 'Moderate' : 'Weak';
+                  const corrLabel = absCorr > 70 ? t('analysis.corrStrong') : absCorr > 40 ? t('analysis.corrModerate') : t('analysis.corrWeak');
                   const corrColor = absCorr > 70 ? 'text-[#d97757]' : absCorr > 40 ? 'text-amber-500' : 'text-emerald-600';
                   return (
                     <>

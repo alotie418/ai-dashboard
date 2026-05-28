@@ -641,7 +641,13 @@
     "tableHeaderNet": "淨利潤",
     "tableHeaderYoy": "同比",
     "tableHeaderMom": "環比",
-    "tableHeaderPrice": "價格指數"
+    "tableHeaderPrice": "價格指數",
+    "severityLow": "低",
+    "severityMid": "中",
+    "severityHigh": "高",
+    "corrStrong": "強",
+    "corrModerate": "中等",
+    "corrWeak": "弱"
   },
   "accounts": {
     "receivable": "應收帳款",

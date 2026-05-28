@@ -105,6 +105,8 @@ const REQUIRED_I18N_KEYS = [
   'analysis.chartTons', 'analysis.chartAvgRevenue', 'analysis.chartMonthlyData',
   'analysis.waitingData', 'analysis.dimSwitch', 'analysis.realtimeProcessing',
   'analysis.progress', 'analysis.peakMonthSub',
+  'analysis.severityLow', 'analysis.severityMid', 'analysis.severityHigh',
+  'analysis.corrStrong', 'analysis.corrModerate', 'analysis.corrWeak',
   // US Tax Tools — required in all 6 locales (page may render under US locale + any uiLanguage)
   'usTax.title', 'usTax.notApplicable', 'usTax.mileage', 'usTax.homeOffice',
   'usTax.totalTrips', 'usTax.totalMiles', 'usTax.deduction', 'usTax.addTrip',
@@ -566,6 +568,23 @@ async function main() {
     if (typeof aiDash === 'string' && ['zh-CN', 'zh-TW', 'ja', 'ko'].includes(lang)) {
       // The "AI" prefix is OK; the rest must contain native script
       if (/^[A-Z\s]+$/.test(aiDash)) reasons.push(`analysis.aiDashboard is all-caps English in ${lang}: "${aiDash}"`);
+    }
+    // severity / correlation labels: non-en locales must not be English literals
+    if (lang !== 'en') {
+      const englishLiterals = {
+        severityLow: /^Low$/i,
+        severityMid: /^Mid$/i,
+        severityHigh: /^High$/i,
+        corrStrong: /^Strong$/i,
+        corrModerate: /^Moderate$/i,
+        corrWeak: /^Weak$/i,
+      };
+      for (const [key, pattern] of Object.entries(englishLiterals)) {
+        const v = get(data, `analysis.${key}`);
+        if (typeof v === 'string' && pattern.test(v.trim())) {
+          reasons.push(`analysis.${key} is English literal in ${lang}: "${v}"`);
+        }
+      }
     }
     if (reasons.length) fail(`analysisWording:${lang}`, reasons); else pass(`analysisWording:${lang}`);
   }

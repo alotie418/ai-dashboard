@@ -641,7 +641,13 @@
     "tableHeaderNet": "Bénéfice net",
     "tableHeaderYoy": "YoY",
     "tableHeaderMom": "MoM",
-    "tableHeaderPrice": "Indice prix"
+    "tableHeaderPrice": "Indice prix",
+    "severityLow": "Faible",
+    "severityMid": "Moyen",
+    "severityHigh": "Élevé",
+    "corrStrong": "Forte",
+    "corrModerate": "Modérée",
+    "corrWeak": "Faible"
   },
   "accounts": {
     "receivable": "Receivables",
