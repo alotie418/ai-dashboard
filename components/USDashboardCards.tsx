@@ -60,14 +60,14 @@ const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice,
         </div>
         <div className="flex flex-col flex-1 justify-around py-2">
           <Row label={label('seTax')} value={fmt(se.totalSETax)} />
-          <Row label="├ Social Security (12.4%)" value={fmt(se.socialSecurityTax)} indent />
-          <Row label="├ Medicare (2.9%)" value={fmt(se.medicareTax)} indent />
-          {se.additionalMedicare > 0 && <Row label="└ Additional Medicare (0.9%)" value={fmt(se.additionalMedicare)} indent />}
+          <Row label={`├ ${label('socialSecurity')} (12.4%)`} value={fmt(se.socialSecurityTax)} indent />
+          <Row label={`├ ${label('medicare')} (2.9%)`} value={fmt(se.medicareTax)} indent />
+          {se.additionalMedicare > 0 && <Row label={`└ ${label('additionalMedicare')} (0.9%)`} value={fmt(se.additionalMedicare)} indent />}
           <div className="border-t border-[#e0ddd5] mx-4 my-1"></div>
           <Row label={label('quarterlyTax')} value={fmt(est.quarterlyPayment)} bold primary />
           {est.dueDates && (
             <div className="px-6 py-1 text-[10px] text-[#7a7a78]">
-              Due: {est.dueDates.join(' · ')}
+              {label('dueLabel')}: {est.dueDates.join(' · ')}
             </div>
           )}
         </div>
@@ -77,11 +77,11 @@ const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice,
       <div className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl p-6 h-full flex flex-col" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
         <div className="flex items-center space-x-3 mb-6">
           <i className="fas fa-chart-line text-lg text-rose-400"></i>
-          <h3 className="text-lg font-bold text-[#191918]">Profit Margins</h3>
+          <h3 className="text-lg font-bold text-[#191918]">{label('profitMargins')}</h3>
         </div>
         <div className="space-y-6 flex-1">
-          <MarginBar label="Gross Margin" value={sc.line7_grossIncome > 0 ? Math.round((sc.line7_grossIncome - sc.line28_totalExpenses) / sc.line7_grossIncome * 100) : 0} color="bg-[#d97757]" />
-          <MarginBar label="Net Margin" value={sc.line7_grossIncome > 0 ? Math.round(sc.line31_netProfit / sc.line7_grossIncome * 100) : 0} color="bg-emerald-500" />
+          <MarginBar label={label('grossMargin')} value={sc.line7_grossIncome > 0 ? Math.round((sc.line7_grossIncome - sc.line28_totalExpenses) / sc.line7_grossIncome * 100) : 0} color="bg-[#d97757]" />
+          <MarginBar label={label('netMargin')} value={sc.line7_grossIncome > 0 ? Math.round(sc.line31_netProfit / sc.line7_grossIncome * 100) : 0} color="bg-emerald-500" />
         </div>
       </div>
     </>
