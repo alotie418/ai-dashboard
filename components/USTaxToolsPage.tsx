@@ -5,13 +5,29 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   listMileage, createMileage, deleteMileage, fetchMileageSummary,
-  fetchHomeOffice, saveHomeOffice,
+  fetchHomeOffice, saveHomeOffice, fetchSettings,
   type MileageLog, type MileageSummary, type HomeOfficeData,
 } from '../services/api';
 
 const USTaxToolsPage: React.FC = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'mileage' | 'homeOffice'>('mileage');
+  const [accLocale, setAccLocale] = useState<string | null>(null);
+  useEffect(() => {
+    fetchSettings().then((s: any) => setAccLocale(s?.accounting_locale || 'CN')).catch(() => setAccLocale('CN'));
+  }, []);
+
+  // Defensive guard: page is gated in nav, but if accessed directly with
+  // non-US accountingLocale, show a clear "not applicable" message.
+  if (accLocale && accLocale !== 'US') {
+    return (
+      <div className="max-w-3xl mx-auto py-20 text-center">
+        <i className="fas fa-flag-usa text-5xl text-[#d1cdc4] mb-6"></i>
+        <h2 className="text-xl font-semibold text-[#191918]">{t('usTax.title')}</h2>
+        <p className="text-sm text-[#5c5c5a] mt-3 max-w-md mx-auto">{t('usTax.notApplicable')}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
