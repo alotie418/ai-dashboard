@@ -33,7 +33,7 @@ const EXPECTED_CURRENCY = {
 };
 
 // Tax keys each accountingLocale should provide in taxConcepts
-const COMMON_TAX_KEYS = ['plRevenue', 'plCost', 'plNetProfit', 'plTitle', 'tabPlLabel', 'taxSummaryTitle', 'purchaseTotal', 'salesTotal', 'taxDifference', 'invoiceTypeOutput', 'invoiceTypeInput'];
+const COMMON_TAX_KEYS = ['plRevenue', 'plCost', 'plNetProfit', 'plTitle', 'tabPlLabel', 'taxSummaryTitle', 'purchaseTotal', 'salesTotal', 'taxDifference', 'invoiceTypeOutput', 'invoiceTypeInput', 'formTaxRate'];
 const VAT_FAMILY_KEYS = ['taxTitle', 'inputTax', 'outputTax', 'estimatedTax', 'certifiedInput', 'invoicedOutput'];
 const REQUIRED_TAX_KEYS_BY_LOCALE = {
   CN: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
@@ -445,6 +445,34 @@ async function main() {
         const t = helpers.getTaxLabel(accId, uiLang, 'taxTitle');
         const expected = { 'zh-CN': /增值税/, 'zh-TW': /增值稅/, en: /VAT/i };
         if (expected[uiLang] && !expected[uiLang].test(t)) reasons.push(`CN taxTitle missing expected term in ${uiLang}: "${t}"`);
+        // formTaxRate for CN must say 增值税率 (Chinese VAT context)
+        const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
+        if (uiLang === 'zh-CN' && !/增值税/.test(rateLabel)) reasons.push(`CN formTaxRate zh-CN should say 增值税率: "${rateLabel}"`);
+      }
+      // formTaxRate cross-regime checks: non-CN locales must NOT say "增值税率"
+      if (accId !== 'CN') {
+        const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
+        if (uiLang === 'zh-CN' && /增值税率/.test(rateLabel)) {
+          reasons.push(`${accId} formTaxRate zh-CN incorrectly uses 中国增值税率: "${rateLabel}"`);
+        }
+      }
+      // formTaxRate per-regime expected terms
+      if (accId === 'US') {
+        const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
+        if (!/Sales Tax|sales tax/i.test(rateLabel)) reasons.push(`US formTaxRate missing Sales Tax in ${uiLang}: "${rateLabel}"`);
+      }
+      if (accId === 'EU') {
+        const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
+        if (!/VAT|TVA/i.test(rateLabel)) reasons.push(`EU formTaxRate missing VAT/TVA in ${uiLang}: "${rateLabel}"`);
+      }
+      if (accId === 'KR') {
+        const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
+        if (!/VAT|TVA|부가가치세/i.test(rateLabel)) reasons.push(`KR formTaxRate missing VAT/TVA in ${uiLang}: "${rateLabel}"`);
+      }
+      if (accId === 'TW') {
+        const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
+        const expected = { 'zh-CN': /营业税率/, 'zh-TW': /營業稅率/ };
+        if (expected[uiLang] && !expected[uiLang].test(rateLabel)) reasons.push(`TW formTaxRate missing 营业税率 in ${uiLang}: "${rateLabel}"`);
       }
       if (accId === 'JP') {
         const t = helpers.getTaxLabel(accId, uiLang, 'taxTitle');
