@@ -571,6 +571,45 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G3: tableHeaders amount-without-tax wording
+  //   zh-CN must say "不含税单价 / 合计不含税金额", not the older
+  //   "无税单价 / 合计无税金额". zh-TW must say "不含稅單價 /
+  //   合計不含稅金額", not "未稅單價 / 未稅合計".
+  // ────────────────────────────────────────────────
+  {
+    const zhCN = locales['zh-CN'];
+    const zhTW = locales['zh-TW'];
+    const reasonsCN = [];
+    const reasonsTW = [];
+    for (const key of ['unitPrice', 'unitPriceWithoutTax']) {
+      const v = get(zhCN, `tableHeaders.${key}`);
+      if (typeof v === 'string') {
+        if (!/不含税单价/.test(v)) reasonsCN.push(`tableHeaders.${key} should say 不含税单价: "${v}"`);
+        if (/无税单价/.test(v)) reasonsCN.push(`tableHeaders.${key} uses deprecated 无税 wording: "${v}"`);
+      }
+      const vw = get(zhTW, `tableHeaders.${key}`);
+      if (typeof vw === 'string') {
+        if (!/不含稅單價/.test(vw)) reasonsTW.push(`tableHeaders.${key} should say 不含稅單價: "${vw}"`);
+        if (/未稅單價/.test(vw)) reasonsTW.push(`tableHeaders.${key} uses deprecated 未稅 wording: "${vw}"`);
+      }
+    }
+    for (const key of ['amount', 'amountWithoutTax', 'totalAmountWithoutTax']) {
+      const v = get(zhCN, `tableHeaders.${key}`);
+      if (typeof v === 'string') {
+        if (!/合计不含税金额|不含税金额/.test(v)) reasonsCN.push(`tableHeaders.${key} should say 合计不含税金额: "${v}"`);
+        if (/合计无税金额|无税金额/.test(v)) reasonsCN.push(`tableHeaders.${key} uses deprecated 无税 wording: "${v}"`);
+      }
+      const vw = get(zhTW, `tableHeaders.${key}`);
+      if (typeof vw === 'string') {
+        if (!/合計不含稅金額|不含稅金額/.test(vw)) reasonsTW.push(`tableHeaders.${key} should say 合計不含稅金額: "${vw}"`);
+        if (/未稅合計|未稅金額/.test(vw)) reasonsTW.push(`tableHeaders.${key} uses deprecated 未稅 wording: "${vw}"`);
+      }
+    }
+    if (reasonsCN.length) fail(`tableHeadersWording:zh-CN`, reasonsCN); else pass(`tableHeadersWording:zh-CN`);
+    if (reasonsTW.length) fail(`tableHeadersWording:zh-TW`, reasonsTW); else pass(`tableHeadersWording:zh-TW`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART H: No English fallback in non-English locales for balance-sheet keys
   // ────────────────────────────────────────────────
   for (const [lang, keys] of Object.entries(NO_ENGLISH_FALLBACK_KEYS)) {
