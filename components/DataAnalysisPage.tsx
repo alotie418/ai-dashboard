@@ -414,7 +414,7 @@ ${JSON.stringify(mcOnVar)}
                 <span className="h-1.5 w-1.5 rounded-full bg-[#d97757]/60"></span>
                 <span className="h-1.5 w-1.5 rounded-full bg-[#d97757]/30"></span>
               </div>
-              <h3 className="text-[#d97757] text-xs font-bold uppercase tracking-[0.4em]">AI Intelligence Dashboard</h3>
+              <h3 className="text-[#d97757] text-xs font-bold uppercase tracking-[0.4em]">{t('analysis.aiDashboard')}</h3>
             </div>
             {isAnalysing ? (
               <div className="space-y-6">
@@ -424,7 +424,7 @@ ${JSON.stringify(mcOnVar)}
                   </div>
                   <div>
                     <p className="text-[#191918] font-bold text-xl">{loadingMessage}</p>
-                    <p className="text-[#d97757]/60 text-[10px] font-mono mt-1">REALTIME NEURAL PROCESSING | PROGRESS: {Math.floor(loadingProgress)}%</p>
+                    <p className="text-[#d97757]/60 text-[10px] font-mono mt-1">{t('analysis.realtimeProcessing')} | {t('analysis.progress')}: {Math.floor(loadingProgress)}%</p>
                   </div>
                 </div>
                 <div className="w-full bg-[#f9f9f8] h-1.5 rounded-full overflow-hidden">
@@ -445,8 +445,8 @@ ${JSON.stringify(mcOnVar)}
             )}
           </div>
           <div className="hidden lg:grid grid-cols-3 gap-8 border-l border-[#e0ddd5] pl-12 shrink-0">
-            <StatsIndicator label="Avg YoY" value={`${stats.yoy.toFixed(1)}%`} trend={stats.yoy >= 0 ? 'up' : 'down'} />
-            <StatsIndicator label="Avg MoM" value={`${stats.mom.toFixed(1)}%`} trend={stats.mom >= 0 ? 'up' : 'down'} />
+            <StatsIndicator label={t('analysis.avgYoy')} value={`${stats.yoy.toFixed(1)}%`} trend={stats.yoy >= 0 ? 'up' : 'down'} />
+            <StatsIndicator label={t('analysis.avgMom')} value={`${stats.mom.toFixed(1)}%`} trend={stats.mom >= 0 ? 'up' : 'down'} />
             <StatsIndicator label={t('analysis.deflator')} value={stats.deflator.toFixed(1)} trend="neutral" color="text-amber-500" />
           </div>
         </div>
@@ -477,7 +477,7 @@ ${JSON.stringify(mcOnVar)}
       {activeTab === 'panorama' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 animate-in fade-in duration-1000">
           {/* Revenue vs Cost Stacked Area */}
-          <PanoramaCard title={t('analysis.revenueStructure')} subtitle="Revenue vs Cost Structure">
+          <PanoramaCard title={t('analysis.revenueStructure')} subtitle={t('analysis.subtitleRevenueCost')}>
             <ResponsiveContainer width="100%" height={260}>
               <AreaChart data={data.monthlyPerformance}>
                 <defs>
@@ -497,7 +497,7 @@ ${JSON.stringify(mcOnVar)}
           </PanoramaCard>
 
           {/* Monthly Growth Compare */}
-          <PanoramaCard title={t('analysis.growthTrend')} subtitle="YoY & MoM Trajectory">
+          <PanoramaCard title={t('analysis.growthTrend')} subtitle={t('analysis.subtitleYoyMom')}>
             <ResponsiveContainer width="100%" height={260}>
               <ComposedChart data={data.monthlyPerformance}>
                 <XAxis dataKey="name" hide />
@@ -510,7 +510,7 @@ ${JSON.stringify(mcOnVar)}
           </PanoramaCard>
 
           {/* Unit Profit Contribution */}
-          <PanoramaCard title={t('analysis.logistics')} subtitle="Purchase vs Sales Tons">
+          <PanoramaCard title={t('analysis.logistics')} subtitle={t('analysis.subtitleLogistics')}>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={data.monthlyPerformance}>
                 <XAxis dataKey="name" hide />
@@ -523,7 +523,7 @@ ${JSON.stringify(mcOnVar)}
           </PanoramaCard>
 
           {/* Profitability Index Scatter */}
-          <PanoramaCard title={t('analysis.efficiency')} subtitle="Efficiency Scatter Matrix">
+          <PanoramaCard title={t('analysis.efficiency')} subtitle={t('analysis.subtitleEfficiency')}>
             <ResponsiveContainer width="100%" height={260}>
               <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                 <XAxis type="number" dataKey="revenue" name={t('analysis.chartRevenue')} hide />
@@ -647,7 +647,7 @@ ${JSON.stringify(mcOnVar)}
                   const meanUR = unitRevenues.length > 0 ? unitRevenues.reduce((a, b) => a + b, 0) / unitRevenues.length : 0;
                   const stdUR = unitRevenues.length > 1 ? Math.sqrt(unitRevenues.reduce((a, b) => a + (b - meanUR) ** 2, 0) / (unitRevenues.length - 1)) : 0;
                   const cvUR = meanUR === 0 ? 0 : (stdUR / meanUR * 100);
-                  const cvLabel = cvUR < 5 ? 'Low' : cvUR < 15 ? 'Mid' : 'High';
+                  const cvLabel = cvUR < 5 ? t('analysis.severityLow') : cvUR < 15 ? t('analysis.severityMid') : t('analysis.severityHigh');
                   const cvColor = cvUR < 5 ? 'text-emerald-600' : cvUR < 15 ? 'text-amber-500' : 'text-rose-500';
                   // 价格指数关联度：deflator 与 profit 的皮尔逊相关系数
                   const profits = perf.map(p => p.profit);
@@ -660,7 +660,7 @@ ${JSON.stringify(mcOnVar)}
                   const corr = (stdP === 0 || stdD === 0) ? 0 : (cov / (stdP * stdD)) * 100;
                   const absCorr = Math.abs(corr);
                   const corrSign = corr >= 0 ? '+' : '−';
-                  const corrLabel = absCorr > 70 ? 'Strong' : absCorr > 40 ? 'Moderate' : 'Weak';
+                  const corrLabel = absCorr > 70 ? t('analysis.corrStrong') : absCorr > 40 ? t('analysis.corrModerate') : t('analysis.corrWeak');
                   const corrColor = absCorr > 70 ? 'text-[#d97757]' : absCorr > 40 ? 'text-amber-500' : 'text-emerald-600';
                   return (
                     <>

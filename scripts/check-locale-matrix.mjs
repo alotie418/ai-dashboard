@@ -97,6 +97,16 @@ const REQUIRED_I18N_KEYS = [
   'finance.tabBalance', 'finance.tabCashflow', 'finance.tabPl',
   // cashflow empty state
   'finance.cashflowTitle', 'finance.cashflowDesc', 'finance.cashflowSync',
+  // Data Analysis page — formerly hardcoded English / missing keys
+  'analysis.aiDashboard', 'analysis.avgYoy', 'analysis.avgMom',
+  'analysis.subtitleRevenueCost', 'analysis.subtitleYoyMom',
+  'analysis.subtitleLogistics', 'analysis.subtitleEfficiency',
+  'analysis.matrixBadgeSteady', 'analysis.matrixBadgeBalance',
+  'analysis.chartTons', 'analysis.chartAvgRevenue', 'analysis.chartMonthlyData',
+  'analysis.waitingData', 'analysis.dimSwitch', 'analysis.realtimeProcessing',
+  'analysis.progress', 'analysis.peakMonthSub',
+  'analysis.severityLow', 'analysis.severityMid', 'analysis.severityHigh',
+  'analysis.corrStrong', 'analysis.corrModerate', 'analysis.corrWeak',
   // US Tax Tools — required in all 6 locales (page may render under US locale + any uiLanguage)
   'usTax.title', 'usTax.notApplicable', 'usTax.mileage', 'usTax.homeOffice',
   'usTax.totalTrips', 'usTax.totalMiles', 'usTax.deduction', 'usTax.addTrip',
@@ -537,6 +547,46 @@ async function main() {
       }
     }
     if (reasons.length) fail(`i18nKeys:${lang}`, reasons); else pass(`i18nKeys:${lang}`);
+  }
+
+  // ────────────────────────────────────────────────
+  // PART G1: Data Analysis page subtitles — must not contain hardcoded
+  // English "TONS" or "吨" since the inventory unit comes from
+  // product_unit (uiLanguage-driven via getInventoryUnitLabel).
+  // ────────────────────────────────────────────────
+  for (const lang of UI_LANGUAGES) {
+    const data = locales[lang];
+    const reasons = [];
+    const subtitleLog = get(data, 'analysis.subtitleLogistics');
+    if (typeof subtitleLog === 'string') {
+      if (/\bTONS\b|\bTons\b/.test(subtitleLog)) reasons.push(`analysis.subtitleLogistics hardcodes TONS: "${subtitleLog}"`);
+      if (lang === 'zh-CN' && /吨/.test(subtitleLog)) reasons.push(`analysis.subtitleLogistics hardcodes 吨: "${subtitleLog}"`);
+      if (lang === 'zh-TW' && /噸/.test(subtitleLog)) reasons.push(`analysis.subtitleLogistics hardcodes 噸: "${subtitleLog}"`);
+    }
+    // aiDashboard heading should not be uppercase English in CJK locales
+    const aiDash = get(data, 'analysis.aiDashboard');
+    if (typeof aiDash === 'string' && ['zh-CN', 'zh-TW', 'ja', 'ko'].includes(lang)) {
+      // The "AI" prefix is OK; the rest must contain native script
+      if (/^[A-Z\s]+$/.test(aiDash)) reasons.push(`analysis.aiDashboard is all-caps English in ${lang}: "${aiDash}"`);
+    }
+    // severity / correlation labels: non-en locales must not be English literals
+    if (lang !== 'en') {
+      const englishLiterals = {
+        severityLow: /^Low$/i,
+        severityMid: /^Mid$/i,
+        severityHigh: /^High$/i,
+        corrStrong: /^Strong$/i,
+        corrModerate: /^Moderate$/i,
+        corrWeak: /^Weak$/i,
+      };
+      for (const [key, pattern] of Object.entries(englishLiterals)) {
+        const v = get(data, `analysis.${key}`);
+        if (typeof v === 'string' && pattern.test(v.trim())) {
+          reasons.push(`analysis.${key} is English literal in ${lang}: "${v}"`);
+        }
+      }
+    }
+    if (reasons.length) fail(`analysisWording:${lang}`, reasons); else pass(`analysisWording:${lang}`);
   }
 
   // ────────────────────────────────────────────────
