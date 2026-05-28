@@ -461,6 +461,22 @@ async function main() {
         // formTaxRate for CN must say 增值税率 (Chinese VAT context)
         const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
         if (uiLang === 'zh-CN' && !/增值税/.test(rateLabel)) reasons.push(`CN formTaxRate zh-CN should say 增值税率: "${rateLabel}"`);
+        // CN certifiedInput / invoicedOutput must use the refined wording
+        // ("已认证进项税额" / "已开票销项税额"), not the older
+        // "已收进项税额 (已认证)" / "已开销项税额 (已开票)" form.
+        const certInput = helpers.getTaxLabel(accId, uiLang, 'certifiedInput');
+        const invOutput = helpers.getTaxLabel(accId, uiLang, 'invoicedOutput');
+        if (uiLang === 'zh-CN') {
+          if (!/已认证.*进项税额|已认证进项/.test(certInput)) reasons.push(`CN certifiedInput zh-CN should say 已认证进项税额: "${certInput}"`);
+          if (!/已开票.*销项税额|已开票销项/.test(invOutput)) reasons.push(`CN invoicedOutput zh-CN should say 已开票销项税额: "${invOutput}"`);
+          if (/已收|已开销/.test(certInput) || /已收|已开销/.test(invOutput)) {
+            reasons.push(`CN labels use deprecated 已收/已开销 wording`);
+          }
+        }
+        if (uiLang === 'zh-TW') {
+          if (!/已認證.*進項稅額|已認證進項/.test(certInput)) reasons.push(`CN certifiedInput zh-TW should say 已認證進項稅額: "${certInput}"`);
+          if (!/已開票.*銷項稅額|已開票銷項/.test(invOutput)) reasons.push(`CN invoicedOutput zh-TW should say 已開票銷項稅額: "${invOutput}"`);
+        }
       }
       // formTaxRate cross-regime checks: non-CN locales must NOT say "增值税率"
       if (accId !== 'CN') {
