@@ -237,7 +237,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
 
       {/* Header Section */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[#191918]">{t('purchases.title')}</h1>
+        <h1 className="text-2xl font-bold text-[#191918]">{accLocale === 'US' ? taxLabel('pageTitlePurchase') : t('purchases.title')}</h1>
         <div className="flex space-x-3">
           <button
             onClick={() => setShowCsvImport(true)}
@@ -308,10 +308,10 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
           )}
         </div>
         <h3 className="text-[#4a4a48] font-medium text-base mb-1">
-          {isScanning ? t('purchases.uploadScanning') : t('purchases.uploadTitle')}
+          {isScanning ? t('purchases.uploadScanning') : (accLocale === 'US' ? taxLabel('uploadTitle') : t('purchases.uploadTitle'))}
         </h3>
         <p className="text-[#5c5c5a] text-xs">
-          {isScanning ? t('purchases.uploadAnalyzing') : t('purchases.uploadSubtitle')}
+          {isScanning ? t('purchases.uploadAnalyzing') : (accLocale === 'US' ? taxLabel('uploadSubtitle') : t('purchases.uploadSubtitle'))}
         </p>
       </div>
 
@@ -324,12 +324,12 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.date')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.supplier')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.quantity')}</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">{t('tableHeaders.unitPriceWithoutTax')}</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">{t('tableHeaders.totalAmountWithoutTax')}</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">{t('tableHeaders.totalTax')}</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">{t('tableHeaders.totalWithTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale === 'US' ? taxLabel('headerUnitPrice') : t('tableHeaders.unitPriceWithoutTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale === 'US' ? taxLabel('headerAmount') : t('tableHeaders.totalAmountWithoutTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale === 'US' ? taxLabel('headerTaxAmount') : t('tableHeaders.totalTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale === 'US' ? taxLabel('headerTotalWithTax') : t('tableHeaders.totalWithTax')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.taxRate')}</th>
-                <th className="px-5 py-4 font-medium">{t('tableHeaders.invoiceNo')}</th>
+                <th className="px-5 py-4 font-medium">{accLocale === 'US' ? taxLabel('headerInvoiceNo') : t('tableHeaders.invoiceNo')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.status')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.actions')}</th>
               </tr>
