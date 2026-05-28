@@ -778,6 +778,26 @@
     "contextFallback": "기업 개요: 연 매출 {{revenue}}, 매출총이익률 {{grossMargin}}%, 순이익률 {{netMargin}}%.",
     "forecastSystemPrompt": "CFO 및 시장 분석가로서, 과거 경영 데이터와 통계 모델 결과를 바탕으로 종합 예측을 수행하세요. insights 문자열과 predictions 배열을 포함한 JSON을 반환하세요."
   },
+  "csvImport": {
+    "id": "ID",
+    "date": "날짜",
+    "customer": "고객",
+    "supplier": "공급업체",
+    "quantity": "수량",
+    "unitPrice": "단가",
+    "totalAmount": "총액",
+    "taxRate": "세율(%)",
+    "shipping": "배송비",
+    "invoiceNumber": "세금계산서 번호",
+    "invoiceStatus": "상태",
+    "dueDate": "납기일",
+    "exampleCustomer": "예시 고객",
+    "exampleSupplier": "예시 공급업체",
+    "exampleIssued": "발행",
+    "exampleReceived": "수령",
+    "templateSales": "매출 가져오기 템플릿",
+    "templatePurchases": "매입 가져오기 템플릿"
+  },
   "transactions": {
     "title": "거래 기록",
     "add": "새 거래",

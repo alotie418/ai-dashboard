@@ -6,6 +6,8 @@ import {
 } from 'recharts';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
+import { fetchSettings } from '../services/api';
+import { formatMoney, getCurrencySymbol, getInventoryUnitLabel } from './accountingHelpers';
 // AI calls moved to server-side proxy
 
 interface Props {
@@ -18,7 +20,18 @@ interface Props {
 type AnalysisDimension = 'financial' | 'volume' | 'efficiency';
 
 const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [accLocale, setAccLocale] = useState<string>('CN');
+  const [productUnit, setProductUnit] = useState<string>('unit');
+  useEffect(() => {
+    fetchSettings().then((s: any) => {
+      if (s?.accounting_locale) setAccLocale(s.accounting_locale);
+      if (s?.product_unit) setProductUnit(s.product_unit);
+    }).catch(() => {});
+  }, []);
+  const uiLang = i18n.language;
+  const unitLabel = getInventoryUnitLabel(productUnit, uiLang);
+  const currSym = getCurrencySymbol(accLocale);
 
   const LOADING_MESSAGES = useMemo(() => [
     t('analysis.loading1'),
@@ -385,7 +398,7 @@ ${JSON.stringify(mcOnVar)}
     }
   }, [runAnalysis]);
 
-  const formatCurrency = (v: number) => `¥${(v / 1000).toFixed(1)}k`;
+  const formatCurrency = (v: number) => `${currSym}${(v / 1000).toFixed(1)}k`;
   const formatNum = (v: number) => v.toLocaleString();
 
   return (
@@ -584,7 +597,7 @@ ${JSON.stringify(mcOnVar)}
                 <ComposedChart data={data.monthlyPerformance}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e0ddd5" vertical={false} />
                   <XAxis dataKey="name" stroke="#6b6b69" fontSize={11} tickLine={false} axisLine={false} dy={10} />
-                  <YAxis yAxisId="left" stroke="#6b6b69" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => dimension === 'volume' ? `${v}t` : formatCurrency(v)} />
+                  <YAxis yAxisId="left" stroke="#6b6b69" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => dimension === 'volume' ? `${v} ${unitLabel}` : formatCurrency(v)} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}
                     cursor={{ stroke: '#d97757', strokeWidth: 1 }}

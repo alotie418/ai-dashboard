@@ -778,6 +778,26 @@
     "contextFallback": "企业概况：年营收 {{revenue}}，毛利率 {{grossMargin}}%，净利率 {{netMargin}}%。",
     "forecastSystemPrompt": "你是一位精通行业的首席财务官与市场分析师。请结合企业历史数据和统计模型结果进行综合预测。返回JSON，包含insights字符串和predictions数组。"
   },
+  "csvImport": {
+    "id": "ID",
+    "date": "日期",
+    "customer": "客户",
+    "supplier": "供应商",
+    "quantity": "数量",
+    "unitPrice": "单价",
+    "totalAmount": "总金额",
+    "taxRate": "税率(%)",
+    "shipping": "运费",
+    "invoiceNumber": "发票号",
+    "invoiceStatus": "发票状态",
+    "dueDate": "到期日",
+    "exampleCustomer": "示例客户",
+    "exampleSupplier": "示例供应商",
+    "exampleIssued": "已开",
+    "exampleReceived": "已收",
+    "templateSales": "销售导入模板",
+    "templatePurchases": "采购导入模板"
+  },
   "transactions": {
     "title": "收支记录",
     "add": "新增记录",

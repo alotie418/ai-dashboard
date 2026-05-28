@@ -159,4 +159,20 @@ export function formatQuantity(
   return `${n} ${label}`;
 }
 
+// Format a legacy string-typed quantity ("10吨" or "10") for display.
+// If the string already carries any non-digit / non-whitespace / non-dot suffix,
+// pass through unchanged (preserves user-typed unit).
+// Otherwise append the locale-aware unit label.
+export function formatLegacyQuantity(
+  quantity: string | null | undefined,
+  unitKey: string | null | undefined,
+  uiLanguage: string,
+): string {
+  const s = (quantity ?? '').trim();
+  if (!s) return '';
+  if (/[^\d.\s]/.test(s)) return s;
+  const label = getInventoryUnitLabel(unitKey, uiLanguage);
+  return `${s} ${label}`;
+}
+
 export { ACCOUNTING_LOCALES, type AccountingLocaleId, type UILanguageCode };

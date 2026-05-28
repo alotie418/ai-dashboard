@@ -778,6 +778,26 @@
     "contextFallback": "企業概況：年間売上 {{revenue}}、粗利率 {{grossMargin}}%、純利率 {{netMargin}}%。",
     "forecastSystemPrompt": "あなたはCFOおよび市場アナリストです。過去の経営データと統計モデルの結果に基づき、総合的な予測を行ってください。insightsの文字列とpredictions配列を含むJSONを返してください。"
   },
+  "csvImport": {
+    "id": "ID",
+    "date": "日付",
+    "customer": "顧客",
+    "supplier": "仕入先",
+    "quantity": "数量",
+    "unitPrice": "単価",
+    "totalAmount": "合計金額",
+    "taxRate": "税率(%)",
+    "shipping": "送料",
+    "invoiceNumber": "請求書番号",
+    "invoiceStatus": "請求書ステータス",
+    "dueDate": "支払期限",
+    "exampleCustomer": "サンプル顧客",
+    "exampleSupplier": "サンプル仕入先",
+    "exampleIssued": "発行済",
+    "exampleReceived": "受領済",
+    "templateSales": "売上インポートテンプレート",
+    "templatePurchases": "仕入インポートテンプレート"
+  },
   "transactions": {
     "title": "取引記録",
     "add": "新規追加",

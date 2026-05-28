@@ -778,6 +778,26 @@
     "contextFallback": "Business summary: annual revenue {{revenue}}, gross margin {{grossMargin}}%, net margin {{netMargin}}%.",
     "forecastSystemPrompt": "You are a CFO and market analyst. Based on historical business data and statistical model results, provide a comprehensive forecast. Return JSON with an insights string and predictions array."
   },
+  "csvImport": {
+    "id": "ID",
+    "date": "Date",
+    "customer": "Customer",
+    "supplier": "Supplier",
+    "quantity": "Quantity",
+    "unitPrice": "Unit Price",
+    "totalAmount": "Total Amount",
+    "taxRate": "Tax Rate (%)",
+    "shipping": "Shipping",
+    "invoiceNumber": "Invoice No.",
+    "invoiceStatus": "Invoice Status",
+    "dueDate": "Due Date",
+    "exampleCustomer": "Sample Customer",
+    "exampleSupplier": "Sample Supplier",
+    "exampleIssued": "Issued",
+    "exampleReceived": "Received",
+    "templateSales": "Sales Import Template",
+    "templatePurchases": "Purchases Import Template"
+  },
   "transactions": {
     "title": "Transactions",
     "add": "New Transaction",

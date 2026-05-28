@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { analyzeInvoice } from '../services/ocrService';
 import { fetchPurchases, createPurchase, deletePurchase, fetchSettings, PurchaseRecord } from '../services/api';
-import { formatMoney, getCurrencySymbol, getTaxLabel } from './accountingHelpers';
+import { formatMoney, getCurrencySymbol, getTaxLabel, formatLegacyQuantity } from './accountingHelpers';
 import CsvImportModal from './CsvImportModal';
 
 interface Props {
@@ -49,7 +49,13 @@ const TAX_RATE_OPTIONS: Record<string, { value: string; labelKey: string }[]> = 
 const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
   const { t, i18n } = useTranslation();
   const [accLocale, setAccLocale] = useState('CN');
-  useEffect(() => { fetchSettings().then((s: any) => { if (s.accounting_locale) setAccLocale(s.accounting_locale); }).catch(() => {}); }, []);
+  const [productUnit, setProductUnit] = useState<string>('unit');
+  useEffect(() => {
+    fetchSettings().then((s: any) => {
+      if (s?.accounting_locale) setAccLocale(s.accounting_locale);
+      if (s?.product_unit) setProductUnit(s.product_unit);
+    }).catch(() => {});
+  }, []);
   const uiLang = i18n.language;
   const currSym = getCurrencySymbol(accLocale);
   const fmtMoney = (val: number) => formatMoney(val, accLocale, uiLang);
@@ -337,7 +343,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                 <tr key={row.id} className="hover:bg-[#f9f9f8]/30 transition-colors">
                   <td className="px-5 py-5 text-sm text-[#4a4a48] whitespace-nowrap">{row.date}</td>
                   <td className="px-5 py-5 text-sm text-[#191918] font-medium">{row.supplier}</td>
-                  <td className="px-5 py-5 text-sm text-[#4a4a48]">{row.quantity}</td>
+                  <td className="px-5 py-5 text-sm text-[#4a4a48]">{formatLegacyQuantity(row.quantity, productUnit, uiLang)}</td>
                   <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{formatCurrency(unitPrice)}</td>
                   <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{formatCurrency(amtWithoutTax)}</td>
                   <td className="px-5 py-5 text-sm text-rose-600 font-medium whitespace-nowrap">{formatCurrency(taxAmt)}</td>

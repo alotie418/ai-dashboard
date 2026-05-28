@@ -778,6 +778,26 @@
     "contextFallback": "Aperçu : CA annuel {{revenue}}, marge brute {{grossMargin}}%, marge nette {{netMargin}}%.",
     "forecastSystemPrompt": "Vous êtes un directeur financier et analyste de marché. Sur la base des données historiques et des résultats de modèles statistiques, fournissez une prévision complète. Retournez un JSON avec une chaîne insights et un tableau predictions."
   },
+  "csvImport": {
+    "id": "ID",
+    "date": "Date",
+    "customer": "Client",
+    "supplier": "Fournisseur",
+    "quantity": "Quantité",
+    "unitPrice": "Prix unitaire",
+    "totalAmount": "Montant total",
+    "taxRate": "Taux de taxe (%)",
+    "shipping": "Livraison",
+    "invoiceNumber": "N° facture",
+    "invoiceStatus": "Statut facture",
+    "dueDate": "Échéance",
+    "exampleCustomer": "Client exemple",
+    "exampleSupplier": "Fournisseur exemple",
+    "exampleIssued": "Émise",
+    "exampleReceived": "Reçue",
+    "templateSales": "Modèle d'import ventes",
+    "templatePurchases": "Modèle d'import achats"
+  },
   "transactions": {
     "title": "Transactions",
     "add": "Nouvelle transaction",

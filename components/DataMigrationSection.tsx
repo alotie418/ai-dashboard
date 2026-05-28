@@ -185,10 +185,10 @@ const DataMigrationSection: React.FC = () => {
           </div>
 
           <div className="text-[10px] text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3 space-y-1">
-            <div><i className="fas fa-info-circle mr-1.5 text-[#d97757]"></i>{t('settings.dataMigration.note1', 'sales → income / purchases → expense；默认归到当前会计制度的"收入第一项 / COGS"类别')}</div>
-            <div className="ml-4">{t('settings.dataMigration.note2', '旧表数据不会删除，可随时回滚')}</div>
-            <div className="ml-4">{t('settings.dataMigration.note3', '迁移记录写入 legacy_migrations 表，避免重复迁移')}</div>
-            <div className="ml-4">{t('settings.dataMigration.note4', '旧字段（吨位 / 单价 / 运费）会保存到 source_meta JSON，不丢失')}</div>
+            <div><i className="fas fa-info-circle mr-1.5 text-[#d97757]"></i>{t('settings.dataMigration.note1', 'sales → income / purchases → expense; defaults to the current accounting locale’s first income / COGS category')}</div>
+            <div className="ml-4">{t('settings.dataMigration.note2', 'Legacy tables are kept and can be rolled back at any time')}</div>
+            <div className="ml-4">{t('settings.dataMigration.note3', 'Migration records are written to legacy_migrations to prevent duplicates')}</div>
+            <div className="ml-4">{t('settings.dataMigration.note4', 'Legacy fields (quantity / unit price / shipping) are preserved in source_meta JSON')}</div>
           </div>
         </>
       )}

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import Papa from 'papaparse';
 import { batchCreateSales, batchCreatePurchases } from '../services/api';
 
@@ -9,30 +10,30 @@ interface Props {
 }
 
 const SALES_FIELDS = [
-  { key: 'id', label: 'ID', required: false },
-  { key: 'date', label: '日期', required: true },
-  { key: 'customer', label: '客户', required: true },
-  { key: 'tons', label: '吨数', required: true },
-  { key: 'pricePerTon', label: '单价(元/吨)', required: false },
-  { key: 'totalAmount', label: '总金额', required: true },
-  { key: 'taxRate', label: '税率(%)', required: false },
-  { key: 'shippingCost', label: '运费', required: false },
-  { key: 'invoiceNumber', label: '发票号', required: false },
-  { key: 'invoiceStatus', label: '发票状态', required: false },
-  { key: 'due_date', label: '到期日', required: false },
+  { key: 'id', labelKey: 'csvImport.id', required: false },
+  { key: 'date', labelKey: 'csvImport.date', required: true },
+  { key: 'customer', labelKey: 'csvImport.customer', required: true },
+  { key: 'tons', labelKey: 'csvImport.quantity', required: true },
+  { key: 'pricePerTon', labelKey: 'csvImport.unitPrice', required: false },
+  { key: 'totalAmount', labelKey: 'csvImport.totalAmount', required: true },
+  { key: 'taxRate', labelKey: 'csvImport.taxRate', required: false },
+  { key: 'shippingCost', labelKey: 'csvImport.shipping', required: false },
+  { key: 'invoiceNumber', labelKey: 'csvImport.invoiceNumber', required: false },
+  { key: 'invoiceStatus', labelKey: 'csvImport.invoiceStatus', required: false },
+  { key: 'due_date', labelKey: 'csvImport.dueDate', required: false },
 ];
 
 const PURCHASE_FIELDS = [
-  { key: 'id', label: 'ID', required: false },
-  { key: 'date', label: '日期', required: true },
-  { key: 'supplier', label: '供应商', required: true },
-  { key: 'tons', label: '吨数', required: true },
-  { key: 'pricePerTon', label: '单价(元/吨)', required: false },
-  { key: 'totalAmount', label: '总金额', required: true },
-  { key: 'taxRate', label: '税率(%)', required: false },
-  { key: 'invoiceNumber', label: '发票号', required: false },
-  { key: 'invoiceStatus', label: '发票状态', required: false },
-  { key: 'due_date', label: '到期日', required: false },
+  { key: 'id', labelKey: 'csvImport.id', required: false },
+  { key: 'date', labelKey: 'csvImport.date', required: true },
+  { key: 'supplier', labelKey: 'csvImport.supplier', required: true },
+  { key: 'tons', labelKey: 'csvImport.quantity', required: true },
+  { key: 'pricePerTon', labelKey: 'csvImport.unitPrice', required: false },
+  { key: 'totalAmount', labelKey: 'csvImport.totalAmount', required: true },
+  { key: 'taxRate', labelKey: 'csvImport.taxRate', required: false },
+  { key: 'invoiceNumber', labelKey: 'csvImport.invoiceNumber', required: false },
+  { key: 'invoiceStatus', labelKey: 'csvImport.invoiceStatus', required: false },
+  { key: 'due_date', labelKey: 'csvImport.dueDate', required: false },
 ];
 
 // Auto-detect CSV header to app field
@@ -67,6 +68,7 @@ function autoMapHeaders(headers: string[], fields: { key: string; label: string 
 }
 
 const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
+  const { t } = useTranslation();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [csvData, setCsvData] = useState<any[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -198,16 +200,16 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
   };
 
   const downloadTemplate = () => {
-    const templateFields = fields.map(f => f.label);
+    const templateFields = fields.map(f => t((f as any).labelKey));
     const exampleRow = type === 'sales'
-      ? ['', '2026-03-01', '示例客户', '10', '3500', '35000', '13', '500', 'FP-001', '已开', '2026-04-01']
-      : ['', '2026-03-01', '示例供应商', '10', '3000', '30000', '13', '', 'FP-001', '已收', '2026-04-01'];
+      ? ['', '2026-03-01', t('csvImport.exampleCustomer'), '10', '3500', '35000', '13', '500', 'FP-001', t('csvImport.exampleIssued'), '2026-04-01']
+      : ['', '2026-03-01', t('csvImport.exampleSupplier'), '10', '3000', '30000', '13', '', 'FP-001', t('csvImport.exampleReceived'), '2026-04-01'];
     const csv = [templateFields.join(','), exampleRow.join(',')].join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${type === 'sales' ? '销售' : '采购'}导入模板.csv`;
+    a.download = `${t(type === 'sales' ? 'csvImport.templateSales' : 'csvImport.templatePurchases')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -281,7 +283,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
                     >
                       <option value="">— 跳过 —</option>
                       {fields.map(f => (
-                        <option key={f.key} value={f.key}>{f.label}{f.required ? ' *' : ''}</option>
+                        <option key={f.key} value={f.key}>{t((f as any).labelKey)}{f.required ? ' *' : ''}</option>
                       ))}
                     </select>
                   </div>
