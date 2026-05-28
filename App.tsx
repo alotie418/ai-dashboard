@@ -20,7 +20,7 @@ import AccountsPage from './components/AccountsPage';
 import TransactionsPage from './components/TransactionsPage';
 import USTaxToolsPage from './components/USTaxToolsPage';
 import USDashboardCards from './components/USDashboardCards';
-import { formatMoney, getTaxLabel, getDashboardSections, getCurrencySymbol } from './components/accountingHelpers';
+import { formatMoney, getTaxLabel, getDashboardSections, getCurrencySymbol, buildAIFinanceContext } from './components/accountingHelpers';
 import AlertCenter from './components/AlertCenter';
 import LoginPage from './components/LoginPage';
 import OnboardingWizard from './components/OnboardingWizard';
@@ -44,12 +44,22 @@ const VOICE_OPTIONS = [
   { id: 'Fenrir', nameKey: 'voice.fenrir' },
 ];
 
+// Recommended default voice per UI language (only used when user has not set one)
+const DEFAULT_VOICE_BY_LANG: Record<string, string> = {
+  'zh-CN': 'Aoede',
+  'zh-TW': 'Aoede',
+  en: 'Aoede',
+  ja: 'Kore',
+  ko: 'Kore',
+  fr: 'Aoede',
+};
+
 const QUICK_FUNCTIONS = [
-  { labelKey: 'chat.uploadInvoice', icon: 'fa-camera', prompt: '我想上传一张发票进行记账' },
-  { labelKey: 'chat.financeQuery', icon: 'fa-file-invoice-dollar', prompt: '帮我查询最新的财务报表摘要' },
-  { labelKey: 'chat.trendAnalysis', icon: 'fa-chart-area', prompt: '分析一下过去几个月的业务历史趋势' },
-  { labelKey: 'chat.marketAnalysis', icon: 'fa-globe-asia', prompt: '搜索最新市场价格和行情' },
-  { labelKey: 'chat.inventoryQuery', icon: 'fa-boxes', prompt: '查询当前库存余量和风险' },
+  { labelKey: 'chat.uploadInvoice', icon: 'fa-camera', promptKey: 'chat.quickPromptUploadInvoice' },
+  { labelKey: 'chat.financeQuery', icon: 'fa-file-invoice-dollar', promptKey: 'chat.quickPromptFinanceQuery' },
+  { labelKey: 'chat.trendAnalysis', icon: 'fa-chart-area', promptKey: 'chat.quickPromptTrend' },
+  { labelKey: 'chat.marketAnalysis', icon: 'fa-globe-asia', promptKey: 'chat.quickPromptMarket' },
+  { labelKey: 'chat.inventoryQuery', icon: 'fa-boxes', promptKey: 'chat.quickPromptInventory' },
 ];
 
 const YEARS = ['2026', '2025', '2024'];
@@ -275,8 +285,24 @@ const AppContent: React.FC = () => {
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
-  const [selectedVoice, setSelectedVoice] = useState(VOICE_OPTIONS[0].id);
+  const [selectedVoice, setSelectedVoice] = useState<string>(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('selectedVoice') : null;
+    return stored || DEFAULT_VOICE_BY_LANG[i18n.language] || 'Aoede';
+  });
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
+  // Stable accounting locale for the AI assistant — sourced from settings,
+  // independent from dashboard data.locale
+  const [assistantAccLocale, setAssistantAccLocale] = useState<string>('CN');
+  useEffect(() => {
+    fetchSettings().then((s: any) => {
+      if (s?.accounting_locale) setAssistantAccLocale(s.accounting_locale);
+    }).catch(() => {});
+  }, []);
+  // Persist voice when user picks one
+  const handleVoiceChange = (v: string) => {
+    setSelectedVoice(v);
+    try { localStorage.setItem('selectedVoice', v); } catch {}
+  };
 
   const [isLiveMode, setIsLiveMode] = useState(false);
   const [liveStatus, setLiveStatus] = useState<'idle' | 'connecting' | 'listening' | 'speaking'>('idle');
@@ -439,7 +465,7 @@ const AppContent: React.FC = () => {
           tools: [{ googleSearch: {} }],
           responseModalities: [Modality.AUDIO],
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } } },
-          systemInstruction: '你是一位精通业务看板数据的 AI 助手。对于语音交互，请保持回答**简练直接**。当用户询问商品价格或行情时：1. 优先使用 Google Search 查询最新价格。2. **直接报出价格数字**和关键趋势，不要通过长篇大论的铺垫。3. 如果有多个来源，简要概括范围（例如"目前市场价在 50 到 60 元之间"）。请像一位专业的交易员一样高效沟通。',
+          systemInstruction: `${t('ai.liveSystemPrompt')}\n\n${buildAIFinanceContext(assistantAccLocale, i18n.language)}`,
         },
       });
       resolvedSession = await sessionPromise;
@@ -523,10 +549,16 @@ const AppContent: React.FC = () => {
       } catch {
         // Fallback to basic summary if context endpoint fails
         const fs = data.financialStatement;
-        contextText = `企业概况：年营收¥${fs.salesRevenue.toLocaleString()}，毛利率${fs.grossMargin}%，净利率${fs.netMargin}%。`;
+        contextText = t('ai.contextFallback', {
+          revenue: formatMoney(fs.salesRevenue, assistantAccLocale),
+          grossMargin: fs.grossMargin,
+          netMargin: fs.netMargin,
+        });
       }
 
       const systemInstruction = `${t('ai.chatSystemPrompt')}
+
+${buildAIFinanceContext(assistantAccLocale, i18n.language)}
 
 ${contextText}`;
 
@@ -544,10 +576,10 @@ ${contextText}`;
         });
         result = await res.json();
       }
-      const content = result.text || "未能获取有效回复。";
+      const content = result.text || t('chat.emptyReply');
       setMessages([...newMsgs, { role: 'model', text: content }]);
     } catch (e) {
-      setMessages([...newMsgs, { role: 'model', text: "请求发生错误，请稍后重试。" }]);
+      setMessages([...newMsgs, { role: 'model', text: t('chat.requestError') }]);
     } finally {
       setIsTyping(false);
     }
@@ -556,29 +588,40 @@ ${contextText}`;
   const handleChatFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const newMsgs: ChatMessage[] = [...messages, { role: 'user', text: `上传发票: ${file.name}` }];
+    const newMsgs: ChatMessage[] = [...messages, { role: 'user', text: t('chat.uploadInvoiceMsg', { name: file.name }) }];
     setMessages(newMsgs);
     setIsTyping(true);
     try {
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('文件读取超时')), 30000);
+        const timeout = setTimeout(() => reject(new Error(t('chat.fileReadTimeout'))), 30000);
         reader.onload = () => {
           clearTimeout(timeout);
           const result = reader.result as string;
           const parts = result.split(',');
-          if (parts.length < 2) { reject(new Error('文件格式不支持')); return; }
+          if (parts.length < 2) { reject(new Error(t('chat.fileFormatUnsupported'))); return; }
           resolve(parts[1]);
         };
-        reader.onerror = () => { clearTimeout(timeout); reject(new Error('文件读取失败')); };
+        reader.onerror = () => { clearTimeout(timeout); reject(new Error(t('chat.fileReadFailed'))); };
       });
       reader.readAsDataURL(file);
       const base64 = await base64Promise;
-      const extracted = await analyzeInvoice(base64, file.type);
-      const resultText = `发票识别成功！\n\n日期: ${extracted.date}\n客户/供应商: ${extracted.customer}\n数量: ${extracted.quantity}\n金额: ¥${extracted.price.toLocaleString()}\n运费: ¥${extracted.shipping.toLocaleString()}\n发票号: ${extracted.invoiceNo}\n\n以上信息已从发票中提取。如需记账，请手动前往「采购与进项」或「销售与销项」页面录入。`;
+      const extracted = await analyzeInvoice(base64, file.type, assistantAccLocale, i18n.language);
+      if (!extracted.isInvoiceLike) {
+        setMessages([...newMsgs, { role: 'model', text: t('chat.notInvoice', { type: extracted.documentType || 'unknown' }) }]);
+        return;
+      }
+      const resultText = t('chat.invoiceExtractResult', {
+        date: extracted.date,
+        partner: extracted.customer,
+        quantity: extracted.quantity || '-',
+        amount: formatMoney(extracted.price || 0, assistantAccLocale),
+        shipping: formatMoney(extracted.shipping || 0, assistantAccLocale),
+        invoiceNo: extracted.invoiceNo || '-',
+      });
       setMessages([...newMsgs, { role: 'model', text: resultText }]);
     } catch (err) {
-      setMessages([...newMsgs, { role: 'model', text: '发票识别失败，请确保上传清晰的发票图片后重试。' }]);
+      setMessages([...newMsgs, { role: 'model', text: t('chat.invoiceRecognizeFailed') }]);
     } finally {
       setIsTyping(false);
       if (chatFileInputRef.current) chatFileInputRef.current.value = '';
@@ -786,7 +829,7 @@ ${contextText}`;
             style={{ width: `${chatSize.width}px`, height: `${chatSize.height}px`, boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
             className="bg-white border border-[#e0ddd5] rounded-2xl overflow-hidden flex flex-col animate-in slide-in-from-right-8 duration-500 relative"
           >
-            <div onMouseDown={handleMouseDown} className="absolute top-0 left-0 w-8 h-8 cursor-nw-resize z-50 flex items-end justify-end pr-1 pb-1 group" title="拖拽调整大小">
+            <div onMouseDown={handleMouseDown} className="absolute top-0 left-0 w-8 h-8 cursor-nw-resize z-50 flex items-end justify-end pr-1 pb-1 group" title={t('chat.resize')}>
               <svg width="10" height="10" viewBox="0 0 10 10" className="text-[#d1cdc4] group-hover:text-[#d97757] transition-colors"><path d="M0 10L10 0M0 6L6 0M0 2L2 0" stroke="currentColor" strokeWidth="1.5" /></svg>
             </div>
 
@@ -809,7 +852,7 @@ ${contextText}`;
                 </button>
                 <select
                   value={selectedVoice}
-                  onChange={(e) => setSelectedVoice(e.target.value)}
+                  onChange={(e) => handleVoiceChange(e.target.value)}
                   className="text-[10px] text-white/80 bg-white/10 px-3 py-1.5 rounded-full border border-white/10 outline-none cursor-pointer appearance-none"
                 >
                   {VOICE_OPTIONS.map(v => (
@@ -828,8 +871,8 @@ ${contextText}`;
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <h4 className="text-[#191918] font-semibold text-xl tracking-tight">{liveStatus === 'connecting' ? '正在连接...' : liveStatus === 'listening' ? '请讲，我在听' : 'AI 正在响应'}</h4>
-                    <p className="text-[#6b6b69] text-sm leading-relaxed px-12">您可以询问任何有关经营、财务或市场的数据问题。</p>
+                    <h4 className="text-[#191918] font-semibold text-xl tracking-tight">{liveStatus === 'connecting' ? t('chat.liveConnecting') : liveStatus === 'listening' ? t('chat.liveListening') : t('chat.liveResponding')}</h4>
+                    <p className="text-[#6b6b69] text-sm leading-relaxed px-12">{t('chat.liveHint')}</p>
                   </div>
                 </div>
               ) : (
@@ -837,7 +880,7 @@ ${contextText}`;
                   {messages.length === 0 && (
                     <div className="bg-white p-6 rounded-xl text-[#4a4a48] text-sm leading-relaxed border border-[#e0ddd5]">
                       <p className="font-semibold text-[#d97757] mb-2 flex items-center"><i className="fas fa-hand-sparkles mr-2"></i> {t('chat.welcome')}</p>
-                      <p className="text-[#6b6b69]">我可以为您提供实时的经营分析和建议。您可以直接提问，或点击下方的功能快捷键。</p>
+                      <p className="text-[#6b6b69]">{t('chat.welcomeDesc')}</p>
                     </div>
                   )}
                   {messages.map((m, i) => (
@@ -848,11 +891,11 @@ ${contextText}`;
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
                           </div>
                         )}
-                        <button onClick={() => handlePlayVoice(m.text, i)} className={`absolute ${m.role === 'user' ? '-left-10' : '-right-10'} top-1/2 -translate-y-1/2 p-2 rounded-full transition-all ${playingIndex === i ? 'text-[#d97757] scale-125' : 'text-[#7a7a78] hover:text-[#d97757] opacity-0 group-hover:opacity-100'}`} title="播放语音"><i className={`fas ${playingIndex === i ? 'fa-spinner fa-spin' : 'fa-volume-up'}`}></i></button>
+                        <button onClick={() => handlePlayVoice(m.text, i)} className={`absolute ${m.role === 'user' ? '-left-10' : '-right-10'} top-1/2 -translate-y-1/2 p-2 rounded-full transition-all ${playingIndex === i ? 'text-[#d97757] scale-125' : 'text-[#7a7a78] hover:text-[#d97757] opacity-0 group-hover:opacity-100'}`} title={t('chat.playVoice')}><i className={`fas ${playingIndex === i ? 'fa-spinner fa-spin' : 'fa-volume-up'}`}></i></button>
                       </div>
                     </div>
                   ))}
-                  {isTyping && <div className="text-[#7a7a78] text-[10px] font-bold uppercase tracking-widest animate-pulse flex items-center space-x-2"><div className="w-1 h-1 bg-[#a0a09c] rounded-full"></div><span>AI 正在分析中...</span></div>}
+                  {isTyping && <div className="text-[#7a7a78] text-[10px] font-bold uppercase tracking-widest animate-pulse flex items-center space-x-2"><div className="w-1 h-1 bg-[#a0a09c] rounded-full"></div><span>{t('chat.thinking')}</span></div>}
                   <div ref={chatEndRef} />
                 </>
               )}
@@ -862,8 +905,8 @@ ${contextText}`;
               <div className="px-5 py-3 bg-[#f9f9f8] border-t border-[#e0ddd5] flex space-x-2 overflow-x-auto shrink-0 no-scrollbar items-center">
                 <input type="file" ref={chatFileInputRef} onChange={handleChatFileUpload} className="hidden" accept="image/*,application/pdf" />
                 {QUICK_FUNCTIONS.map((fn) => (
-                  <button key={(fn as any).labelKey} onClick={() => (fn as any).labelKey === 'chat.uploadInvoice' ? chatFileInputRef.current?.click() : handleSendMessage(fn.prompt)} className="whitespace-nowrap flex items-center space-x-2 px-4 py-2 bg-white border border-[#e0ddd5] rounded-full text-[10px] font-bold text-[#4a4a48] hover:text-[#d97757] hover:border-[#d97757]/40 transition-all active:scale-95">
-                    <i className={`fas ${fn.icon} text-[10px]`}></i><span>{t((fn as any).labelKey)}</span>
+                  <button key={fn.labelKey} onClick={() => fn.labelKey === 'chat.uploadInvoice' ? chatFileInputRef.current?.click() : handleSendMessage(t(fn.promptKey))} className="whitespace-nowrap flex items-center space-x-2 px-4 py-2 bg-white border border-[#e0ddd5] rounded-full text-[10px] font-bold text-[#4a4a48] hover:text-[#d97757] hover:border-[#d97757]/40 transition-all active:scale-95">
+                    <i className={`fas ${fn.icon} text-[10px]`}></i><span>{t(fn.labelKey)}</span>
                   </button>
                 ))}
               </div>
