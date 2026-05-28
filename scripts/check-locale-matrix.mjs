@@ -95,6 +95,8 @@ const REQUIRED_I18N_KEYS = [
   'finance.balanceEquity', 'finance.balanceTotalAssets',
   // finance tabs
   'finance.tabBalance', 'finance.tabCashflow', 'finance.tabPl',
+  // cashflow empty state
+  'finance.cashflowTitle', 'finance.cashflowDesc', 'finance.cashflowSync',
   // US Schedule C line descriptions (any uiLanguage may render US locale)
   ...US_SCHEDULE_LINE_KEYS,
 ];
@@ -508,6 +510,37 @@ async function main() {
       }
     }
     if (reasons.length) fail(`i18nKeys:${lang}`, reasons); else pass(`i18nKeys:${lang}`);
+  }
+
+  // ────────────────────────────────────────────────
+  // PART G2: Cashflow empty-state wording — must NOT imply third-party sync.
+  //   SoloLedger is a standalone ledger; the empty state should ask the user
+  //   to add records, not connect to "accounting software API".
+  // ────────────────────────────────────────────────
+  const FORBIDDEN_CASHFLOW_PHRASES = [
+    /会计软件\s*API|财务软件\s*API/,           // zh-CN
+    /會計軟體\s*API|財務軟體\s*API/,           // zh-TW
+    /accounting (software|API)/i,               // en
+    /会計ソフト/,                                 // ja
+    /회계 소프트웨어/,                            // ko
+    /logiciel comptable/i,                       // fr
+    /同步现金流|同步現金流|sync.*cash flow|キャッシュフロー.*同期/i,
+    /模拟预览|模擬預覽|preview mode|プレビューモード|미리보기 모드|mode aperçu/i,
+  ];
+  for (const lang of UI_LANGUAGES) {
+    const data = locales[lang];
+    const reasons = [];
+    for (const key of ['cashflowTitle', 'cashflowDesc', 'cashflowSubtitle', 'cashflowSync']) {
+      const val = get(data, `finance.${key}`);
+      if (typeof val !== 'string') continue;
+      for (const pattern of FORBIDDEN_CASHFLOW_PHRASES) {
+        if (pattern.test(val)) {
+          reasons.push(`finance.${key} contains forbidden phrase ${pattern}: "${val}"`);
+          break;
+        }
+      }
+    }
+    if (reasons.length) fail(`cashflowWording:${lang}`, reasons); else pass(`cashflowWording:${lang}`);
   }
 
   // ────────────────────────────────────────────────
