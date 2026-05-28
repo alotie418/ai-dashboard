@@ -22,7 +22,7 @@ const EmptyChartPlaceholder: React.FC<{ height?: string }> = ({ height = 'h-80' 
   );
 };
 
-export const PLStatementChart: React.FC<{ data: ChartData[] }> = ({ data }) => {
+export const PLStatementChart: React.FC<{ data: ChartData[]; currencySymbol?: string }> = ({ data, currencySymbol = '¥' }) => {
   const { t } = useTranslation();
   if (!data || data.length === 0) return <EmptyChartPlaceholder />;
   return (
@@ -43,7 +43,7 @@ export const PLStatementChart: React.FC<{ data: ChartData[] }> = ({ data }) => {
           tickLine={false}
           axisLine={false}
           fontSize={12}
-          tickFormatter={(value) => `¥${value/1000}k`}
+          tickFormatter={(value) => `${currencySymbol}${value/1000}k`}
         />
         <Tooltip
           contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
@@ -63,7 +63,7 @@ export const PLStatementChart: React.FC<{ data: ChartData[] }> = ({ data }) => {
   );
 };
 
-export const ProfitBarChart: React.FC<{ data: ChartData[] }> = ({ data }) => {
+export const ProfitBarChart: React.FC<{ data: ChartData[]; currencySymbol?: string }> = ({ data, currencySymbol = '¥' }) => {
   if (!data || data.length === 0) return <EmptyChartPlaceholder />;
   return (
   <div className="h-80 w-full">
@@ -71,7 +71,7 @@ export const ProfitBarChart: React.FC<{ data: ChartData[] }> = ({ data }) => {
       <BarChart data={data} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e0ddd5" vertical={false} />
         <XAxis dataKey="name" stroke="#6b6b69" tickLine={false} axisLine={false} fontSize={12} dy={10} />
-        <YAxis stroke="#6b6b69" tickLine={false} axisLine={false} fontSize={12} tickFormatter={(value) => `¥${value/1000}k`} />
+        <YAxis stroke="#6b6b69" tickLine={false} axisLine={false} fontSize={12} tickFormatter={(value) => `${currencySymbol}${value/1000}k`} />
         <Tooltip
           contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
           itemStyle={{ color: '#333330' }}
@@ -83,7 +83,7 @@ export const ProfitBarChart: React.FC<{ data: ChartData[] }> = ({ data }) => {
   );
 };
 
-export const ProfitabilityBarChart: React.FC<{ data: ChartData[] }> = ({ data }) => {
+export const ProfitabilityBarChart: React.FC<{ data: ChartData[]; currencySymbol?: string }> = ({ data, currencySymbol = '¥' }) => {
   if (!data || data.length === 0) return <EmptyChartPlaceholder />;
   return (
   <div className="h-80 w-full">
@@ -96,7 +96,7 @@ export const ProfitabilityBarChart: React.FC<{ data: ChartData[] }> = ({ data })
           tickLine={false}
           axisLine={false}
           fontSize={12}
-          tickFormatter={(value) => `¥${value/1000}k`}
+          tickFormatter={(value) => `${currencySymbol}${value/1000}k`}
         />
         <Tooltip
           cursor={{fill: 'rgba(217, 119, 87, 0.06)'}}

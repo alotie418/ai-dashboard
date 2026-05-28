@@ -557,22 +557,22 @@ ${JSON.stringify(mcOnVar)}
               {data.monthlyPerformance.map((item, idx) => (
                 <div key={idx} className="bg-[#f9f9f8]/60 border border-[#e0ddd5]/70 p-4 rounded-xl hover:border-[#d97757]/40 transition-all hover:bg-[#f9f9f8]/80 group">
                   <p className="text-[#5c5c5a] text-[10px] font-bold uppercase mb-2 group-hover:text-[#d97757] transition-colors">{item.name}</p>
-                  <p className="text-[#191918] text-lg font-bold">¥{(item.revenue / 1000).toFixed(0)}k</p>
+                  <p className="text-[#191918] text-lg font-bold">{currSym}{(item.revenue / 1000).toFixed(0)}k</p>
                   <div className="mt-3 space-y-1">
                     <div className="flex justify-between text-[9px]">
                       <span className="text-[#5c5c5a]">{t('analysis.chartProfit')}</span>
-                      <span className="text-emerald-600 font-bold">¥{(item.profit / 1000).toFixed(1)}k</span>
+                      <span className="text-emerald-600 font-bold">{currSym}{(item.profit / 1000).toFixed(1)}k</span>
                     </div>
                     <div className="flex justify-between text-[9px]">
                       <span className="text-[#5c5c5a]">{t('analysis.chartTons')}</span>
-                      <span className="text-[#4a4a48]">{item.salesTons}t</span>
+                      <span className="text-[#4a4a48]">{item.salesTons} {unitLabel}</span>
                     </div>
                   </div>
                 </div>
               ))}
               <div className="bg-[#d97757] border border-[#d97757] p-4 rounded-xl flex flex-col justify-center items-center cursor-pointer hover:scale-105 transition-transform" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}>
                 <p className="text-white/80 text-[10px] font-bold uppercase mb-1">{t('analysis.chartAvgRevenue')}</p>
-                <p className="text-white text-xl font-bold">¥{(stats.avgRevenue / 1000).toFixed(1)}k</p>
+                <p className="text-white text-xl font-bold">{currSym}{(stats.avgRevenue / 1000).toFixed(1)}k</p>
               </div>
             </div>
           </div>
@@ -733,10 +733,10 @@ ${JSON.stringify(mcOnVar)}
                           <div className="bg-white border border-[#e0ddd5] p-6 rounded-xl backdrop-blur-xl ring-1 ring-[#e0ddd5]" style={{ boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}>
                             <p className="text-[#5c5c5a] text-[10px] font-bold uppercase mb-3 tracking-[0.2em]">{label} {d.isForecast ? t('analysis.forecastValue') : t('analysis.forecastActual')}</p>
                             <div className="space-y-3">
-                              <p className="text-[#191918] text-2xl font-bold">¥{formatNum(d.revenue)}</p>
+                              <p className="text-[#191918] text-2xl font-bold">{currSym}{formatNum(d.revenue)}</p>
                               {d.isForecast && (
                                 <p className="text-[#d97757] text-xs font-medium border-t border-[#e0ddd5] pt-2">
-                                  {t('analysis.forecastConfidence')}: ¥{formatNum(d.confidenceLower)} - ¥{formatNum(d.confidenceUpper)}
+                                  {t('analysis.forecastConfidence')}: {currSym}{formatNum(d.confidenceLower)} - {currSym}{formatNum(d.confidenceUpper)}
                                 </p>
                               )}
                               <p className="text-emerald-600 text-sm flex items-center">

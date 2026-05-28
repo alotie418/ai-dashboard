@@ -273,6 +273,14 @@ async function main() {
       } else {
         pass(`formatMoney:${accId}+${uiLang}`);
       }
+      // Also verify zero values render with currency symbol (regression guard
+      // for finance summary cards which often show 0 before data loads)
+      const zeroFmt = helpers.formatMoney(0, accId, uiLang);
+      if (!zeroFmt.includes(expected)) {
+        fail(`formatMoney(0):${accId}+${uiLang}`, `zero-value formatting missing symbol "${expected}": "${zeroFmt}"`);
+      } else {
+        pass(`formatMoney(0):${accId}+${uiLang}`);
+      }
     }
   }
 
