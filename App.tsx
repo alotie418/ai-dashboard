@@ -738,8 +738,8 @@ ${contextText}`;
         </div>
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
           <NavItem icon="fa-th-large" label={t('nav.dashboard')} active={currentPage === 'dashboard'} expanded={sidebarOpen} onClick={() => setCurrentPage('dashboard')} />
-          <NavItem icon="fa-file-import" label={t('nav.purchase')} active={currentPage === 'purchase'} expanded={sidebarOpen} onClick={() => setCurrentPage('purchase')} />
-          <NavItem icon="fa-file-export" label={t('nav.sales')} active={currentPage === 'sales'} expanded={sidebarOpen} onClick={() => setCurrentPage('sales')} />
+          <NavItem icon="fa-file-import" label={assistantAccLocale === 'US' ? getTaxLabel(assistantAccLocale, i18n.language, 'navPurchase') : t('nav.purchase')} active={currentPage === 'purchase'} expanded={sidebarOpen} onClick={() => setCurrentPage('purchase')} />
+          <NavItem icon="fa-file-export" label={assistantAccLocale === 'US' ? getTaxLabel(assistantAccLocale, i18n.language, 'navSales') : t('nav.sales')} active={currentPage === 'sales'} expanded={sidebarOpen} onClick={() => setCurrentPage('sales')} />
           <NavItem icon="fa-search-dollar" label={t('nav.inventory')} active={currentPage === 'inventory'} expanded={sidebarOpen} onClick={() => setCurrentPage('inventory')} />
           <NavItem icon="fa-chart-pie" label={t('nav.analysis')} active={currentPage === 'analysis'} expanded={sidebarOpen} onClick={() => setCurrentPage('analysis')} />
           <NavItem icon="fa-handshake" label={t('nav.accounts')} active={currentPage === 'accounts'} expanded={sidebarOpen} onClick={() => setCurrentPage('accounts')} />

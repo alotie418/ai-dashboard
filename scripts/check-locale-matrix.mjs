@@ -47,7 +47,10 @@ const REQUIRED_TAX_KEYS_BY_LOCALE = {
     'pageTitlePurchase', 'uploadTitle', 'uploadSubtitle',
     'headerUnitPrice', 'headerAmount', 'headerTaxAmount',
     'headerTotalWithTax', 'headerInvoiceNo',
-    'modalTitlePurchase', 'modalSubtitlePurchase'],
+    'modalTitlePurchase', 'modalSubtitlePurchase',
+    'pageTitleSales', 'uploadTitleSales', 'uploadSubtitleSales',
+    'emptySales', 'modalTitleSales', 'modalSubtitleSales',
+    'navSales', 'newSaleButton', 'navPurchase'],
 };
 
 // Banned cross-regime terminology
@@ -300,7 +303,10 @@ async function main() {
         for (const key of ['pageTitlePurchase', 'uploadTitle', 'uploadSubtitle',
                            'headerUnitPrice', 'headerAmount', 'headerTaxAmount',
                            'headerTotalWithTax', 'headerInvoiceNo',
-                           'modalTitlePurchase', 'modalSubtitlePurchase']) {
+                           'modalTitlePurchase', 'modalSubtitlePurchase',
+                           'pageTitleSales', 'uploadTitleSales', 'uploadSubtitleSales',
+                           'emptySales', 'modalTitleSales', 'modalSubtitleSales',
+                           'navSales', 'newSaleButton', 'navPurchase']) {
           const label = helpers.getTaxLabel(accId, uiLang, key);
           for (const pattern of US_FORBIDDEN_CN_TERMS) {
             if (pattern.test(label)) {
