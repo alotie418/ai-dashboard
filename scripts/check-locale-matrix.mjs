@@ -58,7 +58,8 @@ const REQUIRED_TAX_KEYS_BY_LOCALE = {
     'invNoInput', 'invNoOutput',
     'invDateRange', 'invStatusFilter', 'invWeightRange',
     'invStatusAll', 'invStatusVerified', 'invStatusCertified', 'invStatusDeducted',
-    'invStatusPendingCert', 'invStatusPendingIssue', 'invStatusIssued'],
+    'invStatusPendingCert', 'invStatusPendingIssue', 'invStatusIssued',
+    'invAdvFilterActive', 'invInputRecordCount', 'invOutputRecordCount'],
 };
 
 // Banned cross-regime terminology
@@ -325,7 +326,8 @@ async function main() {
                            'invNoInput', 'invNoOutput',
                            'invDateRange', 'invStatusFilter', 'invWeightRange',
                            'invStatusAll', 'invStatusVerified', 'invStatusCertified', 'invStatusDeducted',
-                           'invStatusPendingCert', 'invStatusPendingIssue', 'invStatusIssued']) {
+                           'invStatusPendingCert', 'invStatusPendingIssue', 'invStatusIssued',
+                           'invAdvFilterActive', 'invInputRecordCount', 'invOutputRecordCount']) {
           const label = helpers.getTaxLabel(accId, uiLang, key);
           for (const pattern of US_FORBIDDEN_CN_TERMS) {
             if (pattern.test(label)) {
@@ -355,6 +357,20 @@ async function main() {
           if (v === key) reasons.push(`US ${key}[${uiLang}] is a raw key (status dropdown leak): "${v}"`);
           if (/认证|認證|抵扣/.test(v)) reasons.push(`US ${key}[${uiLang}] uses CN-VAT 认证/抵扣 wording: "${v}"`);
         }
+        // US interpolated count templates (stat-card subtitles + active-filter
+        // line). Must NOT be a raw key, must carry the literal {count} token (so
+        // the count actually renders), must not leave a stray token after
+        // substitution, and must avoid CN-VAT wording (认证/抵扣/发票/开票 — these
+        // count strings are never about VAT invoices).
+        for (const key of ['invAdvFilterActive', 'invInputRecordCount', 'invOutputRecordCount']) {
+          const v = helpers.getTaxLabel(accId, uiLang, key);
+          if (v === key) reasons.push(`US ${key}[${uiLang}] is a raw key (interpolated label leak): "${v}"`);
+          if (!v.includes('{count}')) reasons.push(`US ${key}[${uiLang}] missing {count} token: "${v}"`);
+          if (/认证|認證|抵扣|发票|發票|开票|開票/.test(v)) reasons.push(`US ${key}[${uiLang}] uses CN-VAT wording: "${v}"`);
+          // simulate render: substituting {count} must leave no leftover brace token
+          const rendered = v.replace(/\{count\}/g, '7');
+          if (/\{count\}|\{\{|\}\}/.test(rendered)) reasons.push(`US ${key}[${uiLang}] has malformed interpolation token: "${v}"`);
+        }
         // Exact-string lock-in for the search placeholder + "all documents" tab.
         // These regressed by silently losing a trailing character (码/据 →
         // "搜索票据号..." / "全部票"); pin the full expected strings so any future
@@ -367,12 +383,18 @@ async function main() {
               invStatusAll: '全部状态', invStatusVerified: '已核验', invStatusCertified: '已记录',
               invStatusDeducted: '已处理', invStatusPendingCert: '待处理',
               invStatusPendingIssue: '待票据', invStatusIssued: '已开票',
+              invAdvFilterActive: '已启用筛选，找到 {count} 条票据记录',
+              invInputRecordCount: '{count} 条采购/费用记录',
+              invOutputRecordCount: '{count} 条销售/收入记录',
             },
             'zh-TW': {
               invSearchPlaceholder: '搜尋票據號碼或往來單位...', invFilterAll: '全部票據',
               invStatusAll: '全部狀態', invStatusVerified: '已核驗', invStatusCertified: '已記錄',
               invStatusDeducted: '已處理', invStatusPendingCert: '待處理',
               invStatusPendingIssue: '待票據', invStatusIssued: '已開票',
+              invAdvFilterActive: '已啟用篩選，找到 {count} 筆票據記錄',
+              invInputRecordCount: '{count} 筆採購/費用記錄',
+              invOutputRecordCount: '{count} 筆銷售/收入記錄',
             },
           };
           if (EXPECT[uiLang]) {

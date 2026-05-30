@@ -159,6 +159,11 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       invStatusPendingCert:{ 'zh-CN': '待处理', 'zh-TW': '待處理', en: 'Pending', ja: '保留中', ko: '대기 중', fr: 'En attente' },
       invStatusPendingIssue:{ 'zh-CN': '待票据', 'zh-TW': '待票據', en: 'Awaiting Document', ja: '伝票待ち', ko: '문서 대기', fr: 'En attente de pièce' },
       invStatusIssued:    { 'zh-CN': '已开票', 'zh-TW': '已開票', en: 'Issued', ja: '発行済み', ko: '발행됨', fr: 'Émis' },
+      // Interpolated count templates ({count} substituted at render). US receipt/
+      // document context — never 进项/销项/认证/抵扣/发票/开票 wording.
+      invAdvFilterActive: { 'zh-CN': '已启用筛选，找到 {count} 条票据记录', 'zh-TW': '已啟用篩選，找到 {count} 筆票據記錄', en: 'Filter active — {count} document(s) found', ja: 'フィルター適用中 — {count} 件の伝票', ko: '필터 적용됨 — 문서 {count}건', fr: 'Filtre actif — {count} pièce(s)' },
+      invInputRecordCount:{ 'zh-CN': '{count} 条采购/费用记录', 'zh-TW': '{count} 筆採購/費用記錄', en: '{count} purchase/expense record(s)', ja: '仕入・経費 {count} 件', ko: '매입/비용 {count}건', fr: '{count} achat(s)/dépense(s)' },
+      invOutputRecordCount:{ 'zh-CN': '{count} 条销售/收入记录', 'zh-TW': '{count} 筆銷售/收入記錄', en: '{count} sales/revenue record(s)', ja: '売上・収入 {count} 件', ko: '매출/수입 {count}건', fr: '{count} vente(s)/revenu(s)' },
       newSaleButton:      { 'zh-CN': '新增销售记录', 'zh-TW': '新增銷售記錄', en: 'New Sale', ja: '売上を追加', ko: '매출 추가', fr: 'Nouvelle vente' },
       invoiceInputLabel: { 'zh-CN': '费用凭证数', 'zh-TW': '費用憑證數', en: 'Expense Receipts', ja: '経費レシート', ko: '비용 영수증', fr: 'Reçus de dépenses' },
       invoiceOutputLabel: { 'zh-CN': '收入凭证数', 'zh-TW': '收入憑證數', en: 'Income Receipts', ja: '収入レシート', ko: '수입 영수증', fr: 'Reçus de revenus' },
