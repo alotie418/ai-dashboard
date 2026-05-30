@@ -740,7 +740,7 @@ ${contextText}`;
           <NavItem icon="fa-th-large" label={t('nav.dashboard')} active={currentPage === 'dashboard'} expanded={sidebarOpen} onClick={() => setCurrentPage('dashboard')} />
           <NavItem icon="fa-file-import" label={assistantAccLocale === 'US' ? getTaxLabel(assistantAccLocale, i18n.language, 'navPurchase') : t('nav.purchase')} active={currentPage === 'purchase'} expanded={sidebarOpen} onClick={() => setCurrentPage('purchase')} />
           <NavItem icon="fa-file-export" label={assistantAccLocale === 'US' ? getTaxLabel(assistantAccLocale, i18n.language, 'navSales') : t('nav.sales')} active={currentPage === 'sales'} expanded={sidebarOpen} onClick={() => setCurrentPage('sales')} />
-          <NavItem icon="fa-search-dollar" label={t('nav.inventory')} active={currentPage === 'inventory'} expanded={sidebarOpen} onClick={() => setCurrentPage('inventory')} />
+          <NavItem icon="fa-search-dollar" label={assistantAccLocale === 'US' ? getTaxLabel(assistantAccLocale, i18n.language, 'invQueryTitle') : t('nav.inventory')} active={currentPage === 'inventory'} expanded={sidebarOpen} onClick={() => setCurrentPage('inventory')} />
           <NavItem icon="fa-chart-pie" label={t('nav.analysis')} active={currentPage === 'analysis'} expanded={sidebarOpen} onClick={() => setCurrentPage('analysis')} />
           <NavItem icon="fa-handshake" label={t('nav.accounts')} active={currentPage === 'accounts'} expanded={sidebarOpen} onClick={() => setCurrentPage('accounts')} />
           <NavItem icon="fa-wallet" label={t('nav.finance')} active={currentPage === 'finance'} expanded={sidebarOpen} onClick={() => setCurrentPage('finance')} />
@@ -782,7 +782,9 @@ ${contextText}`;
               style={isElectronEnv ? ({ WebkitAppRegion: 'no-drag' } as React.CSSProperties) : undefined}
             >
               <h2 className="text-xl font-semibold text-[#191918]">
-                {t(`headerTitle.${currentPage}`)}
+                {assistantAccLocale === 'US' && currentPage === 'inventory'
+                  ? getTaxLabel(assistantAccLocale, i18n.language, 'invQueryTitle')
+                  : t(`headerTitle.${currentPage}`)}
               </h2>
               <div className="hidden lg:flex items-center space-x-4 pl-4 border-l border-[#e0ddd5]">
                 <div className="flex items-center space-x-2 bg-white rounded-lg p-1 border border-[#e0ddd5]">

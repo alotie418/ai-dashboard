@@ -505,6 +505,7 @@
     "filterInput": "進項明細",
     "filterOutput": "銷項明細",
     "advancedFilter": "高級過濾",
+    "clearAll": "清空篩選",
     "tableTitle": "發票流轉全景視圖",
     "tableSubtitle": "核對發票流與物流的一致性 (Inventory vs Invoices)",
     "export": "匯出報表",

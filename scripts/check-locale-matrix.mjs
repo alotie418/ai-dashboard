@@ -50,7 +50,15 @@ const REQUIRED_TAX_KEYS_BY_LOCALE = {
     'modalTitlePurchase', 'modalSubtitlePurchase',
     'pageTitleSales', 'uploadTitleSales', 'uploadSubtitleSales',
     'emptySales', 'modalTitleSales', 'modalSubtitleSales',
-    'navSales', 'newSaleButton', 'navPurchase'],
+    'navSales', 'newSaleButton', 'navPurchase',
+    'invQueryTitle', 'invSearchPlaceholder', 'invFilterAll', 'invFilterInput',
+    'invFilterOutput', 'invTotalInput', 'invTotalOutput', 'invPendingTax',
+    'invTableTitle', 'invTableSubtitle', 'invHeaderDate', 'invHeaderWeight',
+    'invHeaderAmount', 'invHeaderInvoiceNo', 'invEmpty',
+    'invNoInput', 'invNoOutput',
+    'invDateRange', 'invStatusFilter', 'invWeightRange',
+    'invStatusAll', 'invStatusVerified', 'invStatusCertified', 'invStatusDeducted',
+    'invStatusPendingCert', 'invStatusPendingIssue', 'invStatusIssued'],
 };
 
 // Banned cross-regime terminology
@@ -95,6 +103,9 @@ const REQUIRED_I18N_KEYS = [
   'purchases.notInvoiceWarning',
   'sales.title', 'sales.formCancel', 'sales.formSubmitNew', 'sales.formSubmitEdit',
   'sales.notInvoiceWarning',
+  // invoice-query advanced-filter "clear all" button (was leaking as raw key
+  // invoices.clearAll because it was undefined in every locale file)
+  'invoices.advancedFilter', 'invoices.clearAll',
   // tableHeaders
   'tableHeaders.date', 'tableHeaders.taxAmount', 'tableHeaders.totalTax',
   'tableHeaders.totalWithTax', 'tableHeaders.amountWithoutTax',
@@ -306,11 +317,68 @@ async function main() {
                            'modalTitlePurchase', 'modalSubtitlePurchase',
                            'pageTitleSales', 'uploadTitleSales', 'uploadSubtitleSales',
                            'emptySales', 'modalTitleSales', 'modalSubtitleSales',
-                           'navSales', 'newSaleButton', 'navPurchase']) {
+                           'navSales', 'newSaleButton', 'navPurchase',
+                           'invQueryTitle', 'invSearchPlaceholder', 'invFilterAll', 'invFilterInput',
+                           'invFilterOutput', 'invTotalInput', 'invTotalOutput', 'invPendingTax',
+                           'invTableTitle', 'invTableSubtitle', 'invHeaderDate', 'invHeaderWeight',
+                           'invHeaderAmount', 'invHeaderInvoiceNo', 'invEmpty',
+                           'invNoInput', 'invNoOutput',
+                           'invDateRange', 'invStatusFilter', 'invWeightRange',
+                           'invStatusAll', 'invStatusVerified', 'invStatusCertified', 'invStatusDeducted',
+                           'invStatusPendingCert', 'invStatusPendingIssue', 'invStatusIssued']) {
           const label = helpers.getTaxLabel(accId, uiLang, key);
           for (const pattern of US_FORBIDDEN_CN_TERMS) {
             if (pattern.test(label)) {
               reasons.push(`US ${key}[${uiLang}] uses China-VAT term ${pattern}: "${label}"`);
+            }
+          }
+        }
+        // US advanced-filter labels (票据查询 advanced panel) must not import
+        // CN-VAT-specific wording: invDateRange must not say 开票/開票
+        // (invoice-issuance date), invStatusFilter must not say 发票/發票
+        // (invoice status), invWeightRange must not say 重量/吨/噸 (US ledger
+        // is document-count based, not commodity-weight based).
+        {
+          const dr = helpers.getTaxLabel(accId, uiLang, 'invDateRange');
+          if (/开票|開票/.test(dr)) reasons.push(`US invDateRange[${uiLang}] uses 开票 (CN invoice-issuance wording): "${dr}"`);
+          const sf = helpers.getTaxLabel(accId, uiLang, 'invStatusFilter');
+          if (/发票|發票/.test(sf)) reasons.push(`US invStatusFilter[${uiLang}] uses 发票 (CN VAT-invoice wording): "${sf}"`);
+          const wr = helpers.getTaxLabel(accId, uiLang, 'invWeightRange');
+          if (/重量|吨|噸/.test(wr)) reasons.push(`US invWeightRange[${uiLang}] hardcodes weight/吨: "${wr}"`);
+        }
+        // US document-status filter options must NOT use CN-VAT
+        // 认证/認證/抵扣 (certification/deduction) wording, and must never be a
+        // raw key (this is the dropdown that was leaking invoices.status*).
+        for (const key of ['invStatusAll', 'invStatusVerified', 'invStatusCertified', 'invStatusDeducted',
+                           'invStatusPendingCert', 'invStatusPendingIssue', 'invStatusIssued']) {
+          const v = helpers.getTaxLabel(accId, uiLang, key);
+          if (v === key) reasons.push(`US ${key}[${uiLang}] is a raw key (status dropdown leak): "${v}"`);
+          if (/认证|認證|抵扣/.test(v)) reasons.push(`US ${key}[${uiLang}] uses CN-VAT 认证/抵扣 wording: "${v}"`);
+        }
+        // Exact-string lock-in for the search placeholder + "all documents" tab.
+        // These regressed by silently losing a trailing character (码/据 →
+        // "搜索票据号..." / "全部票"); pin the full expected strings so any future
+        // truncation or rewording fails here. (zh-CN / zh-TW only — these are the
+        // CJK display strings the US localization task fixed.)
+        {
+          const EXPECT = {
+            'zh-CN': {
+              invSearchPlaceholder: '搜索票据号码或往来单位...', invFilterAll: '全部票据',
+              invStatusAll: '全部状态', invStatusVerified: '已核验', invStatusCertified: '已记录',
+              invStatusDeducted: '已处理', invStatusPendingCert: '待处理',
+              invStatusPendingIssue: '待票据', invStatusIssued: '已开票',
+            },
+            'zh-TW': {
+              invSearchPlaceholder: '搜尋票據號碼或往來單位...', invFilterAll: '全部票據',
+              invStatusAll: '全部狀態', invStatusVerified: '已核驗', invStatusCertified: '已記錄',
+              invStatusDeducted: '已處理', invStatusPendingCert: '待處理',
+              invStatusPendingIssue: '待票據', invStatusIssued: '已開票',
+            },
+          };
+          if (EXPECT[uiLang]) {
+            for (const [key, want] of Object.entries(EXPECT[uiLang])) {
+              const got = helpers.getTaxLabel(accId, uiLang, key);
+              if (got !== want) reasons.push(`US ${key}[${uiLang}] should be exactly "${want}", got "${got}"`);
             }
           }
         }

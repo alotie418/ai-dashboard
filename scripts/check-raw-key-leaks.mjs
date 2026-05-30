@@ -171,6 +171,43 @@ async function scanFile(filepath) {
   }
 }
 
+// Cross-check: the invoice-query advanced-filter LABEL keys must resolve in
+// every locale file. A reference to a key that is undefined in JSON renders
+// the raw key in the UI (this is exactly how `invoices.clearAll` leaked — the
+// t() call was correct but the key was missing from every locale file, so a
+// pure source scan could never catch it).
+//
+// Scope note: this guards the advanced-filter LABELS only (the render items in
+// the US invoice-query localization task). It deliberately does NOT guard the
+// status-dropdown OPTION keys (statusVerified/statusCertified/...), the
+// advancedFilterActive count line, or inputRecordCount/outputRecordCount — those
+// are also missing in all locales but carry accountingLocale-vs-uiLanguage
+// semantic decisions (CN-VAT 进项/销项/已认证 wording must differ from US), so
+// they belong to a separate, deliberate localization pass.
+const REQUIRED_INVOICE_LABEL_KEYS = [
+  'advancedFilter', 'clearAll', 'dateRange', 'amountRange',
+  'weightRange', 'statusFilter', 'allStatus', 'min', 'max',
+];
+async function checkInvoiceKeyResolution() {
+  const langs = ['en', 'zh-CN', 'zh-TW', 'ja', 'ko', 'fr'];
+  for (const lang of langs) {
+    const txt = await readFile(join(ROOT, 'i18n/locales', `${lang}.json`), 'utf8');
+    const dict = JSON.parse(txt).invoices || {};
+    for (const key of REQUIRED_INVOICE_LABEL_KEYS) {
+      const v = dict[key];
+      if (v === undefined || (typeof v === 'string' && v.trim() === '')) {
+        findings.push({
+          file: `i18n/locales/${lang}.json`,
+          line: 0,
+          type: 'unresolved-i18n-key',
+          token: `invoices.${key}`,
+          snippet: `advanced-filter label missing/empty in ${lang}.json (would render raw key in UI)`,
+        });
+      }
+    }
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -179,6 +216,7 @@ async function main() {
       await scanFile(f);
     }
   }
+  await checkInvoiceKeyResolution();
 
   console.log(`\n=== Raw Key Leak Scanner ===\n`);
   console.log(`Scanned: ${SCAN_DIRS.join(', ')}`);
