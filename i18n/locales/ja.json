@@ -505,6 +505,7 @@
     "filterInput": "Input (Purchases)",
     "filterOutput": "Output (Sales)",
     "advancedFilter": "Advanced Filter",
+    "clearAll": "フィルターをクリア",
     "tableTitle": "Invoice Flow Overview",
     "tableSubtitle": "Reconcile invoice flow vs. logistics (Inventory vs Invoices)",
     "export": "Export Report",
