@@ -37,6 +37,13 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
   // invoice terminology). usLabel(taxConceptKey, fallbackI18nKey) returns the
   // US taxConcept label when accLocale === 'US', else the default i18n value.
   const usLabel = (taxKey: string, i18nKey: string) => accLocale === 'US' ? taxLabel(taxKey) : t(i18nKey);
+  // Interpolated variant: US taxConcept templates carry a literal {count} token
+  // (getTaxLabel returns a plain string, no i18next interpolation), so substitute
+  // it manually for US; all other locales keep the existing t(key, { count }) path.
+  const usLabelCount = (taxKey: string, i18nKey: string, count: number) =>
+    accLocale === 'US'
+      ? taxLabel(taxKey).replace(/\{count\}/g, String(count))
+      : t(i18nKey, { count });
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<InvoiceType>('all');
@@ -136,9 +143,9 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
       currentStock: formatQuantity(inventoryTons, productUnit, uiLang, 2),
       currentStockSub: t('invoices.stockNormal'),
       totalInputWeight: formatQuantity(totalInputTons, productUnit, uiLang, 1),
-      totalInputSub: purchaseRecords.length > 0 ? t('invoices.inputRecordCount', { count: purchaseRecords.length }) : usLabel('invNoInput', 'invoices.noInput'),
+      totalInputSub: purchaseRecords.length > 0 ? usLabelCount('invInputRecordCount', 'invoices.inputRecordCount', purchaseRecords.length) : usLabel('invNoInput', 'invoices.noInput'),
       totalOutputWeight: formatQuantity(totalOutputTons, productUnit, uiLang, 1),
-      totalOutputSub: salesRecords.length > 0 ? t('invoices.outputRecordCount', { count: salesRecords.length }) : usLabel('invNoOutput', 'invoices.noOutput'),
+      totalOutputSub: salesRecords.length > 0 ? usLabelCount('invOutputRecordCount', 'invoices.outputRecordCount', salesRecords.length) : usLabel('invNoOutput', 'invoices.noOutput'),
       pendingCertification: fmtMoney(pendingTax),
     };
   }, [salesRecords, purchaseRecords, accLocale, uiLang]);
@@ -286,7 +293,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                 {hasAdvancedFilters && (
                   <span className="flex items-center">
                     <i className="fas fa-info-circle mr-1.5 text-[#d97757]"></i>
-                    {t('invoices.advancedFilterActive', { count: filteredInvoices.length })}
+                    {usLabelCount('invAdvFilterActive', 'invoices.advancedFilterActive', filteredInvoices.length)}
                   </span>
                 )}
               </div>
