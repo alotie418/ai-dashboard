@@ -10,6 +10,7 @@ import {
   type Transaction, type TransactionUpsert, type TransactionSummary, type Category,
   type AccountingLocale, type TransactionType,
 } from '../services/api';
+import { getTaxLabel } from './accountingHelpers';
 
 const TransactionsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -120,6 +121,11 @@ const TransactionsPage: React.FC = () => {
   };
 
   const fmt = (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // US accountingLocale labels the report-line column as 账户 (the Schedule C
+  // line is effectively the expense account); other locales keep the existing
+  // transactions.scheduleLine value via the default fallback.
+  const usLabel = (taxKey: string, i18nKey: string, fallback: string) =>
+    locale === 'US' ? getTaxLabel(locale, lang, taxKey) : t(i18nKey, fallback);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -178,7 +184,7 @@ const TransactionsPage: React.FC = () => {
                 <th className="text-left px-4 py-2.5">{t('tableHeaders.date')}</th>
                 <th className="text-left px-4 py-2.5">{activeType === 'income' ? t('tableHeaders.customer') : t('tableHeaders.supplier')}</th>
                 <th className="text-left px-4 py-2.5">{t('transactions.category', 'Category')}</th>
-                <th className="text-left px-4 py-2.5">{t('transactions.scheduleLine', 'Report Line')}</th>
+                <th className="text-left px-4 py-2.5">{usLabel('txnAccountHeader', 'transactions.scheduleLine', 'Report Line')}</th>
                 <th className="text-right px-4 py-2.5">{t('transactions.amount', 'Amount')}</th>
                 <th className="text-left px-4 py-2.5">{t('tableHeaders.status')}</th>
                 <th className="text-right px-4 py-2.5">{t('tableHeaders.action')}</th>

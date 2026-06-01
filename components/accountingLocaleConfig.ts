@@ -181,6 +181,9 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       balLiabEquityHeader:{ 'zh-CN': '负债和所有者权益', 'zh-TW': '負債和所有者權益', en: 'Liabilities & Equity', ja: '負債及び純資産', ko: '부채 및 자본', fr: 'Passif' },
       balTotalLiabEquity: { 'zh-CN': '负债和所有者权益总计', 'zh-TW': '負債和所有者權益總計', en: 'Total Liabilities & Equity', ja: '負債及び純資産合計', ko: '부채 및 자본 총계', fr: 'Total passif' },
       balCashflowAdd:     { 'zh-CN': '添加收支记录', 'zh-TW': '新增收支記錄', en: 'Add Transaction', ja: '取引を追加', ko: '거래 추가', fr: 'Ajouter une opération' },
+      // Transactions (收支记录) page — the report-line column reads as 账户
+      // (the Schedule C line is the US expense account); US only.
+      txnAccountHeader:   { 'zh-CN': '账户', 'zh-TW': '帳戶', en: 'Account', ja: '勘定科目', ko: '계정', fr: 'Compte' },
       newSaleButton:      { 'zh-CN': '新增销售记录', 'zh-TW': '新增銷售記錄', en: 'New Sale', ja: '売上を追加', ko: '매출 추가', fr: 'Nouvelle vente' },
       invoiceInputLabel: { 'zh-CN': '费用凭证数', 'zh-TW': '費用憑證數', en: 'Expense Receipts', ja: '経費レシート', ko: '비용 영수증', fr: 'Reçus de dépenses' },
       invoiceOutputLabel: { 'zh-CN': '收入凭证数', 'zh-TW': '收入憑證數', en: 'Income Receipts', ja: '収入レシート', ko: '수입 영수증', fr: 'Reçus de revenus' },

@@ -62,7 +62,8 @@ const REQUIRED_TAX_KEYS_BY_LOCALE = {
     'invAdvFilterActive', 'invInputRecordCount', 'invOutputRecordCount',
     'acctReceivableTab', 'acctPayableTab', 'acctTotalReceivable', 'acctTotalPayable',
     'balRecvLabel', 'balPayLabel', 'balTaxPayLabel', 'balPaidInCapital',
-    'balRetainedEarnings', 'balLiabEquityHeader', 'balTotalLiabEquity', 'balCashflowAdd'],
+    'balRetainedEarnings', 'balLiabEquityHeader', 'balTotalLiabEquity', 'balCashflowAdd',
+    'txnAccountHeader'],
 };
 
 // Banned cross-regime terminology
@@ -333,7 +334,8 @@ async function main() {
                            'invAdvFilterActive', 'invInputRecordCount', 'invOutputRecordCount',
                            'acctReceivableTab', 'acctPayableTab', 'acctTotalReceivable', 'acctTotalPayable',
                            'balRecvLabel', 'balPayLabel', 'balTaxPayLabel', 'balPaidInCapital',
-                           'balRetainedEarnings', 'balLiabEquityHeader', 'balTotalLiabEquity', 'balCashflowAdd']) {
+                           'balRetainedEarnings', 'balLiabEquityHeader', 'balTotalLiabEquity', 'balCashflowAdd',
+                           'txnAccountHeader']) {
           const label = helpers.getTaxLabel(accId, uiLang, key);
           for (const pattern of US_FORBIDDEN_CN_TERMS) {
             if (pattern.test(label)) {
@@ -399,6 +401,7 @@ async function main() {
               balLiabEquityHeader: '负债和所有者权益', balTotalLiabEquity: '负债和所有者权益总计',
               balCashflowAdd: '添加收支记录',
               kpiGrossIncome: '总收入',
+              txnAccountHeader: '账户',
             },
             'zh-TW': {
               invSearchPlaceholder: '搜尋票據號碼或往來單位...', invFilterAll: '全部票據',
@@ -415,6 +418,7 @@ async function main() {
               balLiabEquityHeader: '負債和所有者權益', balTotalLiabEquity: '負債和所有者權益總計',
               balCashflowAdd: '新增收支記錄',
               kpiGrossIncome: '總收入',
+              txnAccountHeader: '帳戶',
             },
           };
           if (EXPECT[uiLang]) {
