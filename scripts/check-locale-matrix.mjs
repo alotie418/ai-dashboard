@@ -137,6 +137,7 @@ const REQUIRED_I18N_KEYS = [
   'usTax.totalTrips', 'usTax.totalMiles', 'usTax.deduction', 'usTax.addTrip',
   'usTax.newTrip', 'usTax.miles', 'usTax.from', 'usTax.to', 'usTax.purpose',
   'usTax.roundTrip', 'usTax.route', 'usTax.deductionShort', 'usTax.noTrips',
+  'usTax.fromPlaceholder', 'usTax.toPlaceholder', 'usTax.purposePlaceholder', 'usTax.milesPlaceholder',
   'usTax.mileageNote', 'usTax.homeOfficeDeduction', 'usTax.scheduleC30',
   'usTax.simplified', 'usTax.actual', 'usTax.simplifiedTitle', 'usTax.officeSqft',
   'usTax.ratePerSqft', 'usTax.simplifiedCalc', 'usTax.actualTitle',
@@ -781,6 +782,55 @@ async function main() {
         }
       }
       if (reasons.length) fail(`scheduleCWording:${lang}`, reasons); else pass(`scheduleCWording:${lang}`);
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // PART G0c: US Tax Tools (usTax.*) wording lock-in.
+  //   Page renders only under accountingLocale=US (defensive guard otherwise).
+  //   - use 扣除/扣除额, never 抵扣 (抵扣 reads as CN-VAT credit wording)
+  //   - mileage-form placeholders must be localized (no English in zh-CN/zh-TW)
+  //   - keep official form names in canonical case (no all-caps SCHEDULE C /
+  //     FORM 8829 in the string data; CSS uppercasing was removed in the page)
+  // ────────────────────────────────────────────────
+  {
+    const US_TAX_PIN = {
+      'zh-CN': {
+        'usTax.deduction': '扣除额（Schedule C 第 9 行）', 'usTax.deductionShort': '扣除额',
+        'usTax.homeOfficeDeduction': '家庭办公室扣除（Form 8829）',
+        'usTax.fromPlaceholder': '办公室', 'usTax.toPlaceholder': '客户地点', 'usTax.purposePlaceholder': '例如：拜访客户',
+      },
+      'zh-TW': {
+        'usTax.deduction': '扣除額（Schedule C 第 9 行）', 'usTax.deductionShort': '扣除額',
+        'usTax.homeOfficeDeduction': '家庭辦公室扣除（Form 8829）',
+        'usTax.fromPlaceholder': '辦公室', 'usTax.toPlaceholder': '客戶地點', 'usTax.purposePlaceholder': '例如：拜訪客戶',
+      },
+    };
+    for (const [lang, pins] of Object.entries(US_TAX_PIN)) {
+      const reasons = [];
+      for (const [path, want] of Object.entries(pins)) {
+        const got = get(locales[lang], path);
+        if (got !== want) reasons.push(`${path} should be "${want}", got "${got}"`);
+      }
+      // unify on 扣除 — these labels/notes must not use 抵扣
+      for (const path of ['usTax.deduction', 'usTax.deductionShort', 'usTax.homeOfficeDeduction', 'usTax.mileageNote']) {
+        const got = get(locales[lang], path);
+        if (typeof got === 'string' && /抵扣/.test(got)) reasons.push(`${path} uses 抵扣 (should be 扣除): "${got}"`);
+      }
+      // zh placeholders must not contain English letters
+      for (const path of ['usTax.fromPlaceholder', 'usTax.toPlaceholder', 'usTax.purposePlaceholder', 'usTax.milesPlaceholder']) {
+        const got = get(locales[lang], path);
+        if (typeof got === 'string' && /[A-Za-z]/.test(got)) reasons.push(`${path} contains English in ${lang}: "${got}"`);
+      }
+      // official form names must stay canonical case in the string data
+      for (const path of ['usTax.deduction', 'usTax.homeOfficeDeduction', 'usTax.scheduleC30', 'usTax.mileageNote', 'usTax.homeOfficeNote']) {
+        const got = get(locales[lang], path);
+        if (typeof got === 'string') {
+          if (/SCHEDULE C/.test(got)) reasons.push(`${path} has all-caps SCHEDULE C: "${got}"`);
+          if (/FORM 8829/.test(got)) reasons.push(`${path} has all-caps FORM 8829: "${got}"`);
+        }
+      }
+      if (reasons.length) fail(`usTaxWording:${lang}`, reasons); else pass(`usTaxWording:${lang}`);
     }
   }
 

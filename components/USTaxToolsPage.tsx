@@ -101,7 +101,7 @@ const MileageSection: React.FC = () => {
             <p className="text-2xl font-bold text-[#191918] mt-1">{summary.totalMiles.toLocaleString()}</p>
           </div>
           <div className="bg-white/80 border border-[#e0ddd5] p-5 rounded-xl">
-            <p className="text-[10px] uppercase tracking-widest text-[#5c5c5a] font-bold">{t('usTax.deduction', 'Deduction (Sch C Line 9)')}</p>
+            <p className="text-[10px] tracking-widest text-[#5c5c5a] font-bold">{t('usTax.deduction', 'Deduction (Sch C Line 9)')}</p>
             <p className="text-2xl font-bold text-emerald-600 mt-1">${summary.totalDeduction.toLocaleString()}</p>
           </div>
         </div>
@@ -122,20 +122,20 @@ const MileageSection: React.FC = () => {
             </div>
             <div>
               <label className="block text-xs font-medium text-[#4a4a48] mb-1">{t('usTax.miles', 'Miles')}</label>
-              <input type="number" step="0.1" value={form.miles} onChange={e => setForm(f => ({ ...f, miles: e.target.value }))} placeholder="e.g. 25.3" className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm" />
+              <input type="number" step="0.1" value={form.miles} onChange={e => setForm(f => ({ ...f, miles: e.target.value }))} placeholder={t('usTax.milesPlaceholder', 'e.g. 25.3')} className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm" />
             </div>
             <div>
               <label className="block text-xs font-medium text-[#4a4a48] mb-1">{t('usTax.from', 'From')}</label>
-              <input type="text" value={form.start_location} onChange={e => setForm(f => ({ ...f, start_location: e.target.value }))} placeholder="Office" className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm" />
+              <input type="text" value={form.start_location} onChange={e => setForm(f => ({ ...f, start_location: e.target.value }))} placeholder={t('usTax.fromPlaceholder', 'Office')} className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm" />
             </div>
             <div>
               <label className="block text-xs font-medium text-[#4a4a48] mb-1">{t('usTax.to', 'To')}</label>
-              <input type="text" value={form.end_location} onChange={e => setForm(f => ({ ...f, end_location: e.target.value }))} placeholder="Client site" className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm" />
+              <input type="text" value={form.end_location} onChange={e => setForm(f => ({ ...f, end_location: e.target.value }))} placeholder={t('usTax.toPlaceholder', 'Client site')} className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm" />
             </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-[#4a4a48] mb-1">{t('usTax.purpose', 'Business Purpose')}</label>
-            <input type="text" value={form.purpose} onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))} placeholder="e.g. Client meeting" className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm" />
+            <input type="text" value={form.purpose} onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))} placeholder={t('usTax.purposePlaceholder', 'e.g. Client meeting')} className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm" />
           </div>
           <label className="flex items-center space-x-2 text-sm text-[#4a4a48]">
             <input type="checkbox" checked={form.round_trip} onChange={e => setForm(f => ({ ...f, round_trip: e.target.checked }))} className="rounded" />
@@ -218,7 +218,7 @@ const HomeOfficeSection: React.FC = () => {
     <div className="space-y-6">
       {/* Deduction Result Card */}
       <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center">
-        <p className="text-[10px] uppercase tracking-widest text-emerald-700 font-bold">{t('usTax.homeOfficeDeduction', 'Home Office Deduction (Form 8829)')}</p>
+        <p className="text-[10px] tracking-widest text-emerald-700 font-bold">{t('usTax.homeOfficeDeduction', 'Home Office Deduction (Form 8829)')}</p>
         <p className="text-3xl font-bold text-emerald-600 mt-2">${data.deduction.toLocaleString()}</p>
         <p className="text-xs text-emerald-600/70 mt-1">{t('usTax.scheduleC30', 'Schedule C Line 30')}</p>
       </div>
