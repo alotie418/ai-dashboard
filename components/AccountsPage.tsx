@@ -59,11 +59,12 @@ const AccountsPage: React.FC = () => {
   const [accLocale, setAccLocale] = useState('CN');
   useEffect(() => { fetchSettings().then((s: any) => { if (s.accounting_locale) setAccLocale(s.accounting_locale); }).catch(() => {}); }, []);
   const formatCurrency = (val: number) => formatMoney(val, accLocale);
-  // US accountingLocale uses customer/supplier framing for receivables/payables
-  // instead of the traditional Chinese 应收账款/应付账款 ledger terms.
-  // usLabel(taxConceptKey, fallbackI18nKey) returns the US taxConcept when
-  // accLocale === 'US', else the default i18n value (CN/EU/JP/KR/TW unchanged).
-  const usLabel = (taxKey: string, i18nKey: string) => accLocale === 'US' ? getTaxLabel(accLocale, i18n.language, taxKey) : t(i18nKey);
+  // All non-CN accountingLocales (US/JP/KR/TW/EU) frame receivables/payables by
+  // customer/supplier instead of the China-GAAP 应收账款/应付账款 ledger terms.
+  // localeLabel(taxConceptKey, fallbackI18nKey) returns the accountingLocale's
+  // taxConcept when accLocale !== 'CN', else the default i18n value (CN keeps its
+  // China-GAAP wording untouched).
+  const localeLabel = (taxKey: string, i18nKey: string) => accLocale !== 'CN' ? getTaxLabel(accLocale, i18n.language, taxKey) : t(i18nKey);
 
   const data = activeTab === 'receivable' ? receivables : payables;
   const agingData = data ? [
@@ -90,13 +91,13 @@ const AccountsPage: React.FC = () => {
           onClick={() => setActiveTab('receivable')}
           className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'receivable' ? 'bg-white text-[#d97757] shadow-sm' : 'text-[#7a7a78] hover:text-[#191918]'}`}
         >
-          <i className="fas fa-arrow-circle-down mr-1.5"></i>{usLabel('acctReceivableTab', 'accounts.receivable')}
+          <i className="fas fa-arrow-circle-down mr-1.5"></i>{localeLabel('acctReceivableTab', 'accounts.receivable')}
         </button>
         <button
           onClick={() => setActiveTab('payable')}
           className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'payable' ? 'bg-white text-[#d97757] shadow-sm' : 'text-[#7a7a78] hover:text-[#191918]'}`}
         >
-          <i className="fas fa-arrow-circle-up mr-1.5"></i>{usLabel('acctPayableTab', 'accounts.payable')}
+          <i className="fas fa-arrow-circle-up mr-1.5"></i>{localeLabel('acctPayableTab', 'accounts.payable')}
         </button>
       </div>
 
@@ -109,7 +110,7 @@ const AccountsPage: React.FC = () => {
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-xl p-4 border border-[#e0ddd5]">
-              <p className="text-xs text-[#7a7a78] mb-1">{activeTab === 'receivable' ? usLabel('acctTotalReceivable', 'accounts.totalReceivable') : usLabel('acctTotalPayable', 'accounts.totalPayable')}</p>
+              <p className="text-xs text-[#7a7a78] mb-1">{activeTab === 'receivable' ? localeLabel('acctTotalReceivable', 'accounts.totalReceivable') : localeLabel('acctTotalPayable', 'accounts.totalPayable')}</p>
               <p className="text-xl font-bold text-[#191918]">{formatCurrency(totalAmount || 0)}</p>
             </div>
             <div className="bg-white rounded-xl p-4 border border-[#e0ddd5]">

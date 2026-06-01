@@ -78,10 +78,12 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
       : t('header.yearLabel', { year: selectedYear });
 
   const fmt = (v: number) => formatMoney(v, locale, i18n.language);
-  // US accountingLocale shows US-style balance-sheet / cash-flow wording
-  // (customer/supplier framing, owner's-equity terms) while CN/EU/JP/KR/TW keep
-  // their existing finance.* i18n values (and the zh-CN GAAP lock-in) untouched.
-  const usLabel = (taxKey: string, i18nKey: string) => locale === 'US' ? getTaxLabel(locale, i18n.language, taxKey) : t(i18nKey);
+  // All non-CN accountingLocales (US/JP/KR/TW/EU) show generic balance-sheet /
+  // cash-flow wording (customer/supplier framing, owner's-equity terms) instead
+  // of China-GAAP 应收账款/应付账款/应交税费/实收资本/未分配利润. Only CN keeps its
+  // finance.* i18n values (and the zh-CN GAAP lock-in) untouched. The P&L lines
+  // and tax summary already resolve per accountingLocale via getTaxLabel.
+  const localeLabel = (taxKey: string, i18nKey: string) => locale !== 'CN' ? getTaxLabel(locale, i18n.language, taxKey) : t(i18nKey);
 
   // Export CSV
   const exportCSV = () => {
@@ -224,7 +226,7 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
               <div className="space-y-1">
                 <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2">{t('finance.balanceCurrentAssets')}</h4>
                 <LineItem label={t('finance.balanceCash')} value={0.0} />
-                <LineItem label={usLabel('balRecvLabel', 'finance.balanceReceivables')} value={0.0} />
+                <LineItem label={localeLabel('balRecvLabel', 'finance.balanceReceivables')} value={0.0} />
                 <LineItem label={t('finance.balanceInventory')} value={0.0} />
                 <div className="border-t border-[#e0ddd5] my-4"></div>
                 <LineItem label={t('finance.balanceCurrentAssetsTotal')} value={0.0} bold />
@@ -236,19 +238,19 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
             </div>
             <div className="p-10 bg-[#f9f9f8]/20">
               <h3 className="text-lg font-bold text-[#191918] mb-6 flex items-center">
-                <i className="fas fa-hand-holding-dollar mr-3 text-rose-500"></i> {usLabel('balLiabEquityHeader', 'finance.balanceLiabilitiesEquity')}
+                <i className="fas fa-hand-holding-dollar mr-3 text-rose-500"></i> {localeLabel('balLiabEquityHeader', 'finance.balanceLiabilitiesEquity')}
               </h3>
               <div className="space-y-1">
                 <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2">{t('finance.balanceCurrentLiabilities')}</h4>
-                <LineItem label={usLabel('balPayLabel', 'finance.balancePayables')} value={0.0} />
-                <LineItem label={usLabel('balTaxPayLabel', 'finance.balanceTaxPayable')} value={0.0} />
+                <LineItem label={localeLabel('balPayLabel', 'finance.balancePayables')} value={0.0} />
+                <LineItem label={localeLabel('balTaxPayLabel', 'finance.balanceTaxPayable')} value={0.0} />
                 <div className="border-t border-[#e0ddd5] my-4"></div>
                 <LineItem label={t('finance.balanceTotalLiabilities')} value={0.0} bold />
                 <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2 mt-4">{t('finance.balanceEquity')}</h4>
-                <LineItem label={usLabel('balPaidInCapital', 'finance.balancePaidInCapital')} value={0.0} />
-                <LineItem label={usLabel('balRetainedEarnings', 'finance.balanceRetainedEarnings')} value={0.0} />
+                <LineItem label={localeLabel('balPaidInCapital', 'finance.balancePaidInCapital')} value={0.0} />
+                <LineItem label={localeLabel('balRetainedEarnings', 'finance.balanceRetainedEarnings')} value={0.0} />
                 <div className="border-t border-[#e0ddd5] my-4"></div>
-                <LineItem label={usLabel('balTotalLiabEquity', 'finance.balanceTotalLiabilitiesEquity')} value={0.0} bold primary />
+                <LineItem label={localeLabel('balTotalLiabEquity', 'finance.balanceTotalLiabilitiesEquity')} value={0.0} bold primary />
               </div>
             </div>
           </div>
@@ -261,7 +263,7 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
             <h3 className="text-xl font-medium">{t('finance.cashflowTitle')}</h3>
             <p className="mt-2 text-sm max-w-md">{t('finance.cashflowDesc')}</p>
             <button className="mt-8 px-6 py-2 bg-[#f9f9f8] rounded-xl text-sm hover:text-[#191918] transition-colors border border-[#e0ddd5]">
-              {usLabel('balCashflowAdd', 'finance.cashflowSync')}
+              {localeLabel('balCashflowAdd', 'finance.cashflowSync')}
             </button>
           </div>
         )}

@@ -84,6 +84,24 @@ const NON_CN_GENERIC: Record<string, TaxConceptLabels> = {
   invHeaderAmount:    { 'zh-CN': '金额', 'zh-TW': '金額', en: 'Amount', ja: '金額', ko: '금액', fr: 'Montant' },
   invHeaderInvoiceNo: { 'zh-CN': '票据号码', 'zh-TW': '票據號碼', en: 'Document #', ja: '伝票番号', ko: '문서 번호', fr: 'N° de pièce' },
   invEmpty:           { 'zh-CN': '未找到匹配的票据记录', 'zh-TW': '未找到匹配的票據記錄', en: 'No matching documents found', ja: '一致する伝票が見つかりません', ko: '일치하는 문서가 없습니다', fr: 'Aucune pièce correspondante' },
+  // ── Accounts (应收应付) + Finance balance-sheet wording ──
+  // Non-CN frames AR/AP by customer/supplier and uses owner's-equity terms
+  // instead of China-GAAP 应收账款/应付账款/应交税费/实收资本/未分配利润. zh-CN/
+  // zh-TW carry the agreed generic wording; en/ja/ko/fr match the finance.*
+  // accounting terms so only the Chinese UI changes. (Values mirror the US
+  // inline block, which is not spread from this base.)
+  acctReceivableTab:  { 'zh-CN': '客户应收', 'zh-TW': '客戶應收', en: 'Customer Receivables', ja: '顧客売掛金', ko: '고객 미수금', fr: 'Créances clients' },
+  acctPayableTab:     { 'zh-CN': '供应商应付', 'zh-TW': '供應商應付', en: 'Supplier Payables', ja: '仕入先買掛金', ko: '공급업체 미지급금', fr: 'Dettes fournisseurs' },
+  acctTotalReceivable:{ 'zh-CN': '客户应收总额', 'zh-TW': '客戶應收總額', en: 'Total Customer Receivables', ja: '売掛金合計', ko: '고객 미수금 합계', fr: 'Total créances clients' },
+  acctTotalPayable:   { 'zh-CN': '供应商应付总额', 'zh-TW': '供應商應付總額', en: 'Total Supplier Payables', ja: '買掛金合計', ko: '공급업체 미지급금 합계', fr: 'Total dettes fournisseurs' },
+  balRecvLabel:       { 'zh-CN': '客户应收', 'zh-TW': '客戶應收', en: 'Accounts Receivable', ja: '売掛金', ko: '매출채권', fr: 'Créances clients' },
+  balPayLabel:        { 'zh-CN': '供应商应付', 'zh-TW': '供應商應付', en: 'Accounts Payable', ja: '買掛金', ko: '매입채무', fr: 'Dettes fournisseurs' },
+  balTaxPayLabel:     { 'zh-CN': '应付税款', 'zh-TW': '應付稅款', en: 'Tax Payable', ja: '未払税金', ko: '미지급세금', fr: 'Dettes fiscales' },
+  balPaidInCapital:   { 'zh-CN': '所有者投入', 'zh-TW': '所有者投入', en: 'Paid-in Capital', ja: '資本金', ko: '납입자본금', fr: 'Capital social' },
+  balRetainedEarnings:{ 'zh-CN': '留存收益', 'zh-TW': '留存收益', en: 'Retained Earnings', ja: '利益剰余金', ko: '이익잉여금', fr: 'Résultat reporté' },
+  balLiabEquityHeader:{ 'zh-CN': '负债和所有者权益', 'zh-TW': '負債和所有者權益', en: 'Liabilities & Equity', ja: '負債及び純資産', ko: '부채 및 자본', fr: 'Passif' },
+  balTotalLiabEquity: { 'zh-CN': '负债和所有者权益总计', 'zh-TW': '負債和所有者權益總計', en: 'Total Liabilities & Equity', ja: '負債及び純資産合計', ko: '부채 및 자본 총계', fr: 'Total passif' },
+  balCashflowAdd:     { 'zh-CN': '添加收支记录', 'zh-TW': '新增收支記錄', en: 'Add Transaction', ja: '取引を追加', ko: '거래 추가', fr: 'Ajouter une opération' },
 };
 
 // ─── 6 国配置 ───
