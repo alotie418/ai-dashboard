@@ -164,6 +164,12 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       invAdvFilterActive: { 'zh-CN': '已启用筛选，找到 {count} 条票据记录', 'zh-TW': '已啟用篩選，找到 {count} 筆票據記錄', en: 'Filter active — {count} document(s) found', ja: 'フィルター適用中 — {count} 件の伝票', ko: '필터 적용됨 — 문서 {count}건', fr: 'Filtre actif — {count} pièce(s)' },
       invInputRecordCount:{ 'zh-CN': '{count} 条采购/费用记录', 'zh-TW': '{count} 筆採購/費用記錄', en: '{count} purchase/expense record(s)', ja: '仕入・経費 {count} 件', ko: '매입/비용 {count}건', fr: '{count} achat(s)/dépense(s)' },
       invOutputRecordCount:{ 'zh-CN': '{count} 条销售/收入记录', 'zh-TW': '{count} 筆銷售/收入記錄', en: '{count} sales/revenue record(s)', ja: '売上・収入 {count} 件', ko: '매출/수입 {count}건', fr: '{count} vente(s)/revenu(s)' },
+      // Accounts (应收应付) page — US frames receivables/payables by customer/
+      // supplier rather than the traditional 应收账款/应付账款 ledger terms.
+      acctReceivableTab:  { 'zh-CN': '客户应收', 'zh-TW': '客戶應收', en: 'Customer Receivables', ja: '顧客売掛金', ko: '고객 미수금', fr: 'Créances clients' },
+      acctPayableTab:     { 'zh-CN': '供应商应付', 'zh-TW': '供應商應付', en: 'Supplier Payables', ja: '仕入先買掛金', ko: '공급업체 미지급금', fr: 'Dettes fournisseurs' },
+      acctTotalReceivable:{ 'zh-CN': '客户应收总额', 'zh-TW': '客戶應收總額', en: 'Total Customer Receivables', ja: '売掛金合計', ko: '고객 미수금 합계', fr: 'Total créances clients' },
+      acctTotalPayable:   { 'zh-CN': '供应商应付总额', 'zh-TW': '供應商應付總額', en: 'Total Supplier Payables', ja: '買掛金合計', ko: '공급업체 미지급금 합계', fr: 'Total dettes fournisseurs' },
       newSaleButton:      { 'zh-CN': '新增销售记录', 'zh-TW': '新增銷售記錄', en: 'New Sale', ja: '売上を追加', ko: '매출 추가', fr: 'Nouvelle vente' },
       invoiceInputLabel: { 'zh-CN': '费用凭证数', 'zh-TW': '費用憑證數', en: 'Expense Receipts', ja: '経費レシート', ko: '비용 영수증', fr: 'Reçus de dépenses' },
       invoiceOutputLabel: { 'zh-CN': '收入凭证数', 'zh-TW': '收入憑證數', en: 'Income Receipts', ja: '収入レシート', ko: '수입 영수증', fr: 'Reçus de revenus' },
