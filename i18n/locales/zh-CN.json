@@ -754,10 +754,10 @@
     "balanceLiabilitiesEquity": "负债与权益"
   },
   "usSchedule": {
-    "line1": "Line 1 — 营业总收入",
+    "line1": "Line 1 — 总收入或销售额",
     "line2": "Line 2 — 退货与折让",
     "line6": "Line 6 — 其他收入",
-    "line7": "Line 7 — 营业总所得",
+    "line7": "Line 7 — 总收入",
     "line8": "Line 8 — 广告费",
     "line9": "Line 9 — 车辆费用",
     "line10": "Line 10 — 佣金",

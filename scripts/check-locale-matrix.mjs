@@ -60,7 +60,9 @@ const REQUIRED_TAX_KEYS_BY_LOCALE = {
     'invStatusAll', 'invStatusVerified', 'invStatusCertified', 'invStatusDeducted',
     'invStatusPendingCert', 'invStatusPendingIssue', 'invStatusIssued',
     'invAdvFilterActive', 'invInputRecordCount', 'invOutputRecordCount',
-    'acctReceivableTab', 'acctPayableTab', 'acctTotalReceivable', 'acctTotalPayable'],
+    'acctReceivableTab', 'acctPayableTab', 'acctTotalReceivable', 'acctTotalPayable',
+    'balRecvLabel', 'balPayLabel', 'balTaxPayLabel', 'balPaidInCapital',
+    'balRetainedEarnings', 'balLiabEquityHeader', 'balTotalLiabEquity', 'balCashflowAdd'],
 };
 
 // Banned cross-regime terminology
@@ -329,7 +331,9 @@ async function main() {
                            'invStatusAll', 'invStatusVerified', 'invStatusCertified', 'invStatusDeducted',
                            'invStatusPendingCert', 'invStatusPendingIssue', 'invStatusIssued',
                            'invAdvFilterActive', 'invInputRecordCount', 'invOutputRecordCount',
-                           'acctReceivableTab', 'acctPayableTab', 'acctTotalReceivable', 'acctTotalPayable']) {
+                           'acctReceivableTab', 'acctPayableTab', 'acctTotalReceivable', 'acctTotalPayable',
+                           'balRecvLabel', 'balPayLabel', 'balTaxPayLabel', 'balPaidInCapital',
+                           'balRetainedEarnings', 'balLiabEquityHeader', 'balTotalLiabEquity', 'balCashflowAdd']) {
           const label = helpers.getTaxLabel(accId, uiLang, key);
           for (const pattern of US_FORBIDDEN_CN_TERMS) {
             if (pattern.test(label)) {
@@ -390,6 +394,11 @@ async function main() {
               invOutputRecordCount: '{count} 条销售/收入记录',
               acctReceivableTab: '客户应收', acctPayableTab: '供应商应付',
               acctTotalReceivable: '客户应收总额', acctTotalPayable: '供应商应付总额',
+              balRecvLabel: '客户应收', balPayLabel: '供应商应付', balTaxPayLabel: '应付税款',
+              balPaidInCapital: '所有者投入', balRetainedEarnings: '留存收益',
+              balLiabEquityHeader: '负债和所有者权益', balTotalLiabEquity: '负债和所有者权益总计',
+              balCashflowAdd: '添加收支记录',
+              kpiGrossIncome: '总收入',
             },
             'zh-TW': {
               invSearchPlaceholder: '搜尋票據號碼或往來單位...', invFilterAll: '全部票據',
@@ -401,6 +410,11 @@ async function main() {
               invOutputRecordCount: '{count} 筆銷售/收入記錄',
               acctReceivableTab: '客戶應收', acctPayableTab: '供應商應付',
               acctTotalReceivable: '客戶應收總額', acctTotalPayable: '供應商應付總額',
+              balRecvLabel: '客戶應收', balPayLabel: '供應商應付', balTaxPayLabel: '應付稅款',
+              balPaidInCapital: '所有者投入', balRetainedEarnings: '留存收益',
+              balLiabEquityHeader: '負債和所有者權益', balTotalLiabEquity: '負債和所有者權益總計',
+              balCashflowAdd: '新增收支記錄',
+              kpiGrossIncome: '總收入',
             },
           };
           if (EXPECT[uiLang]) {
@@ -735,6 +749,35 @@ async function main() {
       }
     }
     if (reasons.length) fail(`i18nKeys:${lang}`, reasons); else pass(`i18nKeys:${lang}`);
+  }
+
+  // ────────────────────────────────────────────────
+  // PART G0b: US Schedule C line 1 / line 7 wording lock-in.
+  //   These i18n keys only render under accountingLocale=US (the Schedule C
+  //   P&L view), so they carry US gross-receipts / gross-income wording, not
+  //   the Chinese 营业总收入/营业总所得 phrasing. Pin the zh-CN/zh-TW strings so
+  //   they can't drift back. (en/ja/ko/fr are left to the presence check above.)
+  // ────────────────────────────────────────────────
+  {
+    const SCHED_C_PIN = {
+      'zh-CN': { 'usSchedule.line1': 'Line 1 — 总收入或销售额', 'usSchedule.line7': 'Line 7 — 总收入' },
+      'zh-TW': { 'usSchedule.line1': 'Line 1 — 總收入或銷售額', 'usSchedule.line7': 'Line 7 — 總收入' },
+    };
+    for (const [lang, pins] of Object.entries(SCHED_C_PIN)) {
+      const reasons = [];
+      for (const [path, want] of Object.entries(pins)) {
+        const got = get(locales[lang], path);
+        if (got !== want) reasons.push(`${path} should be "${want}", got "${got}"`);
+      }
+      // must NOT revert to the old 营业 phrasing
+      for (const path of ['usSchedule.line1', 'usSchedule.line7']) {
+        const got = get(locales[lang], path);
+        if (typeof got === 'string' && /营业总|營業總/.test(got)) {
+          reasons.push(`${path} uses old 营业总 phrasing: "${got}"`);
+        }
+      }
+      if (reasons.length) fail(`scheduleCWording:${lang}`, reasons); else pass(`scheduleCWording:${lang}`);
+    }
   }
 
   // ────────────────────────────────────────────────
