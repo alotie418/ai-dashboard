@@ -966,6 +966,54 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0f: Non-CN generic business taxConcepts (PR-A shared base).
+  //   The nav / page-title / upload / table-header / modal / button / empty /
+  //   invoice-query-basics labels must be present for every non-CN locale
+  //   (US/JP/KR/TW/EU) and, under zh-CN/zh-TW, must NOT carry China-VAT wording
+  //   (采购与进项 / 销售与销项 / 发票查询 / 进项 / 销项 / 电子发票 / 发票号码 /
+  //   增值税). CN is exempt (its VAT wording is intended).
+  // ────────────────────────────────────────────────
+  {
+    const GENERIC_KEYS = [
+      'navPurchase', 'navSales', 'invQueryTitle', 'pageTitlePurchase', 'pageTitleSales',
+      'uploadTitle', 'uploadSubtitle', 'uploadTitleSales', 'uploadSubtitleSales',
+      'headerUnitPrice', 'headerAmount', 'headerTaxAmount', 'headerTotalWithTax', 'headerInvoiceNo',
+      'modalTitlePurchase', 'modalSubtitlePurchase', 'modalTitleSales', 'modalSubtitleSales',
+      'newPurchaseButton', 'newSaleButton', 'emptyPurchase', 'emptySales',
+      'invSearchPlaceholder', 'invFilterAll', 'invFilterInput', 'invFilterOutput',
+      'invTableTitle', 'invTableSubtitle', 'invHeaderDate', 'invHeaderWeight',
+      'invHeaderAmount', 'invHeaderInvoiceNo', 'invEmpty',
+    ];
+    const CN_VAT_BAN = /采购与进项|採購與進項|销售与销项|銷售與銷項|发票查询|發票查詢|进项|進項|销项|銷項|电子发票|電子發票|发票号码|發票號碼|增值税|增值稅/;
+    for (const accId of ['US', 'JP', 'KR', 'TW', 'EU']) {
+      const reasons = [];
+      for (const key of GENERIC_KEYS) {
+        for (const lang of UI_LANGUAGES) {
+          const v = helpers.getTaxLabel(accId, lang, key);
+          if (v === key) reasons.push(`${key}[${lang}] missing (raw key) for ${accId}`);
+        }
+        // CN-VAT ban only on the Chinese display strings
+        for (const lang of ['zh-CN', 'zh-TW']) {
+          const v = helpers.getTaxLabel(accId, lang, key);
+          if (typeof v === 'string' && CN_VAT_BAN.test(v)) {
+            reasons.push(`${accId} ${key}[${lang}] uses China-VAT wording: "${v}"`);
+          }
+        }
+      }
+      if (reasons.length) fail(`genericNonCn:${accId}`, reasons); else pass(`genericNonCn:${accId}`);
+    }
+    // CN must KEEP its VAT wording (regression guard the other way): CN nav i18n
+    // should still read 采购与进项 / 销售与销项 / 发票查询.
+    {
+      const cn = locales['zh-CN'];
+      const reasons = [];
+      if (get(cn, 'nav.purchase') !== '采购与进项') reasons.push(`CN nav.purchase should stay 采购与进项, got "${get(cn, 'nav.purchase')}"`);
+      if (get(cn, 'nav.sales') !== '销售与销项') reasons.push(`CN nav.sales should stay 销售与销项, got "${get(cn, 'nav.sales')}"`);
+      if (reasons.length) fail(`cnVatPreserved`, reasons); else pass(`cnVatPreserved`);
+    }
+  }
+
+  // ────────────────────────────────────────────────
   // PART G1: Data Analysis page subtitles — must not contain hardcoded
   // English "TONS" or "吨" since the inventory unit comes from
   // product_unit (uiLanguage-driven via getInventoryUnitLabel).

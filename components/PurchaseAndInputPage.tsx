@@ -237,7 +237,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
 
       {/* Header Section */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[#191918]">{(accLocale === 'US' || accLocale === 'JP') ? taxLabel('pageTitlePurchase') : t('purchases.title')}</h1>
+        <h1 className="text-2xl font-bold text-[#191918]">{(accLocale !== 'CN') ? taxLabel('pageTitlePurchase') : t('purchases.title')}</h1>
         <div className="flex space-x-3">
           <button
             onClick={() => setShowCsvImport(true)}
@@ -257,7 +257,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
             onClick={() => setShowAddModal(true)}
             className="flex items-center px-4 py-2 bg-[#d97757] hover:bg-[#c56a4a] text-white rounded-lg transition-colors text-sm font-medium" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}
           >
-            <i className="fas fa-plus mr-2"></i> {accLocale === 'JP' ? taxLabel('newPurchaseButton') : t('purchases.newPurchase')}
+            <i className="fas fa-plus mr-2"></i> {accLocale !== 'CN' ? taxLabel('newPurchaseButton') : t('purchases.newPurchase')}
           </button>
         </div>
       </div>
@@ -308,10 +308,10 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
           )}
         </div>
         <h3 className="text-[#4a4a48] font-medium text-base mb-1">
-          {isScanning ? t('purchases.uploadScanning') : ((accLocale === 'US' || accLocale === 'JP') ? taxLabel('uploadTitle') : t('purchases.uploadTitle'))}
+          {isScanning ? t('purchases.uploadScanning') : ((accLocale !== 'CN') ? taxLabel('uploadTitle') : t('purchases.uploadTitle'))}
         </h3>
         <p className="text-[#5c5c5a] text-xs">
-          {isScanning ? t('purchases.uploadAnalyzing') : ((accLocale === 'US' || accLocale === 'JP') ? taxLabel('uploadSubtitle') : t('purchases.uploadSubtitle'))}
+          {isScanning ? t('purchases.uploadAnalyzing') : ((accLocale !== 'CN') ? taxLabel('uploadSubtitle') : t('purchases.uploadSubtitle'))}
         </p>
       </div>
 
@@ -324,12 +324,12 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.date')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.supplier')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.quantity')}</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">{(accLocale === 'US' || accLocale === 'JP') ? taxLabel('headerUnitPrice') : t('tableHeaders.unitPriceWithoutTax')}</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">{(accLocale === 'US' || accLocale === 'JP') ? taxLabel('headerAmount') : t('tableHeaders.totalAmountWithoutTax')}</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale === 'US' ? taxLabel('headerTaxAmount') : t('tableHeaders.totalTax')}</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale === 'US' ? taxLabel('headerTotalWithTax') : t('tableHeaders.totalWithTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{(accLocale !== 'CN') ? taxLabel('headerUnitPrice') : t('tableHeaders.unitPriceWithoutTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{(accLocale !== 'CN') ? taxLabel('headerAmount') : t('tableHeaders.totalAmountWithoutTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale !== 'CN' ? taxLabel('headerTaxAmount') : t('tableHeaders.totalTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale !== 'CN' ? taxLabel('headerTotalWithTax') : t('tableHeaders.totalWithTax')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.taxRate')}</th>
-                <th className="px-5 py-4 font-medium">{(accLocale === 'US' || accLocale === 'JP') ? taxLabel('headerInvoiceNo') : t('tableHeaders.invoiceNo')}</th>
+                <th className="px-5 py-4 font-medium">{(accLocale !== 'CN') ? taxLabel('headerInvoiceNo') : t('tableHeaders.invoiceNo')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.status')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.actions')}</th>
               </tr>
@@ -392,7 +392,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
               {!isLoading && records.length === 0 && (
                 <tr>
                   <td colSpan={11} className="px-6 py-12 text-center text-[#5c5c5a] text-sm italic">
-                    {t('purchases.empty')}
+                    {accLocale !== 'CN' ? taxLabel('emptyPurchase') : t('purchases.empty')}
                   </td>
                 </tr>
               )}
@@ -451,8 +451,8 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
           <div className="relative w-full max-w-lg bg-white border border-[#e0ddd5] rounded-xl overflow-hidden animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
             <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold text-[#191918]">{(accLocale === 'US' || accLocale === 'JP') ? taxLabel('modalTitlePurchase') : t('purchases.modalTitle')}</h2>
-                <p className="text-xs text-[#5c5c5a] mt-1">{(accLocale === 'US' || accLocale === 'JP') ? taxLabel('modalSubtitlePurchase') : t('purchases.modalSubtitle')}</p>
+                <h2 className="text-xl font-bold text-[#191918]">{(accLocale !== 'CN') ? taxLabel('modalTitlePurchase') : t('purchases.modalTitle')}</h2>
+                <p className="text-xs text-[#5c5c5a] mt-1">{(accLocale !== 'CN') ? taxLabel('modalSubtitlePurchase') : t('purchases.modalSubtitle')}</p>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-[#5c5c5a] hover:text-[#191918] transition-colors">
                 <i className="fas fa-times text-xl"></i>
@@ -472,7 +472,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale === 'JP' ? taxLabel('headerInvoiceNo') : t('purchases.formInvoiceNo')}</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale !== 'CN' ? taxLabel('headerInvoiceNo') : t('purchases.formInvoiceNo')}</label>
                   <input
                     type="text"
                     placeholder={t('common2.optional')}
@@ -509,7 +509,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale === 'JP' ? taxLabel('headerAmount') : t('purchases.formPrice')}</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale !== 'CN' ? taxLabel('headerAmount') : t('purchases.formPrice')}</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
                     <input
@@ -538,7 +538,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale === 'JP' ? taxLabel('headerUnitPrice') : t('purchases.formUnitPrice')}</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale !== 'CN' ? taxLabel('headerUnitPrice') : t('purchases.formUnitPrice')}</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
                     <input

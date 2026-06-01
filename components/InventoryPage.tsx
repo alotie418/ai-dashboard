@@ -37,6 +37,11 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
   // invoice terminology). usLabel(taxConceptKey, fallbackI18nKey) returns the
   // US taxConcept label when accLocale === 'US', else the default i18n value.
   const usLabel = (taxKey: string, i18nKey: string) => accLocale === 'US' ? taxLabel(taxKey) : t(i18nKey);
+  // genLabel: generic non-CN business wording shared by US/JP/KR/TW/EU (PR-A base).
+  // Use for the invoice-query basics (title / search / filter tabs / table headers
+  // / empty). Advanced filter + status dropdown + stat cards stay on usLabel until
+  // their keys are added to the shared base in a later PR.
+  const genLabel = (taxKey: string, i18nKey: string) => accLocale !== 'CN' ? taxLabel(taxKey) : t(i18nKey);
   // Interpolated variant: US taxConcept templates carry a literal {count} token
   // (getTaxLabel returns a plain string, no i18next interpolation), so substitute
   // it manually for US; all other locales keep the existing t(key, { count }) path.
@@ -194,7 +199,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a]"></i>
           <input
             type="text"
-            placeholder={usLabel('invSearchPlaceholder', 'invoices.searchPlaceholder')}
+            placeholder={genLabel('invSearchPlaceholder', 'invoices.searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-white border border-[#e0ddd5] rounded-xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] transition-all"
@@ -202,9 +207,9 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
         </div>
 
         <div className="flex items-center space-x-2 bg-white p-1.5 rounded-xl border border-[#e0ddd5]">
-          <FilterTab active={filterType === 'all'} onClick={() => setFilterType('all')} label={usLabel('invFilterAll', 'invoices.filterAll')} />
-          <FilterTab active={filterType === 'input'} onClick={() => setFilterType('input')} label={usLabel('invFilterInput', 'invoices.filterInput')} />
-          <FilterTab active={filterType === 'output'} onClick={() => setFilterType('output')} label={usLabel('invFilterOutput', 'invoices.filterOutput')} />
+          <FilterTab active={filterType === 'all'} onClick={() => setFilterType('all')} label={genLabel('invFilterAll', 'invoices.filterAll')} />
+          <FilterTab active={filterType === 'input'} onClick={() => setFilterType('input')} label={genLabel('invFilterInput', 'invoices.filterInput')} />
+          <FilterTab active={filterType === 'output'} onClick={() => setFilterType('output')} label={genLabel('invFilterOutput', 'invoices.filterOutput')} />
         </div>
       </div>
 
@@ -212,8 +217,8 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
       <div className="bg-white/80 border border-[#e0ddd5] rounded-xl overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
         <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center bg-[#f9f9f8]/20">
           <div>
-            <h3 className="text-xl font-bold text-[#191918]">{usLabel('invTableTitle', 'invoices.tableTitle')}</h3>
-            <p className="text-sm text-[#5c5c5a] mt-1">{usLabel('invTableSubtitle', 'invoices.tableSubtitle')}</p>
+            <h3 className="text-xl font-bold text-[#191918]">{genLabel('invTableTitle', 'invoices.tableTitle')}</h3>
+            <p className="text-sm text-[#5c5c5a] mt-1">{genLabel('invTableSubtitle', 'invoices.tableSubtitle')}</p>
           </div>
           <div className="flex space-x-3">
             <button
@@ -312,13 +317,13 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="bg-[#f9f9f8]/30 text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest">
-                <th className="px-8 py-5">{usLabel('invHeaderDate', 'invoices.headerDate')}</th>
+                <th className="px-8 py-5">{genLabel('invHeaderDate', 'invoices.headerDate')}</th>
                 <th className="px-8 py-5">{t('invoices.headerType')}</th>
                 <th className="px-8 py-5">{t('invoices.headerPartner')}</th>
-                <th className="px-8 py-5">{usLabel('invHeaderWeight', 'invoices.headerWeight')}</th>
-                <th className="px-8 py-5 text-right">{usLabel('invHeaderAmount', 'invoices.headerAmount')}</th>
+                <th className="px-8 py-5">{genLabel('invHeaderWeight', 'invoices.headerWeight')}</th>
+                <th className="px-8 py-5 text-right">{genLabel('invHeaderAmount', 'invoices.headerAmount')}</th>
                 <th className="px-8 py-5 text-right">{t('invoices.headerTax')}</th>
-                <th className="px-8 py-5">{usLabel('invHeaderInvoiceNo', 'invoices.headerInvoiceNo')}</th>
+                <th className="px-8 py-5">{genLabel('invHeaderInvoiceNo', 'invoices.headerInvoiceNo')}</th>
                 <th className="px-8 py-5 text-center">{t('invoices.headerStatus')}</th>
               </tr>
             </thead>
@@ -346,7 +351,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                   <td colSpan={8} className="px-8 py-20 text-center text-[#5c5c5a] italic">
                     <div className="flex flex-col items-center">
                       <i className="fas fa-search text-4xl mb-4 opacity-20"></i>
-                      <p>{usLabel('invEmpty', 'invoices.empty')}</p>
+                      <p>{genLabel('invEmpty', 'invoices.empty')}</p>
                       {hasAdvancedFilters && (
                         <button onClick={clearAdvancedFilters} className="mt-3 text-[#d97757] text-xs font-bold hover:underline">
                           <i className="fas fa-times mr-1"></i> {t('invoices.clearRetry')}

@@ -741,9 +741,9 @@ ${contextText}`;
         </div>
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
           <NavItem icon="fa-th-large" label={t('nav.dashboard')} active={currentPage === 'dashboard'} expanded={sidebarOpen} onClick={() => setCurrentPage('dashboard')} />
-          <NavItem icon="fa-file-import" label={(assistantAccLocale === 'US' || assistantAccLocale === 'JP') ? getTaxLabel(assistantAccLocale, i18n.language, 'navPurchase') : t('nav.purchase')} active={currentPage === 'purchase'} expanded={sidebarOpen} onClick={() => setCurrentPage('purchase')} />
-          <NavItem icon="fa-file-export" label={(assistantAccLocale === 'US' || assistantAccLocale === 'JP') ? getTaxLabel(assistantAccLocale, i18n.language, 'navSales') : t('nav.sales')} active={currentPage === 'sales'} expanded={sidebarOpen} onClick={() => setCurrentPage('sales')} />
-          <NavItem icon="fa-search-dollar" label={(assistantAccLocale === 'US' || assistantAccLocale === 'JP') ? getTaxLabel(assistantAccLocale, i18n.language, 'invQueryTitle') : t('nav.inventory')} active={currentPage === 'inventory'} expanded={sidebarOpen} onClick={() => setCurrentPage('inventory')} />
+          <NavItem icon="fa-file-import" label={assistantAccLocale !== 'CN' ? getTaxLabel(assistantAccLocale, i18n.language, 'navPurchase') : t('nav.purchase')} active={currentPage === 'purchase'} expanded={sidebarOpen} onClick={() => setCurrentPage('purchase')} />
+          <NavItem icon="fa-file-export" label={assistantAccLocale !== 'CN' ? getTaxLabel(assistantAccLocale, i18n.language, 'navSales') : t('nav.sales')} active={currentPage === 'sales'} expanded={sidebarOpen} onClick={() => setCurrentPage('sales')} />
+          <NavItem icon="fa-search-dollar" label={assistantAccLocale !== 'CN' ? getTaxLabel(assistantAccLocale, i18n.language, 'invQueryTitle') : t('nav.inventory')} active={currentPage === 'inventory'} expanded={sidebarOpen} onClick={() => setCurrentPage('inventory')} />
           <NavItem icon="fa-chart-pie" label={t('nav.analysis')} active={currentPage === 'analysis'} expanded={sidebarOpen} onClick={() => setCurrentPage('analysis')} />
           <NavItem icon="fa-handshake" label={t('nav.accounts')} active={currentPage === 'accounts'} expanded={sidebarOpen} onClick={() => setCurrentPage('accounts')} />
           <NavItem icon="fa-wallet" label={t('nav.finance')} active={currentPage === 'finance'} expanded={sidebarOpen} onClick={() => setCurrentPage('finance')} />
@@ -785,11 +785,11 @@ ${contextText}`;
               style={isElectronEnv ? ({ WebkitAppRegion: 'no-drag' } as React.CSSProperties) : undefined}
             >
               <h2 className="text-xl font-semibold text-[#191918]">
-                {(assistantAccLocale === 'US' || assistantAccLocale === 'JP') && currentPage === 'inventory'
+                {assistantAccLocale !== 'CN' && currentPage === 'inventory'
                   ? getTaxLabel(assistantAccLocale, i18n.language, 'invQueryTitle')
-                  : (assistantAccLocale === 'US' || assistantAccLocale === 'JP') && currentPage === 'purchase'
+                  : assistantAccLocale !== 'CN' && currentPage === 'purchase'
                   ? getTaxLabel(assistantAccLocale, i18n.language, 'navPurchase')
-                  : (assistantAccLocale === 'US' || assistantAccLocale === 'JP') && currentPage === 'sales'
+                  : assistantAccLocale !== 'CN' && currentPage === 'sales'
                   ? getTaxLabel(assistantAccLocale, i18n.language, 'navSales')
                   : t(`headerTitle.${currentPage}`)}
               </h2>

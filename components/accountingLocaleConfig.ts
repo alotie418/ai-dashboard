@@ -33,6 +33,55 @@ export interface AccountingLocaleConfig {
   aiContext: string;
 }
 
+// ─── Non-CN generic business taxConcepts (shared base) ───
+// Business-context labels that are the SAME for every non-CN accountingLocale
+// (US / JP / KR / TW / EU): customer/supplier/document wording, NOT China-VAT
+// (进项/销项/发票). Spread into JP/KR/TW/EU taxConcepts so any locale !== 'CN'
+// renders generic wording while still localizing by uiLanguage. Tax-specific
+// terms (Sales Tax / 消费税 / VAT / 營業稅) stay per-locale and override these.
+// US keeps its own inline values (it predates this base) and is not spread.
+const NON_CN_GENERIC: Record<string, TaxConceptLabels> = {
+  // nav + page titles
+  navPurchase:        { 'zh-CN': '采购与费用', 'zh-TW': '採購與費用', en: 'Purchases & Expenses', ja: '仕入・経費', ko: '매입 및 비용', fr: 'Achats & dépenses' },
+  navSales:           { 'zh-CN': '销售与收入', 'zh-TW': '銷售與收入', en: 'Sales & Revenue', ja: '売上・収入', ko: '매출 및 수입', fr: 'Ventes & revenus' },
+  invQueryTitle:      { 'zh-CN': '票据查询', 'zh-TW': '票據查詢', en: 'Document Search', ja: '伝票検索', ko: '문서 조회', fr: 'Recherche de pièces' },
+  pageTitlePurchase:  { 'zh-CN': '采购与费用', 'zh-TW': '採購與費用', en: 'Purchases & Expenses', ja: '仕入と経費', ko: '매입 및 비용', fr: 'Achats & dépenses' },
+  pageTitleSales:     { 'zh-CN': '销售与收入', 'zh-TW': '銷售與收入', en: 'Sales & Revenue', ja: '売上と収入', ko: '매출 및 수입', fr: 'Ventes & revenus' },
+  // upload areas (receipt / bill / document — no 电子发票)
+  uploadTitle:        { 'zh-CN': '拖放或点击上传收据、账单或票据', 'zh-TW': '拖放或點擊上傳收據、帳單或票據', en: 'Drag and drop or click to upload a receipt, bill or document', ja: 'レシート・請求書・伝票をドラッグまたはクリックでアップロード', ko: '영수증, 청구서 또는 전표를 드래그하거나 클릭해 업로드', fr: 'Glissez ou cliquez pour téléverser un reçu, une facture ou un justificatif' },
+  uploadSubtitle:     { 'zh-CN': '自动提取日期、金额、供应商及票据号码', 'zh-TW': '自動擷取日期、金額、供應商及票據號碼', en: 'Auto-extract date, amount, vendor and document number', ja: '日付、金額、仕入先、伝票番号を自動抽出', ko: '날짜, 금액, 공급업체, 전표 번호를 자동 추출', fr: 'Extraction automatique de la date, du montant, du fournisseur et du numéro' },
+  uploadTitleSales:   { 'zh-CN': '拖放或点击上传收据、账单或票据', 'zh-TW': '拖放或點擊上傳收據、帳單或票據', en: 'Drag and drop or click to upload a receipt, bill or document', ja: 'レシート・請求書・伝票をドラッグまたはクリックでアップロード', ko: '영수증, 청구서 또는 전표를 드래그하거나 클릭해 업로드', fr: 'Glissez ou cliquez pour téléverser un reçu, une facture ou un justificatif' },
+  uploadSubtitleSales:{ 'zh-CN': '支持图片或 PDF，使用 AI 智能识别', 'zh-TW': '支援圖片或 PDF，使用 AI 智慧識別', en: 'Supports images or PDF, recognized by AI', ja: '画像またはPDFに対応、AIで自動認識', ko: '이미지 또는 PDF 지원, AI 자동 인식', fr: 'Images ou PDF, reconnaissance IA' },
+  // table headers (pre-tax amounts; document number)
+  headerUnitPrice:    { 'zh-CN': '税前单价', 'zh-TW': '稅前單價', en: 'Unit Price (pre-tax)', ja: '単価（税抜）', ko: '단가(세전)', fr: 'Prix unitaire (HT)' },
+  headerAmount:       { 'zh-CN': '税前金额', 'zh-TW': '稅前金額', en: 'Amount (pre-tax)', ja: '金額（税抜）', ko: '금액(세전)', fr: 'Montant (HT)' },
+  headerTaxAmount:    { 'zh-CN': '税额', 'zh-TW': '稅額', en: 'Tax', ja: '税額', ko: '세액', fr: 'Taxe' },
+  headerTotalWithTax: { 'zh-CN': '总额', 'zh-TW': '總額', en: 'Total', ja: '合計', ko: '총액', fr: 'Total' },
+  headerInvoiceNo:    { 'zh-CN': '票据号码', 'zh-TW': '票據號碼', en: 'Receipt / Document #', ja: '伝票番号', ko: '전표 번호', fr: 'N° de pièce' },
+  // modals
+  modalTitlePurchase: { 'zh-CN': '新增采购与费用记录', 'zh-TW': '新增採購與費用記錄', en: 'New Purchase / Expense', ja: '仕入・経費を追加', ko: '매입 및 비용 추가', fr: 'Nouvel achat / dépense' },
+  modalSubtitlePurchase: { 'zh-CN': '请手动输入采购或费用明细', 'zh-TW': '請手動輸入採購或費用明細', en: 'Enter purchase or expense details manually', ja: '仕入または経費の詳細を入力', ko: '매입 또는 비용 세부 정보를 입력하세요', fr: "Saisir les détails de l'achat ou de la dépense" },
+  modalTitleSales:    { 'zh-CN': '新增销售与收入记录', 'zh-TW': '新增銷售與收入記錄', en: 'New Sale / Revenue', ja: '売上・収入を追加', ko: '매출 및 수입 추가', fr: 'Nouvelle vente / revenu' },
+  modalSubtitleSales: { 'zh-CN': '请手动输入销售或收入明细', 'zh-TW': '請手動輸入銷售或收入明細', en: 'Enter sale or revenue details manually', ja: '売上または収入の詳細を入力', ko: '매출 또는 수입 세부 정보를 입력하세요', fr: 'Saisir les détails de la vente ou du revenu' },
+  // buttons + empty states
+  newPurchaseButton:  { 'zh-CN': '新增采购记录', 'zh-TW': '新增採購記錄', en: 'New Purchase', ja: '仕入を追加', ko: '매입 추가', fr: 'Nouvel achat' },
+  newSaleButton:      { 'zh-CN': '新增销售记录', 'zh-TW': '新增銷售記錄', en: 'New Sale', ja: '売上を追加', ko: '매출 추가', fr: 'Nouvelle vente' },
+  emptyPurchase:      { 'zh-CN': '暂无采购或费用记录，请上传收据、账单或票据，或手动新增。', 'zh-TW': '暫無採購或費用記錄，請上傳收據、帳單或票據，或手動新增。', en: 'No purchase or expense records yet. Upload a receipt, bill or document, or add one manually.', ja: '仕入・経費の記録がありません。レシート・請求書・伝票をアップロードするか手動で追加してください。', ko: '매입/비용 기록이 없습니다. 영수증, 청구서, 전표를 업로드하거나 수동으로 추가하세요.', fr: 'Aucun achat/dépense. Téléversez un reçu, une facture ou ajoutez manuellement.' },
+  emptySales:         { 'zh-CN': '暂无销售记录，请上传收据、账单或票据，或手动新增。', 'zh-TW': '暫無銷售記錄，請上傳收據、帳單或票據，或手動新增。', en: 'No sales records yet. Upload a receipt, bill or document, or add one manually.', ja: '売上記録がありません。レシート・請求書・伝票をアップロードするか手動で追加してください。', ko: '매출 기록이 없습니다. 영수증, 청구서, 전표를 업로드하거나 수동으로 추가하세요.', fr: 'Aucune vente. Téléversez un reçu, une facture ou ajoutez manuellement.' },
+  // invoice-query (票据查询) basics: title / search / filter tabs / table headers
+  invSearchPlaceholder:{ 'zh-CN': '搜索票据号码或往来单位...', 'zh-TW': '搜尋票據號碼或往來單位...', en: 'Search by document number or party...', ja: '伝票番号または取引先で検索...', ko: '문서 번호 또는 거래처로 검색...', fr: 'Rechercher par n° de pièce ou tiers...' },
+  invFilterAll:       { 'zh-CN': '全部票据', 'zh-TW': '全部票據', en: 'All Documents', ja: 'すべての伝票', ko: '전체 문서', fr: 'Toutes les pièces' },
+  invFilterInput:     { 'zh-CN': '采购与费用', 'zh-TW': '採購與費用', en: 'Purchases & Expenses', ja: '仕入・経費', ko: '매입 및 비용', fr: 'Achats & dépenses' },
+  invFilterOutput:    { 'zh-CN': '销售与收入', 'zh-TW': '銷售與收入', en: 'Sales & Revenue', ja: '売上・収入', ko: '매출 및 수입', fr: 'Ventes & revenus' },
+  invTableTitle:      { 'zh-CN': '票据流转全景视图', 'zh-TW': '票據流轉全景視圖', en: 'Document Flow Overview', ja: '伝票フロー全体ビュー', ko: '문서 흐름 개요', fr: "Vue d'ensemble des pièces" },
+  invTableSubtitle:   { 'zh-CN': '核对票据流与库存/交易记录一致性', 'zh-TW': '核對票據流與庫存/交易記錄一致性', en: 'Reconcile document flow with inventory / transaction records', ja: '伝票フローと在庫・取引記録の整合性を確認', ko: '문서 흐름과 재고/거래 기록의 일관성 확인', fr: 'Rapprocher les pièces avec les stocks / transactions' },
+  invHeaderDate:      { 'zh-CN': '业务日期', 'zh-TW': '業務日期', en: 'Date', ja: '取引日', ko: '거래일', fr: 'Date' },
+  invHeaderWeight:    { 'zh-CN': '数量', 'zh-TW': '數量', en: 'Quantity', ja: '数量', ko: '수량', fr: 'Quantité' },
+  invHeaderAmount:    { 'zh-CN': '金额', 'zh-TW': '金額', en: 'Amount', ja: '金額', ko: '금액', fr: 'Montant' },
+  invHeaderInvoiceNo: { 'zh-CN': '票据号码', 'zh-TW': '票據號碼', en: 'Document #', ja: '伝票番号', ko: '문서 번호', fr: 'N° de pièce' },
+  invEmpty:           { 'zh-CN': '未找到匹配的票据记录', 'zh-TW': '未找到匹配的票據記錄', en: 'No matching documents found', ja: '一致する伝票が見つかりません', ko: '일치하는 문서가 없습니다', fr: 'Aucune pièce correspondante' },
+};
+
 // ─── 6 国配置 ───
 
 export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConfig> = {
@@ -126,6 +175,8 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       uploadTitleSales:   { 'zh-CN': '拖放或点击上传收据、账单或发票', 'zh-TW': '拖放或點擊上傳收據、帳單或發票', en: 'Drag and drop or click to upload a receipt, bill or invoice', ja: 'レシート・請求書・伝票をドラッグまたはクリックでアップロード', ko: '영수증, 청구서 또는 인보이스를 드래그하거나 클릭해 업로드', fr: 'Glissez ou cliquez pour téléverser un reçu, une facture ou un justificatif' },
       uploadSubtitleSales:{ 'zh-CN': '支持图片或 PDF，使用 AI 智能识别', 'zh-TW': '支援圖片或 PDF，使用 AI 智慧識別', en: 'Supports images or PDF, recognized by AI', ja: '画像またはPDFに対応、AIで自動認識', ko: '이미지 또는 PDF 지원, AI 자동 인식', fr: 'Images ou PDF, reconnaissance IA' },
       emptySales:         { 'zh-CN': '暂无销售记录，请上传收据、账单、发票或手动新增。', 'zh-TW': '暫無銷售記錄，請上傳收據、帳單、發票或手動新增。', en: 'No sales records yet. Upload a receipt, bill, invoice, or add one manually.', ja: '売上記録がありません。レシート・請求書・伝票をアップロードするか手動で追加してください。', ko: '매출 기록이 없습니다. 영수증, 청구서, 인보이스를 업로드하거나 수동으로 추가하세요.', fr: 'Aucune vente. Téléversez un reçu, une facture ou ajoutez manuellement.' },
+      emptyPurchase:      { 'zh-CN': '暂无采购或费用记录，请上传收据、账单、发票或手动新增。', 'zh-TW': '暫無採購或費用記錄，請上傳收據、帳單、發票或手動新增。', en: 'No purchase or expense records yet. Upload a receipt, bill, invoice, or add one manually.', ja: '仕入・経費の記録がありません。レシート・請求書・伝票をアップロードするか手動で追加してください。', ko: '매입/비용 기록이 없습니다. 영수증, 청구서, 인보이스를 업로드하거나 수동으로 추가하세요.', fr: 'Aucun achat/dépense. Téléversez un reçu, une facture ou ajoutez manuellement.' },
+      newPurchaseButton:  { 'zh-CN': '新增采购', 'zh-TW': '新增採購', en: 'New Purchase', ja: 'New Purchase', ko: 'New Purchase', fr: 'New Purchase' },
       modalTitleSales:    { 'zh-CN': '新增销售与收入记录', 'zh-TW': '新增銷售與收入記錄', en: 'New Sale / Revenue', ja: '売上・収入を追加', ko: '매출 및 수입 추가', fr: 'Nouvelle vente / revenu' },
       modalSubtitleSales: { 'zh-CN': '请手动输入销售或收入明细', 'zh-TW': '請手動輸入銷售或收入明細', en: 'Enter sale or revenue details manually', ja: '売上または収入の詳細を入力', ko: '매출 또는 수입 세부 정보를 입력하세요', fr: 'Saisir les détails de la vente ou du revenu' },
       navSales:           { 'zh-CN': '销售与收入', 'zh-TW': '銷售與收入', en: 'Sales & Revenue', ja: '売上・収入', ko: '매출 및 수입', fr: 'Ventes & revenus' },
@@ -254,6 +305,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
     currencySymbol: '¥',
     taxRegime: 'consumption_tax',
     taxConcepts: {
+      ...NON_CN_GENERIC,
       taxTitle:      { 'zh-CN': '消费税统计', 'zh-TW': '消費稅統計', en: 'Consumption Tax Summary', ja: '消費税集計', ko: '소비세 통계', fr: 'Résumé taxe consommation' },
       inputTax:      { 'zh-CN': '采购消费税', 'zh-TW': '採購消費稅', en: 'Consumption Tax Paid (Input)', ja: '仕入税額', ko: '매입 소비세', fr: 'Taxe payée (achats)' },
       outputTax:     { 'zh-CN': '销售消费税', 'zh-TW': '銷售消費稅', en: 'Consumption Tax Collected (Output)', ja: '売上税額', ko: '매출 소비세', fr: 'Taxe collectée (ventes)' },
@@ -275,21 +327,6 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       invoicePendingTax: { 'zh-CN': '待申报消费税', 'zh-TW': '待申報消費稅', en: 'Pending Consumption Tax', ja: '未申告消費税', ko: '미신고 소비세', fr: 'Taxe consommation en attente' },
       invoiceTypeOutput: { 'zh-CN': '销售', 'zh-TW': '銷售', en: 'Sales', ja: '売上', ko: '매출', fr: 'Vente' },
       invoiceTypeInput: { 'zh-CN': '采购', 'zh-TW': '採購', en: 'Purchase', ja: '仕入', ko: '매입', fr: 'Achat' },
-      // JP nav uses generic business wording (not 进项/销项) in Chinese UI.
-      navSales:           { 'zh-CN': '销售与收入', 'zh-TW': '銷售與收入', en: 'Sales & Revenue', ja: '売上・収入', ko: '매출 및 수입', fr: 'Ventes & revenus' },
-      navPurchase:        { 'zh-CN': '采购与费用', 'zh-TW': '採購與費用', en: 'Purchases & Expenses', ja: '仕入・経費', ko: '매입 및 비용', fr: 'Achats & dépenses' },
-      invQueryTitle:      { 'zh-CN': '票据查询', 'zh-TW': '票據查詢', en: 'Document Search', ja: '伝票検索', ko: '문서 조회', fr: 'Recherche de pièces' },
-      // JP purchase page + add-purchase modal — receipt/document wording (no
-      // 进项/电子发票/发票号码); 税前 (pre-tax) amounts; 消费税 kept elsewhere.
-      pageTitlePurchase:  { 'zh-CN': '采购与费用', 'zh-TW': '採購與費用', en: 'Purchases & Expenses', ja: '仕入と経費', ko: '매입 및 비용', fr: 'Achats & dépenses' },
-      uploadTitle:        { 'zh-CN': '拖放或点击上传收据、账单或票据', 'zh-TW': '拖放或點擊上傳收據、帳單或票據', en: 'Drag and drop or click to upload a receipt, bill or document', ja: 'レシート・請求書・伝票をドラッグまたはクリックでアップロード', ko: '영수증, 청구서 또는 전표를 드래그하거나 클릭해 업로드', fr: 'Glissez ou cliquez pour téléverser un reçu, une facture ou un justificatif' },
-      uploadSubtitle:     { 'zh-CN': '自动提取日期、金额、供应商及票据号码', 'zh-TW': '自動擷取日期、金額、供應商及票據號碼', en: 'Auto-extract date, amount, vendor and document number', ja: '日付、金額、仕入先、伝票番号を自動抽出', ko: '날짜, 금액, 공급업체, 전표 번호를 자동 추출', fr: 'Extraction automatique de la date, du montant, du fournisseur et du numéro' },
-      headerUnitPrice:    { 'zh-CN': '税前单价', 'zh-TW': '稅前單價', en: 'Unit Price (pre-tax)', ja: '単価（税抜）', ko: '단가(세전)', fr: 'Prix unitaire (HT)' },
-      headerAmount:       { 'zh-CN': '税前金额', 'zh-TW': '稅前金額', en: 'Amount (pre-tax)', ja: '金額（税抜）', ko: '금액(세전)', fr: 'Montant (HT)' },
-      headerInvoiceNo:    { 'zh-CN': '票据号码', 'zh-TW': '票據號碼', en: 'Receipt / Document #', ja: '伝票番号', ko: '전표 번호', fr: 'N° de pièce' },
-      modalTitlePurchase: { 'zh-CN': '新增采购与费用记录', 'zh-TW': '新增採購與費用記錄', en: 'New Purchase / Expense', ja: '仕入・経費を追加', ko: '매입 및 비용 추가', fr: 'Nouvel achat / dépense' },
-      modalSubtitlePurchase: { 'zh-CN': '请手动输入采购或费用明细', 'zh-TW': '請手動輸入採購或費用明細', en: 'Enter purchase or expense details manually', ja: '仕入または経費の詳細を入力', ko: '매입 또는 비용 세부 정보를 입력하세요', fr: "Saisir les détails de l'achat ou de la dépense" },
-      newPurchaseButton:  { 'zh-CN': '新增采购记录', 'zh-TW': '新增採購記錄', en: 'New Purchase', ja: '仕入を追加', ko: '매입 추가', fr: 'Nouvel achat' },
       inventoryUnit: { 'zh-CN': '单位', 'zh-TW': '單位', en: 'units', ja: '単位', ko: '단위', fr: 'unités' },
       taxSummaryTitle:{ 'zh-CN': '消费税含税汇总 (对账用)', 'zh-TW': '消費稅含稅匯總 (對帳用)', en: 'Tax-Inclusive Summary (Reconciliation)', ja: '税込金額集計（照合用）', ko: '소비세 포함 요약 (대조용)', fr: 'Résumé TTC (rapprochement)' },
       purchaseTotal: { 'zh-CN': '采购含税总额', 'zh-TW': '採購含稅總額', en: 'Purchase Total (Incl. Tax)', ja: '仕入税込合計', ko: '매입 세금포함 총액', fr: 'Total achats TTC' },
@@ -307,6 +344,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
     currencySymbol: '€',
     taxRegime: 'vat',
     taxConcepts: {
+      ...NON_CN_GENERIC,
       taxTitle:      { 'zh-CN': 'VAT 统计', 'zh-TW': 'VAT 統計', en: 'VAT Summary', ja: 'VAT集計', ko: 'VAT 통계', fr: 'Résumé TVA' },
       inputTax:      { 'zh-CN': '进项 VAT', 'zh-TW': '進項 VAT', en: 'Input VAT', ja: '仕入VAT', ko: '매입 VAT', fr: 'TVA déductible' },
       outputTax:     { 'zh-CN': '销项 VAT', 'zh-TW': '銷項 VAT', en: 'Output VAT', ja: '売上VAT', ko: '매출 VAT', fr: 'TVA collectée' },
@@ -345,6 +383,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
     currencySymbol: '₩',
     taxRegime: 'vat',
     taxConcepts: {
+      ...NON_CN_GENERIC,
       taxTitle:      { 'zh-CN': '韩国 VAT 统计', 'zh-TW': '韓國 VAT 統計', en: 'Korean VAT Summary', ja: '韓国VAT集計', ko: '부가가치세 요약', fr: 'Résumé TVA (Corée)' },
       inputTax:      { 'zh-CN': '进项 VAT', 'zh-TW': '進項 VAT', en: 'Input VAT', ja: '仕入VAT', ko: '매입세액', fr: 'TVA déductible' },
       outputTax:     { 'zh-CN': '销项 VAT', 'zh-TW': '銷項 VAT', en: 'Output VAT', ja: '売上VAT', ko: '매출세액', fr: 'TVA collectée' },
@@ -383,6 +422,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
     currencySymbol: 'NT$',
     taxRegime: 'business_tax',
     taxConcepts: {
+      ...NON_CN_GENERIC,
       taxTitle:      { 'zh-CN': '营业税统计', 'zh-TW': '營業稅統計', en: 'Business Tax Summary', ja: '営業税集計', ko: '영업세 통계', fr: 'Résumé taxe activité' },
       inputTax:      { 'zh-CN': '进项营业税', 'zh-TW': '進項營業稅', en: 'Input Business Tax', ja: '仕入営業税', ko: '매입 영업세', fr: 'Taxe payée' },
       outputTax:     { 'zh-CN': '销项营业税', 'zh-TW': '銷項營業稅', en: 'Output Business Tax', ja: '売上営業税', ko: '매출 영업세', fr: 'Taxe collectée' },
