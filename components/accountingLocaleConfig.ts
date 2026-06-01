@@ -52,6 +52,10 @@ const NON_CN_GENERIC: Record<string, TaxConceptLabels> = {
   uploadSubtitle:     { 'zh-CN': '自动提取日期、金额、供应商及票据号码', 'zh-TW': '自動擷取日期、金額、供應商及票據號碼', en: 'Auto-extract date, amount, vendor and document number', ja: '日付、金額、仕入先、伝票番号を自動抽出', ko: '날짜, 금액, 공급업체, 전표 번호를 자동 추출', fr: 'Extraction automatique de la date, du montant, du fournisseur et du numéro' },
   uploadTitleSales:   { 'zh-CN': '拖放或点击上传收据、账单或票据', 'zh-TW': '拖放或點擊上傳收據、帳單或票據', en: 'Drag and drop or click to upload a receipt, bill or document', ja: 'レシート・請求書・伝票をドラッグまたはクリックでアップロード', ko: '영수증, 청구서 또는 전표를 드래그하거나 클릭해 업로드', fr: 'Glissez ou cliquez pour téléverser un reçu, une facture ou un justificatif' },
   uploadSubtitleSales:{ 'zh-CN': '支持图片或 PDF，使用 AI 智能识别', 'zh-TW': '支援圖片或 PDF，使用 AI 智慧識別', en: 'Supports images or PDF, recognized by AI', ja: '画像またはPDFに対応、AIで自動認識', ko: '이미지 또는 PDF 지원, AI 자동 인식', fr: 'Images ou PDF, reconnaissance IA' },
+  // OCR scanning-state text (shown while a document is being analyzed). Generic
+  // 票据 / 往来单位 wording — never CN-VAT 进项 / 发票号(码). Shared by purchase + sales.
+  scanningTitle:      { 'zh-CN': '正在分析票据…', 'zh-TW': '正在分析票據…', en: 'Analyzing document…', ja: '伝票を解析中…', ko: '문서 분석 중…', fr: 'Analyse du document…' },
+  scanningSubtitle:   { 'zh-CN': 'AI 正在提取日期、金额、往来单位与税额…', 'zh-TW': 'AI 正在擷取日期、金額、往來單位與稅額…', en: 'AI is extracting date, amount, party and tax…', ja: 'AIが日付・金額・取引先・税額を抽出中…', ko: 'AI가 날짜·금액·거래처·세액을 추출 중…', fr: 'L’IA extrait la date, le montant, le tiers et la taxe…' },
   // table headers (pre-tax amounts; document number)
   headerUnitPrice:    { 'zh-CN': '税前单价', 'zh-TW': '稅前單價', en: 'Unit Price (pre-tax)', ja: '単価（税抜）', ko: '단가(세전)', fr: 'Prix unitaire (HT)' },
   headerAmount:       { 'zh-CN': '税前金额', 'zh-TW': '稅前金額', en: 'Amount (pre-tax)', ja: '金額（税抜）', ko: '금액(세전)', fr: 'Montant (HT)' },
@@ -174,6 +178,9 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       pageTitleSales:     { 'zh-CN': '销售与收入', 'zh-TW': '銷售與收入', en: 'Sales & Revenue', ja: '売上と収入', ko: '매출 및 수입', fr: 'Ventes & revenus' },
       uploadTitleSales:   { 'zh-CN': '拖放或点击上传收据、账单或发票', 'zh-TW': '拖放或點擊上傳收據、帳單或發票', en: 'Drag and drop or click to upload a receipt, bill or invoice', ja: 'レシート・請求書・伝票をドラッグまたはクリックでアップロード', ko: '영수증, 청구서 또는 인보이스를 드래그하거나 클릭해 업로드', fr: 'Glissez ou cliquez pour téléverser un reçu, une facture ou un justificatif' },
       uploadSubtitleSales:{ 'zh-CN': '支持图片或 PDF，使用 AI 智能识别', 'zh-TW': '支援圖片或 PDF，使用 AI 智慧識別', en: 'Supports images or PDF, recognized by AI', ja: '画像またはPDFに対応、AIで自動認識', ko: '이미지 또는 PDF 지원, AI 자동 인식', fr: 'Images ou PDF, reconnaissance IA' },
+      // OCR scanning-state text — generic 票据/往来单位 wording (US is not spread from NON_CN_GENERIC).
+      scanningTitle:      { 'zh-CN': '正在分析票据…', 'zh-TW': '正在分析票據…', en: 'Analyzing document…', ja: '伝票を解析中…', ko: '문서 분석 중…', fr: 'Analyse du document…' },
+      scanningSubtitle:   { 'zh-CN': 'AI 正在提取日期、金额、往来单位与税额…', 'zh-TW': 'AI 正在擷取日期、金額、往來單位與稅額…', en: 'AI is extracting date, amount, party and tax…', ja: 'AIが日付・金額・取引先・税額を抽出中…', ko: 'AI가 날짜·금액·거래처·세액을 추출 중…', fr: 'L’IA extrait la date, le montant, le tiers et la taxe…' },
       emptySales:         { 'zh-CN': '暂无销售记录，请上传收据、账单、发票或手动新增。', 'zh-TW': '暫無銷售記錄，請上傳收據、帳單、發票或手動新增。', en: 'No sales records yet. Upload a receipt, bill, invoice, or add one manually.', ja: '売上記録がありません。レシート・請求書・伝票をアップロードするか手動で追加してください。', ko: '매출 기록이 없습니다. 영수증, 청구서, 인보이스를 업로드하거나 수동으로 추가하세요.', fr: 'Aucune vente. Téléversez un reçu, une facture ou ajoutez manuellement.' },
       emptyPurchase:      { 'zh-CN': '暂无采购或费用记录，请上传收据、账单、发票或手动新增。', 'zh-TW': '暫無採購或費用記錄，請上傳收據、帳單、發票或手動新增。', en: 'No purchase or expense records yet. Upload a receipt, bill, invoice, or add one manually.', ja: '仕入・経費の記録がありません。レシート・請求書・伝票をアップロードするか手動で追加してください。', ko: '매입/비용 기록이 없습니다. 영수증, 청구서, 인보이스를 업로드하거나 수동으로 추가하세요.', fr: 'Aucun achat/dépense. Téléversez un reçu, une facture ou ajoutez manuellement.' },
       newPurchaseButton:  { 'zh-CN': '新增采购', 'zh-TW': '新增採購', en: 'New Purchase', ja: 'New Purchase', ko: 'New Purchase', fr: 'New Purchase' },
