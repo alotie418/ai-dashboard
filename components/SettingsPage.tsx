@@ -293,10 +293,10 @@ const SettingsPage: React.FC = () => {
               <section className="space-y-6">
                 <h3 className="text-xl font-bold text-[#191918] mb-6">{t('settings.notifications.title')}</h3>
                 <div className="space-y-4">
-                  <NotificationToggle label={t('settings.notifications.stockZero')} checked={notifications.stockZero} onChange={(v) => setNotifications(prev => ({ ...prev, stockZero: v }))} />
-                  <NotificationToggle label={t('settings.notifications.taxDeviation')} checked={notifications.taxDeviation} onChange={(v) => setNotifications(prev => ({ ...prev, taxDeviation: v }))} />
-                  <NotificationToggle label={t('settings.notifications.priceVolatility')} checked={notifications.priceVolatility} onChange={(v) => setNotifications(prev => ({ ...prev, priceVolatility: v }))} />
-                  <NotificationToggle label={t('settings.notifications.monthlyReport')} checked={notifications.monthlyReport} onChange={(v) => setNotifications(prev => ({ ...prev, monthlyReport: v }))} />
+                  <NotificationToggle label={usLabel('notifStockZero', 'settings.notifications.stockZero')} checked={notifications.stockZero} onChange={(v) => setNotifications(prev => ({ ...prev, stockZero: v }))} />
+                  <NotificationToggle label={usLabel('notifTaxDeviation', 'settings.notifications.taxDeviation')} checked={notifications.taxDeviation} onChange={(v) => setNotifications(prev => ({ ...prev, taxDeviation: v }))} />
+                  <NotificationToggle label={usLabel('notifPriceVolatility', 'settings.notifications.priceVolatility')} checked={notifications.priceVolatility} onChange={(v) => setNotifications(prev => ({ ...prev, priceVolatility: v }))} />
+                  <NotificationToggle label={usLabel('notifMonthlyReport', 'settings.notifications.monthlyReport')} checked={notifications.monthlyReport} onChange={(v) => setNotifications(prev => ({ ...prev, monthlyReport: v }))} />
                 </div>
               </section>
             )}

@@ -71,7 +71,8 @@ const REQUIRED_TAX_KEYS_BY_LOCALE = {
     'setNavAi', 'setAddKey', 'setEditKey', 'setWebGrounding',
     'setCompanyNamePh', 'setLegalPersonPh', 'setIndustryPh',
     'dmSubtitle', 'dmCardSales', 'dmCardPurchases', 'dmNoLegacy', 'dmResultIncome', 'dmResultExpense',
-    'dmRollbackConfirm', 'dmRollback', 'dmNote1', 'dmNote2', 'dmNote3', 'dmNote4'],
+    'dmRollbackConfirm', 'dmRollback', 'dmNote1', 'dmNote2', 'dmNote3', 'dmNote4',
+    'notifStockZero', 'notifTaxDeviation', 'notifPriceVolatility', 'notifMonthlyReport'],
 };
 
 // Banned cross-regime terminology
@@ -351,7 +352,8 @@ async function main() {
                            'setAdminExpenseLabel', 'setPerYear', 'setTaxHint', 'setDeductibleHeader',
                            'setDeductiblePctLabel', 'setCatGrossReceipts', 'setCatHomeOffice',
                            'setNavAi', 'setAddKey', 'setEditKey', 'setWebGrounding',
-                           'setCompanyNamePh', 'setLegalPersonPh', 'setIndustryPh']) {
+                           'setCompanyNamePh', 'setLegalPersonPh', 'setIndustryPh',
+                           'notifStockZero', 'notifTaxDeviation', 'notifPriceVolatility', 'notifMonthlyReport']) {
           const label = helpers.getTaxLabel(accId, uiLang, key);
           for (const pattern of US_FORBIDDEN_CN_TERMS) {
             if (pattern.test(label)) {
@@ -420,6 +422,14 @@ async function main() {
           const v = helpers.getTaxLabel(accId, uiLang, key);
           if (!v.includes('{count}')) reasons.push(`US ${key}[${uiLang}] missing {count} token: "${v}"`);
         }
+        // US notifications: tax alert uses 税款 (concrete tax due), not the macro
+        // 税收 wording; stock alert is threshold-based, not zero-based.
+        if (uiLang === 'zh-CN' || uiLang === 'zh-TW') {
+          const td = helpers.getTaxLabel(accId, uiLang, 'notifTaxDeviation');
+          if (/税收|稅收/.test(td)) reasons.push(`US notifTaxDeviation[${uiLang}] uses macro 税收 (should be 税款): "${td}"`);
+          const sz = helpers.getTaxLabel(accId, uiLang, 'notifStockZero');
+          if (/跌至零值|跌至零|零值/.test(sz)) reasons.push(`US notifStockZero[${uiLang}] still says 零值 (should be 阈值): "${sz}"`);
+        }
         // Exact-string lock-in for the search placeholder + "all documents" tab.
         // These regressed by silently losing a trailing character (码/据 →
         // "搜索票据号..." / "全部票"); pin the full expected strings so any future
@@ -454,6 +464,8 @@ async function main() {
               dmNote1: '销售记录将迁移为收入记录，采购记录将迁移为费用记录。',
               dmNote2: '旧表数据会保留，可随时回滚。',
               dmNote3: '迁移记录会保存原始记录快照，不会丢失。',
+              notifStockZero: '库存低于阈值提醒', notifTaxDeviation: '税款偏差超过 15% 预警',
+              notifPriceVolatility: '异常价格波动提醒', notifMonthlyReport: '月度财务报告推送',
             },
             'zh-TW': {
               invSearchPlaceholder: '搜尋票據號碼或往來單位...', invFilterAll: '全部票據',
@@ -482,6 +494,8 @@ async function main() {
               dmNote1: '銷售記錄將遷移為收入記錄，採購記錄將遷移為費用記錄。',
               dmNote2: '舊表資料會保留，可隨時回復。',
               dmNote3: '遷移記錄會保存原始記錄快照，不會遺失。',
+              notifStockZero: '庫存低於閾值提醒', notifTaxDeviation: '稅款偏差超過 15% 預警',
+              notifPriceVolatility: '異常價格波動提醒', notifMonthlyReport: '月度財務報告推送',
             },
           };
           if (EXPECT[uiLang]) {
