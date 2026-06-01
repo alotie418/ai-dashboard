@@ -184,6 +184,34 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       // Transactions (收支记录) page — the report-line column reads as 账户
       // (the Schedule C line is the US expense account); US only.
       txnAccountHeader:   { 'zh-CN': '账户', 'zh-TW': '帳戶', en: 'Account', ja: '勘定科目', ko: '계정', fr: 'Compte' },
+      // Settings page (系统设置) — US framing. zh-CN/zh-TW use US terminology;
+      // other languages mirror sensible US-context values. CN/EU/JP/KR/TW keep
+      // their existing settings.* i18n / profile data untouched.
+      setCreditCodeLabel: { 'zh-CN': 'EIN / 税号', 'zh-TW': 'EIN / 稅號', en: 'EIN / Tax ID', ja: 'EIN／納税者番号', ko: 'EIN / 납세자번호', fr: 'EIN / N° fiscal' },
+      setLegalPersonLabel:{ 'zh-CN': '负责人', 'zh-TW': '負責人', en: 'Responsible Party', ja: '代表者', ko: '대표자', fr: 'Responsable' },
+      setCreditCodePh:    { 'zh-CN': '例如：12-3456789', 'zh-TW': '例如：12-3456789', en: 'e.g. 12-3456789', ja: '例：12-3456789', ko: '예: 12-3456789', fr: 'ex. : 12-3456789' },
+      setAddressPh:       { 'zh-CN': '例如：123 Main St, Los Angeles, CA', 'zh-TW': '例如：123 Main St, Los Angeles, CA', en: 'e.g. 123 Main St, Los Angeles, CA', ja: '例：123 Main St, Los Angeles, CA', ko: '예: 123 Main St, Los Angeles, CA', fr: 'ex. : 123 Main St, Los Angeles, CA' },
+      setVatRateLabel:    { 'zh-CN': 'Sales Tax 税率', 'zh-TW': 'Sales Tax 稅率', en: 'Sales Tax Rate', ja: 'Sales Tax（売上税）率', ko: 'Sales Tax 세율', fr: 'Taux de Sales Tax' },
+      setRateByState:     { 'zh-CN': '按州设置', 'zh-TW': '按州設置', en: 'By state', ja: '州別', ko: '주별', fr: 'Par État' },
+      setRateCustom:      { 'zh-CN': '自定义税率', 'zh-TW': '自訂稅率', en: 'Custom rate', ja: 'カスタム税率', ko: '사용자 지정 세율', fr: 'Taux personnalisé' },
+      setRateZero:        { 'zh-CN': '0%', 'zh-TW': '0%', en: '0%', ja: '0%', ko: '0%', fr: '0%' },
+      setAutoAuthLabel:   { 'zh-CN': '票据自动处理', 'zh-TW': '票據自動處理', en: 'Auto-process documents', ja: '伝票の自動処理', ko: '문서 자동 처리', fr: 'Traitement auto des pièces' },
+      setAutoAuthDesc:    { 'zh-CN': '上传后自动用于分类、归档和报表统计', 'zh-TW': '上傳後自動用於分類、歸檔和報表統計', en: 'Uploaded documents are auto-categorized, filed, and included in reports', ja: 'アップロード後、自動的に分類・保管・集計', ko: '업로드 후 자동 분류·보관·집계', fr: 'Pièces classées, archivées et comptabilisées automatiquement' },
+      setAdminExpenseLabel:{ 'zh-CN': '年度运营费用', 'zh-TW': '年度營運費用', en: 'Annual Operating Expenses', ja: '年間運営費', ko: '연간 운영비', fr: "Charges annuelles d'exploitation" },
+      setPerYear:         { 'zh-CN': '美元/年', 'zh-TW': '美元/年', en: 'USD/yr', ja: '米ドル/年', ko: '미국 달러/년', fr: 'USD/an' },
+      setTaxHint:         { 'zh-CN': '提示：销售税与各项费用按所在州规则计算；净利润 = 总收入 − 各项费用。', 'zh-TW': '提示：銷售稅與各項費用按所在州規則計算；淨利潤 = 總收入 − 各項費用。', en: "Note: sales tax and expenses follow your state's rules; net profit = gross income − expenses.", ja: '注：売上税と費用は州の規則に従います。純利益 = 総収入 − 費用。', ko: '참고: 판매세와 비용은 주 규정을 따릅니다. 순이익 = 총수입 − 비용.', fr: "Note : la sales tax et les charges suivent les règles de votre État ; bénéfice net = revenu brut − charges." },
+      setDeductibleHeader:{ 'zh-CN': '可扣除', 'zh-TW': '可扣除', en: 'Deductible', ja: '控除可', ko: '공제 가능', fr: 'Déductible' },
+      setDeductiblePctLabel:{ 'zh-CN': '可扣除比例 (%)', 'zh-TW': '可扣除比例 (%)', en: 'Deductible %', ja: '控除割合 (%)', ko: '공제 비율 (%)', fr: 'Part déductible (%)' },
+      setCatGrossReceipts:{ 'zh-CN': '总收入或销售额', 'zh-TW': '總收入或銷售額', en: 'Gross Receipts', ja: '総収入', ko: '총수입', fr: 'Recettes brutes' },
+      setCatHomeOffice:   { 'zh-CN': '家庭办公室', 'zh-TW': '家庭辦公室', en: 'Home Office', ja: '在宅オフィス', ko: '재택사무실', fr: 'Bureau à domicile' },
+      setNavAi:           { 'zh-CN': 'AI 服务商（BYOK）', 'zh-TW': 'AI 服務商（BYOK）', en: 'AI Providers (BYOK)', ja: 'AIプロバイダー（BYOK）', ko: 'AI 공급자(BYOK)', fr: 'Fournisseurs IA (BYOK)' },
+      setAddKey:          { 'zh-CN': '添加密钥', 'zh-TW': '新增密鑰', en: 'Add Key', ja: 'キーを追加', ko: '키 추가', fr: 'Ajouter la clé' },
+      setEditKey:         { 'zh-CN': '修改密钥', 'zh-TW': '修改密鑰', en: 'Edit Key', ja: 'キーを編集', ko: '키 편집', fr: 'Modifier la clé' },
+      setWebGrounding:    { 'zh-CN': '支持联网检索', 'zh-TW': '支援聯網檢索', en: 'Supports web search', ja: 'ウェブ検索対応', ko: '웹 검색 지원', fr: 'Recherche web prise en charge' },
+      // Company-info example placeholders — US sample values.
+      setCompanyNamePh:   { 'zh-CN': '例如：ABC Trading LLC', 'zh-TW': '例如：ABC Trading LLC', en: 'e.g. ABC Trading LLC', ja: '例：ABC Trading LLC', ko: '예: ABC Trading LLC', fr: 'ex. : ABC Trading LLC' },
+      setLegalPersonPh:   { 'zh-CN': '例如：John Smith', 'zh-TW': '例如：John Smith', en: 'e.g. John Smith', ja: '例：John Smith', ko: '예: John Smith', fr: 'ex. : John Smith' },
+      setIndustryPh:      { 'zh-CN': '例如：Consulting / Retail / Services', 'zh-TW': '例如：Consulting / Retail / Services', en: 'e.g. Consulting / Retail / Services', ja: '例：Consulting / Retail / Services', ko: '예: Consulting / Retail / Services', fr: 'ex. : Consulting / Retail / Services' },
       newSaleButton:      { 'zh-CN': '新增销售记录', 'zh-TW': '新增銷售記錄', en: 'New Sale', ja: '売上を追加', ko: '매출 추가', fr: 'Nouvelle vente' },
       invoiceInputLabel: { 'zh-CN': '费用凭证数', 'zh-TW': '費用憑證數', en: 'Expense Receipts', ja: '経費レシート', ko: '비용 영수증', fr: 'Reçus de dépenses' },
       invoiceOutputLabel: { 'zh-CN': '收入凭证数', 'zh-TW': '收入憑證數', en: 'Income Receipts', ja: '収入レシート', ko: '수입 영수증', fr: 'Reçus de revenus' },

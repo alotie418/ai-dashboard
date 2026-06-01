@@ -9,11 +9,23 @@ import {
   fetchSettings,
 } from '../services/api';
 import { ACCOUNTING_PROFILES } from './accountingProfiles';
+import { getTaxLabel } from './accountingHelpers';
 
 const CategoriesSection: React.FC = () => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language as LangCode;
   const [locale, setLocale] = useState<AccountingLocale>('CN');
+  // US accountingLocale shows US wording; other locales keep existing i18n / DB labels.
+  const usLabel = (taxKey: string, i18nKey: string, fallback: string) => locale === 'US' ? getTaxLabel(locale, lang, taxKey) : t(i18nKey, fallback);
+  // US display override for the two system categories whose seeded labels read
+  // Chinese-ledger-style (gross-receipts / home-office); display-only, US only.
+  const usCatLabel = (c: Category) => {
+    if (locale === 'US') {
+      if (c.slug === 'gross-receipts') return getTaxLabel(locale, lang, 'setCatGrossReceipts');
+      if (c.slug === 'home-office') return getTaxLabel(locale, lang, 'setCatHomeOffice');
+    }
+    return c.displayLabel;
+  };
   const [activeType, setActiveType] = useState<CategoryType>('expense');
   const [cats, setCats] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,7 +160,7 @@ const CategoriesSection: React.FC = () => {
                 <th className="text-left px-4 py-2.5">{t('settings.categories.label', '名称')}</th>
                 <th className="text-left px-4 py-2.5">Slug</th>
                 <th className="text-left px-4 py-2.5">{t('settings.categories.scheduleLine', '报表行')}</th>
-                <th className="text-right px-4 py-2.5">{t('settings.categories.deductible', '可抵扣')}</th>
+                <th className="text-right px-4 py-2.5">{usLabel('setDeductibleHeader', 'settings.categories.deductible', '可抵扣')}</th>
                 <th className="text-right px-4 py-2.5 w-24"></th>
               </tr>
             </thead>
@@ -159,7 +171,7 @@ const CategoriesSection: React.FC = () => {
               {cats.map(c => (
                 <tr key={c.id} className="border-t border-[#e0ddd5]/70 hover:bg-[#f9f9f8]/40">
                   <td className="px-4 py-2 text-[#191918]">
-                    {c.displayLabel}
+                    {usCatLabel(c)}
                     {!c.is_system && <span className="ml-2 text-[10px] bg-[#d97757]/10 text-[#d97757] px-1.5 py-0.5 rounded">{t('settings.categories.userMade', '自建')}</span>}
                   </td>
                   <td className="px-4 py-2 font-mono text-[11px] text-[#7a7a78]">{c.slug}</td>
@@ -215,7 +227,7 @@ const CategoriesSection: React.FC = () => {
                 className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white" />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{t('settings.categories.deductiblePct', '可抵扣比例 (%)')}</label>
+              <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{usLabel('setDeductiblePctLabel', 'settings.categories.deductiblePct', '可抵扣比例 (%)')}</label>
               <input type="number" min="0" max="100" value={newDeductiblePct} onChange={e => setNewDeductiblePct(Number(e.target.value))}
                 className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white" />
             </div>

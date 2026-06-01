@@ -18,7 +18,7 @@ const SEEDS = [
 
   // ============================ 🇺🇸 US (Schedule C) ============================
   // Income
-  { id: 'us-income-gross-receipts',locale: 'US', type: 'income',  slug: 'gross-receipts',  label_zh_cn: '营业总收入',  label_zh_tw: '營業總收入',  label_en: 'Gross Receipts',        label_ja: '総収入',     label_ko: '총수입',         label_fr: 'Recettes brutes',       schedule_line: 'Schedule C Line 1',  sort_order: 10 },
+  { id: 'us-income-gross-receipts',locale: 'US', type: 'income',  slug: 'gross-receipts',  label_zh_cn: '总收入或销售额',  label_zh_tw: '總收入或銷售額',  label_en: 'Gross Receipts',        label_ja: '総収入',     label_ko: '총수입',         label_fr: 'Recettes brutes',       schedule_line: 'Schedule C Line 1',  sort_order: 10 },
   { id: 'us-income-returns',       locale: 'US', type: 'income',  slug: 'returns',         label_zh_cn: '退货与折让',  label_zh_tw: '退貨與折讓',  label_en: 'Returns & Allowances',  label_ja: '返品・値引',  label_ko: '반품·할인',       label_fr: 'Retours & rabais',      schedule_line: 'Schedule C Line 2',  sort_order: 20 },
   { id: 'us-income-other',         locale: 'US', type: 'income',  slug: 'other-income',    label_zh_cn: '其他收入',    label_zh_tw: '其他收入',    label_en: 'Other Income',          label_ja: 'その他収入',  label_ko: '기타수입',       label_fr: 'Autres revenus',        schedule_line: 'Schedule C Line 6',  sort_order: 30 },
   // Expense (Part II Lines 8-27)
@@ -40,7 +40,7 @@ const SEEDS = [
   { id: 'us-expense-utilities',    locale: 'US', type: 'expense', slug: 'utilities',       label_zh_cn: '水电网',     label_zh_tw: '水電網',     label_en: 'Utilities',             label_ja: '水道光熱費', label_ko: '수도광열비',     label_fr: 'Énergie',               schedule_line: 'Schedule C Line 25', sort_order: 160 },
   { id: 'us-expense-wages',        locale: 'US', type: 'expense', slug: 'wages',           label_zh_cn: '工资',       label_zh_tw: '工資',       label_en: 'Wages',                 label_ja: '給料手当',   label_ko: '급여',           label_fr: 'Salaires',              schedule_line: 'Schedule C Line 26', sort_order: 170 },
   { id: 'us-expense-other',        locale: 'US', type: 'expense', slug: 'other',           label_zh_cn: '其他费用',   label_zh_tw: '其他費用',   label_en: 'Other Expenses',        label_ja: '雑費',       label_ko: '잡비',           label_fr: 'Autres charges',        schedule_line: 'Schedule C Line 27a', sort_order: 180 },
-  { id: 'us-expense-home-office',  locale: 'US', type: 'expense', slug: 'home-office',     label_zh_cn: '家庭办公',   label_zh_tw: '家庭辦公',   label_en: 'Home Office',           label_ja: '在宅オフィス', label_ko: '재택사무실',     label_fr: 'Bureau à domicile',     schedule_line: 'Form 8829', sort_order: 190 },
+  { id: 'us-expense-home-office',  locale: 'US', type: 'expense', slug: 'home-office',     label_zh_cn: '家庭办公室', label_zh_tw: '家庭辦公室', label_en: 'Home Office',           label_ja: '在宅オフィス', label_ko: '재택사무실',     label_fr: 'Bureau à domicile',     schedule_line: 'Form 8829', sort_order: 190 },
 
   // ============================ 🇯🇵 JP ============================
   // Income
