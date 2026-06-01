@@ -291,13 +291,16 @@ const AppContent: React.FC = () => {
   });
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   // Stable accounting locale for the AI assistant — sourced from settings,
-  // independent from dashboard data.locale
+  // Tracks the user's current accountingLocale (drives sidebar nav labels, AI &
+  // OCR context). Re-fetched on every page navigation so switching the
+  // accounting locale in Settings is reflected in the sidebar once the user
+  // navigates (not only at app start).
   const [assistantAccLocale, setAssistantAccLocale] = useState<string>('CN');
   useEffect(() => {
     fetchSettings().then((s: any) => {
       if (s?.accounting_locale) setAssistantAccLocale(s.accounting_locale);
     }).catch(() => {});
-  }, []);
+  }, [currentPage]);
   // Persist voice when user picks one
   const handleVoiceChange = (v: string) => {
     setSelectedVoice(v);
@@ -738,9 +741,9 @@ ${contextText}`;
         </div>
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
           <NavItem icon="fa-th-large" label={t('nav.dashboard')} active={currentPage === 'dashboard'} expanded={sidebarOpen} onClick={() => setCurrentPage('dashboard')} />
-          <NavItem icon="fa-file-import" label={assistantAccLocale === 'US' ? getTaxLabel(assistantAccLocale, i18n.language, 'navPurchase') : t('nav.purchase')} active={currentPage === 'purchase'} expanded={sidebarOpen} onClick={() => setCurrentPage('purchase')} />
-          <NavItem icon="fa-file-export" label={assistantAccLocale === 'US' ? getTaxLabel(assistantAccLocale, i18n.language, 'navSales') : t('nav.sales')} active={currentPage === 'sales'} expanded={sidebarOpen} onClick={() => setCurrentPage('sales')} />
-          <NavItem icon="fa-search-dollar" label={assistantAccLocale === 'US' ? getTaxLabel(assistantAccLocale, i18n.language, 'invQueryTitle') : t('nav.inventory')} active={currentPage === 'inventory'} expanded={sidebarOpen} onClick={() => setCurrentPage('inventory')} />
+          <NavItem icon="fa-file-import" label={(assistantAccLocale === 'US' || assistantAccLocale === 'JP') ? getTaxLabel(assistantAccLocale, i18n.language, 'navPurchase') : t('nav.purchase')} active={currentPage === 'purchase'} expanded={sidebarOpen} onClick={() => setCurrentPage('purchase')} />
+          <NavItem icon="fa-file-export" label={(assistantAccLocale === 'US' || assistantAccLocale === 'JP') ? getTaxLabel(assistantAccLocale, i18n.language, 'navSales') : t('nav.sales')} active={currentPage === 'sales'} expanded={sidebarOpen} onClick={() => setCurrentPage('sales')} />
+          <NavItem icon="fa-search-dollar" label={(assistantAccLocale === 'US' || assistantAccLocale === 'JP') ? getTaxLabel(assistantAccLocale, i18n.language, 'invQueryTitle') : t('nav.inventory')} active={currentPage === 'inventory'} expanded={sidebarOpen} onClick={() => setCurrentPage('inventory')} />
           <NavItem icon="fa-chart-pie" label={t('nav.analysis')} active={currentPage === 'analysis'} expanded={sidebarOpen} onClick={() => setCurrentPage('analysis')} />
           <NavItem icon="fa-handshake" label={t('nav.accounts')} active={currentPage === 'accounts'} expanded={sidebarOpen} onClick={() => setCurrentPage('accounts')} />
           <NavItem icon="fa-wallet" label={t('nav.finance')} active={currentPage === 'finance'} expanded={sidebarOpen} onClick={() => setCurrentPage('finance')} />
@@ -782,8 +785,12 @@ ${contextText}`;
               style={isElectronEnv ? ({ WebkitAppRegion: 'no-drag' } as React.CSSProperties) : undefined}
             >
               <h2 className="text-xl font-semibold text-[#191918]">
-                {assistantAccLocale === 'US' && currentPage === 'inventory'
+                {(assistantAccLocale === 'US' || assistantAccLocale === 'JP') && currentPage === 'inventory'
                   ? getTaxLabel(assistantAccLocale, i18n.language, 'invQueryTitle')
+                  : (assistantAccLocale === 'US' || assistantAccLocale === 'JP') && currentPage === 'purchase'
+                  ? getTaxLabel(assistantAccLocale, i18n.language, 'navPurchase')
+                  : (assistantAccLocale === 'US' || assistantAccLocale === 'JP') && currentPage === 'sales'
+                  ? getTaxLabel(assistantAccLocale, i18n.language, 'navSales')
                   : t(`headerTitle.${currentPage}`)}
               </h2>
               <div className="hidden lg:flex items-center space-x-4 pl-4 border-l border-[#e0ddd5]">
