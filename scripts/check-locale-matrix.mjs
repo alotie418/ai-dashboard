@@ -59,7 +59,8 @@ const REQUIRED_TAX_KEYS_BY_LOCALE = {
     'invDateRange', 'invStatusFilter', 'invWeightRange',
     'invStatusAll', 'invStatusVerified', 'invStatusCertified', 'invStatusDeducted',
     'invStatusPendingCert', 'invStatusPendingIssue', 'invStatusIssued',
-    'invAdvFilterActive', 'invInputRecordCount', 'invOutputRecordCount'],
+    'invAdvFilterActive', 'invInputRecordCount', 'invOutputRecordCount',
+    'acctReceivableTab', 'acctPayableTab', 'acctTotalReceivable', 'acctTotalPayable'],
 };
 
 // Banned cross-regime terminology
@@ -327,7 +328,8 @@ async function main() {
                            'invDateRange', 'invStatusFilter', 'invWeightRange',
                            'invStatusAll', 'invStatusVerified', 'invStatusCertified', 'invStatusDeducted',
                            'invStatusPendingCert', 'invStatusPendingIssue', 'invStatusIssued',
-                           'invAdvFilterActive', 'invInputRecordCount', 'invOutputRecordCount']) {
+                           'invAdvFilterActive', 'invInputRecordCount', 'invOutputRecordCount',
+                           'acctReceivableTab', 'acctPayableTab', 'acctTotalReceivable', 'acctTotalPayable']) {
           const label = helpers.getTaxLabel(accId, uiLang, key);
           for (const pattern of US_FORBIDDEN_CN_TERMS) {
             if (pattern.test(label)) {
@@ -386,6 +388,8 @@ async function main() {
               invAdvFilterActive: '已启用筛选，找到 {count} 条票据记录',
               invInputRecordCount: '{count} 条采购/费用记录',
               invOutputRecordCount: '{count} 条销售/收入记录',
+              acctReceivableTab: '客户应收', acctPayableTab: '供应商应付',
+              acctTotalReceivable: '客户应收总额', acctTotalPayable: '供应商应付总额',
             },
             'zh-TW': {
               invSearchPlaceholder: '搜尋票據號碼或往來單位...', invFilterAll: '全部票據',
@@ -395,6 +399,8 @@ async function main() {
               invAdvFilterActive: '已啟用篩選，找到 {count} 筆票據記錄',
               invInputRecordCount: '{count} 筆採購/費用記錄',
               invOutputRecordCount: '{count} 筆銷售/收入記錄',
+              acctReceivableTab: '客戶應收', acctPayableTab: '供應商應付',
+              acctTotalReceivable: '客戶應收總額', acctTotalPayable: '供應商應付總額',
             },
           };
           if (EXPECT[uiLang]) {
