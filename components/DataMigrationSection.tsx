@@ -5,12 +5,21 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  detectLegacyData, runLegacyMigration, rollbackLegacyMigration,
+  detectLegacyData, runLegacyMigration, rollbackLegacyMigration, fetchSettings,
   type LegacyDetectResult, type MigrationRunResult,
 } from '../services/api';
+import { getTaxLabel } from './accountingHelpers';
 
 const DataMigrationSection: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [accLocale, setAccLocale] = useState('CN');
+  useEffect(() => { fetchSettings().then((s: any) => { if (s?.accounting_locale) setAccLocale(s.accounting_locale); }).catch(() => {}); }, []);
+  // US accountingLocale shows user-facing wording (no internal table/field names);
+  // other locales keep their existing text. Three helpers: usLabel for i18n-keyed
+  // strings, usText for hardcoded fallbacks, usCount for {count}-interpolated.
+  const usLabel = (taxKey: string, i18nKey: string, fallback: string) => accLocale === 'US' ? getTaxLabel(accLocale, i18n.language, taxKey) : t(i18nKey, fallback);
+  const usText = (taxKey: string, fallback: string) => accLocale === 'US' ? getTaxLabel(accLocale, i18n.language, taxKey) : fallback;
+  const usCount = (taxKey: string, i18nKey: string, fallback: string, count: number) => accLocale === 'US' ? getTaxLabel(accLocale, i18n.language, taxKey).replace(/\{count\}/g, String(count)) : t(i18nKey, fallback, { count });
   const [detect, setDetect] = useState<LegacyDetectResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -75,7 +84,7 @@ const DataMigrationSection: React.FC = () => {
           {t('settings.dataMigration.title', '数据迁移')}
         </h3>
         <p className="text-xs text-[#6b6b69] mt-1">
-          {t('settings.dataMigration.subtitle', '把旧版本的 sales/purchases 数据一键迁移到新的 transactions 表（国际化数据模型）。旧表保留不删除，30 天内可回滚。')}
+          {usLabel('dmSubtitle', 'settings.dataMigration.subtitle', '把旧版本的 sales/purchases 数据一键迁移到新的 transactions 表（国际化数据模型）。旧表保留不删除，30 天内可回滚。')}
         </p>
       </div>
 
@@ -92,14 +101,14 @@ const DataMigrationSection: React.FC = () => {
       ) : detect && (!detect.sales.exists && !detect.purchases.exists) ? (
         <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
           <i className="fas fa-check-circle mr-2"></i>
-          {t('settings.dataMigration.noLegacy', '本数据库不存在旧版 sales/purchases 表，无需迁移。')}
+          {usLabel('dmNoLegacy', 'settings.dataMigration.noLegacy', '本数据库不存在旧版 sales/purchases 表，无需迁移。')}
         </div>
       ) : detect && (
         <>
           {/* 状态卡 */}
           <div className="grid grid-cols-2 gap-3">
             <div className="border border-[#e0ddd5] rounded-xl p-4 bg-white">
-              <div className="text-[10px] uppercase tracking-wider text-[#7a7a78] mb-1">sales（旧表 → income）</div>
+              <div className="text-[10px] uppercase tracking-wider text-[#7a7a78] mb-1">{usText('dmCardSales', 'sales（旧表 → income）')}</div>
               <div className="text-2xl font-bold text-[#191918]">{detect.sales.total}</div>
               <div className="text-[11px] text-[#5c5c5a] mt-1">
                 <span className="text-emerald-600">{t('settings.dataMigration.migrated', '已迁移')}: {detect.sales.migrated}</span>
@@ -108,7 +117,7 @@ const DataMigrationSection: React.FC = () => {
               </div>
             </div>
             <div className="border border-[#e0ddd5] rounded-xl p-4 bg-white">
-              <div className="text-[10px] uppercase tracking-wider text-[#7a7a78] mb-1">purchases（旧表 → expense）</div>
+              <div className="text-[10px] uppercase tracking-wider text-[#7a7a78] mb-1">{usText('dmCardPurchases', 'purchases（旧表 → expense）')}</div>
               <div className="text-2xl font-bold text-[#191918]">{detect.purchases.total}</div>
               <div className="text-[11px] text-[#5c5c5a] mt-1">
                 <span className="text-emerald-600">{t('settings.dataMigration.migrated', '已迁移')}: {detect.purchases.migrated}</span>
@@ -126,14 +135,23 @@ const DataMigrationSection: React.FC = () => {
                 {t('settings.dataMigration.runSuccess', '迁移完成')}
               </div>
               <div className="text-xs text-[#4a4a48] space-y-1">
-                <div>sales: <b>{result.salesMigrated}</b> migrated, {result.salesSkipped} skipped</div>
-                <div>purchases: <b>{result.purchasesMigrated}</b> migrated, {result.purchasesSkipped} skipped</div>
+                {accLocale === 'US' ? (
+                  <>
+                    <div>{usText('dmResultIncome', '收入记录已迁移')}: <b>{result.salesMigrated}</b></div>
+                    <div>{usText('dmResultExpense', '费用记录已迁移')}: <b>{result.purchasesMigrated}</b></div>
+                  </>
+                ) : (
+                  <>
+                    <div>sales: <b>{result.salesMigrated}</b> migrated, {result.salesSkipped} skipped</div>
+                    <div>purchases: <b>{result.purchasesMigrated}</b> migrated, {result.purchasesSkipped} skipped</div>
+                  </>
+                )}
                 {result.errors.length > 0 && (
                   <details className="mt-2">
                     <summary className="cursor-pointer text-rose-600">{result.errors.length} {t('settings.dataMigration.errors', '个错误')}</summary>
                     <div className="mt-1 max-h-32 overflow-y-auto text-[10px] font-mono bg-white border border-[#e0ddd5] rounded p-2">
                       {result.errors.map((e, i) => (
-                        <div key={i}>{e.legacy_table}/{e.legacy_id}: {e.error}</div>
+                        <div key={i}>{accLocale === 'US' ? e.error : `${e.legacy_table}/${e.legacy_id}: ${e.error}`}</div>
                       ))}
                     </div>
                   </details>
@@ -163,7 +181,7 @@ const DataMigrationSection: React.FC = () => {
                 <div className="border border-rose-200 bg-rose-50 rounded-lg p-3 space-y-2">
                   <div className="text-xs text-rose-700 font-medium">
                     <i className="fas fa-exclamation-triangle mr-1.5"></i>
-                    {t('settings.dataMigration.rollbackConfirm', '确认回滚？这将删除 {{count}} 条已迁移的 transactions，旧 sales/purchases 数据保持不变。', { count: totalMigrated })}
+                    {usCount('dmRollbackConfirm', 'settings.dataMigration.rollbackConfirm', '确认回滚？这将删除 {{count}} 条已迁移的 transactions，旧 sales/purchases 数据保持不变。', totalMigrated)}
                   </div>
                   <div className="flex space-x-2">
                     <button onClick={() => setConfirmRollback(false)} className="text-xs px-3 py-1 border border-[#e0ddd5] text-[#4a4a48] rounded">{t('common.cancel')}</button>
@@ -178,17 +196,17 @@ const DataMigrationSection: React.FC = () => {
                   className="w-full text-xs text-rose-600 hover:text-rose-700 py-1"
                 >
                   <i className="fas fa-undo mr-1"></i>
-                  {t('settings.dataMigration.rollback', '回滚迁移（删除已迁移的 {{count}} 条 transactions）', { count: totalMigrated })}
+                  {usCount('dmRollback', 'settings.dataMigration.rollback', '回滚迁移（删除已迁移的 {{count}} 条 transactions）', totalMigrated)}
                 </button>
               )
             )}
           </div>
 
           <div className="text-[10px] text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3 space-y-1">
-            <div><i className="fas fa-info-circle mr-1.5 text-[#d97757]"></i>{t('settings.dataMigration.note1', 'sales → income / purchases → expense; defaults to the current accounting locale’s first income / COGS category')}</div>
-            <div className="ml-4">{t('settings.dataMigration.note2', 'Legacy tables are kept and can be rolled back at any time')}</div>
-            <div className="ml-4">{t('settings.dataMigration.note3', 'Migration records are written to legacy_migrations to prevent duplicates')}</div>
-            <div className="ml-4">{t('settings.dataMigration.note4', 'Legacy fields (quantity / unit price / shipping) are preserved in source_meta JSON')}</div>
+            <div><i className="fas fa-info-circle mr-1.5 text-[#d97757]"></i>{usLabel('dmNote1', 'settings.dataMigration.note1', 'sales → income / purchases → expense; defaults to the current accounting locale’s first income / COGS category')}</div>
+            <div className="ml-4">{usLabel('dmNote2', 'settings.dataMigration.note2', 'Legacy tables are kept and can be rolled back at any time')}</div>
+            <div className="ml-4">{usLabel('dmNote3', 'settings.dataMigration.note3', 'Migration records are written to legacy_migrations to prevent duplicates')}</div>
+            <div className="ml-4">{usLabel('dmNote4', 'settings.dataMigration.note4', 'Legacy fields (quantity / unit price / shipping) are preserved in source_meta JSON')}</div>
           </div>
         </>
       )}

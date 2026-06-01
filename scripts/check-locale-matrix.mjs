@@ -69,7 +69,9 @@ const REQUIRED_TAX_KEYS_BY_LOCALE = {
     'setAutoAuthLabel', 'setAutoAuthDesc', 'setAdminExpenseLabel', 'setPerYear', 'setTaxHint',
     'setDeductibleHeader', 'setDeductiblePctLabel', 'setCatGrossReceipts', 'setCatHomeOffice',
     'setNavAi', 'setAddKey', 'setEditKey', 'setWebGrounding',
-    'setCompanyNamePh', 'setLegalPersonPh', 'setIndustryPh'],
+    'setCompanyNamePh', 'setLegalPersonPh', 'setIndustryPh',
+    'dmSubtitle', 'dmCardSales', 'dmCardPurchases', 'dmNoLegacy', 'dmResultIncome', 'dmResultExpense',
+    'dmRollbackConfirm', 'dmRollback', 'dmNote1', 'dmNote2', 'dmNote3', 'dmNote4'],
 };
 
 // Banned cross-regime terminology
@@ -404,6 +406,20 @@ async function main() {
           const vat = helpers.getTaxLabel(accId, uiLang, 'setVatRateLabel');
           if (/增值税|增值稅/.test(vat)) reasons.push(`US setVatRateLabel[${uiLang}] still says 增值税: "${vat}"`);
         }
+        // US data-migration page: no internal table/field/JSON names should leak
+        // into the Chinese UI; the rollback strings must keep the {count} token.
+        if (uiLang === 'zh-CN' || uiLang === 'zh-TW') {
+          const INTERNAL = /sales|purchases|transaction|source_meta|legacy_migrations|cogs|\bincome\b|\bexpense\b/i;
+          for (const key of ['dmSubtitle', 'dmCardSales', 'dmCardPurchases', 'dmNoLegacy', 'dmResultIncome',
+                             'dmResultExpense', 'dmRollbackConfirm', 'dmRollback', 'dmNote1', 'dmNote2', 'dmNote3', 'dmNote4']) {
+            const v = helpers.getTaxLabel(accId, uiLang, key);
+            if (INTERNAL.test(v)) reasons.push(`US ${key}[${uiLang}] exposes internal term: "${v}"`);
+          }
+        }
+        for (const key of ['dmRollbackConfirm', 'dmRollback']) {
+          const v = helpers.getTaxLabel(accId, uiLang, key);
+          if (!v.includes('{count}')) reasons.push(`US ${key}[${uiLang}] missing {count} token: "${v}"`);
+        }
         // Exact-string lock-in for the search placeholder + "all documents" tab.
         // These regressed by silently losing a trailing character (码/据 →
         // "搜索票据号..." / "全部票"); pin the full expected strings so any future
@@ -433,6 +449,11 @@ async function main() {
               setDeductibleHeader: '可扣除', setCatGrossReceipts: '总收入或销售额', setCatHomeOffice: '家庭办公室',
               setNavAi: 'AI 服务商（BYOK）', setAddKey: '添加密钥', setEditKey: '修改密钥', setWebGrounding: '支持联网检索',
               setCompanyNamePh: '例如：ABC Trading LLC', setLegalPersonPh: '例如：John Smith', setIndustryPh: '例如：Consulting / Retail / Services',
+              dmCardSales: '销售记录（旧版）→ 收入记录', dmCardPurchases: '采购记录（旧版）→ 费用记录',
+              dmNoLegacy: '没有需要迁移的旧版数据。',
+              dmNote1: '销售记录将迁移为收入记录，采购记录将迁移为费用记录。',
+              dmNote2: '旧表数据会保留，可随时回滚。',
+              dmNote3: '迁移记录会保存原始记录快照，不会丢失。',
             },
             'zh-TW': {
               invSearchPlaceholder: '搜尋票據號碼或往來單位...', invFilterAll: '全部票據',
@@ -456,6 +477,11 @@ async function main() {
               setDeductibleHeader: '可扣除', setCatGrossReceipts: '總收入或銷售額', setCatHomeOffice: '家庭辦公室',
               setNavAi: 'AI 服務商（BYOK）', setAddKey: '新增密鑰', setEditKey: '修改密鑰', setWebGrounding: '支援聯網檢索',
               setCompanyNamePh: '例如：ABC Trading LLC', setLegalPersonPh: '例如：John Smith', setIndustryPh: '例如：Consulting / Retail / Services',
+              dmCardSales: '銷售記錄（舊版）→ 收入記錄', dmCardPurchases: '採購記錄（舊版）→ 費用記錄',
+              dmNoLegacy: '沒有需要遷移的舊版資料。',
+              dmNote1: '銷售記錄將遷移為收入記錄，採購記錄將遷移為費用記錄。',
+              dmNote2: '舊表資料會保留，可隨時回復。',
+              dmNote3: '遷移記錄會保存原始記錄快照，不會遺失。',
             },
           };
           if (EXPECT[uiLang]) {
