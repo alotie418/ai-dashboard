@@ -63,7 +63,13 @@ const REQUIRED_TAX_KEYS_BY_LOCALE = {
     'acctReceivableTab', 'acctPayableTab', 'acctTotalReceivable', 'acctTotalPayable',
     'balRecvLabel', 'balPayLabel', 'balTaxPayLabel', 'balPaidInCapital',
     'balRetainedEarnings', 'balLiabEquityHeader', 'balTotalLiabEquity', 'balCashflowAdd',
-    'txnAccountHeader'],
+    'txnAccountHeader',
+    'setCreditCodeLabel', 'setLegalPersonLabel', 'setCreditCodePh', 'setAddressPh',
+    'setVatRateLabel', 'setRateByState', 'setRateCustom', 'setRateZero',
+    'setAutoAuthLabel', 'setAutoAuthDesc', 'setAdminExpenseLabel', 'setPerYear', 'setTaxHint',
+    'setDeductibleHeader', 'setDeductiblePctLabel', 'setCatGrossReceipts', 'setCatHomeOffice',
+    'setNavAi', 'setAddKey', 'setEditKey', 'setWebGrounding',
+    'setCompanyNamePh', 'setLegalPersonPh', 'setIndustryPh'],
 };
 
 // Banned cross-regime terminology
@@ -200,6 +206,7 @@ function get(obj, path) {
 
 async function main() {
   const config = await import(join(ROOT, 'components/accountingLocaleConfig.ts'));
+  const accProfiles = await import(join(ROOT, 'components/accountingProfiles.ts'));
   const helpers = await import(join(ROOT, 'components/accountingHelpers.ts'));
   const invoiceProfiles = await import(join(ROOT, 'electron/ai/invoiceProfiles.js'));
   const promptBuilder = await import(join(ROOT, 'electron/ai/ocrPromptBuilder.js'));
@@ -336,7 +343,13 @@ async function main() {
                            'acctReceivableTab', 'acctPayableTab', 'acctTotalReceivable', 'acctTotalPayable',
                            'balRecvLabel', 'balPayLabel', 'balTaxPayLabel', 'balPaidInCapital',
                            'balRetainedEarnings', 'balLiabEquityHeader', 'balTotalLiabEquity', 'balCashflowAdd',
-                           'txnAccountHeader']) {
+                           'txnAccountHeader',
+                           'setCreditCodeLabel', 'setLegalPersonLabel', 'setVatRateLabel', 'setRateByState',
+                           'setRateCustom', 'setRateZero', 'setAutoAuthLabel', 'setAutoAuthDesc',
+                           'setAdminExpenseLabel', 'setPerYear', 'setTaxHint', 'setDeductibleHeader',
+                           'setDeductiblePctLabel', 'setCatGrossReceipts', 'setCatHomeOffice',
+                           'setNavAi', 'setAddKey', 'setEditKey', 'setWebGrounding',
+                           'setCompanyNamePh', 'setLegalPersonPh', 'setIndustryPh']) {
           const label = helpers.getTaxLabel(accId, uiLang, key);
           for (const pattern of US_FORBIDDEN_CN_TERMS) {
             if (pattern.test(label)) {
@@ -380,6 +393,17 @@ async function main() {
           const rendered = v.replace(/\{count\}/g, '7');
           if (/\{count\}|\{\{|\}\}/.test(rendered)) reasons.push(`US ${key}[${uiLang}] has malformed interpolation token: "${v}"`);
         }
+        // US settings page: keep CN tax/company wording out of the re-flagged fields.
+        {
+          const hint = helpers.getTaxLabel(accId, uiLang, 'setTaxHint');
+          if (/增值税|增值稅|税金及附加|稅金及附加|所得税|所得稅/.test(hint)) reasons.push(`US setTaxHint[${uiLang}] uses CN-tax wording: "${hint}"`);
+          const auto = helpers.getTaxLabel(accId, uiLang, 'setAutoAuthLabel') + ' / ' + helpers.getTaxLabel(accId, uiLang, 'setAutoAuthDesc');
+          if (/认证|認證|进项|進項|税务系统|稅務系統/.test(auto)) reasons.push(`US setAutoAuth[${uiLang}] uses CN-VAT wording: "${auto}"`);
+          const credit = helpers.getTaxLabel(accId, uiLang, 'setCreditCodeLabel') + ' / ' + helpers.getTaxLabel(accId, uiLang, 'setCreditCodePh');
+          if (/统一社会信用代码|統一社會信用代碼|91110000/.test(credit)) reasons.push(`US creditCode[${uiLang}] uses CN business-code wording: "${credit}"`);
+          const vat = helpers.getTaxLabel(accId, uiLang, 'setVatRateLabel');
+          if (/增值税|增值稅/.test(vat)) reasons.push(`US setVatRateLabel[${uiLang}] still says 增值税: "${vat}"`);
+        }
         // Exact-string lock-in for the search placeholder + "all documents" tab.
         // These regressed by silently losing a trailing character (码/据 →
         // "搜索票据号..." / "全部票"); pin the full expected strings so any future
@@ -403,6 +427,12 @@ async function main() {
               balCashflowAdd: '添加收支记录',
               kpiGrossIncome: '总收入',
               txnAccountHeader: '账户',
+              setCreditCodeLabel: 'EIN / 税号', setLegalPersonLabel: '负责人',
+              setVatRateLabel: 'Sales Tax 税率', setRateByState: '按州设置', setRateCustom: '自定义税率', setRateZero: '0%',
+              setAutoAuthLabel: '票据自动处理', setAdminExpenseLabel: '年度运营费用', setPerYear: '美元/年',
+              setDeductibleHeader: '可扣除', setCatGrossReceipts: '总收入或销售额', setCatHomeOffice: '家庭办公室',
+              setNavAi: 'AI 服务商（BYOK）', setAddKey: '添加密钥', setEditKey: '修改密钥', setWebGrounding: '支持联网检索',
+              setCompanyNamePh: '例如：ABC Trading LLC', setLegalPersonPh: '例如：John Smith', setIndustryPh: '例如：Consulting / Retail / Services',
             },
             'zh-TW': {
               invSearchPlaceholder: '搜尋票據號碼或往來單位...', invFilterAll: '全部票據',
@@ -420,6 +450,12 @@ async function main() {
               balCashflowAdd: '新增收支記錄',
               kpiGrossIncome: '總收入',
               txnAccountHeader: '帳戶',
+              setCreditCodeLabel: 'EIN / 稅號', setLegalPersonLabel: '負責人',
+              setVatRateLabel: 'Sales Tax 稅率', setRateByState: '按州設置', setRateCustom: '自訂稅率', setRateZero: '0%',
+              setAutoAuthLabel: '票據自動處理', setAdminExpenseLabel: '年度營運費用', setPerYear: '美元/年',
+              setDeductibleHeader: '可扣除', setCatGrossReceipts: '總收入或銷售額', setCatHomeOffice: '家庭辦公室',
+              setNavAi: 'AI 服務商（BYOK）', setAddKey: '新增密鑰', setEditKey: '修改密鑰', setWebGrounding: '支援聯網檢索',
+              setCompanyNamePh: '例如：ABC Trading LLC', setLegalPersonPh: '例如：John Smith', setIndustryPh: '例如：Consulting / Retail / Services',
             },
           };
           if (EXPECT[uiLang]) {
@@ -832,6 +868,21 @@ async function main() {
       }
       if (reasons.length) fail(`usTaxWording:${lang}`, reasons); else pass(`usTaxWording:${lang}`);
     }
+  }
+
+  // ────────────────────────────────────────────────
+  // PART G0d: US accounting-profile notes (会计制度 page description).
+  //   Must state the US has NO federal VAT (无联邦 VAT), never read as if the
+  //   US has a federal VAT (美国联邦 VAT), and must keep the official terms.
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const usNotes = accProfiles.getProfile('US').notes || '';
+    if (/美国联邦\s*VAT|美國聯邦\s*VAT/.test(usNotes)) reasons.push(`US profile.notes implies a US federal VAT: "${usNotes}"`);
+    if (!/无联邦\s*VAT|無聯邦\s*VAT/.test(usNotes)) reasons.push(`US profile.notes should state 无联邦 VAT: "${usNotes}"`);
+    if (!/Federal Corporate Tax/.test(usNotes)) reasons.push(`US profile.notes should mention Federal Corporate Tax: "${usNotes}"`);
+    if (/增值税|增值稅|进项|進項|税金及附加|稅金及附加/.test(usNotes)) reasons.push(`US profile.notes uses CN-VAT wording: "${usNotes}"`);
+    if (reasons.length) fail(`usProfileNotes:US`, reasons); else pass(`usProfileNotes:US`);
   }
 
   // ────────────────────────────────────────────────

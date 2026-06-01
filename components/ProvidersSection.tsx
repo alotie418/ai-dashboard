@@ -9,7 +9,9 @@ import {
   removeProvider,
   setDefaultProvider,
   testProvider,
+  fetchSettings,
 } from '../services/api';
+import { getTaxLabel } from './accountingHelpers';
 import { KNOWN_MODELS, DEFAULT_MODEL, modelLabelFor, findModelOption, shouldAutoMigrate } from './aiProviderModels';
 
 const PROVIDER_DOCS: Record<AIProviderId, { label: string; getKeyUrl: string; placeholder: string; icon: string; color: string }> = {
@@ -35,7 +37,11 @@ const initRow = (model: string): RowState => ({
 });
 
 const ProvidersSection: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [accLocale, setAccLocale] = useState('CN');
+  useEffect(() => { fetchSettings().then((s: any) => { if (s?.accounting_locale) setAccLocale(s.accounting_locale); }).catch(() => {}); }, []);
+  // US accountingLocale shows US wording (密钥 / 联网检索); other locales unchanged.
+  const usLabel = (taxKey: string, i18nKey: string) => accLocale === 'US' ? getTaxLabel(accLocale, i18n.language, taxKey) : t(i18nKey);
   const [providers, setProviders] = useState<AIProviderConfig[]>([]);
   const [rowStates, setRowStates] = useState<Record<AIProviderId, RowState>>({} as any);
   const [globalMessage, setGlobalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -211,7 +217,7 @@ const ProvidersSection: React.FC = () => {
                                 <code className="ml-1.5 bg-[#f0eeeb] px-1.5 py-0.5 rounded text-[10px]">{p.model}</code>
                               )}
                               {p.supportsTTS && <span className="ml-2 text-[#d97757]">{t('settings.ai.supportsTTS')}</span>}
-                              {p.supportsWebGrounding && <span className="ml-2 text-[#d97757]">{t('settings.ai.supportsWebGrounding')}</span>}
+                              {p.supportsWebGrounding && <span className="ml-2 text-[#d97757]">{usLabel('setWebGrounding', 'settings.ai.supportsWebGrounding')}</span>}
                             </div>
                             {!isKnown && p.hasKey && (
                               <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1.5">
@@ -241,7 +247,7 @@ const ProvidersSection: React.FC = () => {
                     {!row.editing ? (
                       <button onClick={() => startEdit(p)} className="text-xs px-3 py-1.5 border border-[#e0ddd5] text-[#4a4a48] rounded-lg hover:bg-[#f0eeeb]">
                         <i className={`fas ${p.hasKey ? 'fa-edit' : 'fa-plus'} mr-1.5`}></i>
-                        {p.hasKey ? t('settings.ai.editKey') : t('settings.ai.addKey')}
+                        {p.hasKey ? usLabel('setEditKey', 'settings.ai.editKey') : usLabel('setAddKey', 'settings.ai.addKey')}
                       </button>
                     ) : (
                       <button onClick={() => cancelEdit(p.provider)} className="text-xs px-3 py-1.5 border border-[#e0ddd5] text-[#4a4a48] rounded-lg hover:bg-[#f0eeeb]">

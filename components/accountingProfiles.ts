@@ -46,7 +46,7 @@ export const ACCOUNTING_PROFILES: Record<string, AccountingProfile> = {
     incomeTaxRate: 21, // Federal Corporate Tax，州税另算
     currency: 'USD',
     currencySymbol: '$',
-    notes: '美国无联邦 VAT，Sales Tax 由各州征收（0%-10%+）。本预设默认 0，用户应按企业所在州调整。Federal Corporate Tax 21%；S-Corp/LLC 通常按个人所得税申报',
+    notes: '美国无联邦 VAT；Sales Tax 通常由州和地方征收。Federal Corporate Tax 为 21%；S-Corp/LLC 通常按个人所得税申报。',
   },
   JP: {
     locale: 'JP',

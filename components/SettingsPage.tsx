@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fetchSettings, saveSettings } from '../services/api';
+import { getTaxLabel } from './accountingHelpers';
 import ProvidersSection from './ProvidersSection';
 import LanguageSection from './LanguageSection';
 import AccountingSection from './AccountingSection';
@@ -9,8 +10,15 @@ import CategoriesSection from './CategoriesSection';
 import DataMigrationSection from './DataMigrationSection';
 
 const SettingsPage: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [activeSection, setActiveSection] = useState('company');
+  const [accLocale, setAccLocale] = useState('CN');
+  // US accountingLocale shows US framing (EIN, Sales Tax, owner/operator) while
+  // CN/EU/JP/KR/TW keep their existing settings.* i18n values. usLabel(taxKey,
+  // i18nKey) returns the US taxConcept under US, else the default i18n value.
+  const usLabel = (taxKey: string, i18nKey: string) => accLocale === 'US' ? getTaxLabel(accLocale, i18n.language, taxKey) : t(i18nKey);
+  // For hardcoded (non-i18n) placeholders: US taxConcept, else the literal fallback.
+  const usPh = (taxKey: string, fallback: string) => accLocale === 'US' ? getTaxLabel(accLocale, i18n.language, taxKey) : fallback;
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -89,6 +97,7 @@ const SettingsPage: React.FC = () => {
 
   // Apply fetched settings to state
   const applySettings = (s: any) => {
+    if (s.accounting_locale) setAccLocale(s.accounting_locale);
     if (s.company_info) setCompanyInfo(s.company_info);
     if (s.tax_auto_auth !== undefined) setTaxAutoAuth(s.tax_auto_auth);
     if (s.ai_auto_insight !== undefined) setAiAutoInsight(s.ai_auto_insight);
@@ -144,7 +153,7 @@ const SettingsPage: React.FC = () => {
         <div className="w-full md:w-64 space-y-2">
           <SettingsNavLink active={activeSection === 'company'} onClick={() => setActiveSection('company')} icon="fa-building" label={t('settings.nav.company')} />
           <SettingsNavLink active={activeSection === 'tax'} onClick={() => setActiveSection('tax')} icon="fa-percent" label={t('settings.nav.tax')} />
-          <SettingsNavLink active={activeSection === 'ai'} onClick={() => setActiveSection('ai')} icon="fa-microchip" label={t('settings.nav.ai')} />
+          <SettingsNavLink active={activeSection === 'ai'} onClick={() => setActiveSection('ai')} icon="fa-microchip" label={usLabel('setNavAi', 'settings.nav.ai')} />
           <SettingsNavLink active={activeSection === 'language'} onClick={() => setActiveSection('language')} icon="fa-language" label={t('settings.nav.language')} />
           <SettingsNavLink active={activeSection === 'accounting'} onClick={() => setActiveSection('accounting')} icon="fa-balance-scale" label={t('settings.nav.accounting')} />
           <SettingsNavLink active={activeSection === 'categories'} onClick={() => setActiveSection('categories')} icon="fa-tags" label={t('settings.nav.categories')} />
@@ -204,13 +213,13 @@ const SettingsPage: React.FC = () => {
               <section className="space-y-6">
                 <h3 className="text-xl font-bold text-[#191918] mb-6">{t('settings.company.title')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InputGroup label={t('settings.company.name')} placeholder="AI Dashboard 贸易有限公司" value={companyInfo.name} onChange={(v) => setCompanyInfo(prev => ({ ...prev, name: v }))} />
-                  <InputGroup label={t('settings.company.creditCode')} placeholder="91110000XXXXXXXXXX" value={companyInfo.creditCode} onChange={(v) => setCompanyInfo(prev => ({ ...prev, creditCode: v }))} />
-                  <InputGroup label={t('settings.company.legalPerson')} placeholder="张晓明" value={companyInfo.legalPerson} onChange={(v) => setCompanyInfo(prev => ({ ...prev, legalPerson: v }))} />
-                  <InputGroup label={t('settings.company.industry')} placeholder="通用贸易 / 供应链" value={companyInfo.industry} onChange={(v) => setCompanyInfo(prev => ({ ...prev, industry: v }))} />
+                  <InputGroup label={t('settings.company.name')} placeholder={usPh('setCompanyNamePh', 'AI Dashboard 贸易有限公司')} value={companyInfo.name} onChange={(v) => setCompanyInfo(prev => ({ ...prev, name: v }))} />
+                  <InputGroup label={usLabel('setCreditCodeLabel', 'settings.company.creditCode')} placeholder={usPh('setCreditCodePh', '91110000XXXXXXXXXX')} value={companyInfo.creditCode} onChange={(v) => setCompanyInfo(prev => ({ ...prev, creditCode: v }))} />
+                  <InputGroup label={usLabel('setLegalPersonLabel', 'settings.company.legalPerson')} placeholder={usPh('setLegalPersonPh', '张晓明')} value={companyInfo.legalPerson} onChange={(v) => setCompanyInfo(prev => ({ ...prev, legalPerson: v }))} />
+                  <InputGroup label={t('settings.company.industry')} placeholder={usPh('setIndustryPh', '通用贸易 / 供应链')} value={companyInfo.industry} onChange={(v) => setCompanyInfo(prev => ({ ...prev, industry: v }))} />
                 </div>
                 <div className="pt-4">
-                  <InputGroup label={t('settings.company.address')} placeholder="北京市朝阳区..." value={companyInfo.address} onChange={(v) => setCompanyInfo(prev => ({ ...prev, address: v }))} />
+                  <InputGroup label={t('settings.company.address')} placeholder={usPh('setAddressPh', '北京市朝阳区...')} value={companyInfo.address} onChange={(v) => setCompanyInfo(prev => ({ ...prev, address: v }))} />
                 </div>
               </section>
             )}
@@ -221,30 +230,30 @@ const SettingsPage: React.FC = () => {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-4 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5]">
                     <div>
-                      <p className="text-sm font-bold text-[#191918]">{t('settings.tax.vatRate')}</p>
+                      <p className="text-sm font-bold text-[#191918]">{usLabel('setVatRateLabel', 'settings.tax.vatRate')}</p>
                       <p className="text-xs text-[#5c5c5a]">{t('settings.tax.vatRateDesc')}</p>
                     </div>
                     <select value={vatRate} onChange={e => setVatRate(e.target.value)} className="bg-white border border-[#d1cdc4] rounded-lg px-3 py-1 text-sm outline-none">
-                      <option value="13">{t('settings.tax.rate13')}</option>
-                      <option value="9">{t('settings.tax.rate9')}</option>
-                      <option value="6">{t('settings.tax.rate6')}</option>
+                      <option value="13">{usLabel('setRateByState', 'settings.tax.rate13')}</option>
+                      <option value="9">{usLabel('setRateCustom', 'settings.tax.rate9')}</option>
+                      <option value="6">{usLabel('setRateZero', 'settings.tax.rate6')}</option>
                     </select>
                   </div>
                   <div className="flex items-center justify-between p-4 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5]">
                     <div>
-                      <p className="text-sm font-bold text-[#191918]">{t('settings.tax.autoAuth')}</p>
-                      <p className="text-xs text-[#5c5c5a]">{t('settings.tax.autoAuthDesc')}</p>
+                      <p className="text-sm font-bold text-[#191918]">{usLabel('setAutoAuthLabel', 'settings.tax.autoAuth')}</p>
+                      <p className="text-xs text-[#5c5c5a]">{usLabel('setAutoAuthDesc', 'settings.tax.autoAuthDesc')}</p>
                     </div>
                     <ToggleButton checked={taxAutoAuth} onChange={setTaxAutoAuth} />
                   </div>
 
                   <div className="p-4 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5] space-y-3">
                     <div>
-                      <p className="text-sm font-bold text-[#191918]">{t('settings.tax.adminExpense')}</p>
+                      <p className="text-sm font-bold text-[#191918]">{usLabel('setAdminExpenseLabel', 'settings.tax.adminExpense')}</p>
                       <p className="text-xs text-[#5c5c5a]">{t('settings.tax.adminExpenseDesc')}</p>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className="text-sm text-[#5c5c5a]">¥</span>
+                      <span className="text-sm text-[#5c5c5a]">{accLocale === 'US' ? '$' : '¥'}</span>
                       <input
                         type="number"
                         min="0"
@@ -254,9 +263,9 @@ const SettingsPage: React.FC = () => {
                         placeholder="0"
                         className="flex-1 bg-white border border-[#d1cdc4] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918]"
                       />
-                      <span className="text-xs text-[#5c5c5a]">{t('settings.tax.perYear')}</span>
+                      <span className="text-xs text-[#5c5c5a]">{usLabel('setPerYear', 'settings.tax.perYear')}</span>
                     </div>
-                    <p className="text-[10px] text-[#8a8a88]">{t('settings.tax.hint')}</p>
+                    <p className="text-[10px] text-[#8a8a88]">{usLabel('setTaxHint', 'settings.tax.hint')}</p>
                   </div>
                 </div>
               </section>
