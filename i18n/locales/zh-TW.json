@@ -754,10 +754,10 @@
     "balanceLiabilitiesEquity": "負債與權益"
   },
   "usSchedule": {
-    "line1": "Line 1 — 營業總收入",
+    "line1": "Line 1 — 總收入或銷售額",
     "line2": "Line 2 — 退貨與折讓",
     "line6": "Line 6 — 其他收入",
-    "line7": "Line 7 — 營業總所得",
+    "line7": "Line 7 — 總收入",
     "line8": "Line 8 — 廣告費",
     "line9": "Line 9 — 車輛費用",
     "line10": "Line 10 — 佣金",

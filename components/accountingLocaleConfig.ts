@@ -103,7 +103,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       plTitle:       { 'zh-CN': 'Schedule C（营业损益表）', 'zh-TW': 'Schedule C（營業損益表）', en: 'Schedule C — Profit or Loss From Business', ja: 'Schedule C（事業損益）', ko: 'Schedule C (사업 손익)', fr: 'Schedule C (Profits ou pertes d\'activité)' },
       tabPlLabel:    { 'zh-CN': 'Schedule C', 'zh-TW': 'Schedule C', en: 'Schedule C', ja: 'Schedule C', ko: 'Schedule C', fr: 'Schedule C' },
       formTaxRate:   { 'zh-CN': 'Sales Tax（销售税）税率', 'zh-TW': 'Sales Tax（銷售稅）稅率', en: 'Sales Tax Rate', ja: 'Sales Tax（売上税）率', ko: 'Sales Tax (판매세) 세율', fr: 'Taux Sales Tax (taxe de vente)' },
-      kpiGrossIncome:{ 'zh-CN': '营业总所得', 'zh-TW': '營業總所得', en: 'Gross Income', ja: '総所得', ko: '총소득', fr: 'Revenu brut' },
+      kpiGrossIncome:{ 'zh-CN': '总收入', 'zh-TW': '總收入', en: 'Gross Income', ja: '総所得', ko: '총소득', fr: 'Revenu brut' },
       kpiQuarterlyTax:{ 'zh-CN': '预估季度税', 'zh-TW': '預估季度稅', en: 'Est. Quarterly Tax', ja: '四半期予定税', ko: '예상 분기 세금', fr: 'Acompte trimestriel' },
       profitMargins: { 'zh-CN': '利润率指标', 'zh-TW': '利潤率指標', en: 'Profit Margins', ja: '利益率指標', ko: '이익률 지표', fr: 'Marges bénéficiaires' },
       grossMargin:   { 'zh-CN': '毛利率', 'zh-TW': '毛利率', en: 'Gross Margin', ja: '粗利率', ko: '매출총이익률', fr: 'Marge brute' },
@@ -170,6 +170,17 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       acctPayableTab:     { 'zh-CN': '供应商应付', 'zh-TW': '供應商應付', en: 'Supplier Payables', ja: '仕入先買掛金', ko: '공급업체 미지급금', fr: 'Dettes fournisseurs' },
       acctTotalReceivable:{ 'zh-CN': '客户应收总额', 'zh-TW': '客戶應收總額', en: 'Total Customer Receivables', ja: '売掛金合計', ko: '고객 미수금 합계', fr: 'Total créances clients' },
       acctTotalPayable:   { 'zh-CN': '供应商应付总额', 'zh-TW': '供應商應付總額', en: 'Total Supplier Payables', ja: '買掛金合計', ko: '공급업체 미지급금 합계', fr: 'Total dettes fournisseurs' },
+      // Finance report (财务报表) — US balance-sheet / cash-flow wording. zh-CN/
+      // zh-TW use US framing (customer/supplier, owner's-equity, 留存收益); other
+      // languages match the existing finance.* values so only Chinese changes.
+      balRecvLabel:       { 'zh-CN': '客户应收', 'zh-TW': '客戶應收', en: 'Accounts Receivable', ja: '売掛金', ko: '매출채권', fr: 'Créances clients' },
+      balPayLabel:        { 'zh-CN': '供应商应付', 'zh-TW': '供應商應付', en: 'Accounts Payable', ja: '買掛金', ko: '매입채무', fr: 'Dettes fournisseurs' },
+      balTaxPayLabel:     { 'zh-CN': '应付税款', 'zh-TW': '應付稅款', en: 'Tax Payable', ja: '未払税金', ko: '미지급세금', fr: 'Dettes fiscales' },
+      balPaidInCapital:   { 'zh-CN': '所有者投入', 'zh-TW': '所有者投入', en: 'Paid-in Capital', ja: '資本金', ko: '납입자본금', fr: 'Capital social' },
+      balRetainedEarnings:{ 'zh-CN': '留存收益', 'zh-TW': '留存收益', en: 'Retained Earnings', ja: '利益剰余金', ko: '이익잉여금', fr: 'Résultat reporté' },
+      balLiabEquityHeader:{ 'zh-CN': '负债和所有者权益', 'zh-TW': '負債和所有者權益', en: 'Liabilities & Equity', ja: '負債及び純資産', ko: '부채 및 자본', fr: 'Passif' },
+      balTotalLiabEquity: { 'zh-CN': '负债和所有者权益总计', 'zh-TW': '負債和所有者權益總計', en: 'Total Liabilities & Equity', ja: '負債及び純資産合計', ko: '부채 및 자본 총계', fr: 'Total passif' },
+      balCashflowAdd:     { 'zh-CN': '添加收支记录', 'zh-TW': '新增收支記錄', en: 'Add Transaction', ja: '取引を追加', ko: '거래 추가', fr: 'Ajouter une opération' },
       newSaleButton:      { 'zh-CN': '新增销售记录', 'zh-TW': '新增銷售記錄', en: 'New Sale', ja: '売上を追加', ko: '매출 추가', fr: 'Nouvelle vente' },
       invoiceInputLabel: { 'zh-CN': '费用凭证数', 'zh-TW': '費用憑證數', en: 'Expense Receipts', ja: '経費レシート', ko: '비용 영수증', fr: 'Reçus de dépenses' },
       invoiceOutputLabel: { 'zh-CN': '收入凭证数', 'zh-TW': '收入憑證數', en: 'Income Receipts', ja: '収入レシート', ko: '수입 영수증', fr: 'Reçus de revenus' },
