@@ -977,6 +977,7 @@ async function main() {
     const GENERIC_KEYS = [
       'navPurchase', 'navSales', 'invQueryTitle', 'pageTitlePurchase', 'pageTitleSales',
       'uploadTitle', 'uploadSubtitle', 'uploadTitleSales', 'uploadSubtitleSales',
+      'scanningTitle', 'scanningSubtitle',
       'headerUnitPrice', 'headerAmount', 'headerTaxAmount', 'headerTotalWithTax', 'headerInvoiceNo',
       'modalTitlePurchase', 'modalSubtitlePurchase', 'modalTitleSales', 'modalSubtitleSales',
       'newPurchaseButton', 'newSaleButton', 'emptyPurchase', 'emptySales',
@@ -984,7 +985,9 @@ async function main() {
       'invTableTitle', 'invTableSubtitle', 'invHeaderDate', 'invHeaderWeight',
       'invHeaderAmount', 'invHeaderInvoiceNo', 'invEmpty',
     ];
-    const CN_VAT_BAN = /采购与进项|採購與進項|销售与销项|銷售與銷項|发票查询|發票查詢|进项|進項|销项|銷項|电子发票|電子發票|发票号码|發票號碼|增值税|增值稅/;
+    // 发票号(码) is banned for non-CN (use 票据号码); the bare 发票号 form also
+    // covers the 发票号码 variant. Plain 发票 stays allowed (US uploadTitle uses it).
+    const CN_VAT_BAN = /采购与进项|採購與進項|销售与销项|銷售與銷項|发票查询|發票查詢|进项|進項|销项|銷項|电子发票|電子發票|发票号|發票號|增值税|增值稅/;
     for (const accId of ['US', 'JP', 'KR', 'TW', 'EU']) {
       const reasons = [];
       for (const key of GENERIC_KEYS) {

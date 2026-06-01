@@ -308,10 +308,10 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
           )}
         </div>
         <h3 className="text-[#4a4a48] font-medium text-base mb-1">
-          {isScanning ? t('purchases.uploadScanning') : ((accLocale !== 'CN') ? taxLabel('uploadTitle') : t('purchases.uploadTitle'))}
+          {isScanning ? ((accLocale !== 'CN') ? taxLabel('scanningTitle') : t('purchases.uploadScanning')) : ((accLocale !== 'CN') ? taxLabel('uploadTitle') : t('purchases.uploadTitle'))}
         </h3>
         <p className="text-[#5c5c5a] text-xs">
-          {isScanning ? t('purchases.uploadAnalyzing') : ((accLocale !== 'CN') ? taxLabel('uploadSubtitle') : t('purchases.uploadSubtitle'))}
+          {isScanning ? ((accLocale !== 'CN') ? taxLabel('scanningSubtitle') : t('purchases.uploadAnalyzing')) : ((accLocale !== 'CN') ? taxLabel('uploadSubtitle') : t('purchases.uploadSubtitle'))}
         </p>
       </div>
 
