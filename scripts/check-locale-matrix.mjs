@@ -38,7 +38,9 @@ const VAT_FAMILY_KEYS = ['taxTitle', 'inputTax', 'outputTax', 'estimatedTax', 'c
 const REQUIRED_TAX_KEYS_BY_LOCALE = {
   CN: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
   EU: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
-  JP: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
+  JP: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS, 'navSales', 'navPurchase', 'invQueryTitle',
+    'pageTitlePurchase', 'uploadTitle', 'uploadSubtitle', 'headerUnitPrice', 'headerAmount',
+    'headerInvoiceNo', 'modalTitlePurchase', 'modalSubtitlePurchase', 'newPurchaseButton'],
   KR: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
   TW: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],
   US: [...COMMON_TAX_KEYS, 'grossReceipts', 'totalExpenses', 'netProfit', 'taxTitle', 'kpiGrossIncome', 'kpiQuarterlyTax',
@@ -923,6 +925,44 @@ async function main() {
     if (!/Federal Corporate Tax/.test(usNotes)) reasons.push(`US profile.notes should mention Federal Corporate Tax: "${usNotes}"`);
     if (/增值税|增值稅|进项|進項|税金及附加|稅金及附加/.test(usNotes)) reasons.push(`US profile.notes uses CN-VAT wording: "${usNotes}"`);
     if (reasons.length) fail(`usProfileNotes:US`, reasons); else pass(`usProfileNotes:US`);
+  }
+
+  // ────────────────────────────────────────────────
+  // PART G0e: JP accountingLocale Chinese-UI wording.
+  //   消费税 (Japanese consumption tax) is fine, but the Chinese UI must not use
+  //   进项/销项 as the primary wording — use 采购/销售. Pin the 经营看板 tax cards
+  //   and the left-nav labels.
+  // ────────────────────────────────────────────────
+  {
+    const cfg = config.getAccountingLocale('JP');
+    const JP_PIN = {
+      'zh-CN': { inputTax: '采购消费税', outputTax: '销售消费税', navPurchase: '采购与费用', navSales: '销售与收入', invQueryTitle: '票据查询', invoiceTypeInput: '采购', invoiceTypeOutput: '销售',
+                 pageTitlePurchase: '采购与费用', headerInvoiceNo: '票据号码', headerAmount: '税前金额', headerUnitPrice: '税前单价', modalTitlePurchase: '新增采购与费用记录', newPurchaseButton: '新增采购记录' },
+      'zh-TW': { inputTax: '採購消費稅', outputTax: '銷售消費稅', navPurchase: '採購與費用', navSales: '銷售與收入', invQueryTitle: '票據查詢', invoiceTypeInput: '採購', invoiceTypeOutput: '銷售',
+                 pageTitlePurchase: '採購與費用', headerInvoiceNo: '票據號碼', headerAmount: '稅前金額', headerUnitPrice: '稅前單價', modalTitlePurchase: '新增採購與費用記錄', newPurchaseButton: '新增採購記錄' },
+    };
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      const reasons = [];
+      // ban CN-VAT wording across ALL JP taxConcepts: 进项/销项 (use 采购/销售) and
+      // 电子发票 / 发票号码 (use 票据). 消费税 itself is allowed.
+      for (const [key, labels] of Object.entries(cfg.taxConcepts)) {
+        const v = labels[lang];
+        if (typeof v !== 'string') continue;
+        if (/进项|進項|销项|銷項/.test(v)) reasons.push(`JP ${key}[${lang}] uses 进项/销项 (should be 采购/销售): "${v}"`);
+        if (/电子发票|電子發票/.test(v)) reasons.push(`JP ${key}[${lang}] uses 电子发票 (should be 票据): "${v}"`);
+        if (/发票号码|發票號碼/.test(v)) reasons.push(`JP ${key}[${lang}] uses 发票号码 (should be 票据号码): "${v}"`);
+      }
+      // pin the 经营看板 tax cards + nav wording
+      for (const [key, want] of Object.entries(JP_PIN[lang])) {
+        const got = helpers.getTaxLabel('JP', lang, key);
+        if (got !== want) reasons.push(`JP ${key}[${lang}] should be "${want}", got "${got}"`);
+      }
+      // 消费税 should still be present in the tax cards (JP keeps consumption tax)
+      if (!/消费税|消費稅/.test(helpers.getTaxLabel('JP', lang, 'inputTax'))) {
+        reasons.push(`JP inputTax[${lang}] should keep 消费税: "${helpers.getTaxLabel('JP', lang, 'inputTax')}"`);
+      }
+      if (reasons.length) fail(`jpWording:${lang}`, reasons); else pass(`jpWording:${lang}`);
+    }
   }
 
   // ────────────────────────────────────────────────
