@@ -216,7 +216,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
 
       {/* Header Section */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[#191918]">{accLocale === 'US' ? taxLabel('pageTitleSales') : t('sales.title')}</h1>
+        <h1 className="text-2xl font-bold text-[#191918]">{accLocale !== 'CN' ? taxLabel('pageTitleSales') : t('sales.title')}</h1>
         <div className="flex space-x-3">
           <button
             onClick={() => setShowCsvImport(true)}
@@ -236,7 +236,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
             onClick={() => { setEditingId(null); setShowAddModal(true); }}
             className="flex items-center px-4 py-2 bg-[#d97757] hover:bg-[#c56a4a] text-white rounded-lg transition-colors text-sm font-medium" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}
           >
-            <i className="fas fa-plus mr-2"></i> {accLocale === 'US' ? taxLabel('newSaleButton') : t('sales.newSale')}
+            <i className="fas fa-plus mr-2"></i> {accLocale !== 'CN' ? taxLabel('newSaleButton') : t('sales.newSale')}
           </button>
         </div>
       </div>
@@ -316,10 +316,10 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
           )}
         </div>
         <h3 className="text-[#4a4a48] font-medium text-base mb-1">
-          {isScanning ? t('sales.uploadAnalyzing') : (accLocale === 'US' ? taxLabel('uploadTitleSales') : t('sales.uploadTitle'))}
+          {isScanning ? t('sales.uploadAnalyzing') : (accLocale !== 'CN' ? taxLabel('uploadTitleSales') : t('sales.uploadTitle'))}
         </h3>
         <p className="text-[#5c5c5a] text-xs">
-          {isScanning ? t('sales.uploadExtracting') : (accLocale === 'US' ? taxLabel('uploadSubtitleSales') : t('sales.uploadSubtitle'))}
+          {isScanning ? t('sales.uploadExtracting') : (accLocale !== 'CN' ? taxLabel('uploadSubtitleSales') : t('sales.uploadSubtitle'))}
         </p>
       </div>
 
@@ -332,12 +332,12 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.date')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.customer')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.quantity')}</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale === 'US' ? taxLabel('headerUnitPrice') : t('tableHeaders.unitPriceWithoutTax')}</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale === 'US' ? taxLabel('headerAmount') : t('tableHeaders.amountWithoutTax')}</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale === 'US' ? taxLabel('headerTaxAmount') : t('tableHeaders.taxAmount')}</th>
-                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale === 'US' ? taxLabel('headerTotalWithTax') : t('tableHeaders.totalWithTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale !== 'CN' ? taxLabel('headerUnitPrice') : t('tableHeaders.unitPriceWithoutTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale !== 'CN' ? taxLabel('headerAmount') : t('tableHeaders.amountWithoutTax')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale !== 'CN' ? taxLabel('headerTaxAmount') : t('tableHeaders.taxAmount')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{accLocale !== 'CN' ? taxLabel('headerTotalWithTax') : t('tableHeaders.totalWithTax')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.shipping')}</th>
-                <th className="px-5 py-4 font-medium">{accLocale === 'US' ? taxLabel('headerInvoiceNo') : t('tableHeaders.invoiceNo')}</th>
+                <th className="px-5 py-4 font-medium">{accLocale !== 'CN' ? taxLabel('headerInvoiceNo') : t('tableHeaders.invoiceNo')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.status')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.actions')}</th>
               </tr>
@@ -401,7 +401,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
               {!isLoading && records.length === 0 && (
                 <tr>
                   <td colSpan={11} className="px-6 py-12 text-center text-[#5c5c5a] text-sm italic">
-                    {accLocale === 'US' ? taxLabel('emptySales') : t('sales.empty')}
+                    {accLocale !== 'CN' ? taxLabel('emptySales') : t('sales.empty')}
                   </td>
                 </tr>
               )}
@@ -463,8 +463,8 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
           <div className="relative w-full max-w-lg bg-white border border-[#e0ddd5] rounded-xl overflow-hidden animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
             <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold text-[#191918]">{editingId ? t('sales.modalTitleEdit') : (accLocale === 'US' ? taxLabel('modalTitleSales') : t('sales.modalTitle'))}</h2>
-                <p className="text-xs text-[#5c5c5a] mt-1">{editingId ? t('sales.modalSubtitleEdit') : (accLocale === 'US' ? taxLabel('modalSubtitleSales') : t('sales.modalSubtitle'))}</p>
+                <h2 className="text-xl font-bold text-[#191918]">{editingId ? t('sales.modalTitleEdit') : (accLocale !== 'CN' ? taxLabel('modalTitleSales') : t('sales.modalTitle'))}</h2>
+                <p className="text-xs text-[#5c5c5a] mt-1">{editingId ? t('sales.modalSubtitleEdit') : (accLocale !== 'CN' ? taxLabel('modalSubtitleSales') : t('sales.modalSubtitle'))}</p>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-[#5c5c5a] hover:text-[#191918] transition-colors">
                 <i className="fas fa-times text-xl"></i>
@@ -484,7 +484,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formInvoiceNo')}</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale !== 'CN' ? taxLabel('headerInvoiceNo') : t('sales.formInvoiceNo')}</label>
                   <input
                     type="text"
                     placeholder={t('common2.optional')}
@@ -521,7 +521,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formPrice')}</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale !== 'CN' ? taxLabel('headerAmount') : t('sales.formPrice')}</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
                     <input
@@ -551,7 +551,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formUnitPrice')}</label>
+                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale !== 'CN' ? taxLabel('headerUnitPrice') : t('sales.formUnitPrice')}</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
                     <input
