@@ -182,14 +182,14 @@ const TransactionsPage: React.FC = () => {
           <div className="overflow-x-auto">
           {/* table-fixed + colgroup: columns keep their defined widths (no even-spread in
               empty/sparse state); min-w guarantees a horizontal scroll rather than collapse */}
-          <table className="w-full text-sm table-fixed min-w-[1020px]">
+          <table className="w-full text-sm table-fixed min-w-[1060px]">
             <colgroup>
               <col className="w-[120px]" />{/* date */}
               <col className="w-[180px]" />{/* counterparty (supplier/customer) */}
               <col className="w-[160px]" />{/* category */}
               <col className="w-[180px]" />{/* report line / account */}
-              <col className="w-[140px]" />{/* amount */}
-              <col className="w-[120px]" />{/* status */}
+              <col className="w-[160px]" />{/* amount */}
+              <col className="w-[140px]" />{/* status */}
               <col className="w-[120px]" />{/* action (≥100 to fit en/fr confirm·cancel) */}
             </colgroup>
             <thead className="bg-[#f9f9f8] text-[10px] uppercase tracking-wider text-[#4a4a48]">
