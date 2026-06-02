@@ -726,7 +726,7 @@ ${contextText}`;
       case 'finance': return <FinancePage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'accounts': return <AccountsPage />;
       case 'transactions': return <TransactionsPage />;
-      case 'ustax': return <USTaxToolsPage />;
+      case 'ustax': return <USTaxToolsPage selectedYear={selectedYear} />;
       case 'settings': return <SettingsPage />;
       default: return null;
     }
