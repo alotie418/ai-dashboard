@@ -1270,6 +1270,56 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0k: Invoice-query status dropdown localization.
+  //   CN accountingLocale renders the dropdown from the invoices.* i18n keys, so
+  //   each status MUST resolve in every UI language — a missing key leaked the raw
+  //   invoices.statusVerified / statusCertified / statusDeducted / statusPendingCert
+  //   / statusPendingInvoice in the CN dropdown. CN keeps China-VAT status wording;
+  //   non-CN renders the generic invStatus* taxConcepts (must differ from CN's
+  //   认证/抵扣 wording — also guarded in PART G0j).
+  // ────────────────────────────────────────────────
+  {
+    const STATUS_I18N = ['allStatus', 'statusVerified', 'statusCertified', 'statusDeducted', 'statusPendingCert', 'statusPendingInvoice', 'statusIssued'];
+    const reasons = [];
+    // CN dropdown: every status option resolves (non-empty, no raw key) in all langs
+    for (const lang of UI_LANGUAGES) {
+      const inv = (locales[lang] || {}).invoices || {};
+      for (const k of STATUS_I18N) {
+        const v = inv[k];
+        if (v === undefined || (typeof v === 'string' && v.trim() === '')) {
+          reasons.push(`invoices.${k} missing/empty in ${lang} (CN status dropdown would render raw key)`);
+        }
+      }
+    }
+    // CN zh-CN must keep the China-VAT status wording
+    const cnInv = (locales['zh-CN'] || {}).invoices || {};
+    const CN_PIN = {
+      allStatus: '全部状态', statusVerified: '已核验', statusCertified: '已认证',
+      statusDeducted: '已抵扣', statusPendingCert: '待认证', statusPendingInvoice: '待开票', statusIssued: '已开票',
+    };
+    for (const [k, want] of Object.entries(CN_PIN)) {
+      if (cnInv[k] !== want) reasons.push(`CN invoices.${k} should be "${want}", got "${cnInv[k]}"`);
+    }
+    if (reasons.length) fail(`cnStatusDropdown`, reasons); else pass(`cnStatusDropdown`);
+  }
+  {
+    // non-CN dropdown: the generic invStatus* taxConcepts resolve and must NOT
+    // carry CN-VAT 认证/抵扣 wording, so each non-CN locale shows document statuses.
+    const STATUS_TAX = ['invStatusAll', 'invStatusVerified', 'invStatusCertified', 'invStatusDeducted', 'invStatusPendingCert', 'invStatusPendingIssue', 'invStatusIssued'];
+    for (const accId of ['US', 'JP', 'KR', 'TW', 'EU']) {
+      const reasons = [];
+      for (const key of STATUS_TAX) {
+        for (const lang of ['zh-CN', 'zh-TW']) {
+          const v = helpers.getTaxLabel(accId, lang, key);
+          if (v === key) reasons.push(`${accId} ${key}[${lang}] raw key (non-CN status dropdown)`);
+          if (typeof v === 'string' && /认证|認證|抵扣/.test(v)) reasons.push(`${accId} ${key}[${lang}] uses CN-VAT 认证/抵扣: "${v}"`);
+        }
+      }
+      if (reasons.length) fail(`nonCnStatusDropdown:${accId}`, reasons); else pass(`nonCnStatusDropdown:${accId}`);
+    }
+  }
+
+  // ────────────────────────────────────────────────
   // PART G1: Data Analysis page subtitles — must not contain hardcoded
   // English "TONS" or "吨" since the inventory unit comes from
   // product_unit (uiLanguage-driven via getInventoryUnitLabel).
