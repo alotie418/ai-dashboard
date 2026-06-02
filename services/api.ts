@@ -94,12 +94,26 @@ export interface CategoryUpsert {
   sort_order?: number;
 }
 
+// Canonicalize the IRS form-name casing for US category report lines on read, so
+// the UI never shows a stale "schedule C" / "SCHEDULE C LINE" / "form 8829" variant
+// left over in older seeded DB rows (the committed seed is correct, but INSERT OR
+// IGNORE never overwrites pre-existing rows). Only the official form names are
+// canonicalized — "Schedule C Line" + line number (8 / 16b / 24a …) and "Form 8829";
+// stray double spaces are collapsed. Non-US schedule_line values (e.g. CN 损益表-*)
+// don't match and are left untouched. Display-only; category↔line mapping unchanged.
+const normalizeScheduleLine = (s: string): string =>
+  s.replace(/schedule\s*c\s*line/gi, 'Schedule C Line')
+    .replace(/form\s*8829/gi, 'Form 8829')
+    .replace(/ {2,}/g, ' ')
+    .trim();
+
 export function listCategories(opts: { locale?: AccountingLocale; type?: CategoryType; lang?: string } = {}): Promise<Category[]> {
   const qs = new URLSearchParams();
   if (opts.locale) qs.set('locale', opts.locale);
   if (opts.type) qs.set('type', opts.type);
   if (opts.lang) qs.set('lang', opts.lang);
-  return apiFetch<Category[]>(`/api/categories${qs.toString() ? '?' + qs.toString() : ''}`);
+  return apiFetch<Category[]>(`/api/categories${qs.toString() ? '?' + qs.toString() : ''}`)
+    .then(cats => cats.map(c => (c.schedule_line ? { ...c, schedule_line: normalizeScheduleLine(c.schedule_line) } : c)));
 }
 
 export function createCategory(payload: CategoryUpsert): Promise<{ success: boolean; id: string }> {
