@@ -1017,6 +1017,98 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0g: Accounts (应收应付) + Finance balance-sheet non-CN wording.
+  //   For every non-CN accountingLocale (US/JP/KR/TW/EU) the AR/AP ledger,
+  //   tax-payable and owner-equity labels must use generic business wording, NOT
+  //   China-GAAP (应收账款 / 应付账款 / 应交税费 / 实收资本 / 未分配利润 / 股东权益).
+  //   These keys are present for all non-CN locales (raw-key guard) and the
+  //   zh-CN/zh-TW display strings are pinned to the agreed terms so AccountsPage /
+  //   FinancePage can no longer fall back to the CN i18n values. CN is exempt and
+  //   guarded the other way below.
+  // ────────────────────────────────────────────────
+  {
+    const ACCT_FIN_KEYS = [
+      'acctReceivableTab', 'acctPayableTab', 'acctTotalReceivable', 'acctTotalPayable',
+      'balRecvLabel', 'balPayLabel', 'balTaxPayLabel', 'balPaidInCapital',
+      'balRetainedEarnings', 'balLiabEquityHeader', 'balTotalLiabEquity', 'balCashflowAdd',
+    ];
+    const CN_GAAP_BAN = /应收账款|應收帳款|应付账款|應付帳款|应交税费|應交稅費|实收资本|實收資本|未分配利润|未分配利潤|股东权益|股東權益/;
+    const PIN = {
+      'zh-CN': {
+        acctReceivableTab: '客户应收', acctPayableTab: '供应商应付',
+        acctTotalReceivable: '客户应收总额', acctTotalPayable: '供应商应付总额',
+        balRecvLabel: '客户应收', balPayLabel: '供应商应付', balTaxPayLabel: '应付税款',
+        balPaidInCapital: '所有者投入', balRetainedEarnings: '留存收益',
+        balLiabEquityHeader: '负债和所有者权益', balTotalLiabEquity: '负债和所有者权益总计',
+      },
+      'zh-TW': {
+        acctReceivableTab: '客戶應收', acctPayableTab: '供應商應付',
+        acctTotalReceivable: '客戶應收總額', acctTotalPayable: '供應商應付總額',
+        balRecvLabel: '客戶應收', balPayLabel: '供應商應付', balTaxPayLabel: '應付稅款',
+        balPaidInCapital: '所有者投入', balRetainedEarnings: '留存收益',
+        balLiabEquityHeader: '負債和所有者權益', balTotalLiabEquity: '負債和所有者權益總計',
+      },
+    };
+    for (const accId of ['US', 'JP', 'KR', 'TW', 'EU']) {
+      const reasons = [];
+      for (const key of ACCT_FIN_KEYS) {
+        // presence: every non-CN locale must resolve the key (no raw-key fallback)
+        for (const lang of UI_LANGUAGES) {
+          const v = helpers.getTaxLabel(accId, lang, key);
+          if (v === key) reasons.push(`${key}[${lang}] missing (raw key) for ${accId}`);
+        }
+        // ban China-GAAP / China-VAT wording on the Chinese display strings
+        for (const lang of ['zh-CN', 'zh-TW']) {
+          const v = helpers.getTaxLabel(accId, lang, key);
+          if (typeof v === 'string' && CN_GAAP_BAN.test(v)) {
+            reasons.push(`${accId} ${key}[${lang}] uses China-GAAP wording: "${v}"`);
+          }
+        }
+      }
+      // pin the corrected non-CN wording (also asserts US fixes keep appearing)
+      for (const lang of ['zh-CN', 'zh-TW']) {
+        for (const [key, want] of Object.entries(PIN[lang])) {
+          const got = helpers.getTaxLabel(accId, lang, key);
+          if (got !== want) reasons.push(`${accId} ${key}[${lang}] should be "${want}", got "${got}"`);
+        }
+      }
+      if (reasons.length) fail(`acctFinNonCn:${accId}`, reasons); else pass(`acctFinNonCn:${accId}`);
+    }
+    // CN regression guard: AccountsPage CN fallback i18n must KEEP China-GAAP
+    // ledger wording (FinancePage balance-sheet zh-CN is locked in PART G1.5).
+    {
+      const cn = locales['zh-CN'];
+      const reasons = [];
+      if (get(cn, 'accounts.receivable') !== '应收账款') reasons.push(`CN accounts.receivable should stay 应收账款, got "${get(cn, 'accounts.receivable')}"`);
+      if (get(cn, 'accounts.payable') !== '应付账款') reasons.push(`CN accounts.payable should stay 应付账款, got "${get(cn, 'accounts.payable')}"`);
+      if (reasons.length) fail(`cnGaapAccountsPreserved`, reasons); else pass(`cnGaapAccountsPreserved`);
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // PART G0h: US Schedule C P&L line wording must keep appearing (the US
+  //   财务报表页 income statement is Schedule C). Guards against regression of the
+  //   already-fixed key lines (substring match — tolerant of the "Line N — " /
+  //   "(or Loss)" formatting and em-dash).
+  // ────────────────────────────────────────────────
+  {
+    const SC_PIN = {
+      'zh-CN': { line1: '总收入或销售额', line7: '总收入', line28: '费用总额', line31: '净利润或亏损' },
+      'zh-TW': { line1: '總收入或銷售額', line7: '總收入', line28: '費用總額', line31: '淨利潤或虧損' },
+    };
+    const reasons = [];
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      for (const [k, want] of Object.entries(SC_PIN[lang])) {
+        const v = get(locales[lang], `usSchedule.${k}`);
+        if (typeof v !== 'string' || !v.includes(want)) {
+          reasons.push(`usSchedule.${k}[${lang}] should contain "${want}", got "${v}"`);
+        }
+      }
+    }
+    if (reasons.length) fail(`usScheduleCPreserved`, reasons); else pass(`usScheduleCPreserved`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G1: Data Analysis page subtitles — must not contain hardcoded
   // English "TONS" or "吨" since the inventory unit comes from
   // product_unit (uiLanguage-driven via getInventoryUnitLabel).

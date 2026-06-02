@@ -109,10 +109,10 @@ async function scanFile(filepath) {
       // Filter false positives:
       if (isAllowedContext(line, full, ns, key)) continue;
       if (new RegExp(`t\\s*\\(\\s*['"\`]${ns}\\.${key}['"\`]`).test(line)) continue;
-      // usLabel(taxKey, 'ns.key') / usLabelCount(taxKey, 'ns.key', n): the ns.key
-      // is the i18n fallback passed to the US-locale wrapper (resolved via t()
-      // for non-US locales), not a display-as-literal leak.
-      if (new RegExp(`(usLabel|usLabelCount)\\s*\\([^)]*['"\`]${ns}\\.${key}['"\`]`).test(line)) continue;
+      // usLabel/usLabelCount/localeLabel(taxKey, 'ns.key'[, n]): the ns.key is the
+      // i18n fallback passed to the accountingLocale-aware wrapper (resolved via
+      // t() for the CN/default locale), not a display-as-literal leak.
+      if (new RegExp(`(usLabel|usLabelCount|localeLabel)\\s*\\([^)]*['"\`]${ns}\\.${key}['"\`]`).test(line)) continue;
       if (/Record<string|\[key:|i18n[A-Z]/.test(line)) continue;
 
       // Filter: leak token is inside ${...} interpolation
