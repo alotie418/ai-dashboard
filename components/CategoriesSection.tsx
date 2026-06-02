@@ -15,8 +15,9 @@ const CategoriesSection: React.FC = () => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language as LangCode;
   const [locale, setLocale] = useState<AccountingLocale>('CN');
-  // US accountingLocale shows US wording; other locales keep existing i18n / DB labels.
-  const usLabel = (taxKey: string, i18nKey: string, fallback: string) => locale === 'US' ? getTaxLabel(locale, lang, taxKey) : t(i18nKey, fallback);
+  // Non-CN accountingLocales (US/JP/KR/TW/EU) show generic wording (可扣除, not
+  // the China-VAT 可抵扣); only CN keeps its existing settings.* i18n labels.
+  const usLabel = (taxKey: string, i18nKey: string, fallback: string) => locale !== 'CN' ? getTaxLabel(locale, lang, taxKey) : t(i18nKey, fallback);
   // US display override for the two system categories whose seeded labels read
   // Chinese-ledger-style (gross-receipts / home-office); display-only, US only.
   const usCatLabel = (c: Category) => {

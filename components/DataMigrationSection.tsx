@@ -14,12 +14,14 @@ const DataMigrationSection: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [accLocale, setAccLocale] = useState('CN');
   useEffect(() => { fetchSettings().then((s: any) => { if (s?.accounting_locale) setAccLocale(s.accounting_locale); }).catch(() => {}); }, []);
-  // US accountingLocale shows user-facing wording (no internal table/field names);
-  // other locales keep their existing text. Three helpers: usLabel for i18n-keyed
-  // strings, usText for hardcoded fallbacks, usCount for {count}-interpolated.
-  const usLabel = (taxKey: string, i18nKey: string, fallback: string) => accLocale === 'US' ? getTaxLabel(accLocale, i18n.language, taxKey) : t(i18nKey, fallback);
-  const usText = (taxKey: string, fallback: string) => accLocale === 'US' ? getTaxLabel(accLocale, i18n.language, taxKey) : fallback;
-  const usCount = (taxKey: string, i18nKey: string, fallback: string, count: number) => accLocale === 'US' ? getTaxLabel(accLocale, i18n.language, taxKey).replace(/\{count\}/g, String(count)) : t(i18nKey, fallback, { count });
+  // Every non-CN accountingLocale (US/JP/KR/TW/EU) shows user-facing wording with
+  // no internal table/field/JSON names (sales/purchases/transaction/source_meta/
+  // legacy_migrations/COGS/income/expense); only CN keeps its existing text.
+  // Three helpers: usLabel for i18n-keyed strings, usText for hardcoded fallbacks,
+  // usCount for {count}-interpolated.
+  const usLabel = (taxKey: string, i18nKey: string, fallback: string) => accLocale !== 'CN' ? getTaxLabel(accLocale, i18n.language, taxKey) : t(i18nKey, fallback);
+  const usText = (taxKey: string, fallback: string) => accLocale !== 'CN' ? getTaxLabel(accLocale, i18n.language, taxKey) : fallback;
+  const usCount = (taxKey: string, i18nKey: string, fallback: string, count: number) => accLocale !== 'CN' ? getTaxLabel(accLocale, i18n.language, taxKey).replace(/\{count\}/g, String(count)) : t(i18nKey, fallback, { count });
   const [detect, setDetect] = useState<LegacyDetectResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -135,7 +137,7 @@ const DataMigrationSection: React.FC = () => {
                 {t('settings.dataMigration.runSuccess', '迁移完成')}
               </div>
               <div className="text-xs text-[#4a4a48] space-y-1">
-                {accLocale === 'US' ? (
+                {accLocale !== 'CN' ? (
                   <>
                     <div>{usText('dmResultIncome', '收入记录已迁移')}: <b>{result.salesMigrated}</b></div>
                     <div>{usText('dmResultExpense', '费用记录已迁移')}: <b>{result.purchasesMigrated}</b></div>
@@ -151,7 +153,7 @@ const DataMigrationSection: React.FC = () => {
                     <summary className="cursor-pointer text-rose-600">{result.errors.length} {t('settings.dataMigration.errors', '个错误')}</summary>
                     <div className="mt-1 max-h-32 overflow-y-auto text-[10px] font-mono bg-white border border-[#e0ddd5] rounded p-2">
                       {result.errors.map((e, i) => (
-                        <div key={i}>{accLocale === 'US' ? e.error : `${e.legacy_table}/${e.legacy_id}: ${e.error}`}</div>
+                        <div key={i}>{accLocale !== 'CN' ? e.error : `${e.legacy_table}/${e.legacy_id}: ${e.error}`}</div>
                       ))}
                     </div>
                   </details>

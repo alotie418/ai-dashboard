@@ -102,6 +102,45 @@ const NON_CN_GENERIC: Record<string, TaxConceptLabels> = {
   balLiabEquityHeader:{ 'zh-CN': '负债和所有者权益', 'zh-TW': '負債和所有者權益', en: 'Liabilities & Equity', ja: '負債及び純資産', ko: '부채 및 자본', fr: 'Passif' },
   balTotalLiabEquity: { 'zh-CN': '负债和所有者权益总计', 'zh-TW': '負債和所有者權益總計', en: 'Total Liabilities & Equity', ja: '負債及び純資産合計', ko: '부채 및 자본 총계', fr: 'Total passif' },
   balCashflowAdd:     { 'zh-CN': '添加收支记录', 'zh-TW': '新增收支記錄', en: 'Add Transaction', ja: '取引を追加', ko: '거래 추가', fr: 'Ajouter une opération' },
+  // ── System Settings (系统设置) — generic non-CN wording ──
+  // Company / responsible-party / auto-process / deductible / notification /
+  // data-migration labels that are the SAME for every non-CN locale (never
+  // China-GAAP 统一社会信用代码 / 法定代表人 / 增值税 / 进项认证 / 税金及附加, and no
+  // internal table/field/JSON names in the migration copy). The tax-ID field,
+  // address & ID samples, tax-rate label, currency-per-year and tax hint differ
+  // per regime and are defined per-locale on JP/KR/TW/EU below (US has its own
+  // inline block and is not spread from this base).
+  setNavAi:            { 'zh-CN': 'AI 服务商（BYOK）', 'zh-TW': 'AI 服務商（BYOK）', en: 'AI Providers (BYOK)', ja: 'AIプロバイダー（BYOK）', ko: 'AI 공급자(BYOK)', fr: 'Fournisseurs IA (BYOK)' },
+  setLegalPersonLabel: { 'zh-CN': '负责人', 'zh-TW': '負責人', en: 'Responsible Party', ja: '代表者', ko: '대표자', fr: 'Responsable' },
+  setLegalPersonPh:    { 'zh-CN': '例如：John Smith', 'zh-TW': '例如：John Smith', en: 'e.g. John Smith', ja: '例：John Smith', ko: '예: John Smith', fr: 'ex. : John Smith' },
+  setCompanyNamePh:    { 'zh-CN': '例如：环球贸易有限公司', 'zh-TW': '例如：環球貿易有限公司', en: 'e.g. Global Trading Co., Ltd.', ja: '例：グローバル商事株式会社', ko: '예: 글로벌무역 주식회사', fr: 'ex. : Global Trading SARL' },
+  setIndustryPh:       { 'zh-CN': '例如：贸易 / 零售 / 服务', 'zh-TW': '例如：貿易 / 零售 / 服務', en: 'e.g. Trade / Retail / Services', ja: '例：貿易／小売／サービス', ko: '예: 무역 / 소매 / 서비스', fr: 'ex. : Commerce / Détail / Services' },
+  setRateByState:      { 'zh-CN': '标准税率', 'zh-TW': '標準稅率', en: 'Standard rate', ja: '標準税率', ko: '표준 세율', fr: 'Taux standard' },
+  setRateCustom:       { 'zh-CN': '自定义税率', 'zh-TW': '自訂稅率', en: 'Custom rate', ja: 'カスタム税率', ko: '사용자 지정 세율', fr: 'Taux personnalisé' },
+  setRateZero:         { 'zh-CN': '0%（免税）', 'zh-TW': '0%（免稅）', en: '0% (exempt)', ja: '0%（免税）', ko: '0% (면세)', fr: '0 % (exonéré)' },
+  setAutoAuthLabel:    { 'zh-CN': '票据自动处理', 'zh-TW': '票據自動處理', en: 'Auto-process documents', ja: '伝票の自動処理', ko: '문서 자동 처리', fr: 'Traitement auto des pièces' },
+  setAutoAuthDesc:     { 'zh-CN': '上传后自动用于分类、归档和报表统计', 'zh-TW': '上傳後自動用於分類、歸檔和報表統計', en: 'Uploaded documents are auto-categorized, filed, and included in reports', ja: 'アップロード後、自動的に分類・保管・集計', ko: '업로드 후 자동 분류·보관·집계', fr: 'Pièces classées, archivées et comptabilisées automatiquement' },
+  setAdminExpenseLabel:{ 'zh-CN': '年度运营费用', 'zh-TW': '年度營運費用', en: 'Annual Operating Expenses', ja: '年間運営費', ko: '연간 운영비', fr: "Charges annuelles d'exploitation" },
+  setDeductibleHeader: { 'zh-CN': '可扣除', 'zh-TW': '可扣除', en: 'Deductible', ja: '控除可', ko: '공제 가능', fr: 'Déductible' },
+  setDeductiblePctLabel:{ 'zh-CN': '可扣除比例 (%)', 'zh-TW': '可扣除比例 (%)', en: 'Deductible %', ja: '控除割合 (%)', ko: '공제 비율 (%)', fr: 'Part déductible (%)' },
+  // Alerts & notifications (threshold-based stock; 税款 not 税收)
+  notifStockZero:      { 'zh-CN': '库存低于阈值提醒', 'zh-TW': '庫存低於閾值提醒', en: 'Low-stock alert (below threshold)', ja: '在庫が閾値を下回ったら通知', ko: '재고 임계값 미만 알림', fr: 'Alerte stock sous le seuil' },
+  notifTaxDeviation:   { 'zh-CN': '税款偏差超过 15% 预警', 'zh-TW': '稅款偏差超過 15% 預警', en: 'Tax deviation over 15% alert', ja: '税額の乖離が15%を超えたら警告', ko: '세액 편차 15% 초과 경고', fr: 'Alerte écart de taxe supérieur à 15 %' },
+  notifPriceVolatility:{ 'zh-CN': '异常价格波动提醒', 'zh-TW': '異常價格波動提醒', en: 'Unusual price movement alert', ja: '異常な価格変動を通知', ko: '비정상 가격 변동 알림', fr: 'Alerte de variation de prix inhabituelle' },
+  notifMonthlyReport:  { 'zh-CN': '月度财务报告推送', 'zh-TW': '月度財務報告推送', en: 'Monthly financial report', ja: '月次財務レポートの配信', ko: '월간 재무 보고서 발송', fr: 'Rapport financier mensuel' },
+  // Data migration (user-facing; no internal table/field/JSON names)
+  dmSubtitle:          { 'zh-CN': '将旧版本销售和采购数据迁移为新的收入与费用记录。旧表仅保留备份，30 天内可回滚。', 'zh-TW': '將舊版本銷售和採購資料遷移為新的收入與費用記錄。舊表僅保留備份，30 天內可回復。', en: 'Migrate legacy sales & purchase data into the new income & expense records. Old data is kept as a backup and can be rolled back within 30 days.', ja: '旧版の売上・仕入データを新しい収入・費用の記録へ移行します。旧データはバックアップとして保持され、30日以内に元に戻せます。', ko: '이전 버전의 판매·구매 데이터를 새 수입·비용 기록으로 이전합니다. 기존 데이터는 백업으로 보관되며 30일 이내 되돌릴 수 있습니다.', fr: 'Migrez les anciennes données de ventes et achats vers les nouveaux enregistrements de revenus et dépenses. Les anciennes données sont conservées en sauvegarde et réversibles sous 30 jours.' },
+  dmCardSales:         { 'zh-CN': '销售记录（旧版）→ 收入记录', 'zh-TW': '銷售記錄（舊版）→ 收入記錄', en: 'Sales records (legacy) → Income', ja: '売上記録（旧版）→ 収入', ko: '판매 기록(이전) → 수입', fr: 'Ventes (ancien) → Revenus' },
+  dmCardPurchases:     { 'zh-CN': '采购记录（旧版）→ 费用记录', 'zh-TW': '採購記錄（舊版）→ 費用記錄', en: 'Purchase records (legacy) → Expenses', ja: '仕入記録（旧版）→ 費用', ko: '구매 기록(이전) → 비용', fr: 'Achats (ancien) → Dépenses' },
+  dmNoLegacy:          { 'zh-CN': '没有需要迁移的旧版数据。', 'zh-TW': '沒有需要遷移的舊版資料。', en: 'No legacy data to migrate.', ja: '移行が必要な旧データはありません。', ko: '이전할 이전 데이터가 없습니다.', fr: 'Aucune ancienne donnée à migrer.' },
+  dmResultIncome:      { 'zh-CN': '收入记录已迁移', 'zh-TW': '收入記錄已遷移', en: 'Income records migrated', ja: '収入の記録を移行しました', ko: '수입 기록 이전 완료', fr: 'Revenus migrés' },
+  dmResultExpense:     { 'zh-CN': '费用记录已迁移', 'zh-TW': '費用記錄已遷移', en: 'Expense records migrated', ja: '費用の記録を移行しました', ko: '비용 기록 이전 완료', fr: 'Dépenses migrées' },
+  dmRollbackConfirm:   { 'zh-CN': '确认回滚？这将删除 {count} 条已迁移的记录，旧数据保持不变。', 'zh-TW': '確認回復？這將刪除 {count} 筆已遷移的記錄，舊資料保持不變。', en: 'Roll back? This removes {count} migrated records; your old data stays unchanged.', ja: '元に戻しますか？移行済みの記録 {count} 件を削除します。旧データは変更されません。', ko: '되돌리시겠습니까? 이전된 기록 {count}건이 삭제되며 기존 데이터는 그대로 유지됩니다.', fr: 'Annuler ? Cela supprime {count} enregistrements migrés ; vos anciennes données restent intactes.' },
+  dmRollback:          { 'zh-CN': '回滚迁移（删除已迁移的 {count} 条记录）', 'zh-TW': '回復遷移（刪除已遷移的 {count} 筆記錄）', en: 'Roll back migration (remove {count} migrated records)', ja: '移行を元に戻す（移行済み {count} 件を削除）', ko: '이전 되돌리기(이전된 {count}건 삭제)', fr: 'Annuler la migration (supprimer {count} enregistrements)' },
+  dmNote1:             { 'zh-CN': '销售记录将迁移为收入记录，采购记录将迁移为费用记录。', 'zh-TW': '銷售記錄將遷移為收入記錄，採購記錄將遷移為費用記錄。', en: 'Sales records become income records; purchase records become expense records.', ja: '売上記録は収入に、仕入記録は費用に移行されます。', ko: '판매 기록은 수입으로, 구매 기록은 비용으로 이전됩니다.', fr: 'Les ventes deviennent des revenus ; les achats deviennent des dépenses.' },
+  dmNote2:             { 'zh-CN': '旧表数据会保留，可随时回滚。', 'zh-TW': '舊表資料會保留，可隨時回復。', en: 'Old data is preserved and can be rolled back at any time.', ja: '旧データは保持され、いつでも元に戻せます。', ko: '기존 데이터는 보존되며 언제든 되돌릴 수 있습니다.', fr: 'Les anciennes données sont conservées et réversibles à tout moment.' },
+  dmNote3:             { 'zh-CN': '迁移记录会保存原始记录快照，不会丢失。', 'zh-TW': '遷移記錄會保存原始記錄快照，不會遺失。', en: 'Each migration keeps a snapshot of the original record, so nothing is lost.', ja: '移行ごとに元の記録のスナップショットを保存するため、データは失われません。', ko: '이전 시 원본 기록 스냅샷을 저장하므로 데이터가 손실되지 않습니다.', fr: 'Chaque migration conserve un instantané de l’enregistrement d’origine ; rien n’est perdu.' },
+  dmNote4:             { 'zh-CN': '原始的数量、单价、运费等明细会随记录一并保留。', 'zh-TW': '原始的數量、單價、運費等明細會隨記錄一併保留。', en: 'Original details such as quantity, unit price and shipping are preserved with each record.', ja: '数量・単価・送料などの元の明細も記録と共に保持されます。', ko: '수량·단가·배송비 등 원본 세부 정보도 기록과 함께 보존됩니다.', fr: 'Les détails d’origine (quantité, prix unitaire, frais de port) sont conservés avec chaque enregistrement.' },
 };
 
 // ─── 6 国配置 ───
@@ -331,6 +370,13 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
     taxRegime: 'consumption_tax',
     taxConcepts: {
       ...NON_CN_GENERIC,
+      // System Settings (系统设置) — JP regime: 法人番号, consumption tax, JPY.
+      setCreditCodeLabel: { 'zh-CN': '法人编号 / 税号', 'zh-TW': '法人編號 / 稅號', en: 'Corporate Number / Tax ID', ja: '法人番号／税番号', ko: '법인번호 / 세금번호', fr: "Numéro d'entreprise / N° fiscal" },
+      setCreditCodePh:    { 'zh-CN': '例如：1234567890123', 'zh-TW': '例如：1234567890123', en: 'e.g. 1234567890123', ja: '例：1234567890123', ko: '예: 1234567890123', fr: 'ex. : 1234567890123' },
+      setAddressPh:       { 'zh-CN': '例如：东京都千代田区…', 'zh-TW': '例如：東京都千代田區…', en: 'e.g. Chiyoda-ku, Tokyo', ja: '例：東京都千代田区…', ko: '예: 도쿄도 지요다구…', fr: 'ex. : Chiyoda-ku, Tokyo' },
+      setVatRateLabel:    { 'zh-CN': '消费税率', 'zh-TW': '消費稅率', en: 'Consumption Tax Rate', ja: '消費税率', ko: '소비세율', fr: 'Taux de taxe à la consommation' },
+      setPerYear:         { 'zh-CN': '日元/年', 'zh-TW': '日圓/年', en: 'JPY/yr', ja: '円/年', ko: '엔/년', fr: 'JPY/an' },
+      setTaxHint:         { 'zh-CN': '提示：消费税标准 10% / 轻减 8%；法人税按利润计算。', 'zh-TW': '提示：消費稅標準 10% / 輕減 8%；法人稅按利潤計算。', en: 'Note: consumption tax 10% standard / 8% reduced; corporate tax on profit.', ja: '注：消費税は標準10%／軽減8%。法人税は利益に対して課税。', ko: '참고: 소비세 표준 10% / 경감 8%; 법인세는 이익 기준.', fr: 'Note : taxe à la consommation 10 % / 8 % réduit ; impôt sur les sociétés sur le bénéfice.' },
       taxTitle:      { 'zh-CN': '消费税统计', 'zh-TW': '消費稅統計', en: 'Consumption Tax Summary', ja: '消費税集計', ko: '소비세 통계', fr: 'Résumé taxe consommation' },
       inputTax:      { 'zh-CN': '采购消费税', 'zh-TW': '採購消費稅', en: 'Consumption Tax Paid (Input)', ja: '仕入税額', ko: '매입 소비세', fr: 'Taxe payée (achats)' },
       outputTax:     { 'zh-CN': '销售消费税', 'zh-TW': '銷售消費稅', en: 'Consumption Tax Collected (Output)', ja: '売上税額', ko: '매출 소비세', fr: 'Taxe collectée (ventes)' },
@@ -370,6 +416,13 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
     taxRegime: 'vat',
     taxConcepts: {
       ...NON_CN_GENERIC,
+      // System Settings (系统设置) — EU regime: VAT ID, VAT, EUR.
+      setCreditCodeLabel: { 'zh-CN': 'VAT ID / 税号', 'zh-TW': 'VAT ID / 稅號', en: 'VAT ID / Tax No.', ja: 'VAT ID／税番号', ko: 'VAT ID / 세금번호', fr: 'N° de TVA / N° fiscal' },
+      setCreditCodePh:    { 'zh-CN': '例如：DE123456789', 'zh-TW': '例如：DE123456789', en: 'e.g. DE123456789', ja: '例：DE123456789', ko: '예: DE123456789', fr: 'ex. : DE123456789' },
+      setAddressPh:       { 'zh-CN': '例如：柏林米特区…', 'zh-TW': '例如：柏林米特區…', en: 'e.g. Mitte, Berlin', ja: '例：ベルリン・ミッテ…', ko: '예: 베를린 미테…', fr: 'ex. : Mitte, Berlin' },
+      setVatRateLabel:    { 'zh-CN': 'VAT 税率', 'zh-TW': 'VAT 稅率', en: 'VAT Rate', ja: 'VAT率', ko: 'VAT 세율', fr: 'Taux de TVA' },
+      setPerYear:         { 'zh-CN': '欧元/年', 'zh-TW': '歐元/年', en: 'EUR/yr', ja: 'ユーロ/年', ko: '유로/년', fr: 'EUR/an' },
+      setTaxHint:         { 'zh-CN': '提示：VAT 标准约 20%（各国不同）；所得税按利润计算。', 'zh-TW': '提示：VAT 標準約 20%（各國不同）；所得稅按利潤計算。', en: 'Note: VAT ~20% standard (varies by country); income tax on profit.', ja: '注：VAT標準約20%（国により異なる）；所得税は利益に対して課税。', ko: '참고: VAT 표준 약 20%(국가별 상이); 소득세는 이익 기준.', fr: 'Note : TVA ~20 % (selon le pays) ; impôt sur le bénéfice.' },
       taxTitle:      { 'zh-CN': 'VAT 统计', 'zh-TW': 'VAT 統計', en: 'VAT Summary', ja: 'VAT集計', ko: 'VAT 통계', fr: 'Résumé TVA' },
       inputTax:      { 'zh-CN': '进项 VAT', 'zh-TW': '進項 VAT', en: 'Input VAT', ja: '仕入VAT', ko: '매입 VAT', fr: 'TVA déductible' },
       outputTax:     { 'zh-CN': '销项 VAT', 'zh-TW': '銷項 VAT', en: 'Output VAT', ja: '売上VAT', ko: '매출 VAT', fr: 'TVA collectée' },
@@ -409,6 +462,13 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
     taxRegime: 'vat',
     taxConcepts: {
       ...NON_CN_GENERIC,
+      // System Settings (系统设置) — KR regime: 营业登记号, VAT, KRW.
+      setCreditCodeLabel: { 'zh-CN': '营业登记号 / 税号', 'zh-TW': '營業登記號 / 稅號', en: 'Business Registration No. / Tax ID', ja: '事業者登録番号／税番号', ko: '사업자등록번호 / 세금번호', fr: "N° d'enregistrement / N° fiscal" },
+      setCreditCodePh:    { 'zh-CN': '例如：123-45-67890', 'zh-TW': '例如：123-45-67890', en: 'e.g. 123-45-67890', ja: '例：123-45-67890', ko: '예: 123-45-67890', fr: 'ex. : 123-45-67890' },
+      setAddressPh:       { 'zh-CN': '例如：首尔特别市江南区…', 'zh-TW': '例如：首爾特別市江南區…', en: 'e.g. Gangnam-gu, Seoul', ja: '例：ソウル特別市江南区…', ko: '예: 서울특별시 강남구…', fr: 'ex. : Gangnam-gu, Séoul' },
+      setVatRateLabel:    { 'zh-CN': '韩国 VAT 税率', 'zh-TW': '韓國 VAT 稅率', en: 'Korean VAT Rate', ja: '韓国VAT率', ko: '부가가치세율', fr: 'Taux de TVA (Corée)' },
+      setPerYear:         { 'zh-CN': '韩元/年', 'zh-TW': '韓元/年', en: 'KRW/yr', ja: 'ウォン/年', ko: '원/년', fr: 'KRW/an' },
+      setTaxHint:         { 'zh-CN': '提示：VAT 标准 10%；法人税按利润计算。', 'zh-TW': '提示：VAT 標準 10%；法人稅按利潤計算。', en: 'Note: VAT 10% standard; corporate tax on profit.', ja: '注：VAT標準10%；法人税は利益に対して課税。', ko: '참고: 부가가치세 표준 10%; 법인세는 이익 기준.', fr: 'Note : TVA 10 % ; impôt sur les sociétés sur le bénéfice.' },
       taxTitle:      { 'zh-CN': '韩国 VAT 统计', 'zh-TW': '韓國 VAT 統計', en: 'Korean VAT Summary', ja: '韓国VAT集計', ko: '부가가치세 요약', fr: 'Résumé TVA (Corée)' },
       inputTax:      { 'zh-CN': '进项 VAT', 'zh-TW': '進項 VAT', en: 'Input VAT', ja: '仕入VAT', ko: '매입세액', fr: 'TVA déductible' },
       outputTax:     { 'zh-CN': '销项 VAT', 'zh-TW': '銷項 VAT', en: 'Output VAT', ja: '売上VAT', ko: '매출세액', fr: 'TVA collectée' },
@@ -448,6 +508,13 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
     taxRegime: 'business_tax',
     taxConcepts: {
       ...NON_CN_GENERIC,
+      // System Settings (系统设置) — TW regime: 统一编号, business tax, TWD.
+      setCreditCodeLabel: { 'zh-CN': '统一编号', 'zh-TW': '統一編號', en: 'Unified Business No.', ja: '統一番号', ko: '통일사업자번호', fr: "N° unifié d'entreprise" },
+      setCreditCodePh:    { 'zh-CN': '例如：12345678', 'zh-TW': '例如：12345678', en: 'e.g. 12345678', ja: '例：12345678', ko: '예: 12345678', fr: 'ex. : 12345678' },
+      setAddressPh:       { 'zh-CN': '例如：台北市信义区…', 'zh-TW': '例如：臺北市信義區…', en: 'e.g. Xinyi District, Taipei', ja: '例：台北市信義区…', ko: '예: 타이베이시 신이구…', fr: 'ex. : District de Xinyi, Taipei' },
+      setVatRateLabel:    { 'zh-CN': '营业税率', 'zh-TW': '營業稅率', en: 'Business Tax Rate', ja: '営業税率', ko: '영업세율', fr: "Taux de taxe sur les activités" },
+      setPerYear:         { 'zh-CN': '新台币/年', 'zh-TW': '新臺幣/年', en: 'TWD/yr', ja: '台湾ドル/年', ko: '대만 달러/년', fr: 'TWD/an' },
+      setTaxHint:         { 'zh-CN': '提示：营业税 5%；营利事业所得税 20%。', 'zh-TW': '提示：營業稅 5%；營利事業所得稅 20%。', en: 'Note: business tax 5%; profit-seeking enterprise income tax 20%.', ja: '注：営業税5%；営利事業所得税20%。', ko: '참고: 영업세 5%; 영리사업소득세 20%.', fr: 'Note : taxe sur les activités 5 % ; impôt sur les bénéfices 20 %.' },
       taxTitle:      { 'zh-CN': '营业税统计', 'zh-TW': '營業稅統計', en: 'Business Tax Summary', ja: '営業税集計', ko: '영업세 통계', fr: 'Résumé taxe activité' },
       inputTax:      { 'zh-CN': '进项营业税', 'zh-TW': '進項營業稅', en: 'Input Business Tax', ja: '仕入営業税', ko: '매입 영업세', fr: 'Taxe payée' },
       outputTax:     { 'zh-CN': '销项营业税', 'zh-TW': '銷項營業稅', en: 'Output Business Tax', ja: '売上営業税', ko: '매출 영업세', fr: 'Taxe collectée' },

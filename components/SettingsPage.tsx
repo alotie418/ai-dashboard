@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fetchSettings, saveSettings } from '../services/api';
-import { getTaxLabel } from './accountingHelpers';
+import { getTaxLabel, getCurrencySymbol } from './accountingHelpers';
 import ProvidersSection from './ProvidersSection';
 import LanguageSection from './LanguageSection';
 import AccountingSection from './AccountingSection';
@@ -13,12 +13,14 @@ const SettingsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [activeSection, setActiveSection] = useState('company');
   const [accLocale, setAccLocale] = useState('CN');
-  // US accountingLocale shows US framing (EIN, Sales Tax, owner/operator) while
-  // CN/EU/JP/KR/TW keep their existing settings.* i18n values. usLabel(taxKey,
-  // i18nKey) returns the US taxConcept under US, else the default i18n value.
-  const usLabel = (taxKey: string, i18nKey: string) => accLocale === 'US' ? getTaxLabel(accLocale, i18n.language, taxKey) : t(i18nKey);
-  // For hardcoded (non-i18n) placeholders: US taxConcept, else the literal fallback.
-  const usPh = (taxKey: string, fallback: string) => accLocale === 'US' ? getTaxLabel(accLocale, i18n.language, taxKey) : fallback;
+  // Every non-CN accountingLocale (US/JP/KR/TW/EU) shows its own regime framing
+  // (tax-ID field, tax-rate label, currency, owner/operator wording) from the
+  // accounting-locale taxConcepts; only CN keeps the China-GAAP settings.* i18n
+  // values (统一社会信用代码 / 法定代表人 / 增值税 / 进项认证 / 税金及附加). usLabel(taxKey,
+  // i18nKey) returns the locale taxConcept when non-CN, else the default i18n value.
+  const usLabel = (taxKey: string, i18nKey: string) => accLocale !== 'CN' ? getTaxLabel(accLocale, i18n.language, taxKey) : t(i18nKey);
+  // For hardcoded (non-i18n) placeholders: locale taxConcept when non-CN, else the literal fallback.
+  const usPh = (taxKey: string, fallback: string) => accLocale !== 'CN' ? getTaxLabel(accLocale, i18n.language, taxKey) : fallback;
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -253,7 +255,7 @@ const SettingsPage: React.FC = () => {
                       <p className="text-xs text-[#5c5c5a]">{t('settings.tax.adminExpenseDesc')}</p>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className="text-sm text-[#5c5c5a]">{accLocale === 'US' ? '$' : '¥'}</span>
+                      <span className="text-sm text-[#5c5c5a]">{getCurrencySymbol(accLocale)}</span>
                       <input
                         type="number"
                         min="0"
