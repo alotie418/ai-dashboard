@@ -165,6 +165,20 @@ const NON_CN_GENERIC: Record<string, TaxConceptLabels> = {
   invAdvFilterActive:  { 'zh-CN': '已启用筛选，找到 {count} 条票据记录', 'zh-TW': '已啟用篩選，找到 {count} 筆票據記錄', en: 'Filter active — {count} document(s) found', ja: 'フィルター適用中 — {count} 件の伝票', ko: '필터 적용됨 — 문서 {count}건', fr: 'Filtre actif — {count} pièce(s)' },
   invInputRecordCount: { 'zh-CN': '{count} 条采购/费用记录', 'zh-TW': '{count} 筆採購/費用記錄', en: '{count} purchase/expense record(s)', ja: '仕入・経費 {count} 件', ko: '매입/비용 {count}건', fr: '{count} achat(s)/dépense(s)' },
   invOutputRecordCount:{ 'zh-CN': '{count} 条销售/收入记录', 'zh-TW': '{count} 筆銷售/收入記錄', en: '{count} sales/revenue record(s)', ja: '売上・収入 {count} 件', ko: '매출/수입 {count}건', fr: '{count} vente(s)/revenu(s)' },
+  // ── AI assistant document-extraction result (智能助手识别结果) ──
+  // Generic non-CN result message — 票据/票据号码 framing and the non-CN nav names
+  // (采购与费用 / 销售与收入), never CN-VAT 采购与进项 / 销售与销项 / 进项 / 销项 /
+  // 发票号. The {date}/{partner}/{quantity}/{amount}/{shipping}/{invoiceNo} tokens
+  // are substituted at render (getTaxLabel returns a plain string, no i18next
+  // interpolation). CN keeps its own chat.invoiceExtractResult i18n message.
+  chatExtractResult:  {
+    'zh-CN': '票据识别成功！\n\n日期: {date}\n客户/供应商: {partner}\n数量: {quantity}\n金额: {amount}\n运费: {shipping}\n票据号码: {invoiceNo}\n\n以上信息已从票据中提取。如需记账，请前往「采购与费用」或「销售与收入」页面录入。',
+    'zh-TW': '票據辨識成功！\n\n日期: {date}\n客戶/供應商: {partner}\n數量: {quantity}\n金額: {amount}\n運費: {shipping}\n票據號碼: {invoiceNo}\n\n以上資訊已從票據中擷取。如需記帳，請前往「採購與費用」或「銷售與收入」頁面錄入。',
+    en: 'Document extracted successfully!\n\nDate: {date}\nCustomer/Supplier: {partner}\nQuantity: {quantity}\nAmount: {amount}\nShipping: {shipping}\nDocument #: {invoiceNo}\n\nGo to Purchases & Expenses or Sales & Revenue to record this transaction.',
+    ja: '伝票の認識に成功しました！\n\n日付: {date}\n顧客/仕入先: {partner}\n数量: {quantity}\n金額: {amount}\n送料: {shipping}\n伝票番号: {invoiceNo}\n\n仕入・経費または売上・収入のページから記帳できます。',
+    ko: '문서 인식 성공!\n\n날짜: {date}\n고객/공급업체: {partner}\n수량: {quantity}\n금액: {amount}\n배송비: {shipping}\n문서 번호: {invoiceNo}\n\n매입 및 비용 또는 매출 및 수입 페이지로 이동하여 기록하세요.',
+    fr: 'Pièce extraite avec succès !\n\nDate : {date}\nClient/Fournisseur : {partner}\nQuantité : {quantity}\nMontant : {amount}\nFrais de port : {shipping}\nN° de pièce : {invoiceNo}\n\nAllez sur Achats & dépenses ou Ventes & revenus pour enregistrer.',
+  },
 };
 
 // ─── 6 国配置 ───
@@ -304,6 +318,15 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       invAdvFilterActive: { 'zh-CN': '已启用筛选，找到 {count} 条票据记录', 'zh-TW': '已啟用篩選，找到 {count} 筆票據記錄', en: 'Filter active — {count} document(s) found', ja: 'フィルター適用中 — {count} 件の伝票', ko: '필터 적용됨 — 문서 {count}건', fr: 'Filtre actif — {count} pièce(s)' },
       invInputRecordCount:{ 'zh-CN': '{count} 条采购/费用记录', 'zh-TW': '{count} 筆採購/費用記錄', en: '{count} purchase/expense record(s)', ja: '仕入・経費 {count} 件', ko: '매입/비용 {count}건', fr: '{count} achat(s)/dépense(s)' },
       invOutputRecordCount:{ 'zh-CN': '{count} 条销售/收入记录', 'zh-TW': '{count} 筆銷售/收入記錄', en: '{count} sales/revenue record(s)', ja: '売上・収入 {count} 件', ko: '매출/수입 {count}건', fr: '{count} vente(s)/revenu(s)' },
+      // AI assistant document-extraction result — generic 票据 wording (US is not spread from NON_CN_GENERIC).
+      chatExtractResult:  {
+        'zh-CN': '票据识别成功！\n\n日期: {date}\n客户/供应商: {partner}\n数量: {quantity}\n金额: {amount}\n运费: {shipping}\n票据号码: {invoiceNo}\n\n以上信息已从票据中提取。如需记账，请前往「采购与费用」或「销售与收入」页面录入。',
+        'zh-TW': '票據辨識成功！\n\n日期: {date}\n客戶/供應商: {partner}\n數量: {quantity}\n金額: {amount}\n運費: {shipping}\n票據號碼: {invoiceNo}\n\n以上資訊已從票據中擷取。如需記帳，請前往「採購與費用」或「銷售與收入」頁面錄入。',
+        en: 'Document extracted successfully!\n\nDate: {date}\nCustomer/Supplier: {partner}\nQuantity: {quantity}\nAmount: {amount}\nShipping: {shipping}\nDocument #: {invoiceNo}\n\nGo to Purchases & Expenses or Sales & Revenue to record this transaction.',
+        ja: '伝票の認識に成功しました！\n\n日付: {date}\n顧客/仕入先: {partner}\n数量: {quantity}\n金額: {amount}\n送料: {shipping}\n伝票番号: {invoiceNo}\n\n仕入・経費または売上・収入のページから記帳できます。',
+        ko: '문서 인식 성공!\n\n날짜: {date}\n고객/공급업체: {partner}\n수량: {quantity}\n금액: {amount}\n배송비: {shipping}\n문서 번호: {invoiceNo}\n\n매입 및 비용 또는 매출 및 수입 페이지로 이동하여 기록하세요.',
+        fr: 'Pièce extraite avec succès !\n\nDate : {date}\nClient/Fournisseur : {partner}\nQuantité : {quantity}\nMontant : {amount}\nFrais de port : {shipping}\nN° de pièce : {invoiceNo}\n\nAllez sur Achats & dépenses ou Ventes & revenus pour enregistrer.',
+      },
       // Accounts (应收应付) page — US frames receivables/payables by customer/
       // supplier rather than the traditional 应收账款/应付账款 ledger terms.
       acctReceivableTab:  { 'zh-CN': '客户应收', 'zh-TW': '客戶應收', en: 'Customer Receivables', ja: '顧客売掛金', ko: '고객 미수금', fr: 'Créances clients' },
