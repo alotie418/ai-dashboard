@@ -619,14 +619,27 @@ ${contextText}`;
         setMessages([...newMsgs, { role: 'model', text: t('chat.notInvoice', { type: extracted.documentType || 'unknown' }) }]);
         return;
       }
-      const resultText = t('chat.invoiceExtractResult', {
+      const extractVals = {
         date: extracted.date,
         partner: extracted.customer,
         quantity: extracted.quantity || '-',
         amount: formatMoney(extracted.price || 0, assistantAccLocale),
         shipping: formatMoney(extracted.shipping || 0, assistantAccLocale),
         invoiceNo: extracted.invoiceNo || '-',
-      });
+      };
+      // Non-CN accountingLocales render the generic 票据 result (no CN-VAT 进项/销项/
+      // 发票号 / 采购与进项 wording); CN keeps its chat.invoiceExtractResult i18n message.
+      // The taxConcept returns a plain string, so substitute the tokens with a
+      // $-safe function replace (money strings contain '$').
+      let resultText: string;
+      if (assistantAccLocale !== 'CN') {
+        resultText = getTaxLabel(assistantAccLocale, i18n.language, 'chatExtractResult');
+        for (const [k, v] of Object.entries(extractVals)) {
+          resultText = resultText.replace(`{${k}}`, () => String(v));
+        }
+      } else {
+        resultText = t('chat.invoiceExtractResult', extractVals);
+      }
       setMessages([...newMsgs, { role: 'model', text: resultText }]);
     } catch (err) {
       setMessages([...newMsgs, { role: 'model', text: t('chat.invoiceRecognizeFailed') }]);

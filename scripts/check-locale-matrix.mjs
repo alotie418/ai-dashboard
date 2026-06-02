@@ -1320,6 +1320,59 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0l: AI assistant document-extraction result (chat.invoiceExtractResult).
+  //   CN renders the chat.invoiceExtractResult i18n message (keeps 发票 / 采购与进项
+  //   / 销售与销项 / 发票号). Non-CN renders the chatExtractResult taxConcept, which
+  //   must use the generic 票据 / 采购与费用 / 销售与收入 framing — never CN-VAT
+  //   采购与进项 / 销售与销项 / 进项 / 销项 / 增值税 / 电子发票 / 发票号(码) — and must
+  //   keep all six {date/partner/quantity/amount/shipping/invoiceNo} tokens so the
+  //   substituted message renders no leftover placeholder.
+  // ────────────────────────────────────────────────
+  {
+    const TOKENS = ['{date}', '{partner}', '{quantity}', '{amount}', '{shipping}', '{invoiceNo}'];
+    const CHAT_BAN = /采购与进项|採購與進項|销售与销项|銷售與銷項|进项|進項|销项|銷項|增值税|增值稅|电子发票|電子發票|发票号|發票號/;
+    for (const accId of ['US', 'JP', 'KR', 'TW', 'EU']) {
+      const reasons = [];
+      for (const lang of UI_LANGUAGES) {
+        const v = helpers.getTaxLabel(accId, lang, 'chatExtractResult');
+        if (v === 'chatExtractResult') { reasons.push(`chatExtractResult[${lang}] missing (raw key) for ${accId}`); continue; }
+        for (const tok of TOKENS) {
+          if (!v.includes(tok)) reasons.push(`${accId} chatExtractResult[${lang}] missing ${tok} token`);
+        }
+        // after substituting every token, no stray {…} placeholder should remain
+        let rendered = v;
+        for (const tok of TOKENS) rendered = rendered.split(tok).join('X');
+        if (/\{[a-zA-Z]+\}/.test(rendered)) reasons.push(`${accId} chatExtractResult[${lang}] has an unsubstituted placeholder: "${v}"`);
+      }
+      // Chinese display must avoid CN-VAT wording and surface the generic 票据 framing
+      for (const lang of ['zh-CN', 'zh-TW']) {
+        const v = helpers.getTaxLabel(accId, lang, 'chatExtractResult');
+        if (typeof v === 'string' && CHAT_BAN.test(v)) reasons.push(`${accId} chatExtractResult[${lang}] uses CN-VAT invoice wording: "${v}"`);
+        if (typeof v === 'string' && !/票据|票據/.test(v)) reasons.push(`${accId} chatExtractResult[${lang}] should use 票据 wording: "${v}"`);
+      }
+      // zh-CN must reference the non-CN nav names, not 采购与进项 / 销售与销项
+      const zh = helpers.getTaxLabel(accId, 'zh-CN', 'chatExtractResult');
+      if (typeof zh === 'string') {
+        if (!/采购与费用/.test(zh)) reasons.push(`${accId} chatExtractResult[zh-CN] should reference 采购与费用: "${zh}"`);
+        if (!/销售与收入/.test(zh)) reasons.push(`${accId} chatExtractResult[zh-CN] should reference 销售与收入: "${zh}"`);
+      }
+      if (reasons.length) fail(`chatExtractNonCn:${accId}`, reasons); else pass(`chatExtractNonCn:${accId}`);
+    }
+    // CN regression guard: CN keeps its VAT-invoice chat message + nav口径.
+    {
+      const cn = locales['zh-CN'];
+      const reasons = [];
+      const msg = get(cn, 'chat.invoiceExtractResult');
+      if (typeof msg !== 'string') reasons.push(`CN chat.invoiceExtractResult missing`);
+      else {
+        if (!/采购与进项/.test(msg)) reasons.push(`CN chat.invoiceExtractResult should keep 采购与进项, got "${msg}"`);
+        if (!/销售与销项/.test(msg)) reasons.push(`CN chat.invoiceExtractResult should keep 销售与销项, got "${msg}"`);
+      }
+      if (reasons.length) fail(`cnChatExtractPreserved`, reasons); else pass(`cnChatExtractPreserved`);
+    }
+  }
+
+  // ────────────────────────────────────────────────
   // PART G1: Data Analysis page subtitles — must not contain hardcoded
   // English "TONS" or "吨" since the inventory unit comes from
   // product_unit (uiLanguage-driven via getInventoryUnitLabel).
