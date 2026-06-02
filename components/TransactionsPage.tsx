@@ -180,16 +180,20 @@ const TransactionsPage: React.FC = () => {
         <div className="border border-[#e0ddd5] rounded-xl overflow-hidden bg-white/80">
           {/* overflow-x-auto: small screens scroll horizontally instead of squeezing columns */}
           <div className="overflow-x-auto">
-          {/* table-fixed + colgroup: columns keep their defined widths (no even-spread in
-              empty/sparse state); min-w guarantees a horizontal scroll rather than collapse */}
-          <table className="w-full text-sm table-fixed min-w-[1060px]">
+          {/* table-fixed gives the colgroup widths authority (the earlier even-spread came
+              from auto layout). Six columns are fixed px; counterparty is the single
+              flexible column (no width) so the table fills the card via w-full WITHOUT
+              diluting the fixed columns — amount/status render at exactly 170/150 instead
+              of being proportionally stretched. min-w-[1080px] is the floor (counterparty
+              ≥180px there); the overflow-x-auto wrapper scrolls on narrower screens. */}
+          <table className="w-full text-sm table-fixed min-w-[1080px]">
             <colgroup>
               <col className="w-[120px]" />{/* date */}
-              <col className="w-[180px]" />{/* counterparty (supplier/customer) */}
+              <col />{/* counterparty (supplier/customer) — flexible, absorbs extra width */}
               <col className="w-[160px]" />{/* category */}
               <col className="w-[180px]" />{/* report line / account */}
-              <col className="w-[160px]" />{/* amount */}
-              <col className="w-[140px]" />{/* status */}
+              <col className="w-[170px]" />{/* amount */}
+              <col className="w-[150px]" />{/* status */}
               <col className="w-[120px]" />{/* action (≥100 to fit en/fr confirm·cancel) */}
             </colgroup>
             <thead className="bg-[#f9f9f8] text-[10px] uppercase tracking-wider text-[#4a4a48]">
@@ -199,7 +203,7 @@ const TransactionsPage: React.FC = () => {
                 <th className="text-left px-4 py-2.5 whitespace-nowrap">{t('transactions.category', 'Category')}</th>
                 <th className="text-left px-4 py-2.5 whitespace-nowrap">{usLabel('txnAccountHeader', 'transactions.scheduleLine', 'Report Line')}</th>
                 <th className="text-right px-4 py-2.5 whitespace-nowrap">{t('transactions.amount', 'Amount')}</th>
-                <th className="text-left px-4 py-2.5 whitespace-nowrap">{t('tableHeaders.status')}</th>
+                <th className="text-center px-4 py-2.5 whitespace-nowrap">{t('tableHeaders.status')}</th>
                 <th className="text-right px-4 py-2.5 whitespace-nowrap">{t('tableHeaders.action')}</th>
               </tr>
             </thead>
@@ -215,7 +219,7 @@ const TransactionsPage: React.FC = () => {
                   </td>
                   <td className="px-4 py-2.5 text-[11px] text-[#7a7a78] font-mono truncate" title={getCategoryScheduleLine(txn.category_id) || ''}>{getCategoryScheduleLine(txn.category_id) || '—'}</td>
                   <td className="px-4 py-2.5 text-right font-mono font-medium whitespace-nowrap">{fmt(txn.amount)}</td>
-                  <td className="px-4 py-2.5 whitespace-nowrap">
+                  <td className="px-4 py-2.5 text-center whitespace-nowrap">
                     <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${txn.payment_status === 'paid' ? 'bg-emerald-50 text-emerald-600' : txn.payment_status === 'partial' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
                       {txn.payment_status}
                     </span>
