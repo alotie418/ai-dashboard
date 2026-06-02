@@ -9,9 +9,29 @@ import {
   type MileageLog, type MileageSummary, type HomeOfficeData,
 } from '../services/api';
 
-const USTaxToolsPage: React.FC = () => {
+interface Props {
+  selectedYear?: string;
+}
+
+// IRS standard mileage rate (USD/mile) by tax year. Display-only — drives the
+// informational note so it reflects the selected accounting year instead of a
+// hardcoded 2024 rate. Add new years here as the IRS publishes them.
+const US_MILEAGE_RATES: Record<number, number> = { 2024: 0.67, 2025: 0.70, 2026: 0.725 };
+const LATEST_MILEAGE_YEAR = Math.max(...Object.keys(US_MILEAGE_RATES).map(Number));
+
+// Resolve the rate for the selected accounting year; if that year has no published
+// rate, fall back to the latest known year — and report that actual year so the
+// note never shows a rate/year mismatch.
+const resolveMileageRate = (selectedYear?: string): { year: number; rate: string } => {
+  const requested = Number(selectedYear) || new Date().getFullYear();
+  const year = US_MILEAGE_RATES[requested] != null ? requested : LATEST_MILEAGE_YEAR;
+  return { year, rate: US_MILEAGE_RATES[year].toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 3 }) };
+};
+
+const USTaxToolsPage: React.FC<Props> = ({ selectedYear }) => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'mileage' | 'homeOffice'>('mileage');
+  const { year: mileageYear, rate: mileageRate } = resolveMileageRate(selectedYear);
   const [accLocale, setAccLocale] = useState<string | null>(null);
   useEffect(() => {
     fetchSettings().then((s: any) => setAccLocale(s?.accounting_locale || 'CN')).catch(() => setAccLocale('CN'));
@@ -42,14 +62,14 @@ const USTaxToolsPage: React.FC = () => {
         </button>
       </div>
 
-      {activeTab === 'mileage' && <MileageSection />}
+      {activeTab === 'mileage' && <MileageSection mileageRate={mileageRate} mileageYear={mileageYear} />}
       {activeTab === 'homeOffice' && <HomeOfficeSection />}
     </div>
   );
 };
 
 // ─── Mileage Section ───
-const MileageSection: React.FC = () => {
+const MileageSection: React.FC<{ mileageRate: string; mileageYear: number }> = ({ mileageRate, mileageYear }) => {
   const { t } = useTranslation();
   const [logs, setLogs] = useState<MileageLog[]>([]);
   const [summary, setSummary] = useState<MileageSummary | null>(null);
@@ -186,7 +206,7 @@ const MileageSection: React.FC = () => {
 
       <div className="text-[10px] text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3">
         <i className="fas fa-info-circle mr-1.5 text-[#d97757]"></i>
-        {t('usTax.mileageNote', 'IRS standard mileage rate: $0.67/mile (2024). Deduction auto-calculated and maps to Schedule C Line 9 (Car & Truck Expenses).')}
+        {t('usTax.mileageNote', { rate: mileageRate, year: mileageYear, defaultValue: 'IRS standard mileage rate: ${{rate}}/mile ({{year}}). Deduction auto-calculated and maps to Schedule C Line 9 (Car & Truck Expenses).' })}
       </div>
     </div>
   );
@@ -247,7 +267,7 @@ const HomeOfficeSection: React.FC = () => {
               <input type="number" value={data.rate_per_sqft} disabled className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm bg-[#f9f9f8]" />
             </div>
           </div>
-          <p className="text-xs text-[#7a7a78]">{t('usTax.simplifiedCalc', 'Calculation')}: min({data.sqft}, {data.max_sqft}) × ${data.rate_per_sqft} = <b>${data.deduction}</b></p>
+          <p className="text-xs text-[#7a7a78]">{t('usTax.simplifiedCalc', 'Calculation')}: min({t('usTax.officeArea', 'office area')}, {data.max_sqft}) × ${data.rate_per_sqft} = <b>${data.deduction}</b></p>
         </div>
       )}
 
