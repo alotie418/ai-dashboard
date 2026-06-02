@@ -1109,6 +1109,93 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0i: System Settings (系统设置) non-CN wording.
+  //   For every non-CN accountingLocale (US/JP/KR/TW/EU) the company-info,
+  //   tax-rule, accounting-category and data-migration labels must use the
+  //   locale's own regime wording — never China company/tax口径 (统一社会信用代码 /
+  //   法定代表人 / 增值税 / 进项 / 销项 / 认证 / 税金及附加 / 可抵扣 / 91110000 /
+  //   北京市朝阳区) and never internal engineering terms in the Chinese migration
+  //   copy (sales/purchases/transaction/source_meta/legacy_migrations/COGS/
+  //   income/expense). JP/KR/TW/EU must surface their own tax / currency / tax-ID
+  //   口径; US keeps its already-fixed wording. CN is guarded the other way below.
+  // ────────────────────────────────────────────────
+  {
+    const SETTINGS_KEYS = [
+      'setNavAi', 'setCompanyNamePh', 'setCreditCodeLabel', 'setCreditCodePh',
+      'setLegalPersonLabel', 'setLegalPersonPh', 'setIndustryPh', 'setAddressPh',
+      'setVatRateLabel', 'setRateByState', 'setRateCustom', 'setRateZero',
+      'setAutoAuthLabel', 'setAutoAuthDesc', 'setAdminExpenseLabel', 'setPerYear',
+      'setTaxHint', 'setDeductibleHeader', 'setDeductiblePctLabel',
+      'notifStockZero', 'notifTaxDeviation', 'notifPriceVolatility', 'notifMonthlyReport',
+    ];
+    const DM_KEYS = [
+      'dmSubtitle', 'dmCardSales', 'dmCardPurchases', 'dmNoLegacy', 'dmResultIncome',
+      'dmResultExpense', 'dmRollbackConfirm', 'dmRollback', 'dmNote1', 'dmNote2', 'dmNote3', 'dmNote4',
+    ];
+    // China company / VAT / GAAP wording forbidden on non-CN settings strings.
+    const CN_SETTINGS_BAN = /统一社会信用代码|統一社會信用代碼|法定代表人|增值税|增值稅|进项|進項|销项|銷項|认证|認證|税金及附加|稅金及附加|抵扣|91110000|北京市朝阳区|北京市朝陽區/;
+    // Internal engineering terms forbidden in the Chinese migration copy (these
+    // are normal words in English, so only the zh-CN / zh-TW strings are checked).
+    const INTERNAL_BAN = /sales|purchases|transaction|source_meta|legacy_migrations|cogs|\bincome\b|\bexpense\b/i;
+    // Each non-CN locale must surface its own regime wording (zh-CN display).
+    const REGIME = {
+      US: { vat: /Sales Tax/i, cur: /美元|USD/, id: /EIN/ },
+      JP: { vat: /消费税|消費税/, cur: /日元|日圓|円|JPY/, id: /法人(编号|番号)/ },
+      KR: { vat: /VAT/i, cur: /韩元|韓元|원|KRW/, id: /营业登记|營業登記|사업자등록/ },
+      TW: { vat: /营业税|營業稅/, cur: /新台币|新臺幣|TWD/, id: /统一编号|統一編號/ },
+      EU: { vat: /VAT/i, cur: /欧元|歐元|EUR/, id: /VAT ID/i },
+    };
+    for (const accId of ['US', 'JP', 'KR', 'TW', 'EU']) {
+      const reasons = [];
+      // presence (no raw key) for every settings + migration key, all UI languages
+      for (const key of [...SETTINGS_KEYS, ...DM_KEYS]) {
+        for (const lang of UI_LANGUAGES) {
+          const v = helpers.getTaxLabel(accId, lang, key);
+          if (v === key) reasons.push(`${key}[${lang}] missing (raw key) for ${accId}`);
+        }
+      }
+      // ban China company/tax wording on the Chinese settings display strings
+      for (const key of SETTINGS_KEYS) {
+        for (const lang of ['zh-CN', 'zh-TW']) {
+          const v = helpers.getTaxLabel(accId, lang, key);
+          if (typeof v === 'string' && CN_SETTINGS_BAN.test(v)) {
+            reasons.push(`${accId} ${key}[${lang}] uses China company/tax wording: "${v}"`);
+          }
+        }
+      }
+      // ban internal engineering terms in the Chinese migration copy
+      for (const key of DM_KEYS) {
+        for (const lang of ['zh-CN', 'zh-TW']) {
+          const v = helpers.getTaxLabel(accId, lang, key);
+          if (typeof v === 'string' && INTERNAL_BAN.test(v)) {
+            reasons.push(`${accId} ${key}[${lang}] leaks internal term: "${v}"`);
+          }
+        }
+      }
+      // each locale must surface its own regime wording (tax / currency / tax-ID)
+      const r = REGIME[accId];
+      const vat = helpers.getTaxLabel(accId, 'zh-CN', 'setVatRateLabel');
+      const cur = helpers.getTaxLabel(accId, 'zh-CN', 'setPerYear');
+      const id = helpers.getTaxLabel(accId, 'zh-CN', 'setCreditCodeLabel');
+      if (!r.vat.test(vat)) reasons.push(`${accId} setVatRateLabel[zh-CN] should match ${r.vat}: "${vat}"`);
+      if (!r.cur.test(cur)) reasons.push(`${accId} setPerYear[zh-CN] should match ${r.cur}: "${cur}"`);
+      if (!r.id.test(id)) reasons.push(`${accId} setCreditCodeLabel[zh-CN] should match ${r.id}: "${id}"`);
+      if (reasons.length) fail(`settingsNonCn:${accId}`, reasons); else pass(`settingsNonCn:${accId}`);
+    }
+    // CN regression guard: CN settings i18n must KEEP China company/tax wording.
+    {
+      const cn = locales['zh-CN'];
+      const reasons = [];
+      if (get(cn, 'settings.company.creditCode') !== '统一社会信用代码') reasons.push(`CN settings.company.creditCode should stay 统一社会信用代码, got "${get(cn, 'settings.company.creditCode')}"`);
+      if (get(cn, 'settings.company.legalPerson') !== '法定代表人') reasons.push(`CN settings.company.legalPerson should stay 法定代表人, got "${get(cn, 'settings.company.legalPerson')}"`);
+      if (!/增值税/.test(get(cn, 'settings.tax.vatRate') || '')) reasons.push(`CN settings.tax.vatRate should keep 增值税, got "${get(cn, 'settings.tax.vatRate')}"`);
+      if (get(cn, 'settings.tax.autoAuth') !== '进项发票自动认证') reasons.push(`CN settings.tax.autoAuth should stay 进项发票自动认证, got "${get(cn, 'settings.tax.autoAuth')}"`);
+      if (!/税金及附加/.test(get(cn, 'settings.tax.hint') || '')) reasons.push(`CN settings.tax.hint should keep 税金及附加, got "${get(cn, 'settings.tax.hint')}"`);
+      if (reasons.length) fail(`cnSettingsPreserved`, reasons); else pass(`cnSettingsPreserved`);
+    }
+  }
+
+  // ────────────────────────────────────────────────
   // PART G1: Data Analysis page subtitles — must not contain hardcoded
   // English "TONS" or "吨" since the inventory unit comes from
   // product_unit (uiLanguage-driven via getInventoryUnitLabel).
