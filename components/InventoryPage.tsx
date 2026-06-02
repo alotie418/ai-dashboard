@@ -33,20 +33,14 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
   const taxLabel = (key: string) => getTaxLabel(accLocale, uiLang, key);
   const fmtMoney = (val: number) => formatMoney(val, accLocale, uiLang);
   const unitLabel = getInventoryUnitLabel(productUnit, uiLang);
-  // US accountingLocale uses receipt/document context (no CN VAT input/output
-  // invoice terminology). usLabel(taxConceptKey, fallbackI18nKey) returns the
-  // US taxConcept label when accLocale === 'US', else the default i18n value.
-  const usLabel = (taxKey: string, i18nKey: string) => accLocale === 'US' ? taxLabel(taxKey) : t(i18nKey);
-  // genLabel: generic non-CN business wording shared by US/JP/KR/TW/EU (PR-A base).
-  // Use for the invoice-query basics (title / search / filter tabs / table headers
-  // / empty). Advanced filter + status dropdown + stat cards stay on usLabel until
-  // their keys are added to the shared base in a later PR.
+  // Every non-CN accountingLocale (US/JP/KR/TW/EU) uses the generic document
+  // wording from the accounting-locale taxConcepts (receipt/document context, no
+  // CN-VAT 进项/销项/认证/抵扣/发票号 terminology); only CN keeps the invoices.*
+  // i18n values. genLabelCount substitutes the literal {count} token (getTaxLabel
+  // returns a plain string, no i18next interpolation) for non-CN.
   const genLabel = (taxKey: string, i18nKey: string) => accLocale !== 'CN' ? taxLabel(taxKey) : t(i18nKey);
-  // Interpolated variant: US taxConcept templates carry a literal {count} token
-  // (getTaxLabel returns a plain string, no i18next interpolation), so substitute
-  // it manually for US; all other locales keep the existing t(key, { count }) path.
-  const usLabelCount = (taxKey: string, i18nKey: string, count: number) =>
-    accLocale === 'US'
+  const genLabelCount = (taxKey: string, i18nKey: string, count: number) =>
+    accLocale !== 'CN'
       ? taxLabel(taxKey).replace(/\{count\}/g, String(count))
       : t(i18nKey, { count });
 
@@ -148,9 +142,9 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
       currentStock: formatQuantity(inventoryTons, productUnit, uiLang, 2),
       currentStockSub: t('invoices.stockNormal'),
       totalInputWeight: formatQuantity(totalInputTons, productUnit, uiLang, 1),
-      totalInputSub: purchaseRecords.length > 0 ? usLabelCount('invInputRecordCount', 'invoices.inputRecordCount', purchaseRecords.length) : usLabel('invNoInput', 'invoices.noInput'),
+      totalInputSub: purchaseRecords.length > 0 ? genLabelCount('invInputRecordCount', 'invoices.inputRecordCount', purchaseRecords.length) : genLabel('invNoInput', 'invoices.noInput'),
       totalOutputWeight: formatQuantity(totalOutputTons, productUnit, uiLang, 1),
-      totalOutputSub: salesRecords.length > 0 ? usLabelCount('invOutputRecordCount', 'invoices.outputRecordCount', salesRecords.length) : usLabel('invNoOutput', 'invoices.noOutput'),
+      totalOutputSub: salesRecords.length > 0 ? genLabelCount('invOutputRecordCount', 'invoices.outputRecordCount', salesRecords.length) : genLabel('invNoOutput', 'invoices.noOutput'),
       pendingCertification: fmtMoney(pendingTax),
     };
   }, [salesRecords, purchaseRecords, accLocale, uiLang]);
@@ -168,7 +162,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           bg="bg-amber-500/10"
         />
         <StatCard
-          title={usLabel('invTotalInput', 'invoices.totalInput')}
+          title={genLabel('invTotalInput', 'invoices.totalInput')}
           value={stats.totalInputWeight}
           sub={stats.totalInputSub}
           icon="fa-file-import"
@@ -176,7 +170,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           bg="bg-[#d97757]/10"
         />
         <StatCard
-          title={usLabel('invTotalOutput', 'invoices.totalOutput')}
+          title={genLabel('invTotalOutput', 'invoices.totalOutput')}
           value={stats.totalOutputWeight}
           sub={stats.totalOutputSub}
           icon="fa-file-export"
@@ -184,9 +178,9 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           bg="bg-emerald-500/10"
         />
         <StatCard
-          title={usLabel('invPendingTax', 'invoices.pendingTax')}
+          title={genLabel('invPendingTax', 'invoices.pendingTax')}
           value={stats.pendingCertification}
-          sub={t('invoices.deductible')}
+          sub={genLabel('invPendingTaxSub', 'invoices.deductible')}
           icon="fa-clock"
           color="text-[#d97757]"
           bg="bg-[#d97757]/10"
@@ -241,7 +235,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Date Range */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{usLabel('invDateRange', 'invoices.dateRange')}</label>
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{genLabel('invDateRange', 'invoices.dateRange')}</label>
                 <div className="flex items-center space-x-2">
                   <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
                     className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />
@@ -265,7 +259,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
 
               {/* Weight Range */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{usLabel('invWeightRange', 'invoices.weightRange')}</label>
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{genLabel('invWeightRange', 'invoices.weightRange')}</label>
                 <div className="flex items-center space-x-2">
                   <input type="number" placeholder={t('invoices.min')} value={weightMin} onChange={e => setWeightMin(e.target.value)}
                     className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />
@@ -277,17 +271,17 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
 
               {/* Status Filter */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{usLabel('invStatusFilter', 'invoices.statusFilter')}</label>
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{genLabel('invStatusFilter', 'invoices.statusFilter')}</label>
                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
                   className="w-full bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all appearance-none cursor-pointer"
                   style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}>
-                  <option value="all">{usLabel('invStatusAll', 'invoices.allStatus')}</option>
-                  <option value="verified">{usLabel('invStatusVerified', 'invoices.statusVerified')}</option>
-                  <option value="certified">{usLabel('invStatusCertified', 'invoices.statusCertified')}</option>
-                  <option value="deducted">{usLabel('invStatusDeducted', 'invoices.statusDeducted')}</option>
-                  <option value="pendingCert">{usLabel('invStatusPendingCert', 'invoices.statusPendingCert')}</option>
-                  <option value="pendingIssue">{usLabel('invStatusPendingIssue', 'invoices.statusPendingInvoice')}</option>
-                  <option value="issued">{usLabel('invStatusIssued', 'invoices.statusIssued')}</option>
+                  <option value="all">{genLabel('invStatusAll', 'invoices.allStatus')}</option>
+                  <option value="verified">{genLabel('invStatusVerified', 'invoices.statusVerified')}</option>
+                  <option value="certified">{genLabel('invStatusCertified', 'invoices.statusCertified')}</option>
+                  <option value="deducted">{genLabel('invStatusDeducted', 'invoices.statusDeducted')}</option>
+                  <option value="pendingCert">{genLabel('invStatusPendingCert', 'invoices.statusPendingCert')}</option>
+                  <option value="pendingIssue">{genLabel('invStatusPendingIssue', 'invoices.statusPendingInvoice')}</option>
+                  <option value="issued">{genLabel('invStatusIssued', 'invoices.statusIssued')}</option>
                 </select>
               </div>
             </div>
@@ -298,7 +292,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                 {hasAdvancedFilters && (
                   <span className="flex items-center">
                     <i className="fas fa-info-circle mr-1.5 text-[#d97757]"></i>
-                    {usLabelCount('invAdvFilterActive', 'invoices.advancedFilterActive', filteredInvoices.length)}
+                    {genLabelCount('invAdvFilterActive', 'invoices.advancedFilterActive', filteredInvoices.length)}
                   </span>
                 )}
               </div>
@@ -403,9 +397,9 @@ const statusI18nMap: Record<string, string> = {
   issued: 'invoices.statusIssued',
 };
 
-// US accountingLocale maps each status to a generic document-status taxConcept
-// (no CN-VAT 认证/抵扣 wording). Used by both the filter dropdown and the table
-// StatusBadge so US never renders the raw invoices.status* keys.
+// Every non-CN accountingLocale maps each status to a generic document-status
+// taxConcept (no CN-VAT 认证/抵扣 wording). Used by both the filter dropdown and
+// the table StatusBadge so non-CN never renders the CN invoices.status* wording.
 const usStatusTaxKey: Record<string, string> = {
   all: 'invStatusAll',
   verified: 'invStatusVerified',
@@ -424,9 +418,9 @@ const StatusBadge: React.FC<{ statusKey: string, accLocale: string, uiLang: stri
     deducted: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
     issued: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
   };
-  // US: resolve via document-status taxConcept (no raw key, no VAT wording).
-  // All other locales: unchanged i18n lookup.
-  const label = accLocale === 'US' && usStatusTaxKey[statusKey]
+  // Non-CN (US/JP/KR/TW/EU): resolve via the generic document-status taxConcept
+  // (no raw key, no CN-VAT 认证/抵扣 wording). CN: unchanged invoices.status* i18n.
+  const label = accLocale !== 'CN' && usStatusTaxKey[statusKey]
     ? getTaxLabel(accLocale, uiLang, usStatusTaxKey[statusKey])
     : (statusI18nMap[statusKey] ? t(statusI18nMap[statusKey]) : statusKey);
   return (

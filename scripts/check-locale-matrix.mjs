@@ -1196,6 +1196,130 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0j: Invoice-query (票据查询) non-CN wording.
+  //   For every non-CN accountingLocale (US/JP/KR/TW/EU) the stat cards, status
+  //   filter/badges, record-count subtitles and the table type column must use
+  //   generic document wording — never CN-VAT 进项/销项/认证/抵扣/待认证/已认证/
+  //   已抵扣/预计可抵扣/发票号(码). JP/KR/TW/EU/US share the NON_CN_GENERIC document
+  //   framing (采购/费用·销售/收入·票据·待处理). US keeps income/expense framing for
+  //   the type column. CN keeps its VAT-invoice口径 (guarded the other way below).
+  // ────────────────────────────────────────────────
+  {
+    const INV_KEYS = [
+      'invTotalInput', 'invTotalOutput', 'invPendingTax', 'invPendingTaxSub',
+      'invNoInput', 'invNoOutput', 'invDateRange', 'invWeightRange', 'invStatusFilter',
+      'invStatusAll', 'invStatusVerified', 'invStatusCertified', 'invStatusDeducted',
+      'invStatusPendingCert', 'invStatusPendingIssue', 'invStatusIssued',
+      'invAdvFilterActive', 'invInputRecordCount', 'invOutputRecordCount',
+      'invoiceTypeInput', 'invoiceTypeOutput',
+    ];
+    const COUNT_KEYS = ['invAdvFilterActive', 'invInputRecordCount', 'invOutputRecordCount'];
+    const CN_INV_BAN = /进项|進項|销项|銷項|认证|認證|抵扣|发票号|發票號|电子发票|電子發票/;
+    for (const accId of ['US', 'JP', 'KR', 'TW', 'EU']) {
+      const reasons = [];
+      for (const key of INV_KEYS) {
+        for (const lang of UI_LANGUAGES) {
+          const v = helpers.getTaxLabel(accId, lang, key);
+          if (v === key) reasons.push(`${key}[${lang}] missing (raw key) for ${accId}`);
+        }
+        for (const lang of ['zh-CN', 'zh-TW']) {
+          const v = helpers.getTaxLabel(accId, lang, key);
+          if (typeof v === 'string' && CN_INV_BAN.test(v)) {
+            reasons.push(`${accId} ${key}[${lang}] uses CN-VAT invoice wording: "${v}"`);
+          }
+        }
+      }
+      // interpolated count templates must keep the {count} token
+      for (const key of COUNT_KEYS) {
+        for (const lang of ['zh-CN', 'zh-TW', 'en']) {
+          const v = helpers.getTaxLabel(accId, lang, key);
+          if (typeof v === 'string' && !v.includes('{count}')) {
+            reasons.push(`${accId} ${key}[${lang}] missing {count} token: "${v}"`);
+          }
+        }
+      }
+      // positive: generic document framing must surface (zh-CN display)
+      const totIn = helpers.getTaxLabel(accId, 'zh-CN', 'invTotalInput');
+      const pend = helpers.getTaxLabel(accId, 'zh-CN', 'invPendingTax');
+      const tin = helpers.getTaxLabel(accId, 'zh-CN', 'invoiceTypeInput');
+      const tout = helpers.getTaxLabel(accId, 'zh-CN', 'invoiceTypeOutput');
+      if (!/采购|费用/.test(totIn)) reasons.push(`${accId} invTotalInput[zh-CN] should use 采购/费用: "${totIn}"`);
+      if (!/待处理/.test(pend)) reasons.push(`${accId} invPendingTax[zh-CN] should use 待处理: "${pend}"`);
+      if (accId === 'US') {
+        // US frames the type column as income/expense, not 采购/销售.
+        if (!/费用/.test(tin)) reasons.push(`US invoiceTypeInput[zh-CN] should be 费用-framed: "${tin}"`);
+        if (!/收入/.test(tout)) reasons.push(`US invoiceTypeOutput[zh-CN] should be 收入-framed: "${tout}"`);
+      } else {
+        if (!/采购/.test(tin)) reasons.push(`${accId} invoiceTypeInput[zh-CN] should be 采购: "${tin}"`);
+        if (!/销售/.test(tout)) reasons.push(`${accId} invoiceTypeOutput[zh-CN] should be 销售: "${tout}"`);
+      }
+      if (reasons.length) fail(`invoiceQueryNonCn:${accId}`, reasons); else pass(`invoiceQueryNonCn:${accId}`);
+    }
+    // CN regression guard: CN keeps its VAT-invoice口径 (config type labels + i18n).
+    {
+      const cn = locales['zh-CN'];
+      const reasons = [];
+      if (helpers.getTaxLabel('CN', 'zh-CN', 'invoiceTypeInput') !== '进项') reasons.push(`CN invoiceTypeInput should stay 进项`);
+      if (helpers.getTaxLabel('CN', 'zh-CN', 'invoiceTypeOutput') !== '销项') reasons.push(`CN invoiceTypeOutput should stay 销项`);
+      if (get(cn, 'invoices.totalInput') !== '累计进项吨数') reasons.push(`CN invoices.totalInput should stay 累计进项吨数, got "${get(cn, 'invoices.totalInput')}"`);
+      if (get(cn, 'invoices.pendingTax') !== '待认证进项额') reasons.push(`CN invoices.pendingTax should stay 待认证进项额, got "${get(cn, 'invoices.pendingTax')}"`);
+      if (!/抵扣/.test(get(cn, 'invoices.deductible') || '')) reasons.push(`CN invoices.deductible should keep 抵扣, got "${get(cn, 'invoices.deductible')}"`);
+      if (!/认证/.test(get(cn, 'invoices.authenticated') || '')) reasons.push(`CN invoices.authenticated should keep 认证, got "${get(cn, 'invoices.authenticated')}"`);
+      if (reasons.length) fail(`cnInvoiceQueryPreserved`, reasons); else pass(`cnInvoiceQueryPreserved`);
+    }
+  }
+
+  // ────────────────────────────────────────────────
+  // PART G0k: Invoice-query status dropdown localization.
+  //   CN accountingLocale renders the dropdown from the invoices.* i18n keys, so
+  //   each status MUST resolve in every UI language — a missing key leaked the raw
+  //   invoices.statusVerified / statusCertified / statusDeducted / statusPendingCert
+  //   / statusPendingInvoice in the CN dropdown. CN keeps China-VAT status wording;
+  //   non-CN renders the generic invStatus* taxConcepts (must differ from CN's
+  //   认证/抵扣 wording — also guarded in PART G0j).
+  // ────────────────────────────────────────────────
+  {
+    const STATUS_I18N = ['allStatus', 'statusVerified', 'statusCertified', 'statusDeducted', 'statusPendingCert', 'statusPendingInvoice', 'statusIssued'];
+    const reasons = [];
+    // CN dropdown: every status option resolves (non-empty, no raw key) in all langs
+    for (const lang of UI_LANGUAGES) {
+      const inv = (locales[lang] || {}).invoices || {};
+      for (const k of STATUS_I18N) {
+        const v = inv[k];
+        if (v === undefined || (typeof v === 'string' && v.trim() === '')) {
+          reasons.push(`invoices.${k} missing/empty in ${lang} (CN status dropdown would render raw key)`);
+        }
+      }
+    }
+    // CN zh-CN must keep the China-VAT status wording
+    const cnInv = (locales['zh-CN'] || {}).invoices || {};
+    const CN_PIN = {
+      allStatus: '全部状态', statusVerified: '已核验', statusCertified: '已认证',
+      statusDeducted: '已抵扣', statusPendingCert: '待认证', statusPendingInvoice: '待开票', statusIssued: '已开票',
+    };
+    for (const [k, want] of Object.entries(CN_PIN)) {
+      if (cnInv[k] !== want) reasons.push(`CN invoices.${k} should be "${want}", got "${cnInv[k]}"`);
+    }
+    if (reasons.length) fail(`cnStatusDropdown`, reasons); else pass(`cnStatusDropdown`);
+  }
+  {
+    // non-CN dropdown: the generic invStatus* taxConcepts resolve and must NOT
+    // carry CN-VAT 认证/抵扣 wording, so each non-CN locale shows document statuses.
+    const STATUS_TAX = ['invStatusAll', 'invStatusVerified', 'invStatusCertified', 'invStatusDeducted', 'invStatusPendingCert', 'invStatusPendingIssue', 'invStatusIssued'];
+    for (const accId of ['US', 'JP', 'KR', 'TW', 'EU']) {
+      const reasons = [];
+      for (const key of STATUS_TAX) {
+        for (const lang of ['zh-CN', 'zh-TW']) {
+          const v = helpers.getTaxLabel(accId, lang, key);
+          if (v === key) reasons.push(`${accId} ${key}[${lang}] raw key (non-CN status dropdown)`);
+          if (typeof v === 'string' && /认证|認證|抵扣/.test(v)) reasons.push(`${accId} ${key}[${lang}] uses CN-VAT 认证/抵扣: "${v}"`);
+        }
+      }
+      if (reasons.length) fail(`nonCnStatusDropdown:${accId}`, reasons); else pass(`nonCnStatusDropdown:${accId}`);
+    }
+  }
+
+  // ────────────────────────────────────────────────
   // PART G1: Data Analysis page subtitles — must not contain hardcoded
   // English "TONS" or "吨" since the inventory unit comes from
   // product_unit (uiLanguage-driven via getInventoryUnitLabel).

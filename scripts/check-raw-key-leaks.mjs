@@ -109,10 +109,10 @@ async function scanFile(filepath) {
       // Filter false positives:
       if (isAllowedContext(line, full, ns, key)) continue;
       if (new RegExp(`t\\s*\\(\\s*['"\`]${ns}\\.${key}['"\`]`).test(line)) continue;
-      // usLabel/usLabelCount/localeLabel(taxKey, 'ns.key'[, n]): the ns.key is the
-      // i18n fallback passed to the accountingLocale-aware wrapper (resolved via
-      // t() for the CN/default locale), not a display-as-literal leak.
-      if (new RegExp(`(usLabel|usLabelCount|localeLabel)\\s*\\([^)]*['"\`]${ns}\\.${key}['"\`]`).test(line)) continue;
+      // usLabel/usLabelCount/localeLabel/genLabel/genLabelCount(taxKey, 'ns.key'[, n]):
+      // the ns.key is the i18n fallback passed to the accountingLocale-aware wrapper
+      // (resolved via t() for the CN/default locale), not a display-as-literal leak.
+      if (new RegExp(`(usLabel|usLabelCount|localeLabel|genLabel|genLabelCount)\\s*\\([^)]*['"\`]${ns}\\.${key}['"\`]`).test(line)) continue;
       if (/Record<string|\[key:|i18n[A-Z]/.test(line)) continue;
 
       // Filter: leak token is inside ${...} interpolation
@@ -181,16 +181,18 @@ async function scanFile(filepath) {
 // t() call was correct but the key was missing from every locale file, so a
 // pure source scan could never catch it).
 //
-// Scope note: this guards the advanced-filter LABELS only (the render items in
-// the US invoice-query localization task). It deliberately does NOT guard the
-// status-dropdown OPTION keys (statusVerified/statusCertified/...), the
-// advancedFilterActive count line, or inputRecordCount/outputRecordCount — those
-// are also missing in all locales but carry accountingLocale-vs-uiLanguage
-// semantic decisions (CN-VAT 进项/销项/已认证 wording must differ from US), so
-// they belong to a separate, deliberate localization pass.
+// Scope note: this guards the advanced-filter LABELS plus the status-dropdown
+// OPTION keys. The status options are the CN-accountingLocale fallback (non-CN
+// locales resolve them via the generic invStatus* taxConcepts); they must still
+// resolve in every locale file, because CN + any uiLanguage renders them through
+// t() — a missing key leaked the raw `invoices.statusVerified` etc. in the
+// dropdown. The advancedFilterActive / inputRecordCount / outputRecordCount count
+// lines stay out (they carry {count} interpolation handled separately).
 const REQUIRED_INVOICE_LABEL_KEYS = [
   'advancedFilter', 'clearAll', 'dateRange', 'amountRange',
   'weightRange', 'statusFilter', 'allStatus', 'min', 'max',
+  'statusVerified', 'statusCertified', 'statusDeducted',
+  'statusPendingCert', 'statusPendingInvoice', 'statusIssued',
 ];
 async function checkInvoiceKeyResolution() {
   const langs = ['en', 'zh-CN', 'zh-TW', 'ja', 'ko', 'fr'];
