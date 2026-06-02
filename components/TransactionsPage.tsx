@@ -178,16 +178,29 @@ const TransactionsPage: React.FC = () => {
         <div className="text-center py-10 text-sm text-[#7a7a78]"><i className="fas fa-spinner fa-spin mr-2 text-[#d97757]"></i>{t('common.loading')}</div>
       ) : (
         <div className="border border-[#e0ddd5] rounded-xl overflow-hidden bg-white/80">
-          <table className="w-full text-sm">
+          {/* overflow-x-auto: small screens scroll horizontally instead of squeezing columns */}
+          <div className="overflow-x-auto">
+          {/* table-fixed + colgroup: columns keep their defined widths (no even-spread in
+              empty/sparse state); min-w guarantees a horizontal scroll rather than collapse */}
+          <table className="w-full text-sm table-fixed min-w-[1020px]">
+            <colgroup>
+              <col className="w-[120px]" />{/* date */}
+              <col className="w-[180px]" />{/* counterparty (supplier/customer) */}
+              <col className="w-[160px]" />{/* category */}
+              <col className="w-[180px]" />{/* report line / account */}
+              <col className="w-[140px]" />{/* amount */}
+              <col className="w-[120px]" />{/* status */}
+              <col className="w-[120px]" />{/* action (≥100 to fit en/fr confirm·cancel) */}
+            </colgroup>
             <thead className="bg-[#f9f9f8] text-[10px] uppercase tracking-wider text-[#4a4a48]">
               <tr>
-                <th className="text-left px-4 py-2.5">{t('tableHeaders.date')}</th>
-                <th className="text-left px-4 py-2.5">{activeType === 'income' ? t('tableHeaders.customer') : t('tableHeaders.supplier')}</th>
-                <th className="text-left px-4 py-2.5">{t('transactions.category', 'Category')}</th>
-                <th className="text-left px-4 py-2.5">{usLabel('txnAccountHeader', 'transactions.scheduleLine', 'Report Line')}</th>
-                <th className="text-right px-4 py-2.5">{t('transactions.amount', 'Amount')}</th>
-                <th className="text-left px-4 py-2.5">{t('tableHeaders.status')}</th>
-                <th className="text-right px-4 py-2.5">{t('tableHeaders.action')}</th>
+                <th className="text-left px-4 py-2.5 whitespace-nowrap">{t('tableHeaders.date')}</th>
+                <th className="text-left px-4 py-2.5 whitespace-nowrap">{activeType === 'income' ? t('tableHeaders.customer') : t('tableHeaders.supplier')}</th>
+                <th className="text-left px-4 py-2.5 whitespace-nowrap">{t('transactions.category', 'Category')}</th>
+                <th className="text-left px-4 py-2.5 whitespace-nowrap">{usLabel('txnAccountHeader', 'transactions.scheduleLine', 'Report Line')}</th>
+                <th className="text-right px-4 py-2.5 whitespace-nowrap">{t('transactions.amount', 'Amount')}</th>
+                <th className="text-left px-4 py-2.5 whitespace-nowrap">{t('tableHeaders.status')}</th>
+                <th className="text-right px-4 py-2.5 whitespace-nowrap">{t('tableHeaders.action')}</th>
               </tr>
             </thead>
             <tbody>
@@ -195,19 +208,19 @@ const TransactionsPage: React.FC = () => {
                 <tr><td colSpan={7} className="text-center py-10 text-[#7a7a78]">{t('transactions.empty', 'No transactions yet. Click "New Transaction" to add one.')}</td></tr>
               ) : transactions.map(txn => (
                 <tr key={txn.id} className="border-t border-[#e0ddd5]/70 hover:bg-[#f9f9f8]/40">
-                  <td className="px-4 py-2.5 text-[#191918]">{txn.date}</td>
-                  <td className="px-4 py-2.5 text-[#4a4a48]">{txn.counterparty || '—'}</td>
-                  <td className="px-4 py-2.5">
-                    <span className="text-xs bg-[#f0eeeb] px-2 py-0.5 rounded">{getCategoryLabel(txn.category_id)}</span>
+                  <td className="px-4 py-2.5 text-[#191918] whitespace-nowrap">{txn.date}</td>
+                  <td className="px-4 py-2.5 text-[#4a4a48] truncate" title={txn.counterparty || ''}>{txn.counterparty || '—'}</td>
+                  <td className="px-4 py-2.5 truncate">
+                    <span className="inline-block max-w-full truncate align-middle text-xs bg-[#f0eeeb] px-2 py-0.5 rounded" title={getCategoryLabel(txn.category_id)}>{getCategoryLabel(txn.category_id)}</span>
                   </td>
-                  <td className="px-4 py-2.5 text-[11px] text-[#7a7a78] font-mono">{getCategoryScheduleLine(txn.category_id) || '—'}</td>
-                  <td className="px-4 py-2.5 text-right font-mono font-medium">{fmt(txn.amount)}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-4 py-2.5 text-[11px] text-[#7a7a78] font-mono truncate" title={getCategoryScheduleLine(txn.category_id) || ''}>{getCategoryScheduleLine(txn.category_id) || '—'}</td>
+                  <td className="px-4 py-2.5 text-right font-mono font-medium whitespace-nowrap">{fmt(txn.amount)}</td>
+                  <td className="px-4 py-2.5 whitespace-nowrap">
                     <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${txn.payment_status === 'paid' ? 'bg-emerald-50 text-emerald-600' : txn.payment_status === 'partial' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
                       {txn.payment_status}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-right space-x-2">
+                  <td className="px-4 py-2.5 text-right space-x-2 whitespace-nowrap">
                     <button onClick={() => openEdit(txn)} className="text-xs text-[#d97757] hover:text-[#c56a4a]">{t('common2.edit')}</button>
                     {confirmDelete === txn.id ? (
                       <span className="inline-flex space-x-1">
@@ -222,6 +235,7 @@ const TransactionsPage: React.FC = () => {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
