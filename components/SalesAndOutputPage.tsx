@@ -263,8 +263,9 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
               </div>
             </div>
             <div className="text-right text-[#5c5c5a] text-xs space-y-0.5">
-              <p>{t('sales.inventoryTotalPurchase')}: {fmtQty(purchaseQty)}</p>
-              <p>{t('sales.inventoryTotalSales')}: {fmtQty(salesQty)}</p>
+              {/* US shows quantity stats instead of the CN 总采购/总销售 inventory wording */}
+              <p>{accLocale === 'US' ? taxLabel('salesBannerPurchaseQty') : t('sales.inventoryTotalPurchase')}: {fmtQty(purchaseQty)}</p>
+              <p>{accLocale === 'US' ? taxLabel('salesBannerSalesQty') : t('sales.inventoryTotalSales')}: {fmtQty(salesQty)}</p>
             </div>
           </div>
         );
