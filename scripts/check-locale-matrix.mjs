@@ -409,6 +409,13 @@ async function main() {
           if (/统一社会信用代码|統一社會信用代碼|91110000/.test(credit)) reasons.push(`US creditCode[${uiLang}] uses CN business-code wording: "${credit}"`);
           const vat = helpers.getTaxLabel(accId, uiLang, 'setVatRateLabel');
           if (/增值税|增值稅/.test(vat)) reasons.push(`US setVatRateLabel[${uiLang}] still says 增值税: "${vat}"`);
+          // US sales-page inventory banner: quantity-stat wording, not the CN
+          // 总采购/总销售/库存 commodity-inventory口径 (and never a raw key).
+          for (const k of ['salesBannerPurchaseQty', 'salesBannerSalesQty']) {
+            const v = helpers.getTaxLabel(accId, uiLang, k);
+            if (v === k) reasons.push(`US ${k}[${uiLang}] is a raw key`);
+            if (/总采购|總採購|总销售|總銷售|库存|庫存/.test(v)) reasons.push(`US ${k}[${uiLang}] uses CN inventory wording: "${v}"`);
+          }
         }
         // US data-migration page: no internal table/field/JSON names should leak
         // into the Chinese UI; the rollback strings must keep the {count} token.

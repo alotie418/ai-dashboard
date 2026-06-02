@@ -278,6 +278,10 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       scanningSubtitle:   { 'zh-CN': 'AI 正在提取日期、金额、往来单位与税额…', 'zh-TW': 'AI 正在擷取日期、金額、往來單位與稅額…', en: 'AI is extracting date, amount, party and tax…', ja: 'AIが日付・金額・取引先・税額を抽出中…', ko: 'AI가 날짜·금액·거래처·세액을 추출 중…', fr: 'L’IA extrait la date, le montant, le tiers et la taxe…' },
       emptySales:         { 'zh-CN': '暂无销售或收入记录，请上传收据、账单或发票，或手动新增。', 'zh-TW': '暫無銷售或收入記錄，請上傳收據、帳單或發票，或手動新增。', en: 'No sales or revenue records yet. Upload a receipt, bill or invoice, or add one manually.', ja: '売上・収入の記録がありません。レシート・請求書・伝票をアップロードするか手動で追加してください。', ko: '매출 또는 수입 기록이 없습니다. 영수증, 청구서, 인보이스를 업로드하거나 수동으로 추가하세요.', fr: 'Aucune vente ni recette. Téléversez un reçu, une facture ou ajoutez manuellement.' },
       emptyPurchase:      { 'zh-CN': '暂无采购或费用记录，请上传收据、账单、发票或手动新增。', 'zh-TW': '暫無採購或費用記錄，請上傳收據、帳單、發票或手動新增。', en: 'No purchase or expense records yet. Upload a receipt, bill, invoice, or add one manually.', ja: '仕入・経費の記録がありません。レシート・請求書・伝票をアップロードするか手動で追加してください。', ko: '매입/비용 기록이 없습니다. 영수증, 청구서, 인보이스를 업로드하거나 수동으로 추가하세요.', fr: 'Aucun achat/dépense. Téléversez un reçu, une facture ou ajoutez manuellement.' },
+      // Sales-page inventory banner totals — US frames them as quantity stats, not
+      // the CN 总采购/总销售 commodity-inventory wording (US-only; CN/JP/KR/TW/EU keep sales.inventory*).
+      salesBannerPurchaseQty: { 'zh-CN': '采购数量', 'zh-TW': '採購數量', en: 'Purchase Qty', ja: '仕入数量', ko: '매입 수량', fr: 'Quantité achats' },
+      salesBannerSalesQty:    { 'zh-CN': '销售数量', 'zh-TW': '銷售數量', en: 'Sales Qty', ja: '売上数量', ko: '매출 수량', fr: 'Quantité ventes' },
       newPurchaseButton:  { 'zh-CN': '新增采购', 'zh-TW': '新增採購', en: 'New Purchase', ja: 'New Purchase', ko: 'New Purchase', fr: 'New Purchase' },
       modalTitleSales:    { 'zh-CN': '新增销售与收入记录', 'zh-TW': '新增銷售與收入記錄', en: 'New Sale / Revenue', ja: '売上・収入を追加', ko: '매출 및 수입 추가', fr: 'Nouvelle vente / revenu' },
       modalSubtitleSales: { 'zh-CN': '请手动输入销售或收入明细', 'zh-TW': '請手動輸入銷售或收入明細', en: 'Enter sale or revenue details manually', ja: '売上または収入の詳細を入力', ko: '매출 또는 수입 세부 정보를 입력하세요', fr: 'Saisir les détails de la vente ou du revenu' },
