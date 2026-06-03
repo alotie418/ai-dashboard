@@ -430,6 +430,12 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       setPerYear:         { 'zh-CN': '日元/年', 'zh-TW': '日圓/年', en: 'JPY/yr', ja: '円/年', ko: '엔/년', fr: 'JPY/an' },
       setTaxHint:         { 'zh-CN': '提示：消费税标准 10% / 轻减 8%；所得税/法人税按利润计算。', 'zh-TW': '提示：消費稅標準 10% / 輕減 8%；所得稅/法人稅按利潤計算。', en: 'Note: consumption tax 10% standard / 8% reduced; income/corporate tax on profit.', ja: '注：消費税は標準10%／軽減8%。所得税・法人税は利益に対して課税。', ko: '참고: 소비세 표준 10% / 경감 8%; 소득세/법인세는 이익 기준.', fr: 'Note : taxe à la consommation 10 % / 8 % réduit ; impôt sur le revenu/sociétés sur le bénéfice.' },
       taxTitle:      { 'zh-CN': '消费税统计', 'zh-TW': '消費稅統計', en: 'Consumption Tax Summary', ja: '消費税集計', ko: '소비세 통계', fr: 'Résumé taxe consommation' },
+      // Finance-report (财务报表) consumption-tax section title — reconciliation/
+      // statement framing (汇总) vs the 经营看板 card's 统计. JP-only: FinancePage
+      // gates on locale === 'JP'; the 经营看板 VATStatistics keeps taxTitle (消费税统计),
+      // and CN/US/EU/KR/TW finance pages keep their own taxTitle untouched. zh-CN/zh-TW
+      // differ from taxTitle; en/ja/ko/fr mirror taxTitle (already summary-framed).
+      taxReportTitle:{ 'zh-CN': '消费税汇总', 'zh-TW': '消費稅彙總', en: 'Consumption Tax Summary', ja: '消費税集計', ko: '소비세 통계', fr: 'Résumé taxe consommation' },
       inputTax:      { 'zh-CN': '采购消费税', 'zh-TW': '採購消費稅', en: 'Consumption Tax Paid (Input)', ja: '仕入税額', ko: '매입 소비세', fr: 'Taxe payée (achats)' },
       outputTax:     { 'zh-CN': '销售消费税', 'zh-TW': '銷售消費稅', en: 'Consumption Tax Collected (Output)', ja: '売上税額', ko: '매출 소비세', fr: 'Taxe collectée (ventes)' },
       estimatedTax:  { 'zh-CN': '预计应缴消费税', 'zh-TW': '預計應繳消費稅', en: 'Estimated Consumption Tax Payable', ja: '消費税推定納付額', ko: '예상 소비세 납부액', fr: 'Taxe consommation estimée' },
