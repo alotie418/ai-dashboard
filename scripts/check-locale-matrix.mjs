@@ -945,24 +945,34 @@ async function main() {
     const JP_PIN = {
       'zh-CN': { inputTax: '采购消费税', outputTax: '销售消费税', navPurchase: '采购与费用', navSales: '销售与收入', invQueryTitle: '票据查询', invoiceTypeInput: '采购', invoiceTypeOutput: '销售',
                  pageTitlePurchase: '采购与费用', headerInvoiceNo: '票据号码', headerAmount: '税前金额', headerUnitPrice: '税前单价', modalTitlePurchase: '新增采购与费用记录', newPurchaseButton: '新增采购记录',
-                 plIncomeTax: '所得税/法人税', certifiedInput: '可抵扣采购消费税额', invoicedOutput: '已开票销售消费税额' },
+                 plIncomeTax: '所得税/法人税', certifiedInput: '可抵扣采购消费税额', invoicedOutput: '已开票销售消费税额',
+                 invFilterAll: '全部票据', invFilterInput: '采购与费用', invFilterOutput: '销售与收入',
+                 invTableTitle: '票据流转全景视图', invTableSubtitle: '核对票据、库存与交易记录的一致性',
+                 invPendingTax: '待处理消费税额', invHeaderAmount: '税前金额', invStatusPendingIssue: '待补票据', invEmpty: '未找到匹配的票据记录', invAmountRange: '税前金额范围' },
       'zh-TW': { inputTax: '採購消費稅', outputTax: '銷售消費稅', navPurchase: '採購與費用', navSales: '銷售與收入', invQueryTitle: '票據查詢', invoiceTypeInput: '採購', invoiceTypeOutput: '銷售',
                  pageTitlePurchase: '採購與費用', headerInvoiceNo: '票據號碼', headerAmount: '稅前金額', headerUnitPrice: '稅前單價', modalTitlePurchase: '新增採購與費用記錄', newPurchaseButton: '新增採購記錄',
-                 plIncomeTax: '所得稅/法人稅', certifiedInput: '可抵扣採購消費稅額', invoicedOutput: '已開票銷售消費稅額' },
+                 plIncomeTax: '所得稅/法人稅', certifiedInput: '可抵扣採購消費稅額', invoicedOutput: '已開票銷售消費稅額',
+                 invFilterAll: '全部票據', invFilterInput: '採購與費用', invFilterOutput: '銷售與收入',
+                 invTableTitle: '票據流轉全景視圖', invTableSubtitle: '核對票據、庫存與交易記錄的一致性',
+                 invPendingTax: '待處理消費稅額', invHeaderAmount: '稅前金額', invStatusPendingIssue: '待補票據', invEmpty: '未找到相符的票據記錄', invAmountRange: '稅前金額範圍' },
     };
     // JP money semantics are JPY — no 人民币/人民幣 may leak into any JP wording.
     const JP_UNIT = { 'zh-CN': /日元/, 'zh-TW': /日圓/ };
     for (const lang of ['zh-CN', 'zh-TW']) {
       const reasons = [];
-      // ban CN-VAT wording across ALL JP taxConcepts: 进项/销项 (use 采购/销售) and
-      // 电子发票 / 发票号码 (use 票据). 消费税 itself is allowed. Also ban 人民币 (JP is JPY).
+      // ban CN-VAT wording across ALL JP taxConcepts: 进项/销项 (use 采购/销售),
+      // 电子发票 / 发票号码 (use 票据), 增值税 and 认证 (CN-VAT only). 消费税 itself is
+      // allowed. Money must be JPY — ban 人民币/RMB/CNY.
       for (const [key, labels] of Object.entries(cfg.taxConcepts)) {
         const v = labels[lang];
         if (typeof v !== 'string') continue;
         if (/进项|進項|销项|銷項/.test(v)) reasons.push(`JP ${key}[${lang}] uses 进项/销项 (should be 采购/销售): "${v}"`);
         if (/电子发票|電子發票/.test(v)) reasons.push(`JP ${key}[${lang}] uses 电子发票 (should be 票据): "${v}"`);
         if (/发票号码|發票號碼/.test(v)) reasons.push(`JP ${key}[${lang}] uses 发票号码 (should be 票据号码): "${v}"`);
-        if (/人民币|人民幣/.test(v)) reasons.push(`JP ${key}[${lang}] uses 人民币 (JP money is 日元/JPY): "${v}"`);
+        if (/发票查询|發票查詢/.test(v)) reasons.push(`JP ${key}[${lang}] uses 发票查询 (should be 票据查询): "${v}"`);
+        if (/增值税|增值稅/.test(v)) reasons.push(`JP ${key}[${lang}] uses 增值税 (JP is 消费税): "${v}"`);
+        if (/认证|認證/.test(v)) reasons.push(`JP ${key}[${lang}] uses 认证 (CN-VAT only): "${v}"`);
+        if (/人民币|人民幣|RMB|CNY/.test(v)) reasons.push(`JP ${key}[${lang}] uses 人民币/RMB/CNY (JP money is 日元/JPY): "${v}"`);
       }
       // the P&L period subtitle (单位/币种 说明) must state 日元/日圓, never 人民币
       const period = helpers.getTaxLabel('JP', lang, 'plPeriodPrefix');

@@ -247,7 +247,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
 
               {/* Amount Range */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('invoices.amountRange')}</label>
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale === 'JP' ? taxLabel('invAmountRange') : t('invoices.amountRange')}</label>
                 <div className="flex items-center space-x-2">
                   <input type="number" placeholder={t('invoices.min')} value={amountMin} onChange={e => setAmountMin(e.target.value)}
                     className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />

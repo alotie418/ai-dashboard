@@ -457,6 +457,20 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       purchaseTotal: { 'zh-CN': '采购含税总额', 'zh-TW': '採購含稅總額', en: 'Purchase Total (Incl. Tax)', ja: '仕入税込合計', ko: '매입 세금포함 총액', fr: 'Total achats TTC' },
       salesTotal:    { 'zh-CN': '销售含税总额', 'zh-TW': '銷售含稅總額', en: 'Sales Total (Incl. Tax)', ja: '売上税込合計', ko: '매출 세금포함 총액', fr: 'Total ventes TTC' },
       taxDifference: { 'zh-CN': '消费税差额', 'zh-TW': '消費稅差額', en: 'Consumption Tax Difference', ja: '消費税差額', ko: '소비세 차액', fr: 'Différence taxe consommation' },
+      // ── Invoice-query (票据查询) JP-specific overrides ──
+      // Refine the shared NON_CN_GENERIC document wording to JP consumption-tax /
+      // pre-tax framing (mainly zh-CN/zh-TW; en/ja/ko/fr keep the generic base where
+      // already correct). No CN-VAT 进项/销项/认证/电子发票 terms. EU/KR/TW are NOT
+      // affected — they keep the NON_CN_GENERIC values (these overrides live in JP only).
+      invTableSubtitle:   { 'zh-CN': '核对票据、库存与交易记录的一致性', 'zh-TW': '核對票據、庫存與交易記錄的一致性', en: 'Reconcile document flow with inventory / transaction records', ja: '伝票フローと在庫・取引記録の整合性を確認', ko: '문서 흐름과 재고/거래 기록의 일관성 확인', fr: 'Rapprocher les pièces avec les stocks / transactions' },
+      invPendingTax:      { 'zh-CN': '待处理消费税额', 'zh-TW': '待處理消費稅額', en: 'Pending Consumption Tax', ja: '未処理消費税額', ko: '미처리 소비세액', fr: 'Taxe à la consommation en attente' },
+      invHeaderAmount:    { 'zh-CN': '税前金额', 'zh-TW': '稅前金額', en: 'Amount (pre-tax)', ja: '金額（税抜）', ko: '금액(세전)', fr: 'Montant (HT)' },
+      // Amount-range filter — JP labels it pre-tax to match invHeaderAmount (税前金额).
+      // JP-only: the component gates this on accLocale === 'JP'; CN/US/EU/KR/TW keep
+      // the shared invoices.amountRange i18n value untouched.
+      invAmountRange:     { 'zh-CN': '税前金额范围', 'zh-TW': '稅前金額範圍', en: 'Amount Range (pre-tax)', ja: '金額範囲（税抜）', ko: '금액 범위(세전)', fr: 'Plage de montant (HT)' },
+      invStatusPendingIssue:{ 'zh-CN': '待补票据', 'zh-TW': '待補票據', en: 'Awaiting Document', ja: '伝票待ち', ko: '문서 대기', fr: 'En attente de pièce' },
+      invEmpty:           { 'zh-CN': '未找到匹配的票据记录', 'zh-TW': '未找到相符的票據記錄', en: 'No matching documents found', ja: '一致する伝票が見つかりません', ko: '일치하는 문서가 없습니다', fr: 'Aucune pièce correspondante' },
     },
     dashboardSections: ['profit_loss', 'profit_margins', 'consumption_tax_summary', 'tax_inclusive_summary'],
     reportTypes: ['income-statement', 'consumption-tax'],
