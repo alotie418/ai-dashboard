@@ -434,7 +434,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       outputTax:     { 'zh-CN': '销售消费税', 'zh-TW': '銷售消費稅', en: 'Consumption Tax Collected (Output)', ja: '売上税額', ko: '매출 소비세', fr: 'Taxe collectée (ventes)' },
       estimatedTax:  { 'zh-CN': '预计应缴消费税', 'zh-TW': '預計應繳消費稅', en: 'Estimated Consumption Tax Payable', ja: '消費税推定納付額', ko: '예상 소비세 납부액', fr: 'Taxe consommation estimée' },
       certifiedInput:{ 'zh-CN': '可抵扣采购消费税额', 'zh-TW': '可抵扣採購消費稅額', en: 'Deductible Input Tax Amount', ja: '控除対象仕入税額', ko: '공제 가능 매입 소비세액', fr: 'Montant de taxe déductible' },
-      invoicedOutput:{ 'zh-CN': '已开票销售消费税', 'zh-TW': '已開票銷售消費稅', en: 'Invoiced Output Tax', ja: '請求済み売上税額', ko: '발행된 매출 소비세', fr: 'Taxe collectée facturée' },
+      invoicedOutput:{ 'zh-CN': '已开票销售消费税额', 'zh-TW': '已開票銷售消費稅額', en: 'Invoiced Output Tax Amount', ja: '請求済み売上税額', ko: '발행된 매출 소비세액', fr: 'Montant de taxe collectée' },
       plRevenue:     { 'zh-CN': '营业收入', 'zh-TW': '營業收入', en: 'Sales Revenue', ja: '売上高', ko: '매출', fr: 'Chiffre d\'affaires' },
       plCost:        { 'zh-CN': '营业成本', 'zh-TW': '營業成本', en: 'Cost of Sales', ja: '売上原価', ko: '매출원가', fr: 'Coût des ventes' },
       plGrossProfit: { 'zh-CN': '毛利', 'zh-TW': '毛利', en: 'Gross Profit', ja: '売上総利益', ko: '매출총이익', fr: 'Marge brute' },
