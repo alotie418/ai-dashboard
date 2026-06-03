@@ -465,6 +465,10 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       invTableSubtitle:   { 'zh-CN': '核对票据、库存与交易记录的一致性', 'zh-TW': '核對票據、庫存與交易記錄的一致性', en: 'Reconcile document flow with inventory / transaction records', ja: '伝票フローと在庫・取引記録の整合性を確認', ko: '문서 흐름과 재고/거래 기록의 일관성 확인', fr: 'Rapprocher les pièces avec les stocks / transactions' },
       invPendingTax:      { 'zh-CN': '待处理消费税额', 'zh-TW': '待處理消費稅額', en: 'Pending Consumption Tax', ja: '未処理消費税額', ko: '미처리 소비세액', fr: 'Taxe à la consommation en attente' },
       invHeaderAmount:    { 'zh-CN': '税前金额', 'zh-TW': '稅前金額', en: 'Amount (pre-tax)', ja: '金額（税抜）', ko: '금액(세전)', fr: 'Montant (HT)' },
+      // Amount-range filter — JP labels it pre-tax to match invHeaderAmount (税前金额).
+      // JP-only: the component gates this on accLocale === 'JP'; CN/US/EU/KR/TW keep
+      // the shared invoices.amountRange i18n value untouched.
+      invAmountRange:     { 'zh-CN': '税前金额范围', 'zh-TW': '稅前金額範圍', en: 'Amount Range (pre-tax)', ja: '金額範囲（税抜）', ko: '금액 범위(세전)', fr: 'Plage de montant (HT)' },
       invStatusPendingIssue:{ 'zh-CN': '待补票据', 'zh-TW': '待補票據', en: 'Awaiting Document', ja: '伝票待ち', ko: '문서 대기', fr: 'En attente de pièce' },
       invEmpty:           { 'zh-CN': '未找到匹配的票据记录', 'zh-TW': '未找到相符的票據記錄', en: 'No matching documents found', ja: '一致する伝票が見つかりません', ko: '일치하는 문서가 없습니다', fr: 'Aucune pièce correspondante' },
     },
