@@ -1111,6 +1111,53 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0m: Accounts (应收应付) page — JP accountingLocale + Chinese UI.
+  //   JP frames AR/AP by customer/supplier (taxConcept acct*), while the page's
+  //   generic finance terms (page title / overdue / unpaid-count / rates / aging)
+  //   come from the shared accounts.* / nav.* i18n and stay simplified/traditional
+  //   Chinese under zh-CN/zh-TW (UI language ≠ accountingLocale). Guard: the
+  //   displayed terms must surface, and neither the JP acct*/bal* taxConcepts nor
+  //   the accounts.* i18n may carry CN-VAT (进项/销项/增值税/认证/电子发票) or non-JPY
+  //   money (人民币/RMB/CNY). Money itself is formatted via accountingLocale (¥).
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    // JP taxConcept AR/AP labels — customer/supplier framing (not 应收账款/应付账款).
+    const ACCT_PIN = {
+      'zh-CN': { acctReceivableTab: '客户应收', acctPayableTab: '供应商应付' },
+      'zh-TW': { acctReceivableTab: '客戶應收', acctPayableTab: '供應商應付' },
+    };
+    // Generic AR/AP page terms (i18n) shown verbatim under the zh-CN/zh-TW UI.
+    const I18N_PIN = {
+      'zh-CN': { 'nav.accounts': '应收应付', 'accounts.overdueAmount': '逾期金额', 'accounts.unpaidCount': '未付笔数' },
+      'zh-TW': { 'nav.accounts': '應收應付', 'accounts.overdueAmount': '逾期金額', 'accounts.unpaidCount': '未付筆數' },
+    };
+    const AR_AP_BAN = /进项|進項|销项|銷項|增值税|增值稅|认证|認證|电子发票|電子發票|人民币|人民幣|RMB|CNY/;
+    const ACCT_TAX_KEYS = ['acctReceivableTab', 'acctPayableTab', 'acctTotalReceivable', 'acctTotalPayable', 'balRecvLabel', 'balPayLabel', 'balTaxPayLabel'];
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      for (const [k, want] of Object.entries(ACCT_PIN[lang])) {
+        const got = helpers.getTaxLabel('JP', lang, k);
+        if (got !== want) reasons.push(`JP ${k}[${lang}] should be "${want}", got "${got}"`);
+      }
+      for (const [path, want] of Object.entries(I18N_PIN[lang])) {
+        const got = get(locales[lang], path);
+        if (got !== want) reasons.push(`accounts ${path}[${lang}] should be "${want}", got "${got}"`);
+      }
+      // ban CN-VAT / non-JPY money across the JP acct*/bal* taxConcepts
+      for (const k of ACCT_TAX_KEYS) {
+        const v = helpers.getTaxLabel('JP', lang, k);
+        if (typeof v === 'string' && AR_AP_BAN.test(v)) reasons.push(`JP ${k}[${lang}] uses CN-VAT/non-JPY term: "${v}"`);
+      }
+      // ban CN-VAT / non-JPY money across the accounts.* i18n block (AR/AP page text)
+      const acc = (locales[lang] || {}).accounts || {};
+      for (const [k, v] of Object.entries(acc)) {
+        if (typeof v === 'string' && AR_AP_BAN.test(v)) reasons.push(`accounts.${k}[${lang}] uses CN-VAT/non-JPY term: "${v}"`);
+      }
+    }
+    if (reasons.length) fail(`arApJpWording`, reasons); else pass(`arApJpWording`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G0h: US Schedule C P&L line wording must keep appearing (the US
   //   财务报表页 income statement is Schedule C). Guards against regression of the
   //   already-fixed key lines (substring match — tolerant of the "Line N — " /
