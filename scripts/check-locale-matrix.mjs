@@ -1088,6 +1088,58 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0p: EU accountingLocale full wording audit (rendered pages).
+  //   Across 经营看板 / 采购与费用 / 销售与收入 / 票据查询 / 应收应付 / 财务报表 /
+  //   收支记录, the EU Chinese UI must never carry CN-VAT (进项/销项/增值税/认证),
+  //   JP 消费税, US Sales Tax, or a non-EUR currency (人民币/CNY/¥/日元/JPY/美元/USD).
+  //   Bans those across ALL EU taxConcepts (zh-CN/zh-TW) and pins the key page
+  //   wording. Reverse guards confirm CN/JP/US口径 are not collaterally changed.
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const cfgEU = config.getAccountingLocale('EU');
+    // Currency is rendered via formatMoney(accLocale)=€, never inside these strings.
+    const EU_BAN = /进项|進項|销项|銷項|增值税|增值稅|消费税|消費稅|认证|認證|Sales Tax|人民币|人民幣|CNY|日元|日圓|JPY|美元|USD|¥/;
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      for (const [key, labels] of Object.entries(cfgEU.taxConcepts)) {
+        const v = labels[lang];
+        if (typeof v === 'string' && EU_BAN.test(v)) {
+          reasons.push(`EU ${key}[${lang}] uses banned (CN-VAT/JP/US/non-EUR) wording: "${v}"`);
+        }
+      }
+    }
+    // pin key rendered wording across the EU pages (zh-CN / zh-TW)
+    const EU_PAGE_PIN = {
+      'zh-CN': {
+        pageTitlePurchase: '采购与费用', pageTitleSales: '销售与收入', invQueryTitle: '票据查询',
+        headerInvoiceNo: '票据号码', headerUnitPrice: '税前单价', headerAmount: '税前金额',
+        formTaxRate: 'VAT 税率', setVatRateLabel: 'VAT 税率', plIncomeTax: '所得税',
+        acctReceivableTab: '客户应收', acctPayableTab: '供应商应付',
+        invoiceTypeInput: '采购', invoiceTypeOutput: '销售',
+      },
+      'zh-TW': {
+        pageTitlePurchase: '採購與費用', pageTitleSales: '銷售與收入', invQueryTitle: '票據查詢',
+        headerInvoiceNo: '票據號碼', headerUnitPrice: '稅前單價', headerAmount: '稅前金額',
+        formTaxRate: 'VAT 稅率', setVatRateLabel: 'VAT 稅率', plIncomeTax: '所得稅',
+        acctReceivableTab: '客戶應收', acctPayableTab: '供應商應付',
+        invoiceTypeInput: '採購', invoiceTypeOutput: '銷售',
+      },
+    };
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      for (const [key, want] of Object.entries(EU_PAGE_PIN[lang])) {
+        const got = helpers.getTaxLabel('EU', lang, key);
+        if (got !== want) reasons.push(`EU ${key}[${lang}] should be "${want}", got "${got}"`);
+      }
+    }
+    // reverse guards: CN/JP/US口径 must remain intact (not collaterally changed)
+    if (helpers.getTaxLabel('CN', 'zh-CN', 'inputTax') !== '累计进项税额') reasons.push(`CN inputTax[zh-CN] should stay 累计进项税额`);
+    if (helpers.getTaxLabel('CN', 'zh-CN', 'formTaxRate') !== '增值税率') reasons.push(`CN formTaxRate[zh-CN] should stay 增值税率`);
+    if (!/消费税/.test(helpers.getTaxLabel('JP', 'zh-CN', 'inputTax'))) reasons.push(`JP inputTax[zh-CN] should keep 消费税`);
+    if (!/Sales Tax/.test(helpers.getTaxLabel('US', 'zh-CN', 'formTaxRate'))) reasons.push(`US formTaxRate[zh-CN] should keep Sales Tax`);
+    if (reasons.length) fail(`euAccountingWording`, reasons); else pass(`euAccountingWording`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G0f: Non-CN generic business taxConcepts (PR-A shared base).
   //   The nav / page-title / upload / table-header / modal / button / empty /
   //   invoice-query-basics labels must be present for every non-CN locale
