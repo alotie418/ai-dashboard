@@ -944,21 +944,29 @@ async function main() {
     const cfg = config.getAccountingLocale('JP');
     const JP_PIN = {
       'zh-CN': { inputTax: '采购消费税', outputTax: '销售消费税', navPurchase: '采购与费用', navSales: '销售与收入', invQueryTitle: '票据查询', invoiceTypeInput: '采购', invoiceTypeOutput: '销售',
-                 pageTitlePurchase: '采购与费用', headerInvoiceNo: '票据号码', headerAmount: '税前金额', headerUnitPrice: '税前单价', modalTitlePurchase: '新增采购与费用记录', newPurchaseButton: '新增采购记录' },
+                 pageTitlePurchase: '采购与费用', headerInvoiceNo: '票据号码', headerAmount: '税前金额', headerUnitPrice: '税前单价', modalTitlePurchase: '新增采购与费用记录', newPurchaseButton: '新增采购记录',
+                 plIncomeTax: '所得税/法人税', certifiedInput: '可抵扣采购消费税额' },
       'zh-TW': { inputTax: '採購消費稅', outputTax: '銷售消費稅', navPurchase: '採購與費用', navSales: '銷售與收入', invQueryTitle: '票據查詢', invoiceTypeInput: '採購', invoiceTypeOutput: '銷售',
-                 pageTitlePurchase: '採購與費用', headerInvoiceNo: '票據號碼', headerAmount: '稅前金額', headerUnitPrice: '稅前單價', modalTitlePurchase: '新增採購與費用記錄', newPurchaseButton: '新增採購記錄' },
+                 pageTitlePurchase: '採購與費用', headerInvoiceNo: '票據號碼', headerAmount: '稅前金額', headerUnitPrice: '稅前單價', modalTitlePurchase: '新增採購與費用記錄', newPurchaseButton: '新增採購記錄',
+                 plIncomeTax: '所得稅/法人稅', certifiedInput: '可抵扣採購消費稅額' },
     };
+    // JP money semantics are JPY — no 人民币/人民幣 may leak into any JP wording.
+    const JP_UNIT = { 'zh-CN': /日元/, 'zh-TW': /日圓/ };
     for (const lang of ['zh-CN', 'zh-TW']) {
       const reasons = [];
       // ban CN-VAT wording across ALL JP taxConcepts: 进项/销项 (use 采购/销售) and
-      // 电子发票 / 发票号码 (use 票据). 消费税 itself is allowed.
+      // 电子发票 / 发票号码 (use 票据). 消费税 itself is allowed. Also ban 人民币 (JP is JPY).
       for (const [key, labels] of Object.entries(cfg.taxConcepts)) {
         const v = labels[lang];
         if (typeof v !== 'string') continue;
         if (/进项|進項|销项|銷項/.test(v)) reasons.push(`JP ${key}[${lang}] uses 进项/销项 (should be 采购/销售): "${v}"`);
         if (/电子发票|電子發票/.test(v)) reasons.push(`JP ${key}[${lang}] uses 电子发票 (should be 票据): "${v}"`);
         if (/发票号码|發票號碼/.test(v)) reasons.push(`JP ${key}[${lang}] uses 发票号码 (should be 票据号码): "${v}"`);
+        if (/人民币|人民幣/.test(v)) reasons.push(`JP ${key}[${lang}] uses 人民币 (JP money is 日元/JPY): "${v}"`);
       }
+      // the P&L period subtitle (单位/币种 说明) must state 日元/日圓, never 人民币
+      const period = helpers.getTaxLabel('JP', lang, 'plPeriodPrefix');
+      if (!JP_UNIT[lang].test(period)) reasons.push(`JP plPeriodPrefix[${lang}] should state ${lang === 'zh-CN' ? '日元' : '日圓'}: "${period}"`);
       // pin the 经营看板 tax cards + nav wording
       for (const [key, want] of Object.entries(JP_PIN[lang])) {
         const got = helpers.getTaxLabel('JP', lang, key);
