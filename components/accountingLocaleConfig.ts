@@ -516,6 +516,18 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       plTitle:       { 'zh-CN': '损益表', 'zh-TW': '損益表', en: 'Profit & Loss', ja: '損益計算書', ko: '손익계산서', fr: 'Compte de résultat' },
       tabPlLabel:    { 'zh-CN': '损益表', 'zh-TW': '損益表', en: 'P&L', ja: '損益', ko: '손익', fr: 'Résultat' },
       formTaxRate:   { 'zh-CN': 'VAT 税率', 'zh-TW': 'VAT 稅率', en: 'VAT Rate', ja: 'VAT率', ko: 'VAT 세율', fr: 'Taux TVA' },
+      // ── Invoice-query (票据查询) EU-specific overrides ──
+      // Use the 采购与费用 / 销售与收入 wording (matching the left-nav + tabs) instead
+      // of the shared NON_CN_GENERIC 采购/费用 · 销售/收入 slash form, and 待补票据
+      // instead of 待票据. zh-CN/zh-TW only; en/ja/ko/fr keep the generic base. JP/KR/TW
+      // are NOT affected (these overrides live in the EU block only).
+      invTotalInput:       { 'zh-CN': '累计采购与费用票据', 'zh-TW': '累計採購與費用票據', en: 'Total Purchase/Expense Documents', ja: '仕入・経費伝票数', ko: '매입/비용 문서 합계', fr: 'Total pièces achats/dépenses' },
+      invTotalOutput:      { 'zh-CN': '累计销售与收入票据', 'zh-TW': '累計銷售與收入票據', en: 'Total Sales/Revenue Documents', ja: '売上・収入伝票数', ko: '매출/수입 문서 합계', fr: 'Total pièces ventes/revenus' },
+      invNoInput:          { 'zh-CN': '暂无采购与费用记录', 'zh-TW': '暫無採購與費用記錄', en: 'No purchase/expense records', ja: '仕入・経費の記録なし', ko: '매입/비용 기록 없음', fr: 'Aucun achat/dépense' },
+      invNoOutput:         { 'zh-CN': '暂无销售与收入记录', 'zh-TW': '暫無銷售與收入記錄', en: 'No sales/revenue records', ja: '売上・収入の記録なし', ko: '매출/수입 기록 없음', fr: 'Aucune vente/revenu' },
+      invInputRecordCount: { 'zh-CN': '{count} 条采购与费用记录', 'zh-TW': '{count} 筆採購與費用記錄', en: '{count} purchase/expense record(s)', ja: '仕入・経費 {count} 件', ko: '매입/비용 {count}건', fr: '{count} achat(s)/dépense(s)' },
+      invOutputRecordCount:{ 'zh-CN': '{count} 条销售与收入记录', 'zh-TW': '{count} 筆銷售與收入記錄', en: '{count} sales/revenue record(s)', ja: '売上・収入 {count} 件', ko: '매출/수입 {count}건', fr: '{count} vente(s)/revenu(s)' },
+      invStatusPendingIssue:{ 'zh-CN': '待补票据', 'zh-TW': '待補票據', en: 'Awaiting Document', ja: '伝票待ち', ko: '문서 대기', fr: 'En attente de pièce' },
       invoiceInputLabel: { 'zh-CN': '采购 VAT 单据', 'zh-TW': '採購 VAT 單據', en: 'Input VAT Documents', ja: '仕入VAT書類', ko: '매입 VAT 서류', fr: 'Documents TVA achats' },
       invoiceOutputLabel: { 'zh-CN': '销售 VAT 单据', 'zh-TW': '銷售 VAT 單據', en: 'Output VAT Documents', ja: '売上VAT書類', ko: '매출 VAT 서류', fr: 'Documents TVA ventes' },
       invoicePendingTax: { 'zh-CN': '待申报 VAT', 'zh-TW': '待申報 VAT', en: 'Pending VAT Filing', ja: '未申告VAT', ko: '미신고 VAT', fr: 'TVA en attente de déclaration' },

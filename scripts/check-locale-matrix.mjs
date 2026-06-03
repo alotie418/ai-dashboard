@@ -1140,6 +1140,62 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0q: EU 票据查询 (invoice-query) page wording.
+  //   EU uses the 采购与费用 / 销售与收入 wording (matching nav + tabs), not the shared
+  //   采购/费用 · 销售/收入 slash form, and 待补票据 (not 待票据). Pins the rendered
+  //   票据查询 keys and bans the slash form, 待票据, CN-VAT (进项/销项/增值税/认证), JP
+  //   消费税, US Sales Tax, and non-EUR currency across the page's key set. (库存/交易
+  //   in the table subtitle is allowed — only 采购/费用 · 销售/收入 are banned.)
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const EU_INV_PIN = {
+      'zh-CN': {
+        invQueryTitle: '票据查询', invFilterAll: '全部票据', invFilterInput: '采购与费用', invFilterOutput: '销售与收入',
+        invTotalInput: '累计采购与费用票据', invTotalOutput: '累计销售与收入票据',
+        invTableTitle: '票据流转全景视图', invHeaderInvoiceNo: '票据号码', invEmpty: '未找到匹配的票据记录',
+        invStatusVerified: '已核验', invStatusCertified: '已记录', invStatusDeducted: '已处理',
+        invStatusPendingCert: '待处理', invStatusPendingIssue: '待补票据', invStatusIssued: '已开票',
+        invoiceTypeInput: '采购', invoiceTypeOutput: '销售',
+      },
+      'zh-TW': {
+        invQueryTitle: '票據查詢', invFilterAll: '全部票據', invFilterInput: '採購與費用', invFilterOutput: '銷售與收入',
+        invTotalInput: '累計採購與費用票據', invTotalOutput: '累計銷售與收入票據',
+        invTableTitle: '票據流轉全景視圖', invHeaderInvoiceNo: '票據號碼', invEmpty: '未找到匹配的票據記錄',
+        invStatusVerified: '已核驗', invStatusCertified: '已記錄', invStatusDeducted: '已處理',
+        invStatusPendingCert: '待處理', invStatusPendingIssue: '待補票據', invStatusIssued: '已開票',
+        invoiceTypeInput: '採購', invoiceTypeOutput: '銷售',
+      },
+    };
+    // rendered 票据查询 key set (InventoryPage stat cards / filters / table / statuses)
+    const EU_INV_KEYS = [
+      'invQueryTitle', 'invSearchPlaceholder', 'invFilterAll', 'invFilterInput', 'invFilterOutput',
+      'invTotalInput', 'invTotalOutput', 'invPendingTax', 'invPendingTaxSub', 'invNoInput', 'invNoOutput',
+      'invInputRecordCount', 'invOutputRecordCount', 'invTableTitle', 'invTableSubtitle',
+      'invHeaderDate', 'invHeaderWeight', 'invHeaderAmount', 'invHeaderInvoiceNo', 'invEmpty',
+      'invDateRange', 'invWeightRange', 'invStatusFilter', 'invStatusAll', 'invStatusVerified',
+      'invStatusCertified', 'invStatusDeducted', 'invStatusPendingCert', 'invStatusPendingIssue',
+      'invStatusIssued', 'invAdvFilterActive', 'invoiceTypeInput', 'invoiceTypeOutput',
+    ];
+    const EU_INV_BAN = /待补采购|待補採購|采购\/费用|採購\/費用|销售\/收入|銷售\/收入|待票据|待票據|进项|進項|销项|銷項|增值税|增值稅|消费税|消費稅|Sales Tax|人民币|人民幣|CNY|日元|日圓|JPY|美元|USD/;
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      for (const key of EU_INV_KEYS) {
+        const v = helpers.getTaxLabel('EU', lang, key);
+        if (v === key) reasons.push(`EU ${key}[${lang}] missing (raw key)`);
+        if (typeof v === 'string' && EU_INV_BAN.test(v)) reasons.push(`EU ${key}[${lang}] uses banned 票据查询 wording: "${v}"`);
+      }
+      for (const [key, want] of Object.entries(EU_INV_PIN[lang])) {
+        const got = helpers.getTaxLabel('EU', lang, key);
+        if (got !== want) reasons.push(`EU ${key}[${lang}] should be "${want}", got "${got}"`);
+      }
+    }
+    // reverse guards: JP/KR keep the shared slash form (EU override must not leak to them)
+    if (helpers.getTaxLabel('JP', 'zh-CN', 'invTotalInput') !== '累计采购/费用票据') reasons.push(`JP invTotalInput[zh-CN] should stay 累计采购/费用票据 (NON_CN_GENERIC), got "${helpers.getTaxLabel('JP', 'zh-CN', 'invTotalInput')}"`);
+    if (helpers.getTaxLabel('KR', 'zh-CN', 'invTotalInput') !== '累计采购/费用票据') reasons.push(`KR invTotalInput[zh-CN] should stay 累计采购/费用票据 (NON_CN_GENERIC), got "${helpers.getTaxLabel('KR', 'zh-CN', 'invTotalInput')}"`);
+    if (reasons.length) fail(`euInvoiceQuery`, reasons); else pass(`euInvoiceQuery`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G0f: Non-CN generic business taxConcepts (PR-A shared base).
   //   The nav / page-title / upload / table-header / modal / button / empty /
   //   invoice-query-basics labels must be present for every non-CN locale
