@@ -948,13 +948,15 @@ async function main() {
                  plIncomeTax: '所得税/法人税', certifiedInput: '可抵扣采购消费税额', invoicedOutput: '已开票销售消费税额',
                  invFilterAll: '全部票据', invFilterInput: '采购与费用', invFilterOutput: '销售与收入',
                  invTableTitle: '票据流转全景视图', invTableSubtitle: '核对票据、库存与交易记录的一致性',
-                 invPendingTax: '待处理消费税额', invHeaderAmount: '税前金额', invStatusPendingIssue: '待补票据', invEmpty: '未找到匹配的票据记录', invAmountRange: '税前金额范围' },
+                 invPendingTax: '待处理消费税额', invHeaderAmount: '税前金额', invStatusPendingIssue: '待补票据', invEmpty: '未找到匹配的票据记录', invAmountRange: '税前金额范围',
+                 taxTitle: '消费税统计', taxReportTitle: '消费税汇总' },
       'zh-TW': { inputTax: '採購消費稅', outputTax: '銷售消費稅', navPurchase: '採購與費用', navSales: '銷售與收入', invQueryTitle: '票據查詢', invoiceTypeInput: '採購', invoiceTypeOutput: '銷售',
                  pageTitlePurchase: '採購與費用', headerInvoiceNo: '票據號碼', headerAmount: '稅前金額', headerUnitPrice: '稅前單價', modalTitlePurchase: '新增採購與費用記錄', newPurchaseButton: '新增採購記錄',
                  plIncomeTax: '所得稅/法人稅', certifiedInput: '可抵扣採購消費稅額', invoicedOutput: '已開票銷售消費稅額',
                  invFilterAll: '全部票據', invFilterInput: '採購與費用', invFilterOutput: '銷售與收入',
                  invTableTitle: '票據流轉全景視圖', invTableSubtitle: '核對票據、庫存與交易記錄的一致性',
-                 invPendingTax: '待處理消費稅額', invHeaderAmount: '稅前金額', invStatusPendingIssue: '待補票據', invEmpty: '未找到相符的票據記錄', invAmountRange: '稅前金額範圍' },
+                 invPendingTax: '待處理消費稅額', invHeaderAmount: '稅前金額', invStatusPendingIssue: '待補票據', invEmpty: '未找到相符的票據記錄', invAmountRange: '稅前金額範圍',
+                 taxTitle: '消費稅統計', taxReportTitle: '消費稅彙總' },
     };
     // JP money semantics are JPY — no 人民币/人民幣 may leak into any JP wording.
     const JP_UNIT = { 'zh-CN': /日元/, 'zh-TW': /日圓/ };

@@ -359,7 +359,7 @@ const GenericPL: React.FC<{
         <div className="border-t border-[#e0ddd5] pt-6 space-y-1">
           <h3 className="text-lg font-bold text-[#191918] mb-4 flex items-center">
             <i className="fas fa-calculator mr-3 text-[#4a4a48]"></i>
-            {lbl('taxTitle')}
+            {locale === 'JP' ? lbl('taxReportTitle') : lbl('taxTitle')}
           </h3>
           <LineItem label={lbl('inputTax')} value={fmt(vatSummary.cumulativeInput || vatSummary.paid || vatSummary.inputVAT || 0)} />
           <LineItem label={lbl('outputTax')} value={fmt(vatSummary.cumulativeOutput || vatSummary.collected || vatSummary.outputVAT || 0)} />
