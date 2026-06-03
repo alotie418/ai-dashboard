@@ -625,3 +625,31 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
 export function getAccountingLocale(id: string): AccountingLocaleConfig {
   return ACCOUNTING_LOCALES[id as AccountingLocaleId] || ACCOUNTING_LOCALES.CN;
 }
+
+// ─── JP transaction-category labels for the Chinese UI (收支记录 分类下拉) ───
+// Under JP accountingLocale + zh-CN/zh-TW UI, the transaction category dropdown
+// must read as Chinese main wording with the Japanese formal account name in
+// parentheses — never the raw Japanese report headers (損益計算書 / 販管費 /
+// 売上原価 …) as the primary text. Keyed by the stable category slug so this also
+// corrects stale-DB rows (e.g. a 売上原価/COGS row mislabeled 广告费): services/
+// api.ts applies it on read. Display only — category id/slug and the backend
+// report mapping (by slug) are unchanged. zh-CN/zh-TW only; en/ja/ko/fr keep the
+// seeded label + schedule_line. Slugs mirror electron/db/seedCategories.js JP rows.
+export const JP_TXN_CATEGORY_LABELS: Record<string, { label: Record<'zh-CN' | 'zh-TW', string>; scheduleLine: Record<'zh-CN' | 'zh-TW', string> }> = {
+  // income
+  sales:         { label: { 'zh-CN': '销售收入',   'zh-TW': '銷售收入' },   scheduleLine: { 'zh-CN': '损益表-营业收入（売上高）',     'zh-TW': '損益表-營業收入（売上高）' } },
+  other:         { label: { 'zh-CN': '营业外收入', 'zh-TW': '營業外收入' }, scheduleLine: { 'zh-CN': '损益表-营业外收入（営業外収益）', 'zh-TW': '損益表-營業外收入（営業外収益）' } },
+  // expense
+  cogs:          { label: { 'zh-CN': '销售成本',   'zh-TW': '銷售成本' },   scheduleLine: { 'zh-CN': '损益表-销售成本（売上原価）',   'zh-TW': '損益表-銷售成本（売上原価）' } },
+  salary:        { label: { 'zh-CN': '工资',       'zh-TW': '工資' },       scheduleLine: { 'zh-CN': '损益表-工资薪金（給料手当）',   'zh-TW': '損益表-薪資薪金（給料手当）' } },
+  travel:        { label: { 'zh-CN': '差旅交通',   'zh-TW': '差旅交通' },   scheduleLine: { 'zh-CN': '损益表-差旅交通费（旅費交通費）', 'zh-TW': '損益表-差旅交通費（旅費交通費）' } },
+  communication: { label: { 'zh-CN': '通信费',     'zh-TW': '通訊費' },     scheduleLine: { 'zh-CN': '损益表-通信费（通信費）',       'zh-TW': '損益表-通訊費（通信費）' } },
+  utilities:     { label: { 'zh-CN': '水电费',     'zh-TW': '水電費' },     scheduleLine: { 'zh-CN': '损益表-水电光热费（水道光熱費）', 'zh-TW': '損益表-水電光熱費（水道光熱費）' } },
+  supplies:      { label: { 'zh-CN': '消耗品',     'zh-TW': '消耗品' },     scheduleLine: { 'zh-CN': '损益表-消耗品费（消耗品費）',   'zh-TW': '損益表-消耗品費（消耗品費）' } },
+  entertain:     { label: { 'zh-CN': '招待交际费', 'zh-TW': '招待交際費' }, scheduleLine: { 'zh-CN': '损益表-交际费（接待交際費）',   'zh-TW': '損益表-交際費（接待交際費）' } },
+  advertising:   { label: { 'zh-CN': '广告费',     'zh-TW': '廣告費' },     scheduleLine: { 'zh-CN': '损益表-广告宣传费（広告宣伝費）', 'zh-TW': '損益表-廣告宣傳費（広告宣伝費）' } },
+  rent:          { label: { 'zh-CN': '租金',       'zh-TW': '租金' },       scheduleLine: { 'zh-CN': '损益表-地租家租（地代家賃）',   'zh-TW': '損益表-地租家租（地代家賃）' } },
+  tax:           { label: { 'zh-CN': '税金',       'zh-TW': '稅金' },       scheduleLine: { 'zh-CN': '损益表-税金公课（租税公課）',   'zh-TW': '損益表-稅金公課（租税公課）' } },
+  depreciation:  { label: { 'zh-CN': '折旧',       'zh-TW': '折舊' },       scheduleLine: { 'zh-CN': '损益表-折旧费（減価償却費）',   'zh-TW': '損益表-折舊費（減価償却費）' } },
+  misc:          { label: { 'zh-CN': '其他费用',   'zh-TW': '其他費用' },   scheduleLine: { 'zh-CN': '损益表-杂费（雑費）',         'zh-TW': '損益表-雜費（雑費）' } },
+};
