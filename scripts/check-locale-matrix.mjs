@@ -993,6 +993,57 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0n: JP transaction-category labels (收支记录 分类下拉).
+  //   Under JP accountingLocale + zh-CN/zh-TW UI the category dropdown shows
+  //   `displayLabel → schedule_line`, localized via JP_TXN_CATEGORY_LABELS (applied
+  //   read-time in services/api.ts, keyed by slug). Guard: every JP category slug
+  //   resolves zh-CN/zh-TW label + report-line; the report-line stays Chinese-main
+  //   (损益表-… , never the raw Japanese 損益計算書/販管費) with the formal Japanese
+  //   account name in parens; no CN-VAT (进项/销项/增值税/认证/电子发票) or non-JPY
+  //   (人民币/RMB/CNY); and COGS↔売上原価 / advertising↔広告宣伝費 mappings hold
+  //   (guards against the 广告费→売上原価 regression).
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const M = config.JP_TXN_CATEGORY_LABELS || {};
+    const REQUIRED_SLUGS = ['sales', 'other', 'cogs', 'salary', 'travel', 'communication', 'utilities', 'supplies', 'entertain', 'advertising', 'rent', 'tax', 'depreciation', 'misc'];
+    // raw Japanese report headers must not be the zh main text; no CN-VAT / non-JPY
+    const JP_HEADER_BAN = /損益計算書|损益计算书|販管費|贩管费/;
+    const CN_VAT_MONEY_BAN = /进项|進項|销项|銷項|增值税|增值稅|认证|認證|电子发票|電子發票|人民币|人民幣|RMB|CNY/;
+    for (const slug of REQUIRED_SLUGS) {
+      const e = M[slug];
+      if (!e) { reasons.push(`JP_TXN_CATEGORY_LABELS missing slug "${slug}"`); continue; }
+      for (const lang of ['zh-CN', 'zh-TW']) {
+        const label = e.label && e.label[lang];
+        const line = e.scheduleLine && e.scheduleLine[lang];
+        if (!label) reasons.push(`JP cat ${slug}.label[${lang}] missing`);
+        if (!line) reasons.push(`JP cat ${slug}.scheduleLine[${lang}] missing`);
+        for (const [field, v] of [['label', label], ['scheduleLine', line]]) {
+          if (typeof v !== 'string') continue;
+          if (JP_HEADER_BAN.test(v)) reasons.push(`JP cat ${slug}.${field}[${lang}] uses raw JP report header (should be 损益表-…): "${v}"`);
+          if (CN_VAT_MONEY_BAN.test(v)) reasons.push(`JP cat ${slug}.${field}[${lang}] uses CN-VAT/non-JPY term: "${v}"`);
+        }
+        // report-line must be Chinese-main (损益表/損益表 prefix)
+        if (typeof line === 'string' && !/^损益表-|^損益表-/.test(line)) {
+          reasons.push(`JP cat ${slug}.scheduleLine[${lang}] should start with 损益表-/損益表-: "${line}"`);
+        }
+      }
+    }
+    // mapping integrity: COGS ↔ 売上原価 (label 销售成本, NOT 广告), advertising ↔ 広告宣伝費
+    const cogs = M.cogs, ad = M.advertising;
+    if (cogs) {
+      if (cogs.label['zh-CN'] !== '销售成本') reasons.push(`JP cat cogs.label[zh-CN] should be 销售成本, got "${cogs.label['zh-CN']}"`);
+      if (!/売上原価/.test(cogs.scheduleLine['zh-CN'] || '')) reasons.push(`JP cat cogs.scheduleLine[zh-CN] should map to 売上原価: "${cogs.scheduleLine['zh-CN']}"`);
+      if (/广告|廣告|広告/.test(cogs.label['zh-CN'] + cogs.scheduleLine['zh-CN'])) reasons.push(`JP cat cogs must NOT be advertising (广告费→売上原価 regression)`);
+    }
+    if (ad) {
+      if (ad.label['zh-CN'] !== '广告费') reasons.push(`JP cat advertising.label[zh-CN] should be 广告费, got "${ad.label['zh-CN']}"`);
+      if (!/広告宣伝費/.test(ad.scheduleLine['zh-CN'] || '')) reasons.push(`JP cat advertising.scheduleLine[zh-CN] should map to 広告宣伝費: "${ad.scheduleLine['zh-CN']}"`);
+    }
+    if (reasons.length) fail(`jpTxnCategoryLabels`, reasons); else pass(`jpTxnCategoryLabels`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G0f: Non-CN generic business taxConcepts (PR-A shared base).
   //   The nav / page-title / upload / table-header / modal / button / empty /
   //   invoice-query-basics labels must be present for every non-CN locale
