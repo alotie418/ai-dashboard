@@ -1044,6 +1044,50 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0o: EU dashboard tax section (经营看板 VAT 统计 + 含税汇总).
+  //   EU accountingLocale uses generic VAT wording (采购/销售 VAT), NOT the CN/JP-VAT
+  //   ledger 进项/销项 nor JP 消费税. Under zh-CN/zh-TW the 经营看板 tax cards
+  //   (VATStatistics) and the tax-inclusive summary (TaxInclusiveSummary) must pin
+  //   the agreed VAT wording and never leak 消费税 / 进项 / 销项 or a non-EUR currency
+  //   (人民币/CNY/日元/JPY/美元/USD). en/ja/ko/fr keep the standard Input/Output VAT
+  //   terms (not checked here). CN keeps 进项/销项/增值税; JP keeps 消费税 (guarded
+  //   elsewhere) — both unaffected.
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const EU_PIN = {
+      'zh-CN': {
+        taxTitle: 'VAT 统计', inputTax: '采购 VAT', outputTax: '销售 VAT',
+        certifiedInput: '可抵扣采购 VAT', invoicedOutput: '已开票销售 VAT', estimatedTax: '预计应缴 VAT',
+        taxSummaryTitle: 'VAT 含税汇总 (对账用)', purchaseTotal: '采购含税总额', salesTotal: '销售含税总额', taxDifference: 'VAT 差额',
+      },
+      'zh-TW': {
+        taxTitle: 'VAT 統計', inputTax: '採購 VAT', outputTax: '銷售 VAT',
+        certifiedInput: '可抵扣採購 VAT', invoicedOutput: '已開票銷售 VAT', estimatedTax: '預計應繳 VAT',
+        taxSummaryTitle: 'VAT 含稅匯總 (對帳用)', purchaseTotal: '採購含稅總額', salesTotal: '銷售含稅總額', taxDifference: 'VAT 差額',
+      },
+    };
+    // dashboard tax-section keys (VATStatistics + TaxInclusiveSummary)
+    const EU_DASH_TAX_KEYS = Object.keys(EU_PIN['zh-CN']);
+    const EU_TAX_BAN = /消费税|消費稅|进项|進項|销项|銷項|人民币|人民幣|CNY|日元|日圓|JPY|美元|USD/;
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      for (const [key, want] of Object.entries(EU_PIN[lang])) {
+        const got = helpers.getTaxLabel('EU', lang, key);
+        if (got !== want) reasons.push(`EU ${key}[${lang}] should be "${want}", got "${got}"`);
+      }
+      // ban CN/JP-VAT wording + non-EUR currency on the dashboard tax-section keys
+      for (const key of EU_DASH_TAX_KEYS) {
+        const v = helpers.getTaxLabel('EU', lang, key);
+        if (typeof v === 'string' && EU_TAX_BAN.test(v)) reasons.push(`EU ${key}[${lang}] uses 消费税/进项/销项/non-EUR currency: "${v}"`);
+      }
+    }
+    // regression guards the other way: CN keeps 进项/销项/增值税; JP keeps 消费税
+    if (helpers.getTaxLabel('CN', 'zh-CN', 'inputTax') !== '累计进项税额') reasons.push(`CN inputTax[zh-CN] should stay 累计进项税额, got "${helpers.getTaxLabel('CN', 'zh-CN', 'inputTax')}"`);
+    if (!/消费税/.test(helpers.getTaxLabel('JP', 'zh-CN', 'inputTax'))) reasons.push(`JP inputTax[zh-CN] should keep 消费税, got "${helpers.getTaxLabel('JP', 'zh-CN', 'inputTax')}"`);
+    if (reasons.length) fail(`euDashboardVat`, reasons); else pass(`euDashboardVat`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G0f: Non-CN generic business taxConcepts (PR-A shared base).
   //   The nav / page-title / upload / table-header / modal / button / empty /
   //   invoice-query-basics labels must be present for every non-CN locale
