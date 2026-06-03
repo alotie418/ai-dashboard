@@ -498,11 +498,14 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       setPerYear:         { 'zh-CN': '欧元/年', 'zh-TW': '歐元/年', en: 'EUR/yr', ja: 'ユーロ/年', ko: '유로/년', fr: 'EUR/an' },
       setTaxHint:         { 'zh-CN': '提示：VAT 标准约 20%（各国不同）；所得税按利润计算。', 'zh-TW': '提示：VAT 標準約 20%（各國不同）；所得稅按利潤計算。', en: 'Note: VAT ~20% standard (varies by country); income tax on profit.', ja: '注：VAT標準約20%（国により異なる）；所得税は利益に対して課税。', ko: '참고: VAT 표준 약 20%(국가별 상이); 소득세는 이익 기준.', fr: 'Note : TVA ~20 % (selon le pays) ; impôt sur le bénéfice.' },
       taxTitle:      { 'zh-CN': 'VAT 统计', 'zh-TW': 'VAT 統計', en: 'VAT Summary', ja: 'VAT集計', ko: 'VAT 통계', fr: 'Résumé TVA' },
-      inputTax:      { 'zh-CN': '进项 VAT', 'zh-TW': '進項 VAT', en: 'Input VAT', ja: '仕入VAT', ko: '매입 VAT', fr: 'TVA déductible' },
-      outputTax:     { 'zh-CN': '销项 VAT', 'zh-TW': '銷項 VAT', en: 'Output VAT', ja: '売上VAT', ko: '매출 VAT', fr: 'TVA collectée' },
-      estimatedTax:  { 'zh-CN': '预估应缴 VAT', 'zh-TW': '預估應繳 VAT', en: 'Estimated VAT Payable', ja: 'VAT推定納付額', ko: '예상 VAT 납부액', fr: 'TVA estimée à payer' },
-      certifiedInput:{ 'zh-CN': '可抵扣进项 VAT', 'zh-TW': '可抵扣進項 VAT', en: 'Deductible Input VAT', ja: '控除対象仕入VAT', ko: '공제 가능 매입 VAT', fr: 'TVA déductible certifiée' },
-      invoicedOutput:{ 'zh-CN': '已开票销项 VAT', 'zh-TW': '已開票銷項 VAT', en: 'Invoiced Output VAT', ja: '請求済み売上VAT', ko: '발행된 매출 VAT', fr: 'TVA collectée facturée' },
+      // EU frames VAT cards as 采购/销售 (purchase/sales) rather than the CN/JP-VAT
+      // ledger 进项/销项 (input/output). zh-CN/zh-TW only; en/ja/ko/fr keep the
+      // standard Input/Output VAT accounting terms. Currency stays EUR (€).
+      inputTax:      { 'zh-CN': '采购 VAT', 'zh-TW': '採購 VAT', en: 'Input VAT', ja: '仕入VAT', ko: '매입 VAT', fr: 'TVA déductible' },
+      outputTax:     { 'zh-CN': '销售 VAT', 'zh-TW': '銷售 VAT', en: 'Output VAT', ja: '売上VAT', ko: '매출 VAT', fr: 'TVA collectée' },
+      estimatedTax:  { 'zh-CN': '预计应缴 VAT', 'zh-TW': '預計應繳 VAT', en: 'Estimated VAT Payable', ja: 'VAT推定納付額', ko: '예상 VAT 납부액', fr: 'TVA estimée à payer' },
+      certifiedInput:{ 'zh-CN': '可抵扣采购 VAT', 'zh-TW': '可抵扣採購 VAT', en: 'Deductible Input VAT', ja: '控除対象仕入VAT', ko: '공제 가능 매입 VAT', fr: 'TVA déductible certifiée' },
+      invoicedOutput:{ 'zh-CN': '已开票销售 VAT', 'zh-TW': '已開票銷售 VAT', en: 'Invoiced Output VAT', ja: '請求済み売上VAT', ko: '발행된 매출 VAT', fr: 'TVA collectée facturée' },
       plRevenue:     { 'zh-CN': '营业收入', 'zh-TW': '營業收入', en: 'Revenue', ja: '売上', ko: '매출', fr: 'Chiffre d\'affaires' },
       plCost:        { 'zh-CN': '营业成本', 'zh-TW': '營業成本', en: 'Cost of Sales', ja: '売上原価', ko: '매출원가', fr: 'Coût des ventes' },
       plGrossProfit: { 'zh-CN': '毛利', 'zh-TW': '毛利', en: 'Gross Profit', ja: '粗利益', ko: '매출총이익', fr: 'Marge brute' },
