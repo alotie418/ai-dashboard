@@ -1503,6 +1503,67 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0y: TW purchase/sales modal titles — no word-break space.
+  //   The add-record modal titles must be intact single phrases with no embedded
+  //   whitespace (a stray space rendered as 采购与费 用 / 销售与收 入). Pin the TW
+  //   values and forbid any whitespace inside them. (The h2 also carries
+  //   whitespace-nowrap so CJK never wraps mid-character at render.)
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const PIN = {
+      'zh-CN': { modalTitlePurchase: '新增采购与费用记录', modalTitleSales: '新增销售与收入记录' },
+      'zh-TW': { modalTitlePurchase: '新增採購與費用記錄', modalTitleSales: '新增銷售與收入記錄' },
+    };
+    const BREAK_BAN = /采购与费 用|採購與費 用|销售与收 入|銷售與收 入|费 用|費 用|收 入/;
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      for (const [key, want] of Object.entries(PIN[lang])) {
+        const got = helpers.getTaxLabel('TW', lang, key);
+        if (got !== want) reasons.push(`TW ${key}[${lang}] should be "${want}", got "${got}"`);
+        if (/\s/.test(got)) reasons.push(`TW ${key}[${lang}] must contain no whitespace (word-break): "${got}"`);
+        if (BREAK_BAN.test(got)) reasons.push(`TW ${key}[${lang}] has a 费 用 / 收 入 word-break: "${got}"`);
+      }
+    }
+    if (reasons.length) fail(`twModalTitleNoBreak`, reasons); else pass(`twModalTitleNoBreak`);
+  }
+
+  // ────────────────────────────────────────────────
+  // PART G0z: TW purchase/sales 发票/凭证 wording.
+  //   On the 采购与费用 / 销售与收入 pages, TW frames the document number as 发票/凭证
+  //   号码 (not the generic 票据号码), and the upload/empty hints reference 发票…凭证.
+  //   zh-CN/zh-TW only; JP/EU/KR keep the shared 票据号码 (guarded the other way).
+  //   No CN-VAT (增值税/进项/销项) or non-TWD currency (人民币/CNY/RMB) on these keys.
+  //   (The 票据查询 page keeps 票据号码 — out of this scope.)
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const PS_KEYS = ['headerInvoiceNo', 'uploadSubtitle', 'uploadSubtitleSales', 'emptyPurchase', 'emptySales'];
+    const PS_BAN = /票据号码|票據號碼|增值税|增值稅|进项|進項|销项|銷項|人民币|人民幣|CNY|RMB/;
+    const PIN = { 'zh-CN': { headerInvoiceNo: '发票/凭证号码' }, 'zh-TW': { headerInvoiceNo: '發票/憑證號碼' } };
+    const VOUCHER = /发票\/凭证|發票\/憑證/;
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      for (const [k, want] of Object.entries(PIN[lang])) {
+        const got = helpers.getTaxLabel('TW', lang, k);
+        if (got !== want) reasons.push(`TW ${k}[${lang}] should be "${want}", got "${got}"`);
+      }
+      for (const k of PS_KEYS) {
+        const v = helpers.getTaxLabel('TW', lang, k);
+        if (typeof v === 'string' && PS_BAN.test(v)) reasons.push(`TW ${k}[${lang}] uses banned (票据号码/增值税/进项/销项/人民币/CNY/RMB) wording: "${v}"`);
+      }
+      // 发票/凭证 must surface in the document-number field + both upload subtitles
+      for (const k of ['headerInvoiceNo', 'uploadSubtitle', 'uploadSubtitleSales']) {
+        const v = helpers.getTaxLabel('TW', lang, k);
+        if (!VOUCHER.test(v)) reasons.push(`TW ${k}[${lang}] should contain 发票/凭证: "${v}"`);
+      }
+    }
+    // reverse: JP/EU/KR keep the shared 票据号码 (TW override must not leak)
+    for (const loc of ['JP', 'EU', 'KR']) {
+      if (helpers.getTaxLabel(loc, 'zh-CN', 'headerInvoiceNo') !== '票据号码') reasons.push(`${loc} headerInvoiceNo[zh-CN] should stay 票据号码, got "${helpers.getTaxLabel(loc, 'zh-CN', 'headerInvoiceNo')}"`);
+    }
+    if (reasons.length) fail(`twInvoiceVoucherWording`, reasons); else pass(`twInvoiceVoucherWording`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G0f: Non-CN generic business taxConcepts (PR-A shared base).
   //   The nav / page-title / upload / table-header / modal / button / empty /
   //   invoice-query-basics labels must be present for every non-CN locale

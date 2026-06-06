@@ -643,6 +643,16 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       plTitle:       { 'zh-CN': '损益表', 'zh-TW': '損益表', en: 'Income Statement', ja: '損益計算書', ko: '손익계산서', fr: 'Compte de résultat' },
       tabPlLabel:    { 'zh-CN': '损益表', 'zh-TW': '損益表', en: 'P&L', ja: '損益', ko: '손익', fr: 'Résultat' },
       formTaxRate:   { 'zh-CN': '营业税率', 'zh-TW': '營業稅率', en: 'Business Tax Rate', ja: '営業税率', ko: '영업세율', fr: 'Taux taxe activité' },
+      // ── Purchase/Sales 发票/凭证 wording (TW business-tax context) ──
+      // TW frames the document number as 发票/凭证号码 (统一发票/凭证) rather than the
+      // generic 票据号码, and the upload/empty hints reference 发票…收据…凭证. zh-CN/
+      // zh-TW only; en/ja/ko/fr keep the NON_CN_GENERIC values (TW non-Chinese UI
+      // unchanged). CN/US/EU/JP/KR are not affected (these overrides live in TW only).
+      headerInvoiceNo:    { 'zh-CN': '发票/凭证号码', 'zh-TW': '發票/憑證號碼', en: 'Receipt / Document #', ja: '伝票番号', ko: '전표 번호', fr: 'N° de pièce' },
+      uploadSubtitle:     { 'zh-CN': '自动提取日期、金额、供应商及发票/凭证号码', 'zh-TW': '自動擷取日期、金額、供應商及發票/憑證號碼', en: 'Auto-extract date, amount, vendor and document number', ja: '日付、金額、仕入先、伝票番号を自動抽出', ko: '날짜, 금액, 공급업체, 전표 번호를 자동 추출', fr: 'Extraction automatique de la date, du montant, du fournisseur et du numéro' },
+      uploadSubtitleSales:{ 'zh-CN': '自动提取日期、金额、客户及发票/凭证号码', 'zh-TW': '自動擷取日期、金額、客戶及發票/憑證號碼', en: 'Supports images or PDF, recognized by AI', ja: '画像またはPDFに対応、AIで自動認識', ko: '이미지 또는 PDF 지원, AI 자동 인식', fr: 'Images ou PDF, reconnaissance IA' },
+      emptyPurchase:      { 'zh-CN': '暂无采购或费用记录，请上传发票、收据或凭证，或手动新增。', 'zh-TW': '暫無採購或費用記錄，請上傳發票、收據或憑證，或手動新增。', en: 'No purchase or expense records yet. Upload a receipt, bill or document, or add one manually.', ja: '仕入・経費の記録がありません。レシート・請求書・伝票をアップロードするか手動で追加してください。', ko: '매입/비용 기록이 없습니다. 영수증, 청구서, 전표를 업로드하거나 수동으로 추가하세요.', fr: 'Aucun achat/dépense. Téléversez un reçu, une facture ou ajoutez manuellement.' },
+      emptySales:         { 'zh-CN': '暂无销售记录，请上传发票、收据或凭证，或手动新增。', 'zh-TW': '暫無銷售記錄，請上傳發票、收據或憑證，或手動新增。', en: 'No sales records yet. Upload a receipt, bill or document, or add one manually.', ja: '売上記録がありません。レシート・請求書・伝票をアップロードするか手動で追加してください。', ko: '매출 기록이 없습니다. 영수증, 청구서, 전표를 업로드하거나 수동으로 추가하세요.', fr: 'Aucune vente. Téléversez un reçu, une facture ou ajoutez manuellement.' },
       invoiceInputLabel: { 'zh-CN': '进项发票数', 'zh-TW': '進項發票數', en: 'Input Invoices', ja: '仕入請求書', ko: '매입계산서', fr: 'Factures achats' },
       invoiceOutputLabel: { 'zh-CN': '销项发票数', 'zh-TW': '銷項發票數', en: 'Output Invoices', ja: '売上請求書', ko: '매출계산서', fr: 'Factures ventes' },
       invoicePendingTax: { 'zh-CN': '待申报营业税', 'zh-TW': '待申報營業稅', en: 'Pending Business Tax', ja: '未申告営業税', ko: '미신고 영업세', fr: 'Taxe activité en attente' },

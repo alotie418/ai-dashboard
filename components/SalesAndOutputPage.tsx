@@ -461,13 +461,13 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
       {showAddModal && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setShowAddModal(false); setEditingId(null); }}></div>
-          <div className="relative w-full max-w-lg bg-white border border-[#e0ddd5] rounded-xl overflow-hidden animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
-            <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center">
-              <div>
-                <h2 className="text-xl font-bold text-[#191918]">{editingId ? t('sales.modalTitleEdit') : (accLocale !== 'CN' ? taxLabel('modalTitleSales') : t('sales.modalTitle'))}</h2>
+          <div className="relative w-full max-w-xl bg-white border border-[#e0ddd5] rounded-xl overflow-hidden animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
+            <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center gap-4">
+              <div className="flex-shrink-0">
+                <h2 className="text-xl font-bold text-[#191918] whitespace-nowrap">{editingId ? t('sales.modalTitleEdit') : (accLocale !== 'CN' ? taxLabel('modalTitleSales') : t('sales.modalTitle'))}</h2>
                 <p className="text-xs text-[#5c5c5a] mt-1">{editingId ? t('sales.modalSubtitleEdit') : (accLocale !== 'CN' ? taxLabel('modalSubtitleSales') : t('sales.modalSubtitle'))}</p>
               </div>
-              <button onClick={() => setShowAddModal(false)} className="text-[#5c5c5a] hover:text-[#191918] transition-colors">
+              <button onClick={() => setShowAddModal(false)} className="flex-shrink-0 text-[#5c5c5a] hover:text-[#191918] transition-colors">
                 <i className="fas fa-times text-xl"></i>
               </button>
             </div>
