@@ -547,7 +547,7 @@
     "clearRetry": "清除過濾條件重試"
   },
   "analysis": {
-    "panorama": "年度全景圖",
+    "panorama": "年度總覽",
     "trends": "趨勢分析",
     "forecast": "預測未來",
     "table": "明細資料",
@@ -558,7 +558,7 @@
     "deflator": "平減指數",
     "revenueStructure": "營收與成本結構",
     "growthTrend": "增長動態對比",
-    "logistics": "物流量流轉平衡",
+    "logistics": "庫存流轉平衡",
     "efficiency": "盈利效率偏離度",
     "matrixTitle": "年度資料全景矩陣",
     "matrixSubtitle": "整合金額、噸數與宏觀指數的深度聚類分析",

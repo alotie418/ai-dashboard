@@ -20,7 +20,7 @@ const nextSalesId = () => `sale-${++salesIdCounter}-${Date.now()}`;
 const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
   const { t, i18n } = useTranslation();
   const [accLocale, setAccLocale] = useState('CN');
-  const [productUnit, setProductUnit] = useState<string>('unit');
+  const [productUnit, setProductUnit] = useState<string>('ton');
   useEffect(() => {
     fetchSettings().then((s: any) => {
       if (s.accounting_locale) setAccLocale(s.accounting_locale);
