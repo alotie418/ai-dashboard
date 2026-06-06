@@ -7,7 +7,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { fetchSettings } from '../services/api';
-import { formatMoney, getCurrencySymbol, getInventoryUnitLabel } from './accountingHelpers';
+import { formatMoney, getCurrencySymbol, getInventoryUnitLabel, formatCompactMoney } from './accountingHelpers';
 // AI calls moved to server-side proxy
 
 interface Props {
@@ -398,7 +398,7 @@ ${JSON.stringify(mcOnVar)}
     }
   }, [runAnalysis]);
 
-  const formatCurrency = (v: number) => `${currSym}${(v / 1000).toFixed(1)}k`;
+  const formatCurrency = (v: number) => formatCompactMoney(v, accLocale, uiLang, 1);
   const formatNum = (v: number) => v.toLocaleString();
 
   return (
@@ -557,11 +557,11 @@ ${JSON.stringify(mcOnVar)}
               {data.monthlyPerformance.map((item, idx) => (
                 <div key={idx} className="bg-[#f9f9f8]/60 border border-[#e0ddd5]/70 p-4 rounded-xl hover:border-[#d97757]/40 transition-all hover:bg-[#f9f9f8]/80 group">
                   <p className="text-[#5c5c5a] text-[10px] font-bold uppercase mb-2 group-hover:text-[#d97757] transition-colors">{item.name}</p>
-                  <p className="text-[#191918] text-lg font-bold">{currSym}{(item.revenue / 1000).toFixed(0)}k</p>
+                  <p className="text-[#191918] text-lg font-bold">{formatCompactMoney(item.revenue, accLocale, uiLang, 0)}</p>
                   <div className="mt-3 space-y-1">
                     <div className="flex justify-between text-[9px]">
                       <span className="text-[#5c5c5a]">{t('analysis.chartProfit')}</span>
-                      <span className="text-emerald-600 font-bold">{currSym}{(item.profit / 1000).toFixed(1)}k</span>
+                      <span className="text-emerald-600 font-bold">{formatCompactMoney(item.profit, accLocale, uiLang, 1)}</span>
                     </div>
                     <div className="flex justify-between text-[9px]">
                       <span className="text-[#5c5c5a]">{t('analysis.chartTons')}</span>
@@ -572,7 +572,7 @@ ${JSON.stringify(mcOnVar)}
               ))}
               <div className="bg-[#d97757] border border-[#d97757] p-4 rounded-xl flex flex-col justify-center items-center cursor-pointer hover:scale-105 transition-transform" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}>
                 <p className="text-white/80 text-[10px] font-bold uppercase mb-1">{t('analysis.chartAvgRevenue')}</p>
-                <p className="text-white text-xl font-bold">{currSym}{(stats.avgRevenue / 1000).toFixed(1)}k</p>
+                <p className="text-white text-xl font-bold">{formatCompactMoney(stats.avgRevenue, accLocale, uiLang, 1)}</p>
               </div>
             </div>
           </div>

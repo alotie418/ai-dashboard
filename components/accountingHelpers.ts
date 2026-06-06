@@ -35,6 +35,24 @@ export function getCurrencySymbol(accountingLocale: string): string {
   return getAccountingLocale(accountingLocale).currencySymbol;
 }
 
+// Compact money for analytics cards/axes: `${symbol}${value/1000}k` (e.g. $1.2k).
+// KR + Chinese UI: a value that rounds to zero at the shown precision is rendered
+// as a plain `₩0` (no English 'k' suffix) instead of ₩0k / ₩0.0k. All other
+// accountingLocales / UI languages keep the existing compact `…k` format unchanged.
+// Currency symbol always follows accountingLocale (KR → ₩).
+export function formatCompactMoney(
+  value: number,
+  accountingLocale: string,
+  uiLanguage: string,
+  fractionDigits: number = 1,
+): string {
+  const sym = getCurrencySymbol(accountingLocale);
+  const compact = ((value || 0) / 1000).toFixed(fractionDigits);
+  const isZh = uiLanguage === 'zh-CN' || uiLanguage === 'zh-TW';
+  if (accountingLocale === 'KR' && isZh && parseFloat(compact) === 0) return `${sym}0`;
+  return `${sym}${compact}k`;
+}
+
 export function getCurrency(accountingLocale: string): string {
   return getAccountingLocale(accountingLocale).defaultCurrency;
 }
