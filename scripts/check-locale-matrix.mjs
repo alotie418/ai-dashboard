@@ -1503,6 +1503,31 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0y: TW purchase/sales modal titles — no word-break space.
+  //   The add-record modal titles must be intact single phrases with no embedded
+  //   whitespace (a stray space rendered as 采购与费 用 / 销售与收 入). Pin the TW
+  //   values and forbid any whitespace inside them. (The h2 also carries
+  //   whitespace-nowrap so CJK never wraps mid-character at render.)
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const PIN = {
+      'zh-CN': { modalTitlePurchase: '新增采购与费用记录', modalTitleSales: '新增销售与收入记录' },
+      'zh-TW': { modalTitlePurchase: '新增採購與費用記錄', modalTitleSales: '新增銷售與收入記錄' },
+    };
+    const BREAK_BAN = /采购与费 用|採購與費 用|销售与收 入|銷售與收 入|费 用|費 用|收 入/;
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      for (const [key, want] of Object.entries(PIN[lang])) {
+        const got = helpers.getTaxLabel('TW', lang, key);
+        if (got !== want) reasons.push(`TW ${key}[${lang}] should be "${want}", got "${got}"`);
+        if (/\s/.test(got)) reasons.push(`TW ${key}[${lang}] must contain no whitespace (word-break): "${got}"`);
+        if (BREAK_BAN.test(got)) reasons.push(`TW ${key}[${lang}] has a 费 用 / 收 入 word-break: "${got}"`);
+      }
+    }
+    if (reasons.length) fail(`twModalTitleNoBreak`, reasons); else pass(`twModalTitleNoBreak`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G0f: Non-CN generic business taxConcepts (PR-A shared base).
   //   The nav / page-title / upload / table-header / modal / button / empty /
   //   invoice-query-basics labels must be present for every non-CN locale
