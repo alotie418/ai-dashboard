@@ -251,7 +251,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
             className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50" style={{ boxShadow: '0 4px 16px rgba(147,51,234,0.15)' }}
           >
             <i className={`fas ${isScanning ? 'fa-spinner animate-spin' : 'fa-camera'} mr-2`}></i>
-            {isScanning ? t('purchases.scanning') : t('purchases.scanInvoice')}
+            {isScanning ? t('purchases.scanning') : (accLocale === 'KR' ? taxLabel('scanDocButton') : t('purchases.scanInvoice'))}
           </button>
           <button
             onClick={() => setShowAddModal(true)}

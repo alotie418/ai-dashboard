@@ -558,6 +558,11 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       setVatRateLabel:    { 'zh-CN': '韩国 VAT 税率', 'zh-TW': '韓國 VAT 稅率', en: 'Korean VAT Rate', ja: '韓国VAT率', ko: '부가가치세율', fr: 'Taux de TVA (Corée)' },
       setPerYear:         { 'zh-CN': '韩元/年', 'zh-TW': '韓元/年', en: 'KRW/yr', ja: 'ウォン/年', ko: '원/년', fr: 'KRW/an' },
       setTaxHint:         { 'zh-CN': '提示：VAT 标准 10%；法人税按利润计算。', 'zh-TW': '提示：VAT 標準 10%；法人稅按利潤計算。', en: 'Note: VAT 10% standard; corporate tax on profit.', ja: '注：VAT標準10%；法人税は利益に対して課税。', ko: '참고: 부가가치세 표준 10%; 법인세는 이익 기준.', fr: 'Note : TVA 10 % ; impôt sur les sociétés sur le bénéfice.' },
+      // Purchase/Sales OCR scan button — KR uses generic 票据 wording instead of the
+      // CN 税控发票 framing (扫描发票). zh-CN/zh-TW only; en/ja/ko/fr keep the existing
+      // scanInvoice i18n value so non-Chinese UIs are unchanged. The component gates
+      // this on accLocale === 'KR'; CN/EU/JP/US/TW keep the purchases/sales.scanInvoice i18n.
+      scanDocButton: { 'zh-CN': '扫描票据', 'zh-TW': '掃描票據', en: 'Scan Invoice', ja: 'Scan Invoice', ko: 'Scan Invoice', fr: 'Scan Invoice' },
       taxTitle:      { 'zh-CN': '韩国 VAT 统计', 'zh-TW': '韓國 VAT 統計', en: 'Korean VAT Summary', ja: '韓国VAT集計', ko: '부가가치세 요약', fr: 'Résumé TVA (Corée)' },
       // KR frames VAT cards as 采购/销售 (purchase/sales) rather than the CN/JP-VAT
       // ledger 进项/销项. zh-CN/zh-TW only; en/ja/ko keep the standard accounting
