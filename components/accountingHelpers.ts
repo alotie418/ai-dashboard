@@ -116,7 +116,15 @@ export function buildAIFinanceContext(
   };
 
   const langInstruction = langInstructions[uiLanguage] || langInstructions['en'];
-  return `${config.aiContext}\n\n${langInstruction}`;
+  // KR + Chinese UI: steer the AI briefing's VAT wording to match the dashboard
+  // (采购 VAT / 销售 VAT), not CN-VAT 进项/销项/增值税 or JP 消费税. Gated to KR + zh
+  // so CN/JP/EU/US and en/ja/ko/fr contexts are unchanged.
+  const krZhDirective = (accountingLocale === 'KR' && (uiLanguage === 'zh-CN' || uiLanguage === 'zh-TW'))
+    ? (uiLanguage === 'zh-CN'
+        ? '\n\n韩国 VAT 制度：中文简报请统一使用「采购 VAT」「销售 VAT」「应缴 VAT」等表述（与界面一致）。'
+        : '\n\n韓國 VAT 制度：中文簡報請統一使用「採購 VAT」「銷售 VAT」「應繳 VAT」等表述（與介面一致）。')
+    : '';
+  return `${config.aiContext}\n\n${langInstruction}${krZhDirective}`;
 }
 
 // ─── Convenience: get full config ───
