@@ -1196,6 +1196,44 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0r: EU transaction-category labels (收支记录 分类下拉).
+  //   Under EU accountingLocale + zh-CN/zh-TW UI the category dropdown shows
+  //   `displayLabel → schedule_line`, localized via EU_TXN_CATEGORY_LABELS (applied
+  //   read-time in services/api.ts, keyed by slug). Guard: every EU category slug
+  //   resolves zh-CN/zh-TW label + report-line; the report-line is Chinese (损益表-…
+  //   or VAT 申报), never the seeded English P&L - … / VAT Return; no CN-VAT
+  //   (进项/销项/增值税/认证), JP 消费税, US Sales Tax, or non-EUR currency.
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const M = config.EU_TXN_CATEGORY_LABELS || {};
+    const REQUIRED_SLUGS = ['revenue', 'financial', 'purchases', 'rent', 'salaries', 'social-charges', 'travel', 'professional', 'marketing', 'energy', 'amortization', 'vat-net'];
+    const EU_CAT_BAN = /P&L|VAT Return|进项|進項|销项|銷項|增值税|增值稅|消费税|消費稅|认证|認證|Sales Tax|人民币|人民幣|CNY|日元|日圓|JPY|美元|USD/i;
+    // exact report-line pins (the agreed EU 收支记录 wording)
+    const LINE_PIN = {
+      'zh-CN': { revenue: '损益表-营业收入', financial: '损益表-财务收入', purchases: '损益表-采购', rent: '损益表-租金', salaries: '损益表-工资', 'social-charges': '损益表-社会保险费', travel: '损益表-差旅费', professional: '损益表-专业服务费', marketing: '损益表-市场推广费', energy: '损益表-能源费用', amortization: '损益表-摊销', 'vat-net': 'VAT 申报' },
+      'zh-TW': { revenue: '損益表-營業收入', financial: '損益表-財務收入', purchases: '損益表-採購', rent: '損益表-租金', salaries: '損益表-工資', 'social-charges': '損益表-社會保險費', travel: '損益表-差旅費', professional: '損益表-專業服務費', marketing: '損益表-市場推廣費', energy: '損益表-能源費用', amortization: '損益表-攤銷', 'vat-net': 'VAT 申報' },
+    };
+    for (const slug of REQUIRED_SLUGS) {
+      const e = M[slug];
+      if (!e) { reasons.push(`EU_TXN_CATEGORY_LABELS missing slug "${slug}"`); continue; }
+      for (const lang of ['zh-CN', 'zh-TW']) {
+        const label = e.label && e.label[lang];
+        const line = e.scheduleLine && e.scheduleLine[lang];
+        if (!label) reasons.push(`EU cat ${slug}.label[${lang}] missing`);
+        if (!line) reasons.push(`EU cat ${slug}.scheduleLine[${lang}] missing`);
+        for (const [field, v] of [['label', label], ['scheduleLine', line]]) {
+          if (typeof v === 'string' && EU_CAT_BAN.test(v)) reasons.push(`EU cat ${slug}.${field}[${lang}] uses banned (English P&L/VAT Return/CN-VAT/JP/US/non-EUR) wording: "${v}"`);
+        }
+        if (typeof line === 'string' && LINE_PIN[lang][slug] && line !== LINE_PIN[lang][slug]) {
+          reasons.push(`EU cat ${slug}.scheduleLine[${lang}] should be "${LINE_PIN[lang][slug]}", got "${line}"`);
+        }
+      }
+    }
+    if (reasons.length) fail(`euTxnCategoryLabels`, reasons); else pass(`euTxnCategoryLabels`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G0f: Non-CN generic business taxConcepts (PR-A shared base).
   //   The nav / page-title / upload / table-header / modal / button / empty /
   //   invoice-query-basics labels must be present for every non-CN locale
