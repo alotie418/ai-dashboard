@@ -1283,6 +1283,31 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0t: KR purchase/sales OCR scan button.
+  //   Under KR accountingLocale + zh-CN/zh-TW UI the 采购与费用 / 销售与收入 scan
+  //   button uses generic 票据 wording (扫描票据 / 掃描票據), not the CN 税控发票
+  //   framing (扫描发票 / 掃描發票). Resolved via the KR scanDocButton taxConcept,
+  //   gated on accLocale === 'KR'. Reverse guard: the shared purchases/sales.scanInvoice
+  //   i18n stays 扫描发票 / 掃描發票 (still used by CN/EU/JP/US/TW).
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const PIN = { 'zh-CN': '扫描票据', 'zh-TW': '掃描票據' };
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      const got = helpers.getTaxLabel('KR', lang, 'scanDocButton');
+      if (got !== PIN[lang]) reasons.push(`KR scanDocButton[${lang}] should be "${PIN[lang]}", got "${got}"`);
+      if (/扫描发票|掃描發票/.test(got)) reasons.push(`KR scanDocButton[${lang}] must not say 扫描发票/掃描發票: "${got}"`);
+    }
+    // reverse: the shared scan-button i18n keeps the CN 税控发票 wording (CN display)
+    const cn = locales['zh-CN'], tw = locales['zh-TW'];
+    if (get(cn, 'purchases.scanInvoice') !== '扫描发票') reasons.push(`CN purchases.scanInvoice should stay 扫描发票, got "${get(cn, 'purchases.scanInvoice')}"`);
+    if (get(cn, 'sales.scanInvoice') !== '扫描发票') reasons.push(`CN sales.scanInvoice should stay 扫描发票, got "${get(cn, 'sales.scanInvoice')}"`);
+    if (get(tw, 'purchases.scanInvoice') !== '掃描發票') reasons.push(`CN(zh-TW) purchases.scanInvoice should stay 掃描發票, got "${get(tw, 'purchases.scanInvoice')}"`);
+    if (get(tw, 'sales.scanInvoice') !== '掃描發票') reasons.push(`CN(zh-TW) sales.scanInvoice should stay 掃描發票, got "${get(tw, 'sales.scanInvoice')}"`);
+    if (reasons.length) fail(`krScanDocButton`, reasons); else pass(`krScanDocButton`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G0f: Non-CN generic business taxConcepts (PR-A shared base).
   //   The nav / page-title / upload / table-header / modal / button / empty /
   //   invoice-query-basics labels must be present for every non-CN locale
