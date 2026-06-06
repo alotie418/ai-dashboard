@@ -1537,10 +1537,12 @@ async function main() {
   // ────────────────────────────────────────────────
   {
     const reasons = [];
-    const PS_KEYS = ['headerInvoiceNo', 'uploadSubtitle', 'uploadSubtitleSales', 'emptyPurchase', 'emptySales'];
-    const PS_BAN = /票据号码|票據號碼|增值税|增值稅|进项|進項|销项|銷項|人民币|人民幣|CNY|RMB/;
+    const PS_KEYS = ['headerInvoiceNo', 'uploadTitle', 'uploadTitleSales', 'uploadSubtitle', 'uploadSubtitleSales', 'emptyPurchase', 'emptySales'];
+    // ban the generic 票据号码 / 账单或票据 framing + CN-VAT / non-TWD currency on these keys
+    const PS_BAN = /票据号码|票據號碼|账单或票据|帳單或票據|增值税|增值稅|进项|進項|销项|銷項|人民币|人民幣|CNY|RMB/;
     const PIN = { 'zh-CN': { headerInvoiceNo: '发票/凭证号码' }, 'zh-TW': { headerInvoiceNo: '發票/憑證號碼' } };
     const VOUCHER = /发票\/凭证|發票\/憑證/;
+    const HAS_INVOICE = /发票|發票/;
     for (const lang of ['zh-CN', 'zh-TW']) {
       for (const [k, want] of Object.entries(PIN[lang])) {
         const got = helpers.getTaxLabel('TW', lang, k);
@@ -1548,12 +1550,17 @@ async function main() {
       }
       for (const k of PS_KEYS) {
         const v = helpers.getTaxLabel('TW', lang, k);
-        if (typeof v === 'string' && PS_BAN.test(v)) reasons.push(`TW ${k}[${lang}] uses banned (票据号码/增值税/进项/销项/人民币/CNY/RMB) wording: "${v}"`);
+        if (typeof v === 'string' && PS_BAN.test(v)) reasons.push(`TW ${k}[${lang}] uses banned (票据号码/账单或票据/增值税/进项/销项/人民币/CNY/RMB) wording: "${v}"`);
       }
       // 发票/凭证 must surface in the document-number field + both upload subtitles
       for (const k of ['headerInvoiceNo', 'uploadSubtitle', 'uploadSubtitleSales']) {
         const v = helpers.getTaxLabel('TW', lang, k);
         if (!VOUCHER.test(v)) reasons.push(`TW ${k}[${lang}] should contain 发票/凭证: "${v}"`);
+      }
+      // the upload dropzone titles must reference 发票 (发票、收据或凭证), not 账单或票据
+      for (const k of ['uploadTitle', 'uploadTitleSales']) {
+        const v = helpers.getTaxLabel('TW', lang, k);
+        if (!HAS_INVOICE.test(v)) reasons.push(`TW ${k}[${lang}] should reference 发票 (发票、收据或凭证): "${v}"`);
       }
     }
     // reverse: JP/EU/KR keep the shared 票据号码 (TW override must not leak)
