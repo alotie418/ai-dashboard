@@ -29,6 +29,11 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
   }, []);
   const uiLang = i18n.language;
   const currSym = getCurrencySymbol(accLocale);
+  // Left padding for money inputs whose currency prefix is absolutely positioned.
+  // A multi-char symbol (e.g. NT$) is wider than the default pl-8 and would overlap
+  // the placeholder/value, so widen the padding when the symbol is longer than 1 char.
+  // Generic across NT$ / $ / ¥ / € / ₩ — no per-currency hardcoding.
+  const moneyPad = currSym.length > 1 ? 'pl-12' : 'pl-8';
   const fmtMoney = (val: number) => formatMoney(val, accLocale, uiLang);
   const fmtQty = (val: number, decimals = 2) => formatQuantity(val, productUnit, uiLang, decimals);
   const taxLabel = (key: string) => getTaxLabel(accLocale, uiLang, key);
@@ -531,7 +536,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                       step="0.01"
                       value={newSale.price || ''}
                       onChange={(e) => setNewSale({ ...newSale, price: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all`}
                     />
                   </div>
                 </div>
@@ -544,7 +549,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                       step="0.01"
                       value={newSale.shipping || ''}
                       onChange={(e) => setNewSale({ ...newSale, shipping: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all`}
                     />
                   </div>
                 </div>
@@ -560,7 +565,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                       step="0.01"
                       value={newSale.unitPriceWithoutTax || ''}
                       onChange={(e) => setNewSale({ ...newSale, unitPriceWithoutTax: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all`}
                       placeholder={t('common2.optional')}
                     />
                   </div>
@@ -574,7 +579,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                       step="0.01"
                       value={newSale.taxAmount || ''}
                       onChange={(e) => setNewSale({ ...newSale, taxAmount: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all`}
                       placeholder={t('common2.optional')}
                     />
                   </div>
@@ -588,7 +593,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                       step="0.01"
                       value={newSale.totalWithTax || ''}
                       onChange={(e) => setNewSale({ ...newSale, totalWithTax: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-white border border-[#e0ddd5] rounded-xl pl-8 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all`}
                       placeholder={t('common2.optional')}
                     />
                   </div>
