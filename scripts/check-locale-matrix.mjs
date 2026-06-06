@@ -1403,6 +1403,58 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0w: KR transaction-category labels (收支记录 分类下拉).
+  //   Under KR accountingLocale + zh-CN/zh-TW UI the category dropdown shows
+  //   `displayLabel → schedule_line`, localized via KR_TXN_CATEGORY_LABELS (applied
+  //   read-time in services/api.ts, keyed by slug). Guard: every KR category slug
+  //   resolves zh-CN/zh-TW label + report-line; the report-line main text (before the
+  //   parens) is Chinese (损益表-…), never the Korean headers 손익계산서-/판관비-/판매비-;
+  //   Korean is allowed ONLY inside （） as the formal account name. No CN-VAT
+  //   (进项/销项/增值税/认证), JP 消费税, US Sales Tax, or non-KRW currency.
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const M = config.KR_TXN_CATEGORY_LABELS || {};
+    const REQUIRED_SLUGS = ['sales', 'non-operating', 'cogs', 'salary', 'welfare', 'travel', 'communication', 'utilities', 'supplies', 'entertain', 'advertising', 'rent', 'depreciation'];
+    const HANGUL = /[가-힣]/;
+    const KR_HEADER_BAN = /손익계산서-|판관비-|판매비-/;
+    const KR_CAT_BAN = /进项|進項|销项|銷項|增值税|增值稅|消费税|消費稅|认证|認證|Sales Tax|人民币|人民幣|CNY|欧元|歐元|EUR|€|日元|日圓|JPY|美元|USD|\$/;
+    // exact pins (the agreed KR 收支记录 wording)
+    const LABEL_PIN = {
+      'zh-CN': { sales: '营业收入', 'non-operating': '营业外收入', cogs: '销售成本', salary: '工资', welfare: '福利', travel: '差旅', communication: '通讯', utilities: '水电费', supplies: '消耗品', entertain: '招待', advertising: '广告', rent: '租金', depreciation: '折旧' },
+      'zh-TW': { sales: '營業收入', 'non-operating': '營業外收入', cogs: '銷售成本', salary: '工資', welfare: '福利', travel: '差旅', communication: '通訊', utilities: '水電費', supplies: '消耗品', entertain: '招待', advertising: '廣告', rent: '租金', depreciation: '折舊' },
+    };
+    const LINE_PIN = {
+      'zh-CN': { sales: '损益表-营业收入（매출）', 'non-operating': '损益表-营业外收入（영업외수익）', cogs: '损益表-销售成本（매출원가）', salary: '损益表-工资薪金（급여）', welfare: '损益表-福利费（복리후생비）', travel: '损益表-差旅费（여비교통비）', communication: '损益表-通信费（통신비）', utilities: '损益表-水电费（수도광열비）', supplies: '损益表-消耗品费（소모품비）', entertain: '损益表-招待费（접대비）', advertising: '损益表-广告宣传费（광고선전비）', rent: '损益表-租赁费（임차료）', depreciation: '损益表-折旧费（감가상각비）' },
+      'zh-TW': { sales: '損益表-營業收入（매출）', 'non-operating': '損益表-營業外收入（영업외수익）', cogs: '損益表-銷售成本（매출원가）', salary: '損益表-薪資薪金（급여）', welfare: '損益表-福利費（복리후생비）', travel: '損益表-差旅費（여비교통비）', communication: '損益表-通訊費（통신비）', utilities: '損益表-水電費（수도광열비）', supplies: '損益表-消耗品費（소모품비）', entertain: '損益表-招待費（접대비）', advertising: '損益表-廣告宣傳費（광고선전비）', rent: '損益表-租賃費（임차료）', depreciation: '損益表-折舊費（감가상각비）' },
+    };
+    for (const slug of REQUIRED_SLUGS) {
+      const e = M[slug];
+      if (!e) { reasons.push(`KR_TXN_CATEGORY_LABELS missing slug "${slug}"`); continue; }
+      for (const lang of ['zh-CN', 'zh-TW']) {
+        const label = e.label && e.label[lang];
+        const line = e.scheduleLine && e.scheduleLine[lang];
+        if (label !== LABEL_PIN[lang][slug]) reasons.push(`KR cat ${slug}.label[${lang}] should be "${LABEL_PIN[lang][slug]}", got "${label}"`);
+        if (line !== LINE_PIN[lang][slug]) reasons.push(`KR cat ${slug}.scheduleLine[${lang}] should be "${LINE_PIN[lang][slug]}", got "${line}"`);
+        for (const [field, v] of [['label', label], ['scheduleLine', line]]) {
+          if (typeof v !== 'string') continue;
+          if (KR_HEADER_BAN.test(v)) reasons.push(`KR cat ${slug}.${field}[${lang}] uses Korean report header (should be 损益表-…): "${v}"`);
+          if (KR_CAT_BAN.test(v)) reasons.push(`KR cat ${slug}.${field}[${lang}] uses CN-VAT/JP/US/non-KRW wording: "${v}"`);
+        }
+        // report-line MAIN text (before the parens) must be Chinese — no Korean as main
+        if (typeof line === 'string') {
+          const main = line.split('（')[0];
+          if (HANGUL.test(main)) reasons.push(`KR cat ${slug}.scheduleLine[${lang}] has Korean as main text (only allowed inside （）): "${line}"`);
+          if (!/^损益表-|^損益表-/.test(line)) reasons.push(`KR cat ${slug}.scheduleLine[${lang}] should start with 损益表-/損益表-: "${line}"`);
+        }
+        // the label (left side) must be pure Chinese — no Korean
+        if (typeof label === 'string' && HANGUL.test(label)) reasons.push(`KR cat ${slug}.label[${lang}] must not contain Korean: "${label}"`);
+      }
+    }
+    if (reasons.length) fail(`krTxnCategoryLabels`, reasons); else pass(`krTxnCategoryLabels`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G0f: Non-CN generic business taxConcepts (PR-A shared base).
   //   The nav / page-title / upload / table-header / modal / button / empty /
   //   invoice-query-basics labels must be present for every non-CN locale
