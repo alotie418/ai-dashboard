@@ -53,7 +53,7 @@ export function testProvider(payload: TestProviderRequest): Promise<TestProvider
 // ==================== Categories（国际化数据模型 v4）====================
 
 import type { AIProviderId } from '../types';
-import { JP_TXN_CATEGORY_LABELS } from '../components/accountingLocaleConfig';
+import { JP_TXN_CATEGORY_LABELS, EU_TXN_CATEGORY_LABELS } from '../components/accountingLocaleConfig';
 
 export type AccountingLocale = 'CN' | 'US' | 'JP' | 'EU' | 'KR' | 'TW';
 export type CategoryType = 'income' | 'expense';
@@ -113,16 +113,19 @@ export function listCategories(opts: { locale?: AccountingLocale; type?: Categor
   if (opts.locale) qs.set('locale', opts.locale);
   if (opts.type) qs.set('type', opts.type);
   if (opts.lang) qs.set('lang', opts.lang);
-  // JP + Chinese UI: localize the category dropdown label + report-line display to
-  // Chinese main wording with the Japanese formal account name in parentheses,
+  // JP/EU + Chinese UI: localize the category dropdown label + report-line display,
   // keyed by the stable slug. This also fixes stale-DB rows (older seeds left raw
-  // Japanese 損益計算書/販管費 or mislabeled rows) since it ignores the stored value.
-  // Display only — id/slug and the backend report mapping (by slug) are unchanged.
-  const jpZh = opts.locale === 'JP' && (opts.lang === 'zh-CN' || opts.lang === 'zh-TW');
+  // Japanese 損益計算書/販管費, mislabeled rows, or English EU report lines P&L - … /
+  // VAT Return) since it ignores the stored value. Display only — id/slug and the
+  // backend report mapping (by slug) are unchanged. zh-CN/zh-TW only.
+  const zhLang = opts.lang === 'zh-CN' || opts.lang === 'zh-TW';
+  const catMap = zhLang
+    ? (opts.locale === 'JP' ? JP_TXN_CATEGORY_LABELS : opts.locale === 'EU' ? EU_TXN_CATEGORY_LABELS : null)
+    : null;
   return apiFetch<Category[]>(`/api/categories${qs.toString() ? '?' + qs.toString() : ''}`)
     .then(cats => cats.map(c => {
-      if (jpZh) {
-        const m = JP_TXN_CATEGORY_LABELS[c.slug];
+      if (catMap) {
+        const m = catMap[c.slug];
         if (m) return { ...c, displayLabel: m.label[opts.lang as 'zh-CN' | 'zh-TW'], schedule_line: m.scheduleLine[opts.lang as 'zh-CN' | 'zh-TW'] };
       }
       return c.schedule_line ? { ...c, schedule_line: normalizeScheduleLine(c.schedule_line) } : c;
