@@ -53,7 +53,7 @@ export function testProvider(payload: TestProviderRequest): Promise<TestProvider
 // ==================== Categories（国际化数据模型 v4）====================
 
 import type { AIProviderId } from '../types';
-import { JP_TXN_CATEGORY_LABELS, EU_TXN_CATEGORY_LABELS } from '../components/accountingLocaleConfig';
+import { JP_TXN_CATEGORY_LABELS, EU_TXN_CATEGORY_LABELS, KR_TXN_CATEGORY_LABELS } from '../components/accountingLocaleConfig';
 
 export type AccountingLocale = 'CN' | 'US' | 'JP' | 'EU' | 'KR' | 'TW';
 export type CategoryType = 'income' | 'expense';
@@ -113,14 +113,14 @@ export function listCategories(opts: { locale?: AccountingLocale; type?: Categor
   if (opts.locale) qs.set('locale', opts.locale);
   if (opts.type) qs.set('type', opts.type);
   if (opts.lang) qs.set('lang', opts.lang);
-  // JP/EU + Chinese UI: localize the category dropdown label + report-line display,
+  // JP/EU/KR + Chinese UI: localize the category dropdown label + report-line display,
   // keyed by the stable slug. This also fixes stale-DB rows (older seeds left raw
-  // Japanese 損益計算書/販管費, mislabeled rows, or English EU report lines P&L - … /
-  // VAT Return) since it ignores the stored value. Display only — id/slug and the
-  // backend report mapping (by slug) are unchanged. zh-CN/zh-TW only.
+  // Japanese 損益計算書/販管費, English EU report lines P&L - … / VAT Return, or Korean
+  // KR report lines 손익계산서-… / 판관비-…) since it ignores the stored value. Display
+  // only — id/slug and the backend report mapping (by slug) are unchanged. zh-CN/zh-TW only.
   const zhLang = opts.lang === 'zh-CN' || opts.lang === 'zh-TW';
   const catMap = zhLang
-    ? (opts.locale === 'JP' ? JP_TXN_CATEGORY_LABELS : opts.locale === 'EU' ? EU_TXN_CATEGORY_LABELS : null)
+    ? (opts.locale === 'JP' ? JP_TXN_CATEGORY_LABELS : opts.locale === 'EU' ? EU_TXN_CATEGORY_LABELS : opts.locale === 'KR' ? KR_TXN_CATEGORY_LABELS : null)
     : null;
   return apiFetch<Category[]>(`/api/categories${qs.toString() ? '?' + qs.toString() : ''}`)
     .then(cats => cats.map(c => {
