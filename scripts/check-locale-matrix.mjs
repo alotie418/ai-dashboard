@@ -1189,9 +1189,10 @@ async function main() {
         if (got !== want) reasons.push(`EU ${key}[${lang}] should be "${want}", got "${got}"`);
       }
     }
-    // reverse guards: JP/KR keep the shared slash form (EU override must not leak to them)
+    // reverse guards: JP/TW keep the shared slash form (EU override must not leak to them).
+    // KR has its own invoice-query override (guarded in krInvoiceQuery), so it is not checked here.
     if (helpers.getTaxLabel('JP', 'zh-CN', 'invTotalInput') !== '累计采购/费用票据') reasons.push(`JP invTotalInput[zh-CN] should stay 累计采购/费用票据 (NON_CN_GENERIC), got "${helpers.getTaxLabel('JP', 'zh-CN', 'invTotalInput')}"`);
-    if (helpers.getTaxLabel('KR', 'zh-CN', 'invTotalInput') !== '累计采购/费用票据') reasons.push(`KR invTotalInput[zh-CN] should stay 累计采购/费用票据 (NON_CN_GENERIC), got "${helpers.getTaxLabel('KR', 'zh-CN', 'invTotalInput')}"`);
+    if (helpers.getTaxLabel('TW', 'zh-CN', 'invTotalInput') !== '累计采购/费用票据') reasons.push(`TW invTotalInput[zh-CN] should stay 累计采购/费用票据 (NON_CN_GENERIC), got "${helpers.getTaxLabel('TW', 'zh-CN', 'invTotalInput')}"`);
     if (reasons.length) fail(`euInvoiceQuery`, reasons); else pass(`euInvoiceQuery`);
   }
 
@@ -1305,6 +1306,62 @@ async function main() {
     if (get(tw, 'purchases.scanInvoice') !== '掃描發票') reasons.push(`CN(zh-TW) purchases.scanInvoice should stay 掃描發票, got "${get(tw, 'purchases.scanInvoice')}"`);
     if (get(tw, 'sales.scanInvoice') !== '掃描發票') reasons.push(`CN(zh-TW) sales.scanInvoice should stay 掃描發票, got "${get(tw, 'sales.scanInvoice')}"`);
     if (reasons.length) fail(`krScanDocButton`, reasons); else pass(`krScanDocButton`);
+  }
+
+  // ────────────────────────────────────────────────
+  // PART G0u: KR 票据查询 (invoice-query) page wording.
+  //   KR uses the 采购与费用 / 销售与收入 wording (matching nav + tabs), not the shared
+  //   采购/费用 · 销售/收入 slash form, and 待补票据 (not 待票据). Pins the rendered
+  //   票据查询 keys and bans the slash form, 待票据, CN-VAT (进项/销项/增值税/认证), JP
+  //   消费税, US Sales Tax, and non-KRW currency. (库存/交易 in the table subtitle is
+  //   allowed — only 采购/费用 · 销售/收入 are banned.)
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const KR_INV_PIN = {
+      'zh-CN': {
+        invQueryTitle: '票据查询', invFilterAll: '全部票据', invFilterInput: '采购与费用', invFilterOutput: '销售与收入',
+        invTotalInput: '累计采购与费用票据', invTotalOutput: '累计销售与收入票据',
+        invHeaderInvoiceNo: '票据号码', invEmpty: '未找到匹配的票据记录',
+        invStatusVerified: '已核验', invStatusCertified: '已记录', invStatusDeducted: '已处理',
+        invStatusPendingCert: '待处理', invStatusPendingIssue: '待补票据', invStatusIssued: '已开票',
+        invoiceTypeInput: '采购', invoiceTypeOutput: '销售',
+      },
+      'zh-TW': {
+        invQueryTitle: '票據查詢', invFilterAll: '全部票據', invFilterInput: '採購與費用', invFilterOutput: '銷售與收入',
+        invTotalInput: '累計採購與費用票據', invTotalOutput: '累計銷售與收入票據',
+        invHeaderInvoiceNo: '票據號碼', invEmpty: '未找到匹配的票據記錄',
+        invStatusVerified: '已核驗', invStatusCertified: '已記錄', invStatusDeducted: '已處理',
+        invStatusPendingCert: '待處理', invStatusPendingIssue: '待補票據', invStatusIssued: '已開票',
+        invoiceTypeInput: '採購', invoiceTypeOutput: '銷售',
+      },
+    };
+    const KR_INV_KEYS = [
+      'invQueryTitle', 'invSearchPlaceholder', 'invFilterAll', 'invFilterInput', 'invFilterOutput',
+      'invTotalInput', 'invTotalOutput', 'invPendingTax', 'invPendingTaxSub', 'invNoInput', 'invNoOutput',
+      'invInputRecordCount', 'invOutputRecordCount', 'invTableTitle', 'invTableSubtitle',
+      'invHeaderDate', 'invHeaderWeight', 'invHeaderAmount', 'invHeaderInvoiceNo', 'invEmpty',
+      'invDateRange', 'invWeightRange', 'invStatusFilter', 'invStatusAll', 'invStatusVerified',
+      'invStatusCertified', 'invStatusDeducted', 'invStatusPendingCert', 'invStatusPendingIssue',
+      'invStatusIssued', 'invAdvFilterActive', 'invoiceTypeInput', 'invoiceTypeOutput',
+    ];
+    const KR_INV_BAN = /采购\/费用|採購\/費用|销售\/收入|銷售\/收入|待票据|待票據|进项|進項|销项|銷項|增值税|增值稅|消费税|消費稅|Sales Tax|人民币|人民幣|CNY|欧元|歐元|EUR|€|日元|日圓|JPY|美元|USD|\$/;
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      for (const key of KR_INV_KEYS) {
+        const v = helpers.getTaxLabel('KR', lang, key);
+        if (v === key) reasons.push(`KR ${key}[${lang}] missing (raw key)`);
+        if (typeof v === 'string' && KR_INV_BAN.test(v)) reasons.push(`KR ${key}[${lang}] uses banned 票据查询 wording: "${v}"`);
+      }
+      for (const [key, want] of Object.entries(KR_INV_PIN[lang])) {
+        const got = helpers.getTaxLabel('KR', lang, key);
+        if (got !== want) reasons.push(`KR ${key}[${lang}] should be "${want}", got "${got}"`);
+      }
+    }
+    // reverse guards: JP/EU keep their own invoice-query wording (KR override must not leak)
+    if (helpers.getTaxLabel('JP', 'zh-CN', 'invTotalInput') !== '累计采购/费用票据') reasons.push(`JP invTotalInput[zh-CN] should stay 累计采购/费用票据 (NON_CN_GENERIC), got "${helpers.getTaxLabel('JP', 'zh-CN', 'invTotalInput')}"`);
+    if (helpers.getTaxLabel('EU', 'zh-CN', 'invTotalInput') !== '累计采购与费用票据') reasons.push(`EU invTotalInput[zh-CN] should stay 累计采购与费用票据 (EU override), got "${helpers.getTaxLabel('EU', 'zh-CN', 'invTotalInput')}"`);
+    if (helpers.getTaxLabel('TW', 'zh-CN', 'invTotalInput') !== '累计采购/费用票据') reasons.push(`TW invTotalInput[zh-CN] should stay 累计采购/费用票据 (NON_CN_GENERIC), got "${helpers.getTaxLabel('TW', 'zh-CN', 'invTotalInput')}"`);
+    if (reasons.length) fail(`krInvoiceQuery`, reasons); else pass(`krInvoiceQuery`);
   }
 
   // ────────────────────────────────────────────────
