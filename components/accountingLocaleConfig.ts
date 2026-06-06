@@ -655,6 +655,23 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       uploadSubtitleSales:{ 'zh-CN': '自动提取日期、金额、客户及发票/凭证号码', 'zh-TW': '自動擷取日期、金額、客戶及發票/憑證號碼', en: 'Supports images or PDF, recognized by AI', ja: '画像またはPDFに対応、AIで自動認識', ko: '이미지 또는 PDF 지원, AI 자동 인식', fr: 'Images ou PDF, reconnaissance IA' },
       emptyPurchase:      { 'zh-CN': '暂无采购或费用记录，请上传发票、收据或凭证，或手动新增。', 'zh-TW': '暫無採購或費用記錄，請上傳發票、收據或憑證，或手動新增。', en: 'No purchase or expense records yet. Upload a receipt, bill or document, or add one manually.', ja: '仕入・経費の記録がありません。レシート・請求書・伝票をアップロードするか手動で追加してください。', ko: '매입/비용 기록이 없습니다. 영수증, 청구서, 전표를 업로드하거나 수동으로 추가하세요.', fr: 'Aucun achat/dépense. Téléversez un reçu, une facture ou ajoutez manuellement.' },
       emptySales:         { 'zh-CN': '暂无销售记录，请上传发票、收据或凭证，或手动新增。', 'zh-TW': '暫無銷售記錄，請上傳發票、收據或憑證，或手動新增。', en: 'No sales records yet. Upload a receipt, bill or document, or add one manually.', ja: '売上記録がありません。レシート・請求書・伝票をアップロードするか手動で追加してください。', ko: '매출 기록이 없습니다. 영수증, 청구서, 전표를 업로드하거나 수동으로 추가하세요.', fr: 'Aucune vente. Téléversez un reçu, une facture ou ajoutez manuellement.' },
+      // ── 票据查询 / 状态 / OCR：TW 用「凭证」语境（不把「票据」作通用主词）──
+      // zh-CN/zh-TW only; en/ja/ko/fr keep the NON_CN_GENERIC values (TW non-Chinese UI
+      // unchanged). CN/JP/EU/KR are not affected (these overrides live in the TW block).
+      invQueryTitle:      { 'zh-CN': '凭证查询', 'zh-TW': '憑證查詢', en: 'Document Search', ja: '伝票検索', ko: '문서 조회', fr: 'Recherche de pièces' },
+      scanningTitle:      { 'zh-CN': '正在分析凭证…', 'zh-TW': '正在分析憑證…', en: 'Analyzing document…', ja: '伝票を解析中…', ko: '문서 분석 중…', fr: 'Analyse du document…' },
+      invSearchPlaceholder:{ 'zh-CN': '搜索发票/凭证号码或往来单位...', 'zh-TW': '搜尋發票/憑證號碼或往來單位...', en: 'Search by document number or party...', ja: '伝票番号または取引先で検索...', ko: '문서 번호 또는 거래처로 검색...', fr: 'Rechercher par n° de pièce ou tiers...' },
+      invFilterAll:       { 'zh-CN': '全部凭证', 'zh-TW': '全部憑證', en: 'All Documents', ja: 'すべての伝票', ko: '전체 문서', fr: 'Toutes les pièces' },
+      invTableTitle:      { 'zh-CN': '凭证流转全景视图', 'zh-TW': '憑證流轉全景視圖', en: 'Document Flow Overview', ja: '伝票フロー全体ビュー', ko: '문서 흐름 개요', fr: "Vue d'ensemble des pièces" },
+      invTableSubtitle:   { 'zh-CN': '核对凭证流与库存/交易记录一致性', 'zh-TW': '核對憑證流與庫存/交易記錄一致性', en: 'Reconcile document flow with inventory / transaction records', ja: '伝票フローと在庫・取引記録の整合性を確認', ko: '문서 흐름과 재고/거래 기록의 일관성 확인', fr: 'Rapprocher les pièces avec les stocks / transactions' },
+      invHeaderInvoiceNo: { 'zh-CN': '发票/凭证号码', 'zh-TW': '發票/憑證號碼', en: 'Document #', ja: '伝票番号', ko: '문서 번호', fr: 'N° de pièce' },
+      invEmpty:           { 'zh-CN': '未找到匹配的凭证记录', 'zh-TW': '未找到匹配的憑證記錄', en: 'No matching documents found', ja: '一致する伝票が見つかりません', ko: '일치하는 문서가 없습니다', fr: 'Aucune pièce correspondante' },
+      invTotalInput:      { 'zh-CN': '累计采购/费用凭证', 'zh-TW': '累計採購/費用憑證', en: 'Total Purchase/Expense Documents', ja: '仕入・経費伝票数', ko: '매입/비용 문서 합계', fr: 'Total pièces achats/dépenses' },
+      invTotalOutput:     { 'zh-CN': '累计销售/收入凭证', 'zh-TW': '累計銷售/收入憑證', en: 'Total Sales/Revenue Documents', ja: '売上・収入伝票数', ko: '매출/수입 문서 합계', fr: 'Total pièces ventes/revenus' },
+      invStatusFilter:    { 'zh-CN': '凭证状态', 'zh-TW': '憑證狀態', en: 'Document Status', ja: '伝票ステータス', ko: '문서 상태', fr: 'Statut de la pièce' },
+      invStatusVerified:  { 'zh-CN': '已确认', 'zh-TW': '已確認', en: 'Verified', ja: '確認済み', ko: '확인됨', fr: 'Vérifié' },
+      invStatusPendingIssue:{ 'zh-CN': '待补凭证', 'zh-TW': '待補憑證', en: 'Awaiting Document', ja: '伝票待ち', ko: '문서 대기', fr: 'En attente de pièce' },
+      invStatusIssued:    { 'zh-CN': '已开立发票', 'zh-TW': '已開立發票', en: 'Issued', ja: '発行済み', ko: '발행됨', fr: 'Émis' },
       invoiceInputLabel: { 'zh-CN': '进项发票数', 'zh-TW': '進項發票數', en: 'Input Invoices', ja: '仕入請求書', ko: '매입계산서', fr: 'Factures achats' },
       invoiceOutputLabel: { 'zh-CN': '销项发票数', 'zh-TW': '銷項發票數', en: 'Output Invoices', ja: '売上請求書', ko: '매출계산서', fr: 'Factures ventes' },
       invoicePendingTax: { 'zh-CN': '待申报营业税', 'zh-TW': '待申報營業稅', en: 'Pending Business Tax', ja: '未申告営業税', ko: '미신고 영업세', fr: 'Taxe activité en attente' },
