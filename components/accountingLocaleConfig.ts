@@ -559,11 +559,14 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       setPerYear:         { 'zh-CN': '韩元/年', 'zh-TW': '韓元/年', en: 'KRW/yr', ja: 'ウォン/年', ko: '원/년', fr: 'KRW/an' },
       setTaxHint:         { 'zh-CN': '提示：VAT 标准 10%；法人税按利润计算。', 'zh-TW': '提示：VAT 標準 10%；法人稅按利潤計算。', en: 'Note: VAT 10% standard; corporate tax on profit.', ja: '注：VAT標準10%；法人税は利益に対して課税。', ko: '참고: 부가가치세 표준 10%; 법인세는 이익 기준.', fr: 'Note : TVA 10 % ; impôt sur les sociétés sur le bénéfice.' },
       taxTitle:      { 'zh-CN': '韩国 VAT 统计', 'zh-TW': '韓國 VAT 統計', en: 'Korean VAT Summary', ja: '韓国VAT集計', ko: '부가가치세 요약', fr: 'Résumé TVA (Corée)' },
-      inputTax:      { 'zh-CN': '进项 VAT', 'zh-TW': '進項 VAT', en: 'Input VAT', ja: '仕入VAT', ko: '매입세액', fr: 'TVA déductible' },
-      outputTax:     { 'zh-CN': '销项 VAT', 'zh-TW': '銷項 VAT', en: 'Output VAT', ja: '売上VAT', ko: '매출세액', fr: 'TVA collectée' },
+      // KR frames VAT cards as 采购/销售 (purchase/sales) rather than the CN/JP-VAT
+      // ledger 进项/销项. zh-CN/zh-TW only; en/ja/ko keep the standard accounting
+      // terms (ko: 매입세액/매출세액). Currency stays KRW (₩).
+      inputTax:      { 'zh-CN': '采购 VAT', 'zh-TW': '採購 VAT', en: 'Input VAT', ja: '仕入VAT', ko: '매입세액', fr: 'TVA déductible' },
+      outputTax:     { 'zh-CN': '销售 VAT', 'zh-TW': '銷售 VAT', en: 'Output VAT', ja: '売上VAT', ko: '매출세액', fr: 'TVA collectée' },
       estimatedTax:  { 'zh-CN': '预计应缴 VAT', 'zh-TW': '預計應繳 VAT', en: 'Estimated VAT Payable', ja: 'VAT推定納付額', ko: '예상 부가가치세 납부액', fr: 'TVA estimée à payer' },
-      certifiedInput:{ 'zh-CN': '可抵扣进项 VAT', 'zh-TW': '可抵扣進項 VAT', en: 'Deductible Input VAT', ja: '控除対象仕入VAT', ko: '공제 가능 매입세액', fr: 'TVA déductible certifiée' },
-      invoicedOutput:{ 'zh-CN': '已开票销项 VAT', 'zh-TW': '已開票銷項 VAT', en: 'Invoiced Output VAT', ja: '請求済み売上VAT', ko: '발행된 매출세액', fr: 'TVA collectée facturée' },
+      certifiedInput:{ 'zh-CN': '可抵扣采购 VAT', 'zh-TW': '可抵扣採購 VAT', en: 'Deductible Input VAT', ja: '控除対象仕入VAT', ko: '공제 가능 매입세액', fr: 'TVA déductible certifiée' },
+      invoicedOutput:{ 'zh-CN': '已开票销售 VAT', 'zh-TW': '已開票銷售 VAT', en: 'Invoiced Output VAT', ja: '請求済み売上VAT', ko: '발행된 매출세액', fr: 'TVA collectée facturée' },
       plRevenue:     { 'zh-CN': '营业收入', 'zh-TW': '營業收入', en: 'Revenue', ja: '売上', ko: '매출', fr: 'Chiffre d\'affaires' },
       plCost:        { 'zh-CN': '营业成本', 'zh-TW': '營業成本', en: 'Cost of Sales', ja: '売上原価', ko: '매출원가', fr: 'Coût des ventes' },
       plGrossProfit: { 'zh-CN': '毛利', 'zh-TW': '毛利', en: 'Gross Profit', ja: '売上総利益', ko: '매출총이익', fr: 'Marge brute' },
@@ -580,7 +583,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       invoiceTypeOutput: { 'zh-CN': '销售', 'zh-TW': '銷售', en: 'Sales', ja: '売上', ko: '매출', fr: 'Vente' },
       invoiceTypeInput: { 'zh-CN': '采购', 'zh-TW': '採購', en: 'Purchase', ja: '仕入', ko: '매입', fr: 'Achat' },
       inventoryUnit: { 'zh-CN': '单位', 'zh-TW': '單位', en: 'units', ja: '単位', ko: '단위', fr: 'unités' },
-      taxSummaryTitle:{ 'zh-CN': '韩国 VAT 含税汇总（对账用）', 'zh-TW': '韓國 VAT 含稅匯總（對帳用）', en: 'Korean VAT-Inclusive Summary (Reconciliation)', ja: '韓国VAT税込集計（照合用）', ko: '한국 부가가치세 포함 요약 (대조용)', fr: 'Résumé TTC TVA Corée (rapprochement)' },
+      taxSummaryTitle:{ 'zh-CN': '韩国 VAT 含税汇总（对账用）', 'zh-TW': '韓國 VAT 含稅彙總（對帳用）', en: 'Korean VAT-Inclusive Summary (Reconciliation)', ja: '韓国VAT税込集計（照合用）', ko: '한국 부가가치세 포함 요약 (대조용)', fr: 'Résumé TTC TVA Corée (rapprochement)' },
       purchaseTotal: { 'zh-CN': '采购含税总额', 'zh-TW': '採購含稅總額', en: 'Purchase Total (Incl. VAT)', ja: '仕入VAT込合計', ko: '매입 세금포함 총액', fr: 'Total achats TTC' },
       salesTotal:    { 'zh-CN': '销售含税总额', 'zh-TW': '銷售含稅總額', en: 'Sales Total (Incl. VAT)', ja: '売上VAT込合計', ko: '매출 세금포함 총액', fr: 'Total ventes TTC' },
       taxDifference: { 'zh-CN': 'VAT 差额', 'zh-TW': 'VAT 差額', en: 'VAT Difference', ja: 'VAT差額', ko: '부가가치세 차액', fr: 'Différence TVA' },

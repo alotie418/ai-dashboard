@@ -1234,6 +1234,55 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0s: KR dashboard tax section + AI briefing wording.
+  //   KR accountingLocale uses Korean VAT wording in Chinese (韩国 VAT 统计 / 采购 VAT
+  //   / 销售 VAT), NOT the CN/JP-VAT ledger 进项/销项 nor 消费税. Under zh-CN/zh-TW the
+  //   经营看板 tax cards (VATStatistics) + tax-inclusive summary (TaxInclusiveSummary)
+  //   are pinned, and the AI briefing prompt (buildAIFinanceContext) steers the same
+  //   wording. Money stays KRW (₩) — ban 人民币/CNY/欧元/EUR/€/日元/JPY/美元/USD. CN/JP/
+  //   EU/US口径 are guarded the other way.
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const KR_PIN = {
+      'zh-CN': {
+        taxTitle: '韩国 VAT 统计', inputTax: '采购 VAT', outputTax: '销售 VAT',
+        certifiedInput: '可抵扣采购 VAT', invoicedOutput: '已开票销售 VAT', estimatedTax: '预计应缴 VAT',
+        taxSummaryTitle: '韩国 VAT 含税汇总（对账用）', purchaseTotal: '采购含税总额', salesTotal: '销售含税总额', taxDifference: 'VAT 差额',
+      },
+      'zh-TW': {
+        taxTitle: '韓國 VAT 統計', inputTax: '採購 VAT', outputTax: '銷售 VAT',
+        certifiedInput: '可抵扣採購 VAT', invoicedOutput: '已開票銷售 VAT', estimatedTax: '預計應繳 VAT',
+        taxSummaryTitle: '韓國 VAT 含稅彙總（對帳用）', purchaseTotal: '採購含稅總額', salesTotal: '銷售含稅總額', taxDifference: 'VAT 差額',
+      },
+    };
+    const KR_DASH_TAX_KEYS = Object.keys(KR_PIN['zh-CN']);
+    const KR_TAX_BAN = /进项|進項|销项|銷項|增值税|增值稅|消费税|消費稅|Sales Tax|人民币|人民幣|CNY|欧元|歐元|EUR|€|日元|日圓|JPY|美元|USD|\$/;
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      for (const [key, want] of Object.entries(KR_PIN[lang])) {
+        const got = helpers.getTaxLabel('KR', lang, key);
+        if (got !== want) reasons.push(`KR ${key}[${lang}] should be "${want}", got "${got}"`);
+      }
+      for (const key of KR_DASH_TAX_KEYS) {
+        const v = helpers.getTaxLabel('KR', lang, key);
+        if (typeof v === 'string' && KR_TAX_BAN.test(v)) reasons.push(`KR ${key}[${lang}] uses 进项/销项/消费税/non-KRW currency: "${v}"`);
+      }
+      // AI briefing prompt: steers 采购/销售 VAT, never 进项/销项/增值税/消费税
+      const ctx = helpers.buildAIFinanceContext('KR', lang);
+      const wantIn = lang === 'zh-CN' ? '采购 VAT' : '採購 VAT';
+      const wantOut = lang === 'zh-CN' ? '销售 VAT' : '銷售 VAT';
+      if (!ctx.includes(wantIn) || !ctx.includes(wantOut)) reasons.push(`KR AI context[${lang}] should steer 采购/销售 VAT wording`);
+      if (/进项|進項|销项|銷項|增值税|增值稅|消费税|消費稅/.test(ctx)) reasons.push(`KR AI context[${lang}] must not contain CN-VAT/JP wording: "${ctx}"`);
+    }
+    // reverse guards: CN/JP/EU/US口径 unchanged; AI directive does not leak to CN
+    if (helpers.getTaxLabel('CN', 'zh-CN', 'inputTax') !== '累计进项税额') reasons.push(`CN inputTax[zh-CN] should stay 累计进项税额`);
+    if (!/消费税/.test(helpers.getTaxLabel('JP', 'zh-CN', 'inputTax'))) reasons.push(`JP inputTax[zh-CN] should keep 消费税`);
+    if (helpers.getTaxLabel('EU', 'zh-CN', 'inputTax') !== '采购 VAT') reasons.push(`EU inputTax[zh-CN] should stay 采购 VAT`);
+    if (/采购 VAT|销售 VAT/.test(helpers.buildAIFinanceContext('CN', 'zh-CN'))) reasons.push(`CN AI context should not carry KR VAT directive`);
+    if (reasons.length) fail(`krDashboardVat`, reasons); else pass(`krDashboardVat`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G0f: Non-CN generic business taxConcepts (PR-A shared base).
   //   The nav / page-title / upload / table-header / modal / button / empty /
   //   invoice-query-basics labels must be present for every non-CN locale
