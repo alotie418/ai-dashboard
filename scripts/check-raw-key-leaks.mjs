@@ -214,6 +214,34 @@ async function checkInvoiceKeyResolution() {
   }
 }
 
+// Money inputs render the currency symbol as an absolutely-positioned prefix
+// (<span ...>{currSym}</span>) over the input. The input must reserve enough
+// left padding for the symbol via the dynamic `moneyPad` class, otherwise a
+// multi-char symbol (NT$) overlaps the placeholder/value. Guard: every
+// currency-prefixed money input must use ${moneyPad}, and moneyPad must be defined.
+async function checkMoneyInputPadding() {
+  const files = ['components/PurchaseAndInputPage.tsx', 'components/SalesAndOutputPage.tsx'];
+  for (const file of files) {
+    let src;
+    try { src = await readFile(join(ROOT, file), 'utf8'); } catch { continue; }
+    const prefixCount = (src.match(/\{currSym\}<\/span>/g) || []).length;
+    if (prefixCount === 0) continue;
+    if (!/const moneyPad\s*=/.test(src)) {
+      findings.push({
+        file, line: 0, type: 'money-input-padding', token: 'moneyPad',
+        snippet: `${prefixCount} currency-prefixed money input(s) but no dynamic moneyPad padding defined (NT$ would overlap the placeholder)`,
+      });
+    }
+    const padCount = (src.match(/\$\{moneyPad\}/g) || []).length;
+    if (padCount < prefixCount) {
+      findings.push({
+        file, line: 0, type: 'money-input-padding', token: 'moneyPad',
+        snippet: `${prefixCount} currency-prefixed money input(s) but only ${padCount} use the dynamic moneyPad left-padding (a money input may overlap its currency prefix)`,
+      });
+    }
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -223,6 +251,7 @@ async function main() {
     }
   }
   await checkInvoiceKeyResolution();
+  await checkMoneyInputPadding();
 
   console.log(`\n=== Raw Key Leak Scanner ===\n`);
   console.log(`Scanned: ${SCAN_DIRS.join(', ')}`);
