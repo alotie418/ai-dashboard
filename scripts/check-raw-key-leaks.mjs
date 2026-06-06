@@ -242,6 +242,22 @@ async function checkMoneyInputPadding() {
   }
 }
 
+// The inventory/quantity unit (product_unit) must be in the settings allowlist,
+// otherwise it is filtered out on read and the dashboard/inventory cards always
+// fall back to the generic 单位 instead of the configured unit (吨/袋/公斤…). The
+// frontend already resolves it dynamically via getInventoryUnitLabel(productUnit).
+async function checkProductUnitSetting() {
+  let src;
+  try { src = await readFile(join(ROOT, 'electron/handlers/settings.js'), 'utf8'); } catch { return; }
+  if (/SETTINGS_ALLOWED_KEYS/.test(src) && !/['"]product_unit['"]/.test(src)) {
+    findings.push({
+      file: 'electron/handlers/settings.js', line: 0, type: 'settings-allowlist',
+      token: 'product_unit',
+      snippet: 'product_unit missing from SETTINGS_ALLOWED_KEYS — inventory cards would always fall back to the generic 单位 instead of the configured unit',
+    });
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -252,6 +268,7 @@ async function main() {
   }
   await checkInvoiceKeyResolution();
   await checkMoneyInputPadding();
+  await checkProductUnitSetting();
 
   console.log(`\n=== Raw Key Leak Scanner ===\n`);
   console.log(`Scanned: ${SCAN_DIRS.join(', ')}`);

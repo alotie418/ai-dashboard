@@ -49,7 +49,7 @@ const TAX_RATE_OPTIONS: Record<string, { value: string; labelKey: string }[]> = 
 const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
   const { t, i18n } = useTranslation();
   const [accLocale, setAccLocale] = useState('CN');
-  const [productUnit, setProductUnit] = useState<string>('unit');
+  const [productUnit, setProductUnit] = useState<string>('ton');
   useEffect(() => {
     fetchSettings().then((s: any) => {
       if (s?.accounting_locale) setAccLocale(s.accounting_locale);

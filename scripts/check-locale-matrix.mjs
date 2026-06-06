@@ -1608,7 +1608,7 @@ async function main() {
       'uploadTitle', 'uploadTitleSales', 'uploadSubtitle', 'uploadSubtitleSales', 'headerInvoiceNo',
       'emptyPurchase', 'emptySales',
     ];
-    const TW_VOUCHER_BAN = /票据|票據|待票据|待票據|已核验|已核驗|已开票|已開票|账单或票据|帳單或票據/;
+    const TW_VOUCHER_BAN = /票据|票據|待票据|待票據|待凭证|待憑證|已核验|已核驗|已开票|已開票|账单或票据|帳單或票據/;
     for (const lang of ['zh-CN', 'zh-TW']) {
       for (const [k, want] of Object.entries(PIN[lang])) {
         const got = helpers.getTaxLabel('TW', lang, k);
