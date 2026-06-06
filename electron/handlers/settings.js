@@ -16,6 +16,7 @@ const SETTINGS_ALLOWED_KEYS = new Set([
   'income_tax_rate',       // 企业所得税率
   'currency',              // 'CNY' / 'USD' / 'JPY' ...
   'ui_language',           // 'zh-CN' / 'en' / ...（备份用，主存储仍是 localStorage）
+  'product_unit',          // 库存/数量单位：'unit'|'kg'|'ton'|'piece'|'box'|'bag'|'liter'（前端按此动态显示单位，未配置回退 'unit'→单位）
 ]);
 
 async function get() {
