@@ -1192,7 +1192,7 @@ async function main() {
     // reverse guards: JP/TW keep the shared slash form (EU override must not leak to them).
     // KR has its own invoice-query override (guarded in krInvoiceQuery), so it is not checked here.
     if (helpers.getTaxLabel('JP', 'zh-CN', 'invTotalInput') !== '累计采购/费用票据') reasons.push(`JP invTotalInput[zh-CN] should stay 累计采购/费用票据 (NON_CN_GENERIC), got "${helpers.getTaxLabel('JP', 'zh-CN', 'invTotalInput')}"`);
-    if (helpers.getTaxLabel('TW', 'zh-CN', 'invTotalInput') !== '累计采购/费用票据') reasons.push(`TW invTotalInput[zh-CN] should stay 累计采购/费用票据 (NON_CN_GENERIC), got "${helpers.getTaxLabel('TW', 'zh-CN', 'invTotalInput')}"`);
+    if (helpers.getTaxLabel('TW', 'zh-CN', 'invTotalInput') !== '累计采购/费用凭证') reasons.push(`TW invTotalInput[zh-CN] should stay 累计采购/费用凭证 (TW voucher override), got "${helpers.getTaxLabel('TW', 'zh-CN', 'invTotalInput')}"`);
     if (reasons.length) fail(`euInvoiceQuery`, reasons); else pass(`euInvoiceQuery`);
   }
 
@@ -1360,7 +1360,7 @@ async function main() {
     // reverse guards: JP/EU keep their own invoice-query wording (KR override must not leak)
     if (helpers.getTaxLabel('JP', 'zh-CN', 'invTotalInput') !== '累计采购/费用票据') reasons.push(`JP invTotalInput[zh-CN] should stay 累计采购/费用票据 (NON_CN_GENERIC), got "${helpers.getTaxLabel('JP', 'zh-CN', 'invTotalInput')}"`);
     if (helpers.getTaxLabel('EU', 'zh-CN', 'invTotalInput') !== '累计采购与费用票据') reasons.push(`EU invTotalInput[zh-CN] should stay 累计采购与费用票据 (EU override), got "${helpers.getTaxLabel('EU', 'zh-CN', 'invTotalInput')}"`);
-    if (helpers.getTaxLabel('TW', 'zh-CN', 'invTotalInput') !== '累计采购/费用票据') reasons.push(`TW invTotalInput[zh-CN] should stay 累计采购/费用票据 (NON_CN_GENERIC), got "${helpers.getTaxLabel('TW', 'zh-CN', 'invTotalInput')}"`);
+    if (helpers.getTaxLabel('TW', 'zh-CN', 'invTotalInput') !== '累计采购/费用凭证') reasons.push(`TW invTotalInput[zh-CN] should stay 累计采购/费用凭证 (TW voucher override), got "${helpers.getTaxLabel('TW', 'zh-CN', 'invTotalInput')}"`);
     if (reasons.length) fail(`krInvoiceQuery`, reasons); else pass(`krInvoiceQuery`);
   }
 
@@ -1537,10 +1537,12 @@ async function main() {
   // ────────────────────────────────────────────────
   {
     const reasons = [];
-    const PS_KEYS = ['headerInvoiceNo', 'uploadSubtitle', 'uploadSubtitleSales', 'emptyPurchase', 'emptySales'];
-    const PS_BAN = /票据号码|票據號碼|增值税|增值稅|进项|進項|销项|銷項|人民币|人民幣|CNY|RMB/;
+    const PS_KEYS = ['headerInvoiceNo', 'uploadTitle', 'uploadTitleSales', 'uploadSubtitle', 'uploadSubtitleSales', 'emptyPurchase', 'emptySales'];
+    // ban the generic 票据号码 / 账单或票据 framing + CN-VAT / non-TWD currency on these keys
+    const PS_BAN = /票据号码|票據號碼|账单或票据|帳單或票據|增值税|增值稅|进项|進項|销项|銷項|人民币|人民幣|CNY|RMB/;
     const PIN = { 'zh-CN': { headerInvoiceNo: '发票/凭证号码' }, 'zh-TW': { headerInvoiceNo: '發票/憑證號碼' } };
     const VOUCHER = /发票\/凭证|發票\/憑證/;
+    const HAS_INVOICE = /发票|發票/;
     for (const lang of ['zh-CN', 'zh-TW']) {
       for (const [k, want] of Object.entries(PIN[lang])) {
         const got = helpers.getTaxLabel('TW', lang, k);
@@ -1548,12 +1550,17 @@ async function main() {
       }
       for (const k of PS_KEYS) {
         const v = helpers.getTaxLabel('TW', lang, k);
-        if (typeof v === 'string' && PS_BAN.test(v)) reasons.push(`TW ${k}[${lang}] uses banned (票据号码/增值税/进项/销项/人民币/CNY/RMB) wording: "${v}"`);
+        if (typeof v === 'string' && PS_BAN.test(v)) reasons.push(`TW ${k}[${lang}] uses banned (票据号码/账单或票据/增值税/进项/销项/人民币/CNY/RMB) wording: "${v}"`);
       }
       // 发票/凭证 must surface in the document-number field + both upload subtitles
       for (const k of ['headerInvoiceNo', 'uploadSubtitle', 'uploadSubtitleSales']) {
         const v = helpers.getTaxLabel('TW', lang, k);
         if (!VOUCHER.test(v)) reasons.push(`TW ${k}[${lang}] should contain 发票/凭证: "${v}"`);
+      }
+      // the upload dropzone titles must reference 发票 (发票、收据或凭证), not 账单或票据
+      for (const k of ['uploadTitle', 'uploadTitleSales']) {
+        const v = helpers.getTaxLabel('TW', lang, k);
+        if (!HAS_INVOICE.test(v)) reasons.push(`TW ${k}[${lang}] should reference 发票 (发票、收据或凭证): "${v}"`);
       }
     }
     // reverse: JP/EU/KR keep the shared 票据号码 (TW override must not leak)
@@ -1561,6 +1568,61 @@ async function main() {
       if (helpers.getTaxLabel(loc, 'zh-CN', 'headerInvoiceNo') !== '票据号码') reasons.push(`${loc} headerInvoiceNo[zh-CN] should stay 票据号码, got "${helpers.getTaxLabel(loc, 'zh-CN', 'headerInvoiceNo')}"`);
     }
     if (reasons.length) fail(`twInvoiceVoucherWording`, reasons); else pass(`twInvoiceVoucherWording`);
+  }
+
+  // ────────────────────────────────────────────────
+  // PART G10: TW 凭证 wording (票据查询 / 状态 / OCR), zh-CN/zh-TW.
+  //   TW normalizes the mainland 票据 framing to 凭证 (凭证查询 / 全部凭证 / 凭证状态 /
+  //   凭证流转全景视图 / 未找到匹配的凭证记录), status 待票据→待补凭证, 已核验→已确认,
+  //   已开票→已开立发票, and the OCR/分类号码 use 凭证/发票. Bans 票据/待票据/已核验/
+  //   已开票/账单或票据 across the 票据查询 + 采购/销售 rendered keys (发票 is allowed).
+  //   zh-CN main text stays simplified. JP/EU/KR/CN keep their own wording.
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const PIN = {
+      'zh-CN': {
+        invQueryTitle: '凭证查询', invFilterAll: '全部凭证', invStatusFilter: '凭证状态',
+        invTableTitle: '凭证流转全景视图', invTableSubtitle: '核对凭证流与库存/交易记录一致性',
+        invEmpty: '未找到匹配的凭证记录', invHeaderInvoiceNo: '发票/凭证号码',
+        invSearchPlaceholder: '搜索发票/凭证号码或往来单位...', scanningTitle: '正在分析凭证…',
+        invTotalInput: '累计采购/费用凭证', invTotalOutput: '累计销售/收入凭证',
+        invStatusVerified: '已确认', invStatusPendingIssue: '待补凭证', invStatusIssued: '已开立发票',
+      },
+      'zh-TW': {
+        invQueryTitle: '憑證查詢', invFilterAll: '全部憑證', invStatusFilter: '憑證狀態',
+        invTableTitle: '憑證流轉全景視圖', invTableSubtitle: '核對憑證流與庫存/交易記錄一致性',
+        invEmpty: '未找到匹配的憑證記錄', invHeaderInvoiceNo: '發票/憑證號碼',
+        invSearchPlaceholder: '搜尋發票/憑證號碼或往來單位...', scanningTitle: '正在分析憑證…',
+        invTotalInput: '累計採購/費用憑證', invTotalOutput: '累計銷售/收入憑證',
+        invStatusVerified: '已確認', invStatusPendingIssue: '待補憑證', invStatusIssued: '已開立發票',
+      },
+    };
+    // all 票据查询 + 采购/销售 rendered keys — none may carry 票据/待票据/已核验/已开票
+    const TW_VOUCHER_KEYS = [
+      'invQueryTitle', 'invSearchPlaceholder', 'invFilterAll', 'invFilterInput', 'invFilterOutput',
+      'invTableTitle', 'invTableSubtitle', 'invHeaderInvoiceNo', 'invHeaderDate', 'invHeaderWeight',
+      'invHeaderAmount', 'invEmpty', 'invTotalInput', 'invTotalOutput', 'invPendingTax', 'invPendingTaxSub',
+      'invStatusFilter', 'invStatusAll', 'invStatusVerified', 'invStatusCertified', 'invStatusDeducted',
+      'invStatusPendingCert', 'invStatusPendingIssue', 'invStatusIssued', 'scanningTitle', 'scanningSubtitle',
+      'uploadTitle', 'uploadTitleSales', 'uploadSubtitle', 'uploadSubtitleSales', 'headerInvoiceNo',
+      'emptyPurchase', 'emptySales',
+    ];
+    const TW_VOUCHER_BAN = /票据|票據|待票据|待票據|已核验|已核驗|已开票|已開票|账单或票据|帳單或票據/;
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      for (const [k, want] of Object.entries(PIN[lang])) {
+        const got = helpers.getTaxLabel('TW', lang, k);
+        if (got !== want) reasons.push(`TW ${k}[${lang}] should be "${want}", got "${got}"`);
+      }
+      for (const k of TW_VOUCHER_KEYS) {
+        const v = helpers.getTaxLabel('TW', lang, k);
+        if (typeof v === 'string' && TW_VOUCHER_BAN.test(v)) reasons.push(`TW ${k}[${lang}] uses banned 票据/待票据/已核验/已开票/账单或票据 wording (use 凭证/发票): "${v}"`);
+      }
+    }
+    // reverse: JP keeps NON_CN_GENERIC 票据 wording (TW 凭证 override must not leak)
+    if (helpers.getTaxLabel('JP', 'zh-CN', 'invQueryTitle') !== '票据查询') reasons.push(`JP invQueryTitle[zh-CN] should stay 票据查询, got "${helpers.getTaxLabel('JP', 'zh-CN', 'invQueryTitle')}"`);
+    if (helpers.getTaxLabel('JP', 'zh-CN', 'invFilterAll') !== '全部票据') reasons.push(`JP invFilterAll[zh-CN] should stay 全部票据, got "${helpers.getTaxLabel('JP', 'zh-CN', 'invFilterAll')}"`);
+    if (reasons.length) fail(`twVoucherWording`, reasons); else pass(`twVoucherWording`);
   }
 
   // ────────────────────────────────────────────────
