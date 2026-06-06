@@ -1455,6 +1455,54 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G0x: TW dashboard business-tax section (经营看板 营业税 + P&L).
+  //   TW accountingLocale uses Taiwan 营业税 wording (台湾营业税统计 / 采购进项营业税 /
+  //   销售销项营业税 / 营利事业所得税). 进项/销项 ARE allowed for TW (本地营业税口径);
+  //   what's banned is 增值税 / 消费税 / VAT / Sales Tax / 进项·销项 VAT and any
+  //   non-TWD currency, plus 营利事业所得 without the trailing 税. Under zh-CN the main
+  //   text must be simplified Chinese. Money stays NT$. CN/JP/EU/KR/US guarded the
+  //   other way.
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const cfgTW = config.getAccountingLocale('TW');
+    const TW_PIN = {
+      'zh-CN': {
+        taxTitle: '台湾营业税统计', inputTax: '采购进项营业税', outputTax: '销售销项营业税',
+        certifiedInput: '可抵扣采购进项营业税', invoicedOutput: '已开票销售销项营业税', estimatedTax: '预计应缴营业税',
+        taxSummaryTitle: '台湾营业税含税汇总（对账用）', purchaseTotal: '采购含税总额', salesTotal: '销售含税总额', taxDifference: '营业税差额',
+        plIncomeTax: '营利事业所得税', plRevenue: '销售收入', plCost: '销货成本', plAdmin: '管理费用',
+      },
+      'zh-TW': {
+        taxTitle: '台灣營業稅統計', inputTax: '採購進項營業稅', outputTax: '銷售銷項營業稅',
+        certifiedInput: '可抵扣採購進項營業稅', invoicedOutput: '已開票銷售銷項營業稅', estimatedTax: '預計應繳營業稅',
+        taxSummaryTitle: '台灣營業稅含稅匯總（對帳用）', purchaseTotal: '採購含稅總額', salesTotal: '銷售含稅總額', taxDifference: '營業稅差額',
+        plIncomeTax: '營利事業所得稅', plRevenue: '銷售收入', plCost: '銷貨成本', plAdmin: '管理費用',
+      },
+    };
+    // 进项/销项 (plain) are allowed for TW; ban only the VAT-suffixed / other-regime
+    // forms, non-TWD currency, and 营利事业所得 without 税.
+    const TW_BAN = /增值税|增值稅|消费税|消費稅|VAT|Sales Tax|人民币|人民幣|CNY|欧元|歐元|EUR|€|日元|日圓|JPY|韩元|韓元|KRW|₩|美元|USD|\$|营利事业所得(?!税)|營利事業所得(?!稅)/;
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      for (const [key, want] of Object.entries(TW_PIN[lang])) {
+        const got = helpers.getTaxLabel('TW', lang, key);
+        if (got !== want) reasons.push(`TW ${key}[${lang}] should be "${want}", got "${got}"`);
+      }
+      // ban wrong口径 / non-TWD currency / 营利事业所得-without-税 across ALL TW taxConcepts
+      for (const [key, labels] of Object.entries(cfgTW.taxConcepts)) {
+        const v = labels[lang];
+        if (typeof v === 'string' && TW_BAN.test(v)) reasons.push(`TW ${key}[${lang}] uses banned (增值税/消费税/VAT/Sales Tax/non-TWD/营利事业所得-without-税) wording: "${v}"`);
+      }
+    }
+    // reverse guards: other regimes keep their own口径 (TW changes must not leak)
+    if (helpers.getTaxLabel('CN', 'zh-CN', 'inputTax') !== '累计进项税额') reasons.push(`CN inputTax[zh-CN] should stay 累计进项税额`);
+    if (!/消费税/.test(helpers.getTaxLabel('JP', 'zh-CN', 'inputTax'))) reasons.push(`JP inputTax[zh-CN] should keep 消费税`);
+    if (helpers.getTaxLabel('EU', 'zh-CN', 'inputTax') !== '采购 VAT') reasons.push(`EU inputTax[zh-CN] should stay 采购 VAT`);
+    if (helpers.getTaxLabel('KR', 'zh-CN', 'inputTax') !== '采购 VAT') reasons.push(`KR inputTax[zh-CN] should stay 采购 VAT`);
+    if (reasons.length) fail(`twDashboardBusinessTax`, reasons); else pass(`twDashboardBusinessTax`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G0f: Non-CN generic business taxConcepts (PR-A shared base).
   //   The nav / page-title / upload / table-header / modal / button / empty /
   //   invoice-query-basics labels must be present for every non-CN locale
