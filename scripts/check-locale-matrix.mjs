@@ -1626,6 +1626,41 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G11: TW 应收应付 (AccountsPage) wording.
+  //   TW uses 帐龄 (not the mainland 账龄) and tab-specific 未收款/未付款明细 +
+  //   所有应收/应付款项已结清. Pins the TW acct* keys (zh-CN/zh-TW) and bans 账龄/帳齡
+  //   on the aging title. CN/EU/JP/KR keep the shared accounts.* i18n (guarded below).
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const PIN = {
+      'zh-CN': {
+        acctAgingTitle: '帐龄分析', acctDetailsReceivable: '未收款明细', acctDetailsPayable: '未付款明细',
+        acctAllClearedReceivable: '所有应收款项已结清', acctAllClearedPayable: '所有应付款项已结清',
+      },
+      'zh-TW': {
+        acctAgingTitle: '帳齡分析', acctDetailsReceivable: '未收款明細', acctDetailsPayable: '未付款明細',
+        acctAllClearedReceivable: '所有應收款項已結清', acctAllClearedPayable: '所有應付款項已結清',
+      },
+    };
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      for (const [k, want] of Object.entries(PIN[lang])) {
+        const got = helpers.getTaxLabel('TW', lang, k);
+        if (got !== want) reasons.push(`TW ${k}[${lang}] should be "${want}", got "${got}"`);
+      }
+      // TW aging title must use 帐龄/帳齡, never the mainland 账龄
+      const aging = helpers.getTaxLabel('TW', lang, 'acctAgingTitle');
+      if (/账龄/.test(aging)) reasons.push(`TW acctAgingTitle[${lang}] should use 帐龄/帳齡, not 账龄: "${aging}"`);
+    }
+    // reverse: CN keeps the shared accounts.* i18n (mainland 账龄 / 未结清明细 / 所有款项已结清)
+    const cn = locales['zh-CN'];
+    if (get(cn, 'accounts.agingTitle') !== '账龄分析') reasons.push(`CN accounts.agingTitle should stay 账龄分析, got "${get(cn, 'accounts.agingTitle')}"`);
+    if (get(cn, 'accounts.details') !== '未结清明细') reasons.push(`CN accounts.details should stay 未结清明细, got "${get(cn, 'accounts.details')}"`);
+    if (get(cn, 'accounts.allCleared') !== '所有款项已结清') reasons.push(`CN accounts.allCleared should stay 所有款项已结清, got "${get(cn, 'accounts.allCleared')}"`);
+    if (reasons.length) fail(`twAccountsWording`, reasons); else pass(`twAccountsWording`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G0f: Non-CN generic business taxConcepts (PR-A shared base).
   //   The nav / page-title / upload / table-header / modal / button / empty /
   //   invoice-query-basics labels must be present for every non-CN locale

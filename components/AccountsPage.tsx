@@ -65,6 +65,11 @@ const AccountsPage: React.FC = () => {
   // taxConcept when accLocale !== 'CN', else the default i18n value (CN keeps its
   // China-GAAP wording untouched).
   const localeLabel = (taxKey: string, i18nKey: string) => accLocale !== 'CN' ? getTaxLabel(accLocale, i18n.language, taxKey) : t(i18nKey);
+  // TW accountingLocale + Chinese UI: AR/AP page uses 帐龄 (not 账龄) and tab-specific
+  // 未收款/未付款明细 + 所有应收/应付款项已结清. Other locales / non-Chinese UI keep the
+  // shared accounts.* i18n unchanged.
+  const twZh = accLocale === 'TW' && (i18n.language === 'zh-CN' || i18n.language === 'zh-TW');
+  const twAcct = (taxKey: string, i18nKey: string) => twZh ? getTaxLabel(accLocale, i18n.language, taxKey) : t(i18nKey);
 
   const data = activeTab === 'receivable' ? receivables : payables;
   const agingData = data ? [
@@ -136,7 +141,7 @@ const AccountsPage: React.FC = () => {
             {/* Aging Analysis */}
             <div className="bg-white rounded-xl p-5 border border-[#e0ddd5]">
               <h4 className="text-sm font-bold text-[#191918] mb-4">
-                <i className="fas fa-chart-bar mr-2 text-[#d97757]"></i>{t('accounts.agingTitle')}
+                <i className="fas fa-chart-bar mr-2 text-[#d97757]"></i>{twAcct('acctAgingTitle', 'accounts.agingTitle')}
               </h4>
               {agingData.some(d => d.amount > 0) ? (
                 <ResponsiveContainer width="100%" height={200}>
@@ -181,7 +186,7 @@ const AccountsPage: React.FC = () => {
           <div className="bg-white rounded-xl border border-[#e0ddd5] overflow-hidden">
             <div className="px-5 py-3 border-b border-[#e0ddd5] flex items-center justify-between">
               <h4 className="text-sm font-bold text-[#191918]">
-                <i className="fas fa-list-alt mr-2 text-[#d97757]"></i>{t('accounts.details')}
+                <i className="fas fa-list-alt mr-2 text-[#d97757]"></i>{twAcct(activeTab === 'receivable' ? 'acctDetailsReceivable' : 'acctDetailsPayable', 'accounts.details')}
               </h4>
               <span className="text-xs text-[#7a7a78]">{t('accounts.count')} {details.length} {t('accounts.unit')}</span>
             </div>
@@ -246,7 +251,7 @@ const AccountsPage: React.FC = () => {
               <div className="flex items-center justify-center py-16 text-[#7a7a78]">
                 <div className="text-center">
                   <i className="fas fa-check-circle text-3xl text-green-400 mb-2"></i>
-                  <p className="text-sm">{t('accounts.allCleared')}</p>
+                  <p className="text-sm">{twAcct(activeTab === 'receivable' ? 'acctAllClearedReceivable' : 'acctAllClearedPayable', 'accounts.allCleared')}</p>
                 </div>
               </div>
             )}
