@@ -672,6 +672,14 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       invStatusVerified:  { 'zh-CN': '已确认', 'zh-TW': '已確認', en: 'Verified', ja: '確認済み', ko: '확인됨', fr: 'Vérifié' },
       invStatusPendingIssue:{ 'zh-CN': '待补凭证', 'zh-TW': '待補憑證', en: 'Awaiting Document', ja: '伝票待ち', ko: '문서 대기', fr: 'En attente de pièce' },
       invStatusIssued:    { 'zh-CN': '已开立发票', 'zh-TW': '已開立發票', en: 'Issued', ja: '発行済み', ko: '발행됨', fr: 'Émis' },
+      // ── 应收应付 (AccountsPage) TW wording ── 帐龄 (not 账龄) + tab-specific 明细/空状态.
+      // Applied only for TW + zh-CN/zh-TW (component gates on accLocale==='TW' && zh);
+      // en/ja/ko/fr are present for safety but unused (TW non-Chinese UI keeps i18n).
+      acctAgingTitle:          { 'zh-CN': '帐龄分析', 'zh-TW': '帳齡分析', en: 'Aging Analysis', ja: 'エイジング分析', ko: '채권 연령 분석', fr: "Analyse d'ancienneté" },
+      acctDetailsReceivable:   { 'zh-CN': '未收款明细', 'zh-TW': '未收款明細', en: 'Outstanding Receivables', ja: '未収金明細', ko: '미수금 내역', fr: 'Créances en attente' },
+      acctDetailsPayable:      { 'zh-CN': '未付款明细', 'zh-TW': '未付款明細', en: 'Outstanding Payables', ja: '未払金明細', ko: '미지급금 내역', fr: 'Dettes en attente' },
+      acctAllClearedReceivable:{ 'zh-CN': '所有应收款项已结清', 'zh-TW': '所有應收款項已結清', en: 'All receivables settled', ja: '売掛金はすべて回収済み', ko: '모든 미수금 정산 완료', fr: 'Toutes les créances réglées' },
+      acctAllClearedPayable:   { 'zh-CN': '所有应付款项已结清', 'zh-TW': '所有應付款項已結清', en: 'All payables settled', ja: '買掛金はすべて支払済み', ko: '모든 미지급금 정산 완료', fr: 'Toutes les dettes réglées' },
       invoiceInputLabel: { 'zh-CN': '进项发票数', 'zh-TW': '進項發票數', en: 'Input Invoices', ja: '仕入請求書', ko: '매입계산서', fr: 'Factures achats' },
       invoiceOutputLabel: { 'zh-CN': '销项发票数', 'zh-TW': '銷項發票數', en: 'Output Invoices', ja: '売上請求書', ko: '매출계산서', fr: 'Factures ventes' },
       invoicePendingTax: { 'zh-CN': '待申报营业税', 'zh-TW': '待申報營業稅', en: 'Pending Business Tax', ja: '未申告営業税', ko: '미신고 영업세', fr: 'Taxe activité en attente' },
