@@ -20,7 +20,7 @@ const TaxInclusiveSummary: React.FC<Props> = ({ data, accountingLocale = 'CN' })
     <div className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl overflow-hidden flex flex-col h-full" style={{boxShadow: '0 4px 24px rgba(0,0,0,0.06)'}}>
       <div className="p-6 border-b border-[#e0ddd5] flex items-center space-x-3">
         <i className="fas fa-balance-scale text-lg text-emerald-400"></i>
-        <h3 className="text-lg font-bold text-[#191918]">{label('taxSummaryTitle')}</h3>
+        <h3 className="text-lg font-bold text-[#191918] whitespace-nowrap">{label('taxSummaryTitle')}</h3>
       </div>
       <div className="flex-1 flex flex-col">
         <div className="px-6 py-5 space-y-5">

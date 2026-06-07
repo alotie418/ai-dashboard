@@ -246,7 +246,7 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
                 <LineItem label={localeLabel('balTaxPayLabel', 'finance.balanceTaxPayable')} value={0.0} />
                 <div className="border-t border-[#e0ddd5] my-4"></div>
                 <LineItem label={t('finance.balanceTotalLiabilities')} value={0.0} bold />
-                <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2 mt-4">{t('finance.balanceEquity')}</h4>
+                <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2 mt-4">{localeLabel('balEquityHeader', 'finance.balanceEquity')}</h4>
                 <LineItem label={localeLabel('balPaidInCapital', 'finance.balancePaidInCapital')} value={0.0} />
                 <LineItem label={localeLabel('balRetainedEarnings', 'finance.balanceRetainedEarnings')} value={0.0} />
                 <div className="border-t border-[#e0ddd5] my-4"></div>
@@ -372,7 +372,7 @@ const GenericPL: React.FC<{
         <div className="border-t border-[#e0ddd5] pt-6 space-y-1">
           <h3 className="text-lg font-bold text-[#191918] mb-4 flex items-center">
             <i className="fas fa-balance-scale mr-3 text-emerald-400"></i>
-            {lbl('taxSummaryTitle')}
+            <span className="whitespace-nowrap">{lbl('taxSummaryTitle')}</span>
           </h3>
           <LineItem label={lbl('purchaseTotal')} value={fmt(taxIncSummary.purchaseTotal || 0)} />
           <LineItem label={lbl('salesTotal')} value={fmt(taxIncSummary.salesTotal || 0)} />
