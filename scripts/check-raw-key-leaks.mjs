@@ -283,6 +283,43 @@ async function checkTaxSummaryTitleNoBreak() {
   }
 }
 
+async function checkTransactionSummaryMoney() {
+  // The 收支记录 summary cards (total income / expense / net) must use the
+  // locale-aware money formatter (formatMoney → TW NT$0.00), not a bare number.
+  let src;
+  try { src = await readFile(join(ROOT, 'components/TransactionsPage.tsx'), 'utf8'); } catch { return; }
+  if (!/formatMoney/.test(src)) {
+    findings.push({
+      file: 'components/TransactionsPage.tsx', line: 0, type: 'txn-summary-money', token: 'formatMoney',
+      snippet: 'TransactionsPage summary totals must use formatMoney (locale currency, e.g. TW NT$0.00) — formatMoney not imported/used',
+    });
+    return;
+  }
+  for (const field of ['summary.income.total', 'summary.expense.total', 'summary.net']) {
+    if (new RegExp(`fmt\\(${field.replace(/\./g, '\\.')}\\)`).test(src)) {
+      findings.push({
+        file: 'components/TransactionsPage.tsx', line: 0, type: 'txn-summary-money', token: field,
+        snippet: `${field} still uses bare fmt() — summary totals must use the locale-aware money() formatter (TW NT$0.00)`,
+      });
+    }
+  }
+}
+
+async function checkNoAutoAIAnalysis() {
+  // The AI business briefing (performAnalysis) must NOT auto-run on mount / navigation /
+  // HMR — it depends on assistantAccLocale (refreshed per page change) and the UI
+  // language, so an auto useEffect hammers the default provider and spams Gemini 429.
+  // AI must be user-triggered (AIInsights onRefresh button).
+  let src;
+  try { src = await readFile(join(ROOT, 'App.tsx'), 'utf8'); } catch { return; }
+  if (/useEffect\(\s*\(\)\s*=>\s*\{\s*performAnalysis\(\)\s*;?\s*\}\s*,\s*\[\s*performAnalysis\s*\]\s*\)/.test(src)) {
+    findings.push({
+      file: 'App.tsx', line: 0, type: 'ai-auto-invoke', token: 'performAnalysis',
+      snippet: 'performAnalysis() auto-runs in a useEffect — AI must be user-triggered (avoids Gemini 429 spam on mount/navigation/HMR)',
+    });
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -295,6 +332,8 @@ async function main() {
   await checkMoneyInputPadding();
   await checkProductUnitSetting();
   await checkTaxSummaryTitleNoBreak();
+  await checkTransactionSummaryMoney();
+  await checkNoAutoAIAnalysis();
 
   console.log(`\n=== Raw Key Leak Scanner ===\n`);
   console.log(`Scanned: ${SCAN_DIRS.join(', ')}`);

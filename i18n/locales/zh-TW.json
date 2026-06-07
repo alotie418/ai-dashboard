@@ -279,7 +279,7 @@
     "month10": "10月",
     "month11": "11月",
     "month12": "12月",
-    "yearLabel": "{{year}} 年度",
+    "yearLabel": "{{year}} 年",
     "quarterLabel": "第{{n}}季度"
   },
   "chat": {

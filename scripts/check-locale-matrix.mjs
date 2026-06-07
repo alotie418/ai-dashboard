@@ -1455,6 +1455,92 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G13: TW transaction page (收支记录) wording.
+  //   Under TW accountingLocale + zh-CN/zh-TW UI: (a) the table headers read the formal
+  //   类别 / 会计科目 / 付款状态·收款状态 (taxConcepts txnCategoryHeader / txnScheduleHeader /
+  //   txnPaymentStatusHeader / txnReceiptStatusHeader), never 报表行 / 对应报表行 / 状态;
+  //   (b) the category dropdown shows `displayLabel → schedule_line` via
+  //   TW_TXN_CATEGORY_LABELS in 中文冒号 format (损益表：… / 税务：…) — NEVER the
+  //   half-width-hyphen seed form (损益表-…); (c) 营业税 → 税务：营业税 and 营利事业所得税 →
+  //   税务：营利事业所得税 are 税务 filing lines, NOT 损益表 lines. No CN-VAT / non-TWD /
+  //   营利事业所得-without-税. UI stays Simplified. CN i18n (报表行 / 对应报表行 / 状态) and
+  //   the global header year label ({{year}} 年, no 年度) are guarded too.
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const M = config.TW_TXN_CATEGORY_LABELS || {};
+    const REQUIRED_SLUGS = ['sales', 'other', 'cogs', 'selling', 'admin', 'rd', 'business-tax', 'income-tax'];
+    const TW_TXN_BAN = /增值税|增值稅|消费税|消費稅|VAT|Sales Tax|人民币|人民幣|CNY|欧元|歐元|EUR|€|日元|日圓|JPY|韩元|韓元|KRW|₩|美元|USD|\$|营利事业所得(?!税)|營利事業所得(?!稅)/;
+    const LABEL_PIN = {
+      'zh-CN': { sales: '销货收入', other: '其他营业收入', cogs: '销货成本', selling: '销售费用', admin: '管理费用', rd: '研究发展费用', 'business-tax': '营业税', 'income-tax': '营利事业所得税' },
+      'zh-TW': { sales: '銷貨收入', other: '其他營業收入', cogs: '銷貨成本', selling: '銷售費用', admin: '管理費用', rd: '研究發展費用', 'business-tax': '營業稅', 'income-tax': '營利事業所得稅' },
+    };
+    const LINE_PIN = {
+      'zh-CN': { sales: '损益表：营业收入', other: '损益表：其他营业收入', cogs: '损益表：销货成本', selling: '损益表：销售费用', admin: '损益表：管理费用', rd: '损益表：研究发展费用', 'business-tax': '税务：营业税', 'income-tax': '税务：营利事业所得税' },
+      'zh-TW': { sales: '損益表：營業收入', other: '損益表：其他營業收入', cogs: '損益表：銷貨成本', selling: '損益表：銷售費用', admin: '損益表：管理費用', rd: '損益表：研究發展費用', 'business-tax': '稅務：營業稅', 'income-tax': '稅務：營利事業所得稅' },
+    };
+    for (const slug of REQUIRED_SLUGS) {
+      const e = M[slug];
+      if (!e) { reasons.push(`TW_TXN_CATEGORY_LABELS missing slug "${slug}"`); continue; }
+      for (const lang of ['zh-CN', 'zh-TW']) {
+        const label = e.label && e.label[lang];
+        const line = e.scheduleLine && e.scheduleLine[lang];
+        if (label !== LABEL_PIN[lang][slug]) reasons.push(`TW cat ${slug}.label[${lang}] should be "${LABEL_PIN[lang][slug]}", got "${label}"`);
+        if (line !== LINE_PIN[lang][slug]) reasons.push(`TW cat ${slug}.scheduleLine[${lang}] should be "${LINE_PIN[lang][slug]}", got "${line}"`);
+        for (const [field, v] of [['label', label], ['scheduleLine', line]]) {
+          if (typeof v !== 'string') continue;
+          if (TW_TXN_BAN.test(v)) reasons.push(`TW cat ${slug}.${field}[${lang}] uses banned (CN-VAT/non-TWD/营利事业所得-without-税) wording: "${v}"`);
+        }
+        // report-line must use 中文冒号 (：), never the half-width-hyphen seed form
+        if (typeof line === 'string') {
+          if (/-/.test(line)) reasons.push(`TW cat ${slug}.scheduleLine[${lang}] uses half-width hyphen (should be 中文冒号 ：): "${line}"`);
+          if (!line.includes('：')) reasons.push(`TW cat ${slug}.scheduleLine[${lang}] should use 中文冒号 ：: "${line}"`);
+        }
+      }
+    }
+    // 营业税 / 营利事业所得税 are 税务 filing lines — NOT ordinary 损益表 expense lines
+    for (const slug of ['business-tax', 'income-tax']) {
+      for (const lang of ['zh-CN', 'zh-TW']) {
+        const v = M[slug] && M[slug].scheduleLine && M[slug].scheduleLine[lang];
+        if (typeof v !== 'string') continue;
+        if (/^损益表|^損益表/.test(v)) reasons.push(`TW cat ${slug}.scheduleLine[${lang}] must not be a 损益表 line (should start 税务：/稅務：): "${v}"`);
+        if (!/^税务：|^稅務：/.test(v)) reasons.push(`TW cat ${slug}.scheduleLine[${lang}] should start with 税务：/稅務：: "${v}"`);
+      }
+    }
+    // formal table-header taxConcepts: present for every UI language + pinned zh values
+    const HEADER_PIN = {
+      txnCategoryHeader:      { 'zh-CN': '类别',     'zh-TW': '類別' },
+      txnScheduleHeader:      { 'zh-CN': '会计科目', 'zh-TW': '會計科目' },
+      txnPaymentStatusHeader: { 'zh-CN': '付款状态', 'zh-TW': '付款狀態' },
+      txnReceiptStatusHeader: { 'zh-CN': '收款状态', 'zh-TW': '收款狀態' },
+    };
+    for (const [key, pin] of Object.entries(HEADER_PIN)) {
+      for (const uiLang of UI_LANGUAGES) {
+        if (helpers.getTaxLabel('TW', uiLang, key) === key) reasons.push(`TW ${key}[${uiLang}] missing (raw key)`);
+      }
+      for (const lang of ['zh-CN', 'zh-TW']) {
+        const v = helpers.getTaxLabel('TW', lang, key);
+        if (v !== pin[lang]) reasons.push(`TW ${key}[${lang}] should be "${pin[lang]}", got "${v}"`);
+      }
+    }
+    // 会计科目 must not regress to the generic 报表行 / 对应科目
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      const v = helpers.getTaxLabel('TW', lang, 'txnScheduleHeader');
+      if (/报表行|報表行|对应科目|對應科目/.test(v)) reasons.push(`TW txnScheduleHeader[${lang}] should be 会计科目/會計科目: "${v}"`);
+    }
+    // reverse: CN keeps its own 收支记录 i18n (报表行 / 对应报表行 / 状态) — TW change must not leak
+    if (get(locales['zh-CN'], 'transactions.scheduleLine') !== '报表行') reasons.push(`CN transactions.scheduleLine should stay 报表行, got "${get(locales['zh-CN'], 'transactions.scheduleLine')}"`);
+    if (get(locales['zh-CN'], 'transactions.mapsToLine') !== '对应报表行') reasons.push(`CN transactions.mapsToLine should stay 对应报表行, got "${get(locales['zh-CN'], 'transactions.mapsToLine')}"`);
+    if (get(locales['zh-CN'], 'tableHeaders.status') !== '状态') reasons.push(`CN tableHeaders.status should stay 状态, got "${get(locales['zh-CN'], 'tableHeaders.status')}"`);
+    // global header year label simplified to {{year}} 年 (no 年度) for both Chinese UIs
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      const yl = get(locales[lang], 'header.yearLabel');
+      if (yl !== '{{year}} 年') reasons.push(`${lang} header.yearLabel should be "{{year}} 年" (no 年度), got "${yl}"`);
+    }
+    if (reasons.length) fail(`twTransactionsWording`, reasons); else pass(`twTransactionsWording`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G0x: TW dashboard business-tax section (经营看板 营业税 + P&L).
   //   TW accountingLocale uses Taiwan 营业税 wording (台湾营业税统计 / 采购进项营业税 /
   //   销售销项营业税 / 营利事业所得税). 进项/销项 ARE allowed for TW (本地营业税口径);
