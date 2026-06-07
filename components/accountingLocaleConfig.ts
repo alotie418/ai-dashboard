@@ -100,6 +100,7 @@ const NON_CN_GENERIC: Record<string, TaxConceptLabels> = {
   balPaidInCapital:   { 'zh-CN': '所有者投入', 'zh-TW': '所有者投入', en: 'Paid-in Capital', ja: '資本金', ko: '납입자본금', fr: 'Capital social' },
   balRetainedEarnings:{ 'zh-CN': '留存收益', 'zh-TW': '留存收益', en: 'Retained Earnings', ja: '利益剰余金', ko: '이익잉여금', fr: 'Résultat reporté' },
   balLiabEquityHeader:{ 'zh-CN': '负债和所有者权益', 'zh-TW': '負債和所有者權益', en: 'Liabilities & Equity', ja: '負債及び純資産', ko: '부채 및 자본', fr: 'Passif' },
+  balEquityHeader:    { 'zh-CN': '所有者权益', 'zh-TW': '所有者權益', en: 'Equity', ja: '純資産', ko: '자본', fr: 'Capitaux propres' },
   balTotalLiabEquity: { 'zh-CN': '负债和所有者权益总计', 'zh-TW': '負債和所有者權益總計', en: 'Total Liabilities & Equity', ja: '負債及び純資産合計', ko: '부채 및 자본 총계', fr: 'Total passif' },
   balCashflowAdd:     { 'zh-CN': '添加收支记录', 'zh-TW': '新增收支記錄', en: 'Add Transaction', ja: '取引を追加', ko: '거래 추가', fr: 'Ajouter une opération' },
   // ── System Settings (系统设置) — generic non-CN wording ──
@@ -346,6 +347,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       balPaidInCapital:   { 'zh-CN': '所有者投入', 'zh-TW': '所有者投入', en: 'Paid-in Capital', ja: '資本金', ko: '납입자본금', fr: 'Capital social' },
       balRetainedEarnings:{ 'zh-CN': '留存收益', 'zh-TW': '留存收益', en: 'Retained Earnings', ja: '利益剰余金', ko: '이익잉여금', fr: 'Résultat reporté' },
       balLiabEquityHeader:{ 'zh-CN': '负债和所有者权益', 'zh-TW': '負債和所有者權益', en: 'Liabilities & Equity', ja: '負債及び純資産', ko: '부채 및 자본', fr: 'Passif' },
+      balEquityHeader:    { 'zh-CN': '所有者权益', 'zh-TW': '所有者權益', en: 'Equity', ja: '純資産', ko: '자본', fr: 'Capitaux propres' },
       balTotalLiabEquity: { 'zh-CN': '负债和所有者权益总计', 'zh-TW': '負債和所有者權益總計', en: 'Total Liabilities & Equity', ja: '負債及び純資産合計', ko: '부채 및 자본 총계', fr: 'Total passif' },
       balCashflowAdd:     { 'zh-CN': '添加收支记录', 'zh-TW': '新增收支記錄', en: 'Add Transaction', ja: '取引を追加', ko: '거래 추가', fr: 'Ajouter une opération' },
       // Transactions (收支记录) page — the report-line column reads as 账户
@@ -686,7 +688,17 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       invoiceTypeOutput: { 'zh-CN': '销售', 'zh-TW': '銷售', en: 'Sales', ja: '売上', ko: '매출', fr: 'Vente' },
       invoiceTypeInput: { 'zh-CN': '采购', 'zh-TW': '採購', en: 'Purchase', ja: '仕入', ko: '매입', fr: 'Achat' },
       inventoryUnit: { 'zh-CN': '单位', 'zh-TW': '單位', en: 'units', ja: '単位', ko: '단위', fr: 'unités' },
-      taxSummaryTitle:{ 'zh-CN': '台湾营业税含税汇总（对账用）', 'zh-TW': '台灣營業稅含稅匯總（對帳用）', en: 'Tax-Inclusive Summary (Reconciliation)', ja: '税込金額集計（照合用）', ko: '세금포함 요약 (대조용)', fr: 'Résumé TTC (rapprochement)' },
+      // ── 财务报表 资产负债表 (TW)：台湾会计制度用语，仅 zh-CN/zh-TW 覆盖 ──
+      // 负债及权益 / 权益 / 资本 / 保留盈余 / 应收帐款（台湾用 帐·帳，非大陆 账）。
+      // en/ja/ko/fr 沿用 NON_CN_GENERIC 基值（TW 非中文 UI 不变）；CN/US/JP/EU/KR
+      // 不受影响（覆盖只在 TW 块内，spread 后置生效）。货币资金按用户口径保留不动。
+      balRecvLabel:       { 'zh-CN': '应收帐款', 'zh-TW': '應收帳款', en: 'Accounts Receivable', ja: '売掛金', ko: '매출채권', fr: 'Créances clients' },
+      balPaidInCapital:   { 'zh-CN': '资本', 'zh-TW': '資本', en: 'Paid-in Capital', ja: '資本金', ko: '납입자본금', fr: 'Capital social' },
+      balRetainedEarnings:{ 'zh-CN': '保留盈余', 'zh-TW': '保留盈餘', en: 'Retained Earnings', ja: '利益剰余金', ko: '이익잉여금', fr: 'Résultat reporté' },
+      balEquityHeader:    { 'zh-CN': '权益', 'zh-TW': '權益', en: 'Equity', ja: '純資産', ko: '자본', fr: 'Capitaux propres' },
+      balLiabEquityHeader:{ 'zh-CN': '负债及权益', 'zh-TW': '負債及權益', en: 'Liabilities & Equity', ja: '負債及び純資産', ko: '부채 및 자본', fr: 'Passif' },
+      balTotalLiabEquity: { 'zh-CN': '负债及权益总计', 'zh-TW': '負債及權益總計', en: 'Total Liabilities & Equity', ja: '負債及び純資産合計', ko: '부채 및 자본 총계', fr: 'Total passif' },
+      taxSummaryTitle:{ 'zh-CN': '台湾营业税申报汇总（对账用）', 'zh-TW': '臺灣營業稅申報彙總（對帳用）', en: 'Tax-Inclusive Summary (Reconciliation)', ja: '税込金額集計（照合用）', ko: '세금포함 요약 (대조용)', fr: 'Résumé TTC (rapprochement)' },
       purchaseTotal: { 'zh-CN': '采购含税总额', 'zh-TW': '採購含稅總額', en: 'Purchase Total (Incl. Tax)', ja: '仕入税込合計', ko: '매입 세금포함 총액', fr: 'Total achats TTC' },
       salesTotal:    { 'zh-CN': '销售含税总额', 'zh-TW': '銷售含稅總額', en: 'Sales Total (Incl. Tax)', ja: '売上税込合計', ko: '매출 세금포함 총액', fr: 'Total ventes TTC' },
       taxDifference: { 'zh-CN': '营业税差额', 'zh-TW': '營業稅差額', en: 'Business Tax Difference', ja: '営業税差額', ko: '영업세 차액', fr: 'Différence taxe activité' },

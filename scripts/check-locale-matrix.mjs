@@ -1470,13 +1470,13 @@ async function main() {
       'zh-CN': {
         taxTitle: '台湾营业税统计', inputTax: '采购进项营业税', outputTax: '销售销项营业税',
         certifiedInput: '可抵扣采购进项营业税', invoicedOutput: '已开票销售销项营业税', estimatedTax: '预计应缴营业税',
-        taxSummaryTitle: '台湾营业税含税汇总（对账用）', purchaseTotal: '采购含税总额', salesTotal: '销售含税总额', taxDifference: '营业税差额',
+        taxSummaryTitle: '台湾营业税申报汇总（对账用）', purchaseTotal: '采购含税总额', salesTotal: '销售含税总额', taxDifference: '营业税差额',
         plIncomeTax: '营利事业所得税', plRevenue: '销售收入', plCost: '销货成本', plAdmin: '管理费用',
       },
       'zh-TW': {
         taxTitle: '台灣營業稅統計', inputTax: '採購進項營業稅', outputTax: '銷售銷項營業稅',
         certifiedInput: '可抵扣採購進項營業稅', invoicedOutput: '已開票銷售銷項營業稅', estimatedTax: '預計應繳營業稅',
-        taxSummaryTitle: '台灣營業稅含稅匯總（對帳用）', purchaseTotal: '採購含稅總額', salesTotal: '銷售含稅總額', taxDifference: '營業稅差額',
+        taxSummaryTitle: '臺灣營業稅申報彙總（對帳用）', purchaseTotal: '採購含稅總額', salesTotal: '銷售含稅總額', taxDifference: '營業稅差額',
         plIncomeTax: '營利事業所得稅', plRevenue: '銷售收入', plCost: '銷貨成本', plAdmin: '管理費用',
       },
     };
@@ -1725,27 +1725,32 @@ async function main() {
     const ACCT_FIN_KEYS = [
       'acctReceivableTab', 'acctPayableTab', 'acctTotalReceivable', 'acctTotalPayable',
       'balRecvLabel', 'balPayLabel', 'balTaxPayLabel', 'balPaidInCapital',
-      'balRetainedEarnings', 'balLiabEquityHeader', 'balTotalLiabEquity', 'balCashflowAdd',
+      'balRetainedEarnings', 'balEquityHeader', 'balLiabEquityHeader', 'balTotalLiabEquity', 'balCashflowAdd',
     ];
     const CN_GAAP_BAN = /应收账款|應收帳款|应付账款|應付帳款|应交税费|應交稅費|实收资本|實收資本|未分配利润|未分配利潤|股东权益|股東權益/;
+    // TW uses the Taiwan ledger term 應收帳款/應付帳款 (帐·帳, 巾字旁) legitimately, so
+    // its ban drops those traditional forms but still forbids the Mainland 账款 (账,
+    // 贝字旁) form and the equity-GAAP terms. TW's finance wording is pinned in G12.
+    const TW_GAAP_BAN = /应收账款|应付账款|应交税费|應交稅費|实收资本|實收資本|未分配利润|未分配利潤|股东权益|股東權益/;
     const PIN = {
       'zh-CN': {
         acctReceivableTab: '客户应收', acctPayableTab: '供应商应付',
         acctTotalReceivable: '客户应收总额', acctTotalPayable: '供应商应付总额',
         balRecvLabel: '客户应收', balPayLabel: '供应商应付', balTaxPayLabel: '应付税款',
-        balPaidInCapital: '所有者投入', balRetainedEarnings: '留存收益',
+        balPaidInCapital: '所有者投入', balRetainedEarnings: '留存收益', balEquityHeader: '所有者权益',
         balLiabEquityHeader: '负债和所有者权益', balTotalLiabEquity: '负债和所有者权益总计',
       },
       'zh-TW': {
         acctReceivableTab: '客戶應收', acctPayableTab: '供應商應付',
         acctTotalReceivable: '客戶應收總額', acctTotalPayable: '供應商應付總額',
         balRecvLabel: '客戶應收', balPayLabel: '供應商應付', balTaxPayLabel: '應付稅款',
-        balPaidInCapital: '所有者投入', balRetainedEarnings: '留存收益',
+        balPaidInCapital: '所有者投入', balRetainedEarnings: '留存收益', balEquityHeader: '所有者權益',
         balLiabEquityHeader: '負債和所有者權益', balTotalLiabEquity: '負債和所有者權益總計',
       },
     };
     for (const accId of ['US', 'JP', 'KR', 'TW', 'EU']) {
       const reasons = [];
+      const ban = accId === 'TW' ? TW_GAAP_BAN : CN_GAAP_BAN;
       for (const key of ACCT_FIN_KEYS) {
         // presence: every non-CN locale must resolve the key (no raw-key fallback)
         for (const lang of UI_LANGUAGES) {
@@ -1755,16 +1760,19 @@ async function main() {
         // ban China-GAAP / China-VAT wording on the Chinese display strings
         for (const lang of ['zh-CN', 'zh-TW']) {
           const v = helpers.getTaxLabel(accId, lang, key);
-          if (typeof v === 'string' && CN_GAAP_BAN.test(v)) {
+          if (typeof v === 'string' && ban.test(v)) {
             reasons.push(`${accId} ${key}[${lang}] uses China-GAAP wording: "${v}"`);
           }
         }
       }
-      // pin the corrected non-CN wording (also asserts US fixes keep appearing)
-      for (const lang of ['zh-CN', 'zh-TW']) {
-        for (const [key, want] of Object.entries(PIN[lang])) {
-          const got = helpers.getTaxLabel(accId, lang, key);
-          if (got !== want) reasons.push(`${accId} ${key}[${lang}] should be "${want}", got "${got}"`);
+      // pin the corrected non-CN wording (also asserts US fixes keep appearing).
+      // TW finance wording differs (Taiwan-GAAP) and is pinned in PART G12.
+      if (accId !== 'TW') {
+        for (const lang of ['zh-CN', 'zh-TW']) {
+          for (const [key, want] of Object.entries(PIN[lang])) {
+            const got = helpers.getTaxLabel(accId, lang, key);
+            if (got !== want) reasons.push(`${accId} ${key}[${lang}] should be "${want}", got "${got}"`);
+          }
         }
       }
       if (reasons.length) fail(`acctFinNonCn:${accId}`, reasons); else pass(`acctFinNonCn:${accId}`);
@@ -1778,6 +1786,54 @@ async function main() {
       if (get(cn, 'accounts.payable') !== '应付账款') reasons.push(`CN accounts.payable should stay 应付账款, got "${get(cn, 'accounts.payable')}"`);
       if (reasons.length) fail(`cnGaapAccountsPreserved`, reasons); else pass(`cnGaapAccountsPreserved`);
     }
+  }
+
+  // ────────────────────────────────────────────────
+  // PART G12: TW finance report (财务报表) balance-sheet + business-tax wording.
+  //   Under TW accountingLocale the balance sheet uses Taiwan-GAAP terms:
+  //   负债及权益 / 权益 / 资本 / 保留盈余 / 负债及权益总计 / 应收帐款 (帐·帳, 巾字旁 —
+  //   NOT the Mainland 账款 贝字旁), and the business-tax block reads 申报汇总 (not the
+  //   old 含税汇总). zh-CN/zh-TW only; en/ja/ko/fr keep the NON_CN_GENERIC values. JP/EU/KR
+  //   keep the generic 所有者投入/留存收益/客户应收/所有者权益; CN keeps its own i18n.
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const TW_FIN_PIN = {
+      'zh-CN': {
+        balRecvLabel: '应收帐款', balPaidInCapital: '资本', balRetainedEarnings: '保留盈余',
+        balEquityHeader: '权益', balLiabEquityHeader: '负债及权益', balTotalLiabEquity: '负债及权益总计',
+        taxSummaryTitle: '台湾营业税申报汇总（对账用）',
+      },
+      'zh-TW': {
+        balRecvLabel: '應收帳款', balPaidInCapital: '資本', balRetainedEarnings: '保留盈餘',
+        balEquityHeader: '權益', balLiabEquityHeader: '負債及權益', balTotalLiabEquity: '負債及權益總計',
+        taxSummaryTitle: '臺灣營業稅申報彙總（對帳用）',
+      },
+    };
+    // Mainland-GAAP / pre-fix drift forbidden on TW finance keys. 应收账款 here is the
+    // Mainland 账 (贝字旁) form — TW's legit 应收帐款/應收帳款 (帐·帳, 巾字旁) is NOT matched.
+    const TW_FIN_BAN = /应收账款|股东权益|股東權益|实收资本|實收資本|未分配利润|未分配利潤|含税汇总|含稅匯總|含稅彙總/;
+    const TW_FIN_KEYS = ['balRecvLabel', 'balPaidInCapital', 'balRetainedEarnings', 'balEquityHeader', 'balLiabEquityHeader', 'balTotalLiabEquity', 'taxSummaryTitle'];
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      for (const [key, want] of Object.entries(TW_FIN_PIN[lang])) {
+        const got = helpers.getTaxLabel('TW', lang, key);
+        if (got !== want) reasons.push(`TW ${key}[${lang}] should be "${want}", got "${got}"`);
+      }
+      for (const key of TW_FIN_KEYS) {
+        const v = helpers.getTaxLabel('TW', lang, key);
+        if (typeof v === 'string' && TW_FIN_BAN.test(v)) reasons.push(`TW ${key}[${lang}] uses forbidden (Mainland-GAAP / old 含税汇总) wording: "${v}"`);
+      }
+    }
+    // reverse: JP/EU/KR keep the generic non-CN balance-sheet wording (TW change must not leak)
+    for (const acc of ['JP', 'EU', 'KR']) {
+      if (helpers.getTaxLabel(acc, 'zh-CN', 'balPaidInCapital') !== '所有者投入') reasons.push(`${acc} balPaidInCapital[zh-CN] should stay 所有者投入`);
+      if (helpers.getTaxLabel(acc, 'zh-CN', 'balRetainedEarnings') !== '留存收益') reasons.push(`${acc} balRetainedEarnings[zh-CN] should stay 留存收益`);
+      if (helpers.getTaxLabel(acc, 'zh-CN', 'balRecvLabel') !== '客户应收') reasons.push(`${acc} balRecvLabel[zh-CN] should stay 客户应收`);
+      if (helpers.getTaxLabel(acc, 'zh-CN', 'balEquityHeader') !== '所有者权益') reasons.push(`${acc} balEquityHeader[zh-CN] should stay 所有者权益`);
+    }
+    // reverse: CN keeps its own balance-sheet i18n (equity sub-header = 所有者权益)
+    if (get(locales['zh-CN'], 'finance.balanceEquity') !== '所有者权益') reasons.push(`CN finance.balanceEquity should stay 所有者权益`);
+    if (reasons.length) fail(`twFinanceBalanceWording`, reasons); else pass(`twFinanceBalanceWording`);
   }
 
   // ────────────────────────────────────────────────

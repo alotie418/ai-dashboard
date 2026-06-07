@@ -258,6 +258,31 @@ async function checkProductUnitSetting() {
   }
 }
 
+async function checkTaxSummaryTitleNoBreak() {
+  // The tax-inclusive summary title (taxSummaryTitle) renders inside a flex h3 next
+  // to an icon; without whitespace-nowrap the long CJK title breaks at word
+  // boundaries and reads as "台湾 营业税 申报汇总（对账用）" instead of continuous text.
+  // Pin the nowrap wrapper at both render sites so the title stays on one line.
+  const sites = [
+    { file: 'components/FinancePage.tsx', call: "lbl('taxSummaryTitle')" },
+    { file: 'components/TaxInclusiveSummary.tsx', call: "label('taxSummaryTitle')" },
+  ];
+  for (const { file, call } of sites) {
+    let src;
+    try { src = await readFile(join(ROOT, file), 'utf8'); } catch { continue; }
+    const idx = src.indexOf(call);
+    if (idx === -1) continue;
+    // the nowrap class lives on the wrapping span/h3 just before the label call
+    const window = src.slice(Math.max(0, idx - 140), idx + 40);
+    if (!/whitespace-nowrap/.test(window)) {
+      findings.push({
+        file, line: 0, type: 'tax-summary-title-nobreak', token: 'whitespace-nowrap',
+        snippet: 'taxSummaryTitle render is missing whitespace-nowrap — the CJK title would break into "台湾 营业税 申报汇总" instead of continuous text',
+      });
+    }
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -269,6 +294,7 @@ async function main() {
   await checkInvoiceKeyResolution();
   await checkMoneyInputPadding();
   await checkProductUnitSetting();
+  await checkTaxSummaryTitleNoBreak();
 
   console.log(`\n=== Raw Key Leak Scanner ===\n`);
   console.log(`Scanned: ${SCAN_DIRS.join(', ')}`);
