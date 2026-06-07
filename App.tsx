@@ -349,10 +349,11 @@ const AppContent: React.FC = () => {
     }
   }, [loadDashboardData, assistantAccLocale, i18n.language]);
 
-  useEffect(() => {
-    performAnalysis();
-  }, [performAnalysis]);
-
+  // AI 经营简报不再在挂载 / 切页 / 热更新时自动调用 —— performAnalysis 依赖
+  // assistantAccLocale(每次导航刷新)与 i18n.language，若自动触发会对默认 provider
+  // 反复请求，Gemini 额度耗尽即不断刷 429。改为用户在 AIInsights 卡片点「刷新」
+  // (onRefresh=performAnalysis) 时才触发；默认 provider 可在 设置→AI 服务商 切换
+  // (Claude Sonnet 4.6 / ChatGPT)。AI 请求必须由用户主动触发。
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });

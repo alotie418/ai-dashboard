@@ -10,7 +10,7 @@ import {
   type Transaction, type TransactionUpsert, type TransactionSummary, type Category,
   type AccountingLocale, type TransactionType,
 } from '../services/api';
-import { getTaxLabel } from './accountingHelpers';
+import { getTaxLabel, formatMoney } from './accountingHelpers';
 
 const TransactionsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -121,11 +121,31 @@ const TransactionsPage: React.FC = () => {
   };
 
   const fmt = (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  // US accountingLocale labels the report-line column as 账户 (the Schedule C
-  // line is effectively the expense account); other locales keep the existing
-  // transactions.scheduleLine value via the default fallback.
-  const usLabel = (taxKey: string, i18nKey: string, fallback: string) =>
-    locale === 'US' ? getTaxLabel(locale, lang, taxKey) : t(i18nKey, fallback);
+  // Summary totals follow the accountingLocale currency (TW → NT$0.00, JP/KR → no
+  // decimals) instead of a bare number.
+  const money = (v: number) => formatMoney(v || 0, locale, lang);
+  // Dates display as YYYY/MM/DD (台湾/中文常用格式, e.g. 2026/06/07) rather than the
+  // stored ISO YYYY-MM-DD; never MM/DD/YYYY. The stored value (form/input) stays ISO.
+  const fmtDate = (d: string) => (d || '').replace(/-/g, '/');
+  // TW + zh-CN/zh-TW formal table headers: 类别 / 会计科目 / 付款状态·收款状态 (by tab).
+  // US keeps 账户 for the schedule column; other locales keep the shared i18n
+  // (transactions.category / transactions.scheduleLine / tableHeaders.status).
+  // UI language stays Simplified Chinese; only the accounting wording is Taiwan-style.
+  const twZh = locale === 'TW' && (lang === 'zh-CN' || lang === 'zh-TW');
+  const catHeaderLabel = twZh
+    ? getTaxLabel(locale, lang, 'txnCategoryHeader')
+    : t('transactions.category', 'Category');
+  const scheduleHeaderLabel = locale === 'US'
+    ? getTaxLabel(locale, lang, 'txnAccountHeader')
+    : twZh
+    ? getTaxLabel(locale, lang, 'txnScheduleHeader')
+    : t('transactions.scheduleLine', 'Report Line');
+  const statusHeaderLabel = twZh
+    ? getTaxLabel(locale, lang, activeType === 'income' ? 'txnReceiptStatusHeader' : 'txnPaymentStatusHeader')
+    : t('tableHeaders.status');
+  const mapsToLabel = twZh
+    ? getTaxLabel(locale, lang, 'txnScheduleHeader')
+    : t('transactions.mapsToLine', 'Maps to report line');
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -142,17 +162,17 @@ const TransactionsPage: React.FC = () => {
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white/80 border border-[#e0ddd5] p-5 rounded-xl">
             <p className="text-[10px] uppercase tracking-widest text-[#5c5c5a] font-bold">{t('transactions.totalIncome', 'Total Income')}</p>
-            <p className="text-xl font-bold text-emerald-600 mt-1">{fmt(summary.income.total)}</p>
+            <p className="text-xl font-bold text-emerald-600 mt-1">{money(summary.income.total)}</p>
             <p className="text-[11px] text-[#7a7a78]">{summary.income.count} {t('transactions.items', 'items')}</p>
           </div>
           <div className="bg-white/80 border border-[#e0ddd5] p-5 rounded-xl">
             <p className="text-[10px] uppercase tracking-widest text-[#5c5c5a] font-bold">{t('transactions.totalExpense', 'Total Expense')}</p>
-            <p className="text-xl font-bold text-rose-500 mt-1">{fmt(summary.expense.total)}</p>
+            <p className="text-xl font-bold text-rose-500 mt-1">{money(summary.expense.total)}</p>
             <p className="text-[11px] text-[#7a7a78]">{summary.expense.count} {t('transactions.items', 'items')}</p>
           </div>
           <div className="bg-white/80 border border-[#e0ddd5] p-5 rounded-xl">
             <p className="text-[10px] uppercase tracking-widest text-[#5c5c5a] font-bold">{t('transactions.netIncome', 'Net Income')}</p>
-            <p className={`text-xl font-bold mt-1 ${summary.net >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>{fmt(summary.net)}</p>
+            <p className={`text-xl font-bold mt-1 ${summary.net >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>{money(summary.net)}</p>
           </div>
         </div>
       )}
@@ -200,10 +220,10 @@ const TransactionsPage: React.FC = () => {
               <tr>
                 <th className="text-left px-4 py-2.5 whitespace-nowrap">{t('tableHeaders.date')}</th>
                 <th className="text-left px-4 py-2.5 whitespace-nowrap">{activeType === 'income' ? t('tableHeaders.customer') : t('tableHeaders.supplier')}</th>
-                <th className="text-left px-4 py-2.5 whitespace-nowrap">{t('transactions.category', 'Category')}</th>
-                <th className="text-left px-4 py-2.5 whitespace-nowrap">{usLabel('txnAccountHeader', 'transactions.scheduleLine', 'Report Line')}</th>
+                <th className="text-left px-4 py-2.5 whitespace-nowrap">{catHeaderLabel}</th>
+                <th className="text-left px-4 py-2.5 whitespace-nowrap">{scheduleHeaderLabel}</th>
                 <th className="text-right px-4 py-2.5 whitespace-nowrap">{t('transactions.amount', 'Amount')}</th>
-                <th className="text-center px-4 py-2.5 whitespace-nowrap">{t('tableHeaders.status')}</th>
+                <th className="text-center px-4 py-2.5 whitespace-nowrap">{statusHeaderLabel}</th>
                 <th className="text-right px-4 py-2.5 whitespace-nowrap">{t('tableHeaders.action')}</th>
               </tr>
             </thead>
@@ -212,7 +232,7 @@ const TransactionsPage: React.FC = () => {
                 <tr><td colSpan={7} className="text-center py-10 text-[#7a7a78]">{t('transactions.empty', 'No transactions yet. Click "New Transaction" to add one.')}</td></tr>
               ) : transactions.map(txn => (
                 <tr key={txn.id} className="border-t border-[#e0ddd5]/70 hover:bg-[#f9f9f8]/40">
-                  <td className="px-4 py-2.5 text-[#191918] whitespace-nowrap">{txn.date}</td>
+                  <td className="px-4 py-2.5 text-[#191918] whitespace-nowrap">{fmtDate(txn.date)}</td>
                   <td className="px-4 py-2.5 text-[#4a4a48] truncate" title={txn.counterparty || ''}>{txn.counterparty || '—'}</td>
                   <td className="px-4 py-2.5 truncate">
                     <span className="inline-block max-w-full truncate align-middle text-xs bg-[#f0eeeb] px-2 py-0.5 rounded" title={getCategoryLabel(txn.category_id)}>{getCategoryLabel(txn.category_id)}</span>
@@ -273,8 +293,8 @@ const TransactionsPage: React.FC = () => {
             {/* Category selector with report line mapping */}
             <div>
               <label className="block text-xs font-medium text-[#4a4a48] mb-1">
-                {t('transactions.category', 'Category')}
-                <span className="text-[#7a7a78] font-normal ml-2">→ {t('transactions.mapsToLine', 'Maps to report line')}</span>
+                {catHeaderLabel}
+                <span className="text-[#7a7a78] font-normal ml-2">→ {mapsToLabel}</span>
               </label>
               <select value={form.category_id || ''} onChange={e => setForm(f => ({ ...f, category_id: e.target.value || undefined }))}
                 className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm bg-white">

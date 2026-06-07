@@ -688,6 +688,14 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       invoiceTypeOutput: { 'zh-CN': '销售', 'zh-TW': '銷售', en: 'Sales', ja: '売上', ko: '매출', fr: 'Vente' },
       invoiceTypeInput: { 'zh-CN': '采购', 'zh-TW': '採購', en: 'Purchase', ja: '仕入', ko: '매입', fr: 'Achat' },
       inventoryUnit: { 'zh-CN': '单位', 'zh-TW': '單位', en: 'units', ja: '単位', ko: '단위', fr: 'unités' },
+      // ── 收支记录 (TransactionsPage) 表头：台湾会计制度的正式字段 ──
+      // 仅 zh-CN/zh-TW 生效（组件按 accLocale==='TW' && zh 选择）；en/ja/ko/fr 保留 i18n
+      // (transactions.category / transactions.scheduleLine / tableHeaders.status)，TW 非
+      // 中文 UI 不变。CN 不受影响。付款/收款状态按收支 tab 选择。UI 仍是简体（zh-CN）。
+      txnCategoryHeader:      { 'zh-CN': '类别', 'zh-TW': '類別', en: 'Category', ja: 'カテゴリ', ko: '분류', fr: 'Catégorie' },
+      txnScheduleHeader:      { 'zh-CN': '会计科目', 'zh-TW': '會計科目', en: 'Account', ja: '勘定科目', ko: '계정', fr: 'Compte' },
+      txnPaymentStatusHeader: { 'zh-CN': '付款状态', 'zh-TW': '付款狀態', en: 'Payment Status', ja: '支払ステータス', ko: '결제 상태', fr: 'Statut de paiement' },
+      txnReceiptStatusHeader: { 'zh-CN': '收款状态', 'zh-TW': '收款狀態', en: 'Receipt Status', ja: '入金ステータス', ko: '수금 상태', fr: "Statut d'encaissement" },
       // ── 财务报表 资产负债表 (TW)：台湾会计制度用语，仅 zh-CN/zh-TW 覆盖 ──
       // 负债及权益 / 权益 / 资本 / 保留盈余 / 应收帐款（台湾用 帐·帳，非大陆 账）。
       // en/ja/ko/fr 沿用 NON_CN_GENERIC 基值（TW 非中文 UI 不变）；CN/US/JP/EU/KR
@@ -789,4 +797,26 @@ export const KR_TXN_CATEGORY_LABELS: Record<string, { label: Record<'zh-CN' | 'z
   advertising:     { label: { 'zh-CN': '广告',       'zh-TW': '廣告' },     scheduleLine: { 'zh-CN': '损益表-广告宣传费（광고선전비）', 'zh-TW': '損益表-廣告宣傳費（광고선전비）' } },
   rent:            { label: { 'zh-CN': '租金',       'zh-TW': '租金' },     scheduleLine: { 'zh-CN': '损益表-租赁费（임차료）',   'zh-TW': '損益表-租賃費（임차료）' } },
   depreciation:    { label: { 'zh-CN': '折旧',       'zh-TW': '折舊' },     scheduleLine: { 'zh-CN': '损益表-折旧费（감가상각비）', 'zh-TW': '損益表-折舊費（감가상각비）' } },
+};
+
+// ─── TW transaction-category labels for the Chinese UI (收支记录 分类下拉) ───
+// Under TW accountingLocale + zh-CN/zh-TW UI the category dropdown shows
+// `displayLabel → schedule_line` with the Taiwan report-line wording in 中文冒号
+// format (损益表：… / 損益表：…), NOT the half-width-hyphen seed form (损益表-…).
+// 口径 corrections vs the raw seed: 营业税 (税务：营业税) and 营利事业所得税 (税务：营利事业
+// 所得税) are 税务 filing lines, NOT ordinary 损益表 expense lines; the 'sales' label reads
+// 销货收入 and 'selling' reads 销售费用. Keyed by the stable slug (applied read-time in
+// services/api.ts) so it also fixes stale-DB rows; id/slug + backend report mapping
+// (by slug) are unchanged — display only. zh-CN/zh-TW only.
+export const TW_TXN_CATEGORY_LABELS: Record<string, { label: Record<'zh-CN' | 'zh-TW', string>; scheduleLine: Record<'zh-CN' | 'zh-TW', string> }> = {
+  // income
+  sales:          { label: { 'zh-CN': '销货收入',     'zh-TW': '銷貨收入' },     scheduleLine: { 'zh-CN': '损益表：营业收入',       'zh-TW': '損益表：營業收入' } },
+  other:          { label: { 'zh-CN': '其他营业收入', 'zh-TW': '其他營業收入' }, scheduleLine: { 'zh-CN': '损益表：其他营业收入',   'zh-TW': '損益表：其他營業收入' } },
+  // expense
+  cogs:           { label: { 'zh-CN': '销货成本',     'zh-TW': '銷貨成本' },     scheduleLine: { 'zh-CN': '损益表：销货成本',       'zh-TW': '損益表：銷貨成本' } },
+  selling:        { label: { 'zh-CN': '销售费用',     'zh-TW': '銷售費用' },     scheduleLine: { 'zh-CN': '损益表：销售费用',       'zh-TW': '損益表：銷售費用' } },
+  admin:          { label: { 'zh-CN': '管理费用',     'zh-TW': '管理費用' },     scheduleLine: { 'zh-CN': '损益表：管理费用',       'zh-TW': '損益表：管理費用' } },
+  rd:             { label: { 'zh-CN': '研究发展费用', 'zh-TW': '研究發展費用' }, scheduleLine: { 'zh-CN': '损益表：研究发展费用',   'zh-TW': '損益表：研究發展費用' } },
+  'business-tax': { label: { 'zh-CN': '营业税',       'zh-TW': '營業稅' },       scheduleLine: { 'zh-CN': '税务：营业税',           'zh-TW': '稅務：營業稅' } },
+  'income-tax':   { label: { 'zh-CN': '营利事业所得税', 'zh-TW': '營利事業所得稅' }, scheduleLine: { 'zh-CN': '税务：营利事业所得税', 'zh-TW': '稅務：營利事業所得稅' } },
 };
