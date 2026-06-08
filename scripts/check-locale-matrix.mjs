@@ -1365,41 +1365,43 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
-  // PART G0v: KR analytics compact money format (数据分析中心).
-  //   The 数据分析 cards/axes use a compact `${symbol}${value/1000}k` formatter
-  //   (formatCompactMoney). Under KR + zh-CN/zh-TW a value that rounds to zero must
-  //   show a plain ₩0 (no English 'k' suffix), not ₩0k / ₩0.0k. Non-zero KR keeps
-  //   the …k form; CN/JP/EU/US/TW and KR + en/ja/ko/fr keep the …k form unchanged.
-  //   Currency stays ₩ (no ¥/€/$/CNY/EUR/JPY/USD/人民币/欧元/日元/美元).
+  // PART G0v: 数据分析中心 compact money format (formatCompactMoney).
+  //   The 数据分析 cards/axes use a compact `${symbol}${value/1000}k` formatter. Under
+  //   Chinese UI (zh-CN/zh-TW) a value that rounds to zero shows a plain `${symbol}0`
+  //   (¥0 / ₩0 / €0 / $0 / NT$0) — no English 'k' suffix, not ¥0k / ¥0.0k — for EVERY
+  //   accountingLocale. Non-zero values keep the …k form, and non-Chinese UI (en/ja/ko/
+  //   fr) keeps the …k form for zero too (unchanged). Symbol follows accountingLocale.
   // ────────────────────────────────────────────────
   {
     const reasons = [];
-    for (const lang of ['zh-CN', 'zh-TW']) {
-      for (const digits of [0, 1]) {
-        const got = helpers.formatCompactMoney(0, 'KR', lang, digits);
-        if (got !== '₩0') reasons.push(`KR formatCompactMoney(0,${lang},${digits}) should be "₩0", got "${got}"`);
+    const ZERO = { CN: '¥0', US: '$0', JP: '¥0', EU: '€0', KR: '₩0', TW: 'NT$0' };
+    for (const loc of ['CN', 'US', 'JP', 'EU', 'KR', 'TW']) {
+      for (const lang of ['zh-CN', 'zh-TW']) {
+        for (const digits of [0, 1]) {
+          const got = helpers.formatCompactMoney(0, loc, lang, digits);
+          if (got !== ZERO[loc]) reasons.push(`${loc} formatCompactMoney(0,${lang},${digits}) should be "${ZERO[loc]}", got "${got}"`);
+        }
+        // a tiny value that rounds to zero also collapses to the plain symbol
+        const tiny = helpers.formatCompactMoney(4, loc, lang, 1);
+        if (tiny !== ZERO[loc]) reasons.push(`${loc} formatCompactMoney(4,${lang},1) should round to "${ZERO[loc]}", got "${tiny}"`);
+        // non-zero keeps the compact …k form (do not over-collapse)
+        const nz = helpers.formatCompactMoney(1234567, loc, lang, 1);
+        if (!/k$/.test(nz)) reasons.push(`${loc} non-zero compact money[${lang}] should keep …k: "${nz}"`);
       }
-      // a tiny value that rounds to zero also collapses to ₩0
-      const tiny = helpers.formatCompactMoney(4, 'KR', lang, 1);
-      if (tiny !== '₩0') reasons.push(`KR formatCompactMoney(4,${lang},1) should round to "₩0", got "${tiny}"`);
-      // ban the 'k' suffix + wrong currency on the KR zero result
+    }
+    // KR zero must not leak the 'k' suffix or a non-₩ currency token
+    for (const lang of ['zh-CN', 'zh-TW']) {
       const z = helpers.formatCompactMoney(0, 'KR', lang, 1);
       if (/[kK]|¥|€|\$|CNY|EUR|JPY|USD|人民币|人民幣|欧元|歐元|日元|日圓|美元/.test(z)) reasons.push(`KR zero compact money[${lang}] must be ₩0 only: "${z}"`);
-      // non-zero KR keeps the compact …k form (do not over-collapse)
-      const nz = helpers.formatCompactMoney(1234567, 'KR', lang, 1);
-      if (!/k$/.test(nz) || !nz.startsWith('₩')) reasons.push(`KR non-zero compact money[${lang}] should stay ₩…k: "${nz}"`);
     }
-    // reverse: other accountingLocales keep the …k compact form for zero (unchanged)
-    for (const loc of ['CN', 'JP', 'EU', 'US', 'TW']) {
-      const got = helpers.formatCompactMoney(0, loc, 'zh-CN', 1);
-      if (!/k$/.test(got)) reasons.push(`${loc} formatCompactMoney(0,zh-CN,1) should keep the …k form, got "${got}"`);
+    // reverse: non-Chinese UI keeps the …k compact form for zero (unchanged)
+    for (const loc of ['KR', 'CN']) {
+      for (const lang of ['en', 'ja', 'ko', 'fr']) {
+        const got = helpers.formatCompactMoney(0, loc, lang, 1);
+        if (!/k$/.test(got)) reasons.push(`${loc} formatCompactMoney(0,${lang},1) should keep …k (non-Chinese UI unchanged), got "${got}"`);
+      }
     }
-    // reverse: KR + en/ja/ko/fr unchanged (still ₩0.0k)
-    for (const lang of ['en', 'ja', 'ko', 'fr']) {
-      const got = helpers.formatCompactMoney(0, 'KR', lang, 1);
-      if (got !== '₩0.0k') reasons.push(`KR formatCompactMoney(0,${lang},1) should stay "₩0.0k", got "${got}"`);
-    }
-    if (reasons.length) fail(`krAnalyticsMoneyFormat`, reasons); else pass(`krAnalyticsMoneyFormat`);
+    if (reasons.length) fail(`analyticsCompactMoneyZero`, reasons); else pass(`analyticsCompactMoneyZero`);
   }
 
   // ────────────────────────────────────────────────

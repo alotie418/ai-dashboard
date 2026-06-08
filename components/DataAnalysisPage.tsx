@@ -414,7 +414,7 @@ ${JSON.stringify(mcOnVar)}
                 <span className="h-1.5 w-1.5 rounded-full bg-[#d97757]/60"></span>
                 <span className="h-1.5 w-1.5 rounded-full bg-[#d97757]/30"></span>
               </div>
-              <h3 className="text-[#d97757] text-xs font-bold uppercase tracking-[0.4em]">{t('analysis.aiDashboard')}</h3>
+              <h3 className="text-[#d97757] text-xs font-bold uppercase">{t('analysis.aiDashboard')}</h3>
             </div>
             {isAnalysing ? (
               <div className="space-y-6">
