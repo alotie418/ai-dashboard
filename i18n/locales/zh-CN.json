@@ -38,7 +38,8 @@
     "finance": "财务报表",
     "settings": "系统设置",
     "transactions": "收支记录",
-    "usTax": "美国税务工具"
+    "usTax": "美国税务工具",
+    "logout": "退出登录"
   },
   "headerTitle": {
     "dashboard": "经营数据概览",

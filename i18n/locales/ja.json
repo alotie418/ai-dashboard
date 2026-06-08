@@ -38,7 +38,8 @@
     "finance": "財務諸表",
     "settings": "システム設定",
     "transactions": "取引記録",
-    "usTax": "米国税務ツール"
+    "usTax": "米国税務ツール",
+    "logout": "ログアウト"
   },
   "headerTitle": {
     "dashboard": "経営データ概要",

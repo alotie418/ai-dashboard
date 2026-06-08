@@ -38,7 +38,8 @@
     "finance": "財務報表",
     "settings": "系統設定",
     "transactions": "收支記錄",
-    "usTax": "美國稅務工具"
+    "usTax": "美國稅務工具",
+    "logout": "退出登錄"
   },
   "headerTitle": {
     "dashboard": "經營資料概覽",
@@ -346,7 +347,7 @@
     "netMarginDesc": "計算公式：淨利潤 / 銷售收入",
     "grossProfitNote": "毛利率反映商品本身的盈利能力",
     "netProfitNote": "淨利率反映扣除運營費用後的實際盈利",
-    "geminiCredit": "由 GEMINI 3 FLASH 提供算力支持",
+    "geminiCredit": "由 GEMINI 3 FLASH 提供算力支援",
     "grossMargin": "毛利率",
     "netMargin": "淨利率",
     "grossMarginFormula": "計算公式：毛利 / 銷售收入",
@@ -798,7 +799,7 @@
     "quotaSwitchHint": "偵測到可用的 {{providers}}，可在「設定 → AI 服務商」切換。",
     "retry": "重試",
     "empty": "暫無分析資料。點擊刷新按鈕生成。",
-    "powered": "由 GEMINI 3 FLASH 提供算力支持"
+    "powered": "由 GEMINI 3 FLASH 提供算力支援"
   },
   "alerts": {
     "title": "預警中心",

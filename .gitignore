@@ -11,6 +11,11 @@ node_modules
 dist
 dist-ssr
 *.local
+
+# Playwright E2E artifacts (screenshots + report)
+test-results
+playwright-report
+.playwright
 .env
 .env.production
 

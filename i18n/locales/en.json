@@ -38,7 +38,8 @@
     "finance": "Financial Reports",
     "settings": "Settings",
     "transactions": "Transactions",
-    "usTax": "US Tax Tools"
+    "usTax": "US Tax Tools",
+    "logout": "Log Out"
   },
   "headerTitle": {
     "dashboard": "Business Overview",

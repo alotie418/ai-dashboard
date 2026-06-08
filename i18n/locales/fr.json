@@ -38,7 +38,8 @@
     "finance": "États financiers",
     "settings": "Paramètres système",
     "transactions": "Transactions",
-    "usTax": "Outils fiscaux US"
+    "usTax": "Outils fiscaux US",
+    "logout": "Déconnexion"
   },
   "headerTitle": {
     "dashboard": "Aperçu d'activité",
