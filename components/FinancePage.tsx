@@ -225,15 +225,15 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
               </h3>
               <div className="space-y-1">
                 <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2">{t('finance.balanceCurrentAssets')}</h4>
-                <LineItem label={t('finance.balanceCash')} value={0.0} />
-                <LineItem label={localeLabel('balRecvLabel', 'finance.balanceReceivables')} value={0.0} />
-                <LineItem label={t('finance.balanceInventory')} value={0.0} />
+                <LineItem label={t('finance.balanceCash')} value={fmt(0)} />
+                <LineItem label={localeLabel('balRecvLabel', 'finance.balanceReceivables')} value={fmt(0)} />
+                <LineItem label={t('finance.balanceInventory')} value={fmt(0)} />
                 <div className="border-t border-[#e0ddd5] my-4"></div>
-                <LineItem label={t('finance.balanceCurrentAssetsTotal')} value={0.0} bold />
+                <LineItem label={t('finance.balanceCurrentAssetsTotal')} value={fmt(0)} bold />
                 <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2 mt-4">{t('finance.balanceNonCurrentAssets')}</h4>
-                <LineItem label={t('finance.balanceFixedAssets')} value={0.0} />
+                <LineItem label={t('finance.balanceFixedAssets')} value={fmt(0)} />
                 <div className="border-t border-[#e0ddd5] my-4"></div>
-                <LineItem label={t('finance.balanceTotalAssets')} value={0.0} bold primary />
+                <LineItem label={t('finance.balanceTotalAssets')} value={fmt(0)} bold primary />
               </div>
             </div>
             <div className="p-10 bg-[#f9f9f8]/20">
@@ -242,15 +242,15 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
               </h3>
               <div className="space-y-1">
                 <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2">{t('finance.balanceCurrentLiabilities')}</h4>
-                <LineItem label={localeLabel('balPayLabel', 'finance.balancePayables')} value={0.0} />
-                <LineItem label={localeLabel('balTaxPayLabel', 'finance.balanceTaxPayable')} value={0.0} />
+                <LineItem label={localeLabel('balPayLabel', 'finance.balancePayables')} value={fmt(0)} />
+                <LineItem label={localeLabel('balTaxPayLabel', 'finance.balanceTaxPayable')} value={fmt(0)} />
                 <div className="border-t border-[#e0ddd5] my-4"></div>
-                <LineItem label={t('finance.balanceTotalLiabilities')} value={0.0} bold />
+                <LineItem label={t('finance.balanceTotalLiabilities')} value={fmt(0)} bold />
                 <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2 mt-4">{localeLabel('balEquityHeader', 'finance.balanceEquity')}</h4>
-                <LineItem label={localeLabel('balPaidInCapital', 'finance.balancePaidInCapital')} value={0.0} />
-                <LineItem label={localeLabel('balRetainedEarnings', 'finance.balanceRetainedEarnings')} value={0.0} />
+                <LineItem label={localeLabel('balPaidInCapital', 'finance.balancePaidInCapital')} value={fmt(0)} />
+                <LineItem label={localeLabel('balRetainedEarnings', 'finance.balanceRetainedEarnings')} value={fmt(0)} />
                 <div className="border-t border-[#e0ddd5] my-4"></div>
-                <LineItem label={localeLabel('balTotalLiabEquity', 'finance.balanceTotalLiabilitiesEquity')} value={0.0} bold primary />
+                <LineItem label={localeLabel('balTotalLiabEquity', 'finance.balanceTotalLiabilitiesEquity')} value={fmt(0)} bold primary />
               </div>
             </div>
           </div>
