@@ -807,10 +807,10 @@ ${contextText}`;
                 window.location.reload();
               }}
               className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-red-50 transition-colors text-[#6b6b69] hover:text-red-600"
-              title="退出登录"
+              title={t('nav.logout')}
             >
               <i className="fas fa-sign-out-alt"></i>
-              {sidebarOpen && <span className="ml-2 text-sm">退出登录</span>}
+              {sidebarOpen && <span className="ml-2 text-sm">{t('nav.logout')}</span>}
             </button>
           )}
         </div>

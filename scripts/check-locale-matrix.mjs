@@ -2558,11 +2558,16 @@ async function main() {
       if (obj && typeof obj === 'object') { for (const k of Object.keys(obj)) walkStrings(obj[k], prefix ? `${prefix}.${k}` : k, fn); }
       else if (typeof obj === 'string') fn(prefix, obj);
     };
+    // Word-level variant bans catch regional word choices the char sweep misses
+    // (e.g. 支持/支援 — both made of common chars). Mirrors the page-level E2E lists.
+    const ZH_CN_BAN_WORDS = ['資料', '採購', '銷售', '進項', '銷項', '簡報', '支援', '統計', '應納', '營業'];
+    const ZH_TW_BAN_WORDS = ['资料', '采购', '销售', '进项', '销项', '简报', '支持', '统计', '应纳', '营业'];
     {
       const reasons = [];
       walkStrings(locales['zh-CN'], '', (path, v) => {
         const bad = [...v].filter((c) => TRAD_ONLY.includes(c));
         if (bad.length) reasons.push(`module=i18n field=${path} actual="${v.slice(0, 40)}" forbidden="${[...new Set(bad)].join('')}"(繁体字) expected="Simplified Chinese" suggested=i18n/locales/zh-CN.json`);
+        for (const w of ZH_CN_BAN_WORDS) if (v.includes(w)) reasons.push(`module=i18n field=${path} actual="${v.slice(0, 40)}" forbidden="${w}"(繁体词) expected="Simplified Chinese" suggested=i18n/locales/zh-CN.json`);
       });
       if (reasons.length) fail(`i18nScript:zh-CN`, reasons); else pass(`i18nScript:zh-CN`);
     }
@@ -2571,6 +2576,7 @@ async function main() {
       walkStrings(locales['zh-TW'], '', (path, v) => {
         const bad = [...v].filter((c) => SIMP_ONLY.includes(c));
         if (bad.length) reasons.push(`module=i18n field=${path} actual="${v.slice(0, 40)}" forbidden="${[...new Set(bad)].join('')}"(简体字) expected="Traditional Chinese" suggested=i18n/locales/zh-TW.json`);
+        for (const w of ZH_TW_BAN_WORDS) if (v.includes(w)) reasons.push(`module=i18n field=${path} actual="${v.slice(0, 40)}" forbidden="${w}"(简体词) expected="Traditional Chinese" suggested=i18n/locales/zh-TW.json`);
       });
       if (reasons.length) fail(`i18nScript:zh-TW`, reasons); else pass(`i18nScript:zh-TW`);
     }

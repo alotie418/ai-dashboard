@@ -17,6 +17,7 @@
     "check:locale-matrix": "node --experimental-loader ./scripts/_ts-resolver.mjs scripts/check-locale-matrix.mjs",
     "check:raw-keys": "node scripts/check-raw-key-leaks.mjs",
     "check:locale": "npm run check:locale-matrix && npm run check:raw-keys",
+    "test:locale-ui": "npm run build && playwright test",
     "build:dmg": "BUILD_TARGET=dmg npm run build && electron-builder --mac dmg --config electron-builder.dmg.yml",
     "build:mas": "BUILD_TARGET=mas npm run build && electron-builder --mac mas --config electron-builder.mas.yml",
     "postinstall": "electron-builder install-app-deps"
@@ -45,6 +46,7 @@
   "devDependencies": {
     "@electron/notarize": "^2.5.0",
     "@electron/rebuild": "^3.7.0",
+    "@playwright/test": "^1.60.0",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "concurrently": "^9.1.0",
