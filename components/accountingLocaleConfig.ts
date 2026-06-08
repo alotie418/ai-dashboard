@@ -197,7 +197,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       certifiedInput:{ 'zh-CN': '已认证进项税额', 'zh-TW': '已認證進項稅額', en: 'Certified Input VAT', ja: '認証済み仕入税額', ko: '인증된 매입세액', fr: 'TVA déductible certifiée' },
       invoicedOutput:{ 'zh-CN': '已开票销项税额', 'zh-TW': '已開票銷項稅額', en: 'Invoiced Output VAT', ja: '請求済み売上税額', ko: '발행된 매출세액', fr: 'TVA collectée facturée' },
       estimatedTax:  { 'zh-CN': '预估应交增值税', 'zh-TW': '預估應交增值稅', en: 'Estimated VAT Payable', ja: '増値税推定納付額', ko: '예상 부가가치세 납부액', fr: 'TVA estimée à payer' },
-      taxSummaryTitle:{ 'zh-CN': '含税金额汇总 (对账用)', 'zh-TW': '含稅金額匯總 (對帳用)', en: 'Tax-Inclusive Summary (Reconciliation)', ja: '税込金額集計（照合用）', ko: '세금 포함 금액 요약 (대조용)', fr: 'Résumé TTC (rapprochement)' },
+      taxSummaryTitle:{ 'zh-CN': '含税金额汇总 (对账用)', 'zh-TW': '含稅金額統計', en: 'Tax-Inclusive Summary (Reconciliation)', ja: '税込金額集計（照合用）', ko: '세금 포함 금액 요약 (대조용)', fr: 'Résumé TTC (rapprochement)' },
       purchaseTotal: { 'zh-CN': '采购含税总额', 'zh-TW': '採購含稅總額', en: 'Purchase Total (Incl. Tax)', ja: '仕入税込合計', ko: '매입 세금포함 총액', fr: 'Total achats TTC' },
       salesTotal:    { 'zh-CN': '销售含税总额', 'zh-TW': '銷售含稅總額', en: 'Sales Total (Incl. Tax)', ja: '売上税込合計', ko: '매출 세금포함 총액', fr: 'Total ventes TTC' },
       taxDifference: { 'zh-CN': '含税差额', 'zh-TW': '含稅差額', en: 'Tax-Inclusive Difference', ja: '税込差額', ko: '세금포함 차액', fr: 'Différence TTC' },

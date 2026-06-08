@@ -794,6 +794,8 @@
     "recommendations": "Action Items",
     "recommendation": "Suggestion",
     "error": "AI analysis failed. Check network or API config and retry.",
+    "quotaExceeded": "Gemini quota reached. Switch AI provider or try again later.",
+    "quotaSwitchHint": "{{providers}} available — switch in Settings → AI Providers.",
     "retry": "Retry",
     "empty": "No analysis data. Click refresh to generate.",
     "powered": "Powered by GEMINI 3 FLASH"

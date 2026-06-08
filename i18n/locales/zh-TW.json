@@ -83,7 +83,7 @@
       "autoAuth": "進項發票自動認證",
       "autoAuthDesc": "上傳後自動同步至稅務系統進行認證",
       "adminExpense": "年度管理費用",
-      "adminExpenseDesc": "用於損益表淨利潤計算（含辦公、人工、折舊等）",
+      "adminExpenseDesc": "用於淨利潤計算（含辦公、人工、折舊等）",
       "perYear": "元/年",
       "hint": "提示：稅金及附加按增值稅12%自動計算，所得稅按利潤總額25%自動計算"
     },
@@ -794,6 +794,8 @@
     "recommendations": "落地行動建議",
     "recommendation": "建議",
     "error": "AI 分析失敗，請檢查網路連接或 API 配置後重試。",
+    "quotaExceeded": "Gemini 額度已達上限，請更換 AI 供應商或稍後再試。",
+    "quotaSwitchHint": "偵測到可用的 {{providers}}，可在「設定 → AI 服務商」切換。",
     "retry": "重試",
     "empty": "暫無分析資料。點擊刷新按鈕生成。",
     "powered": "由 GEMINI 3 FLASH 提供算力支持"

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { MOCK_BUSINESS_DATA } from './constants';
 import { fetchAIAnalysis } from './services/geminiService';
 import { AIAnalysis, BusinessData } from './types';
-import { fetchDashboardData, fetchSales, fetchPurchases, fetchSettings } from './services/api';
+import { fetchDashboardData, fetchSales, fetchPurchases, fetchSettings, listProviders } from './services/api';
 import MetricCard from './components/MetricCard';
 import AIInsights from './components/AIInsights';
 import FinancialStatementTable from './components/FinancialStatementTable';
@@ -30,6 +30,9 @@ import remarkGfm from 'remark-gfm';
 import { analyzeInvoice } from './services/ocrService';
 
 type PageId = 'dashboard' | 'sales' | 'purchase' | 'analysis' | 'inventory' | 'finance' | 'accounts' | 'transactions' | 'ustax' | 'settings';
+
+// Display names for the "switch provider" hint shown when Gemini hits its quota (429).
+const AI_PROVIDER_LABELS: Record<string, string> = { openai: 'ChatGPT (OpenAI)', anthropic: 'Claude (Anthropic)', gemini: 'Gemini' };
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -153,6 +156,9 @@ const AppContent: React.FC = () => {
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [loadingAI, setLoadingAI] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  // AI 简报额度冷却：一次 Gemini 429/额度耗尽后，5 分钟内不再向供应商发请求，
+  // 避免控制台反复刷 api:request 错误。时间戳(ms)，0 表示无冷却。
+  const aiQuotaCooldownRef = useRef(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentPage, setCurrentPage] = useState<PageId>('dashboard');
   const [showChat, setShowChat] = useState(false);
@@ -330,6 +336,13 @@ const AppContent: React.FC = () => {
   const resetChatSize = () => setChatSize(DEFAULT_CHAT_SIZE);
 
   const performAnalysis = useCallback(async () => {
+    // 额度冷却中（上次 Gemini 429 后 5 分钟内）：直接显示友好提示，不再发请求，
+    // 避免连点刷新或任何残留路径反复刷 429。
+    if (Date.now() < aiQuotaCooldownRef.current) {
+      setLoadingAI(false);
+      setAiError(t('aiInsights.quotaExceeded'));
+      return;
+    }
     setLoadingAI(true);
     setAiError(null);
     try {
@@ -341,9 +354,28 @@ const AppContent: React.FC = () => {
       const systemPrompt = `${t('ai.analyzeSystemPrompt')}\n\n${buildAIFinanceContext(localeForAI, i18n.language)}`;
       const result = await fetchAIAnalysis(freshData || dataRef.current, undefined, t('ai.languageHint'), systemPrompt);
       setAnalysis(result);
-    } catch (err) {
-      console.error("AI Analysis Failed", err);
-      setAiError(t('aiInsights.error'));
+    } catch (err: any) {
+      // 区分「额度/限流(429)」与一般错误。429 时进入 5 分钟冷却 + 友好提示，
+      // 并在有其他可用 provider 时提示切换（不自动切换），避免控制台刷屏。
+      const msg = String(err?.message || err);
+      const isQuota = /\b429\b|http_429|quota|exceeded|spending cap|额度|超限|rate.?limit/i.test(msg);
+      if (isQuota) {
+        aiQuotaCooldownRef.current = Date.now() + 5 * 60 * 1000;
+        let friendly = t('aiInsights.quotaExceeded');
+        try {
+          const provs = await listProviders();
+          const alt = (provs || []).filter((p: any) => p.provider !== 'gemini' && p.hasKey && p.enabled);
+          if (alt.length) {
+            const names = alt.map((p: any) => AI_PROVIDER_LABELS[p.provider] || p.provider).join(' / ');
+            friendly = `${friendly} ${t('aiInsights.quotaSwitchHint', { providers: names })}`;
+          }
+        } catch { /* 获取 provider 列表失败时仅显示基础提示 */ }
+        setAiError(friendly);
+        console.warn('[AI] Gemini quota/429 — paused 5 min, no auto-retry');
+      } else {
+        console.error("AI Analysis Failed", err);
+        setAiError(t('aiInsights.error'));
+      }
     } finally {
       setLoadingAI(false);
     }

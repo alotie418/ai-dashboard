@@ -320,6 +320,25 @@ async function checkNoAutoAIAnalysis() {
   }
 }
 
+async function checkAIQuotaCooldown() {
+  // A Gemini 429 / quota error must trigger a cooldown + friendly message instead of
+  // re-requesting on every refresh (otherwise the console spams api:request errors).
+  let src;
+  try { src = await readFile(join(ROOT, 'App.tsx'), 'utf8'); } catch { return; }
+  if (!/aiQuotaCooldownRef/.test(src)) {
+    findings.push({
+      file: 'App.tsx', line: 0, type: 'ai-quota-cooldown', token: 'aiQuotaCooldownRef',
+      snippet: 'AI analysis lacks a 429/quota cooldown (aiQuotaCooldownRef) — a Gemini quota error would keep re-requesting and spam the console',
+    });
+  }
+  if (!/aiInsights\.quotaExceeded/.test(src)) {
+    findings.push({
+      file: 'App.tsx', line: 0, type: 'ai-quota-cooldown', token: 'quotaExceeded',
+      snippet: 'AI analysis does not surface the friendly aiInsights.quotaExceeded message on a Gemini 429',
+    });
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -334,6 +353,7 @@ async function main() {
   await checkTaxSummaryTitleNoBreak();
   await checkTransactionSummaryMoney();
   await checkNoAutoAIAnalysis();
+  await checkAIQuotaCooldown();
 
   console.log(`\n=== Raw Key Leak Scanner ===\n`);
   console.log(`Scanned: ${SCAN_DIRS.join(', ')}`);
