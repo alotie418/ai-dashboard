@@ -2585,6 +2585,25 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G16: System Settings notification wording — tax-deviation term.
+  //   The 系统设置 tax-deviation toggle (settings.notifications.taxDeviation, the
+  //   i18n shown under CN accountingLocale) must use the concrete 税款 (tax due),
+  //   matching the canonical notifTaxDeviation taxConcept — never the macro 税收
+  //   (government tax revenue), which would mismatch the actual alert wording.
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      const v = get(locales[lang], 'settings.notifications.taxDeviation');
+      if (typeof v === 'string') {
+        if (/税收|稅收/.test(v)) reasons.push(`${lang} settings.notifications.taxDeviation uses macro 税收 (should be 税款), got "${v}"`);
+        if (!/税款|稅款/.test(v)) reasons.push(`${lang} settings.notifications.taxDeviation should use 税款/稅款, got "${v}"`);
+      }
+    }
+    if (reasons.length) fail(`settingsTaxDeviationWording`, reasons); else pass(`settingsTaxDeviationWording`);
+  }
+
+  // ────────────────────────────────────────────────
   // Report
   // ────────────────────────────────────────────────
   console.log(`\n=== Locale Matrix Check ===\n`);
