@@ -38,7 +38,7 @@ const PURCHASE_FIELDS = [
 ];
 
 // Auto-detect CSV header to app field
-function autoMapHeaders(headers: string[], fields: { key: string; label: string }[]): Record<string, string> {
+function autoMapHeaders(headers: string[], fields: { key: string }[]): Record<string, string> {
   const mapping: Record<string, string> = {};
   const aliases: Record<string, string[]> = {
     date: ['日期', 'date', '时间'],
