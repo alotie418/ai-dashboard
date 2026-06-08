@@ -2489,6 +2489,94 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G15: full 6×6 = 36-combination sweep (accountingLocale × uiLanguage).
+  //   For every combo, resolve the tax-口径 labels via getTaxLabel and assert:
+  //     (a) no cross-regime wording (per-accountingLocale forbidden list),
+  //     (b) uiLanguage script integrity — zh-CN Simplified only / zh-TW Traditional only,
+  //     (c) the regime summary title (taxTitle) carries the expected regime concept.
+  //   accountingLocale decides 口径 (taxConcepts); uiLanguage decides script only.
+  //   Failures print ui / acc / module / field / actual / forbidden / expected / file.
+  // ────────────────────────────────────────────────
+  {
+    // Regime cross-contamination — what each accountingLocale must NEVER show, in any UI language.
+    const FORBIDDEN_BY_LOCALE = {
+      CN: ['营业税', '營業稅', '统一发票', '統一發票', 'Sales Tax', '消费税', '消費稅'],
+      US: ['增值税', '增值稅', '营业税', '營業稅', '进项税额', '進項稅額', '销项税额', '銷項稅額', '消费税', '消費稅'],
+      JP: ['增值税', '增值稅', '营业税', '營業稅', 'Sales Tax', '销售税', '銷售稅', '应交增值税', '應交增值稅'],
+      EU: ['营业税', '營業稅', '消费税', '消費稅', 'Sales Tax', '销售税', '銷售稅', '已认证进项税额', '已認證進項稅額'],
+      KR: ['营业税', '營業稅', '消费税', '消費稅', 'Sales Tax', '销售税', '銷售稅', '已认证进项税额', '已認證進項稅額'],
+      TW: ['增值税', '增值稅', '应交增值税', '應交增值稅', '已认证', '已認證'],
+    };
+    // Variant-only characters (simplified-only / traditional-only; excludes chars common
+    // to both scripts such as 售/支/持/收 — those are NOT leaks).
+    const SIMP_ONLY = '务报单发资应进销项额总户营关转库类数据显实现产业会计帐账团价风财购费贵质软输边过还这远连选录钱错门问间队页题验证设论说请读谢识译试详语调谈课规视见觉访评诺贸贺贴赞跃较递邮钟铁银锁难韩顺颗颜饭饮馆骤东车书长岁两广严丰临为乌乐习乡买乱争亏阳';
+    const TRAD_ONLY = '務報單發資應進銷項額總戶營關轉庫類數據顯實現產業會計帳賬團價風財購費貴質軟輸邊過還這遠連選錄錢錯門問間隊頁題驗證設論說請讀謝識譯試詳語調談課規視見覺訪評諾貿賀貼讚躍較遞郵鐘鐵銀鎖難韓順顆顏飯飲館驟東車書長歲兩廣嚴豐臨為烏樂習鄉買亂爭虧陽';
+    // The regime concept that MUST appear in the summary title (taxTitle), in any language form.
+    const CONCEPT_BY_LOCALE = {
+      CN: /增值税|增值稅|増値税|VAT|TVA|부가가치세/,
+      US: /Schedule C|Sales Tax|销售税|銷售稅|판매세|taxe de vente/i,
+      JP: /消费税|消費稅|消費税|Consumption|소비세|consommation/i,
+      EU: /VAT|TVA/,
+      KR: /VAT|TVA|부가가치세/,
+      TW: /营业税|營業稅|営業税|Business Tax|영업세|activité/i,
+    };
+    // Representative 口径-bearing fields rendered across the pages (raw/undefined keys skipped).
+    const SWEEP_KEYS = [
+      'taxTitle', 'inputTax', 'outputTax', 'certifiedInput', 'invoicedOutput', 'estimatedTax',
+      'taxSummaryTitle', 'purchaseTotal', 'salesTotal', 'taxDifference',
+      'invoiceInputLabel', 'invoiceOutputLabel', 'formTaxRate', 'plTitle', 'plRevenue', 'plNetProfit',
+    ];
+    for (const accId of ACCOUNTING_LOCALES) {
+      for (const uiLang of UI_LANGUAGES) {
+        const reasons = [];
+        for (const key of SWEEP_KEYS) {
+          const v = helpers.getTaxLabel(accId, uiLang, key);
+          if (typeof v !== 'string' || v === key) continue; // key not defined for this locale → not rendered
+          for (const w of FORBIDDEN_BY_LOCALE[accId]) {
+            if (v.includes(w)) reasons.push(`module=TaxLabels field=${key} actual="${v}" forbidden="${w}" expected="${accId} 口径 wording" suggested=components/accountingLocaleConfig.ts`);
+          }
+          if (uiLang === 'zh-CN') {
+            const bad = [...v].filter((c) => TRAD_ONLY.includes(c));
+            if (bad.length) reasons.push(`module=TaxLabels field=${key} actual="${v}" forbidden="${[...new Set(bad)].join('')}"(繁体字) expected="Simplified Chinese" suggested=components/accountingLocaleConfig.ts`);
+          }
+          if (uiLang === 'zh-TW') {
+            const bad = [...v].filter((c) => SIMP_ONLY.includes(c));
+            if (bad.length) reasons.push(`module=TaxLabels field=${key} actual="${v}" forbidden="${[...new Set(bad)].join('')}"(简体字) expected="Traditional Chinese" suggested=components/accountingLocaleConfig.ts`);
+          }
+        }
+        // regime concept must be present in the summary title
+        const title = helpers.getTaxLabel(accId, uiLang, 'taxTitle');
+        if (typeof title === 'string' && title !== 'taxTitle' && !CONCEPT_BY_LOCALE[accId].test(title)) {
+          reasons.push(`module=TaxSummary field=taxTitle actual="${title}" forbidden="(missing concept)" expected="${accId} regime concept (${CONCEPT_BY_LOCALE[accId]})" suggested=components/accountingLocaleConfig.ts`);
+        }
+        if (reasons.length) fail(`matrix36:${accId}/${uiLang}`, reasons.map((r) => `[ui=${uiLang} acc=${accId}] ${r}`)); else pass(`matrix36:${accId}/${uiLang}`);
+      }
+    }
+    // i18n script integrity over the whole tree (uiLanguage-only chrome: nav / dashboard /
+    // settings / AI panel / page labels). zh-CN must be Simplified, zh-TW Traditional.
+    const walkStrings = (obj, prefix, fn) => {
+      if (obj && typeof obj === 'object') { for (const k of Object.keys(obj)) walkStrings(obj[k], prefix ? `${prefix}.${k}` : k, fn); }
+      else if (typeof obj === 'string') fn(prefix, obj);
+    };
+    {
+      const reasons = [];
+      walkStrings(locales['zh-CN'], '', (path, v) => {
+        const bad = [...v].filter((c) => TRAD_ONLY.includes(c));
+        if (bad.length) reasons.push(`module=i18n field=${path} actual="${v.slice(0, 40)}" forbidden="${[...new Set(bad)].join('')}"(繁体字) expected="Simplified Chinese" suggested=i18n/locales/zh-CN.json`);
+      });
+      if (reasons.length) fail(`i18nScript:zh-CN`, reasons); else pass(`i18nScript:zh-CN`);
+    }
+    {
+      const reasons = [];
+      walkStrings(locales['zh-TW'], '', (path, v) => {
+        const bad = [...v].filter((c) => SIMP_ONLY.includes(c));
+        if (bad.length) reasons.push(`module=i18n field=${path} actual="${v.slice(0, 40)}" forbidden="${[...new Set(bad)].join('')}"(简体字) expected="Traditional Chinese" suggested=i18n/locales/zh-TW.json`);
+      });
+      if (reasons.length) fail(`i18nScript:zh-TW`, reasons); else pass(`i18nScript:zh-TW`);
+    }
+  }
+
+  // ────────────────────────────────────────────────
   // Report
   // ────────────────────────────────────────────────
   console.log(`\n=== Locale Matrix Check ===\n`);
