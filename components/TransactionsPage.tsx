@@ -173,6 +173,8 @@ const TransactionsPage: React.FC = () => {
           <div className="bg-white/80 border border-[#e0ddd5] p-5 rounded-xl">
             <p className="text-[10px] uppercase tracking-widest text-[#5c5c5a] font-bold">{t('transactions.netIncome', 'Net Income')}</p>
             <p className={`text-xl font-bold mt-1 ${summary.net >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>{money(summary.net)}</p>
+            {/* Net income shows a formula hint, never a record count (it is income − expense, not a list) */}
+            <p className="text-[11px] text-[#7a7a78]">{t('transactions.netIncomeFormula', 'Income - Expense')}</p>
           </div>
         </div>
       )}

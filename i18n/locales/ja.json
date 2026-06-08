@@ -927,6 +927,7 @@
     "totalIncome": "総収入",
     "totalExpense": "総支出",
     "netIncome": "純利益",
+    "netIncomeFormula": "収入 - 支出",
     "items": "件",
     "expense": "支出",
     "income": "収入",

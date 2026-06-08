@@ -820,3 +820,24 @@ export const TW_TXN_CATEGORY_LABELS: Record<string, { label: Record<'zh-CN' | 'z
   'business-tax': { label: { 'zh-CN': '营业税',       'zh-TW': '營業稅' },       scheduleLine: { 'zh-CN': '税务：营业税',           'zh-TW': '稅務：營業稅' } },
   'income-tax':   { label: { 'zh-CN': '营利事业所得税', 'zh-TW': '營利事業所得稅' }, scheduleLine: { 'zh-CN': '税务：营利事业所得税', 'zh-TW': '稅務：營利事業所得稅' } },
 };
+
+// ─── CN transaction-category labels for the Chinese UI (收支记录 分类下拉) ───
+// Under CN accountingLocale + zh-CN/zh-TW UI the category dropdown shows the China-GAAP
+// report-line name as 利润表 / 利潤表 (the mainland P&L title, matching the CN block
+// plTitle) instead of the seed's 损益表-…, and the surcharge category reads 税金及附加
+// (not 营业税金及附加). Keyed by the stable slug (applied read-time in services/api.ts) so
+// it also fixes stale-DB rows; id/slug + backend report mapping (by slug) are unchanged —
+// display only. zh-CN/zh-TW only; en/ja/ko/fr keep the seed values.
+export const CN_TXN_CATEGORY_LABELS: Record<string, { label: Record<'zh-CN' | 'zh-TW', string>; scheduleLine: Record<'zh-CN' | 'zh-TW', string> }> = {
+  // income
+  sales:           { label: { 'zh-CN': '主营业务收入', 'zh-TW': '主營業務收入' }, scheduleLine: { 'zh-CN': '利润表-营业收入',     'zh-TW': '利潤表-營業收入' } },
+  'other-revenue': { label: { 'zh-CN': '其他业务收入', 'zh-TW': '其他業務收入' }, scheduleLine: { 'zh-CN': '利润表-其他业务收入', 'zh-TW': '利潤表-其他業務收入' } },
+  interest:        { label: { 'zh-CN': '利息收入',     'zh-TW': '利息收入' },     scheduleLine: { 'zh-CN': '利润表-财务收入',     'zh-TW': '利潤表-財務收入' } },
+  // expense
+  cogs:            { label: { 'zh-CN': '营业成本',     'zh-TW': '營業成本' },     scheduleLine: { 'zh-CN': '利润表-营业成本',     'zh-TW': '利潤表-營業成本' } },
+  selling:         { label: { 'zh-CN': '销售费用',     'zh-TW': '銷售費用' },     scheduleLine: { 'zh-CN': '利润表-销售费用',     'zh-TW': '利潤表-銷售費用' } },
+  admin:           { label: { 'zh-CN': '管理费用',     'zh-TW': '管理費用' },     scheduleLine: { 'zh-CN': '利润表-管理费用',     'zh-TW': '利潤表-管理費用' } },
+  financial:       { label: { 'zh-CN': '财务费用',     'zh-TW': '財務費用' },     scheduleLine: { 'zh-CN': '利润表-财务费用',     'zh-TW': '利潤表-財務費用' } },
+  'tax-surcharge': { label: { 'zh-CN': '税金及附加',   'zh-TW': '稅金及附加' },   scheduleLine: { 'zh-CN': '利润表-税金及附加',   'zh-TW': '利潤表-稅金及附加' } },
+  'income-tax':    { label: { 'zh-CN': '所得税',       'zh-TW': '所得稅' },       scheduleLine: { 'zh-CN': '利润表-所得税',       'zh-TW': '利潤表-所得稅' } },
+};

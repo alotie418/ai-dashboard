@@ -1465,7 +1465,7 @@ async function main() {
   //   TW_TXN_CATEGORY_LABELS in 中文冒号 format (损益表：… / 税务：…) — NEVER the
   //   half-width-hyphen seed form (损益表-…); (c) 营业税 → 税务：营业税 and 营利事业所得税 →
   //   税务：营利事业所得税 are 税务 filing lines, NOT 损益表 lines. No CN-VAT / non-TWD /
-  //   营利事业所得-without-税. UI stays Simplified. CN i18n (报表行 / 对应报表行 / 状态) and
+  //   营利事业所得-without-税. UI stays Simplified. CN i18n (报表项目 / 对应报表项目 / 状态) and
   //   the global header year label ({{year}} 年, no 年度) are guarded too.
   // ────────────────────────────────────────────────
   {
@@ -1530,9 +1530,9 @@ async function main() {
       const v = helpers.getTaxLabel('TW', lang, 'txnScheduleHeader');
       if (/报表行|報表行|对应科目|對應科目/.test(v)) reasons.push(`TW txnScheduleHeader[${lang}] should be 会计科目/會計科目: "${v}"`);
     }
-    // reverse: CN keeps its own 收支记录 i18n (报表行 / 对应报表行 / 状态) — TW change must not leak
-    if (get(locales['zh-CN'], 'transactions.scheduleLine') !== '报表行') reasons.push(`CN transactions.scheduleLine should stay 报表行, got "${get(locales['zh-CN'], 'transactions.scheduleLine')}"`);
-    if (get(locales['zh-CN'], 'transactions.mapsToLine') !== '对应报表行') reasons.push(`CN transactions.mapsToLine should stay 对应报表行, got "${get(locales['zh-CN'], 'transactions.mapsToLine')}"`);
+    // reverse: CN keeps its own 收支记录 i18n (报表项目 / 对应报表项目 / 状态) — TW change must not leak
+    if (get(locales['zh-CN'], 'transactions.scheduleLine') !== '报表项目') reasons.push(`CN transactions.scheduleLine should stay 报表项目, got "${get(locales['zh-CN'], 'transactions.scheduleLine')}"`);
+    if (get(locales['zh-CN'], 'transactions.mapsToLine') !== '对应报表项目') reasons.push(`CN transactions.mapsToLine should stay 对应报表项目, got "${get(locales['zh-CN'], 'transactions.mapsToLine')}"`);
     if (get(locales['zh-CN'], 'tableHeaders.status') !== '状态') reasons.push(`CN tableHeaders.status should stay 状态, got "${get(locales['zh-CN'], 'tableHeaders.status')}"`);
     // global header year label simplified to {{year}} 年 (no 年度) for both Chinese UIs
     for (const lang of ['zh-CN', 'zh-TW']) {
@@ -1540,6 +1540,43 @@ async function main() {
       if (yl !== '{{year}} 年') reasons.push(`${lang} header.yearLabel should be "{{year}} 年" (no 年度), got "${yl}"`);
     }
     if (reasons.length) fail(`twTransactionsWording`, reasons); else pass(`twTransactionsWording`);
+  }
+
+  // ────────────────────────────────────────────────
+  // PART G17: CN transaction-category labels (收支记录 分类下拉).
+  //   Under CN accountingLocale + zh-CN/zh-TW UI the dropdown shows `label → schedule_line`
+  //   via CN_TXN_CATEGORY_LABELS (read-time, by slug). The report-line uses the mainland
+  //   P&L name 利润表 / 利潤表 — never the seed's 损益表 / 損益表 — and the surcharge category
+  //   reads 税金及附加 / 稅金及附加, never 营业税金及附加 / 營業稅金及附加.
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const M = config.CN_TXN_CATEGORY_LABELS || {};
+    const REQUIRED_SLUGS = ['sales', 'other-revenue', 'interest', 'cogs', 'selling', 'admin', 'financial', 'tax-surcharge', 'income-tax'];
+    const LABEL_PIN = {
+      'zh-CN': { sales: '主营业务收入', 'other-revenue': '其他业务收入', interest: '利息收入', cogs: '营业成本', selling: '销售费用', admin: '管理费用', financial: '财务费用', 'tax-surcharge': '税金及附加', 'income-tax': '所得税' },
+      'zh-TW': { sales: '主營業務收入', 'other-revenue': '其他業務收入', interest: '利息收入', cogs: '營業成本', selling: '銷售費用', admin: '管理費用', financial: '財務費用', 'tax-surcharge': '稅金及附加', 'income-tax': '所得稅' },
+    };
+    const LINE_PIN = {
+      'zh-CN': { sales: '利润表-营业收入', 'other-revenue': '利润表-其他业务收入', interest: '利润表-财务收入', cogs: '利润表-营业成本', selling: '利润表-销售费用', admin: '利润表-管理费用', financial: '利润表-财务费用', 'tax-surcharge': '利润表-税金及附加', 'income-tax': '利润表-所得税' },
+      'zh-TW': { sales: '利潤表-營業收入', 'other-revenue': '利潤表-其他業務收入', interest: '利潤表-財務收入', cogs: '利潤表-營業成本', selling: '利潤表-銷售費用', admin: '利潤表-管理費用', financial: '利潤表-財務費用', 'tax-surcharge': '利潤表-稅金及附加', 'income-tax': '利潤表-所得稅' },
+    };
+    for (const slug of REQUIRED_SLUGS) {
+      const e = M[slug];
+      if (!e) { reasons.push(`CN_TXN_CATEGORY_LABELS missing slug "${slug}"`); continue; }
+      for (const lang of ['zh-CN', 'zh-TW']) {
+        const label = e.label && e.label[lang];
+        const line = e.scheduleLine && e.scheduleLine[lang];
+        if (label !== LABEL_PIN[lang][slug]) reasons.push(`CN cat ${slug}.label[${lang}] should be "${LABEL_PIN[lang][slug]}", got "${label}"`);
+        if (line !== LINE_PIN[lang][slug]) reasons.push(`CN cat ${slug}.scheduleLine[${lang}] should be "${LINE_PIN[lang][slug]}", got "${line}"`);
+        for (const [field, v] of [['label', label], ['scheduleLine', line]]) {
+          if (typeof v !== 'string') continue;
+          if (/损益表|損益表/.test(v)) reasons.push(`CN cat ${slug}.${field}[${lang}] must use 利润表/利潤表, not 损益表/損益表: "${v}"`);
+          if (/营业税金及附加|營業稅金及附加/.test(v)) reasons.push(`CN cat ${slug}.${field}[${lang}] should be 税金及附加/稅金及附加 (drop 营业): "${v}"`);
+        }
+      }
+    }
+    if (reasons.length) fail(`cnTxnCategoryLabels`, reasons); else pass(`cnTxnCategoryLabels`);
   }
 
   // ────────────────────────────────────────────────
