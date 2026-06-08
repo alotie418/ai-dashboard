@@ -359,6 +359,21 @@ async function checkAnalyticsMatrixDisplay() {
   }
 }
 
+async function checkFinanceMoneyFormat() {
+  // 财务报表 (FinancePage): every money LineItem must go through the currency formatter
+  // fmt() (= formatMoney → ¥0.00 / NT$0.00 …), never a bare numeric value that renders as
+  // "0.00" without a symbol. Percentages/ratios pass pre-built strings ("…%") and are fine.
+  let src;
+  try { src = await readFile(join(ROOT, 'components/FinancePage.tsx'), 'utf8'); } catch { return; }
+  const m = src.match(/value=\{\s*[0-9]/g);
+  if (m) {
+    findings.push({
+      file: 'components/FinancePage.tsx', line: 0, type: 'finance-money-format', token: 'value={<number>}',
+      snippet: `${m.length} LineItem(s) pass a bare numeric value (e.g. value={0.0}) — money must use fmt()/formatMoney so it shows the currency symbol (¥0.00), not a symbol-less 0.00`,
+    });
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -375,6 +390,7 @@ async function main() {
   await checkNoAutoAIAnalysis();
   await checkAIQuotaCooldown();
   await checkAnalyticsMatrixDisplay();
+  await checkFinanceMoneyFormat();
 
   console.log(`\n=== Raw Key Leak Scanner ===\n`);
   console.log(`Scanned: ${SCAN_DIRS.join(', ')}`);
