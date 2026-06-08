@@ -200,10 +200,6 @@
         "item1": "所有 API Key 经 Electron safeStorage 加密后写入本地 SQLite，渲染端无法读到明文",
         "item2": "SoloLedger 不会将 Key 上传到任何服务器，AI 请求由你的设备直接发往对应服务商",
         "item3": "删除 Key 后该 Provider 立即停止可用，但已生成的业务数据保留不变"
-      },
-      "autoInsight": {
-        "title": "自主洞察生成",
-        "subtitle": "看板加载时自动运行 AI 分析（使用默认 Provider）"
       }
     },
     "dataMigration": {

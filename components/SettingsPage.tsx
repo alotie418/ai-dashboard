@@ -35,7 +35,6 @@ const SettingsPage: React.FC = () => {
     address: '',
   });
   const [taxAutoAuth, setTaxAutoAuth] = useState(false);
-  const [aiAutoInsight, setAiAutoInsight] = useState(true);
   const [notifications, setNotifications] = useState({
     stockZero: true,
     taxDeviation: true,
@@ -102,7 +101,6 @@ const SettingsPage: React.FC = () => {
     if (s.accounting_locale) setAccLocale(s.accounting_locale);
     if (s.company_info) setCompanyInfo(s.company_info);
     if (s.tax_auto_auth !== undefined) setTaxAutoAuth(s.tax_auto_auth);
-    if (s.ai_auto_insight !== undefined) setAiAutoInsight(s.ai_auto_insight);
     if (s.notifications) setNotifications(s.notifications);
     if (s.vat_rate !== undefined) setVatRate(String(s.vat_rate));
     if (s.admin_expense_annual !== undefined) setAdminExpenseAnnual(String(s.admin_expense_annual));
@@ -127,7 +125,6 @@ const SettingsPage: React.FC = () => {
       const payload = {
         company_info: companyInfo,
         tax_auto_auth: taxAutoAuth,
-        ai_auto_insight: aiAutoInsight,
         notifications,
         vat_rate: vatRate,
         admin_expense_annual: parseFloat(adminExpenseAnnual) || 0,
@@ -276,13 +273,6 @@ const SettingsPage: React.FC = () => {
             {!isLoading && !loadError && activeSection === 'ai' && (
               <div className="space-y-8">
                 <ProvidersSection />
-                <div className="flex items-center justify-between p-4 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5]">
-                  <div>
-                    <p className="text-sm font-bold text-[#191918]">{t('settings.ai.autoInsight.title')}</p>
-                    <p className="text-xs text-[#5c5c5a]">{t('settings.ai.autoInsight.subtitle')}</p>
-                  </div>
-                  <ToggleButton checked={aiAutoInsight} onChange={setAiAutoInsight} />
-                </div>
               </div>
             )}
 

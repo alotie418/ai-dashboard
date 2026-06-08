@@ -200,10 +200,6 @@
         "item1": "Toutes les clés API sont chiffrées via Electron safeStorage dans SQLite local ; le rendu n'a jamais accès au texte clair",
         "item2": "SoloLedger n'envoie jamais votre clé à aucun serveur. Les requêtes IA partent directement de votre appareil vers le fournisseur",
         "item3": "Supprimer une clé désactive immédiatement ce fournisseur. Les données métier existantes sont préservées."
-      },
-      "autoInsight": {
-        "title": "Analyse automatique",
-        "subtitle": "Lance automatiquement l'analyse IA au chargement du tableau de bord (fournisseur par défaut)"
       }
     },
     "dataMigration": {
