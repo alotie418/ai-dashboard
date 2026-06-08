@@ -237,10 +237,10 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{genLabel('invDateRange', 'invoices.dateRange')}</label>
                 <div className="flex items-center space-x-2">
-                  <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                  <input type="date" lang={uiLang} value={dateFrom} onChange={e => setDateFrom(e.target.value)}
                     className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />
                   <span className="text-[#5c5c5a] text-xs">—</span>
-                  <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                  <input type="date" lang={uiLang} value={dateTo} onChange={e => setDateTo(e.target.value)}
                     className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />
                 </div>
               </div>
