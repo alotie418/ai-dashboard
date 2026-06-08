@@ -339,6 +339,26 @@ async function checkAIQuotaCooldown() {
   }
 }
 
+async function checkAnalyticsMatrixDisplay() {
+  // 年度数据全景矩阵 (DataAnalysisPage): amount cards must use the full money formatter
+  // (formatMoney → ¥0.00, locale-correct) not the compact …k form, and the quantity must
+  // NOT append a hardcoded product unit (吨/ton/…) — units belong to product/SKU settings.
+  let src;
+  try { src = await readFile(join(ROOT, 'components/DataAnalysisPage.tsx'), 'utf8'); } catch { return; }
+  if (!/formatMoney\(item\.revenue/.test(src)) {
+    findings.push({
+      file: 'components/DataAnalysisPage.tsx', line: 0, type: 'analytics-matrix-money', token: 'formatMoney',
+      snippet: '年度数据全景矩阵 month-card revenue should use formatMoney (¥0.00), not the compact …k form',
+    });
+  }
+  if (/item\.salesTons\}\s*\{unitLabel\}/.test(src)) {
+    findings.push({
+      file: 'components/DataAnalysisPage.tsx', line: 0, type: 'analytics-matrix-unit', token: 'unitLabel',
+      snippet: '年度数据全景矩阵 quantity must not append a fixed product unit (drop {unitLabel}); units belong to product/SKU settings',
+    });
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -354,6 +374,7 @@ async function main() {
   await checkTransactionSummaryMoney();
   await checkNoAutoAIAnalysis();
   await checkAIQuotaCooldown();
+  await checkAnalyticsMatrixDisplay();
 
   console.log(`\n=== Raw Key Leak Scanner ===\n`);
   console.log(`Scanned: ${SCAN_DIRS.join(', ')}`);

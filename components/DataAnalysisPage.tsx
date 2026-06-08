@@ -557,22 +557,23 @@ ${JSON.stringify(mcOnVar)}
               {data.monthlyPerformance.map((item, idx) => (
                 <div key={idx} className="bg-[#f9f9f8]/60 border border-[#e0ddd5]/70 p-4 rounded-xl hover:border-[#d97757]/40 transition-all hover:bg-[#f9f9f8]/80 group">
                   <p className="text-[#5c5c5a] text-[10px] font-bold uppercase mb-2 group-hover:text-[#d97757] transition-colors">{item.name}</p>
-                  <p className="text-[#191918] text-lg font-bold">{formatCompactMoney(item.revenue, accLocale, uiLang, 0)}</p>
+                  <p className="text-[#191918] text-lg font-bold">{formatMoney(item.revenue, accLocale, uiLang)}</p>
                   <div className="mt-3 space-y-1">
                     <div className="flex justify-between text-[9px]">
                       <span className="text-[#5c5c5a]">{t('analysis.chartProfit')}</span>
-                      <span className="text-emerald-600 font-bold">{formatCompactMoney(item.profit, accLocale, uiLang, 1)}</span>
+                      <span className="text-emerald-600 font-bold">{formatMoney(item.profit, accLocale, uiLang)}</span>
                     </div>
                     <div className="flex justify-between text-[9px]">
                       <span className="text-[#5c5c5a]">{t('analysis.chartTons')}</span>
-                      <span className="text-[#4a4a48]">{item.salesTons} {unitLabel}</span>
+                      {/* Quantity only — no hardcoded商品单位 (units belong to product/SKU settings, not analytics) */}
+                      <span className="text-[#4a4a48]">{item.salesTons}</span>
                     </div>
                   </div>
                 </div>
               ))}
               <div className="bg-[#d97757] border border-[#d97757] p-4 rounded-xl flex flex-col justify-center items-center cursor-pointer hover:scale-105 transition-transform" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}>
                 <p className="text-white/80 text-[10px] font-bold uppercase mb-1">{t('analysis.chartAvgRevenue')}</p>
-                <p className="text-white text-xl font-bold">{formatCompactMoney(stats.avgRevenue, accLocale, uiLang, 1)}</p>
+                <p className="text-white text-xl font-bold">{formatMoney(stats.avgRevenue, accLocale, uiLang)}</p>
               </div>
             </div>
           </div>
