@@ -783,7 +783,7 @@ ${contextText}`;
           <div className="w-8 h-8 bg-[#d97757] rounded-lg flex items-center justify-center mr-3 flex-shrink-0 shadow-lg" style={{ boxShadow: '0 4px 24px rgba(217,119,87,0.2)' }}>
             <i className="fas fa-layer-group text-white text-sm"></i>
           </div>
-          {sidebarOpen && <span className="font-bold text-xl tracking-tight text-[#191918]">SoloLedger<span className="text-[#6b6b69] text-sm font-normal ml-1.5">{t('app.subtitle').split('·')[0]?.trim()}</span></span>}
+          {sidebarOpen && <span className="font-bold text-xl tracking-tight text-[#191918]">SoloLedger</span>}
         </div>
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
           <NavItem icon="fa-th-large" label={t('nav.dashboard')} active={currentPage === 'dashboard'} expanded={sidebarOpen} onClick={() => setCurrentPage('dashboard')} />
