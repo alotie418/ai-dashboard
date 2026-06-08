@@ -508,7 +508,7 @@
     "advancedFilter": "高级过滤",
     "clearAll": "清空筛选",
     "tableTitle": "发票流转全景视图",
-    "tableSubtitle": "核对发票流与物流的一致性 (Inventory vs Invoices)",
+    "tableSubtitle": "核对发票流与物流的一致性（库存与发票）",
     "export": "导出报表",
     "dateRange": "开票日期范围",
     "amountRange": "金额范围 (不含税)",
