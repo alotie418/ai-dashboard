@@ -91,7 +91,7 @@
     "notifications": {
       "title": "预警与通知",
       "stockZero": "库存跌至零值提醒",
-      "taxDeviation": "税收偏差超过 15% 预警",
+      "taxDeviation": "税款偏差超过 15% 预警",
       "priceVolatility": "异常价格波动监测",
       "monthlyReport": "月度财务报告推送"
     },
@@ -220,7 +220,7 @@
       "rollback": "回滚迁移（删除已迁移的 {{count}} 条 transactions）",
       "rollbackConfirm": "确认回滚？这将删除 {{count}} 条已迁移的 transactions，旧 sales/purchases 数据保持不变。",
       "rollbackButton": "确认回滚",
-      "note1": "sales → income / purchases → expense；默认归到当前会计制度的\"收入第一项 / COGS\"类别",
+      "note1": "sales → income / purchases → expense；默认归到当前会计制度的\"收入第一项 / 销售成本\"类别",
       "note2": "旧表数据不会删除，可随时回滚",
       "note3": "迁移记录写入 legacy_migrations 表，避免重复迁移",
       "note4": "旧字段（吨位 / 单价 / 运费）会保存到 source_meta JSON，不丢失"

@@ -91,7 +91,7 @@
     "notifications": {
       "title": "預警與通知",
       "stockZero": "庫存跌至零值提醒",
-      "taxDeviation": "稅收偏差超過 15% 預警",
+      "taxDeviation": "稅款偏差超過 15% 預警",
       "priceVolatility": "異常價格波動監測",
       "monthlyReport": "月度財務報告推送"
     },
@@ -220,7 +220,7 @@
       "rollback": "回滾遷移（刪除已遷移的 {{count}} 筆 transactions）",
       "rollbackConfirm": "確認回滾？這將刪除 {{count}} 筆已遷移的 transactions，舊 sales/purchases 資料保持不變。",
       "rollbackButton": "確認回滾",
-      "note1": "sales → income / purchases → expense；預設歸到目前會計制度的「收入第一項 / COGS」類別",
+      "note1": "sales → income / purchases → expense；預設歸到目前會計制度的「收入第一項 / 銷售成本」類別",
       "note2": "舊表資料不會刪除，可隨時回滾",
       "note3": "遷移記錄寫入 legacy_migrations 表，避免重複遷移",
       "note4": "舊欄位（噸位 / 單價 / 運費）會保存到 source_meta JSON，不丟失"
