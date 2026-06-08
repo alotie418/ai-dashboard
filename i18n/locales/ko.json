@@ -927,6 +927,7 @@
     "totalIncome": "총 수입",
     "totalExpense": "총 지출",
     "netIncome": "순이익",
+    "netIncomeFormula": "수입 - 지출",
     "items": "건",
     "expense": "지출",
     "income": "수입",

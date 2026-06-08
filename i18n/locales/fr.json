@@ -927,6 +927,7 @@
     "totalIncome": "Total revenus",
     "totalExpense": "Total dépenses",
     "netIncome": "Revenu net",
+    "netIncomeFormula": "Revenus - Dépenses",
     "items": "éléments",
     "expense": "Dépenses",
     "income": "Revenus",
