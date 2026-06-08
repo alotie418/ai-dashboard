@@ -51,8 +51,8 @@ export function testProvider(payload: TestProviderRequest): Promise<TestProvider
 }
 
 // ==================== Categories（国际化数据模型 v4）====================
+// AIProviderId is already imported at the top of this file; no re-import here.
 
-import type { AIProviderId } from '../types';
 import { JP_TXN_CATEGORY_LABELS, EU_TXN_CATEGORY_LABELS, KR_TXN_CATEGORY_LABELS, TW_TXN_CATEGORY_LABELS } from '../components/accountingLocaleConfig';
 
 export type AccountingLocale = 'CN' | 'US' | 'JP' | 'EU' | 'KR' | 'TW';
@@ -691,6 +691,8 @@ export async function deletePurchase(id: string): Promise<void> {
 // --- Dashboard ---
 
 export interface DashboardResponse {
+  // accountingLocale echoed by the backend dashboard summary (App.tsx reads dashboard.locale)
+  locale?: AccountingLocale;
   metrics: {
     inventoryTons: number;
     purchaseTotalTons: number;
