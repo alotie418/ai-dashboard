@@ -794,6 +794,8 @@
     "recommendations": "Action Items",
     "recommendation": "Suggestion",
     "error": "AI analysis failed. Check network or API config and retry.",
+    "quotaExceeded": "Gemini 한도에 도달했습니다. AI 공급자를 변경하거나 나중에 다시 시도하세요.",
+    "quotaSwitchHint": "{{providers}} 사용 가능 — 설정 → AI 공급자에서 전환하세요.",
     "retry": "Retry",
     "empty": "No analysis data. Click refresh to generate.",
     "powered": "Powered by GEMINI 3 FLASH"

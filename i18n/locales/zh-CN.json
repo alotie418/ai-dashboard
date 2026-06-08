@@ -83,7 +83,7 @@
       "autoAuth": "进项发票自动认证",
       "autoAuthDesc": "上传后自动同步至税务系统进行认证",
       "adminExpense": "年度管理费用",
-      "adminExpenseDesc": "用于损益表净利润计算（含办公、人工、折旧等）",
+      "adminExpenseDesc": "用于净利润计算（含办公、人工、折旧等）",
       "perYear": "元/年",
       "hint": "提示：税金及附加按增值税12%自动计算，所得税按利润总额25%自动计算"
     },
@@ -794,6 +794,8 @@
     "recommendations": "落地行动建议",
     "recommendation": "建议",
     "error": "AI 分析失败，请检查网络连接或 API 配置后重试。",
+    "quotaExceeded": "Gemini 额度已达上限，请更换 AI 供应商或稍后再试。",
+    "quotaSwitchHint": "检测到可用的 {{providers}}，可在「设置 → AI 服务商」切换。",
     "retry": "重试",
     "empty": "暂无分析数据。点击刷新按钮生成。",
     "powered": "由 GEMINI 3 FLASH 提供算力支持"

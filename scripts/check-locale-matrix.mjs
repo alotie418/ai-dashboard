@@ -1541,6 +1541,36 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────
+  // PART G14: CN finance tax-inclusive summary title — zh-TW wording.
+  //   Under CN accountingLocale + zh-TW UI the 含税金额汇总 title reads the more formal
+  //   含稅金額統計 (the old 含稅金額匯總 (對帳用) was stiff/repetitive). zh-CN keeps its own
+  //   value; en/ja/ko/fr unchanged. China-GAAP VAT口径 must stay (the title must NOT
+  //   adopt Taiwan wording 营业税 / 营利事业所得税 / 销货收入). Display only.
+  // ────────────────────────────────────────────────
+  {
+    const reasons = [];
+    const TW_VOCAB_BAN = /营业税|營業稅|营利事业所得|營利事業所得|销货收入|銷貨收入/;
+    const tw = helpers.getTaxLabel('CN', 'zh-TW', 'taxSummaryTitle');
+    const cn = helpers.getTaxLabel('CN', 'zh-CN', 'taxSummaryTitle');
+    if (tw !== '含稅金額統計') reasons.push(`CN taxSummaryTitle[zh-TW] should be "含稅金額統計", got "${tw}"`);
+    if (cn !== '含税金额汇总 (对账用)') reasons.push(`CN taxSummaryTitle[zh-CN] should stay "含税金额汇总 (对账用)", got "${cn}"`);
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      const v = helpers.getTaxLabel('CN', lang, 'taxSummaryTitle');
+      if (typeof v === 'string' && TW_VOCAB_BAN.test(v)) reasons.push(`CN taxSummaryTitle[${lang}] must not use Taiwan wording (营业税/营利事业所得/销货收入): "${v}"`);
+    }
+    // CN VAT口径 elsewhere stays China-GAAP (regression guard): 进项/销项/应交增值税
+    if (!/进项税额|進項稅額/.test(helpers.getTaxLabel('CN', 'zh-CN', 'inputTax') + helpers.getTaxLabel('CN', 'zh-TW', 'inputTax'))) reasons.push(`CN inputTax should keep 进项税额/進項稅額`);
+    // The admin-expense settings hint serves every accountingLocale under each Chinese
+    // UI, so it must not embed a regime-specific report name (mainland 利润表 vs TW/JP
+    // 损益表) — keep it regime-neutral so 损益表 never shows under CN nor 利润表 under TW.
+    for (const lang of ['zh-CN', 'zh-TW']) {
+      const desc = get(locales[lang], 'settings.tax.adminExpenseDesc');
+      if (typeof desc === 'string' && /损益表|損益表|利润表|利潤表/.test(desc)) reasons.push(`${lang} settings.tax.adminExpenseDesc should stay regime-neutral (no 损益表/利润表): "${desc}"`);
+    }
+    if (reasons.length) fail(`cnTaxSummaryTitleZhTw`, reasons); else pass(`cnTaxSummaryTitleZhTw`);
+  }
+
+  // ────────────────────────────────────────────────
   // PART G0x: TW dashboard business-tax section (经营看板 营业税 + P&L).
   //   TW accountingLocale uses Taiwan 营业税 wording (台湾营业税统计 / 采购进项营业税 /
   //   销售销项营业税 / 营利事业所得税). 进项/销项 ARE allowed for TW (本地营业税口径);
