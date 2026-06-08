@@ -410,7 +410,6 @@ export interface AppSettings {
     address: string;
   };
   tax_auto_auth?: boolean;
-  ai_auto_insight?: boolean;
   notifications?: {
     stockZero: boolean;
     taxDeviation: boolean;

@@ -6,7 +6,6 @@ const { getDb } = require('../db');
 const SETTINGS_ALLOWED_KEYS = new Set([
   'company_info',
   'tax_auto_auth',
-  'ai_auto_insight',
   'notifications',
   'admin_expense_annual',
   'vat_rate',

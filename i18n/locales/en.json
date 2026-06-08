@@ -200,10 +200,6 @@
         "item1": "All API Keys are encrypted via Electron safeStorage into local SQLite; the renderer never sees plaintext",
         "item2": "SoloLedger never uploads your Key. AI requests go directly from your device to the provider.",
         "item3": "Deleting a Key immediately disables that provider. Existing business data is preserved."
-      },
-      "autoInsight": {
-        "title": "Autonomous Insight",
-        "subtitle": "Automatically run AI analysis on dashboard load (uses default provider)"
       }
     },
     "dataMigration": {
