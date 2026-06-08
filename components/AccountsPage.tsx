@@ -125,7 +125,7 @@ const AccountsPage: React.FC = () => {
               </p>
             </div>
             <div className="bg-white rounded-xl p-4 border border-[#e0ddd5]">
-              <p className="text-xs text-[#7a7a78] mb-1">{t('accounts.unpaidCount')}</p>
+              <p className="text-xs text-[#7a7a78] mb-1">{activeTab === 'receivable' ? t('accounts.unpaidCountReceivable') : t('accounts.unpaidCount')}</p>
               <p className="text-xl font-bold text-[#191918]">{details.length}</p>
             </div>
             <div className="bg-white rounded-xl p-4 border border-[#e0ddd5]">

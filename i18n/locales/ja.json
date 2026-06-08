@@ -663,6 +663,7 @@
     "totalPayable": "Total Payable",
     "overdueAmount": "Overdue",
     "unpaidCount": "Unpaid Items",
+    "unpaidCountReceivable": "Uncollected Items",
     "collectionRate": "Collection Rate",
     "paymentRate": "Payment Rate",
     "agingTitle": "Aging Analysis",
