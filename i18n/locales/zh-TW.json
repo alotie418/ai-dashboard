@@ -966,5 +966,13 @@
     "empty": "暫無商品或服務項目，點擊下方新增。",
     "selectLabel": "商品 / 服務（可選）",
     "unassigned": "未指定"
+  },
+  "inventory": {
+    "inStockCount": "庫存商品數",
+    "totalCost": "庫存總成本",
+    "detailTitle": "庫存明細",
+    "colProduct": "商品",
+    "colQty": "在庫數量",
+    "colCost": "庫存成本"
   }
 }

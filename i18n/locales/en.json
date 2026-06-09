@@ -966,5 +966,13 @@
     "empty": "No products or services yet. Click below to add one.",
     "selectLabel": "Product / Service (optional)",
     "unassigned": "Unassigned"
+  },
+  "inventory": {
+    "inStockCount": "Products in Stock",
+    "totalCost": "Total Inventory Cost",
+    "detailTitle": "Inventory Detail",
+    "colProduct": "Product",
+    "colQty": "On Hand",
+    "colCost": "Cost"
   }
 }

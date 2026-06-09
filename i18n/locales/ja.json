@@ -966,5 +966,13 @@
     "empty": "商品・サービスがありません。下から追加してください。",
     "selectLabel": "商品・サービス（任意）",
     "unassigned": "未指定"
+  },
+  "inventory": {
+    "inStockCount": "在庫商品数",
+    "totalCost": "在庫総原価",
+    "detailTitle": "在庫明細",
+    "colProduct": "商品",
+    "colQty": "在庫数",
+    "colCost": "在庫原価"
   }
 }

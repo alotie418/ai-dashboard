@@ -145,6 +145,8 @@ async function summary({ query }) {
     report,
     mileageSummary,
     homeOffice,
+    // Phase 3: per-product inventory overview (legacy metrics.inventoryTons kept above)
+    inventory: require('./inventory').computeSummary(db),
   };
 }
 

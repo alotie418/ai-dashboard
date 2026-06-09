@@ -14,6 +14,7 @@ const batch = require('./batch');
 const ai = require('./ai');
 const categories = require('./categories');
 const products = require('./products');
+const inventory = require('./inventory');
 const transactions = require('./transactions');
 const migrationsH = require('./migrations');
 const reportsH = require('./reports');
@@ -57,6 +58,9 @@ const routes = [
   ['POST', '/api/categories', categories.create],
   ['PUT', '/api/categories/:id', categories.update],
   ['DELETE', '/api/categories/:id', categories.remove],
+
+  // ---- Inventory（按商品库存聚合，Phase 3；具体路径排前）----
+  ['GET', '/api/inventory/summary', inventory.summary],
 
   // ---- Products / Service Items（商品/服务项目主数据，Phase 1）----
   ['GET', '/api/products', products.list],

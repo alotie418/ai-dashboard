@@ -966,5 +966,13 @@
     "empty": "暂无商品或服务项目，点击下方新增。",
     "selectLabel": "商品 / 服务（可选）",
     "unassigned": "未指定"
+  },
+  "inventory": {
+    "inStockCount": "库存商品数",
+    "totalCost": "库存总成本",
+    "detailTitle": "库存明细",
+    "colProduct": "商品",
+    "colQty": "在库数量",
+    "colCost": "库存成本"
   }
 }
