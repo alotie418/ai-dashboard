@@ -17,8 +17,18 @@ const AccountingSection: React.FC = () => {
 
   useEffect(() => {
     fetchSettings().then((s: any) => {
-      if (s.accounting_locale) setCurrentLocale(s.accounting_locale);
-      if (s.vat_rate !== undefined) setVatRate(Number(s.vat_rate));
+      const loc = s.accounting_locale || DEFAULT_ACCOUNTING_LOCALE;
+      const p = getProfile(loc);
+      if (s.accounting_locale) setCurrentLocale(loc);
+      if (s.vat_rate !== undefined) {
+        // Default-value protection: a persisted rate outside the current regime's
+        // option range (e.g. CN's 13% lingering after switching to US, whose
+        // options top out at 10) falls back to the regime default instead of
+        // leaking across. CN keeps 13 (within its own range).
+        const v = Number(s.vat_rate);
+        const opts = p.vatRateOptions;
+        setVatRate(v < Math.min(...opts) || v > Math.max(...opts) ? p.vatRate : v);
+      }
       if (s.surcharge_rate !== undefined) setSurchargeRate(Number(s.surcharge_rate));
       if (s.income_tax_rate !== undefined) setIncomeTaxRate(Number(s.income_tax_rate));
       if (s.currency) setCurrency(s.currency);
@@ -107,7 +117,7 @@ const AccountingSection: React.FC = () => {
                 {selected && <i className="fas fa-check-circle text-[#d97757]"></i>}
               </div>
               <div className="space-y-1 text-[11px] text-[#5c5c5a]">
-                <div>{taxLabel}: <span className="font-mono font-semibold text-[#191918]">{p.vatRate}%</span></div>
+                <div>{taxLabel}: <span className="font-mono font-semibold text-[#191918]">{p.vatRateDisplay?.[lang] ?? `${p.vatRate}%`}</span></div>
                 <div>{t('settings.accounting.incomeTax')}: <span className="font-mono font-semibold text-[#191918]">{p.incomeTaxRate}%</span></div>
                 <div>{t('settings.accounting.currency')}: <span className="font-mono font-semibold text-[#191918]">{p.currency} ({p.currencySymbol})</span></div>
               </div>
@@ -128,7 +138,7 @@ const AccountingSection: React.FC = () => {
               className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white" />
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{t('settings.accounting.surcharge')} (%)</label>
+            <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{(profile.surchargeLabel?.[lang] ?? t('settings.accounting.surcharge'))} (%)</label>
             <input type="number" step="0.1" value={surchargeRate} onChange={e => setSurchargeRate(Number(e.target.value))}
               className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white" />
           </div>
@@ -161,10 +171,10 @@ const AccountingSection: React.FC = () => {
         >
           {saving ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('common.saving')}</> : t('common.save')}
         </button>
-        {profile.notes && (
+        {(profile.notesByLang?.[lang] || profile.notes) && (
           <div className="text-[10px] text-[#7a7a78] bg-white border border-[#e0ddd5] rounded p-2 mt-2">
             <i className="fas fa-info-circle mr-1 text-[#d97757]"></i>
-            {profile.notes}
+            {profile.notesByLang?.[lang] || profile.notes}
           </div>
         )}
       </div>
