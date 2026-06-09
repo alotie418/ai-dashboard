@@ -13,6 +13,7 @@ const alertsH = require('./alerts');
 const batch = require('./batch');
 const ai = require('./ai');
 const categories = require('./categories');
+const products = require('./products');
 const transactions = require('./transactions');
 const migrationsH = require('./migrations');
 const reportsH = require('./reports');
@@ -56,6 +57,12 @@ const routes = [
   ['POST', '/api/categories', categories.create],
   ['PUT', '/api/categories/:id', categories.update],
   ['DELETE', '/api/categories/:id', categories.remove],
+
+  // ---- Products / Service Items（商品/服务项目主数据，Phase 1）----
+  ['GET', '/api/products', products.list],
+  ['POST', '/api/products', products.create],
+  ['PUT', '/api/products/:id', products.update],
+  ['DELETE', '/api/products/:id', products.remove],
 
   // ---- Transactions（国际化数据模型 v5，C 阶段）----
   // 具体路径排前：summary 不和 :id 冲突

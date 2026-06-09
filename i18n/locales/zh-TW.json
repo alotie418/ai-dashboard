@@ -63,7 +63,8 @@
       "categories": "會計類別",
       "notifications": "預警與通知",
       "security": "帳號與安全",
-      "dataMigration": "資料遷移"
+      "dataMigration": "資料遷移",
+      "products": "商品 / 服務"
     },
     "company": {
       "title": "企業基礎資料",
@@ -945,5 +946,23 @@
     "paid": "已付",
     "partial": "部分",
     "unpaid": "未付"
+  },
+  "products": {
+    "title": "商品 / 服務項目",
+    "subtitle": "管理商品和服務項目及其單位。服務類項目不參與庫存統計。",
+    "name": "名稱",
+    "namePlaceholder": "例如：A 型包裝盒 / 諮詢服務",
+    "unit": "單位",
+    "cost": "預設單價",
+    "type": "類型",
+    "product": "商品",
+    "service": "服務",
+    "isService": "服務類（不計庫存）",
+    "status": "狀態",
+    "active": "啟用",
+    "inactive": "停用",
+    "addButton": "新增商品 / 服務",
+    "addTitle": "新增項目",
+    "empty": "暫無商品或服務項目，點擊下方新增。"
   }
 }

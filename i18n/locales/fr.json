@@ -63,7 +63,8 @@
       "categories": "Catégories comptables",
       "notifications": "Alertes & notifications",
       "security": "Compte & sécurité",
-      "dataMigration": "Migration de données"
+      "dataMigration": "Migration de données",
+      "products": "Produits"
     },
     "company": {
       "title": "Informations entreprise",
@@ -945,5 +946,23 @@
     "paid": "Payé",
     "partial": "Partiel",
     "unpaid": "Impayé"
+  },
+  "products": {
+    "title": "Produits et services",
+    "subtitle": "Gérez les produits et services et leurs unités. Les services sont exclus du stock.",
+    "name": "Nom",
+    "namePlaceholder": "ex. : Boîte type A / Conseil",
+    "unit": "Unité",
+    "cost": "Prix unitaire par défaut",
+    "type": "Type",
+    "product": "Produit",
+    "service": "Service",
+    "isService": "Service (hors stock)",
+    "status": "Statut",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "addButton": "Ajouter un produit / service",
+    "addTitle": "Nouvel élément",
+    "empty": "Aucun produit ni service. Cliquez ci-dessous pour en ajouter."
   }
 }

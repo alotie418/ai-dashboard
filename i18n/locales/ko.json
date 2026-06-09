@@ -63,7 +63,8 @@
       "categories": "회계 계정 과목",
       "notifications": "알림 및 경고",
       "security": "계정 및 보안",
-      "dataMigration": "데이터 마이그레이션"
+      "dataMigration": "데이터 마이그레이션",
+      "products": "상품 / 서비스"
     },
     "company": {
       "title": "기업 기본 정보",
@@ -945,5 +946,23 @@
     "paid": "결제 완료",
     "partial": "일부",
     "unpaid": "미결제"
+  },
+  "products": {
+    "title": "상품 / 서비스 항목",
+    "subtitle": "상품 및 서비스 항목과 단위를 관리합니다. 서비스 항목은 재고에 포함되지 않습니다.",
+    "name": "이름",
+    "namePlaceholder": "예: A형 포장 상자 / 컨설팅",
+    "unit": "단위",
+    "cost": "기본 단가",
+    "type": "유형",
+    "product": "상품",
+    "service": "서비스",
+    "isService": "서비스(재고 미포함)",
+    "status": "상태",
+    "active": "활성",
+    "inactive": "비활성",
+    "addButton": "상품 / 서비스 추가",
+    "addTitle": "새 항목",
+    "empty": "상품 또는 서비스가 없습니다. 아래에서 추가하세요."
   }
 }
