@@ -24,6 +24,7 @@ const CategoriesSection: React.FC = () => {
     if (locale === 'US') {
       if (c.slug === 'gross-receipts') return getTaxLabel(locale, lang, 'setCatGrossReceipts');
       if (c.slug === 'home-office') return getTaxLabel(locale, lang, 'setCatHomeOffice');
+      if (c.slug === 'utilities') return getTaxLabel(locale, lang, 'setCatUtilities');
     }
     return c.displayLabel;
   };
@@ -159,7 +160,7 @@ const CategoriesSection: React.FC = () => {
             <thead className="bg-[#f9f9f8] text-[10px] uppercase tracking-wider text-[#4a4a48]">
               <tr>
                 <th className="text-left px-4 py-2.5">{t('settings.categories.label', '名称')}</th>
-                <th className="text-left px-4 py-2.5">Slug</th>
+                <th className="text-left px-4 py-2.5">{t('settings.categories.slug', 'Slug')}</th>
                 <th className="text-left px-4 py-2.5">{t('settings.categories.scheduleLine', '报表行')}</th>
                 <th className="text-right px-4 py-2.5">{usLabel('setDeductibleHeader', 'settings.categories.deductible', '可抵扣')}</th>
                 <th className="text-right px-4 py-2.5 w-24"></th>

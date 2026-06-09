@@ -151,6 +151,7 @@
       "expense": "支出",
       "income": "収入",
       "label": "名称",
+      "slug": "Slug",
       "scheduleLine": "報告書の行",
       "deductible": "控除可",
       "deductiblePct": "控除率 (%)",

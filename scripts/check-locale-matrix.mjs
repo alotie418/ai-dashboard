@@ -465,7 +465,7 @@ async function main() {
               setCreditCodeLabel: 'EIN / 税号', setLegalPersonLabel: '负责人',
               setVatRateLabel: '销售税税率（Sales Tax）', setRateByState: '按州设置', setRateCustom: '自定义税率', setRateZero: '0%',
               setAutoAuthLabel: '票据自动处理', setAdminExpenseLabel: '年度经营费用', setPerYear: '美元/年',
-              setDeductibleHeader: '可扣除', setCatGrossReceipts: '总收入或销售额', setCatHomeOffice: '家庭办公室',
+              setDeductibleHeader: '可扣除', setCatGrossReceipts: '总收入 / 销售额', setCatHomeOffice: '家庭办公室',
               setNavAi: 'AI 服务商（BYOK）', setAddKey: '添加密钥', setEditKey: '修改密钥', setWebGrounding: '支持联网检索',
               setCompanyNamePh: '例如：ABC Trading LLC', setLegalPersonPh: '例如：张三 / John Smith', setIndustryPh: '例如：咨询 / 零售 / 服务',
               dmCardSales: '销售记录（旧版）→ 收入记录', dmCardPurchases: '采购记录（旧版）→ 费用记录',
@@ -495,7 +495,7 @@ async function main() {
               setCreditCodeLabel: 'EIN / 稅號', setLegalPersonLabel: '負責人',
               setVatRateLabel: '銷售稅稅率（Sales Tax）', setRateByState: '按州設置', setRateCustom: '自訂稅率', setRateZero: '0%',
               setAutoAuthLabel: '票據自動處理', setAdminExpenseLabel: '年度經營費用', setPerYear: '美元/年',
-              setDeductibleHeader: '可扣除', setCatGrossReceipts: '總收入或銷售額', setCatHomeOffice: '家庭辦公室',
+              setDeductibleHeader: '可扣除', setCatGrossReceipts: '總收入 / 銷售額', setCatHomeOffice: '家庭辦公室',
               setNavAi: 'AI 服務商（BYOK）', setAddKey: '新增密鑰', setEditKey: '修改密鑰', setWebGrounding: '支援聯網檢索',
               setCompanyNamePh: '例如：ABC Trading LLC', setLegalPersonPh: '例如：王小明 / John Smith', setIndustryPh: '例如：顧問 / 零售 / 服務',
               dmCardSales: '銷售記錄（舊版）→ 收入記錄', dmCardPurchases: '採購記錄（舊版）→ 費用記錄',
@@ -926,11 +926,29 @@ async function main() {
   // ────────────────────────────────────────────────
   {
     const reasons = [];
-    const usNotes = accProfiles.getProfile('US').notes || '';
-    if (/美国联邦\s*VAT|美國聯邦\s*VAT/.test(usNotes)) reasons.push(`US profile.notes implies a US federal VAT: "${usNotes}"`);
-    if (!/无联邦\s*VAT|無聯邦\s*VAT/.test(usNotes)) reasons.push(`US profile.notes should state 无联邦 VAT: "${usNotes}"`);
-    if (!/Federal Corporate Tax/.test(usNotes)) reasons.push(`US profile.notes should mention Federal Corporate Tax: "${usNotes}"`);
-    if (/增值税|增值稅|进项|進項|税金及附加|稅金及附加/.test(usNotes)) reasons.push(`US profile.notes uses CN-VAT wording: "${usNotes}"`);
+    const usP = accProfiles.getProfile('US');
+    // Notes shown under en/ja/ko/fr fall back to `.notes`; zh-CN/zh-TW use `notesByLang`.
+    // Each variant must keep the same accounting intent regardless of wording.
+    const usNotesVariants = [
+      usP.notes || '',
+      usP.notesByLang?.['zh-CN'] || '',
+      usP.notesByLang?.['zh-TW'] || '',
+    ].filter(Boolean);
+    for (const usNotes of usNotesVariants) {
+      // never read as if the US has a federal VAT
+      if (/美国联邦\s*VAT|美國聯邦\s*VAT/.test(usNotes)) reasons.push(`US profile.notes implies a US federal VAT: "${usNotes}"`);
+      // must state the US has NO federal VAT (either 无联邦 VAT or 没有联邦增值税)
+      if (!/无联邦\s*VAT|無聯邦\s*VAT|没有联邦增值税|沒有聯邦增值稅/.test(usNotes)) reasons.push(`US profile.notes should state the US has no federal VAT: "${usNotes}"`);
+      // must mention the federal corporate income tax (21%)
+      if (!/Federal Corporate Tax|联邦公司所得税|聯邦公司所得稅/.test(usNotes)) reasons.push(`US profile.notes should mention federal corporate income tax: "${usNotes}"`);
+      // must not import CN-specific input/output-tax surcharge wording
+      if (/进项|進項|销项|銷項|税金及附加|稅金及附加|抵扣/.test(usNotes)) reasons.push(`US profile.notes uses CN-VAT wording: "${usNotes}"`);
+    }
+    // US card shows a "by state" hint instead of a misleading 0%, plus a local-tax label (zh only)
+    if (usP.vatRateDisplay?.['zh-CN'] !== '按州设置') reasons.push(`US card vatRateDisplay[zh-CN] should be 按州设置: "${usP.vatRateDisplay?.['zh-CN']}"`);
+    if (usP.vatRateDisplay?.['zh-TW'] !== '按州設定') reasons.push(`US card vatRateDisplay[zh-TW] should be 按州設定: "${usP.vatRateDisplay?.['zh-TW']}"`);
+    if (usP.surchargeLabel?.['zh-CN'] !== '地方税率') reasons.push(`US surchargeLabel[zh-CN] should be 地方税率: "${usP.surchargeLabel?.['zh-CN']}"`);
+    if (usP.surchargeLabel?.['zh-TW'] !== '地方稅率') reasons.push(`US surchargeLabel[zh-TW] should be 地方稅率: "${usP.surchargeLabel?.['zh-TW']}"`);
     if (reasons.length) fail(`usProfileNotes:US`, reasons); else pass(`usProfileNotes:US`);
   }
 
@@ -2145,6 +2163,25 @@ async function main() {
       if (get(cn, 'settings.tax.autoAuth') !== '进项发票自动认证') reasons.push(`CN settings.tax.autoAuth should stay 进项发票自动认证, got "${get(cn, 'settings.tax.autoAuth')}"`);
       if (!/税金及附加/.test(get(cn, 'settings.tax.hint') || '')) reasons.push(`CN settings.tax.hint should keep 税金及附加, got "${get(cn, 'settings.tax.hint')}"`);
       if (reasons.length) fail(`cnSettingsPreserved`, reasons); else pass(`cnSettingsPreserved`);
+    }
+    // Categories page (会计类别) wording: friendly Slug header (分类代码) + 报表项目
+    // (matching the 收支记录 page), plus US category display labels (gross-receipts /
+    // utilities) rendered via getTaxLabel. zh only; en/ja/ko/fr untouched.
+    {
+      const cn = locales['zh-CN'], tw = locales['zh-TW'];
+      const reasons = [];
+      if (get(cn, 'settings.categories.slug') !== '分类代码') reasons.push(`categories.slug[zh-CN] should be 分类代码, got "${get(cn, 'settings.categories.slug')}"`);
+      if (get(tw, 'settings.categories.slug') !== '分類代碼') reasons.push(`categories.slug[zh-TW] should be 分類代碼, got "${get(tw, 'settings.categories.slug')}"`);
+      if (get(cn, 'settings.categories.scheduleLine') !== '报表项目') reasons.push(`categories.scheduleLine[zh-CN] should be 报表项目, got "${get(cn, 'settings.categories.scheduleLine')}"`);
+      if (get(tw, 'settings.categories.scheduleLine') !== '報表項目') reasons.push(`categories.scheduleLine[zh-TW] should be 報表項目, got "${get(tw, 'settings.categories.scheduleLine')}"`);
+      if (helpers.getTaxLabel('US', 'zh-CN', 'setCatGrossReceipts') !== '总收入 / 销售额') reasons.push(`US setCatGrossReceipts[zh-CN] should be 总收入 / 销售额, got "${helpers.getTaxLabel('US','zh-CN','setCatGrossReceipts')}"`);
+      if (helpers.getTaxLabel('US', 'zh-TW', 'setCatGrossReceipts') !== '總收入 / 銷售額') reasons.push(`US setCatGrossReceipts[zh-TW] should be 總收入 / 銷售額, got "${helpers.getTaxLabel('US','zh-TW','setCatGrossReceipts')}"`);
+      if (helpers.getTaxLabel('US', 'zh-CN', 'setCatUtilities') !== '水电及网络') reasons.push(`US setCatUtilities[zh-CN] should be 水电及网络, got "${helpers.getTaxLabel('US','zh-CN','setCatUtilities')}"`);
+      if (helpers.getTaxLabel('US', 'zh-TW', 'setCatUtilities') !== '水電及網路') reasons.push(`US setCatUtilities[zh-TW] should be 水電及網路, got "${helpers.getTaxLabel('US','zh-TW','setCatUtilities')}"`);
+      // systemNote must match the header wording (报表项目, not the old 报表行)
+      if (!/官方报表项目/.test(get(cn, 'settings.categories.systemNote') || '') || /报表行/.test(get(cn, 'settings.categories.systemNote') || '')) reasons.push(`categories.systemNote[zh-CN] should say 官方报表项目 (not 报表行), got "${get(cn, 'settings.categories.systemNote')}"`);
+      if (!/官方報表項目/.test(get(tw, 'settings.categories.systemNote') || '') || /報表行/.test(get(tw, 'settings.categories.systemNote') || '')) reasons.push(`categories.systemNote[zh-TW] should say 官方報表項目 (not 報表行), got "${get(tw, 'settings.categories.systemNote')}"`);
+      if (reasons.length) fail(`categoriesWording`, reasons); else pass(`categoriesWording`);
     }
   }
 

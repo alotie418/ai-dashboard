@@ -151,14 +151,15 @@
       "expense": "支出",
       "income": "收入",
       "label": "名称",
-      "scheduleLine": "报表行",
+      "slug": "分类代码",
+      "scheduleLine": "报表项目",
       "deductible": "可抵扣",
       "deductiblePct": "可抵扣比例 (%)",
       "userMade": "自建",
       "empty": "该制度暂无此类型的类别",
       "addNew": "新增类别",
       "addNewButton": "新增自定义类别",
-      "systemNote": "系统预置类别由 SoloLedger 维护，与官方报表行对应，不可删除（但可改名）。自建类别完全由你掌控。"
+      "systemNote": "系统预置类别由 SoloLedger 维护，与官方报表项目对应，不可删除（但可改名）。自建类别完全由你掌控。"
     },
     "ai": {
       "title": "AI 服务商 · BYOK",

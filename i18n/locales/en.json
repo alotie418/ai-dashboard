@@ -151,6 +151,7 @@
       "expense": "Expense",
       "income": "Income",
       "label": "Name",
+      "slug": "Slug",
       "scheduleLine": "Schedule Line",
       "deductible": "Deductible",
       "deductiblePct": "Deductible % (0-100)",

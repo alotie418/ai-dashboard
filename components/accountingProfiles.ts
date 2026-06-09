@@ -19,6 +19,9 @@ export interface AccountingProfile {
   currency: string;
   currencySymbol: string;
   notes?: string;
+  vatRateDisplay?: { [lang: string]: string };  // optional non-numeric card display (e.g. US「按州设置」instead of 0%)
+  surchargeLabel?: { [lang: string]: string };   // optional per-regime override for the surcharge field label
+  notesByLang?: { [lang: string]: string };       // optional per-language notes; falls back to `notes`
 }
 
 export const ACCOUNTING_PROFILES: Record<string, AccountingProfile> = {
@@ -47,6 +50,12 @@ export const ACCOUNTING_PROFILES: Record<string, AccountingProfile> = {
     currency: 'USD',
     currencySymbol: '$',
     notes: '美国无联邦 VAT；Sales Tax 通常由州和地方征收。Federal Corporate Tax 为 21%；S-Corp/LLC 通常按个人所得税申报。',
+    vatRateDisplay: { 'zh-CN': '按州设置', 'zh-TW': '按州設定' },
+    surchargeLabel: { 'zh-CN': '地方税率', 'zh-TW': '地方稅率' },
+    notesByLang: {
+      'zh-CN': '美国没有联邦增值税（VAT）；销售税（Sales Tax）通常由州和地方征收。联邦公司所得税税率为 21%；S-Corp / LLC 通常按个人所得税申报。',
+      'zh-TW': '美國沒有聯邦增值稅（VAT）；銷售稅（Sales Tax）通常由州和地方徵收。聯邦公司所得稅稅率為 21%；S-Corp / LLC 通常按個人所得稅申報。',
+    },
   },
   JP: {
     locale: 'JP',
