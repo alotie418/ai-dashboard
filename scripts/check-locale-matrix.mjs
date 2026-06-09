@@ -569,6 +569,15 @@ async function main() {
               reasons.push(`US ${key} in ${uiLang} should include native-language explanation: "${v}"`);
             }
           }
+          // 自雇税 module: zh labels read Chinese-first — 中文术语（English，rate）.
+          if (uiLang === 'zh-CN') {
+            if (helpers.getTaxLabel(accId, uiLang, 'socialSecurity') !== '社会保障税（Social Security，12.4%）') reasons.push(`US socialSecurity[zh-CN] should be 社会保障税（Social Security，12.4%）, got "${helpers.getTaxLabel(accId, uiLang, 'socialSecurity')}"`);
+            if (helpers.getTaxLabel(accId, uiLang, 'medicare') !== '医疗保险税（Medicare，2.9%）') reasons.push(`US medicare[zh-CN] should be 医疗保险税（Medicare，2.9%）, got "${helpers.getTaxLabel(accId, uiLang, 'medicare')}"`);
+          }
+          if (uiLang === 'zh-TW') {
+            if (helpers.getTaxLabel(accId, uiLang, 'socialSecurity') !== '社會保障稅（Social Security，12.4%）') reasons.push(`US socialSecurity[zh-TW] should be 社會保障稅（Social Security，12.4%）, got "${helpers.getTaxLabel(accId, uiLang, 'socialSecurity')}"`);
+            if (helpers.getTaxLabel(accId, uiLang, 'medicare') !== '醫療保險稅（Medicare，2.9%）') reasons.push(`US medicare[zh-TW] should be 醫療保險稅（Medicare，2.9%）, got "${helpers.getTaxLabel(accId, uiLang, 'medicare')}"`);
+          }
         }
       }
 

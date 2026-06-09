@@ -60,8 +60,8 @@ const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice,
         </div>
         <div className="flex flex-col flex-1 justify-around py-2">
           <Row label={label('seTax')} value={fmt(se.totalSETax)} />
-          <Row label={`├ ${label('socialSecurity')} (12.4%)`} value={fmt(se.socialSecurityTax)} indent />
-          <Row label={`├ ${label('medicare')} (2.9%)`} value={fmt(se.medicareTax)} indent />
+          <Row label={`├ ${label('socialSecurity')}`} value={fmt(se.socialSecurityTax)} indent />
+          <Row label={`├ ${label('medicare')}`} value={fmt(se.medicareTax)} indent />
           {se.additionalMedicare > 0 && <Row label={`└ ${label('additionalMedicare')} (0.9%)`} value={fmt(se.additionalMedicare)} indent />}
           <div className="border-t border-[#e0ddd5] mx-4 my-1"></div>
           <Row label={label('quarterlyTax')} value={fmt(est.quarterlyPayment)} bold primary />
