@@ -220,7 +220,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
       invoicePendingTax: { 'zh-CN': '待认证进项额', 'zh-TW': '待認證進項額', en: 'Pending Input VAT', ja: '未認証仕入税額', ko: '미인증 매입세액', fr: 'TVA achats en attente' },
       invoiceTypeOutput: { 'zh-CN': '销项', 'zh-TW': '銷項', en: 'Output', ja: '売上', ko: '매출', fr: 'Vente' },
       invoiceTypeInput: { 'zh-CN': '进项', 'zh-TW': '進項', en: 'Input', ja: '仕入', ko: '매입', fr: 'Achat' },
-      inventoryUnit: { 'zh-CN': '吨', 'zh-TW': '噸', en: 'units', ja: '単位', ko: '단위', fr: 'unités' },
+      inventoryUnit: { 'zh-CN': '数量', 'zh-TW': '數量', en: 'units', ja: '単位', ko: '단위', fr: 'unités' },
     },
     dashboardSections: ['profit_loss', 'profit_margins', 'vat_summary', 'tax_inclusive_summary'],
     reportTypes: ['income-statement', 'vat-summary', 'tax-inclusive'],

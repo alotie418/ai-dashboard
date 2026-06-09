@@ -311,7 +311,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
                       <th className="px-2 py-1.5 text-left">#</th>
                       <th className="px-2 py-1.5 text-left">日期</th>
                       <th className="px-2 py-1.5 text-left">{type === 'sales' ? '客户' : '供应商'}</th>
-                      <th className="px-2 py-1.5 text-right">吨数</th>
+                      <th className="px-2 py-1.5 text-right">数量</th>
                       <th className="px-2 py-1.5 text-right">总金额</th>
                       <th className="px-2 py-1.5 text-center">状态</th>
                     </tr>

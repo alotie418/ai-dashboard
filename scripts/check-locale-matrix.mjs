@@ -611,13 +611,15 @@ async function main() {
   // ────────────────────────────────────────────────
   // PART D: getInventoryUnitLabel driven by uiLanguage only
   // ────────────────────────────────────────────────
+  // No hardcoded default unit: legacy 'ton' and the generic 'unit' (and null/unset)
+  // render as NO label (pure quantity). Only an explicit real unit (e.g. bag) shows.
   const unitExpectations = {
-    'zh-CN': { unit: '单位', ton: '吨', bag: '袋' },
-    'zh-TW': { unit: '單位', ton: '噸', bag: '袋' },
-    en: { unit: 'units', ton: 'tons', bag: 'bags' },
-    ja: { unit: '単位', ton: 'トン', bag: '袋' },
-    ko: { unit: '단위', ton: '톤', bag: '포대' },
-    fr: { unit: 'unités', ton: 'tonnes', bag: 'sacs' },
+    'zh-CN': { unit: '', ton: '', bag: '袋' },
+    'zh-TW': { unit: '', ton: '', bag: '袋' },
+    en: { unit: '', ton: '', bag: 'bags' },
+    ja: { unit: '', ton: '', bag: '袋' },
+    ko: { unit: '', ton: '', bag: '포대' },
+    fr: { unit: '', ton: '', bag: 'sacs' },
   };
   for (const uiLang of UI_LANGUAGES) {
     const reasons = [];
@@ -625,11 +627,9 @@ async function main() {
       const got = helpers.getInventoryUnitLabel(unitKey, uiLang);
       if (got !== expected) reasons.push(`unit ${unitKey} expected "${expected}", got "${got}"`);
     }
-    // null/undefined should fall back to 'unit'
+    // null/undefined/unset → no unit label (pure quantity)
     const nullFallback = helpers.getInventoryUnitLabel(null, uiLang);
-    if (nullFallback !== unitExpectations[uiLang].unit) {
-      reasons.push(`null fallback expected "${unitExpectations[uiLang].unit}", got "${nullFallback}"`);
-    }
+    if (nullFallback !== '') reasons.push(`null/unset should have no unit label, got "${nullFallback}"`);
     if (reasons.length) fail(`inventoryUnit:${uiLang}`, reasons); else pass(`inventoryUnit:${uiLang}`);
   }
 
@@ -2278,7 +2278,7 @@ async function main() {
       const reasons = [];
       if (helpers.getTaxLabel('CN', 'zh-CN', 'invoiceTypeInput') !== '进项') reasons.push(`CN invoiceTypeInput should stay 进项`);
       if (helpers.getTaxLabel('CN', 'zh-CN', 'invoiceTypeOutput') !== '销项') reasons.push(`CN invoiceTypeOutput should stay 销项`);
-      if (get(cn, 'invoices.totalInput') !== '累计进项吨数') reasons.push(`CN invoices.totalInput should stay 累计进项吨数, got "${get(cn, 'invoices.totalInput')}"`);
+      if (get(cn, 'invoices.totalInput') !== '累计进项数量') reasons.push(`CN invoices.totalInput should stay 累计进项数量 (进项 kept, no 吨), got "${get(cn, 'invoices.totalInput')}"`);
       if (get(cn, 'invoices.pendingTax') !== '待认证进项额') reasons.push(`CN invoices.pendingTax should stay 待认证进项额, got "${get(cn, 'invoices.pendingTax')}"`);
       if (!/抵扣/.test(get(cn, 'invoices.deductible') || '')) reasons.push(`CN invoices.deductible should keep 抵扣, got "${get(cn, 'invoices.deductible')}"`);
       if (!/认证/.test(get(cn, 'invoices.authenticated') || '')) reasons.push(`CN invoices.authenticated should keep 认证, got "${get(cn, 'invoices.authenticated')}"`);

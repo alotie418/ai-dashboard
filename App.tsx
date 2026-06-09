@@ -20,7 +20,7 @@ import AccountsPage from './components/AccountsPage';
 import TransactionsPage from './components/TransactionsPage';
 import USTaxToolsPage from './components/USTaxToolsPage';
 import USDashboardCards from './components/USDashboardCards';
-import { formatMoney, getTaxLabel, getDashboardSections, getCurrencySymbol, buildAIFinanceContext } from './components/accountingHelpers';
+import { formatMoney, getTaxLabel, getDashboardSections, getCurrencySymbol, buildAIFinanceContext, getInventoryUnitLabel } from './components/accountingHelpers';
 import AlertCenter from './components/AlertCenter';
 import LoginPage from './components/LoginPage';
 import OnboardingWizard from './components/OnboardingWizard';
@@ -232,35 +232,43 @@ const AppContent: React.FC = () => {
       const accLocale = dashboard.locale || 'CN';
       const sym = getCurrencySymbol(accLocale);
 
+      // Quantity unit suffix — empty unless a real business unit is configured
+      // (legacy 'ton'/unset → pure numbers). Display-only; no calc impact.
+      let productUnit = '';
+      try { const us = await fetchSettings(); productUnit = (us as any).product_unit || ''; } catch { /* default: no unit */ }
+      const qtyUnit = getInventoryUnitLabel(productUnit, i18n.language);
+      const qtySuffix = qtyUnit ? ` ${qtyUnit}` : '';
+      const perUnit = qtyUnit ? `/${qtyUnit}` : '';
+
       const next: BusinessData = {
         ...dataRef.current,
         locale: accLocale, // pass through for dashboard rendering
         metrics: [
           {
             label: t('dashboard.inventory'),
-            value: m.inventoryTons > 0 ? `${m.inventoryTons}${t('units.tonSuffix')}` : '—',
-            subValue: m.inventoryTons > 0 ? `${t('dashboard.purchasesLabel')}${m.purchaseTotalTons}${t('units.tonSuffix')} - ${t('dashboard.salesLabel')}${m.salesTotalTons}${t('units.tonSuffix')}` : '—',
+            value: m.inventoryTons > 0 ? `${m.inventoryTons}${qtySuffix}` : '—',
+            subValue: m.inventoryTons > 0 ? `${t('dashboard.purchasesLabel')}${m.purchaseTotalTons}${qtySuffix} - ${t('dashboard.salesLabel')}${m.salesTotalTons}${qtySuffix}` : '—',
             icon: 'fa-boxes',
             color: 'bg-blue-500',
           },
           {
             label: `${t('header.yearLabel', { year: selectedYear })} ${t('dashboard.purchasesLabel')}`,
             value: m.purchaseTotalAmount > 0 ? formatMoney(m.purchaseTotalAmount, accLocale) : '—',
-            subValue: m.purchaseTotalTons > 0 ? `${m.purchaseTotalTons}${t('units.tonSuffix')}` : '—',
+            subValue: m.purchaseTotalTons > 0 ? `${m.purchaseTotalTons}${qtySuffix}` : '—',
             icon: 'fa-truck-loading',
             color: 'bg-purple-500',
           },
           {
             label: `${t('header.yearLabel', { year: selectedYear })} ${t('dashboard.salesLabel')}`,
             value: m.salesTotalAmount > 0 ? formatMoney(m.salesTotalAmount, accLocale) : '—',
-            subValue: m.salesTotalTons > 0 ? `${m.salesTotalTons}${t('units.tonSuffix')}` : '—',
+            subValue: m.salesTotalTons > 0 ? `${m.salesTotalTons}${qtySuffix}` : '—',
             icon: 'fa-chart-line',
             color: 'bg-green-500',
           },
           {
             label: t('dashboard.avgCost'),
-            value: m.avgCostPerTon > 0 ? `${sym}${m.avgCostPerTon.toLocaleString()}${t('units.perTon')}` : '—',
-            subValue: m.purchaseTotalTons > 0 ? `${m.purchaseTotalTons}${t('units.tonSuffix')} ${t('dashboard.purchasesLabel')}` : '—',
+            value: m.avgCostPerTon > 0 ? `${sym}${m.avgCostPerTon.toLocaleString()}${perUnit}` : '—',
+            subValue: m.purchaseTotalTons > 0 ? `${m.purchaseTotalTons}${qtySuffix} ${t('dashboard.purchasesLabel')}` : '—',
             icon: 'fa-tags',
             color: 'bg-orange-500',
           },

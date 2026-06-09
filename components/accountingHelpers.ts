@@ -200,9 +200,14 @@ const INVENTORY_UNIT_LABELS: Record<string, Record<string, string>> = {
 export type InventoryUnitKey = 'unit' | 'kg' | 'ton' | 'piece' | 'box' | 'bag' | 'liter';
 
 export function getInventoryUnitLabel(unitKey: string | null | undefined, uiLanguage: string): string {
-  const key = unitKey || 'unit';
-  const entry = INVENTORY_UNIT_LABELS[key] || INVENTORY_UNIT_LABELS.unit;
-  return entry[uiLanguage] || entry[uiLanguage.split('-')[0]] || entry.en || 'units';
+  // No explicit business unit → no label, so quantities render as pure numbers.
+  // 'ton' is the legacy default (single-product origin) and 'unit' is the generic
+  // placeholder; both are treated as "unconfigured". Any other explicit unit
+  // (kg/piece/box/bag/liter) still shows, for when a unit-picker is added later.
+  if (!unitKey || unitKey === 'ton' || unitKey === 'unit') return '';
+  const entry = INVENTORY_UNIT_LABELS[unitKey];
+  if (!entry) return '';
+  return entry[uiLanguage] || entry[uiLanguage.split('-')[0]] || entry.en || '';
 }
 
 // 格式化数量 + 单位，例如 "0.00 單位" / "100 tons"
@@ -214,7 +219,7 @@ export function formatQuantity(
 ): string {
   const label = getInventoryUnitLabel(unitKey, uiLanguage);
   const n = (amount || 0).toFixed(decimals);
-  return `${n} ${label}`;
+  return label ? `${n} ${label}` : n;
 }
 
 // Format a legacy string-typed quantity ("10吨" or "10") for display.
@@ -230,7 +235,7 @@ export function formatLegacyQuantity(
   if (!s) return '';
   if (/[^\d.\s]/.test(s)) return s;
   const label = getInventoryUnitLabel(unitKey, uiLanguage);
-  return `${s} ${label}`;
+  return label ? `${s} ${label}` : s;
 }
 
 export { ACCOUNTING_LOCALES, type AccountingLocaleId, type UILanguageCode };

@@ -220,7 +220,7 @@
       "note1": "sales → income / purchases → expense; 기본적으로 현재 회계 제도의 '수입 첫 항목 / 매출원가' 과목으로 분류",
       "note2": "이전 테이블 데이터는 삭제되지 않습니다 — 언제든지 롤백 가능",
       "note3": "마이그레이션 기록은 legacy_migrations 테이블에 저장되어 중복 마이그레이션 방지",
-      "note4": "이전 필드(톤수 / 단가 / 운송비)는 source_meta JSON에 저장되어 손실되지 않음"
+      "note4": "이전 필드(수량 / 단가 / 운송비)는 source_meta JSON에 저장되어 손실되지 않음"
     }
   },
   "onboarding": {
@@ -386,7 +386,7 @@
     "formSupplier": "Supplier",
     "formSupplierPlaceholder": "Enter supplier name",
     "formQuantity": "Quantity",
-    "formQuantityPlaceholder": "예: 100 단위",
+    "formQuantityPlaceholder": "예: 1",
     "formPrice": "매입금액 (세전)",
     "formTaxRate": "세율",
     "formUnitPrice": "세전 단가",
@@ -437,7 +437,7 @@
     "uploadScanning": "Analyzing invoice...",
     "uploadAnalyzing": "AI extracting date, amount, invoice number...",
     "inventoryTitle": "Current Inventory",
-    "inventoryTons": "tons",
+    "inventoryTons": "",
     "inventoryBags": "bags",
     "inventoryPurchase": "Total Purchased",
     "inventorySales": "Total Sold",
@@ -454,7 +454,7 @@
     "formCustomer": "Customer",
     "formCustomerPlaceholder": "Enter customer name",
     "formQuantity": "Quantity",
-    "formQuantityPlaceholder": "예: 100 단위",
+    "formQuantityPlaceholder": "예: 1",
     "formPrice": "매출금액 (세전)",
     "formShipping": "Shipping Cost",
     "formUnitPrice": "세전 단가",
@@ -472,7 +472,7 @@
     "recognitionMode": "Recognition Mode",
     "loading": "Loading...",
     "inventoryCurrent": "Current Inventory",
-    "inventoryTon": "tons",
+    "inventoryTon": "",
     "inventoryBag": "bags",
     "inventoryLow": "Low inventory — sales will cause negative stock",
     "inventoryTotalPurchase": "Total Purchased",
@@ -492,8 +492,8 @@
   "invoices": {
     "currentStock": "Real-time Inventory",
     "stockNormal": "Stock Normal",
-    "totalInput": "Total Input (tons)",
-    "totalOutput": "Total Output (tons)",
+    "totalInput": "Total Input",
+    "totalOutput": "Total Output",
     "pendingTax": "Pending Input Tax",
     "deductible": "Estimated Deductible",
     "noInput": "No purchase records",
@@ -511,7 +511,7 @@
     "amountRange": "Amount Range (Excl. Tax)",
     "min": "Min",
     "max": "Max",
-    "weightRange": "Weight Range (tons)",
+    "weightRange": "Quantity Range",
     "statusFilter": "Invoice Status",
     "allStatus": "All Status",
     "verified": "Verified",
@@ -847,10 +847,10 @@
     "empty": "차트 데이터 없음"
   },
   "units": {
-    "ton": "t",
-    "tonSuffix": "t",
+    "ton": "",
+    "tonSuffix": "",
     "bagSuffix": "개",
-    "perTon": "/t"
+    "perTon": ""
   },
   "ai": {
     "languageHint": "한국어로 답변해 주세요.",
