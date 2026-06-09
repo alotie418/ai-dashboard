@@ -220,7 +220,7 @@
       "note1": "sales → income / purchases → expense；既定では現在の会計制度の\"収入第一項 / 売上原価\"科目に振り分け",
       "note2": "旧テーブルのデータは削除されません — いつでもロールバック可能",
       "note3": "移行記録は legacy_migrations テーブルに保存され、重複移行を防止",
-      "note4": "旧フィールド（トン数 / 単価 / 運送費）は source_meta JSON に保存され、失われません"
+      "note4": "旧フィールド（数量 / 単価 / 運送費）は source_meta JSON に保存され、失われません"
     }
   },
   "onboarding": {
@@ -386,7 +386,7 @@
     "formSupplier": "Supplier",
     "formSupplierPlaceholder": "Enter supplier name",
     "formQuantity": "Quantity",
-    "formQuantityPlaceholder": "例: 100 単位",
+    "formQuantityPlaceholder": "例：1",
     "formPrice": "仕入金額（税抜）",
     "formTaxRate": "税率",
     "formUnitPrice": "税抜単価",
@@ -437,7 +437,7 @@
     "uploadScanning": "Analyzing invoice...",
     "uploadAnalyzing": "AI extracting date, amount, invoice number...",
     "inventoryTitle": "Current Inventory",
-    "inventoryTons": "tons",
+    "inventoryTons": "",
     "inventoryBags": "bags",
     "inventoryPurchase": "Total Purchased",
     "inventorySales": "Total Sold",
@@ -454,7 +454,7 @@
     "formCustomer": "Customer",
     "formCustomerPlaceholder": "Enter customer name",
     "formQuantity": "Quantity",
-    "formQuantityPlaceholder": "例: 100 単位",
+    "formQuantityPlaceholder": "例：1",
     "formPrice": "売上金額（税抜）",
     "formShipping": "Shipping Cost",
     "formUnitPrice": "税抜単価",
@@ -472,7 +472,7 @@
     "recognitionMode": "Recognition Mode",
     "loading": "Loading...",
     "inventoryCurrent": "Current Inventory",
-    "inventoryTon": "tons",
+    "inventoryTon": "",
     "inventoryBag": "bags",
     "inventoryLow": "Low inventory — sales will cause negative stock",
     "inventoryTotalPurchase": "Total Purchased",
@@ -492,8 +492,8 @@
   "invoices": {
     "currentStock": "Real-time Inventory",
     "stockNormal": "Stock Normal",
-    "totalInput": "Total Input (tons)",
-    "totalOutput": "Total Output (tons)",
+    "totalInput": "Total Input",
+    "totalOutput": "Total Output",
     "pendingTax": "Pending Input Tax",
     "deductible": "Estimated Deductible",
     "noInput": "No purchase records",
@@ -511,7 +511,7 @@
     "amountRange": "Amount Range (Excl. Tax)",
     "min": "Min",
     "max": "Max",
-    "weightRange": "Weight Range (tons)",
+    "weightRange": "Quantity Range",
     "statusFilter": "Invoice Status",
     "allStatus": "All Status",
     "verified": "Verified",
@@ -847,10 +847,10 @@
     "empty": "チャートデータがありません"
   },
   "units": {
-    "ton": "t",
-    "tonSuffix": "t",
+    "ton": "",
+    "tonSuffix": "",
     "bagSuffix": "袋",
-    "perTon": "/t"
+    "perTon": ""
   },
   "ai": {
     "languageHint": "日本語で回答してください。",

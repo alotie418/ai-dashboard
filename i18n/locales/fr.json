@@ -220,7 +220,7 @@
       "note1": "sales → income / purchases → expense ; par défaut vers la première catégorie de revenu / COGS de la norme actuelle",
       "note2": "Les tables anciennes ne sont PAS supprimées — rollback à tout moment",
       "note3": "Enregistrements de migration stockés dans legacy_migrations pour éviter les doublons",
-      "note4": "Champs existants (tonnage / prix unitaire / fret) sauvegardés dans source_meta JSON — pas de perte"
+      "note4": "Champs existants (quantité / prix unitaire / fret) sauvegardés dans source_meta JSON — pas de perte"
     }
   },
   "onboarding": {
@@ -386,7 +386,7 @@
     "formSupplier": "Supplier",
     "formSupplierPlaceholder": "Enter supplier name",
     "formQuantity": "Quantity",
-    "formQuantityPlaceholder": "ex. 100 unités",
+    "formQuantityPlaceholder": "ex. : 1",
     "formPrice": "Montant achat HT",
     "formTaxRate": "Taux de taxe",
     "formUnitPrice": "Prix unitaire HT",
@@ -437,7 +437,7 @@
     "uploadScanning": "Analyzing invoice...",
     "uploadAnalyzing": "AI extracting date, amount, invoice number...",
     "inventoryTitle": "Current Inventory",
-    "inventoryTons": "tons",
+    "inventoryTons": "",
     "inventoryBags": "bags",
     "inventoryPurchase": "Total Purchased",
     "inventorySales": "Total Sold",
@@ -454,7 +454,7 @@
     "formCustomer": "Customer",
     "formCustomerPlaceholder": "Enter customer name",
     "formQuantity": "Quantity",
-    "formQuantityPlaceholder": "ex. 100 unités",
+    "formQuantityPlaceholder": "ex. : 1",
     "formPrice": "Montant vente HT",
     "formShipping": "Shipping Cost",
     "formUnitPrice": "Prix unitaire HT",
@@ -472,7 +472,7 @@
     "recognitionMode": "Recognition Mode",
     "loading": "Loading...",
     "inventoryCurrent": "Current Inventory",
-    "inventoryTon": "tons",
+    "inventoryTon": "",
     "inventoryBag": "bags",
     "inventoryLow": "Low inventory — sales will cause negative stock",
     "inventoryTotalPurchase": "Total Purchased",
@@ -492,8 +492,8 @@
   "invoices": {
     "currentStock": "Real-time Inventory",
     "stockNormal": "Stock Normal",
-    "totalInput": "Total Input (tons)",
-    "totalOutput": "Total Output (tons)",
+    "totalInput": "Total Input",
+    "totalOutput": "Total Output",
     "pendingTax": "Pending Input Tax",
     "deductible": "Estimated Deductible",
     "noInput": "No purchase records",
@@ -511,7 +511,7 @@
     "amountRange": "Amount Range (Excl. Tax)",
     "min": "Min",
     "max": "Max",
-    "weightRange": "Weight Range (tons)",
+    "weightRange": "Quantity Range",
     "statusFilter": "Invoice Status",
     "allStatus": "All Status",
     "verified": "Verified",
@@ -847,10 +847,10 @@
     "empty": "Aucune donnée graphique"
   },
   "units": {
-    "ton": "t",
-    "tonSuffix": "t",
+    "ton": "",
+    "tonSuffix": "",
     "bagSuffix": "sacs",
-    "perTon": "/t"
+    "perTon": ""
   },
   "ai": {
     "languageHint": "Veuillez répondre en français.",
