@@ -70,7 +70,7 @@ for (const acc of ACCOUNTING_LOCALES) {
         const url = route.request().url();
         if (url.includes('/api/settings')) return route.fulfill({ json: SETTINGS(acc) });
         if (url.includes('/api/dashboard')) return route.fulfill({ json: DASHBOARD(acc) });
-        if (/\/api\/(categories|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|reports\/types)/.test(url)) {
+        if (/\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|reports\/types)/.test(url)) {
           return route.fulfill({ json: [] });
         }
         return route.fulfill({ json: {} }); // catch-all → empty object
@@ -114,6 +114,54 @@ for (const acc of ACCOUNTING_LOCALES) {
     });
   }
 }
+
+// ── Settings → Products/Services sub-tab opens & renders across all 36 combos ──
+// Navigation uses stable, language-independent icons (sidebar fa-cog → settings;
+// sub-tab fa-box → products), so no fragile cross-language text selectors and no UI change.
+async function bootCombo(page: import('@playwright/test').Page, ui: string, acc: string) {
+  await page.route('**/auth/check', (r) => r.fulfill({ json: { authenticated: true } }));
+  await page.route('**/auth/**', (r) => r.fulfill({ json: { authenticated: true } }));
+  await page.route('**/api/**', (route) => {
+    const url = route.request().url();
+    if (url.includes('/api/settings')) return route.fulfill({ json: SETTINGS(acc) });
+    if (url.includes('/api/dashboard')) return route.fulfill({ json: DASHBOARD(acc) });
+    if (/\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|reports\/types)/.test(url)) {
+      return route.fulfill({ json: [] });
+    }
+    return route.fulfill({ json: {} });
+  });
+  await page.addInitScript((l) => { try { localStorage.setItem('sololedger-lang', l as string); } catch { /* ignore */ } }, ui);
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('nav', { timeout: 20_000 });
+}
+
+test.describe('settings → products/services tab', () => {
+  for (const acc of ACCOUNTING_LOCALES) {
+    for (const ui of UI_LANGUAGES) {
+      test(`products-tab ui=${ui} acc=${acc}`, async ({ page }) => {
+        await bootCombo(page, ui, acc);
+        const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+        const expectedTitle: string = loc.products.title;
+        const expectedEmpty: string = loc.products.empty;
+
+        // (1)(2) open Settings via sidebar fa-cog, then the Products/Services sub-tab via fa-box
+        await page.locator('i.fa-cog').first().click();
+        await page.locator('button:has(i.fa-box)').click();
+
+        // (3) the products title renders the resolved translation (proves the key is not a raw leak)
+        await expect(page.getByRole('heading', { name: expectedTitle })).toBeVisible({ timeout: 10_000 });
+
+        // (4) empty state renders — auto-wait, since it only appears after the (empty)
+        //     products list resolves (the title shows earlier, outside the loading gate)
+        await expect(page.getByText(expectedEmpty)).toBeVisible({ timeout: 10_000 });
+
+        // (5) no raw products.* / settings.nav.* i18n key leaked into the rendered UI
+        const body = await page.locator('body').innerText();
+        expect(body, `[ui=${ui} acc=${acc}] raw i18n key leaked`).not.toMatch(/products\.[a-zA-Z]|settings\.nav\.[a-zA-Z]/);
+      });
+    }
+  }
+});
 
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });

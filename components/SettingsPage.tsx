@@ -7,6 +7,7 @@ import ProvidersSection from './ProvidersSection';
 import LanguageSection from './LanguageSection';
 import AccountingSection from './AccountingSection';
 import CategoriesSection from './CategoriesSection';
+import ProductsSection from './ProductsSection';
 import DataMigrationSection from './DataMigrationSection';
 
 const SettingsPage: React.FC = () => {
@@ -156,6 +157,7 @@ const SettingsPage: React.FC = () => {
           <SettingsNavLink active={activeSection === 'language'} onClick={() => setActiveSection('language')} icon="fa-language" label={t('settings.nav.language')} />
           <SettingsNavLink active={activeSection === 'accounting'} onClick={() => setActiveSection('accounting')} icon="fa-balance-scale" label={t('settings.nav.accounting')} />
           <SettingsNavLink active={activeSection === 'categories'} onClick={() => setActiveSection('categories')} icon="fa-tags" label={t('settings.nav.categories')} />
+          <SettingsNavLink active={activeSection === 'products'} onClick={() => setActiveSection('products')} icon="fa-box" label={t('settings.nav.products')} />
           <SettingsNavLink active={activeSection === 'dataMigration'} onClick={() => setActiveSection('dataMigration')} icon="fa-database" label={t('settings.nav.dataMigration')} />
           <SettingsNavLink active={activeSection === 'notifications'} onClick={() => setActiveSection('notifications')} icon="fa-bell" label={t('settings.nav.notifications')} />
           <SettingsNavLink active={activeSection === 'security'} onClick={() => setActiveSection('security')} icon="fa-shield-halved" label={t('settings.nav.security')} />
@@ -279,6 +281,7 @@ const SettingsPage: React.FC = () => {
             {!isLoading && !loadError && activeSection === 'language' && <LanguageSection />}
             {!isLoading && !loadError && activeSection === 'accounting' && <AccountingSection />}
             {!isLoading && !loadError && activeSection === 'categories' && <CategoriesSection />}
+            {!isLoading && !loadError && activeSection === 'products' && <ProductsSection />}
             {!isLoading && !loadError && activeSection === 'dataMigration' && <DataMigrationSection />}
 
             {!isLoading && !loadError && activeSection === 'notifications' && (

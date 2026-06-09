@@ -148,6 +148,42 @@ export function resetCategoriesToDefault(locale: AccountingLocale): Promise<{ su
   return apiFetch('/api/categories/reset', { method: 'POST', body: JSON.stringify({ locale }) });
 }
 
+// ==================== Products / Service Items（商品/服务项目主数据，Phase 1）====================
+
+export interface Product {
+  id: string;
+  name: string;
+  unit: string;                 // key from PRODUCT_UNIT_KEYS (accountingHelpers)
+  default_unit_cost: number;
+  is_service: boolean;          // service items are excluded from inventory
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ProductUpsert {
+  name: string;
+  unit: string;
+  default_unit_cost?: number;
+  is_service?: boolean;
+  is_active?: boolean;
+  sort_order?: number;
+}
+
+export function listProducts(): Promise<Product[]> {
+  return apiFetch<Product[]>('/api/products');
+}
+export function createProduct(payload: ProductUpsert): Promise<{ success: boolean; id: string }> {
+  return apiFetch('/api/products', { method: 'POST', body: JSON.stringify(payload) });
+}
+export function updateProduct(id: string, payload: Partial<ProductUpsert>): Promise<{ success: boolean }> {
+  return apiFetch(`/api/products/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+export function deleteProduct(id: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/products/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
 // ==================== Transactions（国际化数据模型 v5，C 阶段）====================
 
 export type TransactionType = 'income' | 'expense';

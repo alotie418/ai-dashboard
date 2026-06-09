@@ -63,7 +63,8 @@
       "categories": "Categories",
       "notifications": "Alerts & Notifications",
       "security": "Account & Security",
-      "dataMigration": "Data Migration"
+      "dataMigration": "Data Migration",
+      "products": "Products"
     },
     "company": {
       "title": "Company Information",
@@ -945,5 +946,23 @@
     "paid": "Paid",
     "partial": "Partial",
     "unpaid": "Unpaid"
+  },
+  "products": {
+    "title": "Products & Services",
+    "subtitle": "Manage products and service items and their units. Service items are excluded from inventory.",
+    "name": "Name",
+    "namePlaceholder": "e.g. Type-A packing box / Consulting",
+    "unit": "Unit",
+    "cost": "Default Unit Price",
+    "type": "Type",
+    "product": "Product",
+    "service": "Service",
+    "isService": "Service (not counted in inventory)",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "addButton": "Add Product / Service",
+    "addTitle": "New Item",
+    "empty": "No products or services yet. Click below to add one."
   }
 }

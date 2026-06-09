@@ -314,6 +314,25 @@ const MIGRATIONS = [
       console.warn('[db] v8: alerts repair skipped:', e?.message);
     }
   },
+  // v9: products / service items master data (per-item unit + service flag).
+  //   Phase 1 — additive only; does NOT touch purchases/sales or inventory/calc.
+  (d) => {
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS products (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        unit TEXT NOT NULL DEFAULT 'piece',
+        default_unit_cost REAL DEFAULT 0,
+        is_service INTEGER DEFAULT 0,
+        is_active INTEGER DEFAULT 1,
+        sort_order INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    d.exec('CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active)');
+    console.log('[db] v9: products table ready');
+  },
 ];
 
 function runMigrations(d) {

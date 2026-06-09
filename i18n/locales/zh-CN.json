@@ -63,7 +63,8 @@
       "categories": "会计类别",
       "notifications": "预警与通知",
       "security": "账户与安全",
-      "dataMigration": "数据迁移"
+      "dataMigration": "数据迁移",
+      "products": "商品 / 服务"
     },
     "company": {
       "title": "企业基础信息",
@@ -945,5 +946,23 @@
     "paid": "已付",
     "partial": "部分",
     "unpaid": "未付"
+  },
+  "products": {
+    "title": "商品 / 服务项目",
+    "subtitle": "管理商品和服务项目及其单位。服务类项目不参与库存统计。",
+    "name": "名称",
+    "namePlaceholder": "例如：A 型包装盒 / 咨询服务",
+    "unit": "单位",
+    "cost": "默认单价",
+    "type": "类型",
+    "product": "商品",
+    "service": "服务",
+    "isService": "服务类（不计库存）",
+    "status": "状态",
+    "active": "启用",
+    "inactive": "停用",
+    "addButton": "新增商品 / 服务",
+    "addTitle": "新增项目",
+    "empty": "暂无商品或服务项目，点击下方新增。"
   }
 }

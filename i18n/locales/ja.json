@@ -63,7 +63,8 @@
       "categories": "勘定科目",
       "notifications": "アラートと通知",
       "security": "アカウントとセキュリティ",
-      "dataMigration": "データ移行"
+      "dataMigration": "データ移行",
+      "products": "商品・サービス"
     },
     "company": {
       "title": "企業基本情報",
@@ -945,5 +946,23 @@
     "paid": "支払済",
     "partial": "一部",
     "unpaid": "未払"
+  },
+  "products": {
+    "title": "商品・サービス",
+    "subtitle": "商品・サービス項目と単位を管理します。サービス項目は在庫に含まれません。",
+    "name": "名称",
+    "namePlaceholder": "例：A型梱包箱 / コンサルティング",
+    "unit": "単位",
+    "cost": "既定単価",
+    "type": "種別",
+    "product": "商品",
+    "service": "サービス",
+    "isService": "サービス（在庫対象外）",
+    "status": "状態",
+    "active": "有効",
+    "inactive": "無効",
+    "addButton": "商品・サービスを追加",
+    "addTitle": "新規項目",
+    "empty": "商品・サービスがありません。下から追加してください。"
   }
 }

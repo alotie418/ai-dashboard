@@ -2210,6 +2210,32 @@ async function main() {
       }
       if (reasons.length) fail(`usPurchaseSalesWording`, reasons); else pass(`usPurchaseSalesWording`);
     }
+    // PART H: Products / service-items UI strings (Phase 1) — uiLanguage-only, regime-decoupled.
+    //   Every locale carries the full products.* + settings.nav.products set; strings carry NO
+    //   tax/regime wording (products UI must not vary by accountingLocale); unit picker resolves
+    //   a real label for all 11 units × 6 langs.
+    {
+      const reasons = [];
+      const PRODUCT_KEYS = [
+        'products.title', 'products.subtitle', 'products.name', 'products.namePlaceholder',
+        'products.unit', 'products.cost', 'products.type', 'products.product', 'products.service',
+        'products.isService', 'products.status', 'products.active', 'products.inactive',
+        'products.addButton', 'products.addTitle', 'products.empty', 'settings.nav.products',
+      ];
+      const TAX_WORDS = /增值税|增值稅|营业税|營業稅|消费税|消費稅|Sales Tax|进项|進項|销项|銷項|VAT|Schedule C/;
+      for (const lang of UI_LANGUAGES) {
+        const loc = locales[lang];
+        for (const key of PRODUCT_KEYS) {
+          const v = get(loc, key);
+          if (v === undefined || v === null || v === '') reasons.push(`${lang}: ${key} missing/empty`);
+          else if (TAX_WORDS.test(v)) reasons.push(`${lang}: ${key} must not carry tax/regime wording: "${v}"`);
+        }
+        for (const u of ['piece', 'box', 'bag', 'kg', 'ton', 'liter', 'bottle', 'pack', 'session', 'hour', 'month']) {
+          if (!helpers.getProductUnitLabel(u, lang)) reasons.push(`${lang}: product unit "${u}" has no picker label`);
+        }
+      }
+      if (reasons.length) fail(`productLabels`, reasons); else pass(`productLabels`);
+    }
   }
 
   // ────────────────────────────────────────────────

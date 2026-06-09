@@ -195,7 +195,26 @@ const INVENTORY_UNIT_LABELS: Record<string, Record<string, string>> = {
   box:   { 'zh-CN': '箱',   'zh-TW': '箱',   en: 'boxes',  ja: '箱',    ko: '상자',  fr: 'cartons' },
   bag:   { 'zh-CN': '袋',   'zh-TW': '袋',   en: 'bags',   ja: '袋',    ko: '포대',  fr: 'sacs' },
   liter: { 'zh-CN': '升',   'zh-TW': '公升', en: 'L',      ja: 'L',     ko: 'L',     fr: 'L' },
+  bottle:{ 'zh-CN': '瓶',   'zh-TW': '瓶',   en: 'bottles', ja: '本',   ko: '병',    fr: 'bouteilles' },
+  pack:  { 'zh-CN': '盒',   'zh-TW': '盒',   en: 'packs',  ja: 'パック', ko: '팩',    fr: 'paquets' },
+  session:{ 'zh-CN': '次',  'zh-TW': '次',   en: 'times',  ja: '回',    ko: '회',    fr: 'fois' },
+  hour:  { 'zh-CN': '小时', 'zh-TW': '小時', en: 'hours',  ja: '時間',  ko: '시간',  fr: 'heures' },
+  month: { 'zh-CN': '月',   'zh-TW': '月',   en: 'months', ja: 'ヶ月',  ko: '개월',  fr: 'mois' },
 };
+
+// Unit keys offered in the products/services master-data picker (display order).
+export const PRODUCT_UNIT_KEYS = ['piece', 'box', 'bag', 'kg', 'ton', 'liter', 'bottle', 'pack', 'session', 'hour', 'month'];
+
+// Product-picker / products-list unit label. Unlike getInventoryUnitLabel (which
+// intentionally blanks 'ton'/'unit' for the quantity-display default), this always
+// returns a real label so the user can see/choose every unit. uiLanguage-driven,
+// not coupled to accountingLocale.
+export function getProductUnitLabel(unitKey: string | null | undefined, uiLanguage: string): string {
+  if (!unitKey) return '';
+  const entry = INVENTORY_UNIT_LABELS[unitKey];
+  if (!entry) return unitKey;
+  return entry[uiLanguage] || entry[uiLanguage.split('-')[0]] || entry.en || unitKey;
+}
 
 export type InventoryUnitKey = 'unit' | 'kg' | 'ton' | 'piece' | 'box' | 'bag' | 'liter';
 
