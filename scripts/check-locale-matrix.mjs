@@ -2192,6 +2192,24 @@ async function main() {
       if (!/官方報表項目/.test(get(tw, 'settings.categories.systemNote') || '') || /報表行/.test(get(tw, 'settings.categories.systemNote') || '')) reasons.push(`categories.systemNote[zh-TW] should say 官方報表項目 (not 報表行), got "${get(tw, 'settings.categories.systemNote')}"`);
       if (reasons.length) fail(`categoriesWording`, reasons); else pass(`categoriesWording`);
     }
+    // 采购与费用 / 销售与收入 (US) wording — expense/income-first + payee/quantity (zh only).
+    {
+      const reasons = [];
+      const want = {
+        'zh-CN': { newPurchaseButton: '新增支出', newSaleButton: '新增收入', modalTitlePurchase: '新增支出记录', modalSubtitlePurchase: '请手动输入支出明细', modalTitleSales: '新增收入记录', modalSubtitleSales: '请手动输入收入明细', setHeaderPayee: '收款方', setFormPayeeLabel: '收款方名称', setFormPayeePh: '请输入收款方名称', setFormCustomerPh: '请输入客户名称', setFormQtyLabel: '数量（可选）', setFormQtyPh: '例如：1' },
+        'zh-TW': { newPurchaseButton: '新增支出', newSaleButton: '新增收入', modalTitlePurchase: '新增支出記錄', modalSubtitlePurchase: '請手動輸入支出明細', modalTitleSales: '新增收入記錄', modalSubtitleSales: '請手動輸入收入明細', setHeaderPayee: '收款方', setFormPayeeLabel: '收款方名稱', setFormPayeePh: '請輸入收款方名稱', setFormCustomerPh: '請輸入客戶名稱', setFormQtyLabel: '數量（可選）', setFormQtyPh: '例如：1' },
+      };
+      for (const lang of ['zh-CN', 'zh-TW']) {
+        for (const [key, exp] of Object.entries(want[lang])) {
+          const got = helpers.getTaxLabel('US', lang, key);
+          if (got !== exp) reasons.push(`US ${key}[${lang}] should be "${exp}", got "${got}"`);
+        }
+        // upload-area subtitle uses 收款方 (page is expense-context), never 供应商
+        const sub = helpers.getTaxLabel('US', lang, 'uploadSubtitle');
+        if (/供应商|供應商/.test(sub) || !/收款方/.test(sub)) reasons.push(`US uploadSubtitle[${lang}] should say 收款方 (not 供应商): "${sub}"`);
+      }
+      if (reasons.length) fail(`usPurchaseSalesWording`, reasons); else pass(`usPurchaseSalesWording`);
+    }
   }
 
   // ────────────────────────────────────────────────
