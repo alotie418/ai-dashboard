@@ -760,6 +760,11 @@ export interface DashboardResponse {
   financialStatement: import('../types').FinancialStatementData;
   vatStatistics: import('../types').VATData;
   taxInclusiveSummary: import('../types').TaxInclusiveSummaryData;
+  inventory?: import('../types').InventorySummary; // Phase 3: per-product inventory overview
+}
+
+export function fetchInventorySummary(): Promise<import('../types').InventorySummary> {
+  return apiFetch<import('../types').InventorySummary>('/api/inventory/summary');
 }
 
 export async function fetchDashboardData(year?: string): Promise<DashboardResponse> {

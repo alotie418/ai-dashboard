@@ -52,6 +52,23 @@ export interface CategoryData {
   value: number;
 }
 
+// Phase 3: per-product inventory (quantities kept per product/unit, never summed
+// across products; total cost is money and IS summable).
+export interface ProductInventoryLine {
+  product_id: string;
+  name: string;
+  unit: string;        // products.unit key
+  qtyOnHand: number;
+  unitCost: number;
+  lineCost: number;
+}
+
+export interface InventorySummary {
+  inStockCount: number;        // products with qtyOnHand > 0
+  totalInventoryCost: number;  // money — summable across products
+  details: ProductInventoryLine[];
+}
+
 export interface BusinessData {
   locale?: string; // accountingLocale from dashboard handler
   metrics: Metric[];
@@ -65,6 +82,7 @@ export interface BusinessData {
   financialStatement: FinancialStatementData;
   vatStatistics: VATData;
   taxInclusiveSummary: TaxInclusiveSummaryData;
+  inventory?: InventorySummary;
   recentOrders: {
     id: string;
     customer: string;

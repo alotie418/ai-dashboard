@@ -20,7 +20,7 @@ import AccountsPage from './components/AccountsPage';
 import TransactionsPage from './components/TransactionsPage';
 import USTaxToolsPage from './components/USTaxToolsPage';
 import USDashboardCards from './components/USDashboardCards';
-import { formatMoney, getTaxLabel, getDashboardSections, getCurrencySymbol, buildAIFinanceContext, getInventoryUnitLabel } from './components/accountingHelpers';
+import { formatMoney, getTaxLabel, getDashboardSections, getCurrencySymbol, buildAIFinanceContext, getInventoryUnitLabel, getProductUnitLabel } from './components/accountingHelpers';
 import AlertCenter from './components/AlertCenter';
 import LoginPage from './components/LoginPage';
 import OnboardingWizard from './components/OnboardingWizard';
@@ -239,17 +239,26 @@ const AppContent: React.FC = () => {
       const qtyUnit = getInventoryUnitLabel(productUnit, i18n.language);
       const qtySuffix = qtyUnit ? ` ${qtyUnit}` : '';
       const perUnit = qtyUnit ? `/${qtyUnit}` : '';
+      // Phase 3: per-product inventory overview from the dashboard payload
+      const inv = (dashboard as any).inventory || { inStockCount: 0, totalInventoryCost: 0, details: [] };
 
       const next: BusinessData = {
         ...dataRef.current,
         locale: accLocale, // pass through for dashboard rendering
         metrics: [
           {
-            label: t('dashboard.inventory'),
-            value: m.inventoryTons > 0 ? `${m.inventoryTons}${qtySuffix}` : '—',
-            subValue: m.inventoryTons > 0 ? `${t('dashboard.purchasesLabel')}${m.purchaseTotalTons}${qtySuffix} - ${t('dashboard.salesLabel')}${m.salesTotalTons}${qtySuffix}` : '—',
+            label: t('inventory.inStockCount'),
+            value: String(inv.inStockCount),
+            subValue: '—',
             icon: 'fa-boxes',
             color: 'bg-blue-500',
+          },
+          {
+            label: t('inventory.totalCost'),
+            value: inv.totalInventoryCost > 0 ? formatMoney(inv.totalInventoryCost, accLocale) : `${sym}0`,
+            subValue: '—',
+            icon: 'fa-coins',
+            color: 'bg-cyan-500',
           },
           {
             label: `${t('header.yearLabel', { year: selectedYear })} ${t('dashboard.purchasesLabel')}`,
@@ -282,6 +291,7 @@ const AppContent: React.FC = () => {
         financialStatement: enrichedFS,
         vatStatistics: dashboard.vatStatistics,
         taxInclusiveSummary: dashboard.taxInclusiveSummary,
+        inventory: inv,
       };
       dataRef.current = next;
       setData(next);
@@ -730,6 +740,33 @@ ${contextText}`;
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {data.metrics.map((m, i) => <MetricCard key={i} metric={m} />)}
               </div>
+              {/* Phase 3: per-product inventory detail (each line keeps its own unit) */}
+              {data.inventory && data.inventory.details.length > 0 && (
+                <div className="bg-white border border-[#e0ddd5] rounded-2xl overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
+                  <div className="px-6 py-4 border-b border-[#e0ddd5] flex items-center space-x-2">
+                    <i className="fas fa-boxes-stacked text-[#d97757]"></i>
+                    <h3 className="text-sm font-bold text-[#191918]">{t('inventory.detailTitle')}</h3>
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead className="bg-[#f9f9f8] text-[10px] uppercase tracking-wider text-[#4a4a48]">
+                      <tr>
+                        <th className="text-left px-6 py-2.5">{t('inventory.colProduct')}</th>
+                        <th className="text-right px-6 py-2.5">{t('inventory.colQty')}</th>
+                        <th className="text-right px-6 py-2.5">{t('inventory.colCost')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.inventory.details.map(d => (
+                        <tr key={d.product_id} className="border-t border-[#e0ddd5]/70">
+                          <td className="px-6 py-2 text-[#191918]">{d.name}</td>
+                          <td className="px-6 py-2 text-right text-[#5c5c5a]">{`${d.qtyOnHand} ${getProductUnitLabel(d.unit, i18n.language)}`}</td>
+                          <td className="px-6 py-2 text-right text-[#5c5c5a]">{formatMoney(d.lineCost, data.locale || 'CN')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch [grid-auto-rows:1fr]">
                 {/* US: Schedule C + Deductions + SE Tax + Margins */}
                 {sections.includes('schedule_c_summary') ? (

@@ -966,5 +966,13 @@
     "empty": "상품 또는 서비스가 없습니다. 아래에서 추가하세요.",
     "selectLabel": "상품 / 서비스(선택)",
     "unassigned": "미지정"
+  },
+  "inventory": {
+    "inStockCount": "재고 상품 수",
+    "totalCost": "재고 총원가",
+    "detailTitle": "재고 명세",
+    "colProduct": "상품",
+    "colQty": "재고 수량",
+    "colCost": "재고 원가"
   }
 }

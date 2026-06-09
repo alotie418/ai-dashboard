@@ -966,5 +966,13 @@
     "empty": "Aucun produit ni service. Cliquez ci-dessous pour en ajouter.",
     "selectLabel": "Produit / service (facultatif)",
     "unassigned": "Non attribué"
+  },
+  "inventory": {
+    "inStockCount": "Produits en stock",
+    "totalCost": "Coût total du stock",
+    "detailTitle": "Détail du stock",
+    "colProduct": "Produit",
+    "colQty": "En stock",
+    "colCost": "Coût"
   }
 }

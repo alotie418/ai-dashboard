@@ -49,6 +49,7 @@ const DASHBOARD = (acc: string) => ({
   financialStatement: { salesRevenue: 0, costOfSales: 0, taxSurcharge: 0, adminExpense: 0, incomeTax: 0, shippingFee: 0, grossProfit: 0, grossMargin: 0, netProfit: 0, netMargin: 0 },
   vatStatistics: { cumulativeInput: 0, cumulativeOutput: 0, certifiedInput: 0, invoicedOutput: 0, estimatedPayable: 0 },
   taxInclusiveSummary: { purchaseTotal: 0, salesTotal: 0, difference: 0 },
+  inventory: { inStockCount: 1, totalInventoryCost: 100, details: [{ product_id: 'p1', name: 'Item-A', unit: 'piece', qtyOnHand: 10, unitCost: 10, lineCost: 100 }] },
 });
 
 type Failure = { ui: string; acc: string; page: string; word: string; rule: string; snippet: string; screenshot: string };
