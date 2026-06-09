@@ -3,8 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { analyzeInvoice } from '../services/ocrService';
-import { fetchPurchases, createPurchase, deletePurchase, fetchSettings, PurchaseRecord } from '../services/api';
-import { formatMoney, getCurrencySymbol, getTaxLabel, formatLegacyQuantity } from './accountingHelpers';
+import { fetchPurchases, createPurchase, deletePurchase, fetchSettings, listProducts, type Product, PurchaseRecord } from '../services/api';
+import { formatMoney, getCurrencySymbol, getTaxLabel, formatLegacyQuantity, getProductUnitLabel } from './accountingHelpers';
 import CsvImportModal from './CsvImportModal';
 
 interface Props {
@@ -84,6 +84,10 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
       .catch((err) => console.error('Failed to load purchases:', err))
       .finally(() => setIsLoading(false));
   }, []);
+
+  // Phase 2: product/service list for the modal picker (display only; no calc impact).
+  const [products, setProducts] = useState<Product[]>([]);
+  useEffect(() => { listProducts().then(setProducts).catch(() => {}); }, []);
 
   // Form State
   const [newPurchase, setNewPurchase] = useState<Omit<PurchaseRecord, 'status' | 'id'>>({
@@ -351,7 +355,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                 <tr key={row.id} className="hover:bg-[#f9f9f8]/30 transition-colors">
                   <td className="px-5 py-5 text-sm text-[#4a4a48] whitespace-nowrap">{row.date}</td>
                   <td className="px-5 py-5 text-sm text-[#191918] font-medium">{row.supplier}</td>
-                  <td className="px-5 py-5 text-sm text-[#4a4a48]">{formatLegacyQuantity(row.quantity, productUnit, uiLang)}</td>
+                  <td className="px-5 py-5 text-sm text-[#4a4a48]">{row.unit ? `${row.quantity} ${getProductUnitLabel(row.unit, uiLang)}` : formatLegacyQuantity(row.quantity, productUnit, uiLang)}</td>
                   <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{formatCurrency(unitPrice)}</td>
                   <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{formatCurrency(amtWithoutTax)}</td>
                   <td className="px-5 py-5 text-sm text-rose-600 font-medium whitespace-nowrap">{formatCurrency(taxAmt)}</td>
@@ -366,7 +370,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                   <td className="px-5 py-5 text-xs font-medium space-x-3">
                     <button
                       onClick={() => {
-                        setNewPurchase({ date: row.date, supplier: row.supplier, quantity: row.quantity, price: row.price, taxRate: row.taxRate, invoiceNo: row.invoiceNo, totalWithTax: row.totalWithTax || 0, unitPriceWithoutTax: row.unitPriceWithoutTax || 0, taxAmount: row.taxAmount || 0 });
+                        setNewPurchase({ date: row.date, supplier: row.supplier, productId: row.productId || '', quantity: row.quantity, price: row.price, taxRate: row.taxRate, invoiceNo: row.invoiceNo, totalWithTax: row.totalWithTax || 0, unitPriceWithoutTax: row.unitPriceWithoutTax || 0, taxAmount: row.taxAmount || 0 });
                         setShowAddModal(true);
                       }}
                       className="text-[#d97757] hover:text-[#c56a4a] transition-colors"
@@ -500,6 +504,20 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                   onChange={(e) => setNewPurchase({ ...newPurchase, supplier: e.target.value })}
                   className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('products.selectLabel')}</label>
+                <select
+                  value={newPurchase.productId || ''}
+                  onChange={(e) => setNewPurchase({ ...newPurchase, productId: e.target.value })}
+                  className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+                >
+                  <option value="">{t('products.unassigned')}</option>
+                  {products.filter(p => p.is_active).map(p => (
+                    <option key={p.id} value={p.id}>{p.name}（{getProductUnitLabel(p.unit, uiLang)}）</option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">

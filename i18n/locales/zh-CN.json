@@ -963,6 +963,8 @@
     "inactive": "停用",
     "addButton": "新增商品 / 服务",
     "addTitle": "新增项目",
-    "empty": "暂无商品或服务项目，点击下方新增。"
+    "empty": "暂无商品或服务项目，点击下方新增。",
+    "selectLabel": "商品 / 服务（可选）",
+    "unassigned": "未指定"
   }
 }

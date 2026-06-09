@@ -7,6 +7,15 @@ function safeString(v, maxLen = 255) {
   return s;
 }
 
+// Snapshot the product's name/unit at record time (Phase 2). Display-only; the
+// quantity (tons) and all money/tax math are unchanged. Unassigned → all null.
+function productSnapshot(db, productId) {
+  const pid = productId || null;
+  if (!pid) return { id: null, name: null, unit: null };
+  const p = db.prepare('SELECT name, unit FROM products WHERE id = ?').get(pid);
+  return { id: pid, name: p ? p.name : null, unit: p ? p.unit : null };
+}
+
 function validateSale(data) {
   const errors = [];
   if (!data.id) errors.push('id required');
@@ -26,9 +35,10 @@ async function create({ body }) {
   const errors = validateSale(data);
   if (errors.length > 0) throw new Error(errors.join('; '));
 
+  const snap = productSnapshot(db, data.product_id);
   db.prepare(`
-    INSERT INTO sales (id, date, customer, tons, pricePerTon, totalAmount, amountWithoutTax, taxAmount, taxRate, shippingCost, invoiceNumber, invoiceStatus)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO sales (id, date, customer, tons, pricePerTon, totalAmount, amountWithoutTax, taxAmount, taxRate, shippingCost, invoiceNumber, invoiceStatus, product_id, product_name_snapshot, unit_snapshot)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     data.id,
     data.date,
@@ -42,6 +52,9 @@ async function create({ body }) {
     Number(data.shippingCost) || 0,
     safeString(data.invoiceNumber, 100),
     safeString(data.invoiceStatus, 20),
+    snap.id,
+    snap.name,
+    snap.unit,
   );
   return { success: true, id: data.id };
 }
@@ -63,9 +76,19 @@ async function update({ params, body }) {
   const errors = validateSale(data);
   if (errors.length > 0) throw new Error(errors.join('; '));
 
+  // Re-snapshot only when the linked product changes; otherwise preserve history.
+  const existing = db.prepare('SELECT product_id, product_name_snapshot, unit_snapshot FROM sales WHERE id = ?').get(id);
+  if (!existing) throw new Error('Sale not found');
+  let pid = existing.product_id || null, pname = existing.product_name_snapshot ?? null, punit = existing.unit_snapshot ?? null;
+  if (data.product_id !== undefined && (data.product_id || null) !== (existing.product_id || null)) {
+    const snap = productSnapshot(db, data.product_id);
+    pid = snap.id; pname = snap.name; punit = snap.unit;
+  }
+
   const info = db.prepare(`
     UPDATE sales SET date=?, customer=?, tons=?, pricePerTon=?, totalAmount=?,
-      amountWithoutTax=?, taxAmount=?, taxRate=?, shippingCost=?, invoiceNumber=?, invoiceStatus=?
+      amountWithoutTax=?, taxAmount=?, taxRate=?, shippingCost=?, invoiceNumber=?, invoiceStatus=?,
+      product_id=?, product_name_snapshot=?, unit_snapshot=?
     WHERE id=?
   `).run(
     data.date,
@@ -79,6 +102,9 @@ async function update({ params, body }) {
     data.shippingCost,
     safeString(data.invoiceNumber, 100),
     safeString(data.invoiceStatus, 20),
+    pid,
+    pname,
+    punit,
     id,
   );
   if (info.changes === 0) throw new Error('Sale not found');

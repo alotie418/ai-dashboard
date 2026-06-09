@@ -163,6 +163,33 @@ test.describe('settings → products/services tab', () => {
   }
 });
 
+// ── Phase 2: purchase add-record modal exposes the product/service picker ──
+// The picker is uiLanguage-only (regime-neutral), so one accountingLocale × 6 UI langs
+// is the meaningful axis. Navigation uses stable icons (sidebar fa-file-import → 采购页;
+// new-record button fa-plus → modal). No UI change for the test.
+test.describe('purchase modal → product picker (Phase 2)', () => {
+  const acc = 'CN';
+  for (const ui of UI_LANGUAGES) {
+    test(`purchase-picker ui=${ui}`, async ({ page }) => {
+      await bootCombo(page, ui, acc);
+      const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+      const selectLabel: string = loc.products.selectLabel;
+      const unassigned: string = loc.products.unassigned;
+
+      await page.locator('i.fa-file-import').first().click();
+      await page.locator('button:has(i.fa-plus)').first().click();
+
+      // picker label renders the resolved translation (not a raw key)
+      await expect(page.getByText(selectLabel, { exact: false }).first()).toBeVisible({ timeout: 10_000 });
+      // the "unassigned" option is present in the picker
+      expect(await page.locator('option').filter({ hasText: unassigned }).count()).toBeGreaterThan(0);
+      // no raw products.* picker key leaked
+      const body = await page.locator('body').innerText();
+      expect(body, `[ui=${ui}] raw picker key leaked`).not.toMatch(/products\.(selectLabel|unassigned)/);
+    });
+  }
+});
+
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const summary = {

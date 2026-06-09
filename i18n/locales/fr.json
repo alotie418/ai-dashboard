@@ -963,6 +963,8 @@
     "inactive": "Inactif",
     "addButton": "Ajouter un produit / service",
     "addTitle": "Nouvel élément",
-    "empty": "Aucun produit ni service. Cliquez ci-dessous pour en ajouter."
+    "empty": "Aucun produit ni service. Cliquez ci-dessous pour en ajouter.",
+    "selectLabel": "Produit / service (facultatif)",
+    "unassigned": "Non attribué"
   }
 }

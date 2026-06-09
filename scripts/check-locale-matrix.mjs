@@ -2221,6 +2221,7 @@ async function main() {
         'products.unit', 'products.cost', 'products.type', 'products.product', 'products.service',
         'products.isService', 'products.status', 'products.active', 'products.inactive',
         'products.addButton', 'products.addTitle', 'products.empty', 'settings.nav.products',
+        'products.selectLabel', 'products.unassigned',
       ];
       const TAX_WORDS = /增值税|增值稅|营业税|營業稅|消费税|消費稅|Sales Tax|进项|進項|销项|銷項|VAT|Schedule C/;
       for (const lang of UI_LANGUAGES) {

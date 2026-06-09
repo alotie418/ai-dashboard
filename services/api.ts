@@ -415,6 +415,9 @@ export interface SalesRecord {
   paidAmount?: number;
   dueDate?: string;
   paymentDate?: string;
+  productId?: string;       // Phase 2: linked product/service
+  productName?: string;     // snapshot at record time
+  unit?: string;            // snapshot at record time
 }
 
 export interface PurchaseRecord {
@@ -435,6 +438,9 @@ export interface PurchaseRecord {
   paidAmount?: number;
   dueDate?: string;
   paymentDate?: string;
+  productId?: string;       // Phase 2: linked product/service
+  productName?: string;     // snapshot at record time
+  unit?: string;            // snapshot at record time
 }
 
 export interface AppSettings {
@@ -476,6 +482,9 @@ interface ApiSalesRecord {
   paid_amount?: number;
   due_date?: string;
   payment_date?: string;
+  product_id?: string | null;
+  product_name_snapshot?: string | null;
+  unit_snapshot?: string | null;
 }
 
 interface ApiPurchaseRecord {
@@ -495,6 +504,9 @@ interface ApiPurchaseRecord {
   paid_amount?: number;
   due_date?: string;
   payment_date?: string;
+  product_id?: string | null;
+  product_name_snapshot?: string | null;
+  unit_snapshot?: string | null;
 }
 
 // ==================== Helpers ====================
@@ -533,6 +545,7 @@ function toApiSales(r: SalesRecord): ApiSalesRecord {
     shippingCost: r.shipping,
     invoiceNumber: r.invoiceNo,
     invoiceStatus: r.status,
+    product_id: r.productId || null,
   };
 }
 
@@ -556,6 +569,9 @@ function fromApiSales(a: ApiSalesRecord): SalesRecord {
     paidAmount: a.paid_amount || 0,
     dueDate: a.due_date || '',
     paymentDate: a.payment_date || '',
+    productId: a.product_id || '',
+    productName: a.product_name_snapshot || '',
+    unit: a.unit_snapshot || '',
   };
 }
 
@@ -580,6 +596,7 @@ function toApiPurchase(r: PurchaseRecord): ApiPurchaseRecord {
     taxRate,
     invoiceNumber: r.invoiceNo,
     invoiceStatus: r.status,
+    product_id: r.productId || null,
   };
 }
 
@@ -602,6 +619,9 @@ function fromApiPurchase(a: ApiPurchaseRecord): PurchaseRecord {
     paidAmount: a.paid_amount || 0,
     dueDate: a.due_date || '',
     paymentDate: a.payment_date || '',
+    productId: a.product_id || '',
+    productName: a.product_name_snapshot || '',
+    unit: a.unit_snapshot || '',
   };
 }
 
