@@ -333,6 +333,19 @@ const MIGRATIONS = [
     d.exec('CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active)');
     console.log('[db] v9: products table ready');
   },
+  // v10: per-record product reference + unit snapshot on purchases/sales (Phase 2).
+  //   Snapshot freezes the item's name/unit at record time so later product edits
+  //   don't change history. Nullable → legacy rows stay "unassigned". Calc unchanged.
+  (d) => {
+    for (const tbl of ['purchases', 'sales']) {
+      const cols = d.prepare(`PRAGMA table_info(${tbl})`).all().map(c => c.name);
+      if (!cols.includes('product_id')) d.exec(`ALTER TABLE ${tbl} ADD COLUMN product_id TEXT`);
+      if (!cols.includes('product_name_snapshot')) d.exec(`ALTER TABLE ${tbl} ADD COLUMN product_name_snapshot TEXT`);
+      if (!cols.includes('unit_snapshot')) d.exec(`ALTER TABLE ${tbl} ADD COLUMN unit_snapshot TEXT`);
+      d.exec(`CREATE INDEX IF NOT EXISTS idx_${tbl}_product ON ${tbl}(product_id)`);
+    }
+    console.log('[db] v10: purchases/sales product snapshot columns ready');
+  },
 ];
 
 function runMigrations(d) {

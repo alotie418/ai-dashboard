@@ -963,6 +963,8 @@
     "inactive": "Inactive",
     "addButton": "Add Product / Service",
     "addTitle": "New Item",
-    "empty": "No products or services yet. Click below to add one."
+    "empty": "No products or services yet. Click below to add one.",
+    "selectLabel": "Product / Service (optional)",
+    "unassigned": "Unassigned"
   }
 }

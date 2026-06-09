@@ -3,8 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { analyzeInvoice } from '../services/ocrService';
-import { fetchSales, createSale, updateSale, deleteSale, fetchSettings, SalesRecord } from '../services/api';
-import { formatMoney, getCurrencySymbol, formatQuantity, formatLegacyQuantity, getTaxLabel } from './accountingHelpers';
+import { fetchSales, createSale, updateSale, deleteSale, fetchSettings, listProducts, type Product, SalesRecord } from '../services/api';
+import { formatMoney, getCurrencySymbol, formatQuantity, formatLegacyQuantity, getTaxLabel, getProductUnitLabel } from './accountingHelpers';
 import CsvImportModal from './CsvImportModal';
 
 interface Props {
@@ -54,6 +54,10 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
       .catch((err) => console.error('Failed to load sales:', err))
       .finally(() => setIsLoading(false));
   }, []);
+
+  // Phase 2: product/service list for the modal picker (display only; no calc impact).
+  const [products, setProducts] = useState<Product[]>([]);
+  useEffect(() => { listProducts().then(setProducts).catch(() => {}); }, []);
 
   // Form State for manual entry
   const [newSale, setNewSale] = useState<Omit<SalesRecord, 'status' | 'id'>>({
@@ -360,7 +364,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                 <tr key={row.id} className="hover:bg-[#f9f9f8]/30 transition-colors">
                   <td className="px-5 py-5 text-sm text-[#4a4a48] whitespace-nowrap">{row.date}</td>
                   <td className="px-5 py-5 text-sm text-[#191918] font-medium">{row.customer}</td>
-                  <td className="px-5 py-5 text-sm text-[#4a4a48]">{formatLegacyQuantity(row.quantity, productUnit, uiLang)}</td>
+                  <td className="px-5 py-5 text-sm text-[#4a4a48]">{row.unit ? `${row.quantity} ${getProductUnitLabel(row.unit, uiLang)}` : formatLegacyQuantity(row.quantity, productUnit, uiLang)}</td>
                   <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{formatCurrency(unitPrice)}</td>
                   <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{formatCurrency(amtWithoutTax)}</td>
                   <td className="px-5 py-5 text-sm text-rose-600 font-medium whitespace-nowrap">{formatCurrency(taxAmt)}</td>
@@ -376,7 +380,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                     <button
                       onClick={() => {
                         setEditingId(row.id);
-                        setNewSale({ date: row.date, customer: row.customer, quantity: row.quantity, price: row.price, shipping: row.shipping, invoiceNo: row.invoiceNo, totalWithTax: row.totalWithTax || 0, unitPriceWithoutTax: row.unitPriceWithoutTax || 0, taxAmount: row.taxAmount || 0 });
+                        setNewSale({ date: row.date, customer: row.customer, productId: row.productId || '', quantity: row.quantity, price: row.price, shipping: row.shipping, invoiceNo: row.invoiceNo, totalWithTax: row.totalWithTax || 0, unitPriceWithoutTax: row.unitPriceWithoutTax || 0, taxAmount: row.taxAmount || 0 });
                         setShowAddModal(true);
                       }}
                       className="text-[#d97757] hover:text-[#c56a4a] transition-colors"
@@ -513,6 +517,20 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                   onChange={(e) => setNewSale({ ...newSale, customer: e.target.value })}
                   className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('products.selectLabel')}</label>
+                <select
+                  value={newSale.productId || ''}
+                  onChange={(e) => setNewSale({ ...newSale, productId: e.target.value })}
+                  className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+                >
+                  <option value="">{t('products.unassigned')}</option>
+                  {products.filter(p => p.is_active).map(p => (
+                    <option key={p.id} value={p.id}>{p.name}（{getProductUnitLabel(p.unit, uiLang)}）</option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">
