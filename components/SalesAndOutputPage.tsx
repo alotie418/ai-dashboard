@@ -28,6 +28,8 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
     }).catch(() => {});
   }, []);
   const uiLang = i18n.language;
+  // US 销售与收入 page: income wording only under zh UI (en/ja/ko/fr keep their i18n labels).
+  const usZh = accLocale === 'US' && (uiLang === 'zh-CN' || uiLang === 'zh-TW');
   const currSym = getCurrencySymbol(accLocale);
   // Left padding for money inputs whose currency prefix is absolutely positioned.
   // A multi-char symbol (e.g. NT$) is wider than the default pl-8 and would overlap
@@ -506,7 +508,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                 <input
                   type="text"
                   required
-                  placeholder={t('sales.formCustomerPlaceholder')}
+                  placeholder={usZh ? taxLabel('setFormCustomerPh') : t('sales.formCustomerPlaceholder')}
                   value={newSale.customer}
                   onChange={(e) => setNewSale({ ...newSale, customer: e.target.value })}
                   className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
@@ -514,11 +516,11 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('sales.formQuantity')}</label>
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{usZh ? taxLabel('setFormQtyLabel') : t('sales.formQuantity')}</label>
                 <input
                   type="text"
                   required
-                  placeholder={t('sales.formQuantityPlaceholder')}
+                  placeholder={usZh ? taxLabel('setFormQtyPh') : t('sales.formQuantityPlaceholder')}
                   value={newSale.quantity}
                   onChange={(e) => setNewSale({ ...newSale, quantity: e.target.value })}
                   className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"

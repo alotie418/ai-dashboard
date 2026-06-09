@@ -65,6 +65,8 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
   const moneyPad = currSym.length > 1 ? 'pl-12' : 'pl-8';
   const fmtMoney = (val: number) => formatMoney(val, accLocale, uiLang);
   const taxLabel = (key: string) => getTaxLabel(accLocale, uiLang, key);
+  // US 采购与费用 page: payee/expense wording only under zh UI (en/ja/ko/fr keep their i18n labels).
+  const usZh = accLocale === 'US' && (uiLang === 'zh-CN' || uiLang === 'zh-TW');
   const taxRateOptions = TAX_RATE_OPTIONS[accLocale] || TAX_RATE_OPTIONS.CN;
   const defaultTaxRate = taxRateOptions[0]?.value || '13%';
 
@@ -327,7 +329,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
             <thead>
               <tr className="border-b border-[#e0ddd5] text-[#5c5c5a] text-xs">
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.date')}</th>
-                <th className="px-5 py-4 font-medium">{t('tableHeaders.supplier')}</th>
+                <th className="px-5 py-4 font-medium">{usZh ? taxLabel('setHeaderPayee') : t('tableHeaders.supplier')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.quantity')}</th>
                 <th className="px-5 py-4 font-medium whitespace-nowrap">{(accLocale !== 'CN') ? taxLabel('headerUnitPrice') : t('tableHeaders.unitPriceWithoutTax')}</th>
                 <th className="px-5 py-4 font-medium whitespace-nowrap">{(accLocale !== 'CN') ? taxLabel('headerAmount') : t('tableHeaders.totalAmountWithoutTax')}</th>
@@ -489,11 +491,11 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formSupplier')}</label>
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{usZh ? taxLabel('setFormPayeeLabel') : t('purchases.formSupplier')}</label>
                 <input
                   type="text"
                   required
-                  placeholder={t('purchases.formSupplierPlaceholder')}
+                  placeholder={usZh ? taxLabel('setFormPayeePh') : t('purchases.formSupplierPlaceholder')}
                   value={newPurchase.supplier}
                   onChange={(e) => setNewPurchase({ ...newPurchase, supplier: e.target.value })}
                   className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
@@ -501,11 +503,11 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formQuantity')}</label>
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{usZh ? taxLabel('setFormQtyLabel') : t('purchases.formQuantity')}</label>
                 <input
                   type="text"
                   required
-                  placeholder={t('purchases.formQuantityPlaceholder')}
+                  placeholder={usZh ? taxLabel('setFormQtyPh') : t('purchases.formQuantityPlaceholder')}
                   value={newPurchase.quantity}
                   onChange={(e) => setNewPurchase({ ...newPurchase, quantity: e.target.value })}
                   className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
