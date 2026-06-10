@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
-import { generateReport, fetchSettings, type ReportResult } from '../services/api';
-import { formatMoney, getTaxLabel, shouldShowTaxModule, shouldShowTaxInclusiveSummary } from './accountingHelpers';
+import { generateReport, fetchSettings, exportReportPdf, isDesktop, type ReportResult } from '../services/api';
+import { formatMoney, getTaxLabel, getCurrencySymbol, shouldShowTaxModule, shouldShowTaxInclusiveSummary } from './accountingHelpers';
 
 interface Props {
   data: BusinessData;
@@ -23,6 +23,11 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
   const [locale, setLocale] = useState<string>((data as any)?.locale || 'CN');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // PDF export (desktop-only) — company name for the PDF header + export status
+  const [companyName, setCompanyName] = useState('');
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfMsg, setPdfMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   // Eagerly hydrate locale from settings on mount, independent of report fetch.
   // This guarantees the KPI cards render with the correct currency even if
@@ -30,6 +35,7 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
   useEffect(() => {
     fetchSettings().then((s: any) => {
       if (s?.accounting_locale) setLocale(s.accounting_locale);
+      setCompanyName(s?.company_info?.name || s?.company_name || '');
     }).catch(() => {});
   }, []);
 
@@ -46,6 +52,7 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
       const settings = await fetchSettings();
       const loc = (settings as any).accounting_locale || 'CN';
       setLocale(loc);
+      setCompanyName((settings as any)?.company_info?.name || (settings as any)?.company_name || '');
       const r = await generateReport({ locale: loc, year: selectedYear });
       setReport(r);
     } catch (e: any) {
@@ -114,6 +121,93 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
     return report.incomeStatement || report.profitLoss || null;
   };
 
+  // ─── PDF export (desktop-only · Electron printToPDF) ───
+  const escapeHtml = (s: string) =>
+    String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+  // Extract the on-screen statement rows from the rendered report DOM. This guarantees
+  // the PDF matches the screen and reuses the already-localized labels (getTaxLabel /
+  // t / formatMoney) — no duplication of accounting-regime logic.
+  const extractRows = (): Array<{ kind: 'header' | 'row'; label: string; value?: string; indent?: boolean }> => {
+    const root = reportRef.current;
+    if (!root) return [];
+    const out: Array<{ kind: 'header' | 'row'; label: string; value?: string; indent?: boolean }> = [];
+    root.querySelectorAll('h3, h4, div.justify-between').forEach((el) => {
+      const tag = el.tagName.toLowerCase();
+      if (tag === 'h3' || tag === 'h4') {
+        const label = (el.textContent || '').trim();
+        if (label) out.push({ kind: 'header', label });
+      } else {
+        const spans = el.querySelectorAll(':scope > span');
+        if (spans.length >= 2) {
+          const label = (spans[0].textContent || '').trim();
+          const value = (spans[1].textContent || '').trim();
+          const indent = (spans[0].getAttribute('class') || '').includes('pl-8');
+          if (label) out.push({ kind: 'row', label, value, indent });
+        }
+      }
+    });
+    return out;
+  };
+
+  // Build a self-contained print HTML document (inline CSS, no Tailwind / FontAwesome;
+  // all user-supplied text escaped). Chromium renders all 6 UI languages natively.
+  const buildPrintHtml = (reportName: string): string => {
+    const rows = extractRows();
+    const currency = getCurrencySymbol(locale);
+    const generatedAt = new Date().toLocaleString(i18n.language);
+    const body = rows.map((r) =>
+      r.kind === 'header'
+        ? `<tr class="section"><td colspan="2">${escapeHtml(r.label)}</td></tr>`
+        : `<tr><td class="${r.indent ? 'indent' : ''}">${escapeHtml(r.label)}</td><td class="val">${escapeHtml(r.value || '')}</td></tr>`
+    ).join('');
+    return `<!DOCTYPE html><html lang="${escapeHtml(i18n.language)}"><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans","Hiragino Kaku Gothic ProN","Apple SD Gothic Neo","Microsoft YaHei","Noto Sans CJK SC",sans-serif;color:#191918;margin:0;padding:32px;font-size:13px;line-height:1.5;}
+.hdr{border-bottom:2px solid #d97757;padding-bottom:14px;margin-bottom:18px;}
+.company{font-size:20px;font-weight:700;}
+.rname{font-size:15px;margin-top:4px;color:#333;}
+.meta{margin-top:10px;font-size:11px;color:#5c5c5a;}
+.meta span{margin-right:20px;}
+table{width:100%;border-collapse:collapse;margin-top:4px;}
+td{padding:7px 10px;border-bottom:1px solid #eee;}
+td.val{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+td.indent{padding-left:30px;color:#555;}
+tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
+.footer{margin-top:24px;font-size:10px;color:#8a8a88;border-top:1px solid #eee;padding-top:10px;}
+</style></head><body>
+<div class="hdr">
+<div class="company">${escapeHtml(companyName || '—')}</div>
+<div class="rname">${escapeHtml(reportName)}</div>
+<div class="meta"><span>${escapeHtml(t('finance.pdfRegime'))}: ${escapeHtml(locale)}</span><span>${escapeHtml(t('finance.pdfPeriod'))}: ${escapeHtml(periodDisplay)}</span><span>${escapeHtml(t('finance.pdfCurrency'))}: ${escapeHtml(currency)}</span></div>
+</div>
+<table>${body}</table>
+<div class="footer">${escapeHtml(t('finance.pdfGeneratedAt'))}: ${escapeHtml(generatedAt)}</div>
+</body></html>`;
+  };
+
+  const handleExportPdf = async () => {
+    setPdfMsg(null);
+    if (!isDesktop()) { setPdfMsg({ type: 'info', text: t('finance.pdfDesktopOnly') }); return; }
+    setPdfBusy(true);
+    try {
+      const reportName = activeTab === 'pl'
+        ? getTaxLabel(locale, i18n.language, 'plTitle')
+        : activeTab === 'balance'
+          ? t('finance.tabBalance')
+          : t('finance.tabCashflow');
+      const html = buildPrintHtml(reportName);
+      const r = await exportReportPdf(html, `SoloLedger-${locale}-${activeTab}-${selectedYear}.pdf`);
+      if (r.ok && r.path) setPdfMsg({ type: 'success', text: t('finance.pdfExported', { path: r.path }) });
+      else if (r.error) setPdfMsg({ type: 'error', text: t('finance.pdfFailed') });
+      // r.ok===false 且无 error = 用户取消保存框 → 静默
+    } catch {
+      setPdfMsg({ type: 'error', text: t('finance.pdfFailed') });
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
   // Tab labels driven by accountingLocale + uiLanguage
   const plTabLabel = getTaxLabel(locale, i18n.language, 'tabPlLabel');
 
@@ -124,10 +218,20 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
         <button onClick={exportCSV} className="flex items-center px-4 py-2 bg-white border border-[#e0ddd5] rounded-xl text-sm font-medium text-[#4a4a48] hover:text-[#191918] transition-all">
           <i className="fas fa-file-export mr-2 text-[#d97757]"></i> {t('finance.export')}
         </button>
+        <button onClick={handleExportPdf} disabled={pdfBusy} className="flex items-center px-4 py-2 bg-white border border-[#e0ddd5] rounded-xl text-sm font-medium text-[#4a4a48] hover:text-[#191918] transition-all disabled:opacity-50">
+          {pdfBusy ? <span className="mr-2 inline-block w-3 h-3 border-2 border-[#d97757]/30 border-t-[#d97757] rounded-full animate-spin"></span> : <i className="fas fa-file-pdf mr-2 text-[#d97757]"></i>} {t('finance.exportPdf')}
+        </button>
         <button className="flex items-center px-4 py-2 bg-[#d97757] hover:bg-[#c56a4a] text-white rounded-xl text-sm font-medium transition-all" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}>
           <i className="fas fa-print mr-2"></i> {t('finance.print')}
         </button>
       </div>
+
+      {pdfMsg && (
+        <div className={`text-sm rounded-lg px-4 py-2 flex items-center justify-between ${pdfMsg.type === 'success' ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' : pdfMsg.type === 'error' ? 'text-rose-600 bg-rose-50 border border-rose-200' : 'text-amber-700 bg-amber-50 border border-amber-200'}`}>
+          <span className="break-all"><i className={`fas ${pdfMsg.type === 'success' ? 'fa-check-circle' : pdfMsg.type === 'error' ? 'fa-exclamation-circle' : 'fa-circle-info'} mr-2`}></i>{pdfMsg.text}</span>
+          <button onClick={() => setPdfMsg(null)} className="ml-3 opacity-50 hover:opacity-100"><i className="fas fa-times"></i></button>
+        </div>
+      )}
 
       {/* Quick KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -177,7 +281,7 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
       )}
 
       {/* Statement Content */}
-      <div className="bg-white/80 border border-[#e0ddd5] rounded-xl overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
+      <div ref={reportRef} className="bg-white/80 border border-[#e0ddd5] rounded-xl overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
 
         {/* === P&L / Schedule C tab === */}
         {activeTab === 'pl' && !loading && (

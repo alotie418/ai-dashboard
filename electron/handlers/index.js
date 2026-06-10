@@ -172,7 +172,45 @@ function registerHandlers({ ipcMain, dialog }) {
     return { ok: true };
   });
 
-  console.log('[handlers] registered (api:request + providers:* + app:exportDb/importDb/relaunch)');
+  // ====== 财务报表 PDF 导出（离屏 BrowserWindow + webContents.printToPDF）======
+  // 前端传入「自包含打印 HTML」（内联 CSS、无 Tailwind/FontAwesome、用户文本已转义）；
+  // 主进程用隐藏窗口渲染该 HTML → printToPDF → showSaveDialog → 写盘。不嵌字体
+  // （Chromium 原生渲染 6 语言 CJK）；javascript:false 禁脚本执行，纯静态渲染。
+  ipcMain.handle('app:exportReportPdf', async (_evt, payload) => {
+    const { html, defaultFileName } = payload || {};
+    if (!html || typeof html !== 'string') return { ok: false, error: 'NO_HTML' };
+    const { app, BrowserWindow } = require('electron');
+    const fs = require('node:fs');
+    const path = require('node:path');
+    let win = null;
+    let tmpHtmlPath = null;
+    try {
+      // 写临时 HTML 再 loadFile（避免 data: URL 长度上限）
+      tmpHtmlPath = path.join(app.getPath('temp'), `sololedger-report-${Date.now()}.html`);
+      fs.writeFileSync(tmpHtmlPath, html, 'utf8');
+      win = new BrowserWindow({
+        show: false,
+        webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: false },
+      });
+      await win.loadFile(tmpHtmlPath);
+      const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4', margins: { marginType: 'default' } });
+      const result = await dialog.showSaveDialog({
+        title: '导出 PDF 报表',
+        defaultPath: defaultFileName || `SoloLedger-report-${new Date().toISOString().slice(0, 10)}.pdf`,
+        filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      });
+      if (result.canceled || !result.filePath) return { ok: false };
+      fs.writeFileSync(result.filePath, pdf);
+      return { ok: true, path: result.filePath };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'EXPORT_FAILED' };
+    } finally {
+      try { if (win && !win.isDestroyed()) win.destroy(); } catch { /* ignore */ }
+      try { if (tmpHtmlPath && fs.existsSync(tmpHtmlPath)) fs.rmSync(tmpHtmlPath, { force: true }); } catch { /* ignore */ }
+    }
+  });
+
+  console.log('[handlers] registered (api:request + providers:* + app:exportDb/importDb/relaunch/exportReportPdf)');
 
   // 启动横幅：打印当前主进程加载的 provider META
   // 调试时看到的 defaultModel 才是真正被使用的版本——前端再"新鲜"也得跟它对得上

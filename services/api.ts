@@ -49,6 +49,22 @@ export function relaunchApp(): Promise<{ ok: boolean; devMode?: boolean }> {
   return electronInvoke<{ ok: boolean; devMode?: boolean }>('app:relaunch');
 }
 
+// ==================== 财务报表 PDF 导出（仅桌面版）====================
+
+export interface PdfExportResult {
+  ok: boolean;
+  path?: string;   // 成功时：PDF 保存路径
+  error?: string;  // 失败时：错误码
+}
+
+/**
+ * 导出财务报表 PDF：前端传入自包含打印 HTML，主进程离屏渲染 + printToPDF + 另存。
+ * ok=false 且无 error 表示用户取消保存框。
+ */
+export function exportReportPdf(html: string, defaultFileName?: string): Promise<PdfExportResult> {
+  return electronInvoke<PdfExportResult>('app:exportReportPdf', { html, defaultFileName });
+}
+
 // ==================== AI Providers 管理（仅桌面版）====================
 
 import type { AIProviderConfig, AIProviderId, SaveProviderRequest, TestProviderRequest } from '../types';
