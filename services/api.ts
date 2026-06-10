@@ -13,6 +13,42 @@ function electronInvoke<T = any>(channel: string, payload?: any): Promise<T> {
   return (window as any).electronAPI.invoke(channel, payload);
 }
 
+// ==================== 数据备份 / 恢复（仅桌面版 · 本地 SQLite）====================
+// 备份/恢复直连 app:* IPC（非 REST 路由），仅在 Electron 桌面壳内可用。
+
+/** 是否运行在桌面版（决定数据备份按钮是否可用） */
+export function isDesktop(): boolean {
+  return isElectron();
+}
+
+export interface BackupResult {
+  ok: boolean;
+  path?: string;   // 成功时：备份文件保存路径
+  error?: string;  // 失败时：错误码
+}
+
+export interface RestoreResult {
+  ok: boolean;
+  restoredFrom?: string;    // 成功时：恢复所用的备份文件
+  autoBackupPath?: string;  // 成功时：恢复前自动备份当前库的保存路径
+  error?: string;           // 失败时：错误码（INVALID_FILE / INTEGRITY_FAILED / NEWER_VERSION / AUTOBACKUP_FAILED / ...）
+}
+
+/** 备份数据库：弹保存框，checkpoint 后拷出主 .db。ok=false 且无 error 表示用户取消。 */
+export function backupDatabase(): Promise<BackupResult> {
+  return electronInvoke<BackupResult>('app:exportDb');
+}
+
+/** 恢复数据库：弹选择框，校验→自动备份当前库→原子替换→清 wal/shm。ok=false 且无 error 表示用户取消。 */
+export function restoreDatabase(): Promise<RestoreResult> {
+  return electronInvoke<RestoreResult>('app:importDb');
+}
+
+/** 立即重启应用（恢复完成后加载新库）。开发模式不真正重启，返回 devMode=true 由 UI 提示手动重启。 */
+export function relaunchApp(): Promise<{ ok: boolean; devMode?: boolean }> {
+  return electronInvoke<{ ok: boolean; devMode?: boolean }>('app:relaunch');
+}
+
 // ==================== AI Providers 管理（仅桌面版）====================
 
 import type { AIProviderConfig, AIProviderId, SaveProviderRequest, TestProviderRequest } from '../types';

@@ -191,6 +191,96 @@ test.describe('purchase modal → product picker (Phase 2)', () => {
   }
 });
 
+// ── Settings → Data Backup sub-tab opens & renders across all 36 combos ──
+// uiLanguage-only feature. The preview build has no window.electronAPI, so the
+// section must render the desktop-only notice and NOT crash. Navigation uses
+// stable icons (sidebar fa-cog → settings; sub-tab fa-box-archive → data backup).
+test.describe('settings → data backup tab', () => {
+  for (const acc of ACCOUNTING_LOCALES) {
+    for (const ui of UI_LANGUAGES) {
+      test(`data-backup-tab ui=${ui} acc=${acc}`, async ({ page }) => {
+        await bootCombo(page, ui, acc);
+        const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+        const expectedTitle: string = loc.settings.dataBackup.title;
+        const expectedDesktopOnly: string = loc.settings.dataBackup.desktopOnly;
+
+        await page.locator('i.fa-cog').first().click();
+        await page.locator('button:has(i.fa-box-archive)').click();
+
+        // (1) title heading renders the resolved translation (proves the key is not a raw leak)
+        await expect(page.getByRole('heading', { name: expectedTitle })).toBeVisible({ timeout: 10_000 });
+        // (2) web/preview build has no electronAPI → desktop-only notice shown, app does not crash
+        await expect(page.getByText(expectedDesktopOnly)).toBeVisible({ timeout: 10_000 });
+        // (3) no raw settings.dataBackup.* / settings.nav.* key leaked into the rendered UI
+        const body = await page.locator('body').innerText();
+        expect(body, `[ui=${ui} acc=${acc}] raw i18n key leaked`).not.toMatch(/settings\.dataBackup\.[a-zA-Z]|settings\.nav\.[a-zA-Z]/);
+      });
+    }
+  }
+});
+
+// ── Data Backup happy path with a mocked desktop electronAPI ──
+// Inject an isElectron stub BEFORE boot (api.ts routes api:request through IPC when
+// isElectron), so the section runs its real backup/restore/relaunch flow against canned
+// IPC results: backup shows the saved path; restore is gated by a two-step overwrite
+// confirm, then shows the auto-backup path + restart prompt. One ui×acc combo suffices
+// (the feature is regime-neutral; the 36-combo render is covered above).
+test('data backup → mock electronAPI: backup success + restore confirm + success', async ({ page }) => {
+  const ui = 'zh-CN';
+  const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+  const db = loc.settings.dataBackup;
+
+  await page.addInitScript(({ settings, dashboard }) => {
+    const lists = /\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|reports\/types)/;
+    (window as any).electronAPI = {
+      isElectron: true,
+      platform: 'darwin',
+      buildTarget: 'dmg',
+      invoke: (channel: string, payload: any) => {
+        if (channel === 'app:exportDb') return Promise.resolve({ ok: true, path: '/Users/test/Backups/sololedger-backup-2026-06-10.db' });
+        if (channel === 'app:importDb') return Promise.resolve({ ok: true, restoredFrom: '/Users/test/Backups/restore.db', autoBackupPath: '/Users/test/Backups/auto-before-restore.db' });
+        if (channel === 'app:relaunch') return Promise.resolve({ ok: true, devMode: true });
+        // hasAny=true so the desktop boot skips the BYOK onboarding wizard and renders the app (nav)
+        if (channel === 'providers:hasAny') return Promise.resolve(true);
+        if (channel === 'providers:list') return Promise.resolve([]);
+        if (channel === 'api:request') {
+          const p = (payload && payload.path) || '';
+          if (p.includes('/api/settings')) return Promise.resolve(settings);
+          if (p.includes('/api/dashboard')) return Promise.resolve(dashboard);
+          if (lists.test(p)) return Promise.resolve([]);
+          return Promise.resolve({});
+        }
+        return Promise.resolve({});
+      },
+    };
+  }, { settings: SETTINGS('CN'), dashboard: DASHBOARD('CN') });
+
+  await bootCombo(page, ui, 'CN');
+  await page.locator('i.fa-cog').first().click();
+  await page.locator('button:has(i.fa-box-archive)').click();
+
+  // desktop mode → no desktop-only banner
+  await expect(page.getByText(db.desktopOnly)).toHaveCount(0);
+
+  // backup → saved path shown
+  await page.getByRole('button', { name: db.backupButton }).click();
+  await expect(page.getByText(/sololedger-backup-2026-06-10\.db/)).toBeVisible({ timeout: 10_000 });
+
+  // restore → two-step confirm exposes the overwrite/restart warning
+  await page.getByRole('button', { name: db.restoreButton }).click();
+  await expect(page.getByText(db.restoreWarning)).toBeVisible({ timeout: 10_000 });
+
+  // confirm → restore success + auto-backup path + restart prompt + restart button
+  await page.getByRole('button', { name: db.restoreConfirm }).click();
+  await expect(page.getByText(/auto-before-restore\.db/)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(db.restartRequired)).toBeVisible();
+  await expect(page.getByRole('button', { name: db.restartNow })).toBeVisible();
+
+  // dev-mode relaunch: clicking restart shows the manual-restart notice (no process kill / white screen)
+  await page.getByRole('button', { name: db.restartNow }).click();
+  await expect(page.getByText(db.devModeRestart)).toBeVisible({ timeout: 10_000 });
+});
+
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const summary = {

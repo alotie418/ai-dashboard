@@ -64,7 +64,8 @@
       "notifications": "Alerts & Notifications",
       "security": "Account & Security",
       "dataMigration": "Data Migration",
-      "products": "Products"
+      "products": "Products",
+      "dataBackup": "Data Backup"
     },
     "company": {
       "title": "Company Information",
@@ -203,6 +204,28 @@
         "item2": "SoloLedger never uploads your Key. AI requests go directly from your device to the provider.",
         "item3": "Deleting a Key immediately disables that provider. Existing business data is preserved."
       }
+    },
+    "dataBackup": {
+      "title": "Data Backup",
+      "subtitle": "Back up or restore your local ledger database (local SQLite, desktop only).",
+      "backupTitle": "Back Up Database",
+      "backupHint": "Export the current ledger database to a .db file. Keep it safe to restore anytime.",
+      "backupButton": "Back Up Database",
+      "backupSuccess": "Backed up to: {{path}}",
+      "restoreTitle": "Restore Database",
+      "restoreHint": "Restore ledger data from a previously exported .db backup file.",
+      "restoreButton": "Restore Database",
+      "restoreWarning": "Restoring overwrites your current local data with the selected backup and requires an app restart. The current database is automatically backed up first. Continue?",
+      "restoreConfirm": "Choose Backup & Restore",
+      "restoreSuccess": "Restore complete. Your previous data was automatically backed up to: {{path}}",
+      "restartRequired": "The app must restart to load the restored data.",
+      "restartNow": "Restart Now",
+      "invalidFile": "The selected file is not a valid SoloLedger database.",
+      "newerVersion": "This backup is from a newer app version and may be incompatible. Restore was cancelled.",
+      "autoBackupFailed": "Failed to auto-back up the current database. Restore was cancelled to protect your data.",
+      "desktopOnly": "Data backup is available in the desktop app only.",
+      "devModeRestart": "Development mode: please close the app manually and run npm run electron:dev again.",
+      "error": "Operation failed. Please try again."
     },
     "dataMigration": {
       "title": "Data Migration",

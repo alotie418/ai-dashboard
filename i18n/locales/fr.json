@@ -64,7 +64,8 @@
       "notifications": "Alertes & notifications",
       "security": "Compte & sécurité",
       "dataMigration": "Migration de données",
-      "products": "Produits"
+      "products": "Produits",
+      "dataBackup": "Sauvegarde des données"
     },
     "company": {
       "title": "Informations entreprise",
@@ -203,6 +204,28 @@
         "item2": "SoloLedger n'envoie jamais votre clé à aucun serveur. Les requêtes IA partent directement de votre appareil vers le fournisseur",
         "item3": "Supprimer une clé désactive immédiatement ce fournisseur. Les données métier existantes sont préservées."
       }
+    },
+    "dataBackup": {
+      "title": "Sauvegarde des données",
+      "subtitle": "Sauvegardez ou restaurez votre base de données comptable locale (SQLite local, application de bureau uniquement).",
+      "backupTitle": "Sauvegarder la base de données",
+      "backupHint": "Exportez la base de données comptable actuelle vers un fichier .db. Conservez-le pour restaurer à tout moment.",
+      "backupButton": "Sauvegarder la base de données",
+      "backupSuccess": "Sauvegardé dans : {{path}}",
+      "restoreTitle": "Restaurer la base de données",
+      "restoreHint": "Restaurez les données comptables à partir d'un fichier de sauvegarde .db précédemment exporté.",
+      "restoreButton": "Restaurer la base de données",
+      "restoreWarning": "La restauration écrase vos données locales actuelles par la sauvegarde sélectionnée et nécessite un redémarrage de l'application. La base de données actuelle est d'abord sauvegardée automatiquement. Continuer ?",
+      "restoreConfirm": "Choisir une sauvegarde et restaurer",
+      "restoreSuccess": "Restauration terminée. Vos données précédentes ont été automatiquement sauvegardées dans : {{path}}",
+      "restartRequired": "L'application doit redémarrer pour charger les données restaurées.",
+      "restartNow": "Redémarrer maintenant",
+      "invalidFile": "Le fichier sélectionné n'est pas une base de données SoloLedger valide.",
+      "newerVersion": "Cette sauvegarde provient d'une version plus récente de l'application et peut être incompatible. Restauration annulée.",
+      "autoBackupFailed": "Échec de la sauvegarde automatique de la base de données actuelle. Restauration annulée pour protéger vos données.",
+      "desktopOnly": "La sauvegarde des données est disponible uniquement dans l'application de bureau.",
+      "devModeRestart": "Mode développement : veuillez fermer l'application manuellement et relancer npm run electron:dev.",
+      "error": "L'opération a échoué. Veuillez réessayer."
     },
     "dataMigration": {
       "title": "Migration de données",

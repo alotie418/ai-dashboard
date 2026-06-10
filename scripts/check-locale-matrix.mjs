@@ -2239,6 +2239,36 @@ async function main() {
       }
       if (reasons.length) fail(`productLabels`, reasons); else pass(`productLabels`);
     }
+
+    // PART H2: Data backup / restore UI strings — uiLanguage-only, regime-decoupled.
+    //   Every locale carries the full settings.dataBackup.* set + settings.nav.dataBackup;
+    //   strings carry NO tax/regime wording (backup UI must not vary by accountingLocale).
+    {
+      const reasons = [];
+      const BACKUP_KEYS = [
+        'settings.nav.dataBackup',
+        'settings.dataBackup.title', 'settings.dataBackup.subtitle',
+        'settings.dataBackup.backupTitle', 'settings.dataBackup.backupHint',
+        'settings.dataBackup.backupButton', 'settings.dataBackup.backupSuccess',
+        'settings.dataBackup.restoreTitle', 'settings.dataBackup.restoreHint',
+        'settings.dataBackup.restoreButton', 'settings.dataBackup.restoreWarning',
+        'settings.dataBackup.restoreConfirm', 'settings.dataBackup.restoreSuccess',
+        'settings.dataBackup.restartRequired', 'settings.dataBackup.restartNow',
+        'settings.dataBackup.invalidFile', 'settings.dataBackup.newerVersion',
+        'settings.dataBackup.autoBackupFailed', 'settings.dataBackup.desktopOnly',
+        'settings.dataBackup.devModeRestart', 'settings.dataBackup.error',
+      ];
+      const TAX_WORDS = /增值税|增值稅|营业税|營業稅|消费税|消費稅|Sales Tax|进项|進項|销项|銷項|VAT|Schedule C/;
+      for (const lang of UI_LANGUAGES) {
+        const loc = locales[lang];
+        for (const key of BACKUP_KEYS) {
+          const v = get(loc, key);
+          if (v === undefined || v === null || v === '') reasons.push(`${lang}: ${key} missing/empty`);
+          else if (TAX_WORDS.test(v)) reasons.push(`${lang}: ${key} must not carry tax/regime wording: "${v}"`);
+        }
+      }
+      if (reasons.length) fail(`dataBackupLabels`, reasons); else pass(`dataBackupLabels`);
+    }
   }
 
   // ────────────────────────────────────────────────
