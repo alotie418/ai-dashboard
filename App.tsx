@@ -18,6 +18,7 @@ import FinancePage from './components/FinancePage';
 import SettingsPage from './components/SettingsPage';
 import AccountsPage from './components/AccountsPage';
 import TransactionsPage from './components/TransactionsPage';
+import DocumentsPage from './components/DocumentsPage';
 import USTaxToolsPage from './components/USTaxToolsPage';
 import USDashboardCards from './components/USDashboardCards';
 import { formatMoney, getTaxLabel, getDashboardSections, getCurrencySymbol, buildAIFinanceContext, getInventoryUnitLabel, getProductUnitLabel } from './components/accountingHelpers';
@@ -29,7 +30,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { analyzeInvoice } from './services/ocrService';
 
-type PageId = 'dashboard' | 'sales' | 'purchase' | 'analysis' | 'inventory' | 'finance' | 'accounts' | 'transactions' | 'ustax' | 'settings';
+type PageId = 'dashboard' | 'sales' | 'purchase' | 'analysis' | 'inventory' | 'documents' | 'finance' | 'accounts' | 'transactions' | 'ustax' | 'settings';
 
 // Display names for the "switch provider" hint shown when Gemini hits its quota (429).
 const AI_PROVIDER_LABELS: Record<string, string> = { openai: 'ChatGPT (OpenAI)', anthropic: 'Claude (Anthropic)', gemini: 'Gemini' };
@@ -803,6 +804,7 @@ ${contextText}`;
       case 'inventory': return <InventoryPage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'finance': return <FinancePage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'accounts': return <AccountsPage />;
+      case 'documents': return <DocumentsPage />;
       case 'transactions': return <TransactionsPage />;
       case 'ustax': return <USTaxToolsPage selectedYear={selectedYear} />;
       case 'settings': return <SettingsPage />;
@@ -832,6 +834,7 @@ ${contextText}`;
           <NavItem icon="fa-file-import" label={assistantAccLocale !== 'CN' ? getTaxLabel(assistantAccLocale, i18n.language, 'navPurchase') : t('nav.purchase')} active={currentPage === 'purchase'} expanded={sidebarOpen} onClick={() => setCurrentPage('purchase')} />
           <NavItem icon="fa-file-export" label={assistantAccLocale !== 'CN' ? getTaxLabel(assistantAccLocale, i18n.language, 'navSales') : t('nav.sales')} active={currentPage === 'sales'} expanded={sidebarOpen} onClick={() => setCurrentPage('sales')} />
           <NavItem icon="fa-search-dollar" label={assistantAccLocale !== 'CN' ? getTaxLabel(assistantAccLocale, i18n.language, 'invQueryTitle') : t('nav.inventory')} active={currentPage === 'inventory'} expanded={sidebarOpen} onClick={() => setCurrentPage('inventory')} />
+          <NavItem icon="fa-file-contract" label={t('nav.documents')} active={currentPage === 'documents'} expanded={sidebarOpen} onClick={() => setCurrentPage('documents')} />
           <NavItem icon="fa-chart-pie" label={t('nav.analysis')} active={currentPage === 'analysis'} expanded={sidebarOpen} onClick={() => setCurrentPage('analysis')} />
           <NavItem icon="fa-handshake" label={t('nav.accounts')} active={currentPage === 'accounts'} expanded={sidebarOpen} onClick={() => setCurrentPage('accounts')} />
           <NavItem icon="fa-wallet" label={t('nav.finance')} active={currentPage === 'finance'} expanded={sidebarOpen} onClick={() => setCurrentPage('finance')} />

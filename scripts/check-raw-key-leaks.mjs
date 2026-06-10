@@ -29,7 +29,7 @@ const I18N_NAMESPACES = [
   'tableHeaders', 'finance', 'sales', 'purchases', 'invoice', 'invoices',
   'dashboard', 'analysis', 'chat', 'common', 'common2', 'voice', 'ai',
   'transactions', 'usTax', 'accounts', 'settings', 'header', 'nav',
-  'onboarding', 'alerts', 'aiInsights', 'charts',
+  'onboarding', 'alerts', 'aiInsights', 'charts', 'documents',
 ];
 
 // Build the leak pattern. We look for a string literal that contains

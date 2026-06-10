@@ -2311,6 +2311,83 @@ async function main() {
       }
       if (reasons.length) fail(`financeTabLabels`, reasons); else pass(`financeTabLabels`);
     }
+
+    // PART H5: Business documents UI strings (Phase A) — uiLanguage-only, regime-decoupled.
+    //   Every locale carries the full documents.* set + nav/headerTitle entries; strings
+    //   carry NO tax/regime wording (regime tax labels on the page come from getTaxLabel
+    //   with the document's frozen acc_locale, never from these keys). Extra bans beyond
+    //   the usual TAX_WORDS: 统一发票/統一發票 (CN forbidden word + official TW invoice
+    //   claim), 適格請求書/インボイス (ja qualified-invoice claim), 数电票 (CN e-invoice
+    //   claim) — the feature must never present itself as formal tax-invoice issuance.
+    //   The 5 doc-type names must not stay the English fallback in non-en locales
+    //   (financeTabLabels precedent).
+    {
+      const reasons = [];
+      const DOC_KEYS = [
+        'nav.documents', 'headerTitle.documents',
+        'documents.title', 'documents.subtitle', 'documents.desktopOnly',
+        'documents.addButton', 'documents.empty', 'documents.filterAll',
+        'documents.typeQuotation', 'documents.typeSalesOrder', 'documents.typeProforma',
+        'documents.typeCommercial', 'documents.typeStatement',
+        'documents.colNumber', 'documents.colType', 'documents.colDate',
+        'documents.colCustomer', 'documents.colTotal', 'documents.colStatus',
+        'documents.statusDraft', 'documents.statusIssued', 'documents.statusVoid',
+        'documents.markIssued', 'documents.voidAction', 'documents.voidConfirm',
+        'documents.deleteConfirm', 'documents.numberConflict', 'documents.saveFailed',
+        'documents.loadFailed', 'documents.itemsRequired',
+        'documents.formTitle', 'documents.formEditTitle', 'documents.formType',
+        'documents.formNumber', 'documents.formNumberHint', 'documents.formDate',
+        'documents.formValidUntil', 'documents.formCustomer', 'documents.formCustomerPlaceholder',
+        'documents.formCustomerTaxId', 'documents.formCustomerAddress', 'documents.formCustomerContact',
+        'documents.formNotes', 'documents.itemsTitle', 'documents.itemDescription',
+        'documents.itemQty', 'documents.itemUnit', 'documents.noUnit',
+        'documents.itemUnitPrice', 'documents.itemAmount', 'documents.addItem',
+        'documents.removeItem', 'documents.subtotal', 'documents.saveButton',
+      ];
+      const TAX_WORDS = /增值税|增值稅|营业税|營業稅|消费税|消費稅|Sales Tax|进项|進項|销项|銷項|VAT|Schedule C|统一发票|統一發票|適格請求書|インボイス|数电票|數電票/;
+      const TYPE_EN = {
+        'documents.typeQuotation': 'Quotation',
+        'documents.typeSalesOrder': 'Sales Order',
+        'documents.typeProforma': 'Proforma Invoice',
+        'documents.typeCommercial': 'Commercial Invoice',
+        'documents.typeStatement': 'Statement of Account',
+      };
+      for (const lang of UI_LANGUAGES) {
+        const loc = locales[lang];
+        for (const key of DOC_KEYS) {
+          const v = get(loc, key);
+          if (v === undefined || v === null || v === '') reasons.push(`${lang}: ${key} missing/empty`);
+          else if (TAX_WORDS.test(v)) reasons.push(`${lang}: ${key} must not carry tax/regime or invoice-issuance wording: "${v}"`);
+        }
+        if (lang !== 'en') {
+          for (const [key, en] of Object.entries(TYPE_EN)) {
+            if (get(loc, key) === en) reasons.push(`${lang}: ${key} still English "${en}" (must follow UI language)`);
+          }
+        }
+      }
+      // The documents modal borrows regime keys via getTaxLabel with the document's
+      // frozen acc_locale: formTaxRate must resolve for all 6 regimes, header* for
+      // the 5 non-CN regimes (CN gates to tableHeaders.*). getTaxLabel returns the
+      // bare key on a miss and the raw-key scanner can't see dot-less keys, so the
+      // resolution is locked here (header* live only in NON_CN_GENERIC + US inline
+      // and were previously matrix-required for US alone).
+      for (const lang of UI_LANGUAGES) {
+        for (const accId of ACCOUNTING_LOCALES) {
+          if (helpers.getTaxLabel(accId, lang, 'formTaxRate') === 'formTaxRate') {
+            reasons.push(`${accId}/${lang}: taxConcepts.formTaxRate unresolved (documents modal would leak the bare key)`);
+          }
+          if (accId !== 'CN') {
+            for (const k of ['headerTaxAmount', 'headerTotalWithTax']) {
+              if (helpers.getTaxLabel(accId, lang, k) === k) reasons.push(`${accId}/${lang}: taxConcepts.${k} unresolved (documents modal would leak the bare key)`);
+            }
+          }
+        }
+        for (const k of ['tableHeaders.taxAmount', 'tableHeaders.totalWithTax']) {
+          if (!get(locales[lang], k)) reasons.push(`${lang}: ${k} missing (documents modal CN gate)`);
+        }
+      }
+      if (reasons.length) fail(`documentLabels`, reasons); else pass(`documentLabels`);
+    }
   }
 
   // ────────────────────────────────────────────────
