@@ -2290,6 +2290,27 @@ async function main() {
       }
       if (reasons.length) fail(`financePdfLabels`, reasons); else pass(`financePdfLabels`);
     }
+
+    // PART H4: Finance report TAB labels follow uiLanguage. Balance Sheet / Cash Flow are
+    //   universal report types (regime-neutral) rendered via t('finance.tabBalance'|'tabCashflow');
+    //   they must be present in all 6 langs AND must NOT stay the English fallback in non-en
+    //   (the ja/ko/fr "Balance Sheet" / "Cash Flow" regression). P&L tab is regime-driven via
+    //   getTaxLabel('tabPlLabel') and is checked elsewhere, not here.
+    {
+      const reasons = [];
+      for (const lang of UI_LANGUAGES) {
+        const loc = locales[lang];
+        const bal = get(loc, 'finance.tabBalance');
+        const cf = get(loc, 'finance.tabCashflow');
+        if (!bal) reasons.push(`${lang}: finance.tabBalance missing/empty`);
+        if (!cf) reasons.push(`${lang}: finance.tabCashflow missing/empty`);
+        if (lang !== 'en') {
+          if (bal === 'Balance Sheet') reasons.push(`${lang}: finance.tabBalance still English "Balance Sheet" (must follow UI language)`);
+          if (cf === 'Cash Flow') reasons.push(`${lang}: finance.tabCashflow still English "Cash Flow" (must follow UI language)`);
+        }
+      }
+      if (reasons.length) fail(`financeTabLabels`, reasons); else pass(`financeTabLabels`);
+    }
   }
 
   // ────────────────────────────────────────────────

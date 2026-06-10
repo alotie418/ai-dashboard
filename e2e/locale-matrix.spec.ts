@@ -318,6 +318,9 @@ test.describe('finance → export PDF', () => {
       await page.locator('i.fa-wallet').first().click(); // → finance page
       const btn = page.locator('button:has(i.fa-file-pdf)');
       await expect(btn).toBeVisible({ timeout: 10_000 });
+      // report tab labels must follow UI language (regression lock: ja/ko/fr Balance Sheet / Cash Flow)
+      await expect(page.getByRole('button', { name: loc.finance.tabBalance })).toBeVisible();
+      await expect(page.getByRole('button', { name: loc.finance.tabCashflow })).toBeVisible();
       // web/preview build has no electronAPI → clicking shows the desktop-only notice, no crash
       await btn.click();
       await expect(page.getByText(loc.finance.pdfDesktopOnly)).toBeVisible({ timeout: 10_000 });
