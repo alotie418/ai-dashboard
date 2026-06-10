@@ -346,6 +346,64 @@ const MIGRATIONS = [
     }
     console.log('[db] v10: purchases/sales product snapshot columns ready');
   },
+  // v11: business documents (报价单/销售单/形式发票/商业发票/对账单) — header + line
+  //   items. Internal documents only: NOT formal tax-invoice issuance; tax_invoice_*
+  //   columns record an EXTERNALLY issued invoice by hand (UI lands in a later phase).
+  //   items.product_id is a plain column on purpose — an enforced FK would break the
+  //   bare DELETE in products.remove (foreign_keys is ON); items are self-contained
+  //   snapshots (description/unit frozen at save time). acc_locale freezes the
+  //   accounting regime at creation so saved documents keep their currency/tax labels.
+  (d) => {
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS business_documents (
+        id TEXT PRIMARY KEY,
+        doc_type TEXT NOT NULL CHECK(doc_type IN ('quotation','sales_order','proforma_invoice','commercial_invoice','statement')),
+        doc_number TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','issued','void')),
+        doc_date TEXT NOT NULL,
+        valid_until TEXT,
+        customer_name TEXT NOT NULL,
+        customer_tax_id TEXT,
+        customer_address TEXT,
+        customer_contact TEXT,
+        acc_locale TEXT NOT NULL DEFAULT 'CN',
+        subtotal REAL DEFAULT 0,
+        tax_amount REAL DEFAULT 0,
+        total REAL DEFAULT 0,
+        notes TEXT,
+        source_sales_id TEXT,
+        period_start TEXT,
+        period_end TEXT,
+        tax_invoice_issued INTEGER DEFAULT 0,
+        tax_invoice_number TEXT,
+        tax_invoice_date TEXT,
+        tax_invoice_attachment_path TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    d.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_docs_type_number ON business_documents(doc_type, doc_number)');
+    d.exec('CREATE INDEX IF NOT EXISTS idx_docs_type_date ON business_documents(doc_type, doc_date)');
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS business_document_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        doc_id TEXT NOT NULL REFERENCES business_documents(id) ON DELETE CASCADE,
+        product_id TEXT,
+        description TEXT NOT NULL,
+        quantity REAL,
+        unit TEXT,
+        unit_price REAL,
+        tax_rate TEXT,
+        tax_amount REAL DEFAULT 0,
+        amount REAL DEFAULT 0,
+        line_no INTEGER DEFAULT 0,
+        ref_sales_id TEXT,
+        ref_date TEXT
+      )
+    `);
+    d.exec('CREATE INDEX IF NOT EXISTS idx_doc_items_doc ON business_document_items(doc_id)');
+    console.log('[db] v11: business_documents + business_document_items ready');
+  },
 ];
 
 function runMigrations(d) {

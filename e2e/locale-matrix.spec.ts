@@ -71,7 +71,7 @@ for (const acc of ACCOUNTING_LOCALES) {
         const url = route.request().url();
         if (url.includes('/api/settings')) return route.fulfill({ json: SETTINGS(acc) });
         if (url.includes('/api/dashboard')) return route.fulfill({ json: DASHBOARD(acc) });
-        if (/\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|reports\/types)/.test(url)) {
+        if (/\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|documents|reports\/types)/.test(url)) {
           return route.fulfill({ json: [] });
         }
         return route.fulfill({ json: {} }); // catch-all → empty object
@@ -126,7 +126,7 @@ async function bootCombo(page: import('@playwright/test').Page, ui: string, acc:
     const url = route.request().url();
     if (url.includes('/api/settings')) return route.fulfill({ json: SETTINGS(acc) });
     if (url.includes('/api/dashboard')) return route.fulfill({ json: DASHBOARD(acc) });
-    if (/\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|reports\/types)/.test(url)) {
+    if (/\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|documents|reports\/types)/.test(url)) {
       return route.fulfill({ json: [] });
     }
     return route.fulfill({ json: {} });
@@ -231,7 +231,7 @@ test('data backup → mock electronAPI: backup success + restore confirm + succe
   const db = loc.settings.dataBackup;
 
   await page.addInitScript(({ settings, dashboard }) => {
-    const lists = /\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|reports\/types)/;
+    const lists = /\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|documents|reports\/types)/;
     (window as any).electronAPI = {
       isElectron: true,
       platform: 'darwin',
@@ -299,7 +299,7 @@ async function bootFinance(page: import('@playwright/test').Page, ui: string, ac
     if (url.includes('/api/settings')) return route.fulfill({ json: SETTINGS(acc) });
     if (url.includes('/api/dashboard')) return route.fulfill({ json: DASHBOARD(acc) });
     if (url.includes('/api/reports/generate')) return route.fulfill({ json: REPORT_MOCK(acc) });
-    if (/\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|reports\/types)/.test(url)) {
+    if (/\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|documents|reports\/types)/.test(url)) {
       return route.fulfill({ json: [] });
     }
     return route.fulfill({ json: {} });
@@ -356,6 +356,151 @@ test.describe('finance → export PDF', () => {
     await page.locator('i.fa-wallet').first().click();
     await page.locator('button:has(i.fa-file-pdf)').click();
     await expect(page.getByText(/SoloLedger-CN-pl-2026\.pdf/)).toBeVisible({ timeout: 10_000 });
+  });
+});
+
+// ── Business Documents page renders across all 36 combos (Phase A) ──
+// Desktop-only feature: the web/preview build has no window.electronAPI (and the
+// deployed web mode has no /api/documents routes), so the page must render its title
+// + the desktop-only notice and NOT crash / NOT fetch. Navigation uses the sidebar
+// fa-file-contract icon, scoped to <nav> (NavItem is a <div>, not a <button>).
+test.describe('business documents page', () => {
+  for (const acc of ACCOUNTING_LOCALES) {
+    for (const ui of UI_LANGUAGES) {
+      test(`documents-page ui=${ui} acc=${acc}`, async ({ page }) => {
+        await bootCombo(page, ui, acc);
+        const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+
+        await page.locator('nav i.fa-file-contract').first().click();
+
+        // (1) title renders the resolved translation (proves the key is not a raw leak)
+        await expect(page.getByRole('heading', { name: loc.documents.title }).first()).toBeVisible({ timeout: 10_000 });
+        // (2) web/preview build → desktop-only notice shown, app does not crash
+        await expect(page.getByText(loc.documents.desktopOnly)).toBeVisible({ timeout: 10_000 });
+        // (3) no raw documents.* / nav.documents key leaked into the rendered UI
+        const body = await page.locator('body').innerText();
+        expect(body, `[ui=${ui} acc=${acc}] raw documents key leaked`).not.toMatch(/documents\.[a-zA-Z]|nav\.documents|headerTitle\.documents/);
+      });
+    }
+  }
+});
+
+// ── Business Documents create modal with a mocked desktop electronAPI (Phase A) ──
+// The modal is uiLanguage-only (regime tax labels render via getTaxLabel with the
+// frozen acc_locale and are covered by the matrix sweep), so one accountingLocale ×
+// 6 UI langs is the meaningful axis (purchase-picker precedent). The mock keeps a
+// stateful docs array so the happy-path create test can see its row after reload.
+async function injectDocsElectronAPI(page: import('@playwright/test').Page, acc: string = 'CN', seedDocs: any[] = []) {
+  await page.addInitScript(({ settings, dashboard, seed }) => {
+    const lists = /\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|reports\/types)/;
+    const docs: any[] = Array.isArray(seed) ? [...seed] : [];
+    (window as any).electronAPI = {
+      isElectron: true,
+      platform: 'darwin',
+      buildTarget: 'dmg',
+      invoke: (channel: string, payload: any) => {
+        if (channel === 'providers:hasAny') return Promise.resolve(true);
+        if (channel === 'providers:list') return Promise.resolve([]);
+        if (channel === 'api:request') {
+          const method = (payload && payload.method) || 'GET';
+          const p = (payload && payload.path) || '';
+          // next-number must be matched BEFORE the generic documents list
+          if (p.startsWith('/api/documents/next-number')) return Promise.resolve({ number: 'QT-2026-0001' });
+          if (p.startsWith('/api/documents')) {
+            if (method === 'POST') {
+              const b = (payload && payload.body) || {};
+              const items = Array.isArray(b.items) ? b.items : [];
+              const subtotal = items.reduce((s: number, it: any) => s + (it.amount || 0), 0);
+              const tax = items.reduce((s: number, it: any) => s + (it.tax_amount || 0), 0);
+              docs.push({
+                id: 'doc-e2e-1', doc_type: b.doc_type, doc_number: b.doc_number, status: 'draft',
+                doc_date: b.doc_date, customer_name: b.customer_name, acc_locale: b.acc_locale || 'CN',
+                subtotal, tax_amount: tax, total: subtotal + tax,
+              });
+              return Promise.resolve({ success: true, id: 'doc-e2e-1' });
+            }
+            return Promise.resolve(docs);
+          }
+          if (p.includes('/api/settings')) return Promise.resolve(settings);
+          if (p.includes('/api/dashboard')) return Promise.resolve(dashboard);
+          if (lists.test(p)) return Promise.resolve([]);
+          return Promise.resolve({});
+        }
+        return Promise.resolve({});
+      },
+    };
+  }, { settings: SETTINGS(acc), dashboard: DASHBOARD(acc), seed: seedDocs });
+}
+
+test.describe('business documents → create modal (desktop mock)', () => {
+  for (const ui of UI_LANGUAGES) {
+    test(`documents-modal ui=${ui}`, async ({ page }) => {
+      const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+      await injectDocsElectronAPI(page);
+      await bootCombo(page, ui, 'CN');
+      await page.locator('nav i.fa-file-contract').first().click();
+
+      // desktop mode → no desktop-only banner; the new-document button opens the modal
+      await expect(page.getByText(loc.documents.desktopOnly)).toHaveCount(0);
+      await page.locator('button:has(i.fa-plus)').first().click();
+
+      // modal title + the 5 localized doc-type options + suggested internal number prefilled
+      await expect(page.getByText(loc.documents.formTitle).first()).toBeVisible({ timeout: 10_000 });
+      for (const k of ['typeQuotation', 'typeSalesOrder', 'typeProforma', 'typeCommercial', 'typeStatement']) {
+        expect(await page.locator('option').filter({ hasText: loc.documents[k] }).count(), `[ui=${ui}] option ${k}`).toBeGreaterThan(0);
+      }
+      await expect(page.locator('input[name="docNumber"]')).toHaveValue('QT-2026-0001', { timeout: 10_000 });
+
+      // no raw documents.* key leaked
+      const body = await page.locator('body').innerText();
+      expect(body, `[ui=${ui}] raw documents key leaked`).not.toMatch(/documents\.[a-zA-Z]/);
+    });
+  }
+
+  // Happy path: fill the form → save → the new row (number + customer) appears in the list.
+  test('documents-create → mock electronAPI happy path', async ({ page }) => {
+    const ui = 'zh-CN';
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await injectDocsElectronAPI(page);
+    await bootCombo(page, ui, 'CN');
+    await page.locator('nav i.fa-file-contract').first().click();
+    await page.locator('button:has(i.fa-plus)').first().click();
+    await expect(page.locator('input[name="docNumber"]')).toHaveValue('QT-2026-0001', { timeout: 10_000 });
+
+    await page.locator('input[name="customerName"]').fill('集成测试客户');
+    await page.locator('input[name="itemDescription-0"]').fill('咨询服务');
+    await page.locator('input[name="itemQty-0"]').fill('2');
+    await page.locator('input[name="itemUnitPrice-0"]').fill('100');
+    await page.getByRole('button', { name: loc.documents.saveButton }).click();
+
+    // modal closes, the reloaded list shows the created document
+    await expect(page.getByText(loc.documents.formTitle)).toHaveCount(0, { timeout: 10_000 });
+    await expect(page.getByText('QT-2026-0001')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('集成测试客户')).toBeVisible();
+  });
+
+  // Frozen-locale invariant: a saved document renders money with its OWN frozen
+  // acc_locale even when the live setting differs (settings=JP, the seeded doc is
+  // US → $); and the create modal under a non-CN regime resolves its tax labels
+  // via getTaxLabel (a regression there returns the bare key — locked here).
+  test('documents-frozen-locale ui=ja acc=JP', async ({ page }) => {
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', 'ja.json'), 'utf8'));
+    await injectDocsElectronAPI(page, 'JP', [{
+      id: 'doc-us-1', doc_type: 'quotation', doc_number: 'QT-2026-0042', status: 'draft',
+      doc_date: '2026-06-01', customer_name: 'Frozen Co', acc_locale: 'US',
+      subtotal: 100, tax_amount: 7, total: 107,
+    }]);
+    await bootCombo(page, 'ja', 'JP');
+    await page.locator('nav i.fa-file-contract').first().click();
+
+    // the US-frozen document keeps the $ symbol (not the live JP regime's ¥)
+    await expect(page.getByText('$107.00')).toBeVisible({ timeout: 10_000 });
+
+    // create modal under the live JP regime: regime labels must resolve (no bare keys)
+    await page.locator('button:has(i.fa-plus)').first().click();
+    await expect(page.getByText(loc.documents.formTitle).first()).toBeVisible({ timeout: 10_000 });
+    const body = await page.locator('body').innerText();
+    expect(body, 'bare getTaxLabel key leaked into the documents modal').not.toMatch(/\b(headerTaxAmount|headerTotalWithTax|formTaxRate)\b/);
   });
 });
 

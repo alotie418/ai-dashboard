@@ -795,6 +795,142 @@ export async function deletePurchase(id: string): Promise<void> {
   });
 }
 
+// --- Business Documents（业务单据 Phase A）---
+// 内部业务单据（报价单/销售单/形式发票/商业发票/对账单）。非税务发票开具：
+// 正式发票号码仅手工录入（关联功能在后续阶段），永不自动生成。
+// accLocale 创建时冻结，保存后的单据税种/币种标签不随设置切换漂移。
+
+export type BusinessDocType = 'quotation' | 'sales_order' | 'proforma_invoice' | 'commercial_invoice' | 'statement';
+export type BusinessDocStatus = 'draft' | 'issued' | 'void';
+
+export interface BusinessDocumentItem {
+  id?: number;
+  productId?: string | null;
+  description: string;
+  quantity?: number | null;
+  unit?: string | null;       // 商品单位 key（getProductUnitLabel 渲染）
+  unitPrice?: number | null;  // 不含税单价
+  taxRate?: string | null;    // '13%' 风格字符串，与销售记录一致
+  taxAmount?: number;
+  amount?: number;            // 不含税行金额
+  lineNo?: number;
+}
+
+export interface BusinessDocument {
+  id: string;
+  docType: BusinessDocType;
+  docNumber: string;          // 内部单据编号（可编辑；不是正式发票号码）
+  status: BusinessDocStatus;
+  docDate: string;
+  validUntil?: string | null;
+  customerName: string;
+  customerTaxId?: string | null;
+  customerAddress?: string | null;
+  customerContact?: string | null;
+  accLocale: string;          // 创建时冻结的会计制度
+  subtotal: number;
+  taxAmount: number;
+  total: number;
+  notes?: string | null;
+  items?: BusinessDocumentItem[];
+  createdAt?: string;
+}
+
+function fromApiDocumentItem(r: any): BusinessDocumentItem {
+  return {
+    id: r.id,
+    productId: r.product_id ?? null,
+    description: r.description || '',
+    quantity: r.quantity ?? null,
+    unit: r.unit ?? null,
+    unitPrice: r.unit_price ?? null,
+    taxRate: r.tax_rate ?? null,
+    taxAmount: r.tax_amount ?? 0,
+    amount: r.amount ?? 0,
+    lineNo: r.line_no ?? 0,
+  };
+}
+
+function fromApiDocument(r: any): BusinessDocument {
+  return {
+    id: r.id,
+    docType: r.doc_type,
+    docNumber: r.doc_number || '',
+    status: r.status || 'draft',
+    docDate: r.doc_date || '',
+    validUntil: r.valid_until ?? null,
+    customerName: r.customer_name || '',
+    customerTaxId: r.customer_tax_id ?? null,
+    customerAddress: r.customer_address ?? null,
+    customerContact: r.customer_contact ?? null,
+    accLocale: r.acc_locale || 'CN',
+    subtotal: r.subtotal ?? 0,
+    taxAmount: r.tax_amount ?? 0,
+    total: r.total ?? 0,
+    notes: r.notes ?? null,
+    items: Array.isArray(r.items) ? r.items.map(fromApiDocumentItem) : undefined,
+    createdAt: r.created_at,
+  };
+}
+
+function toApiDocument(d: Partial<BusinessDocument>): any {
+  const body: any = {};
+  if (d.docType !== undefined) body.doc_type = d.docType;
+  if (d.docNumber !== undefined) body.doc_number = d.docNumber;
+  if (d.status !== undefined) body.status = d.status;
+  if (d.docDate !== undefined) body.doc_date = d.docDate;
+  if (d.validUntil !== undefined) body.valid_until = d.validUntil;
+  if (d.customerName !== undefined) body.customer_name = d.customerName;
+  if (d.customerTaxId !== undefined) body.customer_tax_id = d.customerTaxId;
+  if (d.customerAddress !== undefined) body.customer_address = d.customerAddress;
+  if (d.customerContact !== undefined) body.customer_contact = d.customerContact;
+  if (d.accLocale !== undefined) body.acc_locale = d.accLocale;
+  if (d.notes !== undefined) body.notes = d.notes;
+  if (d.items !== undefined) {
+    body.items = (d.items || []).map((it) => ({
+      product_id: it.productId ?? null,
+      description: it.description,
+      quantity: it.quantity ?? null,
+      unit: it.unit ?? null,
+      unit_price: it.unitPrice ?? null,
+      tax_rate: it.taxRate ?? null,
+      tax_amount: it.taxAmount ?? 0,
+      amount: it.amount ?? 0,
+      line_no: it.lineNo ?? 0,
+    }));
+  }
+  return body;
+}
+
+export async function listDocuments(type?: BusinessDocType | 'all'): Promise<BusinessDocument[]> {
+  const q = type && type !== 'all' ? `?type=${encodeURIComponent(type)}` : '';
+  const rows = await apiFetch<any[]>(`/api/documents${q}`);
+  return rows.map(fromApiDocument);
+}
+
+export async function getDocument(id: string): Promise<BusinessDocument> {
+  const row = await apiFetch<any>(`/api/documents/${encodeURIComponent(id)}`);
+  return fromApiDocument(row);
+}
+
+export async function createDocument(doc: Partial<BusinessDocument>): Promise<{ success: boolean; id: string }> {
+  return apiFetch('/api/documents', { method: 'POST', body: JSON.stringify(toApiDocument(doc)) });
+}
+
+export async function updateDocument(id: string, patch: Partial<BusinessDocument>): Promise<void> {
+  await apiFetch(`/api/documents/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(toApiDocument(patch)) });
+}
+
+export async function deleteDocument(id: string): Promise<void> {
+  await apiFetch(`/api/documents/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+/** 建议下一个内部单据编号（仅建议值，可编辑；不是正式发票号码） */
+export async function fetchNextDocNumber(type: BusinessDocType): Promise<string> {
+  const r = await apiFetch<{ number: string }>(`/api/documents/next-number?type=${encodeURIComponent(type)}`);
+  return r.number;
+}
+
 // --- Dashboard ---
 
 export interface DashboardResponse {

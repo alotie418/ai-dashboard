@@ -16,6 +16,7 @@ const categories = require('./categories');
 const products = require('./products');
 const inventory = require('./inventory');
 const transactions = require('./transactions');
+const documentsH = require('./documents');
 const migrationsH = require('./migrations');
 const reportsH = require('./reports');
 const mileageH = require('./mileage');
@@ -67,6 +68,14 @@ const routes = [
   ['POST', '/api/products', products.create],
   ['PUT', '/api/products/:id', products.update],
   ['DELETE', '/api/products/:id', products.remove],
+
+  // ---- Business Documents（业务单据 Phase A；next-number 必须排在 :id 前）----
+  ['GET', '/api/documents/next-number', documentsH.nextNumber],
+  ['GET', '/api/documents', documentsH.list],
+  ['POST', '/api/documents', documentsH.create],
+  ['GET', '/api/documents/:id', documentsH.get],
+  ['PUT', '/api/documents/:id', documentsH.update],
+  ['DELETE', '/api/documents/:id', documentsH.remove],
 
   // ---- Transactions（国际化数据模型 v5，C 阶段）----
   // 具体路径排前：summary 不和 :id 冲突
