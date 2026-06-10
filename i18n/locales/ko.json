@@ -64,7 +64,8 @@
       "notifications": "알림 및 경고",
       "security": "계정 및 보안",
       "dataMigration": "데이터 마이그레이션",
-      "products": "상품 / 서비스"
+      "products": "상품 / 서비스",
+      "dataBackup": "데이터 백업"
     },
     "company": {
       "title": "기업 기본 정보",
@@ -203,6 +204,28 @@
         "item2": "SoloLedger는 Key를 서버로 업로드하지 않습니다. AI 요청은 사용자 기기에서 직접 서비스 제공자로 전송됩니다",
         "item3": "Key를 삭제하면 해당 서비스가 즉시 비활성화되지만 기존 비즈니스 데이터는 보존됩니다"
       }
+    },
+    "dataBackup": {
+      "title": "데이터 백업",
+      "subtitle": "로컬 장부 데이터베이스를 백업하거나 복원합니다 (로컬 SQLite, 데스크톱 전용).",
+      "backupTitle": "데이터베이스 백업",
+      "backupHint": "현재 장부 데이터베이스를 .db 파일로 내보냅니다. 안전하게 보관하면 언제든 복원할 수 있습니다.",
+      "backupButton": "데이터베이스 백업",
+      "backupSuccess": "백업 위치: {{path}}",
+      "restoreTitle": "데이터베이스 복원",
+      "restoreHint": "이전에 내보낸 .db 백업 파일에서 장부 데이터를 복원합니다.",
+      "restoreButton": "데이터베이스 복원",
+      "restoreWarning": "복원하면 현재 로컬 데이터가 선택한 백업으로 덮어쓰여지고 앱을 재시작해야 합니다. 계속하기 전에 현재 데이터베이스를 자동으로 백업합니다. 계속하시겠습니까?",
+      "restoreConfirm": "백업 선택 후 복원",
+      "restoreSuccess": "복원이 완료되었습니다. 현재 데이터는 자동으로 백업되었습니다: {{path}}",
+      "restartRequired": "복원된 데이터를 불러오려면 앱을 재시작해야 합니다.",
+      "restartNow": "지금 재시작",
+      "invalidFile": "선택한 파일은 유효한 SoloLedger 데이터베이스가 아닙니다.",
+      "newerVersion": "이 백업은 더 새로운 버전의 앱에서 생성되어 호환되지 않을 수 있으므로 복원을 취소했습니다.",
+      "autoBackupFailed": "현재 데이터베이스 자동 백업에 실패하여 데이터 보호를 위해 복원을 취소했습니다.",
+      "desktopOnly": "데이터 백업은 데스크톱 앱에서만 사용할 수 있습니다.",
+      "devModeRestart": "개발 모드입니다. 앱을 수동으로 종료한 후 npm run electron:dev 를 다시 실행하세요.",
+      "error": "작업에 실패했습니다. 다시 시도해 주세요."
     },
     "dataMigration": {
       "title": "데이터 마이그레이션",

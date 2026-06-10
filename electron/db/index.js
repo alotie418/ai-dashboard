@@ -359,4 +359,19 @@ function runMigrations(d) {
   }
 }
 
-module.exports = { initDatabase, getDb, getDbPath };
+// 当前应用支持的最高 schema 版本（= 迁移数）。恢复备份时若备份的 user_version
+// 高于此值，说明它来自更新版本的应用，schema 可能不兼容，拒绝恢复。
+const SCHEMA_VERSION = MIGRATIONS.length;
+
+// 关闭数据库连接（恢复备份前调用）：
+//   1. 先 wal_checkpoint(TRUNCATE) 把 WAL 落盘到主库，清空 -wal
+//   2. db.close() 释放句柄，避免覆盖主库文件时旧句柄回写脏数据
+//   3. db = null，下次 getDb() 会惰性重连（但恢复后我们走重启，不在本进程重连）
+function closeDb() {
+  if (!db) return;
+  try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch (e) { console.warn('[db] checkpoint before close failed:', e?.message || e); }
+  try { db.close(); } catch (e) { console.warn('[db] close failed:', e?.message || e); }
+  db = null;
+}
+
+module.exports = { initDatabase, getDb, getDbPath, closeDb, SCHEMA_VERSION };

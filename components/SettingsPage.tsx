@@ -9,6 +9,7 @@ import AccountingSection from './AccountingSection';
 import CategoriesSection from './CategoriesSection';
 import ProductsSection from './ProductsSection';
 import DataMigrationSection from './DataMigrationSection';
+import DataBackupSection from './DataBackupSection';
 
 const SettingsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -159,6 +160,7 @@ const SettingsPage: React.FC = () => {
           <SettingsNavLink active={activeSection === 'categories'} onClick={() => setActiveSection('categories')} icon="fa-tags" label={t('settings.nav.categories')} />
           <SettingsNavLink active={activeSection === 'products'} onClick={() => setActiveSection('products')} icon="fa-box" label={t('settings.nav.products')} />
           <SettingsNavLink active={activeSection === 'dataMigration'} onClick={() => setActiveSection('dataMigration')} icon="fa-database" label={t('settings.nav.dataMigration')} />
+          <SettingsNavLink active={activeSection === 'dataBackup'} onClick={() => setActiveSection('dataBackup')} icon="fa-box-archive" label={t('settings.nav.dataBackup')} />
           <SettingsNavLink active={activeSection === 'notifications'} onClick={() => setActiveSection('notifications')} icon="fa-bell" label={t('settings.nav.notifications')} />
           <SettingsNavLink active={activeSection === 'security'} onClick={() => setActiveSection('security')} icon="fa-shield-halved" label={t('settings.nav.security')} />
         </div>
@@ -283,6 +285,7 @@ const SettingsPage: React.FC = () => {
             {!isLoading && !loadError && activeSection === 'categories' && <CategoriesSection />}
             {!isLoading && !loadError && activeSection === 'products' && <ProductsSection />}
             {!isLoading && !loadError && activeSection === 'dataMigration' && <DataMigrationSection />}
+            {!isLoading && !loadError && activeSection === 'dataBackup' && <DataBackupSection />}
 
             {!isLoading && !loadError && activeSection === 'notifications' && (
               <section className="space-y-6">

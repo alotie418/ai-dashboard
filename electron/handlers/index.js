@@ -62,8 +62,11 @@ function registerHandlers({ ipcMain, dialog }) {
 
   // ====== 数据库备份 / 导出 ======
   ipcMain.handle('app:exportDb', async () => {
-    const { getDbPath } = require('../db');
+    const { getDbPath, getDb } = require('../db');
     const dbPath = getDbPath();
+    // 加固：备份前先把 WAL 落盘到主库，否则最近已提交事务可能还在 -wal 里，
+    // 单文件拷贝会丢这部分数据。TRUNCATE 后 wal 清空，单 .db 即完整快照。
+    try { getDb().pragma('wal_checkpoint(TRUNCATE)'); } catch (e) { console.warn('[app:exportDb] checkpoint failed:', e?.message || e); }
     const result = await dialog.showSaveDialog({
       title: '导出账本数据',
       defaultPath: `sololedger-backup-${new Date().toISOString().slice(0, 10)}.db`,
@@ -75,7 +78,101 @@ function registerHandlers({ ipcMain, dialog }) {
     return { ok: true, path: result.filePath };
   });
 
-  console.log('[handlers] registered (api:request + providers:* + app:exportDb)');
+  // ====== 数据库恢复 / 导入 ======
+  // 安全顺序：选文件 → 校验(头/quick_check/关键表/版本) → 自动备份当前库 →
+  //   关闭连接 → 原子替换 → 清旧 wal/shm → 让前端引导重启。任何一步失败即中止并回传 error。
+  ipcMain.handle('app:importDb', async () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const { app } = require('electron');
+    const { getDbPath, getDb, closeDb, SCHEMA_VERSION } = require('../db');
+
+    // 1. 选择 .db 文件
+    const sel = await dialog.showOpenDialog({
+      title: '选择要恢复的账本备份',
+      properties: ['openFile'],
+      filters: [{ name: 'SQLite 数据库', extensions: ['db'] }],
+    });
+    if (sel.canceled || !sel.filePaths || !sel.filePaths[0]) return { ok: false };
+    const srcPath = sel.filePaths[0];
+
+    // 2. 校验 SQLite 文件头（前 16 字节应为 "SQLite format 3\0"）
+    try {
+      const fd = fs.openSync(srcPath, 'r');
+      const header = Buffer.alloc(16);
+      fs.readSync(fd, header, 0, 16, 0);
+      fs.closeSync(fd);
+      if (header.toString('utf8', 0, 15) !== 'SQLite format 3') return { ok: false, error: 'INVALID_FILE' };
+    } catch (e) {
+      return { ok: false, error: 'INVALID_FILE' };
+    }
+
+    // 3-5. 只读打开校验：quick_check + 关键表存在 + user_version 不高于当前支持版本
+    let probe = null;
+    try {
+      const Database = require('better-sqlite3');
+      probe = new Database(srcPath, { readonly: true, fileMustExist: true });
+      const qc = probe.pragma('quick_check', { simple: true });
+      if (qc !== 'ok') { probe.close(); return { ok: false, error: 'INTEGRITY_FAILED' }; }
+      const tables = probe
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('products','transactions')")
+        .all().map(r => r.name);
+      if (!tables.includes('products') || !tables.includes('transactions')) { probe.close(); return { ok: false, error: 'INVALID_FILE' }; }
+      const uv = probe.pragma('user_version', { simple: true });
+      probe.close();
+      probe = null;
+      if (uv > SCHEMA_VERSION) return { ok: false, error: 'NEWER_VERSION' };
+    } catch (e) {
+      try { if (probe) probe.close(); } catch { /* ignore */ }
+      return { ok: false, error: 'INVALID_FILE' };
+    }
+
+    const dbPath = getDbPath();
+
+    // 6. 恢复前自动备份当前库（安全网）。失败则中止恢复，绝不在没有备份的情况下覆盖。
+    let autoBackupPath;
+    try {
+      try { getDb().pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }
+      const backupsDir = path.join(app.getPath('userData'), 'backups');
+      if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      autoBackupPath = path.join(backupsDir, `sololedger-autobackup-before-restore-${stamp}.db`);
+      fs.copyFileSync(dbPath, autoBackupPath);
+    } catch (e) {
+      return { ok: false, error: 'AUTOBACKUP_FAILED' };
+    }
+
+    // 7. 关闭当前连接（checkpoint + close + null）
+    try { closeDb(); } catch (e) { return { ok: false, error: 'CLOSE_FAILED', autoBackupPath }; }
+
+    // 8. 原子替换：先拷到同目录临时文件，再 rename 覆盖主库（同盘 rename 原子，防半成品）
+    // 9. 删除旧的 -wal / -shm（属于旧库；留下会让 SQLite 用过期 WAL 覆盖新库 → 损坏）
+    try {
+      const tmpPath = dbPath + '.restore-tmp';
+      fs.copyFileSync(srcPath, tmpPath);
+      fs.renameSync(tmpPath, dbPath);
+      fs.rmSync(dbPath + '-wal', { force: true });
+      fs.rmSync(dbPath + '-shm', { force: true });
+    } catch (e) {
+      return { ok: false, error: 'REPLACE_FAILED', autoBackupPath };
+    }
+
+    return { ok: true, restoredFrom: srcPath, autoBackupPath };
+  });
+
+  // ====== 重启应用（恢复完成后引导用户立即重启，拿到干净的新库状态）======
+  ipcMain.handle('app:relaunch', async () => {
+    const { app } = require('electron');
+    // 开发模式（concurrently 同时起 vite + electron）下 relaunch()+exit() 会把整组
+    // 子进程一起 SIGTERM 掉，vite dev server 也被杀 → 白屏。仅生产打包版执行真正重启；
+    // 开发模式回传 devMode，由 UI 提示用户手动关闭并重跑 npm run electron:dev。
+    if (!app.isPackaged) return { ok: true, devMode: true };
+    app.relaunch();
+    app.exit(0);
+    return { ok: true };
+  });
+
+  console.log('[handlers] registered (api:request + providers:* + app:exportDb/importDb/relaunch)');
 
   // 启动横幅：打印当前主进程加载的 provider META
   // 调试时看到的 defaultModel 才是真正被使用的版本——前端再"新鲜"也得跟它对得上
