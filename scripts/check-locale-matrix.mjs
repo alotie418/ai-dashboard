@@ -2269,6 +2269,27 @@ async function main() {
       }
       if (reasons.length) fail(`dataBackupLabels`, reasons); else pass(`dataBackupLabels`);
     }
+
+    // PART H3: Finance PDF-export UI strings — uiLanguage-only, regime-decoupled.
+    //   Button + status + PDF header field labels; report name/口径 still come from
+    //   getTaxLabel, so these strings carry NO tax/regime wording.
+    {
+      const reasons = [];
+      const PDF_KEYS = [
+        'finance.exportPdf', 'finance.pdfExported', 'finance.pdfDesktopOnly', 'finance.pdfFailed',
+        'finance.pdfRegime', 'finance.pdfPeriod', 'finance.pdfCurrency', 'finance.pdfGeneratedAt',
+      ];
+      const TAX_WORDS = /增值税|增值稅|营业税|營業稅|消费税|消費稅|Sales Tax|进项|進項|销项|銷項|VAT|Schedule C/;
+      for (const lang of UI_LANGUAGES) {
+        const loc = locales[lang];
+        for (const key of PDF_KEYS) {
+          const v = get(loc, key);
+          if (v === undefined || v === null || v === '') reasons.push(`${lang}: ${key} missing/empty`);
+          else if (TAX_WORDS.test(v)) reasons.push(`${lang}: ${key} must not carry tax/regime wording: "${v}"`);
+        }
+      }
+      if (reasons.length) fail(`financePdfLabels`, reasons); else pass(`financePdfLabels`);
+    }
   }
 
   // ────────────────────────────────────────────────

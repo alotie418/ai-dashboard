@@ -281,6 +281,81 @@ test('data backup → mock electronAPI: backup success + restore confirm + succe
   await expect(page.getByText(db.devModeRestart)).toBeVisible({ timeout: 10_000 });
 });
 
+// ── Finance → Export PDF button (uiLanguage-only feature). The finance page renders
+//    a P&L from /api/reports/generate, so a valid report payload is mocked (empty {}
+//    would crash it). Navigation via the sidebar fa-wallet icon. ──
+const REPORT_MOCK = (acc: string) => ({
+  locale: acc, period: { from: '2026-01-01', to: '2026-12-31', year: '2026' }, currency: '', reportTypes: [], warnings: [],
+  incomeStatement: { salesRevenue: 100000, costOfSales: 60000, grossProfit: 40000, adminExpense: 5000, operatingProfit: 35000, incomeTax: 6000, netProfit: 28000, netMargin: 28 },
+  profitLoss: { revenue: 100000, costOfSales: 60000, grossProfit: 40000, adminExpense: 5000, operatingProfit: 35000, incomeTax: 6000, netProfit: 28000, netMargin: 28 },
+  scheduleC: { line1_grossReceipts: 100000, line7_grossIncome: 100000, line28_totalExpenses: 60000, line31_netProfit: 40000 },
+});
+
+async function bootFinance(page: import('@playwright/test').Page, ui: string, acc: string) {
+  await page.route('**/auth/check', (r) => r.fulfill({ json: { authenticated: true } }));
+  await page.route('**/auth/**', (r) => r.fulfill({ json: { authenticated: true } }));
+  await page.route('**/api/**', (route) => {
+    const url = route.request().url();
+    if (url.includes('/api/settings')) return route.fulfill({ json: SETTINGS(acc) });
+    if (url.includes('/api/dashboard')) return route.fulfill({ json: DASHBOARD(acc) });
+    if (url.includes('/api/reports/generate')) return route.fulfill({ json: REPORT_MOCK(acc) });
+    if (/\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|reports\/types)/.test(url)) {
+      return route.fulfill({ json: [] });
+    }
+    return route.fulfill({ json: {} });
+  });
+  await page.addInitScript((l) => { try { localStorage.setItem('sololedger-lang', l as string); } catch { /* ignore */ } }, ui);
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('nav', { timeout: 20_000 });
+}
+
+test.describe('finance → export PDF', () => {
+  const FINANCE_COMBOS = [{ ui: 'zh-CN', acc: 'CN' }, { ui: 'en', acc: 'US' }, { ui: 'ja', acc: 'JP' }];
+  for (const { ui, acc } of FINANCE_COMBOS) {
+    test(`export-pdf button ui=${ui} acc=${acc}`, async ({ page }) => {
+      await bootFinance(page, ui, acc);
+      const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+      await page.locator('i.fa-wallet').first().click(); // → finance page
+      const btn = page.locator('button:has(i.fa-file-pdf)');
+      await expect(btn).toBeVisible({ timeout: 10_000 });
+      // web/preview build has no electronAPI → clicking shows the desktop-only notice, no crash
+      await btn.click();
+      await expect(page.getByText(loc.finance.pdfDesktopOnly)).toBeVisible({ timeout: 10_000 });
+      // no raw finance.pdf* / finance.exportPdf key leaked
+      const body = await page.locator('body').innerText();
+      expect(body, `[ui=${ui} acc=${acc}] raw finance.pdf key`).not.toMatch(/finance\.pdf[A-Za-z]|finance\.exportPdf/);
+    });
+  }
+
+  test('export-pdf → mock electronAPI success shows saved path', async ({ page }) => {
+    const ui = 'zh-CN';
+    await page.addInitScript(() => {
+      (window as any).electronAPI = {
+        isElectron: true, platform: 'darwin', buildTarget: 'dmg',
+        invoke: (channel: string, payload: any) => {
+          if (channel === 'app:exportReportPdf') return Promise.resolve({ ok: true, path: '/Users/test/Reports/SoloLedger-CN-pl-2026.pdf' });
+          if (channel === 'providers:hasAny') return Promise.resolve(true);
+          if (channel === 'api:request') {
+            const p = (payload && payload.path) || '';
+            if (p.includes('/api/settings')) return Promise.resolve({ accounting_locale: 'CN', company_name: 'Test Co' });
+            if (p.includes('/api/dashboard')) return Promise.resolve({ locale: 'CN', metrics: {}, financialStatement: { salesRevenue: 100000, costOfSales: 60000, taxSurcharge: 0, shippingFee: 0, adminExpense: 0, incomeTax: 0, grossProfit: 40000, grossMargin: 40, netProfit: 40000, netMargin: 40 }, monthlyPerformance: [], vatStatistics: {}, taxInclusiveSummary: {}, inventory: { inStockCount: 0, totalInventoryCost: 0, details: [] } });
+            if (p.includes('/api/reports/generate')) return Promise.resolve({ locale: 'CN', period: { from: '', to: '', year: '2026' }, currency: '', reportTypes: [], warnings: [], incomeStatement: { salesRevenue: 100000, costOfSales: 60000, grossProfit: 40000, adminExpense: 5000, incomeTax: 6000, netProfit: 28000, netMargin: 28 } });
+            return Promise.resolve(/categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|reports\/types/.test(p) ? [] : {});
+          }
+          return Promise.resolve({});
+        },
+      };
+    });
+    await page.route('**/auth/**', (r) => r.fulfill({ json: { authenticated: true } }));
+    await page.addInitScript((l) => { try { localStorage.setItem('sololedger-lang', l as string); } catch { /* ignore */ } }, ui);
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('nav', { timeout: 20_000 });
+    await page.locator('i.fa-wallet').first().click();
+    await page.locator('button:has(i.fa-file-pdf)').click();
+    await expect(page.getByText(/SoloLedger-CN-pl-2026\.pdf/)).toBeVisible({ timeout: 10_000 });
+  });
+});
+
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const summary = {
