@@ -1060,6 +1060,12 @@
     "addItem": "Add Line",
     "removeItem": "Remove",
     "subtotal": "Subtotal (excl. tax)",
-    "saveButton": "Save"
+    "saveButton": "Save",
+    "exportPdf": "Export PDF",
+    "pdfExported": "Exported to: {{path}}",
+    "pdfDesktopOnly": "PDF export is available in the desktop app only.",
+    "pdfFailed": "PDF export failed. Please try again.",
+    "pdfGeneratedAt": "Generated at",
+    "pdfDisclaimer": "This is an internal business document, not an official tax invoice."
   }
 }

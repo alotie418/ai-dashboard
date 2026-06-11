@@ -1060,6 +1060,12 @@
     "addItem": "添加明细行",
     "removeItem": "删除",
     "subtotal": "不含税合计",
-    "saveButton": "保存"
+    "saveButton": "保存",
+    "exportPdf": "导出 PDF",
+    "pdfExported": "已导出到：{{path}}",
+    "pdfDesktopOnly": "仅桌面版支持 PDF 导出。",
+    "pdfFailed": "PDF 导出失败，请重试。",
+    "pdfGeneratedAt": "生成时间",
+    "pdfDisclaimer": "本单据为内部业务单据，并非正式税务发票。"
   }
 }

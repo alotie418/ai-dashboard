@@ -1060,6 +1060,12 @@
     "addItem": "明細行を追加",
     "removeItem": "削除",
     "subtotal": "税抜合計",
-    "saveButton": "保存"
+    "saveButton": "保存",
+    "exportPdf": "PDF 出力",
+    "pdfExported": "出力しました：{{path}}",
+    "pdfDesktopOnly": "PDF 出力はデスクトップ版でのみ利用できます。",
+    "pdfFailed": "PDF 出力に失敗しました。もう一度お試しください。",
+    "pdfGeneratedAt": "生成日時",
+    "pdfDisclaimer": "本帳票は社内業務帳票であり、正式な税務書類ではありません。"
   }
 }

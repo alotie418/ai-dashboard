@@ -1060,6 +1060,12 @@
     "addItem": "품목 추가",
     "removeItem": "삭제",
     "subtotal": "세전 합계",
-    "saveButton": "저장"
+    "saveButton": "저장",
+    "exportPdf": "PDF 내보내기",
+    "pdfExported": "내보낸 위치: {{path}}",
+    "pdfDesktopOnly": "PDF 내보내기는 데스크톱 앱에서만 사용할 수 있습니다.",
+    "pdfFailed": "PDF 내보내기에 실패했습니다. 다시 시도해 주세요.",
+    "pdfGeneratedAt": "생성 시간",
+    "pdfDisclaimer": "본 문서는 내부 업무 문서이며 정식 세무 문서가 아닙니다."
   }
 }

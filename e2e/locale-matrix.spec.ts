@@ -401,6 +401,13 @@ async function injectDocsElectronAPI(page: import('@playwright/test').Page, acc:
       invoke: (channel: string, payload: any) => {
         if (channel === 'providers:hasAny') return Promise.resolve(true);
         if (channel === 'providers:list') return Promise.resolve([]);
+        // Phase B: the generic printToPDF IPC — capture the produced HTML for
+        // content assertions and echo a deterministic saved path
+        if (channel === 'app:exportReportPdf') {
+          (window as any).__lastPdfHtml = (payload && payload.html) || '';
+          const name = (payload && payload.defaultFileName) || 'SoloLedger-doc.pdf';
+          return Promise.resolve({ ok: true, path: `/Users/test/Documents/${name}` });
+        }
         if (channel === 'api:request') {
           const method = (payload && payload.method) || 'GET';
           const p = (payload && payload.path) || '';
@@ -418,6 +425,12 @@ async function injectDocsElectronAPI(page: import('@playwright/test').Page, acc:
                 subtotal, tax_amount: tax, total: subtotal + tax,
               });
               return Promise.resolve({ success: true, id: 'doc-e2e-1' });
+            }
+            // GET /api/documents/:id → single doc with items (the PDF export path)
+            const m = /^\/api\/documents\/([^/?]+)$/.exec(p);
+            if (m) {
+              const found = docs.find((d: any) => d.id === m[1]);
+              return Promise.resolve(found ? { ...found, items: found.items || [] } : {});
             }
             return Promise.resolve(docs);
           }
@@ -501,6 +514,34 @@ test.describe('business documents → create modal (desktop mock)', () => {
     await expect(page.getByText(loc.documents.formTitle).first()).toBeVisible({ timeout: 10_000 });
     const body = await page.locator('body').innerText();
     expect(body, 'bare getTaxLabel key leaked into the documents modal').not.toMatch(/\b(headerTaxAmount|headerTotalWithTax|formTaxRate)\b/);
+  });
+
+  // Phase B: per-row PDF export goes through the generic app:exportReportPdf IPC
+  // (mock echoes the suggested filename back as the saved path). The flow exercises
+  // GET /api/documents/:id (items load) → buildDocumentHtml → IPC → success banner.
+  test('documents-export-pdf → mock electronAPI shows saved path', async ({ page }) => {
+    const ui = 'zh-CN';
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await injectDocsElectronAPI(page, 'CN', [{
+      id: 'doc-pdf-1', doc_type: 'quotation', doc_number: 'QT-2026-0042', status: 'draft',
+      doc_date: '2026-06-01', customer_name: 'PDF 测试客户', acc_locale: 'CN',
+      subtotal: 100, tax_amount: 13, total: 113,
+      items: [{ id: 1, description: '咨询服务', quantity: 2, unit: 'session', unit_price: 50, tax_rate: '13%', tax_amount: 13, amount: 100, line_no: 0 }],
+    }]);
+    await bootCombo(page, ui, 'CN');
+    await page.locator('nav i.fa-file-contract').first().click();
+    await expect(page.getByText('QT-2026-0042')).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole('button', { name: loc.documents.exportPdf }).click();
+    await expect(page.getByText(/SoloLedger-QT-2026-0042\.pdf/)).toBeVisible({ timeout: 10_000 });
+
+    // the produced HTML carries the Phase B contract: doc number, line item,
+    // frozen-locale money and the unconditional non-tax-invoice disclaimer
+    const html = await page.evaluate(() => (window as any).__lastPdfHtml as string);
+    expect(html).toContain('QT-2026-0042');
+    expect(html).toContain('咨询服务');
+    expect(html).toContain('¥113.00');
+    expect(html).toContain(loc.documents.pdfDisclaimer);
   });
 });
 

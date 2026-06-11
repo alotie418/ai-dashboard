@@ -1060,6 +1060,12 @@
     "addItem": "新增明細行",
     "removeItem": "刪除",
     "subtotal": "未稅合計",
-    "saveButton": "儲存"
+    "saveButton": "儲存",
+    "exportPdf": "匯出 PDF",
+    "pdfExported": "已匯出到：{{path}}",
+    "pdfDesktopOnly": "僅桌面版支援 PDF 匯出。",
+    "pdfFailed": "PDF 匯出失敗，請重試。",
+    "pdfGeneratedAt": "產生時間",
+    "pdfDisclaimer": "本單據為內部業務單據，並非正式稅務發票。"
   }
 }
