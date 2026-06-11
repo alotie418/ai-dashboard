@@ -27,8 +27,9 @@ import LoginPage from './components/LoginPage';
 import OnboardingWizard from './components/OnboardingWizard';
 import { AssistantProvider } from './components/assistant/AssistantProvider';
 import AssistantWidget from './components/assistant/AssistantWidget';
+import AssistantPage from './components/assistant/AssistantPage';
 
-type PageId = 'dashboard' | 'sales' | 'purchase' | 'analysis' | 'inventory' | 'documents' | 'finance' | 'accounts' | 'transactions' | 'ustax' | 'settings';
+type PageId = 'dashboard' | 'sales' | 'purchase' | 'analysis' | 'inventory' | 'documents' | 'finance' | 'accounts' | 'transactions' | 'assistant' | 'ustax' | 'settings';
 
 // Display names for the "switch provider" hint shown when Gemini hits its quota (429).
 const AI_PROVIDER_LABELS: Record<string, string> = { openai: 'ChatGPT (OpenAI)', anthropic: 'Claude (Anthropic)', gemini: 'Gemini' };
@@ -335,6 +336,7 @@ const AppContent: React.FC = () => {
       case 'finance': return <FinancePage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'accounts': return <AccountsPage />;
       case 'documents': return <DocumentsPage />;
+      case 'assistant': return <AssistantPage />;
       case 'transactions': return <TransactionsPage />;
       case 'ustax': return <USTaxToolsPage selectedYear={selectedYear} />;
       case 'settings': return <SettingsPage />;
@@ -372,6 +374,7 @@ const AppContent: React.FC = () => {
           <NavItem icon="fa-search-dollar" label={assistantAccLocale !== 'CN' ? getTaxLabel(assistantAccLocale, i18n.language, 'invQueryTitle') : t('nav.inventory')} active={currentPage === 'inventory'} expanded={sidebarOpen} onClick={() => setCurrentPage('inventory')} />
           <NavItem icon="fa-file-contract" label={t('nav.documents')} active={currentPage === 'documents'} expanded={sidebarOpen} onClick={() => setCurrentPage('documents')} />
           <NavItem icon="fa-chart-pie" label={t('nav.analysis')} active={currentPage === 'analysis'} expanded={sidebarOpen} onClick={() => setCurrentPage('analysis')} />
+          <NavItem icon="fa-comments" label={t('nav.assistant')} active={currentPage === 'assistant'} expanded={sidebarOpen} onClick={() => setCurrentPage('assistant')} />
           <NavItem icon="fa-handshake" label={t('nav.accounts')} active={currentPage === 'accounts'} expanded={sidebarOpen} onClick={() => setCurrentPage('accounts')} />
           <NavItem icon="fa-wallet" label={t('nav.finance')} active={currentPage === 'finance'} expanded={sidebarOpen} onClick={() => setCurrentPage('finance')} />
           <NavItem icon="fa-exchange-alt" label={t('nav.transactions')} active={currentPage === 'transactions'} expanded={sidebarOpen} onClick={() => setCurrentPage('transactions')} />

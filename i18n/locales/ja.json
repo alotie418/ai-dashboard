@@ -30,6 +30,7 @@
   },
   "nav": {
     "dashboard": "ダッシュボード",
+    "assistant": "AI アシスタント",
     "purchase": "仕入・仮払消費税",
     "sales": "売上・仮受消費税",
     "inventory": "請求書検索",
@@ -44,6 +45,7 @@
   },
   "headerTitle": {
     "dashboard": "経営データ概要",
+    "assistant": "AI アシスタント",
     "sales": "売上・仮受消費税",
     "purchase": "仕入・仮払消費税",
     "analysis": "データ分析センター",

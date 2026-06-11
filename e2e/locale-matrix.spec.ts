@@ -385,6 +385,35 @@ test.describe('business documents page', () => {
   }
 });
 
+// ── AI Assistant standalone page renders across all 36 combos (R2a) ──
+// The standalone page reuses the floating widget's ChatPanel and shares the same
+// AssistantProvider session. It is NOT desktop-only (chat works in web mode too via
+// apiFetch), so unlike the documents page it must render the chat shell itself: the
+// header title + empty-state welcome card + input box — with no raw chat.* / nav.assistant
+// key leaking. Navigation uses the sidebar fa-comments icon, scoped to <nav> (NavItem is a
+// <div>, not a <button>); the floating widget uses "AI"/fa-robot, never fa-comments.
+test.describe('ai assistant page', () => {
+  for (const acc of ACCOUNTING_LOCALES) {
+    for (const ui of UI_LANGUAGES) {
+      test(`assistant-page ui=${ui} acc=${acc}`, async ({ page }) => {
+        await bootCombo(page, ui, acc);
+        const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+
+        await page.locator('nav i.fa-comments').first().click();
+
+        // (1) header title renders the resolved translation (proves the key is not a raw leak)
+        await expect(page.getByRole('heading', { name: loc.headerTitle.assistant }).first()).toBeVisible({ timeout: 10_000 });
+        // (2) the page's ChatPanel is mounted: empty-state welcome + input placeholder render
+        await expect(page.getByText(loc.chat.welcome).first()).toBeVisible({ timeout: 10_000 });
+        await expect(page.getByPlaceholder(loc.chat.placeholder).first()).toBeVisible({ timeout: 10_000 });
+        // (3) no raw chat.* / nav.assistant / headerTitle.assistant key leaked into the rendered UI
+        const body = await page.locator('body').innerText();
+        expect(body, `[ui=${ui} acc=${acc}] raw assistant key leaked`).not.toMatch(/chat\.[a-zA-Z]|nav\.assistant|headerTitle\.assistant/);
+      });
+    }
+  }
+});
+
 // ── Business Documents create modal with a mocked desktop electronAPI (Phase A) ──
 // The modal is uiLanguage-only (regime tax labels render via getTaxLabel with the
 // frozen acc_locale and are covered by the matrix sweep), so one accountingLocale ×

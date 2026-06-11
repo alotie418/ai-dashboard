@@ -2309,6 +2309,28 @@ async function main() {
       if (reasons.length) fail(`financeTabLabels`, reasons); else pass(`financeTabLabels`);
     }
 
+    // PART H6: AI Assistant standalone page (R2a) nav + header labels — uiLanguage-only,
+    //   regime-neutral (decoupled like nav.documents). nav.assistant / headerTitle.assistant
+    //   must be present in all 6 langs, carry NO tax/regime wording, AND must NOT stay the
+    //   English fallback in non-en (the same non-fallback lock financeTabLabels uses). The
+    //   standalone page reuses the floating widget's ChatPanel, so its chat body strings are
+    //   the already-locked chat.* set (REQUIRED_I18N_KEYS) — only the new nav/header keys here.
+    {
+      const reasons = [];
+      const ASSIST_TAX_WORDS = /增值税|增值稅|营业税|營業稅|消费税|消費稅|Sales Tax|销售税|銷售稅|进项|進項|销项|銷項|統一發票|适格請求書|インボイス/;
+      const ASSIST_KEYS = ['nav.assistant', 'headerTitle.assistant'];
+      for (const lang of UI_LANGUAGES) {
+        const loc = locales[lang];
+        for (const key of ASSIST_KEYS) {
+          const v = get(loc, key);
+          if (v === undefined || v === null || v === '') { reasons.push(`${lang}: ${key} missing/empty`); continue; }
+          if (ASSIST_TAX_WORDS.test(v)) reasons.push(`${lang}: ${key} must not carry tax/regime wording: "${v}"`);
+          if (lang !== 'en' && v === get(locales['en'], key)) reasons.push(`${lang}: ${key} still English fallback "${v}" (must follow UI language)`);
+        }
+      }
+      if (reasons.length) fail(`assistantNavLabels`, reasons); else pass(`assistantNavLabels`);
+    }
+
     // PART H5: Business documents UI strings (Phase A) — uiLanguage-only, regime-decoupled.
     //   Every locale carries the full documents.* set + nav/headerTitle entries; strings
     //   carry NO tax/regime wording (regime tax labels on the page come from getTaxLabel

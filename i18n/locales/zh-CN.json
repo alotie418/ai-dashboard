@@ -30,6 +30,7 @@
   },
   "nav": {
     "dashboard": "经营看板",
+    "assistant": "AI 助手",
     "purchase": "采购与进项",
     "sales": "销售与销项",
     "inventory": "发票查询",
@@ -44,6 +45,7 @@
   },
   "headerTitle": {
     "dashboard": "经营数据概览",
+    "assistant": "AI 助手",
     "sales": "销售与销项",
     "purchase": "采购与进项",
     "analysis": "数据分析中心",
