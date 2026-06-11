@@ -91,13 +91,15 @@ async function chat(apiKey, model, { messages, systemInstruction }) {
 // history 已是 Anthropic 原生 messages（首轮经 toNativeHistory，后续 turn 由 agent loop 原样追加）。
 // 返回 { type:'final', text } 或 { type:'tool_calls', assistantMsg(原生), calls:[{id,name,args}] }。
 async function chatWithTools(apiKey, model, { history, system, tools }) {
-  const json = await callMessages(apiKey, {
+  const body = {
     model: model || META.defaultModel,
     max_tokens: 4096,
     system: system || undefined,
-    tools: (tools || []).map(t => ({ name: t.name, description: t.description, input_schema: t.input_schema })),
     messages: history,
-  });
+  };
+  // 空工具时省略 tools 字段（Anthropic 空数组可能被拒；超轮次兜底走 tools:[]）。
+  if (tools && tools.length) body.tools = tools.map(t => ({ name: t.name, description: t.description, input_schema: t.input_schema }));
+  const json = await callMessages(apiKey, body);
   const toolUses = (json.content || []).filter(b => b.type === 'tool_use');
   if (json.stop_reason === 'tool_use' && toolUses.length) {
     return {

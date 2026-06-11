@@ -101,6 +101,42 @@ async function chat(apiKey, model, { messages, systemInstruction }) {
   return { text: extractText(json) };
 }
 
+// ── 工具调用方言（R2b-2a）──
+// Responses API：function 工具是扁平结构 {type:'function', name, description, parameters}；模型在
+// output[] 里发 type:'function_call'（带 call_id/name/arguments(JSON 串)），工具结果作为 input 的
+// type:'function_call_output' 项回填。无状态续接：每轮重发完整 input（= agent loop 累积的 history）。
+const toResponsesToolDef = (t) => ({ type: 'function', name: t.name, description: t.description, parameters: t.input_schema, strict: false });
+
+// history 即 Responses 的 input 数组：首轮经本函数把渲染端 Gemini 风格 messages 转成 message 项；
+// 后续 turn 的 function_call / function_call_output 项由 agent loop 原样追加，不再过本函数。
+function toNativeHistory(messages) {
+  return toInputMessages(messages);
+}
+
+async function chatWithTools(apiKey, model, { history, system, tools }) {
+  const body = {
+    model: model || META.defaultModel,
+    instructions: system || undefined,
+    input: (history && history.length) ? history : 'Hello',
+    ...(tools && tools.length ? { tools: tools.map(toResponsesToolDef), tool_choice: 'auto' } : {}),
+  };
+  const json = await callResponses(apiKey, body);
+  // 只取 function_call 项；刻意不回填 reasoning 项（Responses 对推理项需 encrypted_content，省略最稳，
+  // 模型每轮基于会话 + 工具结果重新推理）。
+  const fnItems = (json.output || []).filter(o => o.type === 'function_call');
+  if (fnItems.length) {
+    return {
+      type: 'tool_calls',
+      assistantMsg: fnItems,                          // 数组 → 由 agent loop spread 进 input
+      calls: fnItems.map(o => ({ id: o.call_id, name: o.name, args: tryParseJson(o.arguments) || {} })),
+    };
+  }
+  return { type: 'final', text: extractText(json) };
+}
+
+// 把一个工具执行结果包成 Responses 的 function_call_output 项（靠 call_id 匹配；output 必须是字符串）。
+const toToolResultMsg = (call, result) => ({ type: 'function_call_output', call_id: call.id, output: JSON.stringify(result) });
+
 async function analyze(apiKey, model, { data, marketSummary, languageHint, analyzeSystemPrompt }) {
   const marketContext = marketSummary ? `\n\n${marketSummary}` : '';
   const fallbackSys = `你是一位专业的商业分析师。请分析企业经营数据并按 JSON 输出：
@@ -159,4 +195,4 @@ async function dataAnalysis(apiKey, model, { prompt, systemInstruction }) {
   return { ...parsed, groundingSources: [] };
 }
 
-module.exports = { meta: META, test, chat, analyze, ocr, tts, dataAnalysis };
+module.exports = { meta: META, test, chat, chatWithTools, toToolResultMsg, toNativeHistory, analyze, ocr, tts, dataAnalysis };
