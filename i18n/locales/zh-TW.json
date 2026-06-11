@@ -312,9 +312,6 @@
     "welcome": "您好，我是 AI 助手",
     "welcomeDesc": "我可以為您提供即時的經營分析和建議。您可以直接提問，或點擊下方的功能快捷鍵。",
     "placeholder": "請輸入您的問題...",
-    "livePlaceholder": "即時語音模式...",
-    "liveStart": "即時通話",
-    "liveStop": "退出語音",
     "uploadInvoice": "上傳發票",
     "financeQuery": "財報查詢",
     "trendAnalysis": "歷史趨勢",
@@ -322,11 +319,6 @@
     "inventoryQuery": "庫存查詢",
     "thinking": "AI 正在分析中...",
     "resize": "拖拽調整大小",
-    "playVoice": "播放語音",
-    "liveConnecting": "正在連線...",
-    "liveListening": "請說，我在聽",
-    "liveResponding": "AI 正在回應",
-    "liveHint": "您可以詢問任何有關經營、財務或市場的資料問題。",
     "emptyReply": "未能取得有效回覆。",
     "requestError": "請求發生錯誤，請稍後重試。",
     "uploadInvoiceMsg": "上傳發票：{{name}}",
@@ -341,13 +333,6 @@
     "quickPromptTrend": "分析過去幾個月的業務歷史趨勢",
     "quickPromptMarket": "搜尋最新市場價格和行情",
     "quickPromptInventory": "查詢目前庫存餘量和風險"
-  },
-  "voice": {
-    "aoede": "Aoede (溫柔女聲)",
-    "puck": "Puck (活潑男聲)",
-    "charon": "Charon (深沉男聲)",
-    "kore": "Kore (清新女聲)",
-    "fenrir": "Fenrir (激情男聲)"
   },
   "dashboard": {
     "inventory": "庫存餘量 (實時)",
@@ -891,7 +876,6 @@
     "analyzeSystemPrompt": "你是一位專業的商業分析師。請分析以下企業經營資料，給出：\n1. summary: 一段簡要的經營概況總結\n2. topInsights: 3-5條關鍵洞察（陣列）\n3. recommendations: 3-5條改進建議（陣列）\n4. anomalies: 異常指標列表（陣列）\n請嚴格按 JSON 格式返回。",
     "ocrPrompt": "你是一位專業的財務審計員。請從這張發票圖片中提取以下資訊，嚴格按 JSON 格式返回（不要 markdown 代碼塊）：\n{\n  \"date\": \"開票日期 YYYY-MM-DD\",\n  \"customer\": \"客戶名稱/購方名稱\",\n  \"quantity\": \"貨物總數量及單位\",\n  \"price\": 合計不含稅金額數字,\n  \"shipping\": 運費數字,\n  \"invoiceNo\": \"發票號碼\",\n  \"totalWithTax\": 價稅合計數字,\n  \"unitPriceWithoutTax\": 不含稅單價數字,\n  \"taxAmount\": 合計稅額數字\n}\n數字欄位必須是數字而非字串，沒有則填 0。",
     "chatSystemPrompt": "你是一位專業的企業經營資料助手，擁有企業全部即時經營資料的存取權限。\n\n你的職責：\n1. 基於完整資料回答使用者關於企業內部經營的任何問題\n2. 能夠進行跨模組分析\n3. 資料分析時可以主動關聯多個模組的資料給出綜合建議\n\n重要：請嚴格依照下方提供的會計制度（accounting locale）進行財務/稅務推理（幣種、稅制、報表結構、會計類別），按下方提供的 UI 語言回答。不要從 UI 語言推測會計制度，也不要從會計制度推測 UI 語言。\n\n排版要求：僅使用兩個星號(**)進行加粗，使用清晰的列表和段落。",
-    "liveSystemPrompt": "你是一位精通業務看板資料的 AI 助手。對於語音互動，請保持回答簡練直接。當使用者詢問商品價格或行情時：1. 優先使用 Google Search 查詢最新價格。2. 直接報出價格數字和關鍵趨勢，不要長篇鋪墊。3. 如有多個來源，簡要概括範圍。\n\n重要：請依照下方提供的會計制度（accounting locale）進行財務/稅務推理（幣種、稅制），按下方提供的 UI 語言回答。",
     "contextFallback": "企業概況：年營收 {{revenue}}，毛利率 {{grossMargin}}%，淨利率 {{netMargin}}%。",
     "forecastSystemPrompt": "你是一位精通行業的財務長與市場分析師。請結合企業歷史資料和統計模型結果進行綜合預測。返回JSON，包含insights字串和predictions陣列。"
   },

@@ -249,24 +249,6 @@ function getDefaultRecord() {
   };
 }
 
-// 找一个支持指定能力的 provider（如 TTS 只有 Gemini 支持）
-function getRecordForCapability(capability) {
-  ensureTable();
-  const db = getDb();
-  const candidates = db.prepare('SELECT provider, api_key_encrypted, model FROM ai_providers WHERE enabled = 1 ORDER BY is_default DESC, updated_at DESC').all();
-  for (const row of candidates) {
-    const meta = PROVIDERS[row.provider]?.meta;
-    if (meta?.capabilities?.[capability]) {
-      return {
-        provider: row.provider,
-        apiKey: decryptKey(row.api_key_encrypted),
-        model: row.model,
-      };
-    }
-  }
-  return null;
-}
-
 async function analyze(body) {
   const rec = getDefaultRecord();
   return PROVIDERS[rec.provider].analyze(rec.apiKey, rec.model, body);
@@ -284,36 +266,17 @@ async function chat(body) {
   return PROVIDERS[rec.provider].chat(rec.apiKey, rec.model, body);
 }
 
-async function tts(body) {
-  // TTS 只 Gemini 支持，优先找支持的 provider；找不到给清晰错误
-  const rec = getRecordForCapability('tts');
-  if (!rec) {
-    const err = new Error('当前所有已配置的 Provider 都不支持 TTS。请配置 Gemini API Key 以使用语音功能。');
-    err.code = 'NO_CAPABILITY';
-    throw err;
-  }
-  return PROVIDERS[rec.provider].tts(rec.apiKey, rec.model, body);
-}
-
 async function dataAnalysis(body) {
   const rec = getDefaultRecord();
   return PROVIDERS[rec.provider].dataAnalysis(rec.apiKey, rec.model, body);
 }
 
-// 兼容旧的 /api/ai/live-key（仅 Gemini 支持 Live Audio）
-function liveKey() {
-  const rec = getRecordForCapability('tts'); // tts == gemini
-  if (!rec) {
-    const err = new Error('Live Audio 需要 Gemini API Key');
-    err.code = 'NO_CAPABILITY';
-    throw err;
-  }
-  return { key: rec.apiKey, provider: rec.provider, model: rec.model };
-}
+// 语音功能（TTS / Live Audio）已于 AI 助手重设计 R1 移除——
+// 不再暴露 tts()/liveKey()（明文 key 出主进程的安全洞随之消除）。
 
 module.exports = {
   // 管理面
   list, hasAny, save, remove, setDefault, test,
   // 业务面
-  analyze, ocr, chat, tts, dataAnalysis, liveKey,
+  analyze, ocr, chat, dataAnalysis,
 };

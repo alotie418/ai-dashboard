@@ -30,22 +30,13 @@ async function chat({ body }) {
   return aiCore.chat(body);
 }
 
-// /api/ai/tts — 语音合成
-async function tts({ body }) {
-  if (!body?.text) throw new Error('Missing text');
-  return aiCore.tts(body);
-}
-
 // /api/ai/data-analysis — 数据分析（含 Web grounding，仅 Gemini 有效）
 async function dataAnalysis({ body }) {
   if (!body?.prompt) throw new Error('Missing prompt');
   return aiCore.dataAnalysis(body);
 }
 
-// /api/ai/live-key — Live Audio 用 Key（仅 Gemini）
-async function liveKey() {
-  return aiCore.liveKey();
-}
+// 语音（/api/ai/tts、/api/ai/live-key）已于 AI 助手重设计 R1 移除。
 
 // /api/ai/context — 全数据聚合（本地直查 DB，不依赖外部 AI）
 async function context({ body }) {
@@ -162,4 +153,4 @@ Tax surcharge: ${num(f.taxSurcharge)}, admin expense: ${num(f.adminExpense)}, sh
   return { context: sections.join('\n\n') };
 }
 
-module.exports = { analyze, ocr, context, chat, tts, dataAnalysis, liveKey };
+module.exports = { analyze, ocr, context, chat, dataAnalysis };
