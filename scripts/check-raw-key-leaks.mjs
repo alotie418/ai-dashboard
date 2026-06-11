@@ -405,6 +405,21 @@ async function checkAIToolsReadonly() {
   }
 }
 
+async function checkAIContextInvoiceStatus() {
+  // R3a: the AI context aggregation (electron/handlers/ai.js) must NOT count invoices by
+  // hard-equality to a single Chinese status (invoiceStatus === '已开' / '已收') — that makes
+  // non-CN / CSV-imported (English: issued/paid/…) statuses count as 0. Use the locale-robust
+  // isIssuedInvoiceStatus() helper (已开/已收/issued/paid/collected/invoiced) instead.
+  let src;
+  try { src = await readFile(join(ROOT, 'electron/handlers/ai.js'), 'utf8'); } catch { return; }
+  if (/invoiceStatus\s*===\s*['"]已[开收]['"]/.test(src)) {
+    findings.push({
+      file: 'electron/handlers/ai.js', line: 0, type: 'ai-context-invoice-locale', token: 'invoiceStatus',
+      snippet: 'AI context counts invoices by hard-equal to Chinese 已开/已收 — use the locale-robust isIssuedInvoiceStatus() (已开/已收/issued/paid/collected/invoiced)',
+    });
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -421,6 +436,7 @@ async function main() {
   await checkNoAutoAIAnalysis();
   await checkAIQuotaCooldown();
   await checkAIToolsReadonly();
+  await checkAIContextInvoiceStatus();
   await checkAnalyticsMatrixDisplay();
   await checkFinanceMoneyFormat();
 
