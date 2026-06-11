@@ -1060,6 +1060,12 @@
     "addItem": "Ajouter une ligne",
     "removeItem": "Supprimer",
     "subtotal": "Total hors taxes",
-    "saveButton": "Enregistrer"
+    "saveButton": "Enregistrer",
+    "exportPdf": "Exporter en PDF",
+    "pdfExported": "Exporté vers : {{path}}",
+    "pdfDesktopOnly": "L'export PDF est disponible uniquement dans l'application de bureau.",
+    "pdfFailed": "Échec de l'export PDF. Veuillez réessayer.",
+    "pdfGeneratedAt": "Généré le",
+    "pdfDisclaimer": "Ce document est un document commercial interne et ne constitue pas une facture fiscale officielle."
   }
 }

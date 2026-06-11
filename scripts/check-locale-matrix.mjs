@@ -2343,6 +2343,8 @@ async function main() {
         'documents.itemQty', 'documents.itemUnit', 'documents.noUnit',
         'documents.itemUnitPrice', 'documents.itemAmount', 'documents.addItem',
         'documents.removeItem', 'documents.subtotal', 'documents.saveButton',
+        'documents.exportPdf', 'documents.pdfExported', 'documents.pdfDesktopOnly',
+        'documents.pdfFailed', 'documents.pdfGeneratedAt', 'documents.pdfDisclaimer',
       ];
       const TAX_WORDS = /增值税|增值稅|营业税|營業稅|消费税|消費稅|Sales Tax|进项|進項|销项|銷項|VAT|Schedule C|统一发票|統一發票|適格請求書|インボイス|数电票|數電票/;
       const TYPE_EN = {
@@ -2364,6 +2366,12 @@ async function main() {
             if (get(loc, key) === en) reasons.push(`${lang}: ${key} still English "${en}" (must follow UI language)`);
           }
         }
+      }
+      // pdfExported must keep the {{path}} token in every language — a success
+      // banner without the saved path is a silent regression (G0j COUNT_KEYS precedent).
+      for (const lang of UI_LANGUAGES) {
+        const v = get(locales[lang], 'documents.pdfExported');
+        if (v && !v.includes('{{path}}')) reasons.push(`${lang}: documents.pdfExported lost the {{path}} token`);
       }
       // The documents modal borrows regime keys via getTaxLabel with the document's
       // frozen acc_locale: formTaxRate must resolve for all 6 regimes, header* for

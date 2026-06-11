@@ -1,16 +1,20 @@
-// 业务单据 页面（Phase A）— 报价单/销售单/形式发票/商业发票/对账单 的列表与 CRUD
-// 仅内部业务单据：非税务发票开具，不接税控/税局，正式发票号码永不自动生成。
+// 业务单据 页面（Phase A CRUD + Phase B PDF 导出）— 报价单/销售单/形式发票/商业发票/对账单
+// 仅内部业务单据：非税务发票开具，不接税控/税局，正式发票号码永不自动生成；
+// PDF 页脚固定携带「非正式税务发票」免责声明。
 // 仅桌面版可用（web 模式无 /api/documents 路由）：非 Electron 显示提示、不发请求。
-// 列表金额用每张单据「冻结的会计制度」acc_locale 渲染币种（不随设置切换漂移）。
+// 列表金额与 PDF 用每张单据「冻结的会计制度」acc_locale 渲染（不随设置切换漂移）。
 // UI-language-only 文案走 documents.*；税种标签经 getTaxLabel（仅显示，零计算口径）。
+// PDF 复用 #97 通用 IPC app:exportReportPdf（主进程零改动），模板见 documentPdf.ts。
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   isDesktop, fetchSettings, listProducts, listDocuments, getDocument, updateDocument, deleteDocument,
+  exportReportPdf,
   type BusinessDocument, type BusinessDocType, type Product,
 } from '../services/api';
-import { formatMoney } from './accountingHelpers';
+import { formatMoney, getTaxLabel, getProductUnitLabel } from './accountingHelpers';
+import { buildDocumentHtml } from './documentPdf';
 import DocumentModal from './DocumentModal';
 
 const TYPE_LABEL_KEYS: Record<BusinessDocType, string> = {
@@ -36,7 +40,7 @@ const STATUS_BADGE_CLS: Record<string, string> = {
 const FILTERS: Array<'all' | BusinessDocType> = ['all', 'quotation', 'sales_order', 'proforma_invoice', 'commercial_invoice', 'statement'];
 
 const DocumentsPage: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const desktop = isDesktop();
   const [accLocale, setAccLocale] = useState('CN');
   const [filter, setFilter] = useState<'all' | BusinessDocType>('all');
@@ -46,6 +50,8 @@ const DocumentsPage: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<BusinessDocument | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [pdfBusyId, setPdfBusyId] = useState<string | null>(null);
+  const [pdfMsg, setPdfMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   useEffect(() => {
     fetchSettings().then((s: any) => {
@@ -105,6 +111,60 @@ const DocumentsPage: React.FC = () => {
     }
   };
 
+  // Phase B：导出单据 PDF。标签按该单据冻结的 acc_locale 解析（getTaxLabel + 销售页
+  // 同款 CN gate），金额经 formatMoney(冻结制度)；HTML 组装在 documentPdf.ts（数据驱动，
+  // 不动 FinancePage）；主进程走 #97 既有通用 IPC app:exportReportPdf。
+  const handleExportPdf = async (d: BusinessDocument) => {
+    setPdfMsg(null);
+    if (!desktop) { setPdfMsg({ type: 'info', text: t('documents.pdfDesktopOnly') }); return; }
+    setPdfBusyId(d.id);
+    try {
+      const full = await getDocument(d.id);
+      const s: any = await fetchSettings().catch(() => ({}));
+      const company = s?.company_info || null;
+      const uiLang = i18n.language;
+      const docLocale = full.accLocale || 'CN';
+      const taxL = (key: string) => getTaxLabel(docLocale, uiLang, key);
+      const html = buildDocumentHtml(full, company, {
+        lang: uiLang,
+        typeTitle: t(TYPE_LABEL_KEYS[full.docType]),
+        voidBadge: full.status === 'void' ? t('documents.statusVoid') : '',
+        numberLabel: t('documents.colNumber'),
+        dateLabel: t('documents.colDate'),
+        validUntilLabel: t('documents.formValidUntil'),
+        customerLabel: t('documents.colCustomer'),
+        customerTaxIdLabel: t('documents.formCustomerTaxId'),
+        customerAddressLabel: t('documents.formCustomerAddress'),
+        customerContactLabel: t('documents.formCustomerContact'),
+        descriptionLabel: t('documents.itemDescription'),
+        qtyLabel: t('documents.itemQty'),
+        unitPriceLabel: t('documents.itemUnitPrice'),
+        taxRateLabel: taxL('formTaxRate'),
+        taxAmountLabel: docLocale !== 'CN' ? taxL('headerTaxAmount') : t('tableHeaders.taxAmount'),
+        amountLabel: t('documents.itemAmount'),
+        subtotalLabel: t('documents.subtotal'),
+        totalLabel: docLocale !== 'CN' ? taxL('headerTotalWithTax') : t('tableHeaders.totalWithTax'),
+        notesLabel: t('documents.formNotes'),
+        generatedAtLabel: t('documents.pdfGeneratedAt'),
+        disclaimer: t('documents.pdfDisclaimer'),
+      }, {
+        money: (v: number) => formatMoney(v, docLocale),
+        unitLabel: (u) => getProductUnitLabel(u, uiLang),
+        generatedAt: new Date().toLocaleString(uiLang),
+      });
+      const safeName = full.docNumber.replace(/[\\/:*?"<>|\s]+/g, '_') || full.id;
+      const r = await exportReportPdf(html, `SoloLedger-${safeName}.pdf`);
+      if (r.ok && r.path) setPdfMsg({ type: 'success', text: t('documents.pdfExported', { path: r.path }) });
+      else if (r.error) setPdfMsg({ type: 'error', text: t('documents.pdfFailed') });
+      // ok=false 且无 error = 用户取消保存框 → 静默
+    } catch (err) {
+      console.error(err);
+      setPdfMsg({ type: 'error', text: t('documents.pdfFailed') });
+    } finally {
+      setPdfBusyId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* 标题 + 新建 */}
@@ -132,6 +192,15 @@ const DocumentsPage: React.FC = () => {
       {error && (
         <div className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
           <i className="fas fa-exclamation-circle mr-2"></i>{error}
+        </div>
+      )}
+
+      {pdfMsg && (
+        <div className={`text-sm rounded-lg px-3 py-2 break-all ${
+          pdfMsg.type === 'success' ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+          : pdfMsg.type === 'error' ? 'text-rose-600 bg-rose-50 border border-rose-200'
+          : 'text-amber-700 bg-amber-50 border border-amber-200'}`}>
+          <i className={`fas mr-2 ${pdfMsg.type === 'success' ? 'fa-check-circle' : pdfMsg.type === 'error' ? 'fa-exclamation-circle' : 'fa-circle-info'}`}></i>{pdfMsg.text}
         </div>
       )}
 
@@ -204,6 +273,13 @@ const DocumentsPage: React.FC = () => {
                         {t('common2.delete')}
                       </button>
                     )}
+                    <button
+                      onClick={() => handleExportPdf(d)}
+                      disabled={pdfBusyId !== null}
+                      className="text-[#5c5c5a] hover:text-[#191918] transition-colors disabled:opacity-50"
+                    >
+                      {pdfBusyId === d.id ? <i className="fas fa-spinner fa-spin"></i> : t('documents.exportPdf')}
+                    </button>
                   </td>
                 </tr>
               ))}
