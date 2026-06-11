@@ -47,6 +47,9 @@ async function runAgentLoop({ adapter, apiKey, model, history, system, maxRounds
     // function_call 项数组）——统一 spread，对单条向后兼容。
     const assistantTurn = Array.isArray(step.assistantMsg) ? step.assistantMsg : [step.assistantMsg];
     history.push(...assistantTurn);
+    // 先收集本轮所有工具执行结果，再「一次性」回填——多工具一轮时 tool_result 须按 provider 要求成组
+    // （Anthropic/Gemini：所有结果合并到「单条」user turn，角色须交替；OpenAI：function_call_output 平铺）。
+    const toolResults = [];
     for (const call of step.calls) {
       let result;
       let rowCount = 0;
@@ -62,8 +65,10 @@ async function runAgentLoop({ adapter, apiKey, model, history, system, maxRounds
       }
       // trace 只含 工具名 / 参数摘要 / 行数 / 截断标志——绝不含 key 或结果明细。
       trace.push({ name: call.name, argsSummary: argsSummary(call.args), rowCount, truncated });
-      history.push(adapter.toToolResultMsg(call, result));
+      toolResults.push({ call, result });
     }
+    const resultTurn = adapter.toToolResultsMsg(toolResults);
+    history.push(...(Array.isArray(resultTurn) ? resultTurn : [resultTurn]));
   }
 
   // 超轮次兜底：用 chatWithTools 但不带工具（provider 无关、避免把原生 history 再过一遍 chat 的归一化

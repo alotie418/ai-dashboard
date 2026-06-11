@@ -134,8 +134,8 @@ async function chatWithTools(apiKey, model, { history, system, tools }) {
   return { type: 'final', text: extractText(json) };
 }
 
-// 把一个工具执行结果包成 Responses 的 function_call_output 项（靠 call_id 匹配；output 必须是字符串）。
-const toToolResultMsg = (call, result) => ({ type: 'function_call_output', call_id: call.id, output: JSON.stringify(result) });
+// 把本轮所有工具结果包成 Responses 的 function_call_output 项「数组」（由 agent loop spread 平铺进 input）。
+const toToolResultsMsg = (items) => items.map(({ call, result }) => ({ type: 'function_call_output', call_id: call.id, output: JSON.stringify(result) }));
 
 async function analyze(apiKey, model, { data, marketSummary, languageHint, analyzeSystemPrompt }) {
   const marketContext = marketSummary ? `\n\n${marketSummary}` : '';
@@ -195,4 +195,4 @@ async function dataAnalysis(apiKey, model, { prompt, systemInstruction }) {
   return { ...parsed, groundingSources: [] };
 }
 
-module.exports = { meta: META, test, chat, chatWithTools, toToolResultMsg, toNativeHistory, analyze, ocr, tts, dataAnalysis };
+module.exports = { meta: META, test, chat, chatWithTools, toToolResultsMsg, toNativeHistory, analyze, ocr, tts, dataAnalysis };
