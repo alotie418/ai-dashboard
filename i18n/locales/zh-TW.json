@@ -1066,6 +1066,15 @@
     "pdfDesktopOnly": "僅桌面版支援 PDF 匯出。",
     "pdfFailed": "PDF 匯出失敗，請重試。",
     "pdfGeneratedAt": "產生時間",
-    "pdfDisclaimer": "本單據為內部業務單據，並非正式稅務發票。"
+    "pdfDisclaimer": "本單據為內部業務單據，並非正式稅務發票。",
+    "generateFromSale": "產生單據",
+    "generatedOk": "已產生業務單據，可在「業務單據」頁查看",
+    "stmtCustomer": "選擇客戶",
+    "stmtPeriodStart": "期間起始",
+    "stmtPeriodEnd": "期間截止",
+    "stmtGenerate": "產生對帳明細",
+    "stmtNoRecords": "該期間內沒有該客戶的銷售記錄",
+    "stmtNeedInput": "請先選擇客戶和期間",
+    "pdfPeriod": "期間"
   }
 }

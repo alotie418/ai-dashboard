@@ -132,6 +132,7 @@ const DocumentsPage: React.FC = () => {
         numberLabel: t('documents.colNumber'),
         dateLabel: t('documents.colDate'),
         validUntilLabel: t('documents.formValidUntil'),
+        periodLabel: t('documents.pdfPeriod'),
         customerLabel: t('documents.colCustomer'),
         customerTaxIdLabel: t('documents.formCustomerTaxId'),
         customerAddressLabel: t('documents.formCustomerAddress'),
@@ -237,7 +238,13 @@ const DocumentsPage: React.FC = () => {
                 <tr key={d.id} className="hover:bg-[#f9f9f8]/30 transition-colors">
                   <td className="px-5 py-5 text-sm font-mono text-[#191918] tracking-tight whitespace-nowrap">{d.docNumber}</td>
                   <td className="px-5 py-5 text-sm text-[#4a4a48] whitespace-nowrap">{t(TYPE_LABEL_KEYS[d.docType])}</td>
-                  <td className="px-5 py-5 text-sm text-[#4a4a48] whitespace-nowrap">{d.docDate}</td>
+                  <td className="px-5 py-5 text-sm text-[#4a4a48] whitespace-nowrap">
+                    {d.docDate}
+                    {/* 对账单显示期间（其定义性属性） */}
+                    {d.docType === 'statement' && d.periodStart && d.periodEnd && (
+                      <div className="text-[10px] text-[#5c5c5a] mt-0.5">{d.periodStart} ~ {d.periodEnd}</div>
+                    )}
+                  </td>
                   <td className="px-5 py-5 text-sm text-[#191918] font-medium">{d.customerName}</td>
                   {/* 金额按该单据冻结的制度渲染币种 */}
                   <td className="px-5 py-5 text-sm text-[#191918] font-bold whitespace-nowrap">{formatMoney(d.total, d.accLocale)}</td>

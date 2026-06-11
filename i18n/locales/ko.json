@@ -1066,6 +1066,15 @@
     "pdfDesktopOnly": "PDF 내보내기는 데스크톱 앱에서만 사용할 수 있습니다.",
     "pdfFailed": "PDF 내보내기에 실패했습니다. 다시 시도해 주세요.",
     "pdfGeneratedAt": "생성 시간",
-    "pdfDisclaimer": "본 문서는 내부 업무 문서이며 정식 세무 문서가 아닙니다."
+    "pdfDisclaimer": "본 문서는 내부 업무 문서이며 정식 세무 문서가 아닙니다.",
+    "generateFromSale": "문서 생성",
+    "generatedOk": "업무 문서가 생성되었습니다. 업무 문서 페이지에서 확인할 수 있습니다",
+    "stmtCustomer": "고객 선택",
+    "stmtPeriodStart": "기간 시작",
+    "stmtPeriodEnd": "기간 종료",
+    "stmtGenerate": "명세 생성",
+    "stmtNoRecords": "해당 기간에 이 고객의 판매 기록이 없습니다",
+    "stmtNeedInput": "먼저 고객과 기간을 선택하세요",
+    "pdfPeriod": "기간"
   }
 }

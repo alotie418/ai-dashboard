@@ -1066,6 +1066,15 @@
     "pdfDesktopOnly": "PDF 出力はデスクトップ版でのみ利用できます。",
     "pdfFailed": "PDF 出力に失敗しました。もう一度お試しください。",
     "pdfGeneratedAt": "生成日時",
-    "pdfDisclaimer": "本帳票は社内業務帳票であり、正式な税務書類ではありません。"
+    "pdfDisclaimer": "本帳票は社内業務帳票であり、正式な税務書類ではありません。",
+    "generateFromSale": "帳票を作成",
+    "generatedOk": "業務帳票を作成しました。「業務帳票」ページで確認できます",
+    "stmtCustomer": "取引先を選択",
+    "stmtPeriodStart": "期間開始",
+    "stmtPeriodEnd": "期間終了",
+    "stmtGenerate": "明細を生成",
+    "stmtNoRecords": "この期間に該当するこの取引先の売上記録はありません",
+    "stmtNeedInput": "先に取引先と期間を選択してください",
+    "pdfPeriod": "期間"
   }
 }

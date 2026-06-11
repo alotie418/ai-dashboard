@@ -1066,6 +1066,15 @@
     "pdfDesktopOnly": "PDF export is available in the desktop app only.",
     "pdfFailed": "PDF export failed. Please try again.",
     "pdfGeneratedAt": "Generated at",
-    "pdfDisclaimer": "This is an internal business document, not an official tax invoice."
+    "pdfDisclaimer": "This is an internal business document, not an official tax invoice.",
+    "generateFromSale": "Create Document",
+    "generatedOk": "Business document created — see the Business Documents page",
+    "stmtCustomer": "Select Customer",
+    "stmtPeriodStart": "Period Start",
+    "stmtPeriodEnd": "Period End",
+    "stmtGenerate": "Generate Lines",
+    "stmtNoRecords": "No sales records for this customer in the period",
+    "stmtNeedInput": "Select a customer and period first",
+    "pdfPeriod": "Period"
   }
 }
