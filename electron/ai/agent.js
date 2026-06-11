@@ -42,8 +42,11 @@ async function runAgentLoop({ adapter, apiKey, model, history, system, maxRounds
     const step = await adapter.chatWithTools(apiKey, model, { history, system: sys, tools });
     if (step.type === 'final') return { text: step.text || '', toolTrace: trace };
 
-    // step.type === 'tool_calls'：回填模型的原生 assistant turn（含 tool_use），再逐个执行工具。
-    history.push(step.assistantMsg);
+    // step.type === 'tool_calls'：回填模型的原生 assistant turn，再逐个执行工具。
+    // assistantMsg 可能是单条（Anthropic：含 tool_use 的一条 assistant 消息）或数组（OpenAI：
+    // function_call 项数组）——统一 spread，对单条向后兼容。
+    const assistantTurn = Array.isArray(step.assistantMsg) ? step.assistantMsg : [step.assistantMsg];
+    history.push(...assistantTurn);
     for (const call of step.calls) {
       let result;
       let rowCount = 0;
@@ -63,9 +66,10 @@ async function runAgentLoop({ adapter, apiKey, model, history, system, maxRounds
     }
   }
 
-  // 超轮次兜底：去掉工具再答一次，逼出基于已查数据的最终回答（避免停在工具调用态）。
-  const fin = await adapter.chat(apiKey, model, { messages: history, systemInstruction: sys });
-  return { text: fin.text || '', toolTrace: trace };
+  // 超轮次兜底：用 chatWithTools 但不带工具（provider 无关、避免把原生 history 再过一遍 chat 的归一化
+  // 而丢失工具轮项），逼出基于已查数据的最终文本答（避免停在工具调用态）。tools:[] → 模型无工具可调 → final。
+  const fin = await adapter.chatWithTools(apiKey, model, { history, system: sys, tools: [] });
+  return { text: fin.type === 'final' ? (fin.text || '') : '', toolTrace: trace };
 }
 
 module.exports = { runAgentLoop, MAX_ROUNDS, MAX_ROWS };
