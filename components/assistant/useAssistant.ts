@@ -6,7 +6,7 @@
 
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { aiChat, aiContext } from '../../services/api';
+import { aiAgentChat, aiContext, type ToolTraceItem } from '../../services/api';
 import { analyzeInvoice } from '../../services/ocrService';
 import { buildAIFinanceContext, formatMoney, getTaxLabel } from '../accountingHelpers';
 import type { FinancialStatementData } from '../../types';
@@ -14,6 +14,7 @@ import type { FinancialStatementData } from '../../types';
 export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
+  toolTrace?: ToolTraceItem[];   // R2b-1：只读查账工具轨迹（仅 model 消息），渲染「已查询」
 }
 
 export interface AssistantDeps {
@@ -76,9 +77,11 @@ ${buildAIFinanceContext(deps.accountingLocale, deps.uiLanguage)}
 
 ${contextText}`;
 
-      const result = await aiChat(chatHistory, systemInstruction);
+      // R2b-1：改走只读查账 agent（主进程跑工具循环，API Key 不出主进程）；
+      // 仍注入 60s 快照基线 context（简单问题不必触发工具），工具用于下钻取实数。
+      const result = await aiAgentChat(chatHistory, systemInstruction);
       const content = result.text || t('chat.emptyReply');
-      setMessages([...newMsgs, { role: 'model', text: content }]);
+      setMessages([...newMsgs, { role: 'model', text: content, toolTrace: result.toolTrace }]);
     } catch {
       setMessages([...newMsgs, { role: 'model', text: t('chat.requestError') }]);
     } finally {

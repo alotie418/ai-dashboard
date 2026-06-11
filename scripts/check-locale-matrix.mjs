@@ -2331,6 +2331,26 @@ async function main() {
       if (reasons.length) fail(`assistantNavLabels`, reasons); else pass(`assistantNavLabels`);
     }
 
+    // PART H7: AI assistant read-only tool-trace labels (R2b-1) — uiLanguage-only, regime-neutral.
+    //   The "已查询/Queried" trace title + per-tool labels render in the assistant chat after a
+    //   tool-backed answer; they must be present in all 6 langs and carry NO tax/regime wording
+    //   (the labels are generic business areas like 销售记录/库存, decoupled like nav.assistant).
+    {
+      const reasons = [];
+      const TOOL_NAMES = ['get_dashboard','get_sales','get_purchases','get_transactions','get_inventory','get_products','get_receivables','get_payables','get_documents','get_alerts'];
+      const KEYS = ['chat.toolTraceTitle', 'chat.toolTruncated', ...TOOL_NAMES.map(n => `chat.toolLabel.${n}`)];
+      const TOOL_TAX_WORDS = /增值税|增值稅|营业税|營業稅|消费税|消費稅|Sales Tax|销售税|銷售稅|进项税|進項稅|销项税|銷項稅|統一發票|適格請求書|インボイス/;
+      for (const lang of UI_LANGUAGES) {
+        const loc = locales[lang];
+        for (const key of KEYS) {
+          const v = get(loc, key);
+          if (v === undefined || v === null || v === '') reasons.push(`${lang}: ${key} missing/empty`);
+          else if (TOOL_TAX_WORDS.test(v)) reasons.push(`${lang}: ${key} must not carry tax/regime wording: "${v}"`);
+        }
+      }
+      if (reasons.length) fail(`assistantToolLabels`, reasons); else pass(`assistantToolLabels`);
+    }
+
     // PART H5: Business documents UI strings (Phase A) — uiLanguage-only, regime-decoupled.
     //   Every locale carries the full documents.* set + nav/headerTitle entries; strings
     //   carry NO tax/regime wording (regime tax labels on the page come from getTaxLabel

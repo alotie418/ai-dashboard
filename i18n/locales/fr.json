@@ -334,7 +334,21 @@
     "quickPromptFinanceQuery": "Montrez-moi le dernier résumé du rapport financier",
     "quickPromptTrend": "Analyser les tendances des derniers mois",
     "quickPromptMarket": "Rechercher les prix du marché et les tendances",
-    "quickPromptInventory": "Vérifier les stocks et les risques actuels"
+    "quickPromptInventory": "Vérifier les stocks et les risques actuels",
+    "toolTraceTitle": "Consulté",
+    "toolTruncated": "Affichage des {{n}} premiers",
+    "toolLabel": {
+      "get_dashboard": "Tableau de bord",
+      "get_sales": "Ventes",
+      "get_purchases": "Achats",
+      "get_transactions": "Transactions",
+      "get_inventory": "Stocks",
+      "get_products": "Produits/Services",
+      "get_receivables": "Créances",
+      "get_payables": "Dettes",
+      "get_documents": "Documents",
+      "get_alerts": "Alertes"
+    }
   },
   "dashboard": {
     "inventory": "Inventory (Real-time)",

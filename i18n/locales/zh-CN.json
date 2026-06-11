@@ -334,7 +334,21 @@
     "quickPromptFinanceQuery": "帮我查询最新的财务报表摘要",
     "quickPromptTrend": "分析一下过去几个月的业务历史趋势",
     "quickPromptMarket": "搜索最新市场价格和行情",
-    "quickPromptInventory": "查询当前库存余量和风险"
+    "quickPromptInventory": "查询当前库存余量和风险",
+    "toolTraceTitle": "已查询",
+    "toolTruncated": "仅显示前 {{n}} 条",
+    "toolLabel": {
+      "get_dashboard": "经营看板",
+      "get_sales": "销售记录",
+      "get_purchases": "采购记录",
+      "get_transactions": "收支流水",
+      "get_inventory": "库存",
+      "get_products": "商品/服务",
+      "get_receivables": "应收",
+      "get_payables": "应付",
+      "get_documents": "业务单据",
+      "get_alerts": "预警"
+    }
   },
   "dashboard": {
     "inventory": "库存余量 (实时)",

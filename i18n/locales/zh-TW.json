@@ -334,7 +334,21 @@
     "quickPromptFinanceQuery": "幫我查詢最新的財務報表摘要",
     "quickPromptTrend": "分析過去幾個月的業務歷史趨勢",
     "quickPromptMarket": "搜尋最新市場價格和行情",
-    "quickPromptInventory": "查詢目前庫存餘量和風險"
+    "quickPromptInventory": "查詢目前庫存餘量和風險",
+    "toolTraceTitle": "已查詢",
+    "toolTruncated": "僅顯示前 {{n}} 筆",
+    "toolLabel": {
+      "get_dashboard": "經營看板",
+      "get_sales": "銷售記錄",
+      "get_purchases": "採購記錄",
+      "get_transactions": "收支流水",
+      "get_inventory": "庫存",
+      "get_products": "商品/服務",
+      "get_receivables": "應收",
+      "get_payables": "應付",
+      "get_documents": "業務單據",
+      "get_alerts": "預警"
+    }
   },
   "dashboard": {
     "inventory": "庫存餘量 (實時)",

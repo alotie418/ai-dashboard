@@ -66,21 +66,55 @@ async function test(apiKey, model) {
   return { ok: !!extractText(json) };
 }
 
-async function chat(apiKey, model, { messages, systemInstruction }) {
-  // 入参兼容 Gemini 格式：messages: [{ role, parts: [{ text }] }]
-  const normalized = (messages || []).map(m => ({
+// 把渲染端传来的 Gemini 风格历史（[{ role, parts: [{ text }] }] 或 { role, content: string }）
+// 归一化为 Anthropic 原生 messages（{ role, content: string }）。agent loop 仅在循环起点调用一次；
+// 循环中追加的 tool_use / tool_result 已是原生格式，不再经过本函数（避免二次归一化丢内容）。
+function toNativeHistory(messages) {
+  return (messages || []).map(m => ({
     role: m.role === 'model' ? 'assistant' : (m.role || 'user'),
     content: typeof m.content === 'string' ? m.content
       : (m.parts ? m.parts.map(p => p.text).join('\n') : ''),
   })).filter(m => m.content);
+}
 
+async function chat(apiKey, model, { messages, systemInstruction }) {
   const json = await callMessages(apiKey, {
     model: model || META.defaultModel,
     max_tokens: 4096,
     system: systemInstruction || undefined,
-    messages: normalized,
+    messages: toNativeHistory(messages),
   });
   return { text: extractText(json) };
+}
+
+// ── 工具调用方言（R2b-1）──
+// history 已是 Anthropic 原生 messages（首轮经 toNativeHistory，后续 turn 由 agent loop 原样追加）。
+// 返回 { type:'final', text } 或 { type:'tool_calls', assistantMsg(原生), calls:[{id,name,args}] }。
+async function chatWithTools(apiKey, model, { history, system, tools }) {
+  const json = await callMessages(apiKey, {
+    model: model || META.defaultModel,
+    max_tokens: 4096,
+    system: system || undefined,
+    tools: (tools || []).map(t => ({ name: t.name, description: t.description, input_schema: t.input_schema })),
+    messages: history,
+  });
+  const toolUses = (json.content || []).filter(b => b.type === 'tool_use');
+  if (json.stop_reason === 'tool_use' && toolUses.length) {
+    return {
+      type: 'tool_calls',
+      assistantMsg: { role: 'assistant', content: json.content }, // 原样回填整个 content（含 tool_use 块）
+      calls: toolUses.map(b => ({ id: b.id, name: b.name, args: b.input || {} })),
+    };
+  }
+  return { type: 'final', text: extractText(json) };
+}
+
+// 把一个工具执行结果包成 Anthropic 的 tool_result user turn。
+function toToolResultMsg(call, result) {
+  return {
+    role: 'user',
+    content: [{ type: 'tool_result', tool_use_id: call.id, content: JSON.stringify(result) }],
+  };
 }
 
 async function analyze(apiKey, model, { data, marketSummary, languageHint, analyzeSystemPrompt }) {
@@ -141,4 +175,4 @@ async function dataAnalysis(apiKey, model, { prompt, systemInstruction }) {
   return { ...parsed, groundingSources: [] }; // Claude 当前不接入 web grounding
 }
 
-module.exports = { meta: META, test, chat, analyze, ocr, tts, dataAnalysis };
+module.exports = { meta: META, test, chat, chatWithTools, toToolResultMsg, toNativeHistory, analyze, ocr, tts, dataAnalysis };

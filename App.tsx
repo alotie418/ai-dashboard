@@ -459,8 +459,10 @@ const AppContent: React.FC = () => {
         </div>
       </main>
 
-      {/* AI Assistant — 浮窗已抽离为独立组件（R1），与后续独立页面共享会话状态 */}
-      <AssistantWidget />
+      {/* AI Assistant 浮窗（R1 抽离），与各页共享同一 AssistantProvider 会话。独立「AI 助手」页
+          （R2a）本身已是全屏聊天，且右下角浮窗圆钮会遮挡该页输入框的发送按钮，故在该页隐藏浮窗；
+          其余页面保留右下角快捷入口。会话状态在 Provider 中，隐藏/重挂浮窗不丢消息。 */}
+      {currentPage !== 'assistant' && <AssistantWidget />}
 
       <style>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
