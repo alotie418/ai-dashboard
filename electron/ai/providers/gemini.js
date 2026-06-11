@@ -86,6 +86,69 @@ async function chat(apiKey, model, { messages, systemInstruction }) {
   }
 }
 
+// ── 工具调用方言（R2b-2b）──
+const toGeminiFnDecl = (t) => ({ name: t.name, description: t.description, parameters: t.input_schema });
+
+// 工具模式只放 functionDeclarations、绝不放 googleSearch（二者互斥）；空工具时整个省略 tools（兜底用）。
+function buildGeminiConfig(system, tools) {
+  const config = { systemInstruction: system || '' };
+  if (tools && tools.length) config.tools = [{ functionDeclarations: tools.map(toGeminiFnDecl) }];
+  return config;
+}
+
+// 渲染端 chatHistory 已是 Gemini contents 形（{role:'user'|'model', parts:[{text}]}）；兜底 assistant→model。
+// 后续 functionCall / functionResponse turn 由 agent loop 原样追加，不再过本函数。
+function toNativeHistory(messages) {
+  return (messages || []).map(m => ({
+    role: (m.role === 'model' || m.role === 'assistant') ? 'model' : (m.role || 'user'),
+    parts: m.parts ? m.parts : [{ text: typeof m.content === 'string' ? m.content : '' }],
+  })).filter(m => m.parts && m.parts.length);
+}
+
+// 纯解析：SDK response → 统一 step 形（离线测试直接喂构造的 response，规避 SDK mock）。
+function parseGeminiResponse(response) {
+  const parts = response?.candidates?.[0]?.content?.parts || [];
+  const fnCalls = parts.filter(p => p.functionCall).map(p => p.functionCall);
+  if (fnCalls.length) {
+    return {
+      type: 'tool_calls',
+      assistantMsg: { role: 'model', parts },                                  // 单对象 → agent loop wrap 兼容
+      calls: fnCalls.map(fc => ({ id: fc.name, name: fc.name, args: fc.args || {} })), // Gemini 无 id → 用 name
+    };
+  }
+  return { type: 'final', text: response?.text || parts.map(p => p.text || '').join('') || '' };
+}
+
+async function chatWithTools(apiKey, model, { history, system, tools }) {
+  try {
+    const { GoogleGenAI } = await loadSDK();
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: model || META.defaultModel,
+      contents: history,
+      config: buildGeminiConfig(system, tools),
+    });
+    return parseGeminiResponse(response);
+  } catch (e) {
+    throw normalizeSdkError(e);
+  }
+}
+
+// 本轮所有工具结果合并成「单条」functionResponse user turn（response 必须是对象，数组/标量包一层）。
+// role 用 'user'：与现有 contents（user/model）结构一致，且 @google/genai 当前版本以 'user' 携带
+// functionResponse（落地按 SDK 版本核对；若该版本要求 'tool'/'function' 再调整并说明原因）。
+function toToolResultsMsg(items) {
+  return {
+    role: 'user',
+    parts: items.map(({ call, result }) => ({
+      functionResponse: {
+        name: call.name,
+        response: (result && typeof result === 'object' && !Array.isArray(result)) ? result : { result },
+      },
+    })),
+  };
+}
+
 async function analyze(apiKey, model, { data, marketSummary, languageHint, analyzeSystemPrompt }) {
   try {
     const { GoogleGenAI, Type } = await loadSDK();
@@ -200,4 +263,4 @@ async function dataAnalysis(apiKey, model, { prompt, systemInstruction, response
   }
 }
 
-module.exports = { meta: META, test, chat, analyze, ocr, tts, dataAnalysis };
+module.exports = { meta: META, test, chat, chatWithTools, toToolResultsMsg, toNativeHistory, parseGeminiResponse, buildGeminiConfig, analyze, ocr, tts, dataAnalysis };

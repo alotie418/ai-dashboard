@@ -111,11 +111,11 @@ async function chatWithTools(apiKey, model, { history, system, tools }) {
   return { type: 'final', text: extractText(json) };
 }
 
-// 把一个工具执行结果包成 Anthropic 的 tool_result user turn。
-function toToolResultMsg(call, result) {
+// 把本轮所有工具结果合并成「单条」tool_result user turn（多 tool_use 必须同一条 user turn，角色须交替）。
+function toToolResultsMsg(items) {
   return {
     role: 'user',
-    content: [{ type: 'tool_result', tool_use_id: call.id, content: JSON.stringify(result) }],
+    content: items.map(({ call, result }) => ({ type: 'tool_result', tool_use_id: call.id, content: JSON.stringify(result) })),
   };
 }
 
@@ -177,4 +177,4 @@ async function dataAnalysis(apiKey, model, { prompt, systemInstruction }) {
   return { ...parsed, groundingSources: [] }; // Claude 当前不接入 web grounding
 }
 
-module.exports = { meta: META, test, chat, chatWithTools, toToolResultMsg, toNativeHistory, analyze, ocr, tts, dataAnalysis };
+module.exports = { meta: META, test, chat, chatWithTools, toToolResultsMsg, toNativeHistory, analyze, ocr, tts, dataAnalysis };
