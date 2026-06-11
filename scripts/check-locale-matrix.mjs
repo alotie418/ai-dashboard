@@ -2348,6 +2348,15 @@ async function main() {
         'documents.generateFromSale', 'documents.generatedOk', 'documents.stmtCustomer',
         'documents.stmtPeriodStart', 'documents.stmtPeriodEnd', 'documents.stmtGenerate',
         'documents.stmtNoRecords', 'documents.stmtNeedInput', 'documents.pdfPeriod',
+        // Phase D: 正式税务发票关联（仅记录外部开具的发票；TAX_WORDS 禁词同时锁住
+        // 统一发票/数电票/適格請求書/インボイス 等开票措辞，确保该功能永不自称开票）
+        'documents.colTaxInvoice', 'documents.taxInvoiceAction', 'documents.taxInvoiceTitle',
+        'documents.taxInvoiceIssuedLabel', 'documents.taxInvoiceNumberLabel', 'documents.taxInvoiceNumberHint',
+        'documents.taxInvoiceDateLabel', 'documents.taxInvoiceAttachmentLabel',
+        'documents.attachmentPick', 'documents.attachmentOpen', 'documents.attachmentRemove',
+        'documents.attachmentMissing', 'documents.attachmentTooLarge', 'documents.attachmentFailed',
+        'documents.attachmentInvalidType', 'documents.attachmentNotBackedUp', 'documents.taxInvoiceCompliance',
+        'documents.taxInvoiceVoidReadOnly', 'documents.taxInvoiceYes', 'documents.taxInvoiceNo',
       ];
       const TAX_WORDS = /增值税|增值稅|营业税|營業稅|消费税|消費稅|Sales Tax|进项|進項|销项|銷項|VAT|Schedule C|统一发票|統一發票|適格請求書|インボイス|数电票|數電票/;
       const TYPE_EN = {

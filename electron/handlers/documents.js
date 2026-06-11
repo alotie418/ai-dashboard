@@ -1,10 +1,13 @@
-// 业务单据 CRUD（Phase A）— 报价单/销售单/形式发票/商业发票/对账单
+// 业务单据 CRUD（Phase A）+ 正式税务发票关联（Phase D）
 // 仅内部业务单据：非税务发票开具，不接税控/税局，正式发票号码只能手工录入
-// （关联 UI 在后续阶段），永不自动生成。单据为自包含快照：明细/客户/金额
-// 保存时冻结；acc_locale 冻结创建时的会计制度（币种/税种标签渲染依据）。
+// （updateTaxInvoice 仅记录外部开具的发票信息），永不自动生成。
+// 单据为自包含快照：明细/客户/金额保存时冻结；acc_locale 冻结创建时的会计制度。
 // 纯增量：不触碰 purchases/sales/products/库存/金额税额计算。
+// 注意：发票关联走专用子路由（PUT /:id/tax-invoice），与 update() 的 draft-only
+// 编辑规则解耦——关联必须对「已签发」单据可用；update() 的 EDITABLE 白名单不动。
 
 const { getDb } = require('../db');
+const { isValidAttachmentRelPath, safeDeleteAttachment } = require('./attachments');
 
 const DOC_TYPES = ['quotation', 'sales_order', 'proforma_invoice', 'commercial_invoice', 'statement'];
 const DOC_STATUSES = ['draft', 'issued', 'void'];
@@ -248,16 +251,72 @@ async function update({ params, body }) {
   return { success: true };
 }
 
-// DELETE /api/documents/:id — 已签发不可直接删除（先作废）；明细随 FK CASCADE 删除
+// DELETE /api/documents/:id — 已签发不可直接删除（先作废）；明细随 FK CASCADE 删除；
+// 附件副本随单据 best-effort 删除（目录自清洁，用户原文件不受影响）
 async function remove({ params }) {
   const db = getDb();
   const id = params.id;
   if (!id) throw new Error('Invalid ID');
-  const row = db.prepare('SELECT id, status FROM business_documents WHERE id = ?').get(id);
+  const row = db.prepare('SELECT id, status, tax_invoice_attachment_path FROM business_documents WHERE id = ?').get(id);
   if (!row) throw new Error('Document not found');
   if (row.status === 'issued') throw new Error('DOC_ISSUED_VOID_FIRST');
   db.prepare('DELETE FROM business_documents WHERE id = ?').run(id);
+  if (row.tax_invoice_attachment_path) safeDeleteAttachment(row.tax_invoice_attachment_path);
   return { success: true };
 }
 
-module.exports = { list, get, create, update, remove, nextNumber };
+// PUT /api/documents/:id/tax-invoice — Phase D：正式税务发票关联。
+// 仅记录外部开具的发票（手动标记/号码手填/日期/附件），永不开票、永不自动生成号码。
+// 与 update() 的 draft-only 规则解耦：草稿/已签发可改，作废为只读（终态）。
+// 附件路径替换/清除时 best-effort 删除旧副本（提交后执行，不影响事务）。
+async function updateTaxInvoice({ params, body }) {
+  const db = getDb();
+  const id = params.id;
+  if (!id) throw new Error('Invalid ID');
+  const existing = db.prepare(
+    'SELECT id, status, tax_invoice_attachment_path FROM business_documents WHERE id = ?'
+  ).get(id);
+  if (!existing) throw new Error('Document not found');
+  if (existing.status === 'void') throw new Error('DOC_VOID_TAX_INVOICE_READONLY');
+
+  const b = body || {};
+  const sets = [];
+  const vals = [];
+  if (b.tax_invoice_issued !== undefined) {
+    sets.push('tax_invoice_issued = ?'); vals.push(b.tax_invoice_issued ? 1 : 0);
+  }
+  if (b.tax_invoice_number !== undefined) {
+    const n = safeString(b.tax_invoice_number, 100);
+    sets.push('tax_invoice_number = ?'); vals.push(n && n.trim() ? n.trim() : null);
+  }
+  if (b.tax_invoice_date !== undefined) {
+    sets.push('tax_invoice_date = ?'); vals.push(safeString(b.tax_invoice_date, 30) || null);
+  }
+  let oldPathToDelete = null;
+  if (b.tax_invoice_attachment_path !== undefined) {
+    const p = b.tax_invoice_attachment_path === null || b.tax_invoice_attachment_path === ''
+      ? null : String(b.tax_invoice_attachment_path);
+    if (p !== null && !isValidAttachmentRelPath(p)) throw new Error('INVALID_ATTACHMENT_PATH');
+    // 所有权守卫：不得把另一张单据已关联的附件指给本单据——否则任一方替换/清除
+    // 都会删掉共享文件，留下悬空引用（与 discard 通道的引用守卫对称）。
+    if (p !== null && p !== existing.tax_invoice_attachment_path) {
+      const inUse = db.prepare(
+        'SELECT 1 FROM business_documents WHERE tax_invoice_attachment_path = ? AND id != ? LIMIT 1'
+      ).get(p, id);
+      if (inUse) throw new Error('ATTACHMENT_IN_USE');
+    }
+    sets.push('tax_invoice_attachment_path = ?'); vals.push(p);
+    if (existing.tax_invoice_attachment_path && existing.tax_invoice_attachment_path !== p) {
+      oldPathToDelete = existing.tax_invoice_attachment_path;
+    }
+  }
+  if (sets.length === 0) return { success: true };
+
+  sets.push("updated_at = datetime('now')");
+  vals.push(id);
+  db.prepare(`UPDATE business_documents SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+  if (oldPathToDelete) safeDeleteAttachment(oldPathToDelete);
+  return { success: true };
+}
+
+module.exports = { list, get, create, update, remove, nextNumber, updateTaxInvoice };

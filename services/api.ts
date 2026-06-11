@@ -837,6 +837,11 @@ export interface BusinessDocument {
   sourceSalesId?: string | null; // Phase C：由销售记录生成时的信息性回链
   periodStart?: string | null;   // Phase C：对账单期间起始
   periodEnd?: string | null;     // Phase C：对账单期间截止
+  // Phase D：正式税务发票关联（仅记录外部开具的发票；号码手填、永不自动生成）
+  taxInvoiceIssued?: boolean;
+  taxInvoiceNumber?: string | null;
+  taxInvoiceDate?: string | null;
+  taxInvoiceAttachmentPath?: string | null; // 相对 userData 的附件副本路径
   items?: BusinessDocumentItem[];
   createdAt?: string;
 }
@@ -878,6 +883,10 @@ function fromApiDocument(r: any): BusinessDocument {
     sourceSalesId: r.source_sales_id ?? null,
     periodStart: r.period_start ?? null,
     periodEnd: r.period_end ?? null,
+    taxInvoiceIssued: !!r.tax_invoice_issued,
+    taxInvoiceNumber: r.tax_invoice_number ?? null,
+    taxInvoiceDate: r.tax_invoice_date ?? null,
+    taxInvoiceAttachmentPath: r.tax_invoice_attachment_path ?? null,
     items: Array.isArray(r.items) ? r.items.map(fromApiDocumentItem) : undefined,
     createdAt: r.created_at,
   };
@@ -944,6 +953,48 @@ export async function deleteDocument(id: string): Promise<void> {
 export async function fetchNextDocNumber(type: BusinessDocType): Promise<string> {
   const r = await apiFetch<{ number: string }>(`/api/documents/next-number?type=${encodeURIComponent(type)}`);
   return r.number;
+}
+
+// --- Phase D：正式税务发票关联（专用子路由，与通用编辑的 draft-only 规则解耦）---
+// 仅记录外部开具的发票：已开标记/号码（手填）/日期/附件路径。
+// 注意：toApiDocument 刻意不携带 tax 字段——通用 PUT 永远不写它们。
+
+export interface DocTaxInvoicePatch {
+  issued?: boolean;
+  number?: string | null;
+  date?: string | null;
+  attachmentPath?: string | null;
+}
+
+export async function updateDocTaxInvoice(id: string, patch: DocTaxInvoicePatch): Promise<void> {
+  const body: any = {};
+  if (patch.issued !== undefined) body.tax_invoice_issued = patch.issued ? 1 : 0;
+  if (patch.number !== undefined) body.tax_invoice_number = patch.number;
+  if (patch.date !== undefined) body.tax_invoice_date = patch.date;
+  if (patch.attachmentPath !== undefined) body.tax_invoice_attachment_path = patch.attachmentPath;
+  await apiFetch(`/api/documents/${encodeURIComponent(id)}/tax-invoice`, { method: 'PUT', body: JSON.stringify(body) });
+}
+
+export interface DocAttachmentPickResult {
+  ok: boolean;
+  relPath?: string;   // 相对 userData 的副本路径（attachments/docs/...）
+  fileName?: string;  // 用户原文件名（仅显示用）
+  error?: string;     // INVALID_FILE_TYPE / FILE_TOO_LARGE / COPY_FAILED；取消时无 error
+}
+
+/** 选择发票附件：复制进 userData/attachments/docs/，返回相对路径（不落库，由保存统一持久化） */
+export function pickDocAttachment(docId: string): Promise<DocAttachmentPickResult> {
+  return electronInvoke<DocAttachmentPickResult>('app:pickDocAttachment', { docId });
+}
+
+/** 打开附件（系统默认应用）。error: INVALID_PATH / ATTACHMENT_NOT_FOUND / OPEN_FAILED */
+export function openDocAttachment(relPath: string): Promise<{ ok: boolean; error?: string }> {
+  return electronInvoke('app:openDocAttachment', { relPath });
+}
+
+/** 丢弃未保存的附件副本（选了又取消/重选时清理；被引用的文件会被拒绝） */
+export function discardDocAttachment(relPath: string): Promise<{ ok: boolean; error?: string }> {
+  return electronInvoke('app:discardDocAttachment', { relPath });
 }
 
 // --- Dashboard ---

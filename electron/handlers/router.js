@@ -69,8 +69,9 @@ const routes = [
   ['PUT', '/api/products/:id', products.update],
   ['DELETE', '/api/products/:id', products.remove],
 
-  // ---- Business Documents（业务单据 Phase A；next-number 必须排在 :id 前）----
+  // ---- Business Documents（业务单据 Phase A；next-number/tax-invoice 排在 :id 前）----
   ['GET', '/api/documents/next-number', documentsH.nextNumber],
+  ['PUT', '/api/documents/:id/tax-invoice', documentsH.updateTaxInvoice],
   ['GET', '/api/documents', documentsH.list],
   ['POST', '/api/documents', documentsH.create],
   ['GET', '/api/documents/:id', documentsH.get],

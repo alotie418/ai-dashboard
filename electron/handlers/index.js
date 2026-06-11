@@ -210,7 +210,85 @@ function registerHandlers({ ipcMain, dialog }) {
     }
   });
 
-  console.log('[handlers] registered (api:request + providers:* + app:exportDb/importDb/relaunch/exportReportPdf)');
+  // ====== 业务单据附件（Phase D：正式税务发票附件，仅记录外部开具的发票文件）======
+  // 选择附件：复制一份进 userData/attachments/docs/（用户原文件永不移动/删除），
+  // 只复制不落库——相对路径由前端经 PUT /api/documents/:id/tax-invoice 统一持久化
+  // （单一写路径：作废锁/路径校验集中在 documents handler）。
+  ipcMain.handle('app:pickDocAttachment', async (_evt, payload) => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const { getDocsAttachmentsRoot } = require('./attachments');
+    const ALLOWED_EXTS = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
+    try {
+      const sel = await dialog.showOpenDialog({
+        title: '选择发票附件',
+        properties: ['openFile'],
+        filters: [{ name: 'PDF / 图片', extensions: ['pdf', 'jpg', 'jpeg', 'png'] }],
+      });
+      if (sel.canceled || !sel.filePaths || !sel.filePaths[0]) return { ok: false }; // 取消静默（#96 惯例）
+      const srcPath = sel.filePaths[0];
+      const ext = path.extname(srcPath).toLowerCase();
+      if (!ALLOWED_EXTS.includes(ext)) return { ok: false, error: 'INVALID_FILE_TYPE' };
+      const stat = fs.statSync(srcPath);
+      if (!stat.isFile()) return { ok: false, error: 'INVALID_FILE_TYPE' };
+      if (stat.size > MAX_BYTES) return { ok: false, error: 'FILE_TOO_LARGE' };
+
+      const root = getDocsAttachmentsRoot();
+      fs.mkdirSync(root, { recursive: true });
+      // 唯一文件名：清洗后的单据 id + 时间戳 + 随机后缀。首字符强制字母数字
+      // （与 attachments.js 的 REL_RE 白名单严格一致，生成的名字必能通过校验）；
+      // 随机后缀防同毫秒重选碰撞。
+      const rawId = String((payload && payload.docId) || 'doc')
+        .replace(/[^A-Za-z0-9_-]/g, '').replace(/^[_-]+/, '').slice(0, 40);
+      const docId = rawId || 'doc';
+      const name = `${docId}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}${ext}`;
+      fs.copyFileSync(srcPath, path.join(root, name));
+      return { ok: true, relPath: `attachments/docs/${name}`, fileName: path.basename(srcPath) };
+    } catch (e) {
+      return { ok: false, error: 'COPY_FAILED' };
+    }
+  });
+
+  // 打开附件：白名单正则 + resolve 包含双校验后交给系统默认应用
+  ipcMain.handle('app:openDocAttachment', async (_evt, payload) => {
+    const fs = require('node:fs');
+    const { shell } = require('electron');
+    const { resolveAttachment } = require('./attachments');
+    try {
+      const abs = resolveAttachment(payload && payload.relPath);
+      if (!abs) return { ok: false, error: 'INVALID_PATH' };
+      if (!fs.existsSync(abs)) return { ok: false, error: 'ATTACHMENT_NOT_FOUND' };
+      const err = await shell.openPath(abs);
+      if (err) return { ok: false, error: 'OPEN_FAILED' };
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: 'OPEN_FAILED' };
+    }
+  });
+
+  // 丢弃未保存的附件副本（选了又取消/重选时的清理）。
+  // DB 引用守卫：被任何单据引用的文件拒绝删除（ATTACHMENT_IN_USE）——
+  // 该渲染端可触达的删除通道在构造上无法删掉已保存的关联附件。
+  ipcMain.handle('app:discardDocAttachment', async (_evt, payload) => {
+    const { resolveAttachment, safeDeleteAttachment } = require('./attachments');
+    const { getDb } = require('../db');
+    try {
+      const rel = payload && payload.relPath;
+      const abs = resolveAttachment(rel);
+      if (!abs) return { ok: false, error: 'INVALID_PATH' };
+      const referenced = getDb()
+        .prepare('SELECT 1 FROM business_documents WHERE tax_invoice_attachment_path = ? LIMIT 1')
+        .get(rel);
+      if (referenced) return { ok: false, error: 'ATTACHMENT_IN_USE' };
+      safeDeleteAttachment(rel);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: 'DISCARD_FAILED' };
+    }
+  });
+
+  console.log('[handlers] registered (api:request + providers:* + app:exportDb/importDb/relaunch/exportReportPdf + app:pickDocAttachment/openDocAttachment/discardDocAttachment)');
 
   // 启动横幅：打印当前主进程加载的 provider META
   // 调试时看到的 defaultModel 才是真正被使用的版本——前端再"新鲜"也得跟它对得上

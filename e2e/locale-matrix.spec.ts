@@ -409,6 +409,17 @@ async function injectDocsElectronAPI(page: import('@playwright/test').Page, acc:
           const name = (payload && payload.defaultFileName) || 'SoloLedger-doc.pdf';
           return Promise.resolve({ ok: true, path: `/Users/test/Documents/${name}` });
         }
+        // Phase D: attachment channels — pick returns a deterministic copied path,
+        // open records what was requested, discard always succeeds
+        if (channel === 'app:pickDocAttachment') {
+          (window as any).__pickedDocId = payload && payload.docId;
+          return Promise.resolve({ ok: true, relPath: 'attachments/docs/doc-tax-1-abc.pdf', fileName: 'fapiao.pdf' });
+        }
+        if (channel === 'app:openDocAttachment') {
+          (window as any).__openedAttachment = payload && payload.relPath;
+          return Promise.resolve({ ok: true });
+        }
+        if (channel === 'app:discardDocAttachment') return Promise.resolve({ ok: true });
         if (channel === 'api:request') {
           const method = (payload && payload.method) || 'GET';
           const p = (payload && payload.path) || '';
@@ -429,6 +440,13 @@ async function injectDocsElectronAPI(page: import('@playwright/test').Page, acc:
                 items: b.items || [],
               });
               return Promise.resolve({ success: true, id: 'doc-e2e-1' });
+            }
+            // Phase D: PUT /:id/tax-invoice merges the snake_case fields into the seeded doc
+            const tmm = /^\/api\/documents\/([^/?]+)\/tax-invoice$/.exec(p);
+            if (tmm && method === 'PUT') {
+              const d = docs.find((x: any) => x.id === tmm[1]);
+              if (d) Object.assign(d, (payload && payload.body) || {});
+              return Promise.resolve({ success: true });
             }
             // GET /api/documents/:id → single doc with items (the PDF export path)
             const m = /^\/api\/documents\/([^/?]+)$/.exec(p);
@@ -662,6 +680,103 @@ test.describe('business documents → generate from sales (Phase C)', () => {
     await expect(page.getByText('¥339.00').first()).toBeVisible();
     // the statement's defining attribute — its period — is surfaced in the list
     await expect(page.getByText('2026-06-01 ~ 2026-06-30')).toBeVisible();
+  });
+});
+
+// ── Phase D: 正式税务发票关联 (records an EXTERNALLY issued invoice — never issues) ──
+// The linkage modal is uiLanguage-only; one accountingLocale × 6 UI langs covers the
+// label axis (purchase-picker precedent). The happy path exercises the dedicated
+// PUT /:id/tax-invoice sub-route + the attachment pick/open mock channels.
+const TAX_DOC_SEED = {
+  id: 'doc-tax-1', doc_type: 'commercial_invoice', doc_number: 'CI-2026-0007', status: 'issued',
+  doc_date: '2026-06-10', customer_name: '发票关联客户', acc_locale: 'CN',
+  subtotal: 100, tax_amount: 13, total: 113,
+  tax_invoice_issued: 0, tax_invoice_number: null, tax_invoice_date: null, tax_invoice_attachment_path: null,
+};
+
+test.describe('business documents → tax invoice link (Phase D)', () => {
+  for (const ui of UI_LANGUAGES) {
+    test(`tax-invoice modal ui=${ui}`, async ({ page }) => {
+      const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+      await injectDocsElectronAPI(page, 'CN', [{ ...TAX_DOC_SEED }]);
+      await bootCombo(page, ui, 'CN');
+      await page.locator('nav i.fa-file-contract').first().click();
+
+      await expect(page.getByText('CI-2026-0007')).toBeVisible({ timeout: 10_000 });
+      await page.getByRole('button', { name: loc.documents.taxInvoiceAction }).click();
+
+      // modal renders: title, issued checkbox label, manual-only hint,
+      // compliance banner (records only / never issues), backup-limitation hint
+      await expect(page.getByText(loc.documents.taxInvoiceTitle).first()).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText(loc.documents.taxInvoiceIssuedLabel)).toBeVisible();
+      await expect(page.getByText(loc.documents.taxInvoiceNumberHint)).toBeVisible();
+      await expect(page.getByText(loc.documents.taxInvoiceCompliance)).toBeVisible();
+      await expect(page.getByText(loc.documents.attachmentNotBackedUp)).toBeVisible();
+
+      const body = await page.locator('body').innerText();
+      expect(body, `[ui=${ui}] raw documents key leaked`).not.toMatch(/documents\.[a-zA-Z]/);
+    });
+  }
+
+  // Happy path: mark issued + manual number + date + pick attachment → save via the
+  // dedicated sub-route → list shows the issued badge + paperclip; reopen → Open
+  // goes through the containment-checked IPC with the stored relative path.
+  test('tax-invoice → mock electronAPI happy path', async ({ page }) => {
+    const ui = 'zh-CN';
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await injectDocsElectronAPI(page, 'CN', [{ ...TAX_DOC_SEED }]);
+    await bootCombo(page, ui, 'CN');
+    await page.locator('nav i.fa-file-contract').first().click();
+    await expect(page.getByText('CI-2026-0007')).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: loc.documents.taxInvoiceAction }).click();
+    await expect(page.getByText(loc.documents.taxInvoiceTitle).first()).toBeVisible({ timeout: 10_000 });
+
+    await page.locator('input[name="taxInvoiceIssued"]').check();
+    await page.locator('input[name="taxInvoiceNumber"]').fill('INV-EXT-001');
+    await page.locator('input[name="taxInvoiceDate"]').fill('2026-06-11');
+    await page.getByRole('button', { name: loc.documents.attachmentPick }).click();
+    await expect(page.getByText('fapiao.pdf')).toBeVisible({ timeout: 10_000 });
+    // the pick IPC received the document id (filenames embed it)
+    expect(await page.evaluate(() => (window as any).__pickedDocId)).toBe('doc-tax-1');
+
+    await page.getByRole('button', { name: loc.documents.saveButton }).click();
+    await expect(page.getByText(loc.documents.taxInvoiceTitle)).toHaveCount(0, { timeout: 10_000 });
+
+    // list reflects the merged tax fields: issued badge + paperclip icon
+    await expect(page.getByText(loc.documents.taxInvoiceYes)).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('td i.fa-paperclip')).toBeVisible();
+
+    // reopen → the persisted values render (saved attachment shows its stored copy
+    // name); Open passes the stored relative path through the containment-checked IPC
+    await page.getByRole('button', { name: loc.documents.taxInvoiceAction }).click();
+    await expect(page.locator('input[name="taxInvoiceNumber"]')).toHaveValue('INV-EXT-001', { timeout: 10_000 });
+    await expect(page.getByText('doc-tax-1-abc.pdf')).toBeVisible();
+    await page.getByRole('button', { name: loc.documents.attachmentOpen }).click();
+    expect(await page.evaluate(() => (window as any).__openedAttachment)).toBe('attachments/docs/doc-tax-1-abc.pdf');
+  });
+
+  // Void documents: linkage info is READ-ONLY (terminal state); Open still available.
+  test('tax-invoice → void document is read-only', async ({ page }) => {
+    const ui = 'zh-CN';
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await injectDocsElectronAPI(page, 'CN', [{
+      ...TAX_DOC_SEED, id: 'doc-tax-void', doc_number: 'CI-2026-0008', status: 'void',
+      tax_invoice_issued: 1, tax_invoice_number: 'INV-EXT-009', tax_invoice_date: '2026-06-01',
+      tax_invoice_attachment_path: 'attachments/docs/doc-tax-void-old.pdf',
+    }]);
+    await bootCombo(page, ui, 'CN');
+    await page.locator('nav i.fa-file-contract').first().click();
+    await expect(page.getByText('CI-2026-0008')).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: loc.documents.taxInvoiceAction }).click();
+
+    await expect(page.getByText(loc.documents.taxInvoiceVoidReadOnly)).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('input[name="taxInvoiceNumber"]')).toBeDisabled();
+    await expect(page.locator('input[name="taxInvoiceIssued"]')).toBeDisabled();
+    await expect(page.locator('input[name="taxInvoiceDate"]')).toBeDisabled();
+    // no save/remove in read-only mode; Open is still offered for the attachment
+    await expect(page.getByRole('button', { name: loc.documents.saveButton })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: loc.documents.attachmentRemove })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: loc.documents.attachmentOpen })).toBeVisible();
   });
 });
 

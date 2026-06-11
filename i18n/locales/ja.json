@@ -1075,6 +1075,26 @@
     "stmtGenerate": "明細を生成",
     "stmtNoRecords": "この期間に該当するこの取引先の売上記録はありません",
     "stmtNeedInput": "先に取引先と期間を選択してください",
-    "pdfPeriod": "期間"
+    "pdfPeriod": "期間",
+    "colTaxInvoice": "正式税務書類",
+    "taxInvoiceAction": "税務書類",
+    "taxInvoiceTitle": "正式な税務書類の関連付け",
+    "taxInvoiceIssuedLabel": "正式な税務書類を発行済み（外部の発行プラットフォームで発行）",
+    "taxInvoiceNumberLabel": "書類番号",
+    "taxInvoiceNumberHint": "外部で発行された書類番号を手動で入力します。自動生成されません",
+    "taxInvoiceDateLabel": "発行日",
+    "taxInvoiceAttachmentLabel": "添付ファイル",
+    "attachmentPick": "ファイルを選択（PDF / JPG / PNG）",
+    "attachmentOpen": "開く",
+    "attachmentRemove": "削除",
+    "attachmentMissing": "添付ファイルが見つかりません。移動または削除された可能性があります",
+    "attachmentTooLarge": "ファイルが大きすぎます（上限 20 MB）",
+    "attachmentFailed": "添付ファイルの操作に失敗しました",
+    "attachmentNotBackedUp": "注意：添付ファイルはデータベースバックアップに含まれません。添付フォルダは別途バックアップしてください",
+    "taxInvoiceCompliance": "本機能は外部で発行された正式な税務書類の情報を記録するだけで、発行機能は提供しません",
+    "taxInvoiceVoidReadOnly": "無効化された帳票の関連付け情報は読み取り専用です",
+    "taxInvoiceYes": "記録済み",
+    "taxInvoiceNo": "未記録",
+    "attachmentInvalidType": "PDF / JPG / PNG のみ対応しています"
   }
 }
