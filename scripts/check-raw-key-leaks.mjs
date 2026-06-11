@@ -27,7 +27,7 @@ const EXTS = ['.ts', '.tsx', '.js'];
 // i18n namespaces that should always go through t()
 const I18N_NAMESPACES = [
   'tableHeaders', 'finance', 'sales', 'purchases', 'invoice', 'invoices',
-  'dashboard', 'analysis', 'chat', 'common', 'common2', 'voice', 'ai',
+  'dashboard', 'analysis', 'chat', 'common', 'common2', 'ai',
   'transactions', 'usTax', 'accounts', 'settings', 'header', 'nav',
   'onboarding', 'alerts', 'aiInsights', 'charts', 'documents',
 ];

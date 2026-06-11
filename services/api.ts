@@ -102,6 +102,20 @@ export function testProvider(payload: TestProviderRequest): Promise<TestProvider
   return electronInvoke<TestProviderResult>('providers:test', payload);
 }
 
+// ==================== AI 助手聊天（走统一 apiFetch：桌面 IPC / Web fetch）====================
+// 业务上下文由 /api/ai/context 现查（本地聚合 DB，不调外部 AI）；对话走 /api/ai/chat。
+// 系统提示词由调用方（useAssistant）按 accountingLocale×uiLanguage 组装后传入。
+
+/** AI 助手多轮对话 */
+export function aiChat(messages: any[], systemInstruction: string): Promise<{ text?: string }> {
+  return apiFetch('/api/ai/chat', { method: 'POST', body: JSON.stringify({ messages, systemInstruction }) });
+}
+
+/** 拉取业务上下文文本（服务端聚合本地数据，渲染端缓存 60s） */
+export function aiContext(year: string): Promise<{ context?: string }> {
+  return apiFetch('/api/ai/context', { method: 'POST', body: JSON.stringify({ year }) });
+}
+
 // ==================== Categories（国际化数据模型 v4）====================
 // AIProviderId is already imported at the top of this file; no re-import here.
 

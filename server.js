@@ -481,34 +481,7 @@ app.post('/api/ai/chat', async (req, res) => {
   }
 });
 
-// --- AI TTS ---
-app.post('/api/ai/tts', async (req, res) => {
-  const start = Date.now();
-  try {
-    const { text, voiceName } = req.body;
-    if (!text) return res.status(400).json({ error: 'Missing text' });
-    if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
-
-    const { GoogleGenAI, Modality } = await import('@google/genai');
-    const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-preview-tts',
-      contents: [{ parts: [{ text }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName || 'Aoede' } } },
-      },
-    });
-
-    const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    console.log(`[AI/TTS] ${Date.now() - start}ms`);
-    res.json({ data: audioData || null });
-  } catch (err) {
-    console.error(`[AI/TTS] Error (${Date.now() - start}ms):`, err.message);
-    res.status(502).json({ error: err.message });
-  }
-});
+// 语音（/api/ai/tts、/api/ai/live-key）已于 AI 助手重设计 R1 移除。
 
 // --- AI Data Analysis (with Google Search grounding) ---
 app.post('/api/ai/data-analysis', async (req, res) => {
@@ -552,13 +525,6 @@ app.post('/api/ai/data-analysis', async (req, res) => {
     console.error(`[AI/DataAnalysis] Error (${Date.now() - start}ms):`, err.message);
     res.status(502).json({ error: err.message });
   }
-});
-
-// --- Live Audio Key (short-lived key endpoint for WebSocket live sessions) ---
-app.get('/api/ai/live-key', (req, res) => {
-  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
-  // Return key for authenticated sessions only (authGuard already checked session)
-  res.json({ key: GEMINI_API_KEY });
 });
 
 // ==================== Proxy non-agent API calls to Cloudflare Worker ====================

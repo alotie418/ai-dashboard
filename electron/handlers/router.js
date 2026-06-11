@@ -116,9 +116,7 @@ const routes = [
   ['POST', '/api/ai/ocr', ai.ocr],
   ['POST', '/api/ai/context', ai.context],
   ['POST', '/api/ai/chat', ai.chat],
-  ['POST', '/api/ai/tts', ai.tts],
   ['POST', '/api/ai/data-analysis', ai.dataAnalysis],
-  ['GET', '/api/ai/live-key', ai.liveKey],
 ];
 
 // 所有路由都已迁移，PENDING_ROUTES 清空

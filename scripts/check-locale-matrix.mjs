@@ -102,16 +102,13 @@ const REQUIRED_I18N_KEYS = [
   // chat panel
   'chat.title', 'chat.status', 'chat.welcome', 'chat.welcomeDesc', 'chat.placeholder',
   'chat.uploadInvoice', 'chat.financeQuery', 'chat.trendAnalysis', 'chat.marketAnalysis', 'chat.inventoryQuery',
-  'chat.thinking', 'chat.resize', 'chat.playVoice', 'chat.liveConnecting', 'chat.liveListening',
-  'chat.liveResponding', 'chat.liveHint', 'chat.emptyReply', 'chat.requestError',
+  'chat.thinking', 'chat.resize', 'chat.emptyReply', 'chat.requestError',
   'chat.uploadInvoiceMsg', 'chat.fileReadTimeout', 'chat.fileFormatUnsupported', 'chat.fileReadFailed',
   'chat.notInvoice', 'chat.invoiceExtractResult', 'chat.invoiceRecognizeFailed',
   'chat.quickPromptUploadInvoice', 'chat.quickPromptFinanceQuery', 'chat.quickPromptTrend',
   'chat.quickPromptMarket', 'chat.quickPromptInventory',
-  // voice
-  'voice.aoede', 'voice.puck', 'voice.charon', 'voice.kore', 'voice.fenrir',
-  // ai
-  'ai.chatSystemPrompt', 'ai.liveSystemPrompt', 'ai.contextFallback', 'ai.analyzeSystemPrompt',
+  // ai （语音已移除：voice.* 与 ai.liveSystemPrompt 不再要求）
+  'ai.chatSystemPrompt', 'ai.contextFallback', 'ai.analyzeSystemPrompt',
   // purchases & sales form
   'purchases.title', 'purchases.formCancel', 'purchases.formSubmit',
   'purchases.taxStandard', 'purchases.taxNone', 'purchases.taxJpStandard',
@@ -2775,7 +2772,7 @@ async function main() {
   // ────────────────────────────────────────────────
   {
     const data = locales['zh-TW'];
-    const sectionsToCheck = ['finance', 'tableHeaders', 'chat', 'voice', 'purchases', 'sales', 'invoices', 'dashboard'];
+    const sectionsToCheck = ['finance', 'tableHeaders', 'chat', 'purchases', 'sales', 'invoices', 'dashboard'];
     const reasons = [];
     for (const sec of sectionsToCheck) {
       const section = data[sec];
