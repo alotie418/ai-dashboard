@@ -16,6 +16,7 @@ import {
 import { formatMoney, getTaxLabel, getProductUnitLabel } from './accountingHelpers';
 import { buildDocumentHtml } from './documentPdf';
 import DocumentModal from './DocumentModal';
+import TaxInvoiceModal from './TaxInvoiceModal';
 
 const TYPE_LABEL_KEYS: Record<BusinessDocType, string> = {
   quotation: 'documents.typeQuotation',
@@ -52,6 +53,8 @@ const DocumentsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [pdfBusyId, setPdfBusyId] = useState<string | null>(null);
   const [pdfMsg, setPdfMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  // Phase D：正式税务发票关联弹窗（作废单据打开即只读）
+  const [taxDoc, setTaxDoc] = useState<BusinessDocument | null>(null);
 
   useEffect(() => {
     fetchSettings().then((s: any) => {
@@ -230,6 +233,7 @@ const DocumentsPage: React.FC = () => {
                 <th className="px-5 py-4 font-medium">{t('documents.colCustomer')}</th>
                 <th className="px-5 py-4 font-medium whitespace-nowrap">{t('documents.colTotal')}</th>
                 <th className="px-5 py-4 font-medium">{t('documents.colStatus')}</th>
+                <th className="px-5 py-4 font-medium whitespace-nowrap">{t('documents.colTaxInvoice')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.actions')}</th>
               </tr>
             </thead>
@@ -252,6 +256,17 @@ const DocumentsPage: React.FC = () => {
                     <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${STATUS_BADGE_CLS[d.status] || STATUS_BADGE_CLS.draft}`}>
                       {t(STATUS_LABEL_KEYS[d.status] || STATUS_LABEL_KEYS.draft)}
                     </span>
+                  </td>
+                  {/* Phase D：正式发票关联状态（外部开具，仅记录） */}
+                  <td className="px-5 py-5 whitespace-nowrap">
+                    {d.taxInvoiceIssued ? (
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${STATUS_BADGE_CLS.issued}`}>
+                        {t('documents.taxInvoiceYes')}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-[#8a8a88]">{t('documents.taxInvoiceNo')}</span>
+                    )}
+                    {d.taxInvoiceAttachmentPath && <i className="fas fa-paperclip ml-1.5 text-[#5c5c5a] text-[10px]"></i>}
                   </td>
                   <td className="px-5 py-5 text-xs font-medium space-x-3 whitespace-nowrap">
                     {d.status === 'draft' && (
@@ -287,19 +302,25 @@ const DocumentsPage: React.FC = () => {
                     >
                       {pdfBusyId === d.id ? <i className="fas fa-spinner fa-spin"></i> : t('documents.exportPdf')}
                     </button>
+                    <button
+                      onClick={() => setTaxDoc(d)}
+                      className="text-[#5c5c5a] hover:text-[#191918] transition-colors"
+                    >
+                      {t('documents.taxInvoiceAction')}
+                    </button>
                   </td>
                 </tr>
               ))}
               {isLoading && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-[#5c5c5a] text-sm">
+                  <td colSpan={8} className="px-6 py-12 text-center text-[#5c5c5a] text-sm">
                     <i className="fas fa-spinner animate-spin mr-2"></i>{t('common.loading')}
                   </td>
                 </tr>
               )}
               {!isLoading && docs.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-[#5c5c5a] text-sm italic">
+                  <td colSpan={8} className="px-6 py-12 text-center text-[#5c5c5a] text-sm italic">
                     {t('documents.empty')}
                   </td>
                 </tr>
@@ -316,6 +337,15 @@ const DocumentsPage: React.FC = () => {
           products={products}
           onClose={() => { setShowModal(false); setEditing(null); }}
           onSaved={() => { setShowModal(false); setEditing(null); load(); }}
+        />
+      )}
+
+      {/* Phase D：正式税务发票关联（仅记录外部开具的发票；作废单据只读） */}
+      {taxDoc && (
+        <TaxInvoiceModal
+          doc={taxDoc}
+          onClose={() => setTaxDoc(null)}
+          onSaved={() => { setTaxDoc(null); load(); }}
         />
       )}
     </div>

@@ -1075,6 +1075,26 @@
     "stmtGenerate": "Générer les lignes",
     "stmtNoRecords": "Aucune vente pour ce client sur la période",
     "stmtNeedInput": "Sélectionnez d'abord un client et une période",
-    "pdfPeriod": "Période"
+    "pdfPeriod": "Période",
+    "colTaxInvoice": "Facture fiscale",
+    "taxInvoiceAction": "Lien facture",
+    "taxInvoiceTitle": "Lien vers la facture fiscale officielle",
+    "taxInvoiceIssuedLabel": "Facture fiscale officielle émise (en externe)",
+    "taxInvoiceNumberLabel": "Numéro de facture",
+    "taxInvoiceNumberHint": "Saisissez manuellement le numéro de la facture émise en externe ; jamais généré automatiquement",
+    "taxInvoiceDateLabel": "Date d'émission",
+    "taxInvoiceAttachmentLabel": "Pièce jointe",
+    "attachmentPick": "Choisir un fichier (PDF / JPG / PNG)",
+    "attachmentOpen": "Ouvrir",
+    "attachmentRemove": "Retirer",
+    "attachmentMissing": "Pièce jointe introuvable ; elle a peut-être été déplacée ou supprimée",
+    "attachmentTooLarge": "Fichier trop volumineux (max 20 Mo)",
+    "attachmentFailed": "Échec de l'opération sur la pièce jointe",
+    "attachmentNotBackedUp": "Remarque : les pièces jointes ne sont pas incluses dans la sauvegarde de la base de données ; sauvegardez le dossier des pièces jointes séparément",
+    "taxInvoiceCompliance": "Cette fonction enregistre uniquement une facture fiscale officielle émise en externe ; elle n'émet aucune facture",
+    "taxInvoiceVoidReadOnly": "Les informations de lien facture d'un document annulé sont en lecture seule",
+    "taxInvoiceYes": "Émise",
+    "taxInvoiceNo": "Non émise",
+    "attachmentInvalidType": "Seuls les fichiers PDF / JPG / PNG sont pris en charge"
   }
 }

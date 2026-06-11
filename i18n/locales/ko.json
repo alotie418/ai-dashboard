@@ -1075,6 +1075,26 @@
     "stmtGenerate": "명세 생성",
     "stmtNoRecords": "해당 기간에 이 고객의 판매 기록이 없습니다",
     "stmtNeedInput": "먼저 고객과 기간을 선택하세요",
-    "pdfPeriod": "기간"
+    "pdfPeriod": "기간",
+    "colTaxInvoice": "정식 세무 증빙",
+    "taxInvoiceAction": "증빙 연결",
+    "taxInvoiceTitle": "정식 세무 증빙 연결",
+    "taxInvoiceIssuedLabel": "정식 세무 증빙 발행됨 (외부 발행 플랫폼에서 발행)",
+    "taxInvoiceNumberLabel": "증빙 번호",
+    "taxInvoiceNumberHint": "외부에서 발행된 번호를 직접 입력합니다. 자동 생성되지 않습니다",
+    "taxInvoiceDateLabel": "발행일",
+    "taxInvoiceAttachmentLabel": "증빙 첨부 파일",
+    "attachmentPick": "파일 선택 (PDF / JPG / PNG)",
+    "attachmentOpen": "열기",
+    "attachmentRemove": "제거",
+    "attachmentMissing": "첨부 파일을 찾을 수 없습니다. 이동되었거나 삭제되었을 수 있습니다",
+    "attachmentTooLarge": "파일이 너무 큽니다 (최대 20 MB)",
+    "attachmentFailed": "첨부 파일 작업에 실패했습니다",
+    "attachmentNotBackedUp": "참고: 첨부 파일은 데이터베이스 백업에 포함되지 않습니다. 첨부 폴더를 별도로 백업하세요",
+    "taxInvoiceCompliance": "이 기능은 외부에서 발행된 정식 세무 증빙 정보를 기록만 하며, 발행 기능은 제공하지 않습니다",
+    "taxInvoiceVoidReadOnly": "무효 처리된 문서의 증빙 연결 정보는 읽기 전용입니다",
+    "taxInvoiceYes": "기록됨",
+    "taxInvoiceNo": "미기록",
+    "attachmentInvalidType": "PDF / JPG / PNG 파일만 지원됩니다"
   }
 }

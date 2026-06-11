@@ -1075,6 +1075,26 @@
     "stmtGenerate": "生成对账明细",
     "stmtNoRecords": "该期间内没有该客户的销售记录",
     "stmtNeedInput": "请先选择客户和期间",
-    "pdfPeriod": "期间"
+    "pdfPeriod": "期间",
+    "colTaxInvoice": "正式发票",
+    "taxInvoiceAction": "发票关联",
+    "taxInvoiceTitle": "正式发票关联",
+    "taxInvoiceIssuedLabel": "已开具正式发票（由外部开票平台开具）",
+    "taxInvoiceNumberLabel": "发票号码",
+    "taxInvoiceNumberHint": "仅手工录入外部开具的发票号码，永不自动生成",
+    "taxInvoiceDateLabel": "开票日期",
+    "taxInvoiceAttachmentLabel": "发票附件",
+    "attachmentPick": "选择文件（PDF / JPG / PNG）",
+    "attachmentOpen": "打开",
+    "attachmentRemove": "移除",
+    "attachmentMissing": "附件文件不存在，可能已被移动或删除",
+    "attachmentTooLarge": "文件过大（上限 20 MB）",
+    "attachmentFailed": "附件操作失败",
+    "attachmentNotBackedUp": "注意：附件不包含在数据库备份中，请自行备份附件文件夹",
+    "taxInvoiceCompliance": "本功能仅记录外部开具的正式发票信息，不提供任何开票功能",
+    "taxInvoiceVoidReadOnly": "已作废单据的发票关联信息为只读",
+    "taxInvoiceYes": "已开",
+    "taxInvoiceNo": "未开",
+    "attachmentInvalidType": "仅支持 PDF / JPG / PNG 格式"
   }
 }

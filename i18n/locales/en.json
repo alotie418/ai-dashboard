@@ -1075,6 +1075,26 @@
     "stmtGenerate": "Generate Lines",
     "stmtNoRecords": "No sales records for this customer in the period",
     "stmtNeedInput": "Select a customer and period first",
-    "pdfPeriod": "Period"
+    "pdfPeriod": "Period",
+    "colTaxInvoice": "Tax Invoice",
+    "taxInvoiceAction": "Invoice Link",
+    "taxInvoiceTitle": "Official Tax Invoice Link",
+    "taxInvoiceIssuedLabel": "Official tax invoice issued (externally)",
+    "taxInvoiceNumberLabel": "Invoice number",
+    "taxInvoiceNumberHint": "Manually enter the externally issued invoice number; never auto-generated",
+    "taxInvoiceDateLabel": "Issue date",
+    "taxInvoiceAttachmentLabel": "Invoice attachment",
+    "attachmentPick": "Choose file (PDF / JPG / PNG)",
+    "attachmentOpen": "Open",
+    "attachmentRemove": "Remove",
+    "attachmentMissing": "Attachment file not found; it may have been moved or deleted",
+    "attachmentTooLarge": "File too large (max 20 MB)",
+    "attachmentFailed": "Attachment operation failed",
+    "attachmentNotBackedUp": "Note: attachments are not included in database backups; back up the attachments folder separately",
+    "taxInvoiceCompliance": "This feature only records an externally issued official tax invoice; it does not issue invoices",
+    "taxInvoiceVoidReadOnly": "Invoice link info is read-only for voided documents",
+    "taxInvoiceYes": "Invoiced",
+    "taxInvoiceNo": "Not invoiced",
+    "attachmentInvalidType": "Only PDF / JPG / PNG files are supported"
   }
 }

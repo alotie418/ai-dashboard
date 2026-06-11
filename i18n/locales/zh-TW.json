@@ -1075,6 +1075,26 @@
     "stmtGenerate": "產生對帳明細",
     "stmtNoRecords": "該期間內沒有該客戶的銷售記錄",
     "stmtNeedInput": "請先選擇客戶和期間",
-    "pdfPeriod": "期間"
+    "pdfPeriod": "期間",
+    "colTaxInvoice": "正式發票",
+    "taxInvoiceAction": "發票關聯",
+    "taxInvoiceTitle": "正式發票關聯",
+    "taxInvoiceIssuedLabel": "已開立正式發票（由外部開票平台開立）",
+    "taxInvoiceNumberLabel": "發票號碼",
+    "taxInvoiceNumberHint": "僅手動輸入外部開立的發票號碼，永不自動產生",
+    "taxInvoiceDateLabel": "開立日期",
+    "taxInvoiceAttachmentLabel": "發票附件",
+    "attachmentPick": "選擇檔案（PDF / JPG / PNG）",
+    "attachmentOpen": "開啟",
+    "attachmentRemove": "移除",
+    "attachmentMissing": "附件檔案不存在，可能已被移動或刪除",
+    "attachmentTooLarge": "檔案過大（上限 20 MB）",
+    "attachmentFailed": "附件操作失敗",
+    "attachmentNotBackedUp": "注意：附件不包含在資料庫備份中，請自行備份附件資料夾",
+    "taxInvoiceCompliance": "本功能僅記錄外部開立的正式發票資訊，不提供任何開票功能",
+    "taxInvoiceVoidReadOnly": "已作廢單據的發票關聯資訊為唯讀",
+    "taxInvoiceYes": "已開",
+    "taxInvoiceNo": "未開",
+    "attachmentInvalidType": "僅支援 PDF / JPG / PNG 格式"
   }
 }
