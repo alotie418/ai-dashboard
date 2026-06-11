@@ -266,6 +266,29 @@ async function chat(body) {
   return PROVIDERS[rec.provider].chat(rec.apiKey, rec.model, body);
 }
 
+// 只读查账 agent 对话（R2b-1）。agent loop 跑在主进程，解密后的 API Key 仅注入 adapter、
+// 全程不出主进程。R2b-1 仅 Anthropic 实现工具调用；其余 provider 优雅回退普通 chat（无工具），
+// 返回同样的 { text, toolTrace } 形状，渲染端无需区分。
+async function agentChat(body) {
+  const rec = getDefaultRecord();
+  const adapter = PROVIDERS[rec.provider];
+  if (typeof adapter.chatWithTools !== 'function') {
+    const r = await adapter.chat(rec.apiKey, rec.model, body);
+    return { text: r.text || '', toolTrace: [] };
+  }
+  const { runAgentLoop } = require('./agent');
+  const history = typeof adapter.toNativeHistory === 'function'
+    ? adapter.toNativeHistory(body.messages)
+    : (body.messages || []);
+  return runAgentLoop({
+    adapter,
+    apiKey: rec.apiKey,
+    model: rec.model,
+    history,
+    system: body.systemInstruction || '',
+  });
+}
+
 async function dataAnalysis(body) {
   const rec = getDefaultRecord();
   return PROVIDERS[rec.provider].dataAnalysis(rec.apiKey, rec.model, body);
@@ -278,5 +301,5 @@ module.exports = {
   // 管理面
   list, hasAny, save, remove, setDefault, test,
   // 业务面
-  analyze, ocr, chat, dataAnalysis,
+  analyze, ocr, chat, agentChat, dataAnalysis,
 };

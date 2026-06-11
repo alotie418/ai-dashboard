@@ -374,6 +374,37 @@ async function checkFinanceMoneyFormat() {
   }
 }
 
+async function checkAIToolsReadonly() {
+  // R2b-1: the AI assistant tool whitelist (electron/ai/tools.js) must stay READ-ONLY.
+  // It may only map GET/summary/list/get handlers; it must NEVER reference a write handler
+  // (create/update/remove/save/payment/issue/void/tax-invoice/migrate), and must NEVER touch
+  // the API key / encrypted storage / DB restore. This is the machine lock behind
+  // "AI can only read, never mutate / never see the key".
+  let src;
+  try {
+    src = await readFile(join(ROOT, 'electron/ai/tools.js'), 'utf8');
+  } catch {
+    findings.push({
+      file: 'electron/ai/tools.js', line: 0, type: 'ai-tools-missing', token: 'tools.js',
+      snippet: 'R2b-1 expects electron/ai/tools.js (the read-only AI tool whitelist) to exist',
+    });
+    return;
+  }
+  const WRITE_CALL = /\.(create|update|remove|delete|save|batchSales|batchPurchases|recordSalePayment|recordPurchasePayment|updateTaxInvoice|resetToDefault|setDefault|migrateAll|rollback)\s*\(/;
+  if (WRITE_CALL.test(src)) {
+    findings.push({
+      file: 'electron/ai/tools.js', line: 0, type: 'ai-tool-write', token: 'mutating-handler',
+      snippet: 'AI tool file calls a write handler — assistant tools MUST be read-only (no create/update/remove/save/payment/issue/void/migrate)',
+    });
+  }
+  if (/safeStorage|decryptKey|api_key|importDb|relaunch/.test(src)) {
+    findings.push({
+      file: 'electron/ai/tools.js', line: 0, type: 'ai-tool-sensitive', token: 'sensitive-ref',
+      snippet: 'AI tool file must not reference API keys / encrypted storage / DB restore (safeStorage/decryptKey/api_key/importDb/relaunch)',
+    });
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -389,6 +420,7 @@ async function main() {
   await checkTransactionSummaryMoney();
   await checkNoAutoAIAnalysis();
   await checkAIQuotaCooldown();
+  await checkAIToolsReadonly();
   await checkAnalyticsMatrixDisplay();
   await checkFinanceMoneyFormat();
 

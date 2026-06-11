@@ -334,7 +334,21 @@
     "quickPromptFinanceQuery": "最新の財務レポートサマリを表示してください",
     "quickPromptTrend": "過去数ヶ月のビジネス履歴トレンドを分析して",
     "quickPromptMarket": "最新の市場価格と動向を検索",
-    "quickPromptInventory": "現在の在庫残高とリスクを確認"
+    "quickPromptInventory": "現在の在庫残高とリスクを確認",
+    "toolTraceTitle": "照会済み",
+    "toolTruncated": "先頭 {{n}} 件のみ表示",
+    "toolLabel": {
+      "get_dashboard": "ダッシュボード",
+      "get_sales": "売上記録",
+      "get_purchases": "仕入記録",
+      "get_transactions": "収支記録",
+      "get_inventory": "在庫",
+      "get_products": "商品/サービス",
+      "get_receivables": "売掛金",
+      "get_payables": "買掛金",
+      "get_documents": "業務帳票",
+      "get_alerts": "アラート"
+    }
   },
   "dashboard": {
     "inventory": "Inventory (Real-time)",

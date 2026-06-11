@@ -49,6 +49,14 @@ const ChatPanel: React.FC = () => {
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
                 </div>
               )}
+              {/* R2b-1：只读查账工具轨迹「已查询：…」。未知工具名兜底显示原始名，绝不裸 key。 */}
+              {m.role !== 'user' && m.toolTrace && m.toolTrace.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-[#e0ddd5] flex items-center flex-wrap gap-x-1 text-[10px] text-[#7a7a78]">
+                  <i className="fas fa-search mr-1 text-[#d97757]"></i>
+                  <span className="font-semibold">{t('chat.toolTraceTitle')}：</span>
+                  <span>{m.toolTrace.map((tt) => t(`chat.toolLabel.${tt.name}`, { defaultValue: tt.name })).join(' · ')}</span>
+                </div>
+              )}
             </div>
           </div>
         ))}

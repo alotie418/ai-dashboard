@@ -414,6 +414,51 @@ test.describe('ai assistant page', () => {
   }
 });
 
+// ── AI assistant read-only tool trace (R2b-1) — mocked agent-chat happy path ──
+// The assistant page now sends through aiAgentChat (POST /api/ai/agent-chat). We mock that
+// endpoint (registered after bootCombo → takes precedence) to return a deterministic answer +
+// a toolTrace, then assert the chat renders BOTH the final answer AND the localized "已查询 …"
+// tool-trace line, with no raw chat.* key leaking. uiLanguage axis (acc fixed to CN — the tool
+// labels are regime-neutral). This locks the trace rendering + the per-tool i18n labels.
+test.describe('ai assistant tool trace (R2b-1)', () => {
+  for (const ui of UI_LANGUAGES) {
+    test(`agent-trace ui=${ui}`, async ({ page }) => {
+      await bootCombo(page, ui, 'CN');
+      const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+
+      await page.route('**/api/ai/agent-chat', (route) => route.fulfill({
+        json: {
+          text: 'Annual sales total is 123,456.',
+          toolTrace: [
+            { name: 'get_sales', argsSummary: '', rowCount: 3, truncated: false },
+            { name: 'get_dashboard', argsSummary: '{"year":"2026"}', rowCount: 0, truncated: false },
+          ],
+        },
+      }));
+
+      await page.locator('nav i.fa-comments').first().click();
+
+      // send a message → triggers aiContext (catch-all {}) then the mocked agent-chat.
+      // Submit via Enter (form onSubmit) rather than clicking the send button — the floating
+      // widget's circular toggle (fixed bottom-right, z-10000) overlaps the send button corner.
+      const input = page.getByPlaceholder(loc.chat.placeholder).first();
+      await input.fill('今年销售总额多少？');
+      await input.press('Enter');
+
+      // (1) final answer renders
+      await expect(page.getByText('Annual sales total is 123,456.').first()).toBeVisible({ timeout: 10_000 });
+      // (2) tool-trace line: localized title + joined tool labels (joined string is unique to the trace,
+      //     so it won't collide with the sidebar nav labels e.g. en "Sales")
+      await expect(page.getByText(loc.chat.toolTraceTitle, { exact: false }).first()).toBeVisible({ timeout: 10_000 });
+      const joined = [loc.chat.toolLabel.get_sales, loc.chat.toolLabel.get_dashboard].join(' · ');
+      await expect(page.getByText(joined, { exact: false }).first()).toBeVisible({ timeout: 10_000 });
+      // (3) no raw chat.* key leaked into the rendered UI
+      const body = await page.locator('body').innerText();
+      expect(body, `[ui=${ui}] raw chat key leaked`).not.toMatch(/chat\.[a-zA-Z]/);
+    });
+  }
+});
+
 // ── Business Documents create modal with a mocked desktop electronAPI (Phase A) ──
 // The modal is uiLanguage-only (regime tax labels render via getTaxLabel with the
 // frozen acc_locale and are covered by the matrix sweep), so one accountingLocale ×

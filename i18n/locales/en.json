@@ -334,7 +334,21 @@
     "quickPromptFinanceQuery": "Show me the latest financial report summary",
     "quickPromptTrend": "Analyze business trends over the past few months",
     "quickPromptMarket": "Search latest market prices and trends",
-    "quickPromptInventory": "Check current inventory and risks"
+    "quickPromptInventory": "Check current inventory and risks",
+    "toolTraceTitle": "Queried",
+    "toolTruncated": "Showing first {{n}}",
+    "toolLabel": {
+      "get_dashboard": "Dashboard",
+      "get_sales": "Sales",
+      "get_purchases": "Purchases",
+      "get_transactions": "Transactions",
+      "get_inventory": "Inventory",
+      "get_products": "Products/Services",
+      "get_receivables": "Receivables",
+      "get_payables": "Payables",
+      "get_documents": "Documents",
+      "get_alerts": "Alerts"
+    }
   },
   "dashboard": {
     "inventory": "Inventory (Real-time)",

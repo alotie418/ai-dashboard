@@ -116,6 +116,7 @@ const routes = [
   ['POST', '/api/ai/ocr', ai.ocr],
   ['POST', '/api/ai/context', ai.context],
   ['POST', '/api/ai/chat', ai.chat],
+  ['POST', '/api/ai/agent-chat', ai.agentChat],
   ['POST', '/api/ai/data-analysis', ai.dataAnalysis],
 ];
 

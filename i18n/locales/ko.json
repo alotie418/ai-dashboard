@@ -334,7 +334,21 @@
     "quickPromptFinanceQuery": "최신 재무 보고서 요약을 보여주세요",
     "quickPromptTrend": "지난 몇 개월간의 비즈니스 추세 분석",
     "quickPromptMarket": "최신 시장 가격 및 동향 검색",
-    "quickPromptInventory": "현재 재고 잔량 및 리스크 확인"
+    "quickPromptInventory": "현재 재고 잔량 및 리스크 확인",
+    "toolTraceTitle": "조회함",
+    "toolTruncated": "처음 {{n}}건만 표시",
+    "toolLabel": {
+      "get_dashboard": "대시보드",
+      "get_sales": "매출 기록",
+      "get_purchases": "매입 기록",
+      "get_transactions": "수입지출",
+      "get_inventory": "재고",
+      "get_products": "상품/서비스",
+      "get_receivables": "채권",
+      "get_payables": "채무",
+      "get_documents": "업무 문서",
+      "get_alerts": "알림"
+    }
   },
   "dashboard": {
     "inventory": "Inventory (Real-time)",

@@ -116,6 +116,22 @@ export function aiContext(year: string): Promise<{ context?: string }> {
   return apiFetch('/api/ai/context', { method: 'POST', body: JSON.stringify({ year }) });
 }
 
+/** AI 工具轨迹项（只读：工具名 / 参数摘要 / 行数 / 截断标志；绝不含 API Key 或结果明细） */
+export interface ToolTraceItem {
+  name: string;
+  argsSummary?: string;
+  rowCount: number;
+  truncated: boolean;
+}
+
+/**
+ * AI 助手只读查账对话（R2b-1）。主进程跑「LLM ↔ 只读工具」循环后返回最终回答 + 工具轨迹。
+ * API Key 全程不出主进程；与 aiChat 同样走统一 apiFetch（桌面 IPC / Web fetch）。
+ */
+export function aiAgentChat(messages: any[], systemInstruction: string): Promise<{ text?: string; toolTrace?: ToolTraceItem[] }> {
+  return apiFetch('/api/ai/agent-chat', { method: 'POST', body: JSON.stringify({ messages, systemInstruction }) });
+}
+
 // ==================== Categories（国际化数据模型 v4）====================
 // AIProviderId is already imported at the top of this file; no re-import here.
 

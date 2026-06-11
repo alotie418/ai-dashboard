@@ -30,6 +30,12 @@ async function chat({ body }) {
   return aiCore.chat(body);
 }
 
+// /api/ai/agent-chat — 只读查账 agent 对话（主进程跑工具循环，API Key 不出主进程）
+async function agentChat({ body }) {
+  if (!body?.messages) throw new Error('Missing messages');
+  return aiCore.agentChat(body);
+}
+
 // /api/ai/data-analysis — 数据分析（含 Web grounding，仅 Gemini 有效）
 async function dataAnalysis({ body }) {
   if (!body?.prompt) throw new Error('Missing prompt');
@@ -153,4 +159,4 @@ Tax surcharge: ${num(f.taxSurcharge)}, admin expense: ${num(f.adminExpense)}, sh
   return { context: sections.join('\n\n') };
 }
 
-module.exports = { analyze, ocr, context, chat, dataAnalysis };
+module.exports = { analyze, ocr, context, chat, agentChat, dataAnalysis };
