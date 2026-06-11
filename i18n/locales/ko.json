@@ -30,6 +30,7 @@
   },
   "nav": {
     "dashboard": "대시보드",
+    "assistant": "AI 어시스턴트",
     "purchase": "매입 · 매입세액",
     "sales": "매출 · 매출세액",
     "inventory": "세금계산서 조회",
@@ -44,6 +45,7 @@
   },
   "headerTitle": {
     "dashboard": "경영 데이터 개요",
+    "assistant": "AI 어시스턴트",
     "sales": "매출 · 매출세액",
     "purchase": "매입 · 매입세액",
     "analysis": "데이터 분석 센터",

@@ -30,6 +30,7 @@
   },
   "nav": {
     "dashboard": "經營看板",
+    "assistant": "AI 助手",
     "purchase": "採購與進項",
     "sales": "銷售與銷項",
     "inventory": "發票查詢",
@@ -44,6 +45,7 @@
   },
   "headerTitle": {
     "dashboard": "經營資料概覽",
+    "assistant": "AI 助手",
     "sales": "銷售與銷項",
     "purchase": "採購與進項",
     "analysis": "資料分析中心",

@@ -30,6 +30,7 @@
   },
   "nav": {
     "dashboard": "Dashboard",
+    "assistant": "AI Assistant",
     "purchase": "Purchases",
     "sales": "Sales",
     "inventory": "Invoices",
@@ -44,6 +45,7 @@
   },
   "headerTitle": {
     "dashboard": "Business Overview",
+    "assistant": "AI Assistant",
     "sales": "Sales & Output Tax",
     "purchase": "Purchases & Input Tax",
     "analysis": "Data Analysis",

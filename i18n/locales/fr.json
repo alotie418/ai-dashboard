@@ -30,6 +30,7 @@
   },
   "nav": {
     "dashboard": "Tableau de bord",
+    "assistant": "Assistant IA",
     "purchase": "Achats / TVA déductible",
     "sales": "Ventes / TVA collectée",
     "inventory": "Recherche factures",
@@ -44,6 +45,7 @@
   },
   "headerTitle": {
     "dashboard": "Aperçu d'activité",
+    "assistant": "Assistant IA",
     "sales": "Ventes / TVA collectée",
     "purchase": "Achats / TVA déductible",
     "analysis": "Centre d'analyse",
