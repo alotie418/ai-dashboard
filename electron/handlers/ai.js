@@ -44,6 +44,12 @@ async function dataAnalysis({ body }) {
 
 // 语音（/api/ai/tts、/api/ai/live-key）已于 AI 助手重设计 R1 移除。
 
+// R3a: locale-robust「已开票/已收票」判定 —— context 聚合发票统计不再硬等单一中文值。
+// 兼容前端写入的中文（已开/已收）+ CSV 导入/未来 locale 可能出现的英文枚举（issued/paid/collected/invoiced）；
+// 待开/待收/pending 不算已开。大小写不敏感（中文 toLowerCase 无副作用）。
+const ISSUED_INVOICE_STATUSES = new Set(['已开', '已收', 'issued', 'paid', 'collected', 'invoiced']);
+const isIssuedInvoiceStatus = (s) => ISSUED_INVOICE_STATUSES.has(String(s || '').trim().toLowerCase());
+
 // /api/ai/context — 全数据聚合（本地直查 DB，不依赖外部 AI）
 async function context({ body }) {
   const dashboard = require('./dashboard');
@@ -122,8 +128,8 @@ ${recent || '  (none)'}`);
   if (sales || purchases) {
     const salesL = sales || [];
     const purchL = purchases || [];
-    const salesInvoiced = salesL.filter(r => r.invoiceStatus === '已开').length;
-    const purchaseInvoiced = purchL.filter(r => r.invoiceStatus === '已收').length;
+    const salesInvoiced = salesL.filter(r => isIssuedInvoiceStatus(r.invoiceStatus)).length;
+    const purchaseInvoiced = purchL.filter(r => isIssuedInvoiceStatus(r.invoiceStatus)).length;
     sections.push(`[Invoices]
 Output invoices: ${salesInvoiced} issued, ${salesL.length - salesInvoiced} pending
 Input invoices: ${purchaseInvoiced} received, ${purchL.length - purchaseInvoiced} pending`);
@@ -153,7 +159,7 @@ Tax surcharge: ${num(f.taxSurcharge)}, admin expense: ${num(f.adminExpense)}, sh
     const alertStr = alerts.slice(0, 10).map(a => `  [${a.type || ''}] ${a.title || ''}`).join('\n');
     sections.push(`[Alerts]\n${alerts.length} active:\n${alertStr}`);
   } else {
-    sections.push(`【系统告警】\n无告警`);
+    sections.push(`[Alerts]\nNone active`);
   }
 
   return { context: sections.join('\n\n') };
