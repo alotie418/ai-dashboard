@@ -814,6 +814,8 @@ export interface BusinessDocumentItem {
   taxAmount?: number;
   amount?: number;            // 不含税行金额
   lineNo?: number;
+  refSalesId?: string | null; // Phase C：对账单/由销售记录生成时回链的销售记录 id
+  refDate?: string | null;    // Phase C：引用销售记录的日期
 }
 
 export interface BusinessDocument {
@@ -832,6 +834,9 @@ export interface BusinessDocument {
   taxAmount: number;
   total: number;
   notes?: string | null;
+  sourceSalesId?: string | null; // Phase C：由销售记录生成时的信息性回链
+  periodStart?: string | null;   // Phase C：对账单期间起始
+  periodEnd?: string | null;     // Phase C：对账单期间截止
   items?: BusinessDocumentItem[];
   createdAt?: string;
 }
@@ -848,6 +853,8 @@ function fromApiDocumentItem(r: any): BusinessDocumentItem {
     taxAmount: r.tax_amount ?? 0,
     amount: r.amount ?? 0,
     lineNo: r.line_no ?? 0,
+    refSalesId: r.ref_sales_id ?? null,
+    refDate: r.ref_date ?? null,
   };
 }
 
@@ -868,6 +875,9 @@ function fromApiDocument(r: any): BusinessDocument {
     taxAmount: r.tax_amount ?? 0,
     total: r.total ?? 0,
     notes: r.notes ?? null,
+    sourceSalesId: r.source_sales_id ?? null,
+    periodStart: r.period_start ?? null,
+    periodEnd: r.period_end ?? null,
     items: Array.isArray(r.items) ? r.items.map(fromApiDocumentItem) : undefined,
     createdAt: r.created_at,
   };
@@ -886,6 +896,9 @@ function toApiDocument(d: Partial<BusinessDocument>): any {
   if (d.customerContact !== undefined) body.customer_contact = d.customerContact;
   if (d.accLocale !== undefined) body.acc_locale = d.accLocale;
   if (d.notes !== undefined) body.notes = d.notes;
+  if (d.sourceSalesId !== undefined) body.source_sales_id = d.sourceSalesId;
+  if (d.periodStart !== undefined) body.period_start = d.periodStart;
+  if (d.periodEnd !== undefined) body.period_end = d.periodEnd;
   if (d.items !== undefined) {
     body.items = (d.items || []).map((it) => ({
       product_id: it.productId ?? null,
@@ -897,6 +910,8 @@ function toApiDocument(d: Partial<BusinessDocument>): any {
       tax_amount: it.taxAmount ?? 0,
       amount: it.amount ?? 0,
       line_no: it.lineNo ?? 0,
+      ref_sales_id: it.refSalesId ?? null,
+      ref_date: it.refDate ?? null,
     }));
   }
   return body;

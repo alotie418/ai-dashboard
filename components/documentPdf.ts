@@ -23,6 +23,7 @@ export interface DocumentPdfLabels {
   numberLabel: string;
   dateLabel: string;
   validUntilLabel: string;
+  periodLabel: string;        // 对账单期间标签（period 字段存在时渲染）
   customerLabel: string;
   customerTaxIdLabel: string;
   customerAddressLabel: string;
@@ -74,11 +75,12 @@ export function buildDocumentHtml(
     .map((v) => `<span>${e(String(v))}</span>`)
     .join('');
 
-  // 单据 meta 行：编号 / 日期 / 有效期（可选）
+  // 单据 meta 行：编号 / 日期 / 有效期（可选）/ 对账期间（对账单的定义性属性）
   const docMeta = [
     `<span>${e(L.numberLabel)}: ${e(doc.docNumber)}</span>`,
     `<span>${e(L.dateLabel)}: ${e(doc.docDate)}</span>`,
     doc.validUntil ? `<span>${e(L.validUntilLabel)}: ${e(doc.validUntil)}</span>` : '',
+    doc.periodStart && doc.periodEnd ? `<span>${e(L.periodLabel)}: ${e(doc.periodStart)} ~ ${e(doc.periodEnd)}</span>` : '',
   ].join('');
 
   // 客户信息块（税号/地址/联系方式为空跳过）

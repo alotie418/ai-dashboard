@@ -1066,6 +1066,15 @@
     "pdfDesktopOnly": "L'export PDF est disponible uniquement dans l'application de bureau.",
     "pdfFailed": "Échec de l'export PDF. Veuillez réessayer.",
     "pdfGeneratedAt": "Généré le",
-    "pdfDisclaimer": "Ce document est un document commercial interne et ne constitue pas une facture fiscale officielle."
+    "pdfDisclaimer": "Ce document est un document commercial interne et ne constitue pas une facture fiscale officielle.",
+    "generateFromSale": "Créer un document",
+    "generatedOk": "Document commercial créé — voir la page Documents commerciaux",
+    "stmtCustomer": "Sélectionner un client",
+    "stmtPeriodStart": "Début de période",
+    "stmtPeriodEnd": "Fin de période",
+    "stmtGenerate": "Générer les lignes",
+    "stmtNoRecords": "Aucune vente pour ce client sur la période",
+    "stmtNeedInput": "Sélectionnez d'abord un client et une période",
+    "pdfPeriod": "Période"
   }
 }

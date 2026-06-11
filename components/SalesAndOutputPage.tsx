@@ -3,9 +3,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { analyzeInvoice } from '../services/ocrService';
-import { fetchSales, createSale, updateSale, deleteSale, fetchSettings, listProducts, type Product, SalesRecord } from '../services/api';
+import { fetchSales, createSale, updateSale, deleteSale, fetchSettings, listProducts, isDesktop, type Product, type BusinessDocument, SalesRecord } from '../services/api';
 import { formatMoney, getCurrencySymbol, formatQuantity, formatLegacyQuantity, getTaxLabel, getProductUnitLabel } from './accountingHelpers';
 import CsvImportModal from './CsvImportModal';
+import DocumentModal from './DocumentModal';
 
 interface Props {
   data: BusinessData;
@@ -46,6 +47,11 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
   const [isLoading, setIsLoading] = useState(true);
   const [showCsvImport, setShowCsvImport] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Phase C：从销售记录生成业务单据（仅桌面版；共享 DocumentModal 预填，
+  // 金额复制记录已存值、不重算——见 DocumentModal 的锁定行机制）
+  const docDesktop = isDesktop();
+  const [docPrefill, setDocPrefill] = useState<Partial<BusinessDocument> | null>(null);
+  const [docGenOk, setDocGenOk] = useState(false);
 
   // Load records from API on mount
   useEffect(() => {
@@ -102,6 +108,33 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
   }, [newSale.totalWithTax, newSale.quantity, newSale.taxRate]);
 
   const formatCurrency = (val: number) => fmtMoney(val);
+
+  // Phase C：销售记录 → 业务单据预填。金额三项（不含税/税额）走「锁定行」复制
+  // 已存值（pricePerTon 写库时已舍入，重算会差分）；一条记录 = 一行明细。
+  const buildDocPrefill = (row: SalesRecord): Partial<BusinessDocument> => {
+    const qtyMatch = (row.quantity || '').match(/[\d.]+/);
+    // 旧记录可能无商品快照：回退「日期 + 票据号」描述（与对账单行同款），保证非空可保存
+    const desc = row.productName
+      || products.find((p) => p.id === row.productId)?.name
+      || `${row.date} ${row.invoiceNo || ''}`.trim();
+    return {
+      customerName: row.customer,
+      sourceSalesId: row.id,
+      items: [{
+        productId: row.productId || null,
+        description: desc,
+        quantity: qtyMatch ? parseFloat(qtyMatch[0]) : null,
+        unit: row.unit || null,
+        unitPrice: row.unitPriceWithoutTax || row.pricePerTon || null,
+        taxRate: row.taxRate || null,
+        // 已存金额（与列表显示同款 || 回退）：DocumentModal 的 toRow 锁定显示、不重算
+        amount: row.amountWithoutTax || row.price,
+        taxAmount: row.taxAmount || 0,
+        refSalesId: row.id,
+        refDate: row.date,
+      }],
+    };
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -335,6 +368,13 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
         </p>
       </div>
 
+      {/* Phase C：业务单据生成成功提示 */}
+      {docGenOk && (
+        <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+          <i className="fas fa-check-circle mr-2"></i>{t('documents.generatedOk')}
+        </div>
+      )}
+
       {/* Data Table */}
       <div className="bg-white/80 border border-[#e0ddd5] rounded-xl overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
         <div className="overflow-x-auto">
@@ -399,6 +439,14 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                     >
                       {t('common2.delete')}
                     </button>
+                    {docDesktop && (
+                      <button
+                        onClick={() => { setDocGenOk(false); setDocPrefill(buildDocPrefill(row)); }}
+                        className="text-[#5c5c5a] hover:text-[#191918] transition-colors"
+                      >
+                        {t('documents.generateFromSale')}
+                      </button>
+                    )}
                   </td>
                 </tr>
                 );
@@ -465,6 +513,18 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
             setShowCsvImport(false);
             fetchSales().then(setRecords).catch(console.error);
           }}
+        />
+      )}
+
+      {/* Phase C：从销售记录生成业务单据（共享 DocumentModal，预填 + 锁定金额） */}
+      {docPrefill && (
+        <DocumentModal
+          editing={null}
+          initial={docPrefill}
+          accLocale={accLocale}
+          products={products}
+          onClose={() => setDocPrefill(null)}
+          onSaved={() => { setDocPrefill(null); setDocGenOk(true); }}
         />
       )}
 

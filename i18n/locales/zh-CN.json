@@ -1066,6 +1066,15 @@
     "pdfDesktopOnly": "仅桌面版支持 PDF 导出。",
     "pdfFailed": "PDF 导出失败，请重试。",
     "pdfGeneratedAt": "生成时间",
-    "pdfDisclaimer": "本单据为内部业务单据，并非正式税务发票。"
+    "pdfDisclaimer": "本单据为内部业务单据，并非正式税务发票。",
+    "generateFromSale": "生成单据",
+    "generatedOk": "已生成业务单据，可在「业务单据」页查看",
+    "stmtCustomer": "选择客户",
+    "stmtPeriodStart": "期间起始",
+    "stmtPeriodEnd": "期间截止",
+    "stmtGenerate": "生成对账明细",
+    "stmtNoRecords": "该期间内没有该客户的销售记录",
+    "stmtNeedInput": "请先选择客户和期间",
+    "pdfPeriod": "期间"
   }
 }

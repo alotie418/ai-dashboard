@@ -2345,6 +2345,9 @@ async function main() {
         'documents.removeItem', 'documents.subtotal', 'documents.saveButton',
         'documents.exportPdf', 'documents.pdfExported', 'documents.pdfDesktopOnly',
         'documents.pdfFailed', 'documents.pdfGeneratedAt', 'documents.pdfDisclaimer',
+        'documents.generateFromSale', 'documents.generatedOk', 'documents.stmtCustomer',
+        'documents.stmtPeriodStart', 'documents.stmtPeriodEnd', 'documents.stmtGenerate',
+        'documents.stmtNoRecords', 'documents.stmtNeedInput', 'documents.pdfPeriod',
       ];
       const TAX_WORDS = /增值税|增值稅|营业税|營業稅|消费税|消費稅|Sales Tax|进项|進項|销项|銷項|VAT|Schedule C|统一发票|統一發票|適格請求書|インボイス|数电票|數電票/;
       const TYPE_EN = {

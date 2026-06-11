@@ -390,10 +390,11 @@ test.describe('business documents page', () => {
 // frozen acc_locale and are covered by the matrix sweep), so one accountingLocale ×
 // 6 UI langs is the meaningful axis (purchase-picker precedent). The mock keeps a
 // stateful docs array so the happy-path create test can see its row after reload.
-async function injectDocsElectronAPI(page: import('@playwright/test').Page, acc: string = 'CN', seedDocs: any[] = []) {
-  await page.addInitScript(({ settings, dashboard, seed }) => {
+async function injectDocsElectronAPI(page: import('@playwright/test').Page, acc: string = 'CN', seedDocs: any[] = [], seedSales: any[] = []) {
+  await page.addInitScript(({ settings, dashboard, seed, sales }) => {
     const lists = /\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|reports\/types)/;
     const docs: any[] = Array.isArray(seed) ? [...seed] : [];
+    const salesRows: any[] = Array.isArray(sales) ? sales : [];
     (window as any).electronAPI = {
       isElectron: true,
       platform: 'darwin',
@@ -423,6 +424,9 @@ async function injectDocsElectronAPI(page: import('@playwright/test').Page, acc:
                 id: 'doc-e2e-1', doc_type: b.doc_type, doc_number: b.doc_number, status: 'draft',
                 doc_date: b.doc_date, customer_name: b.customer_name, acc_locale: b.acc_locale || 'CN',
                 subtotal, tax_amount: tax, total: subtotal + tax,
+                source_sales_id: b.source_sales_id || null,
+                period_start: b.period_start || null, period_end: b.period_end || null,
+                items: b.items || [],
               });
               return Promise.resolve({ success: true, id: 'doc-e2e-1' });
             }
@@ -434,6 +438,9 @@ async function injectDocsElectronAPI(page: import('@playwright/test').Page, acc:
             }
             return Promise.resolve(docs);
           }
+          // seeded sales rows (Phase C from-sales / statement tests) — must be
+          // matched BEFORE the generic lists regex (it also contains "sales")
+          if (p.startsWith('/api/sales') && method === 'GET') return Promise.resolve(salesRows);
           if (p.includes('/api/settings')) return Promise.resolve(settings);
           if (p.includes('/api/dashboard')) return Promise.resolve(dashboard);
           if (lists.test(p)) return Promise.resolve([]);
@@ -442,7 +449,7 @@ async function injectDocsElectronAPI(page: import('@playwright/test').Page, acc:
         return Promise.resolve({});
       },
     };
-  }, { settings: SETTINGS(acc), dashboard: DASHBOARD(acc), seed: seedDocs });
+  }, { settings: SETTINGS(acc), dashboard: DASHBOARD(acc), seed: seedDocs, sales: seedSales });
 }
 
 test.describe('business documents → create modal (desktop mock)', () => {
@@ -542,6 +549,119 @@ test.describe('business documents → create modal (desktop mock)', () => {
     expect(html).toContain('咨询服务');
     expect(html).toContain('¥113.00');
     expect(html).toContain(loc.documents.pdfDisclaimer);
+  });
+});
+
+// ── Phase C: 销售页 → 生成单据 (shared DocumentModal prefill) + 对账单生成器 ──
+// The seeded sales row deliberately has amountWithoutTax (884.96) ≠ tons×pricePerTon
+// (3×294.99=884.97): the modal must show the COPIED stored amount, proving the
+// locked-row no-recompute contract. Navigation: sidebar fa-file-export → sales page.
+const SALES_SEED = {
+  id: 'sale-c-1', date: '2026-06-03', customer: '单据测试客户', tons: 3, pricePerTon: 294.99,
+  totalAmount: 1000, amountWithoutTax: 884.96, taxAmount: 115.04, taxRate: 13, shippingCost: 0,
+  invoiceNumber: 'INV-001', invoiceStatus: '已开', product_id: 'p1', product_name_snapshot: '货物A', unit_snapshot: 'ton',
+};
+
+test.describe('business documents → generate from sales (Phase C)', () => {
+  for (const ui of UI_LANGUAGES) {
+    test(`from-sales modal ui=${ui}`, async ({ page }) => {
+      const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+      await injectDocsElectronAPI(page, 'CN', [], [SALES_SEED]);
+      await bootCombo(page, ui, 'CN');
+      await page.locator('nav i.fa-file-export').first().click();
+
+      // the seeded row renders, the per-row generate button opens the shared modal
+      await expect(page.getByText('单据测试客户').first()).toBeVisible({ timeout: 10_000 });
+      await page.getByRole('button', { name: loc.documents.generateFromSale }).click();
+
+      // create modal opens prefilled: customer name + suggested internal number
+      await expect(page.getByText(loc.documents.formTitle).first()).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator('input[name="customerName"]')).toHaveValue('单据测试客户');
+      await expect(page.locator('input[name="docNumber"]')).toHaveValue('QT-2026-0001', { timeout: 10_000 });
+
+      // switch to statement: the generator panel renders its localized labels
+      // (covers the stmt* keys in all 6 languages, not just the zh-CN flow test)
+      await page.locator('select[name="docType"]').selectOption('statement');
+      await expect(page.getByRole('button', { name: loc.documents.stmtGenerate })).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator('select[name="stmtCustomer"]')).toBeVisible();
+
+      const body = await page.locator('body').innerText();
+      expect(body, `[ui=${ui}] raw documents key leaked`).not.toMatch(/documents\.[a-zA-Z]/);
+    });
+  }
+
+  // Happy path incl. the copy-not-recompute lock: the line shows the stored
+  // ¥884.96 (recompute would give ¥884.97) → save → row appears on the documents page.
+  test('from-sales → mock electronAPI happy path (copied amounts)', async ({ page }) => {
+    const ui = 'zh-CN';
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await injectDocsElectronAPI(page, 'CN', [], [SALES_SEED]);
+    await bootCombo(page, ui, 'CN');
+    await page.locator('nav i.fa-file-export').first().click();
+    await expect(page.getByText('单据测试客户').first()).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: loc.documents.generateFromSale }).click();
+    await expect(page.locator('input[name="docNumber"]')).toHaveValue('QT-2026-0001', { timeout: 10_000 });
+
+    // locked amounts copied from the sales record — NOT recomputed from qty×price.
+    // Scope to the modal <form> (the sales table BEHIND the modal shows the same
+    // strings, which would make an unscoped assertion vacuous), and assert the
+    // recomputed value (3 × 294.99 = 884.97) appears nowhere.
+    const modalForm = page.locator('form');
+    await expect(modalForm.getByText('¥884.96').first()).toBeVisible();
+    await expect(modalForm.getByText('¥1,000.00').first()).toBeVisible();
+    await expect(page.getByText('¥884.97')).toHaveCount(0);
+
+    await page.getByRole('button', { name: loc.documents.saveButton }).click();
+    await expect(page.getByText(loc.documents.formTitle)).toHaveCount(0, { timeout: 10_000 });
+    await expect(page.getByText(loc.documents.generatedOk)).toBeVisible({ timeout: 10_000 });
+
+    // the created document is visible on the documents page with the copied total
+    await page.locator('nav i.fa-file-contract').first().click();
+    await expect(page.getByText('QT-2026-0001')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('¥1,000.00').first()).toBeVisible();
+  });
+
+  // Statement generator: trim-exact customer matching ('对账客户 ' with a trailing
+  // space and '对账客户' are the same customer) + period filter + summed locked totals.
+  test('statement generator → trim match + period + copied totals', async ({ page }) => {
+    const ui = 'zh-CN';
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    // sale-s-1 is deliberately recompute-sensitive: 3 × 33.33 = 99.99 ≠ stored 100.00,
+    // so a locked-row regression shifts the totals to ¥338.99 and fails the ¥339.00 asserts
+    await injectDocsElectronAPI(page, 'CN', [], [
+      { id: 'sale-s-1', date: '2026-06-01', customer: '对账客户', tons: 3, pricePerTon: 33.33, totalAmount: 113, amountWithoutTax: 100, taxAmount: 13, taxRate: 13, shippingCost: 0, invoiceNumber: '', invoiceStatus: '已开', product_id: 'p1', product_name_snapshot: '货物A', unit_snapshot: 'ton' },
+      { id: 'sale-s-2', date: '2026-06-05', customer: '对账客户 ', tons: 2, pricePerTon: 100, totalAmount: 226, amountWithoutTax: 200, taxAmount: 26, taxRate: 13, shippingCost: 0, invoiceNumber: 'INV-9', invoiceStatus: '已开', product_id: null, product_name_snapshot: null, unit_snapshot: null },
+      { id: 'sale-s-3', date: '2026-07-01', customer: '对账客户', tons: 1, pricePerTon: 100, totalAmount: 113, amountWithoutTax: 100, taxAmount: 13, taxRate: 13, shippingCost: 0, invoiceNumber: '', invoiceStatus: '已开', product_id: 'p1', product_name_snapshot: '货物A', unit_snapshot: 'ton' },
+    ]);
+    await bootCombo(page, ui, 'CN');
+    await page.locator('nav i.fa-file-contract').first().click();
+    await page.locator('button:has(i.fa-plus)').first().click();
+    await expect(page.locator('input[name="docNumber"]')).toHaveValue('QT-2026-0001', { timeout: 10_000 });
+
+    // switch to statement → generator appears; the two trim-variants collapse to ONE option
+    await page.locator('select[name="docType"]').selectOption('statement');
+    await expect(page.locator('select[name="stmtCustomer"]')).toBeVisible({ timeout: 10_000 });
+    expect(await page.locator('select[name="stmtCustomer"] option').filter({ hasText: '对账客户' }).count()).toBe(1);
+
+    await page.locator('select[name="stmtCustomer"]').selectOption('对账客户');
+    await page.locator('input[name="stmtStart"]').fill('2026-06-01');
+    await page.locator('input[name="stmtEnd"]').fill('2026-06-30');
+    await page.getByRole('button', { name: loc.documents.stmtGenerate }).click();
+
+    // both June rows (trim-matched) are generated; the July row is excluded
+    await expect(page.locator('input[name="itemDescription-0"]')).toHaveValue('2026-06-01 货物A');
+    await expect(page.locator('input[name="itemDescription-1"]')).toHaveValue('2026-06-05 INV-9');
+    await expect(page.locator('input[name="customerName"]')).toHaveValue('对账客户');
+    // totals = COPIED sums: 300 subtotal + 39 tax = 339 (a recompute would show ¥338.99)
+    await expect(page.locator('form').getByText('¥339.00').first()).toBeVisible();
+    await expect(page.getByText('¥338.99')).toHaveCount(0);
+
+    await page.getByRole('button', { name: loc.documents.saveButton }).click();
+    await expect(page.getByText(loc.documents.formTitle)).toHaveCount(0, { timeout: 10_000 });
+    await expect(page.getByText('对账客户').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('¥339.00').first()).toBeVisible();
+    // the statement's defining attribute — its period — is surfaced in the list
+    await expect(page.getByText('2026-06-01 ~ 2026-06-30')).toBeVisible();
   });
 });
 

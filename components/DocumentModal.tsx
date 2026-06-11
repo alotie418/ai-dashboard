@@ -1,15 +1,18 @@
-// 业务单据 新建/编辑 弹窗（Phase A）
+// 业务单据 新建/编辑 弹窗（Phase A CRUD + Phase C 预填/对账单）
 // 内部业务单据：非税务发票开具；单据编号为内部编号（自动建议、可编辑），
-// 永不自动生成正式发票号码。明细行手动录入，行金额 = 数量 × 单价 自动计算，
+// 永不自动生成正式发票号码。明细行手动录入时 行金额 = 数量 × 单价 自动计算；
+// 由销售记录预填/对账单生成的行带「锁定金额」（复制销售记录已存金额、不重算，
+// 避免单价写库时舍入造成的分差），用户改动数量/单价/税率才解锁转为重算。
 // 表头合计 = 明细求和。税种标签（税率/税额/价税合计）按单据「冻结的会计制度」
 // docLocale 经 getTaxLabel/CN-gate 渲染——不随设置里的制度切换漂移；
-// 计算只有乘加求和，零税务口径逻辑。
+// 计算只有乘加求和，零税务口径逻辑。对账单生成器：客户名 trim 后精确匹配 +
+// 期间 [起, 止] 闭区间过滤销售记录，纯读取、不改任何销售数据。
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  createDocument, updateDocument, fetchNextDocNumber, isDesktop,
-  type BusinessDocument, type BusinessDocType, type Product,
+  createDocument, updateDocument, fetchNextDocNumber, fetchSales, isDesktop,
+  type BusinessDocument, type BusinessDocType, type Product, type SalesRecord,
 } from '../services/api';
 import { formatMoney, getTaxLabel, getProductUnitLabel, PRODUCT_UNIT_KEYS } from './accountingHelpers';
 
@@ -20,11 +23,16 @@ interface ItemRow {
   unit: string;
   unitPrice: string;
   taxRatePct: string;
+  // 锁定金额（来自销售记录的已存值）；用户改 数量/单价/税率 即清空转为重算
+  locked: { amount: number; tax: number } | null;
+  refSalesId: string | null;
+  refDate: string | null;
 }
 
 interface Props {
-  editing: BusinessDocument | null; // null = 新建
-  accLocale: string;                // 当前会计制度（新建时冻结进单据）
+  editing: BusinessDocument | null;        // null = 新建
+  initial?: Partial<BusinessDocument> | null; // Phase C：新建时的预填（由销售记录生成）
+  accLocale: string;                       // 当前会计制度（新建时冻结进单据）
   products: Product[];
   onClose: () => void;
   onSaved: () => void;
@@ -42,8 +50,10 @@ const TYPE_LABEL_KEYS: Record<BusinessDocType, string> = {
 
 const round2 = (v: number) => Math.round((v || 0) * 100) / 100;
 
-const emptyRow = (): ItemRow => ({ productId: '', description: '', quantity: '', unit: '', unitPrice: '', taxRatePct: '' });
+const emptyRow = (): ItemRow => ({ productId: '', description: '', quantity: '', unit: '', unitPrice: '', taxRatePct: '', locked: null, refSalesId: null, refDate: null });
 
+// 已存明细 → 编辑行：金额默认「锁定」为已存值（不因重算产生分差），
+// 用户改动 数量/单价/税率 时解锁（setRow 统一清 locked）。
 const toRow = (it: NonNullable<BusinessDocument['items']>[number]): ItemRow => ({
   productId: it.productId || '',
   description: it.description || '',
@@ -56,9 +66,12 @@ const toRow = (it: NonNullable<BusinessDocument['items']>[number]): ItemRow => (
     const n = parseFloat(it.taxRate.replace('%', ''));
     return Number.isFinite(n) ? String(n) : '';
   })(),
+  locked: { amount: it.amount || 0, tax: it.taxAmount || 0 },
+  refSalesId: it.refSalesId ?? null,
+  refDate: it.refDate ?? null,
 });
 
-const DocumentModal: React.FC<Props> = ({ editing, accLocale, products, onClose, onSaved }) => {
+const DocumentModal: React.FC<Props> = ({ editing, initial, accLocale, products, onClose, onSaved }) => {
   const { t, i18n } = useTranslation();
   const uiLang = i18n.language;
   // 编辑时用单据创建时冻结的制度，新建时冻结当前制度
@@ -68,23 +81,34 @@ const DocumentModal: React.FC<Props> = ({ editing, accLocale, products, onClose,
   const taxAmountLabel = docLocale !== 'CN' ? taxLabel('headerTaxAmount') : t('tableHeaders.taxAmount');
   const totalLabel = docLocale !== 'CN' ? taxLabel('headerTotalWithTax') : t('tableHeaders.totalWithTax');
 
-  const [docType, setDocType] = useState<BusinessDocType>(editing ? editing.docType : 'quotation');
+  // 新建预填（Phase C：由销售记录生成）只在 create 模式生效
+  const seed = !editing ? initial || null : null;
+  const seedItems = (editing?.items && editing.items.length > 0 ? editing.items : null)
+    || (seed?.items && seed.items.length > 0 ? seed.items : null);
+
+  const [docType, setDocType] = useState<BusinessDocType>(editing?.docType || seed?.docType || 'quotation');
   const [docNumber, setDocNumber] = useState(editing ? editing.docNumber : '');
   const [numberEdited, setNumberEdited] = useState(!!editing);
   // ref 守卫：用户敲第一个字符到 effect cleanup 之间，在途的建议请求不得覆盖手输值
   const numberEditedRef = useRef(!!editing);
   const [docDate, setDocDate] = useState(editing ? editing.docDate : new Date().toISOString().split('T')[0]);
   const [validUntil, setValidUntil] = useState(editing?.validUntil || '');
-  const [customerName, setCustomerName] = useState(editing?.customerName || '');
+  const [customerName, setCustomerName] = useState(editing?.customerName || seed?.customerName || '');
   const [customerTaxId, setCustomerTaxId] = useState(editing?.customerTaxId || '');
   const [customerAddress, setCustomerAddress] = useState(editing?.customerAddress || '');
   const [customerContact, setCustomerContact] = useState(editing?.customerContact || '');
   const [notes, setNotes] = useState(editing?.notes || '');
-  const [rows, setRows] = useState<ItemRow[]>(
-    editing?.items && editing.items.length > 0 ? editing.items.map(toRow) : [emptyRow()],
-  );
+  const [rows, setRows] = useState<ItemRow[]>(seedItems ? seedItems.map(toRow) : [emptyRow()]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Phase C：对账单期间 + 来源销售记录回链（信息性）
+  const [periodStart, setPeriodStart] = useState(editing?.periodStart || '');
+  const [periodEnd, setPeriodEnd] = useState(editing?.periodEnd || '');
+  const sourceSalesId = seed?.sourceSalesId ?? editing?.sourceSalesId ?? null;
+  // Phase C：对账单生成器（仅新建 + statement 类型；纯读取销售记录）
+  const [salesRecs, setSalesRecs] = useState<SalesRecord[] | null>(null);
+  const [stmtCustomer, setStmtCustomer] = useState('');
+  const [stmtMsg, setStmtMsg] = useState<string | null>(null);
 
   // 新建时按类型建议内部编号；用户手动改过就不再覆盖
   useEffect(() => {
@@ -98,6 +122,8 @@ const DocumentModal: React.FC<Props> = ({ editing, accLocale, products, onClose,
 
   const computed = useMemo(() => {
     const lines = rows.map((r) => {
+      // 锁定行（销售记录已存金额）原样求和；解锁后按 数量×单价 重算
+      if (r.locked) return { amount: round2(r.locked.amount), tax: round2(r.locked.tax) };
       const qty = parseFloat(r.quantity) || 0;
       const price = parseFloat(r.unitPrice) || 0;
       const amount = round2(qty * price);
@@ -111,7 +137,50 @@ const DocumentModal: React.FC<Props> = ({ editing, accLocale, products, onClose,
   }, [rows]);
 
   const setRow = (i: number, patch: Partial<ItemRow>) => {
-    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+    // 改动 数量/单价/税率 任意一项即解锁该行（转为重算）；其余字段不动锁
+    const unlocks = patch.quantity !== undefined || patch.unitPrice !== undefined || patch.taxRatePct !== undefined;
+    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch, ...(unlocks ? { locked: null } : {}) } : r)));
+  };
+
+  // ─── Phase C：对账单生成器 ───
+  // 客户清单来自销售记录的 distinct(trim(customer))；生成时 trim 后精确匹配 +
+  // 期间闭区间过滤（ISO 日期字符串可直接比较），明细金额复制已存值（锁定行）。
+  useEffect(() => {
+    if (editing || docType !== 'statement' || salesRecs !== null || !isDesktop()) return;
+    fetchSales().then(setSalesRecs).catch(() => setSalesRecs([]));
+  }, [docType, editing, salesRecs]);
+
+  const stmtCustomers = useMemo(() => {
+    if (!salesRecs) return [];
+    return Array.from(new Set(salesRecs.map((r) => r.customer.trim()).filter(Boolean))).sort();
+  }, [salesRecs]);
+
+  const salesToRow = (r: SalesRecord): ItemRow => {
+    const qtyMatch = (r.quantity || '').match(/[\d.]+/);
+    const pct = parseFloat((r.taxRate || '').replace('%', ''));
+    return {
+      productId: r.productId || '',
+      description: `${r.date} ${r.productName || r.invoiceNo || ''}`.trim(),
+      quantity: qtyMatch ? qtyMatch[0] : '',
+      unit: r.unit || '',
+      unitPrice: r.unitPriceWithoutTax || r.pricePerTon ? String(r.unitPriceWithoutTax || r.pricePerTon) : '',
+      taxRatePct: Number.isFinite(pct) ? String(pct) : '',
+      // 复制销售记录已存金额（与销售页列表显示同款 || 回退），不重算
+      locked: { amount: round2(r.amountWithoutTax || r.price), tax: round2(r.taxAmount || 0) },
+      refSalesId: r.id,
+      refDate: r.date,
+    };
+  };
+
+  const generateStatement = () => {
+    setStmtMsg(null);
+    if (!stmtCustomer || !periodStart || !periodEnd) { setStmtMsg(t('documents.stmtNeedInput')); return; }
+    const matches = (salesRecs || [])
+      .filter((r) => r.customer.trim() === stmtCustomer && r.date >= periodStart && r.date <= periodEnd)
+      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    if (matches.length === 0) { setStmtMsg(t('documents.stmtNoRecords')); return; }
+    setCustomerName(stmtCustomer);
+    setRows(matches.map(salesToRow));
   };
 
   const onPickProduct = (i: number, productId: string) => {
@@ -145,6 +214,14 @@ const DocumentModal: React.FC<Props> = ({ editing, accLocale, products, onClose,
         customerAddress: customerAddress.trim() || null,
         customerContact: customerContact.trim() || null,
         notes: notes.trim() || null,
+        // 来源回链/期间仅在新建时发送（update handler 的 EDITABLE 白名单不含它们，
+        // 编辑时发送会被静默忽略——干脆不发，避免无声的契约错位）；
+        // 切到对账单类型后来源回链不再成立，置空。
+        ...(editing ? {} : {
+          sourceSalesId: docType === 'statement' ? null : sourceSalesId,
+          periodStart: docType === 'statement' && periodStart ? periodStart : null,
+          periodEnd: docType === 'statement' && periodEnd ? periodEnd : null,
+        }),
         // accLocale 不随 payload 发送：创建时由 handler 同步读取 settings 真值冻结
         // （前端的 accLocale prop 是异步加载的，竞态下可能还是默认 'CN'）；
         // 编辑时 handler 本就忽略 acc_locale，冻结值不可变。
@@ -158,6 +235,8 @@ const DocumentModal: React.FC<Props> = ({ editing, accLocale, products, onClose,
           taxAmount: line.tax,
           amount: line.amount,
           lineNo: idx,
+          refSalesId: r.refSalesId,
+          refDate: r.refDate,
         })),
       };
       if (editing) await updateDocument(editing.id, payload);
@@ -195,7 +274,7 @@ const DocumentModal: React.FC<Props> = ({ editing, accLocale, products, onClose,
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className={labelCls}>{t('documents.formType')}</label>
-              <select value={docType} onChange={(e) => setDocType(e.target.value as BusinessDocType)} className={inputCls} disabled={!!editing}>
+              <select name="docType" value={docType} onChange={(e) => setDocType(e.target.value as BusinessDocType)} className={inputCls} disabled={!!editing}>
                 {DOC_TYPES.map((ty) => (
                   <option key={ty} value={ty}>{t(TYPE_LABEL_KEYS[ty])}</option>
                 ))}
@@ -225,6 +304,51 @@ const DocumentModal: React.FC<Props> = ({ editing, accLocale, products, onClose,
               <input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={inputCls} />
             </div>
           </div>
+
+          {/* 编辑对账单：期间只读显示（创建后期间冻结，与生成的明细行保持一致） */}
+          {editing && docType === 'statement' && (editing.periodStart || editing.periodEnd) && (
+            <div className="text-xs text-[#5c5c5a] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg px-3 py-2">
+              <i className="fas fa-calendar-days mr-2"></i>
+              {t('documents.pdfPeriod')}: {editing.periodStart || '—'} ~ {editing.periodEnd || '—'}
+            </div>
+          )}
+
+          {/* Phase C：对账单生成器（仅新建 + statement；客户 trim 精确匹配 + 期间闭区间） */}
+          {!editing && docType === 'statement' && (
+            <div className="border border-[#e0ddd5] rounded-xl p-4 space-y-3 bg-[#f9f9f8]/50">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <label className={labelCls}>{t('documents.stmtCustomer')}</label>
+                  <select name="stmtCustomer" value={stmtCustomer} onChange={(e) => setStmtCustomer(e.target.value)} className={inputCls}>
+                    <option value=""></option>
+                    {stmtCustomers.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className={labelCls}>{t('documents.stmtPeriodStart')}</label>
+                  <input type="date" name="stmtStart" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className={inputCls} />
+                </div>
+                <div className="space-y-2">
+                  <label className={labelCls}>{t('documents.stmtPeriodEnd')}</label>
+                  <input type="date" name="stmtEnd" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className={inputCls} />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={generateStatement}
+                className="bg-[#191918] text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-black"
+              >
+                <i className="fas fa-list-check mr-2"></i>{t('documents.stmtGenerate')}
+              </button>
+              {stmtMsg && (
+                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <i className="fas fa-circle-info mr-2"></i>{stmtMsg}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             <label className={labelCls}>{t('documents.formCustomer')}</label>
