@@ -6,6 +6,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SoloLedger 独账 — 一人公司的智能账本</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // PR-C theme tokens — deep tech blue + gold accent, sampled from the app icon.
+    // Tailwind runs via CDN at runtime; keep these in sync with components/theme.ts.
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { DEFAULT: '#274C92', hover: '#1E3A6E', deep: '#16264D', light: '#5B7FC4' },
+            accent: { DEFAULT: '#DDA82E' },
+          },
+        },
+      },
+    };
+  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.0/github-markdown-light.min.css">
@@ -16,7 +30,12 @@
 
     body {
       font-family: 'Inter', "Microsoft YaHei", "PingFang SC", sans-serif;
-      background-color: #ffffff;
+      /* Faint deep-blue gradient so Liquid Glass panels have depth to blur over (icon "微渐变") */
+      background-color: #f6f8fd;
+      background-image:
+        radial-gradient(1200px 600px at 72% -12%, rgba(39, 76, 146, 0.07), transparent 60%),
+        radial-gradient(900px 520px at -12% 112%, rgba(39, 76, 146, 0.05), transparent 55%);
+      background-attachment: fixed;
       color: #1a1a19;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
@@ -40,30 +59,6 @@
       background: rgba(0, 0, 0, 0.18);
     }
 
-    /* Anthropic accent utilities */
-    .text-accent {
-      color: #d97757;
-    }
-
-    .bg-accent {
-      background-color: #d97757;
-    }
-
-    .bg-accent-hover:hover {
-      background-color: #c4694d;
-    }
-
-    .border-accent {
-      border-color: #d97757;
-    }
-
-    .shadow-accent {
-      box-shadow: 0 4px 24px rgba(217, 119, 87, 0.15);
-    }
-
-    .ring-accent {
-      --tw-ring-color: rgba(217, 119, 87, 0.3);
-    }
   </style>
   <script type="importmap">
 {

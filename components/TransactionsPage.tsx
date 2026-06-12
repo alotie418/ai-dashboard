@@ -152,7 +152,7 @@ const TransactionsPage: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-[#191918]">{t('transactions.title', 'Transactions')}</h2>
-        <button onClick={openNew} className="flex items-center px-5 py-2.5 bg-[#d97757] hover:bg-[#c56a4a] text-white rounded-xl text-sm font-medium transition-all" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}>
+        <button onClick={openNew} className="flex items-center px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-sm font-medium transition-all" style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}>
           <i className="fas fa-plus mr-2"></i> {t('transactions.add', 'New Transaction')}
         </button>
       </div>
@@ -183,7 +183,7 @@ const TransactionsPage: React.FC = () => {
       <div className="flex border-b border-[#e0ddd5]">
         {(['expense', 'income'] as TransactionType[]).map(tp => (
           <button key={tp} onClick={() => setActiveType(tp)}
-            className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeType === tp ? 'border-[#d97757] text-[#d97757]' : 'border-transparent text-[#7a7a78] hover:text-[#4a4a48]'}`}>
+            className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeType === tp ? 'border-primary text-primary' : 'border-transparent text-[#7a7a78] hover:text-[#4a4a48]'}`}>
             {tp === 'expense' ? t('transactions.expense', 'Expenses') : t('transactions.income', 'Income')}
           </button>
         ))}
@@ -197,7 +197,7 @@ const TransactionsPage: React.FC = () => {
 
       {/* Table */}
       {loading ? (
-        <div className="text-center py-10 text-sm text-[#7a7a78]"><i className="fas fa-spinner fa-spin mr-2 text-[#d97757]"></i>{t('common.loading')}</div>
+        <div className="text-center py-10 text-sm text-[#7a7a78]"><i className="fas fa-spinner fa-spin mr-2 text-primary"></i>{t('common.loading')}</div>
       ) : (
         <div className="border border-[#e0ddd5] rounded-xl overflow-hidden bg-white/80">
           {/* overflow-x-auto: small screens scroll horizontally instead of squeezing columns */}
@@ -247,7 +247,7 @@ const TransactionsPage: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-right space-x-2 whitespace-nowrap">
-                    <button onClick={() => openEdit(txn)} className="text-xs text-[#d97757] hover:text-[#c56a4a]">{t('common2.edit')}</button>
+                    <button onClick={() => openEdit(txn)} className="text-xs text-primary hover:text-primary-hover">{t('common2.edit')}</button>
                     {confirmDelete === txn.id ? (
                       <span className="inline-flex space-x-1">
                         <button onClick={() => handleDelete(txn.id)} className="text-[10px] px-2 py-0.5 bg-rose-600 text-white rounded">{t('common.confirm')}</button>
@@ -337,7 +337,7 @@ const TransactionsPage: React.FC = () => {
               <button onClick={() => setShowForm(false)} className="px-5 py-2 border border-[#e0ddd5] text-[#4a4a48] rounded-lg text-sm font-medium hover:bg-[#f0eeeb]">
                 {t('common.cancel')}
               </button>
-              <button onClick={handleSave} disabled={saving} className="px-5 py-2 bg-[#d97757] text-white rounded-lg text-sm font-medium hover:bg-[#c56a4a] disabled:opacity-50">
+              <button onClick={handleSave} disabled={saving} className="px-5 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-hover disabled:opacity-50">
                 {saving ? <><i className="fas fa-spinner fa-spin mr-2"></i>{t('common.saving')}</> : t('common.save')}
               </button>
             </div>

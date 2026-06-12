@@ -417,30 +417,30 @@ ${t('analysis.forecastPromptRequirements')}`;
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
       {/* AI Header Banner */}
       <div className="bg-gradient-to-br from-white via-white to-[#f9f9f8] border border-[#e0ddd5] rounded-xl p-10 relative overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
-        <div className="absolute top-0 right-0 w-1/3 h-full bg-[#d97757]/5 blur-[120px] pointer-events-none"></div>
+        <div className="absolute top-0 right-0 w-1/3 h-full bg-primary/5 blur-[120px] pointer-events-none"></div>
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-10">
           <div className="flex-1">
             <div className="flex items-center space-x-3 mb-6">
               <div className="flex space-x-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#d97757]"></span>
-                <span className="h-1.5 w-1.5 rounded-full bg-[#d97757]/60"></span>
-                <span className="h-1.5 w-1.5 rounded-full bg-[#d97757]/30"></span>
+                <span className="h-1.5 w-1.5 rounded-full bg-primary"></span>
+                <span className="h-1.5 w-1.5 rounded-full bg-primary/60"></span>
+                <span className="h-1.5 w-1.5 rounded-full bg-primary/30"></span>
               </div>
-              <h3 className="text-[#d97757] text-xs font-bold uppercase">{t('analysis.aiDashboard')}</h3>
+              <h3 className="text-primary text-xs font-bold uppercase">{t('analysis.aiDashboard')}</h3>
             </div>
             {isAnalysing ? (
               <div className="space-y-6">
                 <div className="flex items-center space-x-6">
-                  <div className="w-14 h-14 bg-[#d97757]/10 rounded-xl flex items-center justify-center border border-[#d97757]/20 shadow-inner">
+                  <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 shadow-inner">
                     <span className="text-3xl animate-bounce">🧠</span>
                   </div>
                   <div>
                     <p className="text-[#191918] font-bold text-xl">{loadingMessage}</p>
-                    <p className="text-[#d97757]/60 text-[10px] font-mono mt-1">{t('analysis.realtimeProcessing')} | {t('analysis.progress')}: {Math.floor(loadingProgress)}%</p>
+                    <p className="text-primary/60 text-[10px] font-mono mt-1">{t('analysis.realtimeProcessing')} | {t('analysis.progress')}: {Math.floor(loadingProgress)}%</p>
                   </div>
                 </div>
                 <div className="w-full bg-[#f9f9f8] h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-gradient-to-r from-[#d97757] to-[#e8956e] h-full transition-all duration-300 ease-out" style={{ width: `${loadingProgress}%`, boxShadow: '0 0 15px rgba(217,119,87,0.5)' }}></div>
+                  <div className="bg-gradient-to-r from-primary to-primary-light h-full transition-all duration-300 ease-out" style={{ width: `${loadingProgress}%`, boxShadow: '0 0 15px rgba(39,76,146,0.5)' }}></div>
                 </div>
               </div>
             ) : (
@@ -449,7 +449,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                   {salesForecast || t('analysis.forecastIdle')}
                 </p>
                 <div className="mt-8 flex items-center space-x-6">
-                  <button onClick={runAnalysis} className="px-6 py-2.5 bg-[#d97757]/10 hover:bg-[#d97757]/20 border border-[#d97757]/30 rounded-full text-[10px] text-[#d97757] font-bold uppercase tracking-widest flex items-center transition-all active:scale-95">
+                  <button onClick={runAnalysis} className="px-6 py-2.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-full text-[10px] text-primary font-bold uppercase tracking-widest flex items-center transition-all active:scale-95">
                     <i className="fas fa-sync-alt mr-2"></i> {salesForecast ? t('analysis.rerun') : t('analysis.runForecast')}
                   </button>
                 </div>
@@ -494,15 +494,15 @@ ${t('analysis.forecastPromptRequirements')}`;
               <AreaChart data={data.monthlyPerformance}>
                 <defs>
                   <linearGradient id="p_rev" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#d97757" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#d97757" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#274C92" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#274C92" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0ddd5" vertical={false} />
                 <XAxis dataKey="name" hide />
                 <YAxis hide domain={['auto', 'auto']} />
                 <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} />
-                <Area type="monotone" dataKey="revenue" stroke="#d97757" fill="url(#p_rev)" strokeWidth={2} />
+                <Area type="monotone" dataKey="revenue" stroke="#274C92" fill="url(#p_rev)" strokeWidth={2} />
                 <Area type="monotone" dataKey="cost" stroke="#ef4444" fill="transparent" strokeWidth={1} strokeDasharray="3 3" />
               </AreaChart>
             </ResponsiveContainer>
@@ -516,7 +516,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                   <XAxis dataKey="name" hide />
                   <YAxis hide />
                   <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} />
-                  <Bar dataKey="mom" name={t('analysis.chartMom')} fill="#d97757" radius={[4, 4, 0, 0]} barSize={8} />
+                  <Bar dataKey="mom" name={t('analysis.chartMom')} fill="#274C92" radius={[4, 4, 0, 0]} barSize={8} />
                   <Line type="monotone" dataKey="yoy" name={t('analysis.chartYoy')} stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} connectNulls={false} />
                 </ComposedChart>
               </ResponsiveContainer>
@@ -535,7 +535,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                 <XAxis dataKey="name" hide />
                 <YAxis hide />
                 <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} />
-                <Bar dataKey="purchaseTons" name={t('analysis.chartPurchase')} fill="#e8956e" opacity={0.6} radius={[2, 2, 0, 0]} />
+                <Bar dataKey="purchaseTons" name={t('analysis.chartPurchase')} fill="#5B7FC4" opacity={0.6} radius={[2, 2, 0, 0]} />
                 <Bar dataKey="salesTons" name={t('analysis.chartSales')} fill="#10b981" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -549,9 +549,9 @@ ${t('analysis.forecastPromptRequirements')}`;
                 <YAxis type="number" dataKey="profit" name={t('analysis.chartProfit')} hide />
                 <ZAxis type="number" dataKey="deflator" range={[50, 400]} name={t('analysis.deflator')} />
                 <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} />
-                <Scatter name={t('analysis.chartMonthlyData')} data={data.monthlyPerformance.filter(p => p.deflator != null)} fill="#d97757">
+                <Scatter name={t('analysis.chartMonthlyData')} data={data.monthlyPerformance.filter(p => p.deflator != null)} fill="#274C92">
                   {data.monthlyPerformance.filter(p => p.deflator != null).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.profit > stats.avgProfit ? '#10b981' : '#d97757'} />
+                    <Cell key={`cell-${index}`} fill={entry.profit > stats.avgProfit ? '#10b981' : '#274C92'} />
                   ))}
                 </Scatter>
               </ScatterChart>
@@ -560,7 +560,7 @@ ${t('analysis.forecastPromptRequirements')}`;
 
           {/* Large Row: Comprehensive Summary Table Overlay or Chart */}
           <div className="lg:col-span-4 bg-white/80 border border-[#e0ddd5] rounded-xl p-10 overflow-hidden relative" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
-            <div className="absolute -top-24 -right-24 w-64 h-64 bg-[#d97757]/5 blur-[80px] rounded-full pointer-events-none"></div>
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/5 blur-[80px] rounded-full pointer-events-none"></div>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
               <div>
                 <h4 className="text-xl font-bold text-[#191918] tracking-tight">{t('analysis.matrixTitle')}</h4>
@@ -568,14 +568,14 @@ ${t('analysis.forecastPromptRequirements')}`;
               </div>
               <div className="flex space-x-2">
                 <span className="px-3 py-1 bg-emerald-500/10 text-emerald-600 text-[10px] font-bold rounded-full border border-emerald-500/20">{t('analysis.matrixBadgeSteady')}</span>
-                <span className="px-3 py-1 bg-[#d97757]/10 text-[#d97757] text-[10px] font-bold rounded-full border border-[#d97757]/20">{t('analysis.matrixBadgeBalance')}</span>
+                <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full border border-primary/20">{t('analysis.matrixBadgeBalance')}</span>
               </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
               {data.monthlyPerformance.map((item, idx) => (
-                <div key={idx} className="bg-[#f9f9f8]/60 border border-[#e0ddd5]/70 p-4 rounded-xl hover:border-[#d97757]/40 transition-all hover:bg-[#f9f9f8]/80 group">
-                  <p className="text-[#5c5c5a] text-[11px] font-bold uppercase mb-2 whitespace-nowrap group-hover:text-[#d97757] transition-colors">{item.name}</p>
+                <div key={idx} className="bg-[#f9f9f8]/60 border border-[#e0ddd5]/70 p-4 rounded-xl hover:border-primary/40 transition-all hover:bg-[#f9f9f8]/80 group">
+                  <p className="text-[#5c5c5a] text-[11px] font-bold uppercase mb-2 whitespace-nowrap group-hover:text-primary transition-colors">{item.name}</p>
                   <p className="text-[#191918] text-lg font-bold">{formatMoney(item.revenue, accLocale, uiLang)}</p>
                   <div className="mt-3 space-y-1">
                     <div className="flex justify-between items-center gap-2 text-[11px] whitespace-nowrap">
@@ -590,7 +590,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                   </div>
                 </div>
               ))}
-              <div className="bg-[#d97757] border border-[#d97757] p-4 rounded-xl flex flex-col justify-center items-center cursor-pointer hover:scale-105 transition-transform" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}>
+              <div className="bg-primary border border-primary p-4 rounded-xl flex flex-col justify-center items-center cursor-pointer hover:scale-105 transition-transform" style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}>
                 <p className="text-white/80 text-[10px] font-bold uppercase mb-1">{t('analysis.chartAvgRevenue')}</p>
                 <p className="text-white text-xl font-bold">{formatMoney(stats.avgRevenue, accLocale, uiLang)}</p>
               </div>
@@ -620,25 +620,25 @@ ${t('analysis.forecastPromptRequirements')}`;
                   <YAxis yAxisId="left" stroke="#6b6b69" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => dimension === 'volume' ? `${v} ${unitLabel}` : formatCurrency(v)} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}
-                    cursor={{ stroke: '#d97757', strokeWidth: 1 }}
+                    cursor={{ stroke: '#274C92', strokeWidth: 1 }}
                   />
                   <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: '30px' }} />
                   {dimension === 'financial' && (
                     <>
-                      <Area yAxisId="left" type="monotone" dataKey="revenue" name={t('analysis.chartRevenueLabel')} stroke="#d97757" fill="url(#colorRev)" strokeWidth={3} />
+                      <Area yAxisId="left" type="monotone" dataKey="revenue" name={t('analysis.chartRevenueLabel')} stroke="#274C92" fill="url(#colorRev)" strokeWidth={3} />
                       <Line yAxisId="left" type="monotone" dataKey="profit" name={t('analysis.chartProfitLabel')} stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} />
                       <defs>
                         <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#d97757" stopOpacity={0.2} />
-                          <stop offset="95%" stopColor="#d97757" stopOpacity={0} />
+                          <stop offset="5%" stopColor="#274C92" stopOpacity={0.2} />
+                          <stop offset="95%" stopColor="#274C92" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                     </>
                   )}
                   {dimension === 'volume' && (
                     <>
-                      <Bar yAxisId="left" dataKey="purchaseTons" name={t('analysis.chartPurchaseTons')} fill="#e8956e" radius={[6, 6, 0, 0]} barSize={20} />
-                      <Bar yAxisId="left" dataKey="salesTons" name={t('analysis.chartSalesTons')} fill="#d97757" radius={[6, 6, 0, 0]} barSize={20} />
+                      <Bar yAxisId="left" dataKey="purchaseTons" name={t('analysis.chartPurchaseTons')} fill="#5B7FC4" radius={[6, 6, 0, 0]} barSize={20} />
+                      <Bar yAxisId="left" dataKey="salesTons" name={t('analysis.chartSalesTons')} fill="#274C92" radius={[6, 6, 0, 0]} barSize={20} />
                     </>
                   )}
                   {dimension === 'efficiency' && (
@@ -655,7 +655,7 @@ ${t('analysis.forecastPromptRequirements')}`;
 
           <div className="space-y-6">
             <SummaryMiniCard title={t('analysis.peakMonth')} value={data.monthlyPerformance.length > 0 ? [...data.monthlyPerformance].sort((a, b) => b.revenue - a.revenue)[0].name : '—'} sub={t('analysis.peakMonthSub')} icon="fa-crown" color="text-amber-600" />
-            <SummaryMiniCard title={t('analysis.fastest')} value={data.monthlyPerformance.some(p => p.mom != null) ? [...data.monthlyPerformance].sort((a, b) => (b.mom ?? -Infinity) - (a.mom ?? -Infinity))[0].name : '—'} sub={t('analysis.fastestSub')} icon="fa-bolt" color="text-[#d97757]" />
+            <SummaryMiniCard title={t('analysis.fastest')} value={data.monthlyPerformance.some(p => p.mom != null) ? [...data.monthlyPerformance].sort((a, b) => (b.mom ?? -Infinity) - (a.mom ?? -Infinity))[0].name : '—'} sub={t('analysis.fastestSub')} icon="fa-bolt" color="text-primary" />
             <div className="bg-white/80 border border-[#e0ddd5] rounded-xl p-8" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
               <h4 className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-[0.2em] mb-6">{t('analysis.anomalyTitle')}</h4>
               <div className="space-y-5">
@@ -683,7 +683,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                   const absCorr = Math.abs(corr);
                   const corrSign = corr >= 0 ? '+' : '−';
                   const corrLabel = absCorr > 70 ? t('analysis.corrStrong') : absCorr > 40 ? t('analysis.corrModerate') : t('analysis.corrWeak');
-                  const corrColor = absCorr > 70 ? 'text-[#d97757]' : absCorr > 40 ? 'text-amber-500' : 'text-emerald-600';
+                  const corrColor = absCorr > 70 ? 'text-primary' : absCorr > 40 ? 'text-amber-500' : 'text-emerald-600';
                   return (
                     <>
                       <div className="flex justify-between items-center text-xs">
@@ -715,7 +715,7 @@ ${t('analysis.forecastPromptRequirements')}`;
             <div>
               <h3 className="text-2xl font-bold text-[#191918] flex items-center">
                 {t('analysis.forecastTitle')}
-                <span className="ml-4 px-3 py-1 bg-[#d97757]/10 text-[#d97757] text-[10px] rounded-full border border-[#d97757]/20 font-bold uppercase tracking-wider">Next 90 Days</span>
+                <span className="ml-4 px-3 py-1 bg-primary/10 text-primary text-[10px] rounded-full border border-primary/20 font-bold uppercase tracking-wider">Next 90 Days</span>
               </h3>
               <p className="text-[#5c5c5a] text-sm mt-1 italic">{t('analysis.forecastSubtitle')}</p>
             </div>
@@ -724,10 +724,10 @@ ${t('analysis.forecastPromptRequirements')}`;
           {isAnalysing ? (
             <div className="h-[450px] flex flex-col items-center justify-center space-y-10">
               <div className="relative">
-                <div className="w-24 h-24 rounded-full bg-[#d97757]/10 border border-[#d97757]/30 flex items-center justify-center animate-pulse">
+                <div className="w-24 h-24 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center animate-pulse">
                   <span className="text-4xl">🔮</span>
                 </div>
-                <div className="absolute inset-0 border-2 border-dashed border-[#d97757]/40 rounded-full animate-[spin_10s_linear_infinite]"></div>
+                <div className="absolute inset-0 border-2 border-dashed border-primary/40 rounded-full animate-[spin_10s_linear_infinite]"></div>
               </div>
               <div className="text-center space-y-3">
                 <p className="text-[#191918] text-xl font-medium tracking-tight">{loadingMessage}</p>
@@ -740,8 +740,8 @@ ${t('analysis.forecastPromptRequirements')}`;
                 <ComposedChart data={predictedData}>
                   <defs>
                     <linearGradient id="colorForecast" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#d97757" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#d97757" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#274C92" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#274C92" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e0ddd5" vertical={false} />
@@ -757,7 +757,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                             <div className="space-y-3">
                               <p className="text-[#191918] text-2xl font-bold">{currSym}{formatNum(d.revenue)}</p>
                               {d.isForecast && (
-                                <p className="text-[#d97757] text-xs font-medium border-t border-[#e0ddd5] pt-2">
+                                <p className="text-primary text-xs font-medium border-t border-[#e0ddd5] pt-2">
                                   {t('analysis.forecastConfidence')}: {currSym}{formatNum(d.confidenceLower)} - {currSym}{formatNum(d.confidenceUpper)}
                                 </p>
                               )}
@@ -771,13 +771,13 @@ ${t('analysis.forecastPromptRequirements')}`;
                       return null;
                     }}
                   />
-                  <Area type="monotone" dataKey="confidenceUpper" stroke="none" fill="#d97757" fillOpacity={0.12} name={t('analysis.forecastUpperBound')} />
-                  <Area type="monotone" dataKey="confidenceLower" stroke="none" fill="#d97757" fillOpacity={0.12} name={t('analysis.forecastLowerBound')} />
+                  <Area type="monotone" dataKey="confidenceUpper" stroke="none" fill="#274C92" fillOpacity={0.12} name={t('analysis.forecastUpperBound')} />
+                  <Area type="monotone" dataKey="confidenceLower" stroke="none" fill="#274C92" fillOpacity={0.12} name={t('analysis.forecastLowerBound')} />
                   <Area
                     type="monotone"
                     dataKey="revenue"
                     name={t('analysis.chartRevenueLabel')}
-                    stroke="#d97757"
+                    stroke="#274C92"
                     strokeWidth={4}
                     fill="url(#colorForecast)"
                   />
@@ -791,7 +791,7 @@ ${t('analysis.forecastPromptRequirements')}`;
           {groundingSources.length > 0 && (
             <div className="mt-6 bg-white/60 border border-[#e0ddd5] rounded-xl p-6" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
               <h4 className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest mb-4 flex items-center">
-                <i className="fas fa-globe mr-2 text-[#d97757]"></i>
+                <i className="fas fa-globe mr-2 text-primary"></i>
                 {t('analysis.forecastSources')}
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -801,9 +801,9 @@ ${t('analysis.forecastPromptRequirements')}`;
                     href={src.uri}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center text-xs text-[#4a4a48] hover:text-[#d97757] transition-colors truncate p-2 rounded-lg hover:bg-[#f9f9f8]"
+                    className="flex items-center text-xs text-[#4a4a48] hover:text-primary transition-colors truncate p-2 rounded-lg hover:bg-[#f9f9f8]"
                   >
-                    <i className="fas fa-link mr-2 text-[#d97757]/40 flex-shrink-0"></i>
+                    <i className="fas fa-link mr-2 text-primary/40 flex-shrink-0"></i>
                     <span className="truncate">{src.title}</span>
                   </a>
                 ))}
@@ -855,7 +855,7 @@ ${t('analysis.forecastPromptRequirements')}`;
               </thead>
               <tbody className="divide-y divide-[#e0ddd5]">
                 {data.monthlyPerformance.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-[#d97757]/5 transition-colors group">
+                  <tr key={idx} className="hover:bg-primary/5 transition-colors group">
                     <td className="px-10 py-6 text-sm font-bold text-[#333330] border-r border-[#e0ddd5]/70 sticky left-0 bg-white/90 group-hover:bg-[#f0eeeb] transition-colors">{row.name}</td>
                     <td className="px-10 py-6 text-sm text-center font-mono text-[#4a4a48] border-r border-[#e0ddd5]/70">{row.purchaseTons}</td>
                     <td className="px-10 py-6 text-sm text-center font-mono text-[#4a4a48] border-r border-[#e0ddd5]/70">{row.salesTons}</td>
@@ -874,7 +874,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                       {row.mom == null ? (
                         <span className="text-[10px] text-[#a0a09c]">—</span>
                       ) : (
-                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${row.mom >= 0 ? 'bg-[#d97757]/10 text-[#d97757]' : 'bg-rose-500/10 text-rose-500'}`}>
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${row.mom >= 0 ? 'bg-primary/10 text-primary' : 'bg-rose-500/10 text-rose-500'}`}>
                           {row.mom > 0 ? '+' : ''}{row.mom.toFixed(1)}%
                         </span>
                       )}
@@ -893,9 +893,9 @@ ${t('analysis.forecastPromptRequirements')}`;
 };
 
 const PanoramaCard: React.FC<{ title: string, subtitle: string, children: React.ReactNode }> = ({ title, subtitle, children }) => (
-  <div className="bg-white/80 border border-[#e0ddd5] rounded-xl p-8 flex flex-col hover:border-[#d97757]/30 transition-all group" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
+  <div className="bg-white/80 border border-[#e0ddd5] rounded-xl p-8 flex flex-col hover:border-primary/30 transition-all group" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
     <div className="mb-6">
-      <h4 className="text-[#191918] font-bold text-lg tracking-tight group-hover:text-[#d97757] transition-colors">{title}</h4>
+      <h4 className="text-[#191918] font-bold text-lg tracking-tight group-hover:text-primary transition-colors">{title}</h4>
       <p className="text-[10px] text-[#5c5c5a] uppercase font-bold tracking-[0.2em] mt-1">{subtitle}</p>
     </div>
     <div className="flex-1 min-h-[260px] flex items-center justify-center">
@@ -908,9 +908,9 @@ const TabButton: React.FC<{ active: boolean, onClick: () => void, label: string,
   <button
     onClick={onClick}
     className={`flex items-center space-x-3 px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300
-      ${active ? 'bg-[#d97757] text-white' : 'text-[#4a4a48] hover:text-[#333330]'}
+      ${active ? 'bg-primary text-white' : 'text-[#4a4a48] hover:text-[#333330]'}
     `}
-    style={active ? { boxShadow: '0 4px 16px rgba(217,119,87,0.15)' } : {}}
+    style={active ? { boxShadow: '0 4px 16px rgba(39,76,146,0.15)' } : {}}
   >
     <i className={`fas ${icon} text-sm ${active ? 'scale-110' : ''}`}></i>
     <span>{label}</span>
@@ -921,7 +921,7 @@ const DimButton: React.FC<{ active: boolean, onClick: () => void, label: string 
   <button
     onClick={onClick}
     className={`px-5 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all
-      ${active ? 'bg-[#f0eeeb] text-[#d97757] shadow-inner' : 'text-[#5c5c5a] hover:text-[#4a4a48]'}
+      ${active ? 'bg-[#f0eeeb] text-primary shadow-inner' : 'text-[#5c5c5a] hover:text-[#4a4a48]'}
     `}
   >
     {label}

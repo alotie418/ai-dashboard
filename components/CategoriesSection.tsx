@@ -135,7 +135,7 @@ const CategoriesSection: React.FC = () => {
             key={t_}
             onClick={() => setActiveType(t_)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              activeType === t_ ? 'border-[#d97757] text-[#d97757]' : 'border-transparent text-[#7a7a78] hover:text-[#4a4a48]'
+              activeType === t_ ? 'border-primary text-primary' : 'border-transparent text-[#7a7a78] hover:text-[#4a4a48]'
             }`}
           >
             {t_ === 'expense' ? t('settings.categories.expense', '支出') : t('settings.categories.income', '收入')}
@@ -175,7 +175,7 @@ const CategoriesSection: React.FC = () => {
                 <tr key={c.id} className="border-t border-[#e0ddd5]/70 hover:bg-[#f9f9f8]/40">
                   <td className="px-4 py-2 text-[#191918] col-name">
                     {usCatLabel(c)}
-                    {!c.is_system && <span className="ml-2 text-[10px] bg-[#d97757]/10 text-[#d97757] px-1.5 py-0.5 rounded">{t('settings.categories.userMade', '自建')}</span>}
+                    {!c.is_system && <span className="ml-2 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">{t('settings.categories.userMade', '自建')}</span>}
                   </td>
                   <td className="px-4 py-2 font-mono text-[11px] text-[#7a7a78]">{c.slug}</td>
                   <td className="px-4 py-2 text-[11px] text-[#5c5c5a]">{c.schedule_line || '—'}</td>
@@ -210,7 +210,7 @@ const CategoriesSection: React.FC = () => {
 
       {/* 新增类别表单 */}
       {showAddForm ? (
-        <div className="border border-[#d97757]/30 bg-[#d97757]/5 rounded-xl p-4 space-y-3">
+        <div className="border border-primary/30 bg-primary/5 rounded-xl p-4 space-y-3">
           <div className="text-sm font-semibold text-[#191918]">
             {t('settings.categories.addNew', '新增类别')} · {activeType === 'expense' ? t('settings.categories.expense') : t('settings.categories.income')} · {localeFlag} {localeName}
           </div>
@@ -241,20 +241,20 @@ const CategoriesSection: React.FC = () => {
               {t('common.cancel')}
             </button>
             <button onClick={handleAdd} disabled={!newSlug.trim() || !newLabel.trim()}
-              className="text-xs px-4 py-1.5 bg-[#d97757] text-white rounded-lg hover:bg-[#c4694d] disabled:opacity-50">
+              className="text-xs px-4 py-1.5 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50">
               {t('common.save')}
             </button>
           </div>
         </div>
       ) : (
-        <button onClick={() => setShowAddForm(true)} className="w-full border-2 border-dashed border-[#e0ddd5] text-sm text-[#7a7a78] hover:text-[#d97757] hover:border-[#d97757]/50 rounded-xl py-3 transition-colors">
+        <button onClick={() => setShowAddForm(true)} className="w-full border-2 border-dashed border-[#e0ddd5] text-sm text-[#7a7a78] hover:text-primary hover:border-primary/50 rounded-xl py-3 transition-colors">
           <i className="fas fa-plus mr-1.5"></i>
           {t('settings.categories.addNewButton', '新增自定义类别')}
         </button>
       )}
 
       <div className="text-[10px] text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3">
-        <i className="fas fa-info-circle mr-1.5 text-[#d97757]"></i>
+        <i className="fas fa-info-circle mr-1.5 text-primary"></i>
         {t('settings.categories.systemNote', '系统预置类别由 SoloLedger 维护，与官方报表行对应，不可删除（但可改名）。自建类别完全由你掌控。')}
       </div>
     </section>

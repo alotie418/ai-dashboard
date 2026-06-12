@@ -36,7 +36,7 @@ const LanguageSection: React.FC = () => {
               onClick={() => setLanguage(lang.code as LangCode)}
               className={`flex items-center p-4 rounded-xl border transition-all ${
                 selected
-                  ? 'border-[#d97757] bg-[#d97757]/5'
+                  ? 'border-primary bg-primary/5'
                   : 'border-[#e0ddd5] bg-white hover:bg-[#f0eeeb]'
               }`}
             >
@@ -45,14 +45,14 @@ const LanguageSection: React.FC = () => {
                 <div className="text-sm font-semibold text-[#191918]">{lang.label}</div>
                 <div className="text-[10px] text-[#7a7a78] mt-0.5 font-mono">{lang.code}</div>
               </div>
-              {selected && <i className="fas fa-check-circle text-[#d97757] text-lg"></i>}
+              {selected && <i className="fas fa-check-circle text-primary text-lg"></i>}
             </button>
           );
         })}
       </div>
 
       <div className="text-[11px] text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3">
-        <i className="fas fa-info-circle mr-1.5 text-[#d97757]"></i>
+        <i className="fas fa-info-circle mr-1.5 text-primary"></i>
         {t('settings.language.note')}
       </div>
     </section>

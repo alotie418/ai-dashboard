@@ -97,7 +97,7 @@ const DataBackupSection: React.FC = () => {
         <button
           onClick={handleBackup}
           disabled={!desktop || busy !== null}
-          className="bg-[#d97757] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#c4694d] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-primary text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {busy === 'backup'
             ? <><i className="fas fa-spinner fa-spin mr-2"></i>{t('common.loading')}</>

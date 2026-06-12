@@ -57,7 +57,7 @@
 }
 
 .markdown-body blockquote {
-  border-left: 4px solid #d97757;
+  border-left: 4px solid #274C92;
   padding-left: 1em;
   color: #6b7280;
   margin-bottom: 1em;
@@ -85,7 +85,7 @@
 }
 
 .markdown-body a {
-  color: #d97757;
+  color: #274C92;
   text-decoration: underline;
   word-break: break-all;
   overflow-wrap: break-word;
@@ -133,4 +133,46 @@
   text-overflow: ellipsis;
   min-width: 10rem;
   max-width: 20rem;
+}
+
+/* ── Liquid Glass (opt-in) ──
+   Translucent surfaces with backdrop blur, a silver-white top sheen and soft
+   shadow — applied only to container shells (top bar / sidebar / filter / AI
+   widget / AI briefing / modal / card outer / tab container), NEVER to table
+   cells, inputs, chart plot areas or dense data text (keeps PR-B readability).
+   The faint blue body gradient (index.html) gives these something to blur. */
+.glass-bar {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0) 60%),
+    rgba(247, 249, 253, 0.72);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.glass-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0) 45%),
+    rgba(247, 249, 253, 0.6);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 24px rgba(22, 38, 77, 0.06);
+}
+.glass-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 50%),
+    rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(10px) saturate(130%);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 24px rgba(22, 38, 77, 0.05);
+}
+.glass-modal {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 40%),
+    rgba(250, 251, 254, 0.8);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 24px 60px rgba(16, 38, 77, 0.18);
 }

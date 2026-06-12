@@ -132,7 +132,7 @@ const ProductsSection: React.FC = () => {
       )}
 
       {showAddForm ? (
-        <div className="border border-[#d97757]/30 bg-[#d97757]/5 rounded-xl p-4 space-y-3">
+        <div className="border border-primary/30 bg-primary/5 rounded-xl p-4 space-y-3">
           <div className="text-sm font-semibold text-[#191918]">{t('products.addTitle')}</div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -164,13 +164,13 @@ const ProductsSection: React.FC = () => {
               {t('common.cancel')}
             </button>
             <button onClick={handleAdd} disabled={!newName.trim() || saving}
-              className="text-xs px-4 py-1.5 bg-[#d97757] text-white rounded-lg hover:bg-[#c4694d] disabled:opacity-50">
+              className="text-xs px-4 py-1.5 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50">
               {t('common.save')}
             </button>
           </div>
         </div>
       ) : (
-        <button onClick={() => setShowAddForm(true)} className="w-full border-2 border-dashed border-[#e0ddd5] text-sm text-[#7a7a78] hover:text-[#d97757] hover:border-[#d97757]/50 rounded-xl py-3 transition-colors">
+        <button onClick={() => setShowAddForm(true)} className="w-full border-2 border-dashed border-[#e0ddd5] text-sm text-[#7a7a78] hover:text-primary hover:border-primary/50 rounded-xl py-3 transition-colors">
           <i className="fas fa-plus mr-1.5"></i>{t('products.addButton')}
         </button>
       )}

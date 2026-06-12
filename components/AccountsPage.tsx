@@ -94,13 +94,13 @@ const AccountsPage: React.FC = () => {
       <div className="flex items-center gap-1 bg-[#f0eeeb] rounded-xl p-1 w-fit">
         <button
           onClick={() => setActiveTab('receivable')}
-          className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'receivable' ? 'bg-white text-[#d97757] shadow-sm' : 'text-[#7a7a78] hover:text-[#191918]'}`}
+          className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'receivable' ? 'bg-white text-primary shadow-sm' : 'text-[#7a7a78] hover:text-[#191918]'}`}
         >
           <i className="fas fa-arrow-circle-down mr-1.5"></i>{localeLabel('acctReceivableTab', 'accounts.receivable')}
         </button>
         <button
           onClick={() => setActiveTab('payable')}
-          className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'payable' ? 'bg-white text-[#d97757] shadow-sm' : 'text-[#7a7a78] hover:text-[#191918]'}`}
+          className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'payable' ? 'bg-white text-primary shadow-sm' : 'text-[#7a7a78] hover:text-[#191918]'}`}
         >
           <i className="fas fa-arrow-circle-up mr-1.5"></i>{localeLabel('acctPayableTab', 'accounts.payable')}
         </button>
@@ -108,7 +108,7 @@ const AccountsPage: React.FC = () => {
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <i className="fas fa-spinner fa-spin text-2xl text-[#d97757]"></i>
+          <i className="fas fa-spinner fa-spin text-2xl text-primary"></i>
         </div>
       ) : (
         <>
@@ -141,7 +141,7 @@ const AccountsPage: React.FC = () => {
             {/* Aging Analysis */}
             <div className="bg-white rounded-xl p-5 border border-[#e0ddd5]">
               <h4 className="text-sm font-bold text-[#191918] mb-4">
-                <i className="fas fa-chart-bar mr-2 text-[#d97757]"></i>{twAcct('acctAgingTitle', 'accounts.agingTitle')}
+                <i className="fas fa-chart-bar mr-2 text-primary"></i>{twAcct('acctAgingTitle', 'accounts.agingTitle')}
               </h4>
               {agingData.some(d => d.amount > 0) ? (
                 <ResponsiveContainer width="100%" height={200}>
@@ -150,7 +150,7 @@ const AccountsPage: React.FC = () => {
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#7a7a78' }} />
                     <YAxis tick={{ fontSize: 11, fill: '#7a7a78' }} />
                     <Tooltip formatter={(val: number) => formatCurrency(val)} />
-                    <Bar dataKey="amount" fill="#d97757" radius={[4, 4, 0, 0]} name={t('accounts.headerTotal')} />
+                    <Bar dataKey="amount" fill="#274C92" radius={[4, 4, 0, 0]} name={t('accounts.headerTotal')} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -161,7 +161,7 @@ const AccountsPage: React.FC = () => {
             {/* Ranking */}
             <div className="bg-white rounded-xl p-5 border border-[#e0ddd5]">
               <h4 className="text-sm font-bold text-[#191918] mb-4">
-                <i className="fas fa-ranking-star mr-2 text-[#d97757]"></i>
+                <i className="fas fa-ranking-star mr-2 text-primary"></i>
                 {activeTab === 'receivable' ? t('accounts.rankingReceivable') : t('accounts.rankingPayable')}
               </h4>
               {ranking.length > 0 ? (
@@ -169,7 +169,7 @@ const AccountsPage: React.FC = () => {
                   {ranking.map((item, i) => (
                     <div key={i} className="flex items-center justify-between py-2 border-b border-[#f0eeeb] last:border-0">
                       <div className="flex items-center gap-2">
-                        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${i < 3 ? 'bg-[#d97757]' : 'bg-[#b0b0ae]'}`}>{i + 1}</span>
+                        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${i < 3 ? 'bg-primary' : 'bg-[#b0b0ae]'}`}>{i + 1}</span>
                         <span className="text-sm text-[#191918]">{item.name}</span>
                       </div>
                       <span className="text-sm font-medium text-[#191918]">{formatCurrency(item.amount)}</span>
@@ -186,7 +186,7 @@ const AccountsPage: React.FC = () => {
           <div className="bg-white rounded-xl border border-[#e0ddd5] overflow-hidden">
             <div className="px-5 py-3 border-b border-[#e0ddd5] flex items-center justify-between">
               <h4 className="text-sm font-bold text-[#191918]">
-                <i className="fas fa-list-alt mr-2 text-[#d97757]"></i>{twAcct(activeTab === 'receivable' ? 'acctDetailsReceivable' : 'acctDetailsPayable', 'accounts.details')}
+                <i className="fas fa-list-alt mr-2 text-primary"></i>{twAcct(activeTab === 'receivable' ? 'acctDetailsReceivable' : 'acctDetailsPayable', 'accounts.details')}
               </h4>
               <span className="text-xs text-[#7a7a78]">{t('accounts.count')} {details.length} {t('accounts.unit')}</span>
             </div>
@@ -235,7 +235,7 @@ const AccountsPage: React.FC = () => {
                                 paid: item.paid_amount || 0,
                                 name: activeTab === 'receivable' ? item.customer : item.supplier,
                               })}
-                              className="text-xs text-[#d97757] hover:text-[#c56646] font-medium"
+                              className="text-xs text-primary hover:text-primary-hover font-medium"
                             >
                               <i className="fas fa-money-bill-wave mr-1"></i>
                               {activeTab === 'receivable' ? t('accounts.recordPayment') : t('accounts.recordPaymentPay')}
@@ -264,7 +264,7 @@ const AccountsPage: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
             <h3 className="text-lg font-bold text-[#191918] mb-4">
-              <i className="fas fa-money-bill-wave mr-2 text-[#d97757]"></i>
+              <i className="fas fa-money-bill-wave mr-2 text-primary"></i>
               {paymentModal.type === 'sale' ? t('accounts.recordPayment') : t('accounts.recordPaymentPay')}
             </h3>
             <div className="space-y-3 mb-6">
@@ -291,7 +291,7 @@ const AccountsPage: React.FC = () => {
                   value={paymentAmount}
                   onChange={e => setPaymentAmount(e.target.value)}
                   placeholder={`${t('accounts.modalMax')} ${formatCurrency(paymentModal.total - paymentModal.paid)}`}
-                  className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm focus:ring-2 focus:ring-[#d97757] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
               <div className="flex gap-2 pt-1">
@@ -303,7 +303,7 @@ const AccountsPage: React.FC = () => {
             </div>
             <div className="flex gap-3">
               <button onClick={() => { setPaymentModal(null); setPaymentAmount(''); }} className="flex-1 py-2 text-sm text-[#7a7a78] border border-[#e0ddd5] rounded-lg hover:bg-[#f0eeeb]">{t('accounts.modalCancel')}</button>
-              <button onClick={handlePayment} disabled={!paymentAmount || parseFloat(paymentAmount) <= 0} className="flex-1 py-2 text-sm bg-[#d97757] text-white rounded-lg hover:bg-[#c56646] disabled:opacity-50">{t('accounts.modalConfirm')}</button>
+              <button onClick={handlePayment} disabled={!paymentAmount || parseFloat(paymentAmount) <= 0} className="flex-1 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50">{t('accounts.modalConfirm')}</button>
             </div>
           </div>
         </div>

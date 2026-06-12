@@ -23,7 +23,7 @@ const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice,
       {/* Schedule C Summary */}
       <div className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl overflow-hidden h-full flex flex-col" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
         <div className="p-6 border-b border-[#e0ddd5] flex items-center space-x-3">
-          <i className="fas fa-file-invoice-dollar text-lg text-[#d97757]"></i>
+          <i className="fas fa-file-invoice-dollar text-lg text-primary"></i>
           <h3 className="text-lg font-bold text-[#191918]">{label('taxTitle')}</h3>
         </div>
         <div className="flex flex-col flex-1 justify-around py-2">
@@ -80,7 +80,7 @@ const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice,
           <h3 className="text-lg font-bold text-[#191918]">{label('profitMargins')}</h3>
         </div>
         <div className="space-y-6 flex-1">
-          <MarginBar label={label('grossMargin')} value={sc.line7_grossIncome > 0 ? Math.round((sc.line7_grossIncome - sc.line28_totalExpenses) / sc.line7_grossIncome * 100) : 0} color="bg-[#d97757]" />
+          <MarginBar label={label('grossMargin')} value={sc.line7_grossIncome > 0 ? Math.round((sc.line7_grossIncome - sc.line28_totalExpenses) / sc.line7_grossIncome * 100) : 0} color="bg-primary" />
           <MarginBar label={label('netMargin')} value={sc.line7_grossIncome > 0 ? Math.round(sc.line31_netProfit / sc.line7_grossIncome * 100) : 0} color="bg-emerald-500" />
         </div>
       </div>
@@ -89,9 +89,9 @@ const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice,
 };
 
 const Row: React.FC<{ label: string; value: string; bold?: boolean; indent?: boolean; primary?: boolean; success?: boolean }> = ({ label, value, bold, indent, primary, success }) => (
-  <div className={`flex justify-between items-center px-6 py-2.5 hover:bg-[#f0eeeb] transition-colors ${bold ? 'font-bold' : ''} ${primary ? 'bg-[#d97757]/5' : ''} ${success ? 'bg-emerald-500/5' : ''}`}>
+  <div className={`flex justify-between items-center px-6 py-2.5 hover:bg-[#f0eeeb] transition-colors ${bold ? 'font-bold' : ''} ${primary ? 'bg-primary/5' : ''} ${success ? 'bg-emerald-500/5' : ''}`}>
     <span className={`text-sm ${indent ? 'pl-4 text-[#5c5c5a]' : 'text-[#4a4a48]'}`}>{label}</span>
-    <span className={`text-base font-mono tabular-nums whitespace-nowrap ${primary ? 'text-[#d97757]' : success ? 'text-emerald-600' : 'text-[#4a4a48]'}`}>{value}</span>
+    <span className={`text-base font-mono tabular-nums whitespace-nowrap ${primary ? 'text-primary' : success ? 'text-emerald-600' : 'text-[#4a4a48]'}`}>{value}</span>
   </div>
 );
 

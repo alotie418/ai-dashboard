@@ -180,8 +180,8 @@ const DocumentsPage: React.FC = () => {
         <button
           onClick={() => { setEditing(null); setShowModal(true); }}
           disabled={!desktop}
-          className="flex items-center px-4 py-2 bg-[#d97757] hover:bg-[#c56a4a] text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}
+          className="flex items-center px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}
         >
           <i className="fas fa-plus mr-2"></i>{t('documents.addButton')}
         </button>
@@ -214,7 +214,7 @@ const DocumentsPage: React.FC = () => {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-md text-xs transition-all ${filter === f ? 'bg-[#d97757] text-white shadow-sm' : 'text-[#4a4a48] hover:text-[#191918]'}`}
+            className={`px-3 py-1.5 rounded-md text-xs transition-all ${filter === f ? 'bg-primary text-white shadow-sm' : 'text-[#4a4a48] hover:text-[#191918]'}`}
           >
             {f === 'all' ? t('documents.filterAll') : t(TYPE_LABEL_KEYS[f])}
           </button>
@@ -270,7 +270,7 @@ const DocumentsPage: React.FC = () => {
                   </td>
                   <td className="px-5 py-5 text-xs font-medium space-x-3 whitespace-nowrap">
                     {d.status === 'draft' && (
-                      <button onClick={() => openEdit(d.id)} className="text-[#d97757] hover:text-[#c56a4a] transition-colors">
+                      <button onClick={() => openEdit(d.id)} className="text-primary hover:text-primary-hover transition-colors">
                         {t('common2.edit')}
                       </button>
                     )}

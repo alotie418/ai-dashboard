@@ -134,12 +134,12 @@ const AlertCenter: React.FC = () => {
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#e0ddd5] bg-[#f9f9f8]">
             <h4 className="text-sm font-bold text-[#191918]">
-              <i className="fas fa-bell mr-1.5 text-[#d97757]"></i>
+              <i className="fas fa-bell mr-1.5 text-primary"></i>
               {t('alerts.title')}
               {unreadCount > 0 && <span className="ml-2 text-xs text-[#7a7a78]">({unreadCount} {t('alerts.unread')})</span>}
             </h4>
             {unreadCount > 0 && (
-              <button onClick={handleMarkAllRead} className="text-xs text-[#d97757] hover:text-[#c56646]">
+              <button onClick={handleMarkAllRead} className="text-xs text-primary hover:text-primary-hover">
                 {t('alerts.markAllRead')}
               </button>
             )}
@@ -149,7 +149,7 @@ const AlertCenter: React.FC = () => {
           <div className="overflow-y-auto max-h-[400px]">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <i className="fas fa-spinner fa-spin text-[#d97757]"></i>
+                <i className="fas fa-spinner fa-spin text-primary"></i>
               </div>
             ) : alerts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-[#7a7a78]">
@@ -174,7 +174,7 @@ const AlertCenter: React.FC = () => {
                           <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${style.bg} ${style.text}`}>
                             {TYPE_LABEL_KEYS[alert.type] ? t(TYPE_LABEL_KEYS[alert.type]) : alert.type}
                           </span>
-                          {!alert.is_read && <span className="w-1.5 h-1.5 rounded-full bg-[#d97757]"></span>}
+                          {!alert.is_read && <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>}
                         </div>
                         <p className="text-sm font-medium text-[#191918] truncate">{alert.title}</p>
                         <p className="text-xs text-[#7a7a78] mt-0.5 line-clamp-2">{alert.message}</p>

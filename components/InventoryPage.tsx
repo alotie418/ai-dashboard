@@ -166,8 +166,8 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           value={stats.totalInputWeight}
           sub={stats.totalInputSub}
           icon="fa-file-import"
-          color="text-[#d97757]"
-          bg="bg-[#d97757]/10"
+          color="text-primary"
+          bg="bg-primary/10"
         />
         <StatCard
           title={genLabel('invTotalOutput', 'invoices.totalOutput')}
@@ -182,13 +182,13 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           value={stats.pendingCertification}
           sub={genLabel('invPendingTaxSub', 'invoices.deductible')}
           icon="fa-clock"
-          color="text-[#d97757]"
-          bg="bg-[#d97757]/10"
+          color="text-primary"
+          bg="bg-primary/10"
         />
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-white/80 border border-[#e0ddd5] p-6 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
+      <div className="glass-card p-6 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
         <div className="relative flex-1 max-w-md">
           <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a]"></i>
           <input
@@ -196,11 +196,11 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
             placeholder={genLabel('invSearchPlaceholder', 'invoices.searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-white border border-[#e0ddd5] rounded-xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] transition-all"
+            className="w-full bg-white border border-[#e0ddd5] rounded-xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary transition-all"
           />
         </div>
 
-        <div className="flex items-center space-x-2 bg-white p-1.5 rounded-xl border border-[#e0ddd5] shrink-0">
+        <div className="flex items-center space-x-2 glass-card p-1.5 rounded-xl shrink-0">
           <FilterTab active={filterType === 'all'} onClick={() => setFilterType('all')} label={genLabel('invFilterAll', 'invoices.filterAll')} />
           <FilterTab active={filterType === 'input'} onClick={() => setFilterType('input')} label={genLabel('invFilterInput', 'invoices.filterInput')} />
           <FilterTab active={filterType === 'output'} onClick={() => setFilterType('output')} label={genLabel('invFilterOutput', 'invoices.filterOutput')} />
@@ -217,13 +217,13 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           <div className="flex space-x-3">
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center ${showAdvanced || hasAdvancedFilters ? 'bg-[#d97757]/10 text-[#d97757] border border-[#d97757]/30' : 'text-[#4a4a48] hover:text-[#191918] hover:bg-[#f0eeeb] border border-transparent'}`}
+              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center ${showAdvanced || hasAdvancedFilters ? 'bg-primary/10 text-primary border border-primary/30' : 'text-[#4a4a48] hover:text-[#191918] hover:bg-[#f0eeeb] border border-transparent'}`}
             >
-              <i className={`fas fa-filter mr-2 ${hasAdvancedFilters ? 'text-[#d97757]' : ''}`}></i>
+              <i className={`fas fa-filter mr-2 ${hasAdvancedFilters ? 'text-primary' : ''}`}></i>
               {t('invoices.advancedFilter')}
-              {hasAdvancedFilters && <span className="ml-2 w-2 h-2 bg-[#d97757] rounded-full"></span>}
+              {hasAdvancedFilters && <span className="ml-2 w-2 h-2 bg-primary rounded-full"></span>}
             </button>
-            <button className="px-4 py-2 bg-[#d97757] text-white rounded-xl text-xs font-bold hover:bg-[#c56a4a] transition-all" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}>
+            <button className="px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary-hover transition-all" style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}>
               <i className="fas fa-download mr-2"></i> {t('invoices.export')}
             </button>
           </div>
@@ -238,10 +238,10 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                 <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{genLabel('invDateRange', 'invoices.dateRange')}</label>
                 <div className="flex items-center space-x-2">
                   <input type="date" lang={uiLang} value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                    className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />
+                    className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all" />
                   <span className="text-[#5c5c5a] text-xs">—</span>
                   <input type="date" lang={uiLang} value={dateTo} onChange={e => setDateTo(e.target.value)}
-                    className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />
+                    className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all" />
                 </div>
               </div>
 
@@ -250,10 +250,10 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                 <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale === 'JP' ? taxLabel('invAmountRange') : t('invoices.amountRange')}</label>
                 <div className="flex items-center space-x-2">
                   <input type="number" placeholder={t('invoices.min')} value={amountMin} onChange={e => setAmountMin(e.target.value)}
-                    className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />
+                    className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all" />
                   <span className="text-[#5c5c5a] text-xs">—</span>
                   <input type="number" placeholder={t('invoices.max')} value={amountMax} onChange={e => setAmountMax(e.target.value)}
-                    className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />
+                    className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all" />
                 </div>
               </div>
 
@@ -262,10 +262,10 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                 <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{genLabel('invWeightRange', 'invoices.weightRange')}</label>
                 <div className="flex items-center space-x-2">
                   <input type="number" placeholder={t('invoices.min')} value={weightMin} onChange={e => setWeightMin(e.target.value)}
-                    className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />
+                    className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all" />
                   <span className="text-[#5c5c5a] text-xs">—</span>
                   <input type="number" placeholder={t('invoices.max')} value={weightMax} onChange={e => setWeightMax(e.target.value)}
-                    className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all" />
+                    className="flex-1 bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all" />
                 </div>
               </div>
 
@@ -273,7 +273,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{genLabel('invStatusFilter', 'invoices.statusFilter')}</label>
                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-                  className="w-full bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-[#d97757]/50 transition-all appearance-none cursor-pointer"
+                  className="w-full bg-white border border-[#e0ddd5] rounded-lg px-3 py-2 text-xs text-[#191918] focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all appearance-none cursor-pointer"
                   style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}>
                   <option value="all">{genLabel('invStatusAll', 'invoices.allStatus')}</option>
                   <option value="verified">{genLabel('invStatusVerified', 'invoices.statusVerified')}</option>
@@ -291,7 +291,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
               <div className="text-xs text-[#5c5c5a]">
                 {hasAdvancedFilters && (
                   <span className="flex items-center">
-                    <i className="fas fa-info-circle mr-1.5 text-[#d97757]"></i>
+                    <i className="fas fa-info-circle mr-1.5 text-primary"></i>
                     {genLabelCount('invAdvFilterActive', 'invoices.advancedFilterActive', filteredInvoices.length)}
                   </span>
                 )}
@@ -299,7 +299,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
               <button
                 onClick={clearAdvancedFilters}
                 disabled={!hasAdvancedFilters}
-                className="px-4 py-2 text-xs font-bold text-[#5c5c5a] hover:text-[#d97757] disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center"
+                className="px-4 py-2 text-xs font-bold text-[#5c5c5a] hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center"
               >
                 <i className="fas fa-times mr-1.5"></i> {t('invoices.clearAll')}
               </button>
@@ -326,7 +326,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                 <tr key={inv.invoiceNo || inv.date + inv.partner} className="group hover:bg-[#f9f9f8]/40 transition-all">
                   <td className="px-8 py-5 text-sm text-[#4a4a48] whitespace-nowrap min-w-[7rem]">{inv.date}</td>
                   <td className="px-8 py-5 whitespace-nowrap min-w-[5rem]">
-                    <span className={`inline-block whitespace-nowrap px-2 py-1 rounded text-[10px] font-bold ${inv.typeKey === 'output' ? 'bg-[#d97757]/10 text-[#d97757]' : 'bg-amber-500/10 text-amber-400'}`}>
+                    <span className={`inline-block whitespace-nowrap px-2 py-1 rounded text-[10px] font-bold ${inv.typeKey === 'output' ? 'bg-primary/10 text-primary' : 'bg-amber-500/10 text-amber-400'}`}>
                       {taxLabel(inv.typeKey === 'output' ? 'invoiceTypeOutput' : 'invoiceTypeInput')}
                     </span>
                   </td>
@@ -347,7 +347,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                       <i className="fas fa-search text-4xl mb-4 opacity-20"></i>
                       <p>{genLabel('invEmpty', 'invoices.empty')}</p>
                       {hasAdvancedFilters && (
-                        <button onClick={clearAdvancedFilters} className="mt-3 text-[#d97757] text-xs font-bold hover:underline">
+                        <button onClick={clearAdvancedFilters} className="mt-3 text-primary text-xs font-bold hover:underline">
                           <i className="fas fa-times mr-1"></i> {t('invoices.clearRetry')}
                         </button>
                       )}
@@ -364,7 +364,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
 };
 
 const StatCard: React.FC<{ title: string, value: string, sub: string, icon: string, color: string, bg: string }> = ({ title, value, sub, icon, color, bg }) => (
-  <div className="bg-white/80 border border-[#e0ddd5] p-6 rounded-xl group hover:border-[#d97757]/30 transition-all duration-300" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
+  <div className="glass-card p-6 rounded-xl group hover:border-primary/30 transition-all duration-300" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
     <div className="flex items-center justify-between mb-4">
       <div className={`w-12 h-12 ${bg} rounded-xl flex items-center justify-center ${color} group-hover:scale-110 transition-transform`}>
         <i className={`fas ${icon} text-xl`}></i>
@@ -381,8 +381,8 @@ const StatCard: React.FC<{ title: string, value: string, sub: string, icon: stri
 const FilterTab: React.FC<{ active: boolean, onClick: () => void, label: string }> = ({ active, onClick, label }) => (
   <button
     onClick={onClick}
-    className={`px-5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-300 ${active ? 'bg-[#d97757] text-white' : 'text-[#5c5c5a] hover:text-[#4a4a48]'}`}
-    style={active ? { boxShadow: '0 4px 16px rgba(217,119,87,0.15)' } : {}}
+    className={`px-5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-300 ${active ? 'bg-primary text-white' : 'text-[#5c5c5a] hover:text-[#4a4a48]'}`}
+    style={active ? { boxShadow: '0 4px 16px rgba(39,76,146,0.15)' } : {}}
   >
     {label}
   </button>
@@ -413,7 +413,7 @@ const usStatusTaxKey: Record<string, string> = {
 const StatusBadge: React.FC<{ statusKey: string, accLocale: string, uiLang: string }> = ({ statusKey, accLocale, uiLang }) => {
   const { t } = useTranslation();
   const colors: Record<string, string> = {
-    verified: 'bg-[#d97757]/10 text-[#d97757] border-[#d97757]/20',
+    verified: 'bg-primary/10 text-primary border-primary/20',
     certified: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
     deducted: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
     issued: 'bg-blue-500/10 text-blue-600 border-blue-500/20',

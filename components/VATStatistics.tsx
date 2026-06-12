@@ -33,14 +33,14 @@ const VATStatistics: React.FC<Props> = ({ data, accountingLocale = 'CN' }) => {
             <span className="text-base font-semibold text-[#191918]">{fmt(data.cumulativeOutput)}</span>
           </div>
         </div>
-        <div className="px-6 py-5 border-t border-dashed border-[#e0ddd5] space-y-4 bg-[#d97757]/5">
+        <div className="px-6 py-5 border-t border-dashed border-[#e0ddd5] space-y-4 bg-primary/5">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-[#d97757]/80">{label('certifiedInput')}</span>
-            <span className="text-base font-semibold text-[#d97757]">{fmt(data.certifiedInput)}</span>
+            <span className="text-sm text-primary/80">{label('certifiedInput')}</span>
+            <span className="text-base font-semibold text-primary">{fmt(data.certifiedInput)}</span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm text-[#d97757]/80">{label('invoicedOutput')}</span>
-            <span className="text-base font-semibold text-[#d97757]">{fmt(data.invoicedOutput)}</span>
+            <span className="text-sm text-primary/80">{label('invoicedOutput')}</span>
+            <span className="text-base font-semibold text-primary">{fmt(data.invoicedOutput)}</span>
           </div>
         </div>
         <div className="mt-auto px-6 py-6 border-t border-[#e0ddd5] bg-orange-500/5">

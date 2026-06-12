@@ -64,7 +64,7 @@ const SnowflakeEffect: React.FC = () => {
         if (!ctx) return;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(217, 119, 87, ${this.opacity * 0.25})`;
+        ctx.fillStyle = `rgba(39, 76, 146, ${this.opacity * 0.25})`;
         ctx.fill();
       }
     }

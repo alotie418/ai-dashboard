@@ -224,11 +224,11 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+      <div className="glass-modal rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#e0ddd5]">
           <h3 className="text-lg font-bold text-[#191918]">
-            <i className="fas fa-file-import mr-2 text-[#d97757]"></i>
+            <i className="fas fa-file-import mr-2 text-primary"></i>
             批量导入{type === 'sales' ? '销售' : '采购'}记录
           </h3>
           <button onClick={handleClose} className="text-[#7a7a78] hover:text-[#191918]">
@@ -241,7 +241,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
           {['上传文件', '列映射', '预览验证', '导入结果'].map((label, i) => (
             <div key={i} className="flex items-center">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                step > i + 1 ? 'bg-green-500 text-white' : step === i + 1 ? 'bg-[#d97757] text-white' : 'bg-[#e0ddd5] text-[#7a7a78]'
+                step > i + 1 ? 'bg-green-500 text-white' : step === i + 1 ? 'bg-primary text-white' : 'bg-[#e0ddd5] text-[#7a7a78]'
               }`}>{step > i + 1 ? '✓' : i + 1}</div>
               <span className={`ml-1.5 text-xs ${step === i + 1 ? 'text-[#191918] font-medium' : 'text-[#7a7a78]'}`}>{label}</span>
               {i < 3 && <div className="w-8 h-px bg-[#e0ddd5] mx-2"></div>}
@@ -260,16 +260,16 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
                 onDragLeave={() => setDragActive(false)}
                 onClick={() => fileInputRef.current?.click()}
                 className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all ${
-                  dragActive ? 'border-[#d97757] bg-[#d97757]/5' : 'border-[#e0ddd5] hover:border-[#d97757]/50'
+                  dragActive ? 'border-primary bg-primary/5' : 'border-[#e0ddd5] hover:border-primary/50'
                 }`}
               >
-                <i className="fas fa-cloud-upload-alt text-4xl text-[#d97757] mb-3"></i>
+                <i className="fas fa-cloud-upload-alt text-4xl text-primary mb-3"></i>
                 <p className="text-[#191918] font-medium mb-1">拖拽文件到这里，或点击选择</p>
                 <p className="text-xs text-[#7a7a78]">支持 CSV、Excel(.xlsx) 文件，最多 500 条</p>
                 <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
                   onChange={(e) => { if (e.target.files?.[0]) processFile(e.target.files[0]); }} />
               </div>
-              <button onClick={downloadTemplate} className="mt-4 text-sm text-[#d97757] hover:underline">
+              <button onClick={downloadTemplate} className="mt-4 text-sm text-primary hover:underline">
                 <i className="fas fa-download mr-1"></i> 下载导入模板
               </button>
             </div>
@@ -379,17 +379,17 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
               <button onClick={() => setStep((step - 1) as any)} className="px-4 py-2 text-sm text-[#7a7a78] hover:text-[#191918]">上一步</button>
             )}
             {step === 2 && (
-              <button onClick={() => setStep(3)} className="px-4 py-2 text-sm bg-[#d97757] text-white rounded-lg hover:bg-[#c56646]">
+              <button onClick={() => setStep(3)} className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover">
                 下一步：预览
               </button>
             )}
             {step === 3 && (
-              <button onClick={handleImport} disabled={importing} className="px-4 py-2 text-sm bg-[#d97757] text-white rounded-lg hover:bg-[#c56646] disabled:opacity-50">
+              <button onClick={handleImport} disabled={importing} className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50">
                 {importing ? <><i className="fas fa-spinner fa-spin mr-1"></i>导入中...</> : `确认导入 ${mappedRecords.length} 条`}
               </button>
             )}
             {step === 4 && (
-              <button onClick={handleClose} className="px-4 py-2 text-sm bg-[#d97757] text-white rounded-lg hover:bg-[#c56646]">完成</button>
+              <button onClick={handleClose} className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover">完成</button>
             )}
           </div>
         </div>

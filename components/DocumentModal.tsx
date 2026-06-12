@@ -250,13 +250,13 @@ const DocumentModal: React.FC<Props> = ({ editing, initial, accLocale, products,
     }
   };
 
-  const inputCls = 'w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all';
+  const inputCls = 'w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all';
   const labelCls = 'text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest';
 
   return (
     <div className="fixed inset-0 z-[10001] flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose}></div>
-      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white border border-[#e0ddd5] rounded-xl animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
+      <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto glass-modal rounded-xl animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
         <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center gap-4 sticky top-0 bg-white z-10">
           <h2 className="text-xl font-bold text-[#191918] whitespace-nowrap">{editing ? t('documents.formEditTitle') : t('documents.formTitle')}</h2>
           <button type="button" onClick={onClose} className="flex-shrink-0 text-[#5c5c5a] hover:text-[#191918] transition-colors">
@@ -443,7 +443,7 @@ const DocumentModal: React.FC<Props> = ({ editing, initial, accLocale, products,
             <button
               type="button"
               onClick={() => setRows((prev) => [...prev, emptyRow()])}
-              className="w-full border-2 border-dashed border-[#e0ddd5] hover:border-[#d97757]/50 hover:bg-[#d97757]/5 rounded-xl py-2.5 text-xs text-[#5c5c5a] hover:text-[#d97757] transition-all"
+              className="w-full border-2 border-dashed border-[#e0ddd5] hover:border-primary/50 hover:bg-primary/5 rounded-xl py-2.5 text-xs text-[#5c5c5a] hover:text-primary transition-all"
             >
               <i className="fas fa-plus mr-2"></i>{t('documents.addItem')}
             </button>
@@ -482,7 +482,7 @@ const DocumentModal: React.FC<Props> = ({ editing, initial, accLocale, products,
             <button
               type="submit"
               disabled={saving}
-              className="bg-[#d97757] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#c56a4a] disabled:opacity-50"
+              className="bg-primary text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-hover disabled:opacity-50"
             >
               {saving
                 ? <><i className="fas fa-spinner fa-spin mr-2"></i>{t('common.loading')}</>

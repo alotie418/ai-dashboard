@@ -105,7 +105,7 @@ const AccountingSection: React.FC = () => {
               onClick={() => applyProfile(code)}
               className={`p-4 rounded-xl border text-left transition-all ${
                 selected
-                  ? 'border-[#d97757] bg-[#d97757]/5'
+                  ? 'border-primary bg-primary/5'
                   : 'border-[#e0ddd5] bg-white hover:bg-[#f0eeeb]'
               } disabled:opacity-50`}
             >
@@ -114,7 +114,7 @@ const AccountingSection: React.FC = () => {
                   <span className="text-2xl mr-2">{p.flag}</span>
                   <span className="text-sm font-semibold text-[#191918]">{name}</span>
                 </div>
-                {selected && <i className="fas fa-check-circle text-[#d97757]"></i>}
+                {selected && <i className="fas fa-check-circle text-primary"></i>}
               </div>
               <div className="space-y-1 text-[11px] text-[#5c5c5a]">
                 <div>{taxLabel}: <span className="font-mono font-semibold text-[#191918]">{p.vatRateDisplay?.[lang] ?? `${p.vatRate}%`}</span></div>
@@ -167,13 +167,13 @@ const AccountingSection: React.FC = () => {
             }
           }}
           disabled={saving}
-          className="text-xs px-3 py-1.5 border border-[#d97757] text-[#d97757] rounded-lg hover:bg-[#d97757]/5 disabled:opacity-50"
+          className="text-xs px-3 py-1.5 border border-primary text-primary rounded-lg hover:bg-primary/5 disabled:opacity-50"
         >
           {saving ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('common.saving')}</> : t('common.save')}
         </button>
         {(profile.notesByLang?.[lang] || profile.notes) && (
           <div className="text-[10px] text-[#7a7a78] bg-white border border-[#e0ddd5] rounded p-2 mt-2">
-            <i className="fas fa-info-circle mr-1 text-[#d97757]"></i>
+            <i className="fas fa-info-circle mr-1 text-primary"></i>
             {profile.notesByLang?.[lang] || profile.notes}
           </div>
         )}

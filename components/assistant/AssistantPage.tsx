@@ -21,7 +21,7 @@ const AssistantPage: React.FC = () => {
         <ConversationSidebar />
         <div className="flex-1 min-w-0 flex flex-col">
           {/* 页头：复用浮窗同款标题/状态文案（chat.title / chat.status），不新增 i18n 键 */}
-          <div className="p-5 bg-[#d97757] flex items-center space-x-3 shrink-0">
+          <div className="p-5 bg-primary flex items-center space-x-3 shrink-0">
             <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center text-white">
               <i className="fas fa-comments text-sm"></i>
             </div>

@@ -54,10 +54,10 @@ const USTaxToolsPage: React.FC<Props> = ({ selectedYear }) => {
       <h2 className="text-2xl font-bold text-[#191918]">{t('usTax.title', 'US Tax Tools')}</h2>
 
       <div className="flex border-b border-[#e0ddd5]">
-        <button onClick={() => setActiveTab('mileage')} className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'mileage' ? 'border-[#d97757] text-[#d97757]' : 'border-transparent text-[#7a7a78]'}`}>
+        <button onClick={() => setActiveTab('mileage')} className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'mileage' ? 'border-primary text-primary' : 'border-transparent text-[#7a7a78]'}`}>
           <i className="fas fa-car mr-2"></i>{t('usTax.mileage', 'Mileage Tracking')}
         </button>
-        <button onClick={() => setActiveTab('homeOffice')} className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'homeOffice' ? 'border-[#d97757] text-[#d97757]' : 'border-transparent text-[#7a7a78]'}`}>
+        <button onClick={() => setActiveTab('homeOffice')} className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'homeOffice' ? 'border-primary text-primary' : 'border-transparent text-[#7a7a78]'}`}>
           <i className="fas fa-home mr-2"></i>{t('usTax.homeOffice', 'Home Office')}
         </button>
       </div>
@@ -129,11 +129,11 @@ const MileageSection: React.FC<{ mileageRate: string; mileageYear: number }> = (
 
       {/* Add button */}
       {!showForm ? (
-        <button onClick={() => setShowForm(true)} className="flex items-center px-5 py-2.5 bg-[#d97757] hover:bg-[#c56a4a] text-white rounded-xl text-sm font-medium">
+        <button onClick={() => setShowForm(true)} className="flex items-center px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-sm font-medium">
           <i className="fas fa-plus mr-2"></i>{t('usTax.addTrip', 'Log a Trip')}
         </button>
       ) : (
-        <div className="border border-[#d97757]/30 bg-[#d97757]/5 rounded-xl p-5 space-y-4">
+        <div className="border border-primary/30 bg-primary/5 rounded-xl p-5 space-y-4">
           <h3 className="text-sm font-semibold text-[#191918]">{t('usTax.newTrip', 'New Mileage Entry')}</h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -163,7 +163,7 @@ const MileageSection: React.FC<{ mileageRate: string; mileageYear: number }> = (
           </label>
           <div className="flex space-x-2">
             <button onClick={() => setShowForm(false)} className="px-4 py-2 border border-[#e0ddd5] text-[#4a4a48] rounded-lg text-sm">{t('common.cancel')}</button>
-            <button onClick={handleAdd} disabled={saving} className="px-4 py-2 bg-[#d97757] text-white rounded-lg text-sm disabled:opacity-50">{saving ? t('common.saving') : t('common.save')}</button>
+            <button onClick={handleAdd} disabled={saving} className="px-4 py-2 bg-primary text-white rounded-lg text-sm disabled:opacity-50">{saving ? t('common.saving') : t('common.save')}</button>
           </div>
         </div>
       )}
@@ -207,7 +207,7 @@ const MileageSection: React.FC<{ mileageRate: string; mileageYear: number }> = (
       )}
 
       <div className="text-[10px] text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3">
-        <i className="fas fa-info-circle mr-1.5 text-[#d97757]"></i>
+        <i className="fas fa-info-circle mr-1.5 text-primary"></i>
         {t('usTax.mileageNote', { rate: mileageRate, year: mileageYear, defaultValue: 'IRS standard mileage rate: ${{rate}}/mile ({{year}}). Deduction auto-calculated and maps to Schedule C Line 9 (Car & Truck Expenses).' })}
       </div>
     </div>
@@ -247,10 +247,10 @@ const HomeOfficeSection: React.FC = () => {
 
       {/* Method Toggle */}
       <div className="flex bg-white/80 p-1.5 rounded-xl border border-[#e0ddd5] w-fit">
-        <button onClick={() => handleSave({ method: 'simplified' })} className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${data.method === 'simplified' ? 'bg-[#d97757] text-white' : 'text-[#4a4a48]'}`}>
+        <button onClick={() => handleSave({ method: 'simplified' })} className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${data.method === 'simplified' ? 'bg-primary text-white' : 'text-[#4a4a48]'}`}>
           {t('usTax.simplified', 'Simplified Method')}
         </button>
-        <button onClick={() => handleSave({ method: 'actual' })} className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${data.method === 'actual' ? 'bg-[#d97757] text-white' : 'text-[#4a4a48]'}`}>
+        <button onClick={() => handleSave({ method: 'actual' })} className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${data.method === 'actual' ? 'bg-primary text-white' : 'text-[#4a4a48]'}`}>
           {t('usTax.actual', 'Actual Expenses')}
         </button>
       </div>
@@ -310,7 +310,7 @@ const HomeOfficeSection: React.FC = () => {
       )}
 
       <div className="text-[10px] text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3">
-        <i className="fas fa-info-circle mr-1.5 text-[#d97757]"></i>
+        <i className="fas fa-info-circle mr-1.5 text-primary"></i>
         {t('usTax.homeOfficeNote', 'Simplified method: max $1,500 (300 sqft × $5). Actual method requires tracking actual expenses and prorating by area. Maps to Schedule C Line 30 / Form 8829.')}
       </div>
     </div>

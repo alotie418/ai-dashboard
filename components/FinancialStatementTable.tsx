@@ -34,7 +34,7 @@ const FinancialStatementTable: React.FC<Props> = ({ data, accountingLocale = 'CN
   return (
     <div className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl overflow-hidden h-full flex flex-col" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
       <div className="p-6 border-b border-[#e0ddd5] flex items-center space-x-3">
-        <i className="fas fa-file-invoice-dollar text-lg text-[#d97757]"></i>
+        <i className="fas fa-file-invoice-dollar text-lg text-primary"></i>
         <h3 className="text-lg font-bold text-[#191918]">{label('plRevenue').split('.')[0] || 'P&L'}</h3>
       </div>
       <div className="flex flex-col flex-1 justify-around py-2">
@@ -52,9 +52,9 @@ const FinancialStatementTable: React.FC<Props> = ({ data, accountingLocale = 'CN
 };
 
 const LineItem: React.FC<{ label: string; value: string; bold?: boolean; primary?: boolean; success?: boolean }> = ({ label, value, bold, primary, success }) => (
-  <div className={`flex justify-between items-center px-6 py-3 hover:bg-[#f0eeeb] transition-colors ${bold ? 'font-bold' : ''} ${primary ? 'bg-[#d97757]/5' : ''} ${success ? 'bg-emerald-500/5' : ''}`}>
+  <div className={`flex justify-between items-center px-6 py-3 hover:bg-[#f0eeeb] transition-colors ${bold ? 'font-bold' : ''} ${primary ? 'bg-primary/5' : ''} ${success ? 'bg-emerald-500/5' : ''}`}>
     <span className="text-sm text-[#4a4a48]">{label}</span>
-    <span className={`text-base font-mono ${primary ? 'text-[#d97757]' : success ? 'text-emerald-600' : 'text-[#4a4a48]'}`}>{value}</span>
+    <span className={`text-base font-mono ${primary ? 'text-primary' : success ? 'text-emerald-600' : 'text-[#4a4a48]'}`}>{value}</span>
   </div>
 );
 
