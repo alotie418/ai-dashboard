@@ -602,6 +602,22 @@ async function checkConversationsNoSecrets() {
   }
 }
 
+async function checkAgentBudget() {
+  // R4b: the read-only agent loop's guardrails must stay in place — MAX_ROUNDS / MAX_ROWS (R2b-1)
+  // and the R4b token budget MAX_TOKENS. Removing the budget would let a runaway loop accumulate
+  // unbounded context (cost / context-window risk). Lock that all three caps remain declared.
+  let src;
+  try { src = await readFile(join(ROOT, 'electron/ai/agent.js'), 'utf8'); } catch { return; }
+  for (const cap of ['MAX_ROUNDS', 'MAX_ROWS', 'MAX_TOKENS']) {
+    if (!new RegExp(`\\b${cap}\\b`).test(src)) {
+      findings.push({
+        file: 'electron/ai/agent.js', line: 0, type: 'agent-guardrail-missing', token: cap,
+        snippet: `agent.js must keep the ${cap} guardrail — round / row / token caps bound the read-only agent loop; do not remove`,
+      });
+    }
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -623,6 +639,7 @@ async function main() {
   await checkAIErrorCodes();
   await checkNoTTSResidue();
   await checkConversationsNoSecrets();
+  await checkAgentBudget();
   await checkAnalyticsMatrixDisplay();
   await checkFinanceMoneyFormat();
 

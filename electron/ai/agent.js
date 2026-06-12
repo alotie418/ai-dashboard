@@ -9,8 +9,10 @@
 
 const { toolDefs, executeReadonlyTool } = require('./tools');
 
-const MAX_ROUNDS = 5;   // 单次用户消息内最多 LLM↔工具往返轮数
-const MAX_ROWS = 50;    // 单工具结果最多回传给模型的行数
+const MAX_ROUNDS = 5;     // 单次用户消息内最多 LLM↔工具往返轮数
+const MAX_ROWS = 50;      // 单工具结果最多回传给模型的行数
+const MAX_TOKENS = 60000; // 累计上下文 token 预算（backstop；MAX_ROUNDS/MAX_ROWS 为主限）。
+                          // 超预算即停止再下钻、走兜底用已查数据答一次（不报错）。
 
 // 注入到 system 末尾：约束工具语义 + 缓解 prompt injection（工具结果仅为数据，不得当指令）。
 // 刻意用 locale-neutral 英文写在主进程，不进 i18n（与口径 / 语言解耦）。
@@ -33,12 +35,29 @@ function argsSummary(args) {
   }
 }
 
-async function runAgentLoop({ adapter, apiKey, model, history, system, maxRounds = MAX_ROUNDS }) {
+// 粗估累计上下文 token 数（provider 无关、无依赖）：序列化字符数 / 3 —— 偏保守不低估
+// （CJK 字符/token 比低，用 /3 留余量）。仅用于 backstop 预算闸，无需精确。
+function estimateTokens(history, system) {
+  let chars = (system || '').length;
+  for (const m of history) {
+    try { chars += JSON.stringify(m).length; } catch { /* 跳过不可序列化项 */ }
+  }
+  return Math.ceil(chars / 3);
+}
+
+async function runAgentLoop({ adapter, apiKey, model, history, system, maxRounds = MAX_ROUNDS, maxTokens = MAX_TOKENS }) {
   const tools = toolDefs();
   const sys = (system || '') + TOOL_SYS_SUFFIX;
   const trace = [];
 
   for (let round = 0; round < maxRounds; round++) {
+    // token 预算闸：累计上下文超预算则停止再下钻，落到下方「超轮/超预算兜底」用已查数据
+    // 答一次（不报错——与达轮次上限同一收尾路径）。round 0 上下文仅初始用户消息，不会触发，
+    // 保证至少一次真实尝试。
+    if (estimateTokens(history, sys) >= maxTokens) {
+      console.warn('[agent] token budget reached — answering with gathered data (no more tool rounds)');
+      break;
+    }
     const step = await adapter.chatWithTools(apiKey, model, { history, system: sys, tools });
     if (step.type === 'final') return { text: step.text || '', toolTrace: trace };
 
@@ -71,10 +90,10 @@ async function runAgentLoop({ adapter, apiKey, model, history, system, maxRounds
     history.push(...(Array.isArray(resultTurn) ? resultTurn : [resultTurn]));
   }
 
-  // 超轮次兜底：用 chatWithTools 但不带工具（provider 无关、避免把原生 history 再过一遍 chat 的归一化
-  // 而丢失工具轮项），逼出基于已查数据的最终文本答（避免停在工具调用态）。tools:[] → 模型无工具可调 → final。
+  // 超轮次 / 超预算兜底：用 chatWithTools 但不带工具（provider 无关、避免把原生 history 再过一遍 chat 的
+  // 归一化而丢失工具轮项），逼出基于已查数据的最终文本答（避免停在工具调用态）。tools:[] → 模型无工具可调 → final。
   const fin = await adapter.chatWithTools(apiKey, model, { history, system: sys, tools: [] });
   return { text: fin.type === 'final' ? (fin.text || '') : '', toolTrace: trace };
 }
 
-module.exports = { runAgentLoop, MAX_ROUNDS, MAX_ROWS };
+module.exports = { runAgentLoop, MAX_ROUNDS, MAX_ROWS, MAX_TOKENS };
