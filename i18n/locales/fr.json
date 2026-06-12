@@ -186,7 +186,6 @@
       "resetTo": "Réinitialiser à {{model}}",
       "configured": "Configuré",
       "notConfigured": "Non configuré",
-      "supportsTTS": "Supporte TTS",
       "supportsWebGrounding": "Supporte Web Grounding",
       "providerSavedToast": "{{name}} enregistré",
       "modelUpdatedToast": "Modèle {{name}} mis à jour",
@@ -272,19 +271,19 @@
     "industryPlaceholder": "ex. Commerce chimique / Logiciel / Conseil",
     "finishAndEnter": "Terminer et entrer dans l'app",
     "skipCompany": "Ignorer pour l'instant, remplir plus tard",
-    "localeDesc": "Ces deux paramètres sont indépendants. La langue UI contrôle les menus et libellés. La norme comptable contrôle les règles fiscales, devise et rapports."
-  },
-  "byok": {
+    "localeDesc": "Ces deux paramètres sont indépendants. La langue UI contrôle les menus et libellés. La norme comptable contrôle les règles fiscales, devise et rapports.",
+    "brandTagline": "SoloLedger · un registre intelligent pour les entreprises individuelles",
+    "loadFailedTitle": "Échec du chargement de la configuration du fournisseur d'IA",
+    "loadFailedHint": "Si vous venez de mettre à jour SoloLedger, quittez complètement l'application (Cmd+Q) puis redémarrez.",
+    "providersEmpty": "La liste des fournisseurs est vide. Quittez complètement SoloLedger (Cmd+Q) puis redémarrez.",
+    "savedBadge": "✓ Enregistré",
+    "clickToExpand": "Cliquer pour configurer",
+    "defaultBadge": "Par défaut",
     "howToGetKey": "Comment obtenir une clé {{provider}}",
-    "apiKey": "Clé API",
-    "modelHelp": "Si vous obtenez model_not_found, consultez la documentation du fournisseur pour les IDs disponibles",
-    "customMarker": "personnalisé",
-    "supportsTTSHint": "Supporte TTS"
-  },
-  "providers": {
-    "anthropic": "Claude · Anthropic",
-    "openai": "ChatGPT · OpenAI",
-    "gemini": "Gemini · Google"
+    "testing": "Test en cours",
+    "saving": "Enregistrement",
+    "saveBtn": "Enregistrer",
+    "optional": "(optionnel)"
   },
   "header": {
     "yearSuffix": "",
@@ -371,7 +370,6 @@
     "netMarginDesc": "Formula: Net Profit / Revenue",
     "grossProfitNote": "Gross margin reflects product profitability",
     "netProfitNote": "Net margin reflects profitability after operating costs",
-    "geminiCredit": "Powered by GEMINI 3 FLASH",
     "grossMargin": "Gross Margin",
     "netMargin": "Net Margin",
     "grossMarginFormula": "Formula: Gross Profit / Revenue",
@@ -845,7 +843,7 @@
     "quotaSwitchHint": "{{providers}} disponible — changez dans Paramètres → Fournisseurs d'IA.",
     "retry": "Retry",
     "empty": "No analysis data. Click refresh to generate.",
-    "powered": "Powered by GEMINI 3 FLASH"
+    "powered": "Propulsé par l'IA"
   },
   "aiError": {
     "noProvider": "Aucun fournisseur d'IA configuré. Ajoutez une clé API dans Paramètres → Fournisseurs d'IA.",

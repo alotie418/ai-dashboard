@@ -218,7 +218,6 @@ const ProvidersSection: React.FC = () => {
                               {isKnown && (
                                 <code className="ml-1.5 bg-[#f0eeeb] px-1.5 py-0.5 rounded text-[10px]">{p.model}</code>
                               )}
-                              {p.supportsTTS && <span className="ml-2 text-[#d97757]">{t('settings.ai.supportsTTS')}</span>}
                               {p.supportsWebGrounding && <span className="ml-2 text-[#d97757]">{usLabel('setWebGrounding', 'settings.ai.supportsWebGrounding')}</span>}
                             </div>
                             {!isKnown && p.hasKey && (

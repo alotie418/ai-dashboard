@@ -186,7 +186,6 @@
       "resetTo": "Reset to {{model}}",
       "configured": "Configured",
       "notConfigured": "Not configured",
-      "supportsTTS": "Supports TTS",
       "supportsWebGrounding": "Supports Web Grounding",
       "providerSavedToast": "{{name}} saved",
       "modelUpdatedToast": "{{name}} model updated",
@@ -272,19 +271,19 @@
     "industryPlaceholder": "e.g. Chemical trade / Software / Consulting",
     "finishAndEnter": "Finish and enter app",
     "skipCompany": "Skip for now; fill in settings later",
-    "localeDesc": "These are independent settings. UI language controls menus and labels. Accounting standard controls tax rules, currency, and reports."
-  },
-  "byok": {
+    "localeDesc": "These are independent settings. UI language controls menus and labels. Accounting standard controls tax rules, currency, and reports.",
+    "brandTagline": "SoloLedger · smart ledger for one-person companies",
+    "loadFailedTitle": "Failed to load AI provider configuration",
+    "loadFailedHint": "If you just upgraded SoloLedger, fully quit the app (Cmd+Q) and restart.",
+    "providersEmpty": "The provider list is empty. Fully quit SoloLedger (Cmd+Q) and restart.",
+    "savedBadge": "✓ Saved",
+    "clickToExpand": "Click to configure",
+    "defaultBadge": "Default",
     "howToGetKey": "How to get a {{provider}} Key",
-    "apiKey": "API Key",
-    "modelHelp": "If you get model_not_found, check the provider's docs for current available IDs",
-    "customMarker": "custom",
-    "supportsTTSHint": "Supports TTS"
-  },
-  "providers": {
-    "anthropic": "Claude · Anthropic",
-    "openai": "ChatGPT · OpenAI",
-    "gemini": "Gemini · Google"
+    "testing": "Testing",
+    "saving": "Saving",
+    "saveBtn": "Save",
+    "optional": "(optional)"
   },
   "header": {
     "yearSuffix": "",
@@ -371,7 +370,6 @@
     "netMarginDesc": "Formula: Net Profit / Revenue",
     "grossProfitNote": "Gross margin reflects product profitability",
     "netProfitNote": "Net margin reflects profitability after operating costs",
-    "geminiCredit": "Powered by GEMINI 3 FLASH",
     "grossMargin": "Gross Margin",
     "netMargin": "Net Margin",
     "grossMarginFormula": "Formula: Gross Profit / Revenue",
@@ -845,7 +843,7 @@
     "quotaSwitchHint": "{{providers}} available — switch in Settings → AI Providers.",
     "retry": "Retry",
     "empty": "No analysis data. Click refresh to generate.",
-    "powered": "Powered by GEMINI 3 FLASH"
+    "powered": "Powered by AI"
   },
   "aiError": {
     "noProvider": "No AI provider configured. Add an API key under Settings → AI Providers.",

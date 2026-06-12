@@ -150,6 +150,11 @@ const REQUIRED_I18N_KEYS = [
   'aiError.noProvider', 'aiError.auth', 'aiError.permission', 'aiError.quota',
   'aiError.modelNotFound', 'aiError.badRequest', 'aiError.serverError',
   'aiError.parseFailed', 'aiError.network', 'aiError.timeout', 'aiError.unknown',
+  // R4c: onboarding wizard new keys (rest of onboarding.* wired from pre-existing keys)
+  'onboarding.brandTagline', 'onboarding.loadFailedTitle', 'onboarding.loadFailedHint',
+  'onboarding.providersEmpty', 'onboarding.savedBadge', 'onboarding.clickToExpand',
+  'onboarding.defaultBadge', 'onboarding.howToGetKey', 'onboarding.testing',
+  'onboarding.saving', 'onboarding.saveBtn', 'onboarding.optional',
   // US Tax Tools — required in all 6 locales (page may render under US locale + any uiLanguage)
   'usTax.title', 'usTax.notApplicable', 'usTax.mileage', 'usTax.homeOffice',
   'usTax.totalTrips', 'usTax.totalMiles', 'usTax.deduction', 'usTax.addTrip',

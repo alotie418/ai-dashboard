@@ -186,7 +186,6 @@
       "resetTo": "{{model}}にリセット",
       "configured": "設定済み",
       "notConfigured": "未設定",
-      "supportsTTS": "TTS対応",
       "supportsWebGrounding": "Web Grounding対応",
       "providerSavedToast": "{{name}} 保存しました",
       "modelUpdatedToast": "{{name}} モデルを更新しました",
@@ -272,19 +271,19 @@
     "industryPlaceholder": "例：化学品商社 / ソフトウェア開発 / コンサルティング",
     "finishAndEnter": "完了してアプリに入る",
     "skipCompany": "後でスキップ、設定で後ほど記入",
-    "localeDesc": "これら2つの設定は独立しています。UI言語はメニューとラベルを制御。会計制度は税制、通貨、帳票を制御。"
-  },
-  "byok": {
-    "howToGetKey": "{{provider}} Keyの取得方法",
-    "apiKey": "API Key",
-    "modelHelp": "model_not_foundエラーが出た場合は、プロバイダー公式サイトで最新の利用可能IDを確認してください",
-    "customMarker": "カスタム",
-    "supportsTTSHint": "TTS対応"
-  },
-  "providers": {
-    "anthropic": "Claude · Anthropic",
-    "openai": "ChatGPT · OpenAI",
-    "gemini": "Gemini · Google"
+    "localeDesc": "これら2つの設定は独立しています。UI言語はメニューとラベルを制御。会計制度は税制、通貨、帳票を制御。",
+    "brandTagline": "SoloLedger · 一人会社のためのスマート台帳",
+    "loadFailedTitle": "AI プロバイダー設定の読み込みに失敗しました",
+    "loadFailedHint": "SoloLedger をアップグレードした直後の場合は、アプリを完全に終了（Cmd+Q）してから再起動してください。",
+    "providersEmpty": "プロバイダー一覧が空です。SoloLedger を完全に終了（Cmd+Q）してから再起動してください。",
+    "savedBadge": "✓ 保存済み",
+    "clickToExpand": "クリックして設定",
+    "defaultBadge": "デフォルト",
+    "howToGetKey": "{{provider}} Key の取得方法",
+    "testing": "テスト中",
+    "saving": "保存中",
+    "saveBtn": "保存",
+    "optional": "（任意）"
   },
   "header": {
     "yearSuffix": "年度",
@@ -371,7 +370,6 @@
     "netMarginDesc": "Formula: Net Profit / Revenue",
     "grossProfitNote": "Gross margin reflects product profitability",
     "netProfitNote": "Net margin reflects profitability after operating costs",
-    "geminiCredit": "Powered by GEMINI 3 FLASH",
     "grossMargin": "Gross Margin",
     "netMargin": "Net Margin",
     "grossMarginFormula": "Formula: Gross Profit / Revenue",
@@ -845,7 +843,7 @@
     "quotaSwitchHint": "{{providers}} が利用可能です。設定 → AIプロバイダー で切り替えできます。",
     "retry": "Retry",
     "empty": "No analysis data. Click refresh to generate.",
-    "powered": "Powered by GEMINI 3 FLASH"
+    "powered": "Powered by AI"
   },
   "aiError": {
     "noProvider": "AI プロバイダーが未設定です。「設定 → AI プロバイダー」で API キーを追加してください。",

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MOCK_BUSINESS_DATA } from './constants';
-import { fetchAIAnalysis } from './services/geminiService';
+import { fetchAIAnalysis } from './services/aiBriefingService';
 import { AIAnalysis, BusinessData } from './types';
 import { fetchDashboardData, fetchSales, fetchPurchases, fetchSettings, listProviders } from './services/api';
 import { parseAiErrorCode, aiErrorMessage } from './services/aiErrors';

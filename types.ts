@@ -191,7 +191,6 @@ export interface AIProviderConfig {
   enabled: boolean;
   isDefault: boolean;
   supportsOCR: boolean;
-  supportsTTS: boolean;
   supportsWebGrounding: boolean;
 }
 

@@ -126,7 +126,6 @@ function list() {
       enabled: row ? !!row.enabled : false,
       isDefault: row ? !!row.is_default : false,
       supportsOCR: meta.capabilities.ocr,
-      supportsTTS: meta.capabilities.tts,
       supportsWebGrounding: meta.capabilities.webGrounding,
     };
   });
