@@ -664,6 +664,7 @@
     "chartSalesTons": "銷售量",
     "chartUnitProfit": "單位利潤",
     "forecastDefault": "暫無預測結果",
+    "insufficientHistory": "歷史資料不足，無法計算環比/同比",
     "forecastEstProfit": "預估利潤",
     "forecastLoading": "正在生成預測...",
     "forecastLowerBound": "下限",

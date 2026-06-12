@@ -4,6 +4,7 @@
 
 const { getDb } = require('../db');
 const reportEngine = require('../reports');
+const { computeMonthlyComparisons } = require('./_metrics');
 
 const MONTH_NAMES = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
@@ -102,7 +103,7 @@ async function summary({ query }) {
       monthlyPerformance.push({
         name: MONTH_NAMES[m - 1], revenue, cost, profit: revenue - cost,
         purchaseTons: p.purchaseTons || 0, salesTons: s.salesTons || 0,
-        netProfit: revenue - cost - (s.salesShipping || 0), yoy: 0, mom: 0, deflator: 0,
+        netProfit: revenue - cost - (s.salesShipping || 0), yoy: null, mom: null, deflator: null,
       });
     }
   }
@@ -114,9 +115,34 @@ async function summary({ query }) {
       revenue: m.revenue, cost: m.cost, profit: m.profit,
       purchaseTons: monthlyPerformance[i]?.purchaseTons || 0,
       salesTons: monthlyPerformance[i]?.salesTons || 0,
-      netProfit: m.profit, yoy: 0, mom: 0, deflator: 0,
+      netProfit: m.profit, yoy: null, mom: null, deflator: null,
     }));
   }
+
+  // ===== 真实环比/同比/价格指数（PR-A）=====
+  // 去年同月营收经报表引擎同源生成（与当年口径一致）；失败/无数据→null→前端显「—」。
+  // mom/yoy 按营收（不含税）；基期缺失或为 0 一律 null，绝不显示 0.0%。
+  let priorRevenue = [];
+  try {
+    const priorYear = String(Number(year) - 1);
+    const priorReport = reportEngine.generate(db, { locale, year: priorYear });
+    if (priorReport?.monthlyBreakdown) {
+      priorRevenue = Array.from({ length: 12 }, (_, i) => {
+        const v = priorReport.monthlyBreakdown[i]?.revenue;
+        return v == null ? null : v;
+      });
+    } else if (hasSales) {
+      const rows = db.prepare(`
+        SELECT CAST(strftime('%m', date) AS INTEGER) as m, COALESCE(SUM(amountWithoutTax), 0) as rev
+        FROM sales WHERE date >= ? AND date <= ? GROUP BY strftime('%m', date)
+      `).all(`${priorYear}-01-01`, `${priorYear}-12-31`);
+      const pm = Object.fromEntries(rows.map(r => [r.m, r.rev]));
+      priorRevenue = Array.from({ length: 12 }, (_, i) => (pm[i + 1] ?? null));
+    }
+  } catch (e) {
+    console.warn('[dashboard] prior-year revenue query failed:', e?.message || e);
+  }
+  monthlyPerformance = computeMonthlyComparisons(monthlyPerformance, priorRevenue);
 
   // ===== 构建 financialStatement（从报表引擎或 fallback）=====
   const is = report?.incomeStatement || report?.profitLoss || report?.scheduleC;

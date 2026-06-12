@@ -664,6 +664,7 @@
     "chartSalesTons": "Ventes",
     "chartUnitProfit": "Bénéfice unitaire",
     "forecastDefault": "Aucune prévision",
+    "insufficientHistory": "Historique insuffisant pour calculer les variations mensuelle/annuelle",
     "forecastEstProfit": "Bénéfice estimé",
     "forecastLoading": "Génération de la prévision...",
     "forecastLowerBound": "Borne inférieure",

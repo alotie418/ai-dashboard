@@ -664,6 +664,7 @@
     "chartSalesTons": "売上量",
     "chartUnitProfit": "単位利益",
     "forecastDefault": "予測結果なし",
+    "insufficientHistory": "履歴が不足しており前月比/前年比を計算できません",
     "forecastEstProfit": "予想利益",
     "forecastLoading": "予測を生成中...",
     "forecastLowerBound": "下限",

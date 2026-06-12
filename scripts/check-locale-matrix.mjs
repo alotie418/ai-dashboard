@@ -140,6 +140,8 @@ const REQUIRED_I18N_KEYS = [
   'analysis.progress', 'analysis.peakMonthSub',
   'analysis.severityLow', 'analysis.severityMid', 'analysis.severityHigh',
   'analysis.corrStrong', 'analysis.corrModerate', 'analysis.corrWeak',
+  // PR-A: data-analysis metrics correctness — insufficient-history empty state (MoM/YoY)
+  'analysis.insufficientHistory',
   // R3b: data-analysis forecast — idle CTA + i18n-driven prompt prose (follows uiLanguage)
   'analysis.forecastIdle', 'analysis.runForecast',
   'analysis.forecastPromptIntro', 'analysis.forecastPromptHistoryTitle', 'analysis.forecastPromptHistoryLegend',
