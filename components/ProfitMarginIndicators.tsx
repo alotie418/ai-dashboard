@@ -40,10 +40,10 @@ const ProfitMarginIndicators: React.FC<Props> = ({ data, accountingLocale = 'CN'
         <div className="space-y-3">
           <div className="flex justify-between items-end">
             <span className="text-sm text-[#4a4a48] font-medium">{t('dashboard.grossMargin')}</span>
-            <span className="text-[#d97757] font-bold text-xl">{grossMargin}%</span>
+            <span className="text-primary font-bold text-xl">{grossMargin}%</span>
           </div>
           <div className="w-full bg-[#f0eeeb]/50 h-2.5 rounded-full overflow-hidden">
-            <div className="bg-[#d97757] h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${Math.max(0, Math.min(100, grossMargin))}%`, boxShadow: '0 0 10px rgba(217,119,87,0.3)' }}></div>
+            <div className="bg-primary h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${Math.max(0, Math.min(100, grossMargin))}%`, boxShadow: '0 0 10px rgba(39,76,146,0.3)' }}></div>
           </div>
           <div className="text-[#5c5c5a] text-[10px] uppercase tracking-tight">{t('dashboard.grossMarginFormula')}</div>
         </div>

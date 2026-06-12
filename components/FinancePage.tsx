@@ -164,7 +164,7 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
     return `<!DOCTYPE html><html lang="${escapeHtml(i18n.language)}"><head><meta charset="utf-8"><style>
 *{box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans","Hiragino Kaku Gothic ProN","Apple SD Gothic Neo","Microsoft YaHei","Noto Sans CJK SC",sans-serif;color:#191918;margin:0;padding:32px;font-size:13px;line-height:1.5;}
-.hdr{border-bottom:2px solid #d97757;padding-bottom:14px;margin-bottom:18px;}
+.hdr{border-bottom:2px solid #274C92;padding-bottom:14px;margin-bottom:18px;}
 .company{font-size:20px;font-weight:700;}
 .rname{font-size:15px;margin-top:4px;color:#333;}
 .meta{margin-top:10px;font-size:11px;color:#5c5c5a;}
@@ -216,12 +216,12 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
       {/* Header */}
       <div className="flex justify-end space-x-3">
         <button onClick={exportCSV} className="flex items-center px-4 py-2 bg-white border border-[#e0ddd5] rounded-xl text-sm font-medium text-[#4a4a48] hover:text-[#191918] transition-all">
-          <i className="fas fa-file-export mr-2 text-[#d97757]"></i> {t('finance.export')}
+          <i className="fas fa-file-export mr-2 text-primary"></i> {t('finance.export')}
         </button>
         <button onClick={handleExportPdf} disabled={pdfBusy} className="flex items-center px-4 py-2 bg-white border border-[#e0ddd5] rounded-xl text-sm font-medium text-[#4a4a48] hover:text-[#191918] transition-all disabled:opacity-50">
-          {pdfBusy ? <span className="mr-2 inline-block w-3 h-3 border-2 border-[#d97757]/30 border-t-[#d97757] rounded-full animate-spin"></span> : <i className="fas fa-file-pdf mr-2 text-[#d97757]"></i>} {t('finance.exportPdf')}
+          {pdfBusy ? <span className="mr-2 inline-block w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></span> : <i className="fas fa-file-pdf mr-2 text-primary"></i>} {t('finance.exportPdf')}
         </button>
-        <button className="flex items-center px-4 py-2 bg-[#d97757] hover:bg-[#c56a4a] text-white rounded-xl text-sm font-medium transition-all" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}>
+        <button className="flex items-center px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-sm font-medium transition-all" style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}>
           <i className="fas fa-print mr-2"></i> {t('finance.print')}
         </button>
       </div>
@@ -257,13 +257,13 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
 
       {/* Tabs */}
       <div className="flex bg-white/80 p-1.5 rounded-xl border border-[#e0ddd5] w-fit">
-        <button onClick={() => setActiveTab('pl')} className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'pl' ? 'bg-[#d97757] text-white' : 'text-[#4a4a48] hover:text-[#191918]'}`} style={activeTab === 'pl' ? { boxShadow: '0 4px 16px rgba(217,119,87,0.15)' } : {}}>
+        <button onClick={() => setActiveTab('pl')} className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'pl' ? 'bg-primary text-white' : 'text-[#4a4a48] hover:text-[#191918]'}`} style={activeTab === 'pl' ? { boxShadow: '0 4px 16px rgba(39,76,146,0.15)' } : {}}>
           {plTabLabel}
         </button>
-        <button onClick={() => setActiveTab('balance')} className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'balance' ? 'bg-[#d97757] text-white' : 'text-[#4a4a48] hover:text-[#191918]'}`} style={activeTab === 'balance' ? { boxShadow: '0 4px 16px rgba(217,119,87,0.15)' } : {}}>
+        <button onClick={() => setActiveTab('balance')} className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'balance' ? 'bg-primary text-white' : 'text-[#4a4a48] hover:text-[#191918]'}`} style={activeTab === 'balance' ? { boxShadow: '0 4px 16px rgba(39,76,146,0.15)' } : {}}>
           {t('finance.tabBalance')}
         </button>
-        <button onClick={() => setActiveTab('cashflow')} className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'cashflow' ? 'bg-[#d97757] text-white' : 'text-[#4a4a48] hover:text-[#191918]'}`} style={activeTab === 'cashflow' ? { boxShadow: '0 4px 16px rgba(217,119,87,0.15)' } : {}}>
+        <button onClick={() => setActiveTab('cashflow')} className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'cashflow' ? 'bg-primary text-white' : 'text-[#4a4a48] hover:text-[#191918]'}`} style={activeTab === 'cashflow' ? { boxShadow: '0 4px 16px rgba(39,76,146,0.15)' } : {}}>
           {t('finance.tabCashflow')}
         </button>
       </div>
@@ -271,7 +271,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
       {/* Loading / Error */}
       {loading && (
         <div className="text-center py-8 text-sm text-[#7a7a78]">
-          <i className="fas fa-spinner fa-spin mr-2 text-[#d97757]"></i>{t('common.loading')}
+          <i className="fas fa-spinner fa-spin mr-2 text-primary"></i>{t('common.loading')}
         </div>
       )}
       {error && (
@@ -498,9 +498,9 @@ interface LineItemProps {
 }
 
 const LineItem: React.FC<LineItemProps> = ({ label, value, bold, indent, primary, success }) => (
-  <div className={`flex justify-between items-center py-3 px-4 rounded-xl transition-colors hover:bg-[#f0eeeb]/50 ${bold ? 'font-bold' : ''} ${primary ? 'bg-[#d97757]/5' : ''} ${success ? 'bg-emerald-500/5' : ''}`}>
+  <div className={`flex justify-between items-center py-3 px-4 rounded-xl transition-colors hover:bg-[#f0eeeb]/50 ${bold ? 'font-bold' : ''} ${primary ? 'bg-primary/5' : ''} ${success ? 'bg-emerald-500/5' : ''}`}>
     <span className={`text-sm ${indent ? 'pl-8 text-[#4a4a48]' : 'text-[#191918]'}`}>{label}</span>
-    <span className={`text-base font-mono ${primary ? 'text-[#d97757]' : success ? 'text-emerald-600' : 'text-[#4a4a48]'}`}>
+    <span className={`text-base font-mono ${primary ? 'text-primary' : success ? 'text-emerald-600' : 'text-[#4a4a48]'}`}>
       {/* Callers pre-format numeric values via formatMoney(); plain numbers render with default locale */}
       {typeof value === 'number' ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value}
     </span>

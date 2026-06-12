@@ -6,9 +6,10 @@ import {
   Legend, Cell, PieChart, Pie, BarChart
 } from 'recharts';
 import { ChartData, CategoryData } from '../types';
+import { CHART_COLORS } from './theme';
 
-// Anthropic-style warm color palette
-const COLORS = ['#d97757', '#10b981', '#8b5cf6', '#f59e0b', '#3b82f6'];
+// Chart series palette — series-1 = brand blue (THEME.primary); rest stay semantic.
+const COLORS = CHART_COLORS;
 
 const EmptyChartPlaceholder: React.FC<{ height?: string }> = ({ height = 'h-80' }) => {
   const { t } = useTranslation();
@@ -54,8 +55,8 @@ export const PLStatementChart: React.FC<{ data: ChartData[]; currencySymbol?: st
           align="right"
           wrapperStyle={{ paddingBottom: '20px', fontSize: '12px', color: '#4a4a48' }}
         />
-        <Bar dataKey="revenue" name={t('analysis.chartRevenue')} fill="#d97757" radius={[4, 4, 0, 0]} barSize={30} />
-        <Bar dataKey="cost" name={t('analysis.chartCost')} fill="#e8956e" radius={[4, 4, 0, 0]} barSize={30} opacity={0.6} />
+        <Bar dataKey="revenue" name={t('analysis.chartRevenue')} fill="#274C92" radius={[4, 4, 0, 0]} barSize={30} />
+        <Bar dataKey="cost" name={t('analysis.chartCost')} fill="#5B7FC4" radius={[4, 4, 0, 0]} barSize={30} opacity={0.6} />
         <Line type="monotone" dataKey="profit" name={t('analysis.chartProfit')} stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4 }} />
       </ComposedChart>
     </ResponsiveContainer>
@@ -76,7 +77,7 @@ export const ProfitBarChart: React.FC<{ data: ChartData[]; currencySymbol?: stri
           contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
           itemStyle={{ color: '#333330' }}
         />
-        <Bar dataKey="profit" fill="#d97757" radius={[4, 4, 0, 0]} barSize={40} />
+        <Bar dataKey="profit" fill="#274C92" radius={[4, 4, 0, 0]} barSize={40} />
       </BarChart>
     </ResponsiveContainer>
   </div>
@@ -99,7 +100,7 @@ export const ProfitabilityBarChart: React.FC<{ data: ChartData[]; currencySymbol
           tickFormatter={(value) => `${currencySymbol}${value/1000}k`}
         />
         <Tooltip
-          cursor={{fill: 'rgba(217, 119, 87, 0.06)'}}
+          cursor={{fill: 'rgba(39, 76, 146, 0.06)'}}
           contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
           itemStyle={{ color: '#333330' }}
         />

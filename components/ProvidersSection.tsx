@@ -16,7 +16,7 @@ import { aiErrorMessage, aiErrorMessageFromCode } from '../services/aiErrors';
 import { KNOWN_MODELS, DEFAULT_MODEL, modelLabelFor, findModelOption, shouldAutoMigrate } from './aiProviderModels';
 
 const PROVIDER_DOCS: Record<AIProviderId, { label: string; getKeyUrl: string; placeholder: string; icon: string; color: string }> = {
-  anthropic: { label: 'Claude · Anthropic', getKeyUrl: 'https://console.anthropic.com/settings/keys', placeholder: 'sk-ant-api03-...', icon: 'fa-feather', color: '#d97757' },
+  anthropic: { label: 'Claude · Anthropic', getKeyUrl: 'https://console.anthropic.com/settings/keys', placeholder: 'sk-ant-api03-...', icon: 'fa-feather', color: '#274C92' },
   openai: { label: 'ChatGPT · OpenAI', getKeyUrl: 'https://platform.openai.com/api-keys', placeholder: 'sk-proj-...', icon: 'fa-robot', color: '#10a37f' },
   gemini: { label: 'Gemini · Google', getKeyUrl: 'https://aistudio.google.com/app/apikey', placeholder: 'AIzaSy...', icon: 'fa-gem', color: '#4285f4' },
 };
@@ -191,7 +191,7 @@ const ProvidersSection: React.FC = () => {
           const row = rowStates[p.provider] || initRow(p.model || DEFAULT_MODEL[p.provider]);
 
           return (
-            <div key={p.provider} className={`border rounded-xl ${p.isDefault ? 'border-[#d97757] bg-[#d97757]/5' : 'border-[#e0ddd5] bg-white'}`}>
+            <div key={p.provider} className={`border rounded-xl ${p.isDefault ? 'border-primary bg-primary/5' : 'border-[#e0ddd5] bg-white'}`}>
               <div className="p-5">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center">
@@ -201,7 +201,7 @@ const ProvidersSection: React.FC = () => {
                     <div>
                       <div className="flex items-center space-x-2">
                         <h4 className="text-sm font-semibold text-[#191918]">{doc.label}</h4>
-                        {p.isDefault && <span className="text-[10px] font-bold bg-[#d97757] text-white px-2 py-0.5 rounded uppercase">{t('common.default')}</span>}
+                        {p.isDefault && <span className="text-[10px] font-bold bg-primary text-white px-2 py-0.5 rounded uppercase">{t('common.default')}</span>}
                         {p.hasKey && !p.isDefault && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded uppercase">{t('settings.ai.configured')}</span>}
                         {!p.hasKey && <span className="text-[10px] font-bold text-[#7a7a78] bg-[#f0eeeb] px-2 py-0.5 rounded uppercase">{t('settings.ai.notConfigured')}</span>}
                       </div>
@@ -218,7 +218,7 @@ const ProvidersSection: React.FC = () => {
                               {isKnown && (
                                 <code className="ml-1.5 bg-[#f0eeeb] px-1.5 py-0.5 rounded text-[10px]">{p.model}</code>
                               )}
-                              {p.supportsWebGrounding && <span className="ml-2 text-[#d97757]">{usLabel('setWebGrounding', 'settings.ai.supportsWebGrounding')}</span>}
+                              {p.supportsWebGrounding && <span className="ml-2 text-primary">{usLabel('setWebGrounding', 'settings.ai.supportsWebGrounding')}</span>}
                             </div>
                             {!isKnown && p.hasKey && (
                               <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1.5">
@@ -241,7 +241,7 @@ const ProvidersSection: React.FC = () => {
 
                   <div className="flex items-center space-x-2">
                     {p.hasKey && !p.isDefault && (
-                      <button onClick={() => handleSetDefault(p.provider)} className="text-xs px-3 py-1.5 border border-[#d97757] text-[#d97757] rounded-lg hover:bg-[#d97757]/5">
+                      <button onClick={() => handleSetDefault(p.provider)} className="text-xs px-3 py-1.5 border border-primary text-primary rounded-lg hover:bg-primary/5">
                         {t('settings.ai.setAsDefault')}
                       </button>
                     )}
@@ -282,7 +282,7 @@ const ProvidersSection: React.FC = () => {
                         value={row.apiKey}
                         onChange={e => updateRow(p.provider, { apiKey: e.target.value, testResult: null })}
                         placeholder={doc.placeholder}
-                        className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm focus:outline-none focus:border-[#d97757] focus:ring-2 focus:ring-[#d97757]/20"
+                        className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                       />
                       <a href={doc.getKeyUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-[11px] mt-1.5 hover:underline" style={{ color: doc.color }}>
                         <i className="fas fa-external-link-alt mr-1 text-[9px]"></i>
@@ -324,7 +324,7 @@ const ProvidersSection: React.FC = () => {
                           value={row.model}
                           onChange={e => updateRow(p.provider, { model: e.target.value, testResult: null })}
                           placeholder={DEFAULT_MODEL[p.provider] || p.defaultModel}
-                          className="w-full mt-2 px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm bg-white focus:outline-none focus:border-[#d97757] font-mono"
+                          className="w-full mt-2 px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm bg-white focus:outline-none focus:border-primary font-mono"
                         />
                         <p className="text-[10px] text-[#7a7a78] mt-1">
                           {t('settings.ai.currentModelId')}: <code className="bg-[#f0eeeb] px-1.5 py-0.5 rounded">{row.model}</code>
@@ -389,7 +389,7 @@ const ProvidersSection: React.FC = () => {
 
       <div className="text-xs text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl p-4">
         <div className="font-semibold text-[#4a4a48] mb-2">
-          <i className="fas fa-shield-alt mr-1.5 text-[#d97757]"></i>
+          <i className="fas fa-shield-alt mr-1.5 text-primary"></i>
           {t('settings.ai.security.title')}
         </div>
         <ul className="space-y-1 list-disc list-inside">

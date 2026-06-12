@@ -278,7 +278,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
           </button>
           <button
             onClick={() => { setEditingId(null); setShowAddModal(true); }}
-            className="flex items-center px-4 py-2 bg-[#d97757] hover:bg-[#c56a4a] text-white rounded-lg transition-colors text-sm font-medium" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}
+            className="flex items-center px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors text-sm font-medium" style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}
           >
             <i className="fas fa-plus mr-2"></i> {accLocale !== 'CN' ? taxLabel('newSaleButton') : t('sales.newSale')}
           </button>
@@ -322,7 +322,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
           <div className="flex bg-[#f9f9f8] rounded-lg p-1 border border-[#e0ddd5]">
             <button
               onClick={() => setRecognitionMode('ai')}
-              className={`flex items-center px-3 py-1.5 rounded-md text-xs transition-all ${recognitionMode === 'ai' ? 'bg-[#d97757] text-white shadow-sm' : 'text-[#4a4a48] hover:text-[#191918]'}`}
+              className={`flex items-center px-3 py-1.5 rounded-md text-xs transition-all ${recognitionMode === 'ai' ? 'bg-primary text-white shadow-sm' : 'text-[#4a4a48] hover:text-[#191918]'}`}
             >
               <i className="fas fa-robot mr-2"></i> {t('sales.modeAi')}
             </button>
@@ -350,12 +350,12 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
           if (file) await processFile(file);
         }}
         className={`border-2 border-dashed rounded-xl py-12 flex flex-col items-center justify-center transition-all cursor-pointer group
-          ${isScanning ? 'border-[#d97757]/50 bg-[#d97757]/10' : 'border-[#d97757]/30 bg-[#d97757]/5 hover:bg-[#d97757]/10 hover:border-[#d97757]/50'}
+          ${isScanning ? 'border-primary/50 bg-primary/10' : 'border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/50'}
         `}
       >
         <div className="mb-4 transform group-hover:scale-110 transition-transform duration-300">
           {isScanning ? (
-            <div className="w-12 h-12 border-4 border-[#d97757]/30 border-t-[#d97757] rounded-full animate-spin"></div>
+            <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
           ) : (
             <div className="text-4xl">🤖</div>
           )}
@@ -423,7 +423,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                         setNewSale({ date: row.date, customer: row.customer, productId: row.productId || '', quantity: row.quantity, price: row.price, shipping: row.shipping, invoiceNo: row.invoiceNo, totalWithTax: row.totalWithTax || 0, unitPriceWithoutTax: row.unitPriceWithoutTax || 0, taxAmount: row.taxAmount || 0 });
                         setShowAddModal(true);
                       }}
-                      className="text-[#d97757] hover:text-[#c56a4a] transition-colors"
+                      className="text-primary hover:text-primary-hover transition-colors"
                     >{t('common2.edit')}</button>
                     <button
                       onClick={async () => {
@@ -552,7 +552,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                     required
                     value={newSale.date}
                     onChange={(e) => setNewSale({ ...newSale, date: e.target.value })}
-                    className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+                    className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
                   />
                 </div>
                 <div className="space-y-2">
@@ -562,7 +562,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                     placeholder={t('common2.optional')}
                     value={newSale.invoiceNo}
                     onChange={(e) => setNewSale({ ...newSale, invoiceNo: e.target.value })}
-                    className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+                    className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
                   />
                 </div>
               </div>
@@ -575,7 +575,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                   placeholder={usZh ? taxLabel('setFormCustomerPh') : t('sales.formCustomerPlaceholder')}
                   value={newSale.customer}
                   onChange={(e) => setNewSale({ ...newSale, customer: e.target.value })}
-                  className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+                  className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
                 />
               </div>
 
@@ -584,7 +584,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                 <select
                   value={newSale.productId || ''}
                   onChange={(e) => setNewSale({ ...newSale, productId: e.target.value })}
-                  className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+                  className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
                 >
                   <option value="">{t('products.unassigned')}</option>
                   {products.filter(p => p.is_active).map(p => (
@@ -601,7 +601,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                   placeholder={usZh ? taxLabel('setFormQtyPh') : t('sales.formQuantityPlaceholder')}
                   value={newSale.quantity}
                   onChange={(e) => setNewSale({ ...newSale, quantity: e.target.value })}
-                  className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+                  className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
                 />
               </div>
 
@@ -616,7 +616,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                       step="0.01"
                       value={newSale.price || ''}
                       onChange={(e) => setNewSale({ ...newSale, price: parseFloat(e.target.value) || 0 })}
-                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all`}
+                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all`}
                     />
                   </div>
                 </div>
@@ -629,7 +629,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                       step="0.01"
                       value={newSale.shipping || ''}
                       onChange={(e) => setNewSale({ ...newSale, shipping: parseFloat(e.target.value) || 0 })}
-                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all`}
+                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all`}
                     />
                   </div>
                 </div>
@@ -645,7 +645,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                       step="0.01"
                       value={newSale.unitPriceWithoutTax || ''}
                       onChange={(e) => setNewSale({ ...newSale, unitPriceWithoutTax: parseFloat(e.target.value) || 0 })}
-                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all`}
+                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all`}
                       placeholder={t('common2.optional')}
                     />
                   </div>
@@ -659,7 +659,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                       step="0.01"
                       value={newSale.taxAmount || ''}
                       onChange={(e) => setNewSale({ ...newSale, taxAmount: parseFloat(e.target.value) || 0 })}
-                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all`}
+                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all`}
                       placeholder={t('common2.optional')}
                     />
                   </div>
@@ -673,7 +673,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                       step="0.01"
                       value={newSale.totalWithTax || ''}
                       onChange={(e) => setNewSale({ ...newSale, totalWithTax: parseFloat(e.target.value) || 0 })}
-                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all`}
+                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all`}
                       placeholder={t('common2.optional')}
                     />
                   </div>
@@ -691,7 +691,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                 </button>
                 <button
                   type="submit"
-                  className="flex-2 px-10 py-4 bg-[#d97757] hover:bg-[#c56a4a] text-white font-bold rounded-xl transition-all active:scale-95" style={{ boxShadow: '0 4px 16px rgba(217,119,87,0.15)' }}
+                  className="flex-2 px-10 py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl transition-all active:scale-95" style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}
                 >
                   {editingId ? t('sales.formSubmitEdit') : t('sales.formSubmitNew')}
                 </button>

@@ -46,7 +46,7 @@ const ChatPanel: React.FC = () => {
         <div className="flex items-center space-x-1.5 shrink-0">
           <button
             onClick={() => { newConversation(); setConfirmClear(false); }}
-            className="flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold text-[#4a4a48] border border-[#e0ddd5] hover:text-[#d97757] hover:border-[#d97757]/40 transition-all active:scale-95"
+            className="flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold text-[#4a4a48] border border-[#e0ddd5] hover:text-primary hover:border-primary/40 transition-all active:scale-95"
           >
             <i className="fas fa-plus mr-1 text-[9px]"></i>{t('chat.newConversation')}
           </button>
@@ -72,13 +72,13 @@ const ChatPanel: React.FC = () => {
       <div className="flex-1 p-6 space-y-6 overflow-y-auto custom-scrollbar bg-[#fafaf9]">
         {messages.length === 0 && (
           <div className="bg-white p-6 rounded-xl text-[#4a4a48] text-sm leading-relaxed border border-[#e0ddd5]">
-            <p className="font-semibold text-[#d97757] mb-2 flex items-center"><i className="fas fa-hand-sparkles mr-2"></i> {t('chat.welcome')}</p>
+            <p className="font-semibold text-primary mb-2 flex items-center"><i className="fas fa-hand-sparkles mr-2"></i> {t('chat.welcome')}</p>
             <p className="text-[#6b6b69]">{t('chat.welcomeDesc')}</p>
           </div>
         )}
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`relative group max-w-[88%] p-4 rounded-xl text-sm leading-relaxed ${m.role === 'user' ? 'bg-[#d97757] text-white rounded-tr-sm' : 'bg-white text-[#4a4a48] border border-[#e0ddd5] rounded-tl-sm'}`}>
+            <div className={`relative group max-w-[88%] p-4 rounded-xl text-sm leading-relaxed ${m.role === 'user' ? 'bg-primary text-white rounded-tr-sm' : 'bg-white text-[#4a4a48] border border-[#e0ddd5] rounded-tl-sm'}`}>
               {m.role === 'user' ? m.text : (
                 <div className="markdown-body">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
@@ -87,7 +87,7 @@ const ChatPanel: React.FC = () => {
               {/* R2b-1：只读查账工具轨迹「已查询：…」。未知工具名兜底显示原始名，绝不裸 key。 */}
               {m.role !== 'user' && m.toolTrace && m.toolTrace.length > 0 && (
                 <div className="mt-2 pt-2 border-t border-[#e0ddd5] flex items-center flex-wrap gap-x-1 text-[10px] text-[#7a7a78]">
-                  <i className="fas fa-search mr-1 text-[#d97757]"></i>
+                  <i className="fas fa-search mr-1 text-primary"></i>
                   <span className="font-semibold">{t('chat.toolTraceTitle')}：</span>
                   <span>{m.toolTrace.map((tt) => t(`chat.toolLabel.${tt.name}`, { defaultValue: tt.name })).join(' · ')}</span>
                 </div>
@@ -102,7 +102,7 @@ const ChatPanel: React.FC = () => {
       <div className="px-5 py-3 bg-[#f9f9f8] border-t border-[#e0ddd5] flex space-x-2 overflow-x-auto shrink-0 no-scrollbar items-center">
         <input type="file" ref={fileInputRef} onChange={onFileChange} className="hidden" accept="image/*,application/pdf" />
         {QUICK_FUNCTIONS.map((fn) => (
-          <button key={fn.labelKey} onClick={() => fn.labelKey === 'chat.uploadInvoice' ? fileInputRef.current?.click() : sendMessage(t(fn.promptKey))} className="whitespace-nowrap flex items-center space-x-2 px-4 py-2 bg-white border border-[#e0ddd5] rounded-full text-[10px] font-bold text-[#4a4a48] hover:text-[#d97757] hover:border-[#d97757]/40 transition-all active:scale-95">
+          <button key={fn.labelKey} onClick={() => fn.labelKey === 'chat.uploadInvoice' ? fileInputRef.current?.click() : sendMessage(t(fn.promptKey))} className="whitespace-nowrap flex items-center space-x-2 px-4 py-2 bg-white border border-[#e0ddd5] rounded-full text-[10px] font-bold text-[#4a4a48] hover:text-primary hover:border-primary/40 transition-all active:scale-95">
             <i className={`fas ${fn.icon} text-[10px]`}></i><span>{t(fn.labelKey)}</span>
           </button>
         ))}
@@ -115,9 +115,9 @@ const ChatPanel: React.FC = () => {
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
             placeholder={t('chat.placeholder')}
-            className="flex-1 bg-white border border-[#e0ddd5] rounded-xl px-5 py-3.5 text-xs outline-none focus:border-[#d97757] text-[#191918] placeholder:text-[#7a7a78] transition-all"
+            className="flex-1 bg-white border border-[#e0ddd5] rounded-xl px-5 py-3.5 text-xs outline-none focus:border-primary text-[#191918] placeholder:text-[#7a7a78] transition-all"
           />
-          <button type="submit" disabled={!chatInput.trim() || isTyping} className="w-12 h-12 bg-[#d97757] rounded-xl text-white hover:bg-[#c4694d] disabled:opacity-30 transition-all flex items-center justify-center shrink-0 active:scale-90" style={{ boxShadow: '0 4px 24px rgba(217,119,87,0.2)' }}>
+          <button type="submit" disabled={!chatInput.trim() || isTyping} className="w-12 h-12 bg-primary rounded-xl text-white hover:bg-primary-hover disabled:opacity-30 transition-all flex items-center justify-center shrink-0 active:scale-90" style={{ boxShadow: '0 4px 24px rgba(39,76,146,0.2)' }}>
             <SendIcon />
           </button>
         </form>

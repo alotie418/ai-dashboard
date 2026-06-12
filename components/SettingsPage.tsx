@@ -184,7 +184,7 @@ const SettingsPage: React.FC = () => {
             {/* Loading state */}
             {isLoading && (
               <div className="flex flex-col items-center justify-center py-16 space-y-4">
-                <div className="w-10 h-10 border-3 border-[#d97757]/20 border-t-[#d97757] rounded-full animate-spin"></div>
+                <div className="w-10 h-10 border-3 border-primary/20 border-t-primary rounded-full animate-spin"></div>
                 <p className="text-sm text-[#5c5c5a]">{t('settings.loadingHint')}</p>
               </div>
             )}
@@ -264,7 +264,7 @@ const SettingsPage: React.FC = () => {
                         value={adminExpenseAnnual}
                         onChange={e => setAdminExpenseAnnual(e.target.value)}
                         placeholder="0"
-                        className="flex-1 bg-white border border-[#d1cdc4] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918]"
+                        className="flex-1 bg-white border border-[#d1cdc4] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary text-[#191918]"
                       />
                       <span className="text-xs text-[#5c5c5a]">{usLabel('setPerYear', 'settings.tax.perYear')}</span>
                     </div>
@@ -310,7 +310,7 @@ const SettingsPage: React.FC = () => {
                     </div>
                     <button
                       onClick={() => { setShowPasswordModal(true); setPasswordError(''); setPasswordSuccess(''); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }}
-                      className="px-5 py-2 bg-[#d97757] hover:bg-[#c56a4a] text-white text-sm font-medium rounded-xl transition-all active:scale-95"
+                      className="px-5 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-xl transition-all active:scale-95"
                     >
                       {t('settings.security.changePassword')}
                     </button>
@@ -329,22 +329,22 @@ const SettingsPage: React.FC = () => {
                       <div className="space-y-4">
                         <div>
                           <label className="block text-xs font-medium text-[#4a4a48] mb-1.5">{t('settings.security.currentPassword')}</label>
-                          <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="w-full px-4 py-3 bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl text-sm outline-none focus:border-[#d97757] transition-colors" autoComplete="current-password" />
+                          <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="w-full px-4 py-3 bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl text-sm outline-none focus:border-primary transition-colors" autoComplete="current-password" />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-[#4a4a48] mb-1.5">{t('settings.security.newPassword')}</label>
-                          <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full px-4 py-3 bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl text-sm outline-none focus:border-[#d97757] transition-colors" autoComplete="new-password" />
+                          <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full px-4 py-3 bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl text-sm outline-none focus:border-primary transition-colors" autoComplete="new-password" />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-[#4a4a48] mb-1.5">{t('settings.security.confirmPassword')}</label>
-                          <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-4 py-3 bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl text-sm outline-none focus:border-[#d97757] transition-colors" autoComplete="new-password" />
+                          <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-4 py-3 bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl text-sm outline-none focus:border-primary transition-colors" autoComplete="new-password" />
                         </div>
                         {passwordError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{passwordError}</p>}
                         {passwordSuccess && <p className="text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2">{passwordSuccess}</p>}
                       </div>
                       <div className="flex space-x-3 mt-6">
                         <button onClick={() => setShowPasswordModal(false)} className="flex-1 py-3 bg-[#f9f9f8] text-[#4a4a48] border border-[#e0ddd5] rounded-xl text-sm font-medium hover:bg-[#f0eeeb] transition-all">{t('common.cancel')}</button>
-                        <button onClick={handleChangePassword} disabled={changingPassword} className="flex-1 py-3 bg-[#d97757] text-white rounded-xl text-sm font-medium hover:bg-[#c56a4a] disabled:opacity-40 transition-all">
+                        <button onClick={handleChangePassword} disabled={changingPassword} className="flex-1 py-3 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover disabled:opacity-40 transition-all">
                           {changingPassword ? <><i className="fas fa-spinner fa-spin mr-2"></i>{t('settings.security.changing')}</> : t('settings.security.confirmChange')}
                         </button>
                       </div>
@@ -359,7 +359,7 @@ const SettingsPage: React.FC = () => {
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="px-10 py-3 bg-[#d97757] hover:bg-[#c56a4a] text-white font-bold rounded-xl transition-all active:scale-95 disabled:opacity-50 flex items-center" style={{boxShadow: '0 4px 16px rgba(217,119,87,0.15)'}}
+                  className="px-10 py-3 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl transition-all active:scale-95 disabled:opacity-50 flex items-center" style={{boxShadow: '0 4px 16px rgba(39,76,146,0.15)'}}
                 >
                   {isSaving ? <i className="fas fa-spinner animate-spin mr-2"></i> : <i className="fas fa-save mr-2"></i>}
                   {t('settings.saveButton')}
@@ -376,8 +376,8 @@ const SettingsPage: React.FC = () => {
 const SettingsNavLink: React.FC<{ active: boolean, onClick: () => void, icon: string, label: string }> = ({ active, onClick, icon, label }) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center px-6 py-4 rounded-xl transition-all border ${active ? 'bg-[#d97757] text-white border-[#d97757]' : 'bg-white/80 text-[#4a4a48] border-[#e0ddd5] hover:bg-[#f9f9f8] hover:text-[#191918]'}`}
-    style={active ? {boxShadow: '0 4px 16px rgba(217,119,87,0.15)'} : {}}
+    className={`w-full flex items-center px-6 py-4 rounded-xl transition-all border ${active ? 'bg-primary text-white border-primary' : 'bg-white/80 text-[#4a4a48] border-[#e0ddd5] hover:bg-[#f9f9f8] hover:text-[#191918]'}`}
+    style={active ? {boxShadow: '0 4px 16px rgba(39,76,146,0.15)'} : {}}
   >
     <i className={`fas ${icon} mr-4 w-5 text-center`}></i>
     <span className="text-sm font-bold">{label}</span>
@@ -392,7 +392,7 @@ const InputGroup: React.FC<{ label: string, placeholder: string, value: string, 
       placeholder={placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all"
+      className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
     />
   </div>
 );
@@ -400,7 +400,7 @@ const InputGroup: React.FC<{ label: string, placeholder: string, value: string, 
 const ToggleButton: React.FC<{ checked: boolean, onChange: (v: boolean) => void }> = ({ checked, onChange }) => (
   <button
     onClick={() => onChange(!checked)}
-    className={`w-12 h-6 rounded-full relative transition-colors ${checked ? 'bg-[#d97757]' : 'bg-[#e0ddd5]'}`}
+    className={`w-12 h-6 rounded-full relative transition-colors ${checked ? 'bg-primary' : 'bg-[#e0ddd5]'}`}
   >
     <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${checked ? 'left-7' : 'left-1'}`}></div>
   </button>

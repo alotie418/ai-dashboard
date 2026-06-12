@@ -167,7 +167,7 @@ const DataMigrationSection: React.FC = () => {
             <button
               onClick={handleRun}
               disabled={running || totalPending === 0}
-              className="w-full bg-[#d97757] text-white py-2.5 rounded-lg text-sm font-medium hover:bg-[#c4694d] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-primary text-white py-2.5 rounded-lg text-sm font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {running ? (
                 <><i className="fas fa-spinner fa-spin mr-2"></i>{t('settings.dataMigration.running', '迁移中...')}</>
@@ -205,7 +205,7 @@ const DataMigrationSection: React.FC = () => {
           </div>
 
           <div className="text-[10px] text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3 space-y-1">
-            <div><i className="fas fa-info-circle mr-1.5 text-[#d97757]"></i>{usLabel('dmNote1', 'settings.dataMigration.note1', 'sales → income / purchases → expense; defaults to the current accounting locale’s first income / COGS category')}</div>
+            <div><i className="fas fa-info-circle mr-1.5 text-primary"></i>{usLabel('dmNote1', 'settings.dataMigration.note1', 'sales → income / purchases → expense; defaults to the current accounting locale’s first income / COGS category')}</div>
             <div className="ml-4">{usLabel('dmNote2', 'settings.dataMigration.note2', 'Legacy tables are kept and can be rolled back at any time')}</div>
             <div className="ml-4">{usLabel('dmNote3', 'settings.dataMigration.note3', 'Migration records are written to legacy_migrations to prevent duplicates')}</div>
             <div className="ml-4">{usLabel('dmNote4', 'settings.dataMigration.note4', 'Legacy fields (quantity / unit price / shipping) are preserved in source_meta JSON')}</div>

@@ -46,8 +46,8 @@ const AssistantWidget: React.FC = () => {
     <div className="fixed bottom-8 right-8 z-[10000] flex flex-row-reverse items-end space-x-4 space-x-reverse">
       <button
         onClick={() => setShowChat(!showChat)}
-        className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${showChat ? 'bg-[#f0eeeb] border border-[#d1cdc4] text-[#d97757] rotate-90 scale-110' : 'bg-[#d97757] text-white hover:scale-110'}`}
-        style={{ boxShadow: showChat ? 'none' : '0 4px 24px rgba(217,119,87,0.3)' }}
+        className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${showChat ? 'bg-[#f0eeeb] border border-[#d1cdc4] text-primary rotate-90 scale-110' : 'bg-primary text-white hover:scale-110'}`}
+        style={{ boxShadow: showChat ? 'none' : '0 4px 24px rgba(39,76,146,0.3)' }}
       >
         {showChat ? <CloseIcon /> : <div className="text-2xl">AI</div>}
       </button>
@@ -56,16 +56,16 @@ const AssistantWidget: React.FC = () => {
         <div
           ref={chatBoxRef}
           style={{ width: `${chatSize.width}px`, height: `${chatSize.height}px`, boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
-          className="bg-white border border-[#e0ddd5] rounded-2xl overflow-hidden flex flex-col animate-in slide-in-from-right-8 duration-500 relative"
+          className="glass-modal rounded-2xl overflow-hidden flex flex-col animate-in slide-in-from-right-8 duration-500 relative"
         >
           <div onMouseDown={handleMouseDown} className="absolute top-0 left-0 w-8 h-8 cursor-nw-resize z-50 flex items-end justify-end pr-1 pb-1 group" title={t('chat.resize')}>
-            <svg width="10" height="10" viewBox="0 0 10 10" className="text-[#d1cdc4] group-hover:text-[#d97757] transition-colors"><path d="M0 10L10 0M0 6L6 0M0 2L2 0" stroke="currentColor" strokeWidth="1.5" /></svg>
+            <svg width="10" height="10" viewBox="0 0 10 10" className="text-[#d1cdc4] group-hover:text-primary transition-colors"><path d="M0 10L10 0M0 6L6 0M0 2L2 0" stroke="currentColor" strokeWidth="1.5" /></svg>
           </div>
 
           {/* 标题栏（双击复位大小）。语音控件已移除。 */}
-          <div onDoubleClick={resetChatSize} className="p-5 bg-[#d97757] flex justify-between items-center shrink-0 cursor-pointer select-none">
+          <div onDoubleClick={resetChatSize} className="p-5 bg-primary flex justify-between items-center shrink-0 cursor-pointer select-none">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center text-white"><i className="fas fa-robot text-sm"></i></div>
+              <div className="w-8 h-8 bg-accent/90 rounded-lg flex items-center justify-center text-[#16264D]"><i className="fas fa-robot text-sm"></i></div>
               <div>
                 <h3 className="text-sm font-semibold text-white tracking-tight">{t('chat.title')}</h3>
                 <p className="text-[10px] text-white/60">{t('chat.status')}</p>

@@ -115,7 +115,7 @@ export function buildDocumentHtml(
   return `<!DOCTYPE html><html lang="${e(L.lang)}"><head><meta charset="utf-8"><style>
 *{box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",${cjkFonts(L.lang)},sans-serif;color:#191918;margin:0;padding:32px;font-size:13px;line-height:1.5;}
-.hdr{border-bottom:2px solid #d97757;padding-bottom:14px;margin-bottom:16px;}
+.hdr{border-bottom:2px solid #274C92;padding-bottom:14px;margin-bottom:16px;}
 .company{font-size:20px;font-weight:700;}
 .cmeta{margin-top:4px;font-size:11px;color:#5c5c5a;}
 .cmeta span{margin-right:16px;}

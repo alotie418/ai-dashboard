@@ -45,7 +45,7 @@ const PROVIDER_DOCS: Record<AIProviderId, { label: string; getKeyUrl: string; pl
     getKeyUrl: 'https://console.anthropic.com/settings/keys',
     placeholder: 'sk-ant-api03-...',
     icon: 'fa-feather',
-    color: '#d97757',
+    color: '#274C92',
   },
   openai: {
     label: 'ChatGPT · OpenAI',
@@ -192,7 +192,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
       <div className="w-full max-w-2xl bg-white border border-[#e0ddd5] rounded-2xl p-10" style={{ boxShadow: '0 8px 48px rgba(0,0,0,0.06)' }}>
         {/* Logo */}
         <div className="flex items-center justify-center mb-7">
-          <div className="w-12 h-12 bg-[#d97757] rounded-xl flex items-center justify-center mr-3 shadow-lg" style={{ boxShadow: '0 4px 24px rgba(217,119,87,0.2)' }}>
+          <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center mr-3 shadow-lg" style={{ boxShadow: '0 4px 24px rgba(39,76,146,0.2)' }}>
             <i className="fas fa-layer-group text-white text-xl"></i>
           </div>
           <div>
@@ -205,7 +205,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
         <div className="flex items-center justify-center mb-8 space-x-2">
           {(['welcome', 'locale', 'providers', 'company'] as Step[]).map((s, i) => (
             <React.Fragment key={s}>
-              <div className={`w-2 h-2 rounded-full transition-all ${s === step ? 'bg-[#d97757] w-6' : (['welcome', 'locale', 'providers', 'company'].indexOf(step) > i ? 'bg-[#d97757]/40' : 'bg-[#e0ddd5]')}`}></div>
+              <div className={`w-2 h-2 rounded-full transition-all ${s === step ? 'bg-primary w-6' : (['welcome', 'locale', 'providers', 'company'].indexOf(step) > i ? 'bg-primary/40' : 'bg-[#e0ddd5]')}`}></div>
               {i < 3 && <div className="w-4 h-px bg-[#e0ddd5]"></div>}
             </React.Fragment>
           ))}
@@ -219,25 +219,25 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
             </p>
             <ul className="space-y-3 text-sm text-[#4a4a48]">
               <li className="flex items-start">
-                <i className="fas fa-shield-alt text-[#d97757] mt-1 mr-3 w-4 text-center"></i>
+                <i className="fas fa-shield-alt text-primary mt-1 mr-3 w-4 text-center"></i>
                 <span>{t('onboarding.feature1')}</span>
               </li>
               <li className="flex items-start">
-                <i className="fas fa-key text-[#d97757] mt-1 mr-3 w-4 text-center"></i>
+                <i className="fas fa-key text-primary mt-1 mr-3 w-4 text-center"></i>
                 <span>{t('onboarding.feature2')}</span>
               </li>
               <li className="flex items-start">
-                <i className="fas fa-lock text-[#d97757] mt-1 mr-3 w-4 text-center"></i>
+                <i className="fas fa-lock text-primary mt-1 mr-3 w-4 text-center"></i>
                 <span>{t('onboarding.feature3')}</span>
               </li>
               <li className="flex items-start">
-                <i className="fas fa-cloud-download-alt text-[#d97757] mt-1 mr-3 w-4 text-center"></i>
+                <i className="fas fa-cloud-download-alt text-primary mt-1 mr-3 w-4 text-center"></i>
                 <span>{t('onboarding.feature4')}</span>
               </li>
             </ul>
             <button
               onClick={() => setStep('locale')}
-              className="w-full bg-[#d97757] text-white py-3 rounded-lg font-medium hover:bg-[#c4694d] transition-colors"
+              className="w-full bg-primary text-white py-3 rounded-lg font-medium hover:bg-primary-hover transition-colors"
             >
               {t('onboarding.startConfig')}
             </button>
@@ -265,10 +265,10 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                   return (
                     <button key={lang.code} type="button"
                       onClick={() => { setSelectedUILang(lang.code); setLanguage(lang.code as LangCode); }}
-                      className={`flex items-center p-3 rounded-lg border text-sm transition-all ${sel ? 'border-[#d97757] bg-[#d97757]/5' : 'border-[#e0ddd5] bg-white hover:bg-[#f0eeeb]'}`}>
+                      className={`flex items-center p-3 rounded-lg border text-sm transition-all ${sel ? 'border-primary bg-primary/5' : 'border-[#e0ddd5] bg-white hover:bg-[#f0eeeb]'}`}>
                       <span className="text-lg mr-2">{lang.flag}</span>
                       <span className="font-medium text-[#191918]">{lang.label}</span>
-                      {sel && <i className="fas fa-check-circle text-[#d97757] ml-auto"></i>}
+                      {sel && <i className="fas fa-check-circle text-primary ml-auto"></i>}
                     </button>
                   );
                 })}
@@ -322,7 +322,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                   } catch { /* ignore */ }
                   setStep('providers');
                 }}
-                className="flex-1 bg-[#d97757] text-white py-2.5 rounded-lg font-medium hover:bg-[#c4694d] transition-colors"
+                className="flex-1 bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-primary-hover transition-colors"
               >
                 {t('common.next')}
               </button>
@@ -339,7 +339,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
 
             {loading && (
               <div className="flex items-center justify-center py-10 text-sm text-[#6b6b69]">
-                <i className="fas fa-spinner fa-spin mr-2 text-[#d97757]"></i>{t('onboarding.loadingProviders')}
+                <i className="fas fa-spinner fa-spin mr-2 text-primary"></i>{t('onboarding.loadingProviders')}
               </div>
             )}
 
@@ -383,7 +383,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                       </div>
                       <div className="flex items-center space-x-2">
                         {form.saved && defaultProvider === p.provider && (
-                          <span className="text-[10px] font-bold bg-[#d97757] text-white px-2 py-1 rounded uppercase">{t('onboarding.defaultBadge')}</span>
+                          <span className="text-[10px] font-bold bg-primary text-white px-2 py-1 rounded uppercase">{t('onboarding.defaultBadge')}</span>
                         )}
                         <i className={`fas fa-chevron-${expanded ? 'up' : 'down'} text-[#7a7a78] text-xs`}></i>
                       </div>
@@ -398,7 +398,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                             value={form.apiKey}
                             onChange={e => updateForm(p.provider, { apiKey: e.target.value, testResult: null, saved: false })}
                             placeholder={doc.placeholder}
-                            className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm focus:outline-none focus:border-[#d97757] focus:ring-2 focus:ring-[#d97757]/20"
+                            className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                           />
                           <a href={doc.getKeyUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-[11px] mt-1.5 hover:underline" style={{ color: doc.color }}>
                             <i className="fas fa-external-link-alt mr-1 text-[9px]"></i>
@@ -441,7 +441,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                               value={form.model}
                               onChange={e => updateForm(p.provider, { model: e.target.value, testResult: null })}
                               placeholder={p.defaultModel}
-                              className="w-full mt-2 px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm bg-white focus:outline-none focus:border-[#d97757] font-mono"
+                              className="w-full mt-2 px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm bg-white focus:outline-none focus:border-primary font-mono"
                             />
                             <p className="text-[10px] text-[#7a7a78] mt-1">
                               {t('settings.ai.currentModelId')}: <code className="bg-[#f0eeeb] px-1.5 py-0.5 rounded">{form.model}</code>
@@ -493,7 +493,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                             defaultProvider !== p.provider && (
                               <button
                                 onClick={() => handleSetDefault(p.provider)}
-                                className="flex-1 text-[#d97757] border border-[#d97757] py-2 rounded-lg text-sm font-medium hover:bg-[#d97757]/5 transition-colors"
+                                className="flex-1 text-primary border border-primary py-2 rounded-lg text-sm font-medium hover:bg-primary/5 transition-colors"
                               >
                                 {t('settings.ai.setAsDefault')}
                               </button>
@@ -517,7 +517,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
               <button
                 onClick={() => setStep('company')}
                 disabled={savedCount === 0}
-                className="flex-1 bg-[#d97757] text-white py-2.5 rounded-lg font-medium hover:bg-[#c4694d] disabled:opacity-40 transition-colors"
+                className="flex-1 bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-primary-hover disabled:opacity-40 transition-colors"
               >
                 {savedCount > 0 ? t('onboarding.configuredCount', { count: savedCount }) : t('onboarding.atLeastOneRequired')}
               </button>
@@ -539,7 +539,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                 value={companyName}
                 onChange={e => setCompanyName(e.target.value)}
                 placeholder={t('onboarding.companyNamePlaceholder')}
-                className="w-full px-4 py-2.5 border border-[#e0ddd5] rounded-lg text-sm focus:outline-none focus:border-[#d97757] focus:ring-2 focus:ring-[#d97757]/20"
+                className="w-full px-4 py-2.5 border border-[#e0ddd5] rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
             </div>
 
@@ -550,7 +550,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                 value={industry}
                 onChange={e => setIndustry(e.target.value)}
                 placeholder={t('onboarding.industryPlaceholder')}
-                className="w-full px-4 py-2.5 border border-[#e0ddd5] rounded-lg text-sm focus:outline-none focus:border-[#d97757] focus:ring-2 focus:ring-[#d97757]/20"
+                className="w-full px-4 py-2.5 border border-[#e0ddd5] rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
             </div>
 
@@ -568,7 +568,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
               <button
                 onClick={finish}
                 disabled={companySaving}
-                className="flex-1 bg-[#d97757] text-white py-2.5 rounded-lg font-medium hover:bg-[#c4694d] disabled:opacity-50 transition-colors"
+                className="flex-1 bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-primary-hover disabled:opacity-50 transition-colors"
               >
                 {companySaving ? <><i className="fas fa-spinner fa-spin mr-2"></i>{t('onboarding.saving')}</> : t('onboarding.finishAndEnter')}
               </button>

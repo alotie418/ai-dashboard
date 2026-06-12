@@ -112,13 +112,13 @@ const TaxInvoiceModal: React.FC<Props> = ({ doc, onClose, onSaved }) => {
     }
   };
 
-  const inputCls = 'w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#d97757] text-[#191918] transition-all disabled:opacity-50 disabled:cursor-not-allowed';
+  const inputCls = 'w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all disabled:opacity-50 disabled:cursor-not-allowed';
   const labelCls = 'text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest';
 
   return (
     <div className="fixed inset-0 z-[10001] flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleCancel}></div>
-      <div className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto bg-white border border-[#e0ddd5] rounded-xl animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
+      <div className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto glass-modal rounded-xl animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
         <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center gap-4">
           <div>
             <h2 className="text-xl font-bold text-[#191918]">{t('documents.taxInvoiceTitle')}</h2>
@@ -154,7 +154,7 @@ const TaxInvoiceModal: React.FC<Props> = ({ doc, onClose, onSaved }) => {
               checked={issued}
               disabled={readOnly}
               onChange={(e) => setIssued(e.target.checked)}
-              className="w-4 h-4 accent-[#d97757]"
+              className="w-4 h-4 accent-primary"
             />
             <span className="text-sm text-[#191918]">{t('documents.taxInvoiceIssuedLabel')}</span>
           </label>
@@ -191,7 +191,7 @@ const TaxInvoiceModal: React.FC<Props> = ({ doc, onClose, onSaved }) => {
               <div className="border border-[#e0ddd5] rounded-xl p-3 flex items-center gap-3 bg-[#f9f9f8]/50">
                 <i className="fas fa-paperclip text-[#5c5c5a]"></i>
                 <span className="text-sm text-[#191918] flex-1 break-all">{effectiveName}</span>
-                <button type="button" onClick={handleOpen} className="text-xs font-medium text-[#d97757] hover:text-[#c56a4a] transition-colors whitespace-nowrap">
+                <button type="button" onClick={handleOpen} className="text-xs font-medium text-primary hover:text-primary-hover transition-colors whitespace-nowrap">
                   {t('documents.attachmentOpen')}
                 </button>
                 {!readOnly && (
@@ -205,7 +205,7 @@ const TaxInvoiceModal: React.FC<Props> = ({ doc, onClose, onSaved }) => {
                 <button
                   type="button"
                   onClick={handlePick}
-                  className="w-full border-2 border-dashed border-[#e0ddd5] hover:border-[#d97757]/50 hover:bg-[#d97757]/5 rounded-xl py-3 text-xs text-[#5c5c5a] hover:text-[#d97757] transition-all"
+                  className="w-full border-2 border-dashed border-[#e0ddd5] hover:border-primary/50 hover:bg-primary/5 rounded-xl py-3 text-xs text-[#5c5c5a] hover:text-primary transition-all"
                 >
                   <i className="fas fa-paperclip mr-2"></i>{t('documents.attachmentPick')}
                 </button>
@@ -230,7 +230,7 @@ const TaxInvoiceModal: React.FC<Props> = ({ doc, onClose, onSaved }) => {
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-[#d97757] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#c56a4a] disabled:opacity-50"
+                className="bg-primary text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-hover disabled:opacity-50"
               >
                 {saving
                   ? <><i className="fas fa-spinner fa-spin mr-2"></i>{t('common.loading')}</>

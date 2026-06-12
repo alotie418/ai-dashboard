@@ -277,7 +277,7 @@ const AppContent: React.FC = () => {
               {data.inventory && data.inventory.details.length > 0 && (
                 <div className="bg-white border border-[#e0ddd5] rounded-2xl overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
                   <div className="px-6 py-4 border-b border-[#e0ddd5] flex items-center space-x-2">
-                    <i className="fas fa-boxes-stacked text-[#d97757]"></i>
+                    <i className="fas fa-boxes-stacked text-primary"></i>
                     <h3 className="text-sm font-bold text-[#191918]">{t('inventory.detailTitle')}</h3>
                   </div>
                   <table className="w-full text-sm">
@@ -352,9 +352,9 @@ const AppContent: React.FC = () => {
       selectedYear={selectedYear}
       fallbackStatement={data.financialStatement}
     >
-    <div className="flex h-screen overflow-hidden bg-white text-[#191918] font-sans relative">
+    <div className="flex h-screen overflow-hidden bg-transparent text-[#191918] font-sans relative">
       {/* Sidebar */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-[#f9f9f8] border-r border-[#e0ddd5] transition-all duration-300 flex flex-col hidden md:flex z-20`}>
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} glass-bar border-r border-[#e0ddd5] transition-all duration-300 flex flex-col hidden md:flex z-20`}>
         {/* macOS 红绿灯避让区 + 可拖动 + 可双击最大化（仅 Electron 桌面版生效）*/}
         {isElectronEnv && (
           <div
@@ -408,7 +408,7 @@ const AppContent: React.FC = () => {
       <main className="flex-1 flex flex-col overflow-hidden relative z-10">
         {(
           <header
-            className="h-16 bg-[#f9f9f8] border-b border-[#e0ddd5] flex items-center justify-between px-8 z-10 shrink-0"
+            className="h-16 glass-bar border-b border-[#e0ddd5] flex items-center justify-between px-8 z-10 shrink-0"
             style={isElectronEnv ? ({ WebkitAppRegion: 'drag' } as React.CSSProperties) : undefined}
           >
             <div
@@ -426,23 +426,23 @@ const AppContent: React.FC = () => {
               </h2>
               <div className="hidden lg:flex items-center space-x-4 pl-4 border-l border-[#e0ddd5]">
                 <div className="flex items-center space-x-2 bg-white rounded-lg p-1 border border-[#e0ddd5]">
-                  <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="bg-transparent text-xs font-medium text-[#6b6b69] outline-none px-2 py-1.5 cursor-pointer hover:text-[#d97757]">
+                  <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="bg-transparent text-xs font-medium text-[#6b6b69] outline-none px-2 py-1.5 cursor-pointer hover:text-primary">
                     {YEARS.map(y => <option key={y} value={y} className="bg-white">{t('header.yearLabel', { year: y })}</option>)}
                   </select>
                   {FILTER_SUPPORTED_PAGES.includes(currentPage) && (
                     <>
                       <div className="w-px h-3 bg-[#e0ddd5]"></div>
-                      <select value={selectedQuarter} onChange={(e) => { setSelectedQuarter(e.target.value); if (e.target.value !== '全年') setSelectedMonth('全部'); }} className="bg-transparent text-xs font-medium text-[#6b6b69] outline-none px-2 py-1.5 cursor-pointer hover:text-[#d97757]">
+                      <select value={selectedQuarter} onChange={(e) => { setSelectedQuarter(e.target.value); if (e.target.value !== '全年') setSelectedMonth('全部'); }} className="bg-transparent text-xs font-medium text-[#6b6b69] outline-none px-2 py-1.5 cursor-pointer hover:text-primary">
                         {QUARTERS.map(q => <option key={q} value={q} className="bg-white">{q === '全年' ? t('header.allYear') : t('header.quarterLabel', { n: q.replace('Q', '') })}</option>)}
                       </select>
                     </>
                   )}
                   <div className="w-px h-3 bg-[#e0ddd5]"></div>
-                  <select value={selectedMonth} onChange={(e) => { setSelectedMonth(e.target.value); if (e.target.value !== '全部') setSelectedQuarter('全年'); }} className="bg-transparent text-xs font-medium text-[#6b6b69] outline-none px-2 py-1.5 cursor-pointer hover:text-[#d97757]">
+                  <select value={selectedMonth} onChange={(e) => { setSelectedMonth(e.target.value); if (e.target.value !== '全部') setSelectedQuarter('全年'); }} className="bg-transparent text-xs font-medium text-[#6b6b69] outline-none px-2 py-1.5 cursor-pointer hover:text-primary">
                     {MONTHS.map((m, i) => <option key={m} value={m} className="bg-white">{i === 0 ? t('header.monthAll') : t(`header.month${m.replace('月', '').padStart(2, '0')}`)}</option>)}
                   </select>
                 </div>
-                <button onClick={performAnalysis} className="p-2 text-[#d97757] hover:text-[#c4694d] transition-colors" title="立即刷新数据">
+                <button onClick={performAnalysis} className="p-2 text-primary hover:text-primary-hover transition-colors" title="立即刷新数据">
                   <i className={`fas fa-sync-alt ${loadingAI ? 'animate-spin' : ''}`}></i>
                 </button>
               </div>
@@ -504,7 +504,7 @@ const AuthWrapper: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f9f9f8]">
         <div className="flex items-center space-x-3 text-[#6b6b69]">
-          <i className="fas fa-spinner fa-spin text-[#d97757]"></i>
+          <i className="fas fa-spinner fa-spin text-primary"></i>
           <span className="text-sm">加载中...</span>
         </div>
       </div>
@@ -519,7 +519,7 @@ const AuthWrapper: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f9f9f8]">
         <div className="flex items-center space-x-3 text-[#6b6b69]">
-          <i className="fas fa-spinner fa-spin text-[#d97757]"></i>
+          <i className="fas fa-spinner fa-spin text-primary"></i>
           <span className="text-sm">加载中...</span>
         </div>
       </div>
@@ -534,7 +534,7 @@ const AuthWrapper: React.FC = () => {
 };
 
 const NavItem: React.FC<{ icon: string; label: string; active?: boolean; expanded?: boolean; onClick?: () => void; }> = ({ icon, label, active = false, expanded = true, onClick }) => (
-  <div onClick={onClick} className={`flex items-center p-3 rounded-lg transition-all duration-200 cursor-pointer group ${active ? 'bg-[#d97757] text-white' : 'text-[#4a4a48] hover:bg-[#f0eeeb] hover:text-[#191918]'}`} style={active ? { boxShadow: '0 4px 24px rgba(217,119,87,0.15)' } : {}}>
+  <div onClick={onClick} className={`flex items-center p-3 rounded-lg transition-all duration-200 cursor-pointer group ${active ? 'bg-primary text-white' : 'text-[#4a4a48] hover:bg-[#f0eeeb] hover:text-[#191918]'}`} style={active ? { boxShadow: '0 4px 24px rgba(39,76,146,0.15)' } : {}}>
     <i className={`fas ${icon} text-base ${expanded ? 'mr-4' : 'mx-auto'} w-5 text-center group-hover:scale-110 transition-transform`}></i>
     {expanded && <span className="text-sm font-medium">{label}</span>}
   </div>

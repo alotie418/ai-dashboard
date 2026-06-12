@@ -31,7 +31,7 @@ const ConversationSidebar: React.FC = () => {
       <div className="p-3 shrink-0">
         <button
           onClick={() => { newConversation(); setRenamingId(null); setConfirmDeleteId(null); }}
-          className="w-full flex items-center justify-center px-3 py-2 rounded-lg text-xs font-bold text-white bg-[#d97757] hover:bg-[#c4694d] transition-all active:scale-95"
+          className="w-full flex items-center justify-center px-3 py-2 rounded-lg text-xs font-bold text-white bg-primary hover:bg-primary-hover transition-all active:scale-95"
         >
           <i className="fas fa-plus mr-2 text-[10px]"></i>{t('chat.newConversation')}
         </button>
@@ -49,7 +49,7 @@ const ConversationSidebar: React.FC = () => {
 
           if (renamingId === c.id) {
             return (
-              <div key={c.id} className="px-2 py-1.5 rounded-lg bg-white border border-[#d97757]/40">
+              <div key={c.id} className="px-2 py-1.5 rounded-lg bg-white border border-primary/40">
                 <input
                   autoFocus
                   value={renameValue}
@@ -70,10 +70,10 @@ const ConversationSidebar: React.FC = () => {
           return (
             <div
               key={c.id}
-              className={`group relative px-2 py-1.5 rounded-lg cursor-pointer transition-all ${active ? 'bg-white border border-[#d97757]/40' : 'hover:bg-white/70 border border-transparent'}`}
+              className={`group relative px-2 py-1.5 rounded-lg cursor-pointer transition-all ${active ? 'bg-white border border-primary/40' : 'hover:bg-white/70 border border-transparent'}`}
             >
               <button onClick={() => switchConversation(c.id)} className="w-full text-left pr-12">
-                <div className={`text-xs font-medium truncate ${active ? 'text-[#d97757]' : 'text-[#4a4a48]'}`} title={title}>{title}</div>
+                <div className={`text-xs font-medium truncate ${active ? 'text-primary' : 'text-[#4a4a48]'}`} title={title}>{title}</div>
                 {c.updated_at && <div className="text-[9px] text-[#a0a09c] mt-0.5">{c.updated_at.slice(0, 10)}</div>}
               </button>
               <div className={`absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center space-x-1 transition-opacity ${armed ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
@@ -89,7 +89,7 @@ const ConversationSidebar: React.FC = () => {
                     <button
                       onClick={(e) => { e.stopPropagation(); startRename(c.id, c.title || ''); }}
                       title={t('chat.renameConversation')}
-                      className="text-[#7a7a78] hover:text-[#d97757] text-[10px] w-5 h-5 flex items-center justify-center"
+                      className="text-[#7a7a78] hover:text-primary text-[10px] w-5 h-5 flex items-center justify-center"
                     >
                       <i className="fas fa-pen"></i>
                     </button>

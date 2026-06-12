@@ -28,7 +28,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
             {this.state.error.stack}
           </pre>
           <button onClick={() => { this.setState({ error: null }); window.location.reload(); }}
-            style={{ marginTop: '16px', padding: '8px 16px', background: '#d97757', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+            style={{ marginTop: '16px', padding: '8px 16px', background: '#274C92', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
             Reload
           </button>
         </div>
