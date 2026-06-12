@@ -116,3 +116,21 @@
 .markdown-inline a:hover {
   opacity: 1;
 }
+
+/* ── Data tables (opt-in via .data-table) ──
+   Keep non-name columns on a single line so the table grows wide and scrolls
+   horizontally inside its overflow-x-auto wrapper, instead of squeezing cells
+   until CJK text wraps one character per line (vertical text). The name column
+   also stays on a single line: a min-width keeps it from collapsing, and past
+   the max-width it ellipsizes while the table scrolls to reveal the rest. */
+.data-table th,
+.data-table td {
+  white-space: nowrap;
+}
+.data-table .col-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 10rem;
+  max-width: 20rem;
+}

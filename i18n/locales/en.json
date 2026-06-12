@@ -533,6 +533,8 @@
     "deductible": "Estimated Deductible",
     "noInput": "No purchase records",
     "noOutput": "No sales records",
+    "inputRecordCount": "{{count}} purchase records",
+    "outputRecordCount": "{{count}} sales records",
     "searchPlaceholder": "Search invoice no. or counterparty...",
     "filterAll": "All Invoices",
     "filterInput": "Input (Purchases)",

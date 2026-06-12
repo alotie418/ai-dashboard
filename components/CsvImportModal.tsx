@@ -305,7 +305,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
             <div>
               <p className="text-sm text-[#7a7a78] mb-3">预览前 10 条记录（共 {mappedRecords.length} 条）：</p>
               <div className="overflow-x-auto">
-                <table className="w-full text-xs border-collapse">
+                <table className="w-full text-xs border-collapse data-table">
                   <thead>
                     <tr className="bg-[#f0eeeb]">
                       <th className="px-2 py-1.5 text-left">#</th>

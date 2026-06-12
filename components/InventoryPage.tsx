@@ -200,7 +200,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           />
         </div>
 
-        <div className="flex items-center space-x-2 bg-white p-1.5 rounded-xl border border-[#e0ddd5]">
+        <div className="flex items-center space-x-2 bg-white p-1.5 rounded-xl border border-[#e0ddd5] shrink-0">
           <FilterTab active={filterType === 'all'} onClick={() => setFilterType('all')} label={genLabel('invFilterAll', 'invoices.filterAll')} />
           <FilterTab active={filterType === 'input'} onClick={() => setFilterType('input')} label={genLabel('invFilterInput', 'invoices.filterInput')} />
           <FilterTab active={filterType === 'output'} onClick={() => setFilterType('output')} label={genLabel('invFilterOutput', 'invoices.filterOutput')} />
@@ -324,9 +324,9 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
             <tbody className="divide-y divide-[#e0ddd5]">
               {filteredInvoices.map((inv) => (
                 <tr key={inv.invoiceNo || inv.date + inv.partner} className="group hover:bg-[#f9f9f8]/40 transition-all">
-                  <td className="px-8 py-5 text-sm text-[#4a4a48]">{inv.date}</td>
-                  <td className="px-8 py-5">
-                    <span className={`px-2 py-1 rounded text-[10px] font-bold ${inv.typeKey === 'output' ? 'bg-[#d97757]/10 text-[#d97757]' : 'bg-amber-500/10 text-amber-400'}`}>
+                  <td className="px-8 py-5 text-sm text-[#4a4a48] whitespace-nowrap min-w-[7rem]">{inv.date}</td>
+                  <td className="px-8 py-5 whitespace-nowrap min-w-[5rem]">
+                    <span className={`inline-block whitespace-nowrap px-2 py-1 rounded text-[10px] font-bold ${inv.typeKey === 'output' ? 'bg-[#d97757]/10 text-[#d97757]' : 'bg-amber-500/10 text-amber-400'}`}>
                       {taxLabel(inv.typeKey === 'output' ? 'invoiceTypeOutput' : 'invoiceTypeInput')}
                     </span>
                   </td>
@@ -381,7 +381,7 @@ const StatCard: React.FC<{ title: string, value: string, sub: string, icon: stri
 const FilterTab: React.FC<{ active: boolean, onClick: () => void, label: string }> = ({ active, onClick, label }) => (
   <button
     onClick={onClick}
-    className={`px-5 py-2 rounded-xl text-xs font-bold transition-all duration-300 ${active ? 'bg-[#d97757] text-white' : 'text-[#5c5c5a] hover:text-[#4a4a48]'}`}
+    className={`px-5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-300 ${active ? 'bg-[#d97757] text-white' : 'text-[#5c5c5a] hover:text-[#4a4a48]'}`}
     style={active ? { boxShadow: '0 4px 16px rgba(217,119,87,0.15)' } : {}}
   >
     {label}
@@ -424,7 +424,7 @@ const StatusBadge: React.FC<{ statusKey: string, accLocale: string, uiLang: stri
     ? getTaxLabel(accLocale, uiLang, usStatusTaxKey[statusKey])
     : (statusI18nMap[statusKey] ? t(statusI18nMap[statusKey]) : statusKey);
   return (
-    <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${colors[statusKey] || 'bg-[#f0eeeb]/10 text-[#4a4a48] border-[#e0ddd5]/20'}`}>
+    <span className={`inline-block min-w-[3.5rem] text-center whitespace-nowrap px-2 py-0.5 rounded border text-[10px] font-bold ${colors[statusKey] || 'bg-[#f0eeeb]/10 text-[#4a4a48] border-[#e0ddd5]/20'}`}>
       {label}
     </span>
   );

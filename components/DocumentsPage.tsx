@@ -224,7 +224,7 @@ const DocumentsPage: React.FC = () => {
       {/* 单据列表 */}
       <div className="bg-white/80 border border-[#e0ddd5] rounded-xl overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse data-table">
             <thead>
               <tr className="border-b border-[#e0ddd5] text-[#5c5c5a] text-xs">
                 <th className="px-5 py-4 font-medium">{t('documents.colNumber')}</th>
@@ -249,7 +249,7 @@ const DocumentsPage: React.FC = () => {
                       <div className="text-[10px] text-[#5c5c5a] mt-0.5">{d.periodStart} ~ {d.periodEnd}</div>
                     )}
                   </td>
-                  <td className="px-5 py-5 text-sm text-[#191918] font-medium">{d.customerName}</td>
+                  <td className="px-5 py-5 text-sm text-[#191918] font-medium col-name">{d.customerName}</td>
                   {/* 金额按该单据冻结的制度渲染币种 */}
                   <td className="px-5 py-5 text-sm text-[#191918] font-bold whitespace-nowrap">{formatMoney(d.total, d.accLocale)}</td>
                   <td className="px-5 py-5">
