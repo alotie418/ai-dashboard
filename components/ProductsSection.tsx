@@ -80,7 +80,8 @@ const ProductsSection: React.FC = () => {
         </div>
       ) : (
         <div className="border border-[#e0ddd5] rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm data-table">
             <thead className="bg-[#f9f9f8] text-[10px] uppercase tracking-wider text-[#4a4a48]">
               <tr>
                 <th className="text-left px-4 py-2.5">{t('products.name')}</th>
@@ -97,7 +98,7 @@ const ProductsSection: React.FC = () => {
               )}
               {items.map(p => (
                 <tr key={p.id} className="border-t border-[#e0ddd5]/70 hover:bg-[#f9f9f8]/40">
-                  <td className="px-4 py-2 text-[#191918]">{p.name}</td>
+                  <td className="px-4 py-2 text-[#191918] col-name">{p.name}</td>
                   <td className="px-4 py-2 text-[11px] text-[#5c5c5a]">{getProductUnitLabel(p.unit, lang)}</td>
                   <td className="px-4 py-2 text-[11px]">
                     {p.is_service
@@ -126,6 +127,7 @@ const ProductsSection: React.FC = () => {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

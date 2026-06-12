@@ -533,6 +533,8 @@
     "deductible": "预计可抵扣税额",
     "noInput": "暂无进项记录",
     "noOutput": "暂无销售记录",
+    "inputRecordCount": "{{count}} 条进项记录",
+    "outputRecordCount": "{{count}} 条销售记录",
     "searchPlaceholder": "搜索发票号或往来单位...",
     "filterAll": "全部发票",
     "filterInput": "进项明细",

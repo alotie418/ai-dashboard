@@ -91,7 +91,7 @@ const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice,
 const Row: React.FC<{ label: string; value: string; bold?: boolean; indent?: boolean; primary?: boolean; success?: boolean }> = ({ label, value, bold, indent, primary, success }) => (
   <div className={`flex justify-between items-center px-6 py-2.5 hover:bg-[#f0eeeb] transition-colors ${bold ? 'font-bold' : ''} ${primary ? 'bg-[#d97757]/5' : ''} ${success ? 'bg-emerald-500/5' : ''}`}>
     <span className={`text-sm ${indent ? 'pl-4 text-[#5c5c5a]' : 'text-[#4a4a48]'}`}>{label}</span>
-    <span className={`text-base font-mono ${primary ? 'text-[#d97757]' : success ? 'text-emerald-600' : 'text-[#4a4a48]'}`}>{value}</span>
+    <span className={`text-base font-mono tabular-nums whitespace-nowrap ${primary ? 'text-[#d97757]' : success ? 'text-emerald-600' : 'text-[#4a4a48]'}`}>{value}</span>
   </div>
 );
 

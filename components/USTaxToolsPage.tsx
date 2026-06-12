@@ -173,7 +173,8 @@ const MileageSection: React.FC<{ mileageRate: string; mileageYear: number }> = (
         <div className="text-center py-8 text-sm text-[#7a7a78]"><i className="fas fa-spinner fa-spin mr-2"></i></div>
       ) : (
         <div className="border border-[#e0ddd5] rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm data-table">
             <thead className="bg-[#f9f9f8] text-[10px] uppercase tracking-wider text-[#4a4a48]">
               <tr>
                 <th className="text-left px-4 py-2.5">{t('tableHeaders.date')}</th>
@@ -190,7 +191,7 @@ const MileageSection: React.FC<{ mileageRate: string; mileageYear: number }> = (
               ) : logs.map(log => (
                 <tr key={log.id} className="border-t border-[#e0ddd5]/70 hover:bg-[#f9f9f8]/40">
                   <td className="px-4 py-2.5">{log.date}</td>
-                  <td className="px-4 py-2.5 text-[#4a4a48]">{log.start_location || '—'} → {log.end_location || '—'}{log.round_trip ? ' ↩' : ''}</td>
+                  <td className="px-4 py-2.5 text-[#4a4a48] col-name">{log.start_location || '—'} → {log.end_location || '—'}{log.round_trip ? ' ↩' : ''}</td>
                   <td className="px-4 py-2.5 text-right font-mono">{log.miles}</td>
                   <td className="px-4 py-2.5 text-[#5c5c5a]">{log.purpose || '—'}</td>
                   <td className="px-4 py-2.5 text-right font-mono text-emerald-600">${log.deduction.toFixed(2)}</td>
@@ -201,6 +202,7 @@ const MileageSection: React.FC<{ mileageRate: string; mileageYear: number }> = (
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

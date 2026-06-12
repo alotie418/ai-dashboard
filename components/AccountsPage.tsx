@@ -192,7 +192,7 @@ const AccountsPage: React.FC = () => {
             </div>
             {details.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm data-table">
                   <thead>
                     <tr className="bg-[#f9f9f8] text-[#7a7a78] text-xs">
                       <th className="px-4 py-2 text-left">{t('accounts.headerDate')}</th>
@@ -212,7 +212,7 @@ const AccountsPage: React.FC = () => {
                       return (
                         <tr key={item.id} className="border-t border-[#f0eeeb] hover:bg-[#f9f9f8]">
                           <td className="px-4 py-2.5">{item.date}</td>
-                          <td className="px-4 py-2.5">{activeTab === 'receivable' ? item.customer : item.supplier}</td>
+                          <td className="px-4 py-2.5 col-name">{activeTab === 'receivable' ? item.customer : item.supplier}</td>
                           <td className="px-4 py-2.5 text-right">{formatCurrency(item.totalAmount)}</td>
                           <td className="px-4 py-2.5 text-right text-green-600">{formatCurrency(item.paid_amount || 0)}</td>
                           <td className="px-4 py-2.5 text-right font-medium text-red-500">{formatCurrency(unpaid)}</td>

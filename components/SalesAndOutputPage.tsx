@@ -378,7 +378,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
       {/* Data Table */}
       <div className="bg-white/80 border border-[#e0ddd5] rounded-xl overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse data-table">
             <thead>
               <tr className="border-b border-[#e0ddd5] text-[#5c5c5a] text-xs">
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.date')}</th>
@@ -403,7 +403,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                 return (
                 <tr key={row.id} className="hover:bg-[#f9f9f8]/30 transition-colors">
                   <td className="px-5 py-5 text-sm text-[#4a4a48] whitespace-nowrap">{row.date}</td>
-                  <td className="px-5 py-5 text-sm text-[#191918] font-medium">{row.customer}</td>
+                  <td className="px-5 py-5 text-sm text-[#191918] font-medium col-name">{row.customer}</td>
                   <td className="px-5 py-5 text-sm text-[#4a4a48]">{row.unit ? `${row.quantity} ${getProductUnitLabel(row.unit, uiLang)}` : formatLegacyQuantity(row.quantity, productUnit, uiLang)}</td>
                   <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{formatCurrency(unitPrice)}</td>
                   <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{formatCurrency(amtWithoutTax)}</td>
