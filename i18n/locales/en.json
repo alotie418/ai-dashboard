@@ -664,6 +664,7 @@
     "chartSalesTons": "Sales",
     "chartUnitProfit": "Unit profit",
     "forecastDefault": "No forecast available",
+    "insufficientHistory": "Not enough history to compute MoM / YoY",
     "forecastEstProfit": "Estimated profit",
     "forecastLoading": "Generating forecast...",
     "forecastLowerBound": "Lower bound",

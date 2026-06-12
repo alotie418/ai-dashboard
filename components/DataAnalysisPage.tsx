@@ -51,17 +51,18 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
 
   const stats = useMemo(() => {
     const perf = data.monthlyPerformance;
-    if (!perf.length) return { yoy: 0, mom: 0, deflator: 0, avgProfit: 0, avgRevenue: 0 };
-    const safeAvg = (arr: number[]) => {
-      const valid = arr.filter(v => Number.isFinite(v));
-      return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : 0;
+    if (!perf.length) return { yoy: null, mom: null, deflator: null, avgProfit: 0, avgRevenue: 0 };
+    // 跳过 null（无基期）与非有限值——空集返回 null（前端显「—」，不显 0.0% 假均值）。
+    const safeAvg = (arr: (number | null)[]): number | null => {
+      const valid = arr.filter((v): v is number => v != null && Number.isFinite(v));
+      return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : null;
     };
     return {
       yoy: safeAvg(perf.map(p => p.yoy)),
       mom: safeAvg(perf.map(p => p.mom)),
       deflator: safeAvg(perf.map(p => p.deflator)),
-      avgProfit: safeAvg(perf.map(p => p.profit)),
-      avgRevenue: safeAvg(perf.map(p => p.revenue))
+      avgProfit: safeAvg(perf.map(p => p.profit)) ?? 0,
+      avgRevenue: safeAvg(perf.map(p => p.revenue)) ?? 0
     };
   }, [data.monthlyPerformance]);
 
@@ -141,8 +142,8 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
       index: avgRevenue > 0 ? +(p.revenue / avgRevenue).toFixed(3) : 1
     }));
 
-    // Growth acceleration (2nd derivative of MoM)
-    const moms = nonZero.map(p => p.mom);
+    // Growth acceleration (2nd derivative of MoM) — skip null (no base period) MoM values.
+    const moms = nonZero.map(p => p.mom).filter((v): v is number => v != null);
     const momDiffs = moms.slice(1).map((v, i) => v - moms[i]);
     const avgAcceleration = momDiffs.length > 0 ? momDiffs.reduce((a, b) => a + b, 0) / momDiffs.length : 0;
 
@@ -456,9 +457,9 @@ ${t('analysis.forecastPromptRequirements')}`;
             )}
           </div>
           <div className="hidden lg:grid grid-cols-3 gap-8 border-l border-[#e0ddd5] pl-12 shrink-0">
-            <StatsIndicator label={t('analysis.avgYoy')} value={`${stats.yoy.toFixed(1)}%`} trend={stats.yoy >= 0 ? 'up' : 'down'} />
-            <StatsIndicator label={t('analysis.avgMom')} value={`${stats.mom.toFixed(1)}%`} trend={stats.mom >= 0 ? 'up' : 'down'} />
-            <StatsIndicator label={t('analysis.deflator')} value={stats.deflator.toFixed(1)} trend="neutral" color="text-amber-500" />
+            <StatsIndicator label={t('analysis.avgYoy')} value={stats.yoy == null ? '—' : `${stats.yoy.toFixed(1)}%`} trend={stats.yoy == null ? 'neutral' : stats.yoy >= 0 ? 'up' : 'down'} />
+            <StatsIndicator label={t('analysis.avgMom')} value={stats.mom == null ? '—' : `${stats.mom.toFixed(1)}%`} trend={stats.mom == null ? 'neutral' : stats.mom >= 0 ? 'up' : 'down'} />
+            <StatsIndicator label={t('analysis.deflator')} value={stats.deflator == null ? '—' : stats.deflator.toFixed(1)} trend="neutral" color="text-amber-500" />
           </div>
         </div>
       </div>
@@ -509,15 +510,22 @@ ${t('analysis.forecastPromptRequirements')}`;
 
           {/* Monthly Growth Compare */}
           <PanoramaCard title={t('analysis.growthTrend')} subtitle={t('analysis.subtitleYoyMom')}>
-            <ResponsiveContainer width="100%" height={260}>
-              <ComposedChart data={data.monthlyPerformance}>
-                <XAxis dataKey="name" hide />
-                <YAxis hide />
-                <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} />
-                <Bar dataKey="mom" name={t('analysis.chartMom')} fill="#d97757" radius={[4, 4, 0, 0]} barSize={8} />
-                <Line type="monotone" dataKey="yoy" name={t('analysis.chartYoy')} stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
+            {data.monthlyPerformance.some(p => p.mom != null || p.yoy != null) ? (
+              <ResponsiveContainer width="100%" height={260}>
+                <ComposedChart data={data.monthlyPerformance}>
+                  <XAxis dataKey="name" hide />
+                  <YAxis hide />
+                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} />
+                  <Bar dataKey="mom" name={t('analysis.chartMom')} fill="#d97757" radius={[4, 4, 0, 0]} barSize={8} />
+                  <Line type="monotone" dataKey="yoy" name={t('analysis.chartYoy')} stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} connectNulls={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              /* 全期 mom/yoy 均无基期 → 不画假趋势，显式空态 */
+              <div className="h-[260px] flex items-center justify-center text-center px-4">
+                <p className="text-xs text-[#7a7a78] italic">{t('analysis.insufficientHistory')}</p>
+              </div>
+            )}
           </PanoramaCard>
 
           {/* Unit Profit Contribution */}
@@ -541,8 +549,8 @@ ${t('analysis.forecastPromptRequirements')}`;
                 <YAxis type="number" dataKey="profit" name={t('analysis.chartProfit')} hide />
                 <ZAxis type="number" dataKey="deflator" range={[50, 400]} name={t('analysis.deflator')} />
                 <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} />
-                <Scatter name={t('analysis.chartMonthlyData')} data={data.monthlyPerformance} fill="#d97757">
-                  {data.monthlyPerformance.map((entry, index) => (
+                <Scatter name={t('analysis.chartMonthlyData')} data={data.monthlyPerformance.filter(p => p.deflator != null)} fill="#d97757">
+                  {data.monthlyPerformance.filter(p => p.deflator != null).map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.profit > stats.avgProfit ? '#10b981' : '#d97757'} />
                   ))}
                 </Scatter>
@@ -636,7 +644,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                   {dimension === 'efficiency' && (
                     <>
                       <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={11} tickLine={false} axisLine={false} domain={['auto', 'auto']} />
-                      <Line yAxisId="right" type="step" dataKey="deflator" name={t('analysis.deflator')} stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                      <Line yAxisId="right" type="step" dataKey="deflator" name={t('analysis.deflator')} stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
                       <Area yAxisId="left" type="monotone" dataKey="profit" name={t('analysis.chartUnitProfit')} fill="#10b981" fillOpacity={0.1} stroke="#10b981" />
                     </>
                   )}
@@ -647,7 +655,7 @@ ${t('analysis.forecastPromptRequirements')}`;
 
           <div className="space-y-6">
             <SummaryMiniCard title={t('analysis.peakMonth')} value={data.monthlyPerformance.length > 0 ? [...data.monthlyPerformance].sort((a, b) => b.revenue - a.revenue)[0].name : '—'} sub={t('analysis.peakMonthSub')} icon="fa-crown" color="text-amber-600" />
-            <SummaryMiniCard title={t('analysis.fastest')} value={data.monthlyPerformance.length > 0 ? [...data.monthlyPerformance].sort((a, b) => b.mom - a.mom)[0].name : '—'} sub={t('analysis.fastestSub')} icon="fa-bolt" color="text-[#d97757]" />
+            <SummaryMiniCard title={t('analysis.fastest')} value={data.monthlyPerformance.some(p => p.mom != null) ? [...data.monthlyPerformance].sort((a, b) => (b.mom ?? -Infinity) - (a.mom ?? -Infinity))[0].name : '—'} sub={t('analysis.fastestSub')} icon="fa-bolt" color="text-[#d97757]" />
             <div className="bg-white/80 border border-[#e0ddd5] rounded-xl p-8" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
               <h4 className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-[0.2em] mb-6">{t('analysis.anomalyTitle')}</h4>
               <div className="space-y-5">
@@ -661,15 +669,17 @@ ${t('analysis.forecastPromptRequirements')}`;
                   const cvUR = meanUR === 0 ? 0 : (stdUR / meanUR * 100);
                   const cvLabel = cvUR < 5 ? t('analysis.severityLow') : cvUR < 15 ? t('analysis.severityMid') : t('analysis.severityHigh');
                   const cvColor = cvUR < 5 ? 'text-emerald-600' : cvUR < 15 ? 'text-amber-500' : 'text-rose-500';
-                  // 价格指数关联度：deflator 与 profit 的皮尔逊相关系数
-                  const profits = perf.map(p => p.profit);
-                  const deflators = perf.map(p => p.deflator);
-                  const meanP = profits.reduce((a, b) => a + b, 0) / profits.length;
-                  const meanD = deflators.reduce((a, b) => a + b, 0) / deflators.length;
+                  // 价格指数关联度：deflator 与 profit 的皮尔逊相关系数（仅取有价格指数的月份，成对对齐）
+                  const withDef = perf.filter(p => p.deflator != null);
+                  const profits = withDef.map(p => p.profit);
+                  const deflators = withDef.map(p => p.deflator as number);
+                  const n = deflators.length;
+                  const meanP = n ? profits.reduce((a, b) => a + b, 0) / n : 0;
+                  const meanD = n ? deflators.reduce((a, b) => a + b, 0) / n : 0;
                   const cov = profits.reduce((a, b, i) => a + (b - meanP) * (deflators[i] - meanD), 0);
                   const stdP = Math.sqrt(profits.reduce((a, b) => a + (b - meanP) ** 2, 0));
                   const stdD = Math.sqrt(deflators.reduce((a, b) => a + (b - meanD) ** 2, 0));
-                  const corr = (stdP === 0 || stdD === 0) ? 0 : (cov / (stdP * stdD)) * 100;
+                  const corr = (n < 2 || stdP === 0 || stdD === 0) ? 0 : (cov / (stdP * stdD)) * 100;
                   const absCorr = Math.abs(corr);
                   const corrSign = corr >= 0 ? '+' : '−';
                   const corrLabel = absCorr > 70 ? t('analysis.corrStrong') : absCorr > 40 ? t('analysis.corrModerate') : t('analysis.corrWeak');
@@ -816,7 +826,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                 const csvHeader = [t('analysis.tableMonth'),t('analysis.tableHeaderPurchase'),t('analysis.tableHeaderSales'),t('analysis.tableHeaderRevenue'),t('analysis.tableHeaderCost'),t('analysis.tableHeaderGross'),t('analysis.tableHeaderNet'),t('analysis.tableHeaderYoy'),t('analysis.tableHeaderMom'),t('analysis.tableHeaderPrice')].join(',');
                 let csv = '﻿' + csvHeader + '\n';
                 rows.forEach(r => {
-                  csv += `${r.name},${r.purchaseTons},${r.salesTons},${r.revenue},${r.cost},${r.profit},${r.netProfit},${r.yoy},${r.mom},${r.deflator}\n`;
+                  csv += `${r.name},${r.purchaseTons},${r.salesTons},${r.revenue},${r.cost},${r.profit},${r.netProfit},${r.yoy ?? ''},${r.mom ?? ''},${r.deflator ?? ''}\n`;
                 });
                 const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
@@ -852,16 +862,24 @@ ${t('analysis.forecastPromptRequirements')}`;
                     <td className="px-10 py-6 text-sm text-right font-bold text-[#191918] border-r border-[#e0ddd5]/70">{row.revenue.toLocaleString()}</td>
                     <td className="px-10 py-6 text-sm text-right font-bold text-emerald-600 border-r border-[#e0ddd5]/70">{row.netProfit.toLocaleString()}</td>
                     <td className="px-10 py-6 text-center border-r border-[#e0ddd5]/70">
-                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${row.yoy >= 0 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-500'}`}>
-                        {row.yoy > 0 ? '+' : ''}{row.yoy.toFixed(1)}%
-                      </span>
+                      {row.yoy == null ? (
+                        <span className="text-[10px] text-[#a0a09c]">—</span>
+                      ) : (
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${row.yoy >= 0 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-500'}`}>
+                          {row.yoy > 0 ? '+' : ''}{row.yoy.toFixed(1)}%
+                        </span>
+                      )}
                     </td>
                     <td className="px-10 py-6 text-center border-r border-[#e0ddd5]/70">
-                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${row.mom >= 0 ? 'bg-[#d97757]/10 text-[#d97757]' : 'bg-rose-500/10 text-rose-500'}`}>
-                        {row.mom > 0 ? '+' : ''}{row.mom.toFixed(1)}%
-                      </span>
+                      {row.mom == null ? (
+                        <span className="text-[10px] text-[#a0a09c]">—</span>
+                      ) : (
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${row.mom >= 0 ? 'bg-[#d97757]/10 text-[#d97757]' : 'bg-rose-500/10 text-rose-500'}`}>
+                          {row.mom > 0 ? '+' : ''}{row.mom.toFixed(1)}%
+                        </span>
+                      )}
                     </td>
-                    <td className="px-10 py-6 text-sm text-center font-bold text-amber-500 bg-amber-500/5">{row.deflator}</td>
+                    <td className="px-10 py-6 text-sm text-center font-bold text-amber-500 bg-amber-500/5">{row.deflator == null ? <span className="text-[#a0a09c]">—</span> : row.deflator}</td>
                   </tr>
                 ))}
               </tbody>

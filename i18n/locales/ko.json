@@ -664,6 +664,7 @@
     "chartSalesTons": "매출량",
     "chartUnitProfit": "단위 이익",
     "forecastDefault": "예측 결과 없음",
+    "insufficientHistory": "전월 대비/전년 대비를 계산할 이력이 부족합니다",
     "forecastEstProfit": "예상 이익",
     "forecastLoading": "예측 생성 중...",
     "forecastLowerBound": "하한",

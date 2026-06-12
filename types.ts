@@ -42,9 +42,9 @@ export interface ChartData {
   purchaseTons: number;
   salesTons: number;
   netProfit: number;
-  yoy: number; // Year-on-Year growth %
-  mom: number; // Month-on-Month growth %
-  deflator: number; // Price deflator index
+  yoy: number | null; // Year-on-Year revenue growth % (null = no prior-year base period)
+  mom: number | null; // Month-on-Month revenue growth % (null = no prior month / base 0)
+  deflator: number | null; // Price index = unit-revenue / avg × 100 (null = no sales volume)
 }
 
 export interface CategoryData {
