@@ -847,6 +847,19 @@
     "empty": "No analysis data. Click refresh to generate.",
     "powered": "Powered by GEMINI 3 FLASH"
   },
+  "aiError": {
+    "noProvider": "Aucun fournisseur d'IA configuré. Ajoutez une clé API dans Paramètres → Fournisseurs d'IA.",
+    "auth": "La clé API est invalide ou expirée. Vérifiez-la et mettez-la à jour dans Paramètres → Fournisseurs d'IA.",
+    "permission": "Pas d'accès à ce modèle. Vous devrez peut-être l'activer ou être ajouté à la liste blanche dans la console du fournisseur.",
+    "quota": "Limite de débit atteinte ou quota épuisé. Réessayez plus tard, ou changez de fournisseur d'IA.",
+    "modelNotFound": "L'ID du modèle n'existe pas ou est indisponible. Définissez un ID de modèle valide dans Paramètres → Fournisseurs d'IA.",
+    "badRequest": "Requête invalide. Causes fréquentes : ID de modèle mal orthographié ou fonctionnalité non prise en charge.",
+    "serverError": "Le service du fournisseur d'IA rencontre des problèmes. Réessayez plus tard.",
+    "parseFailed": "Échec de l'analyse de la réponse de l'IA. Réessayez ; si cela persiste, changez de modèle ou de fournisseur.",
+    "network": "Impossible de joindre le fournisseur d'IA. Vérifiez votre réseau ou vos paramètres de proxy.",
+    "timeout": "La requête IA a expiré. Réessayez plus tard.",
+    "unknown": "La requête IA a échoué. Réessayez plus tard."
+  },
   "alerts": {
     "title": "Centre d'alertes",
     "unread": "Unread",

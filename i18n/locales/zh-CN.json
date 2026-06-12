@@ -847,6 +847,19 @@
     "empty": "暂无分析数据。点击刷新按钮生成。",
     "powered": "由 GEMINI 3 FLASH 提供算力支持"
   },
+  "aiError": {
+    "noProvider": "尚未配置 AI 服务商，请在「设置 → AI 服务商」中添加 API Key。",
+    "auth": "API Key 无效或已过期，请在「设置 → AI 服务商」检查并更新 Key。",
+    "permission": "没有访问该模型的权限，可能需要在服务商后台开通或加入白名单。",
+    "quota": "请求超限或额度已用完，请稍后重试，或更换 AI 服务商。",
+    "modelNotFound": "模型 ID 不存在或不可用，请在「设置 → AI 服务商」改成可用的模型 ID。",
+    "badRequest": "请求参数无效，常见原因：模型 ID 拼写错误或不支持的功能。",
+    "serverError": "AI 服务商接口异常，请稍后重试。",
+    "parseFailed": "AI 返回内容解析失败，请重试；若反复出现可更换模型或服务商。",
+    "network": "无法连接到 AI 服务商，请检查网络或代理设置。",
+    "timeout": "AI 请求超时，请稍后重试。",
+    "unknown": "AI 请求失败，请稍后重试。"
+  },
   "alerts": {
     "title": "预警中心",
     "unread": "未读",

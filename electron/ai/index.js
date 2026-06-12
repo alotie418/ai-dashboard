@@ -238,8 +238,8 @@ function getDefaultRecord() {
     ).get();
   }
   if (!row) {
-    const err = new Error('尚未配置任何 AI Provider，请在「系统设置 → AI 服务商」中添加 API Key');
-    err.code = 'NO_PROVIDER';
+    const err = new Error('No AI provider configured [noProvider]');
+    err.code = 'noProvider';
     throw err;
   }
   return {

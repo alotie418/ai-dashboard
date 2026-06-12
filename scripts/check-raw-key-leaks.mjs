@@ -456,6 +456,80 @@ async function checkAIContextInvoiceStatus() {
   }
 }
 
+async function checkAIErrorCodes() {
+  // R3c: AI errors must carry a STABLE code (aiError.* enum) and the renderer must map
+  // code → i18n (follows uiLanguage). The main process must NOT emit localized Chinese
+  // "friendly" strings, and provider parse failures must go through parseError (code=parseFailed),
+  // never a bare Chinese `throw new Error('…解析失败')`.
+
+  // (1) _error.js / gemini.js must not re-introduce a `friendly` field or Chinese friendly prose.
+  for (const file of ['electron/ai/providers/_error.js', 'electron/ai/providers/gemini.js']) {
+    let src;
+    try { src = await readFile(join(ROOT, file), 'utf8'); } catch { continue; }
+    // Match a re-introduced friendly FIELD / helper / assignment — not the word in an
+    // explanatory comment ("不再生成 friendly 串").
+    if (/\.friendly\b|friendlyHint|friendly\s*=|['"]friendly['"]\s*:/.test(src)) {
+      findings.push({
+        file, line: 0, type: 'ai-error-friendly', token: 'friendly',
+        snippet: `${file} reintroduces a localized 'friendly' error string — AI errors must rely on a stable code (aiError.*), the renderer localizes via i18n`,
+      });
+    }
+  }
+
+  // (2) provider files must not throw bare Chinese parse-failure messages (use parseError → parseFailed).
+  for (const file of ['electron/ai/providers/openai.js', 'electron/ai/providers/anthropic.js', 'electron/ai/providers/gemini.js']) {
+    let src;
+    try { src = await readFile(join(ROOT, file), 'utf8'); } catch { continue; }
+    if (/throw new Error\(['"][^'"]*(解析失败|返回为空)/.test(src)) {
+      findings.push({
+        file, line: 0, type: 'ai-parse-no-code', token: 'parseFailed',
+        snippet: `${file} throws a bare Chinese parse-failure Error — use parseError(LABEL, …) so it carries the stable parseFailed code`,
+      });
+    }
+  }
+
+  // (3) the api:request IPC catch must embed the stable code via the AI_ERR:<code> prefix.
+  {
+    let src;
+    try { src = await readFile(join(ROOT, 'electron/handlers/index.js'), 'utf8'); } catch { src = null; }
+    if (src && !/AI_ERR:\$\{code\}/.test(src)) {
+      findings.push({
+        file: 'electron/handlers/index.js', line: 0, type: 'ai-error-no-token', token: 'AI_ERR',
+        snippet: "api:request catch must prefix the message with AI_ERR:${code} so the renderer can deterministically extract the stable code (Electron IPC drops Error custom fields)",
+      });
+    }
+  }
+
+  // (4) the renderer code→i18n helper must exist.
+  {
+    let src;
+    try { src = await readFile(join(ROOT, 'services/aiErrors.ts'), 'utf8'); } catch { src = null; }
+    if (!src || !/parseAiErrorCode/.test(src) || !/aiErrorMessage/.test(src)) {
+      findings.push({
+        file: 'services/aiErrors.ts', line: 0, type: 'ai-error-helper-missing', token: 'aiErrors',
+        snippet: 'services/aiErrors.ts must export parseAiErrorCode + aiErrorMessage (the code→i18n mapping the AI surfaces depend on)',
+      });
+    }
+  }
+
+  // (5) the AI business surfaces must consume the helper (no regressing to a hardcoded fallback).
+  const CONSUMERS = [
+    'components/assistant/useAssistant.ts',
+    'App.tsx',
+    'components/DataAnalysisPage.tsx',
+  ];
+  for (const file of CONSUMERS) {
+    let src;
+    try { src = await readFile(join(ROOT, file), 'utf8'); } catch { continue; }
+    if (!/aiErrorMessage|parseAiErrorCode/.test(src)) {
+      findings.push({
+        file, line: 0, type: 'ai-error-not-mapped', token: 'aiErrorMessage',
+        snippet: `${file} must map AI errors via services/aiErrors (aiErrorMessage / parseAiErrorCode), not a hardcoded fallback message`,
+      });
+    }
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -474,6 +548,7 @@ async function main() {
   await checkAIQuotaCooldown();
   await checkAIToolsReadonly();
   await checkAIContextInvoiceStatus();
+  await checkAIErrorCodes();
   await checkAnalyticsMatrixDisplay();
   await checkFinanceMoneyFormat();
 

@@ -8,7 +8,7 @@
 //   - Vision：content type 用 'input_text' / 'input_image' (image_url 直接传 data URI)
 //   - 出参：output[] 数组，便捷字段 output_text；REST 端可能不一定带 output_text，需 fallback 解析
 
-const { buildHttpError, wrapNetworkError } = require('./_error');
+const { buildHttpError, wrapNetworkError, parseError } = require('./_error');
 
 const API_BASE = 'https://api.openai.com/v1/responses';
 const LABEL = 'OpenAI';
@@ -155,7 +155,7 @@ async function analyze(apiKey, model, { data, marketSummary, languageHint, analy
   });
   const text = extractText(json);
   const parsed = tryParseJson(text);
-  if (!parsed) throw new Error('OpenAI 返回 JSON 解析失败');
+  if (!parsed) throw parseError(LABEL, 'chat JSON');
   return parsed;
 }
 
@@ -174,7 +174,7 @@ async function ocr(apiKey, model, { base64Data, mimeType, ocrPrompt }) {
   });
   const text = extractText(json);
   const parsed = tryParseJson(text);
-  if (!parsed) throw new Error('OpenAI OCR 返回解析失败');
+  if (!parsed) throw parseError(LABEL, 'OCR');
   return parsed;
 }
 
@@ -191,7 +191,7 @@ async function dataAnalysis(apiKey, model, { prompt, systemInstruction }) {
   });
   const text = extractText(json);
   const parsed = tryParseJson(text);
-  if (!parsed) throw new Error('OpenAI dataAnalysis 解析失败');
+  if (!parsed) throw parseError(LABEL, 'dataAnalysis');
   return { ...parsed, groundingSources: [] };
 }
 

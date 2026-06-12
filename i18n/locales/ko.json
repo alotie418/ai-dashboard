@@ -847,6 +847,19 @@
     "empty": "No analysis data. Click refresh to generate.",
     "powered": "Powered by GEMINI 3 FLASH"
   },
+  "aiError": {
+    "noProvider": "AI 제공업체가 설정되지 않았습니다. 「설정 → AI 제공업체」에서 API 키를 추가하세요.",
+    "auth": "API 키가 유효하지 않거나 만료되었습니다. 「설정 → AI 제공업체」에서 확인하고 업데이트하세요.",
+    "permission": "이 모델에 접근할 권한이 없습니다. 제공업체 콘솔에서 활성화하거나 허용 목록에 추가해야 할 수 있습니다.",
+    "quota": "요청 한도에 도달했거나 할당량을 모두 사용했습니다. 나중에 다시 시도하거나 AI 제공업체를 변경하세요.",
+    "modelNotFound": "모델 ID가 존재하지 않거나 사용할 수 없습니다. 「설정 → AI 제공업체」에서 사용 가능한 모델 ID로 변경하세요.",
+    "badRequest": "요청이 잘못되었습니다. 일반적인 원인: 모델 ID 오타 또는 지원되지 않는 기능.",
+    "serverError": "AI 제공업체 서비스에 문제가 있습니다. 나중에 다시 시도하세요.",
+    "parseFailed": "AI 응답을 해석하지 못했습니다. 다시 시도하세요. 계속되면 모델이나 제공업체를 변경하세요.",
+    "network": "AI 제공업체에 연결할 수 없습니다. 네트워크 또는 프록시 설정을 확인하세요.",
+    "timeout": "AI 요청 시간이 초과되었습니다. 나중에 다시 시도하세요.",
+    "unknown": "AI 요청에 실패했습니다. 나중에 다시 시도하세요."
+  },
   "alerts": {
     "title": "알림 센터",
     "unread": "Unread",

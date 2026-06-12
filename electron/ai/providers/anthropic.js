@@ -1,7 +1,7 @@
 // Anthropic Claude adapter — 直接走 REST API，不引入 SDK
 // 端点：https://docs.anthropic.com/en/api/messages
 
-const { buildHttpError, wrapNetworkError } = require('./_error');
+const { buildHttpError, wrapNetworkError, parseError } = require('./_error');
 
 const API_BASE = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
@@ -137,7 +137,7 @@ async function analyze(apiKey, model, { data, marketSummary, languageHint, analy
   });
   const text = extractText(json);
   const parsed = tryParseJson(text);
-  if (!parsed) throw new Error('Claude 返回 JSON 解析失败');
+  if (!parsed) throw parseError(LABEL, 'chat JSON');
   return parsed;
 }
 
@@ -156,7 +156,7 @@ async function ocr(apiKey, model, { base64Data, mimeType, ocrPrompt }) {
   });
   const text = extractText(json);
   const parsed = tryParseJson(text);
-  if (!parsed) throw new Error('Claude OCR 返回解析失败');
+  if (!parsed) throw parseError(LABEL, 'OCR');
   return parsed;
 }
 
@@ -173,7 +173,7 @@ async function dataAnalysis(apiKey, model, { prompt, systemInstruction }) {
   });
   const text = extractText(json);
   const parsed = tryParseJson(text);
-  if (!parsed) throw new Error('Claude dataAnalysis 返回解析失败');
+  if (!parsed) throw parseError(LABEL, 'dataAnalysis');
   return { ...parsed, groundingSources: [] }; // Claude 当前不接入 web grounding
 }
 

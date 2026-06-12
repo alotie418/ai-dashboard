@@ -7,6 +7,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { fetchSettings } from '../services/api';
+import { parseAiErrorCode, aiErrorMessage } from '../services/aiErrors';
 import { formatMoney, getCurrencySymbol, getInventoryUnitLabel, formatCompactMoney } from './accountingHelpers';
 // AI calls moved to server-side proxy
 
@@ -387,16 +388,17 @@ ${t('analysis.forecastPromptRequirements')}`;
         ...forecasts
       ]);
     } catch (err: any) {
-      // 区分「额度/限流(429)」与一般错误：429 进入 5 分钟冷却 + 友好提示，
+      // 区分「额度/限流(quota)」与一般错误：quota 进入 5 分钟冷却 + 友好提示，
       // 避免连点或任何残留路径反复刷 429 刷屏控制台。
-      const msg = String(err?.message || err);
-      if (/\b429\b|http_429|quota|exceeded|spending cap|额度|超限|rate.?limit/i.test(msg)) {
+      // R3c：错误分类改用稳定 code（parseAiErrorCode），其余按 code 映射 i18n（随 uiLanguage）。
+      const code = parseAiErrorCode(err);
+      if (code === 'quota') {
         aiQuotaCooldownRef.current = Date.now() + 5 * 60 * 1000;
         setSalesForecast(t('aiInsights.quotaExceeded'));
         console.warn('[AI] data-analysis quota/429 — paused 5 min, no auto-retry');
       } else {
         console.error(err);
-        setSalesForecast(t('analysis.aiError'));
+        setSalesForecast(aiErrorMessage(err, t));
       }
     } finally {
       isAnalysingRef.current = false;

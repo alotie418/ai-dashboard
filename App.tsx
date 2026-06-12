@@ -4,6 +4,7 @@ import { MOCK_BUSINESS_DATA } from './constants';
 import { fetchAIAnalysis } from './services/geminiService';
 import { AIAnalysis, BusinessData } from './types';
 import { fetchDashboardData, fetchSales, fetchPurchases, fetchSettings, listProviders } from './services/api';
+import { parseAiErrorCode, aiErrorMessage } from './services/aiErrors';
 import MetricCard from './components/MetricCard';
 import AIInsights from './components/AIInsights';
 import FinancialStatementTable from './components/FinancialStatementTable';
@@ -229,9 +230,9 @@ const AppContent: React.FC = () => {
     } catch (err: any) {
       // 区分「额度/限流(429)」与一般错误。429 时进入 5 分钟冷却 + 友好提示，
       // 并在有其他可用 provider 时提示切换（不自动切换），避免控制台刷屏。
-      const msg = String(err?.message || err);
-      const isQuota = /\b429\b|http_429|quota|exceeded|spending cap|额度|超限|rate.?limit/i.test(msg);
-      if (isQuota) {
+      // R3c：错误分类改用稳定 code（parseAiErrorCode），其余按 code 映射 i18n（随 uiLanguage）。
+      const code = parseAiErrorCode(err);
+      if (code === 'quota') {
         aiQuotaCooldownRef.current = Date.now() + 5 * 60 * 1000;
         let friendly = t('aiInsights.quotaExceeded');
         try {
@@ -246,7 +247,7 @@ const AppContent: React.FC = () => {
         console.warn('[AI] Gemini quota/429 — paused 5 min, no auto-retry');
       } else {
         console.error("AI Analysis Failed", err);
-        setAiError(t('aiInsights.error'));
+        setAiError(aiErrorMessage(err, t));
       }
     } finally {
       setLoadingAI(false);
