@@ -516,6 +516,72 @@ test.describe('ai assistant conversation persistence (R4a-1)', () => {
   });
 });
 
+// ── AI assistant conversation history sidebar (R4a-2) — mocked conversation endpoints ──
+// The AssistantPage sidebar lists conversations (refreshed after a send), switches on click
+// (loads that conversation's messages), renames inline (PUT /api/conversations/:id), and deletes
+// with a two-click confirm (DELETE /api/conversations/:id). We seed the list/messages and record
+// the rename/delete calls. The floating widget has no sidebar (page-only).
+test.describe('ai assistant conversation history (R4a-2)', () => {
+  test('conversation-sidebar ui=zh-CN → list + switch + rename + delete', async ({ page }) => {
+    const ui = 'zh-CN';
+    await bootCombo(page, ui, 'CN');
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+
+    const calls: { kind: string; url: string; body: any }[] = [];
+    await page.route('**/api/conversations', (route) => {
+      const req = route.request();
+      if (req.method() === 'POST') return route.fulfill({ json: { id: 'conv-new' } });
+      // GET list → one prior conversation
+      return route.fulfill({ json: [{ id: 'conv-prev', title: '历史对话', updated_at: '2026-06-10 09:00:00' }] });
+    });
+    await page.route('**/api/conversations/*/messages', (route) => {
+      const req = route.request();
+      if (req.method() === 'POST') return route.fulfill({ json: { ok: true } });
+      // GET messages for the prior conversation
+      return route.fulfill({ json: [{ role: 'user', text: '历史问题' }, { role: 'model', text: '历史回答' }] });
+    });
+    await page.route('**/api/conversations/*', (route) => {
+      const req = route.request();
+      if (req.method() === 'PUT') { calls.push({ kind: 'rename', url: req.url(), body: req.postDataJSON() }); return route.fulfill({ json: { ok: true } }); }
+      if (req.method() === 'DELETE') { calls.push({ kind: 'delete', url: req.url(), body: null }); return route.fulfill({ json: { ok: true } }); }
+      return route.fulfill({ json: {} });
+    });
+    await page.route('**/api/ai/agent-chat', (route) => route.fulfill({ json: { text: 'ok.' } }));
+
+    await page.locator('nav i.fa-comments').first().click();
+    await expect(page.getByText(loc.chat.historyTitle).first()).toBeVisible({ timeout: 10_000 });
+
+    // (1) send a message → refreshConversations → the seeded prior conversation appears in the sidebar
+    const input = page.getByPlaceholder(loc.chat.placeholder).first();
+    await input.fill('触发刷新');
+    await input.press('Enter');
+    await expect(page.getByText('历史对话').first()).toBeVisible({ timeout: 10_000 });
+
+    // (2) switch → clicking the history item loads its messages
+    await page.getByText('历史对话').first().click();
+    await expect(page.getByText('历史回答').first()).toBeVisible({ timeout: 10_000 });
+
+    // (3) inline rename → PUT /api/conversations/conv-prev with the new title
+    await page.getByTitle(loc.chat.renameConversation).first().click();
+    const renameInput = page.getByPlaceholder(loc.chat.renamePlaceholder).first();
+    await renameInput.fill('改名了');
+    await renameInput.press('Enter');
+    await expect.poll(() => calls.filter(c => c.kind === 'rename').length, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
+    expect(calls.find(c => c.kind === 'rename')?.url).toContain('conv-prev');
+    expect(calls.find(c => c.kind === 'rename')?.body?.title).toBe('改名了');
+
+    // (4) two-click delete → DELETE /api/conversations/conv-prev
+    await page.getByTitle(loc.chat.deleteConversation).first().click();
+    await page.getByText(loc.chat.deleteConfirm).first().click();
+    await expect.poll(() => calls.filter(c => c.kind === 'delete').length, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
+    expect(calls.find(c => c.kind === 'delete')?.url).toContain('conv-prev');
+
+    // (5) no raw chat.* key leaked
+    const body = await page.locator('body').innerText();
+    expect(body, 'raw chat key leaked').not.toMatch(/chat\.[a-zA-Z]/);
+  });
+});
+
 // ── Business Documents create modal with a mocked desktop electronAPI (Phase A) ──
 // The modal is uiLanguage-only (regime tax labels render via getTaxLabel with the
 // frozen acc_locale and are covered by the matrix sweep), so one accountingLocale ×

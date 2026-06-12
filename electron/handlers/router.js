@@ -125,6 +125,7 @@ const routes = [
   ['POST', '/api/conversations', conversationsH.create],
   ['GET', '/api/conversations/:id/messages', conversationsH.messages],
   ['POST', '/api/conversations/:id/messages', conversationsH.appendMessage],
+  ['PUT', '/api/conversations/:id', conversationsH.rename],
   ['DELETE', '/api/conversations/:id', conversationsH.remove],
 ];
 

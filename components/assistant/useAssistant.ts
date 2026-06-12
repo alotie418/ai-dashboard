@@ -7,9 +7,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  aiAgentChat, aiContext, type ToolTraceItem,
+  aiAgentChat, aiContext, type ToolTraceItem, type ConversationMeta,
   listConversations, createConversation, fetchConversationMessages,
-  appendConversationMessage, deleteConversation,
+  appendConversationMessage, deleteConversation, renameConversation,
 } from '../../services/api';
 import { aiErrorMessage } from '../../services/aiErrors';
 import { analyzeInvoice } from '../../services/ocrService';
@@ -39,6 +39,12 @@ export interface AssistantSession {
   activeTitle: string | null;         // R4a-1：当前会话标题（首条用户消息派生，供 ChatPanel 头部）
   newConversation: () => void;        // 新建对话（当前会话已持久化、留存历史）
   clearActive: () => Promise<void>;   // 清空当前对话（删除会话+消息）并开新空会话
+  // R4a-2：独立页侧栏会话历史（浮窗不渲染侧栏）。
+  conversations: ConversationMeta[];          // 会话列表（最近更新在前，响应式）
+  activeConversationId: string | null;        // 当前活动会话 id（侧栏高亮）
+  switchConversation: (id: string) => Promise<void>;        // 切换并载入该会话消息
+  renameConversation: (id: string, title: string) => Promise<void>; // 重命名标题
+  deleteConversation: (id: string) => Promise<void>;        // 删除会话（连同消息）
 }
 
 export function useAssistant(deps: AssistantDeps): AssistantSession {
@@ -52,8 +58,20 @@ export function useAssistant(deps: AssistantDeps): AssistantSession {
   // 头部标题改由 messages 派生）。所有持久化调用均 try/catch 降级——web 模式 /api/conversations
   // 404 / 任何失败时退回纯内存会话，绝不阻断聊天。
   const convIdRef = useRef<string | null>(null);
+  // R4a-2：活动会话 id（响应式，供侧栏高亮）+ 会话列表（响应式）。convIdRef 始终与
+  // activeConversationId 同步（ref 供 async 流同步读，state 供渲染）。
+  const [activeConversationId, setActiveConversationIdState] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<ConversationMeta[]>([]);
+  const setActiveConversationId = (id: string | null) => { convIdRef.current = id; setActiveConversationIdState(id); };
 
-  // 挂载时自动载入最近会话（重开 app 续上次对话）。仅跑一次。
+  const refreshConversations = async () => {
+    try {
+      const convs = await listConversations();
+      if (Array.isArray(convs)) setConversations(convs);
+    } catch { /* 降级：纯内存，列表留空 */ }
+  };
+
+  // 挂载时自动载入最近会话（重开 app 续上次对话）+ 拉取会话列表。仅跑一次。
   const loadedRef = useRef(false);
   useEffect(() => {
     if (loadedRef.current) return;
@@ -61,10 +79,11 @@ export function useAssistant(deps: AssistantDeps): AssistantSession {
     (async () => {
       try {
         const convs = await listConversations();
-        if (convs && convs.length) {
+        if (Array.isArray(convs) && convs.length) {
+          setConversations(convs);
           const recent = convs[0];
           const msgs = await fetchConversationMessages(recent.id);
-          convIdRef.current = recent.id;
+          setActiveConversationId(recent.id);
           setMessages(msgs as ChatMessage[]);
         }
       } catch { /* 非桌面/降级：保持空白纯内存会话 */ }
@@ -76,7 +95,7 @@ export function useAssistant(deps: AssistantDeps): AssistantSession {
     if (convIdRef.current) return convIdRef.current;
     try {
       const c = await createConversation({ accLocale: deps.accountingLocale, uiLanguage: deps.uiLanguage });
-      convIdRef.current = c.id;
+      setActiveConversationId(c.id);
       return c.id;
     } catch { return null; }
   };
@@ -96,6 +115,7 @@ export function useAssistant(deps: AssistantDeps): AssistantSession {
     // 先持久化用户消息（懒建会话），即使后续 AI 失败也保留输入。
     const convId = await ensureConversation();
     await persist(convId, { role: 'user', text });
+    void refreshConversations();  // 新会话 + 首条消息自动标题反映到侧栏
     try {
       // 多轮对话历史（Gemini 风格 parts；adapter 内部归一化）
       const chatHistory = newMsgs.map(m => ({ role: m.role, parts: [{ text: m.text }] }));
@@ -149,6 +169,7 @@ ${contextText}`;
     setIsTyping(true);
     const convId = await ensureConversation();
     await persist(convId, { role: 'user', text: userText });
+    void refreshConversations();
     try {
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve, reject) => {
@@ -203,20 +224,51 @@ ${contextText}`;
 
   // 新建对话：当前会话已持久化、留存历史；清空当前视图、下次发消息懒建新会话。
   const newConversation = () => {
-    convIdRef.current = null;
+    setActiveConversationId(null);
     setMessages([]);
   };
 
   // 清空当前对话：删除当前会话（连同消息）并开新空会话。
   const clearActive = async () => {
     const id = convIdRef.current;
-    convIdRef.current = null;
+    setActiveConversationId(null);
     setMessages([]);
-    if (id) { try { await deleteConversation(id); } catch { /* 降级：纯内存 */ } }
+    if (id) {
+      try { await deleteConversation(id); } catch { /* 降级：纯内存 */ }
+      void refreshConversations();
+    }
+  };
+
+  // R4a-2 侧栏：切换会话（载入其消息；发送中不切换防并发）。
+  const switchConversation = async (id: string) => {
+    if (id === convIdRef.current || isTyping) return;
+    try {
+      const msgs = await fetchConversationMessages(id);
+      setActiveConversationId(id);
+      setMessages(msgs as ChatMessage[]);
+    } catch { /* 降级：忽略切换 */ }
+  };
+
+  // R4a-2 侧栏：就地重命名标题。
+  const renameConversationById = async (id: string, title: string) => {
+    try { await renameConversation(id, title); } catch { /* 降级：纯内存 */ }
+    void refreshConversations();
+  };
+
+  // R4a-2 侧栏：删除会话（连同消息）；删的是当前会话则清空视图。
+  const deleteConversationById = async (id: string) => {
+    try { await deleteConversation(id); } catch { /* 降级：纯内存 */ }
+    if (id === convIdRef.current) { setActiveConversationId(null); setMessages([]); }
+    void refreshConversations();
   };
 
   // 头部标题：首条用户消息派生（截 40 字符），空会话为 null（ChatPanel 显示「新对话」）。
   const activeTitle = messages.find(m => m.role === 'user')?.text.slice(0, 40) || null;
 
-  return { messages, chatInput, setChatInput, isTyping, sendMessage, uploadInvoice, activeTitle, newConversation, clearActive };
+  return {
+    messages, chatInput, setChatInput, isTyping, sendMessage, uploadInvoice,
+    activeTitle, newConversation, clearActive,
+    conversations, activeConversationId, switchConversation,
+    renameConversation: renameConversationById, deleteConversation: deleteConversationById,
+  };
 }
