@@ -847,6 +847,19 @@
     "empty": "暫無分析資料。點擊刷新按鈕生成。",
     "powered": "由 GEMINI 3 FLASH 提供算力支援"
   },
+  "aiError": {
+    "noProvider": "尚未設定 AI 服務商，請在「設定 → AI 服務商」中新增 API Key。",
+    "auth": "API Key 無效或已過期，請在「設定 → AI 服務商」檢查並更新 Key。",
+    "permission": "沒有存取該模型的權限，可能需要在服務商後台開通或加入白名單。",
+    "quota": "請求超限或額度已用完，請稍後重試，或更換 AI 服務商。",
+    "modelNotFound": "模型 ID 不存在或不可用，請在「設定 → AI 服務商」改成可用的模型 ID。",
+    "badRequest": "請求參數無效，常見原因：模型 ID 拼寫錯誤或不支援的功能。",
+    "serverError": "AI 服務商介面異常，請稍後重試。",
+    "parseFailed": "AI 回傳內容解析失敗，請重試；若反覆出現可更換模型或服務商。",
+    "network": "無法連線到 AI 服務商，請檢查網路或代理設定。",
+    "timeout": "AI 請求逾時，請稍後重試。",
+    "unknown": "AI 請求失敗，請稍後重試。"
+  },
   "alerts": {
     "title": "預警中心",
     "unread": "未讀",

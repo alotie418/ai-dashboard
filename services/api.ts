@@ -91,11 +91,10 @@ export function setDefaultProvider(provider: AIProviderId): Promise<{ success: b
 
 export interface TestProviderResult {
   ok: boolean;
-  error?: string;
   status?: number;     // HTTP 状态码（如 401/403/404/429）
-  code?: string;       // 服务商错误码（如 invalid_api_key / model_not_found）
-  providerMessage?: string; // 服务商原始 message
-  rawMessage?: string; // 完整错误字符串（含状态码、code、friendly）
+  code?: string;       // 稳定错误码（aiError.* 枚举，如 auth / quota / modelNotFound）
+  providerMessage?: string; // 服务商原始 message（英文，仅供调试展示）
+  rawMessage?: string; // 完整错误字符串（含 AI_ERR:<code> + 状态码）
 }
 
 export function testProvider(payload: TestProviderRequest): Promise<TestProviderResult> {
@@ -722,7 +721,7 @@ async function apiFetch<T>(path: string, options?: RequestInit & { signal?: Abor
     const electronAPI = (window as any).electronAPI;
 
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error(`请求超时 (${API_TIMEOUT_MS / 1000}s): ${path}`)), API_TIMEOUT_MS);
+      setTimeout(() => reject(new Error(`AI_ERR:timeout (request timeout ${API_TIMEOUT_MS / 1000}s: ${path})`)), API_TIMEOUT_MS);
     });
     const cancelPromise = new Promise<never>((_, reject) => {
       userSignal?.addEventListener('abort', () => reject(new Error('cancelled')), { once: true });
@@ -763,7 +762,7 @@ async function apiFetch<T>(path: string, options?: RequestInit & { signal?: Abor
     return res.json() as Promise<T>;
   } catch (err: any) {
     if (userSignal?.aborted) throw new Error('cancelled');
-    if (err?.name === 'AbortError') throw new Error(`请求超时 (${API_TIMEOUT_MS / 1000}s): ${path}`);
+    if (err?.name === 'AbortError') throw new Error(`AI_ERR:timeout (request timeout ${API_TIMEOUT_MS / 1000}s: ${path})`);
     throw err;
   } finally {
     clearTimeout(timeoutId);

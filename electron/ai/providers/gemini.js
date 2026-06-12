@@ -1,34 +1,21 @@
 // Gemini adapter — 用 @google/genai SDK（项目已装）
 
-const { wrapNetworkError } = require('./_error');
+const { wrapNetworkError, normalizeCode, parseError } = require('./_error');
 
 const LABEL = 'Gemini';
 
-// SDK 抛错时尝试解析为统一格式
+// SDK 抛错时尝试解析为统一格式（带稳定 code，渲染端按 code 映射 i18n）
 function normalizeSdkError(err) {
   if (!err) return wrapNetworkError(new Error('Unknown Gemini error'), LABEL);
   const message = err?.message || String(err);
   // SDK 会在 message 里塞 HTTP status，例如 "[GoogleGenerativeAI Error]: 400 INVALID_ARGUMENT ..."
   const statusMatch = message.match(/\b(4\d\d|5\d\d)\b/);
   const status = statusMatch ? parseInt(statusMatch[1], 10) : 0;
-  const lower = message.toLowerCase();
-  let friendly = '';
-  if (status === 401 || /api[_ ]?key.*invalid|unauthorized/.test(lower)) {
-    friendly = 'API Key 无效或已过期';
-  } else if (status === 403 || /permission|forbidden/.test(lower)) {
-    friendly = '没有访问该模型的权限，可能需要开通 Google AI Studio 或加入白名单';
-  } else if (status === 429 || /quota|rate.?limit|exceeded/.test(lower)) {
-    friendly = '请求超限或额度耗尽';
-  } else if (status === 404 || /model.*not.*found|not.*supported/.test(lower)) {
-    friendly = '模型 ID 不存在或不可用，请在设置页改成可用 ID';
-  } else if (status >= 500) {
-    friendly = '服务商接口异常，请稍后重试';
-  }
-  const e = new Error(`${LABEL}${status ? ' ' + status : ''}${friendly ? ' — ' + friendly : ''} (${message.slice(0, 200)})`);
+  const code = normalizeCode(status, '', message);
+  const e = new Error(`${LABEL}${status ? ' ' + status : ''} [${code}] (${message.slice(0, 200)})`);
   e.status = status;
-  e.code = statusMatch ? `http_${status}` : 'gemini_error';
+  e.code = code;
   e.providerMessage = message;
-  e.friendly = friendly;
   e.providerLabel = LABEL;
   return e;
 }
@@ -201,7 +188,7 @@ async function ocr(apiKey, model, { base64Data, mimeType, ocrPrompt }) {
       contents: [{ parts: [{ text: prompt }, { inlineData: { data: base64Data, mimeType } }] }],
     });
     const text = response.text;
-    if (!text) throw new Error('Gemini OCR 返回为空');
+    if (!text) throw parseError(LABEL, 'OCR empty');
     const cleaned = text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
     return JSON.parse(cleaned);
   } catch (e) {

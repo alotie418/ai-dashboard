@@ -12,13 +12,13 @@ function registerHandlers({ ipcMain, dialog }) {
     try {
       return await dispatch(req || {});
     } catch (err) {
-      // 把归一化的错误字段拼到 message 里，IPC throw 至少能保留 message
-      // 前端 catch 后可以基于关键字判断（NO_PROVIDER / model_not_found / HTTP 401 等）
+      // Electron IPC 不传 Error 自定义字段，故把【稳定 code】以 "AI_ERR:<code>" 前缀
+      // 塞进 message，渲染端 services/aiErrors.ts 确定性提取后映射 i18n（aiError.*，随 uiLanguage）。
+      // 不再外显本地化 friendly 中文——message 只保留英文调试信息（status / providerMessage）。
+      const code = err?.code || 'unknown';
       const status = err?.status ? ` · HTTP ${err.status}` : '';
-      const code = err?.code ? ` [${err.code}]` : '';
-      const friendly = err?.friendly ? ` — ${err.friendly}` : '';
-      const base = err?.message || 'IPC dispatch failed';
-      throw new Error(`${base}${status}${code}${friendly}`);
+      const base = err?.providerMessage || err?.message || 'request failed';
+      throw new Error(`AI_ERR:${code}${status} (${String(base).slice(0, 300)})`);
     }
   });
 
@@ -48,12 +48,12 @@ function registerHandlers({ ipcMain, dialog }) {
       const result = await aiCore.test(payload || {});
       return { ok: true, ...result };
     } catch (err) {
-      // 把 provider adapter / _error.js 归一化后的错误字段全部回传给 UI
+      // 回传【稳定 code】给 UI，由渲染端按 code 映射 i18n（aiError.*）；
+      // 不再回传本地化 friendly 中文（providerMessage 为英文原文，仅供调试展示）。
       return {
         ok: false,
-        error: err?.friendly || err?.message || '连接失败',
+        code: err?.code || 'unknown',
         status: err?.status,
-        code: err?.code,
         providerMessage: err?.providerMessage,
         rawMessage: err?.message,
       };

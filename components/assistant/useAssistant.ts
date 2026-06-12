@@ -7,6 +7,7 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { aiAgentChat, aiContext, type ToolTraceItem } from '../../services/api';
+import { aiErrorMessage } from '../../services/aiErrors';
 import { analyzeInvoice } from '../../services/ocrService';
 import { buildAIFinanceContext, formatMoney, getTaxLabel } from '../accountingHelpers';
 import type { FinancialStatementData } from '../../types';
@@ -82,8 +83,9 @@ ${contextText}`;
       const result = await aiAgentChat(chatHistory, systemInstruction);
       const content = result.text || t('chat.emptyReply');
       setMessages([...newMsgs, { role: 'model', text: content, toolTrace: result.toolTrace }]);
-    } catch {
-      setMessages([...newMsgs, { role: 'model', text: t('chat.requestError') }]);
+    } catch (err) {
+      // R3c：按稳定 code 映射 i18n（随 uiLanguage），替代恒定的通用兜底文案。
+      setMessages([...newMsgs, { role: 'model', text: aiErrorMessage(err, t) }]);
     } finally {
       setIsTyping(false);
     }

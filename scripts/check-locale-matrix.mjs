@@ -146,6 +146,10 @@ const REQUIRED_I18N_KEYS = [
   'analysis.forecastPromptFinTitle', 'analysis.forecastPromptFeaturesTitle', 'analysis.forecastPromptFeaturesLegend',
   'analysis.forecastPromptVarTitle', 'analysis.forecastPromptVarLegend',
   'analysis.forecastPromptMcTitle', 'analysis.forecastPromptMcLegend', 'analysis.forecastPromptRequirements',
+  // R3c: AI error codes — stable code → i18n message (all surfaces, follows uiLanguage)
+  'aiError.noProvider', 'aiError.auth', 'aiError.permission', 'aiError.quota',
+  'aiError.modelNotFound', 'aiError.badRequest', 'aiError.serverError',
+  'aiError.parseFailed', 'aiError.network', 'aiError.timeout', 'aiError.unknown',
   // US Tax Tools — required in all 6 locales (page may render under US locale + any uiLanguage)
   'usTax.title', 'usTax.notApplicable', 'usTax.mileage', 'usTax.homeOffice',
   'usTax.totalTrips', 'usTax.totalMiles', 'usTax.deduction', 'usTax.addTrip',
@@ -2692,6 +2696,30 @@ async function main() {
       }
     }
     if (reasons.length) fail(`analysisWording:${lang}`, reasons); else pass(`analysisWording:${lang}`);
+  }
+
+  // ────────────────────────────────────────────────
+  // PART G1.4: AI error codes (R3c) — aiError.* messages must be localized
+  //   per uiLanguage. Presence/non-empty is covered by PART G (REQUIRED_I18N_KEYS);
+  //   here we lock that non-en locales are NOT a byte-identical English fallback.
+  // ────────────────────────────────────────────────
+  {
+    const AI_ERROR_KEYS = [
+      'noProvider', 'auth', 'permission', 'quota', 'modelNotFound', 'badRequest',
+      'serverError', 'parseFailed', 'network', 'timeout', 'unknown',
+    ];
+    for (const lang of UI_LANGUAGES) {
+      if (lang === 'en') { pass(`aiErrorCodes:${lang}`); continue; }
+      const reasons = [];
+      for (const key of AI_ERROR_KEYS) {
+        const v = get(locales[lang], `aiError.${key}`);
+        const enV = get(locales['en'], `aiError.${key}`);
+        if (typeof v === 'string' && typeof enV === 'string' && v.trim() === enV.trim()) {
+          reasons.push(`aiError.${key} is an untranslated English fallback in ${lang}`);
+        }
+      }
+      if (reasons.length) fail(`aiErrorCodes:${lang}`, reasons); else pass(`aiErrorCodes:${lang}`);
+    }
   }
 
   // ────────────────────────────────────────────────

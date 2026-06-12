@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AIProviderConfig, AIProviderId } from '../types';
 import { listProviders, saveProvider, setDefaultProvider, testProvider, saveSettings } from '../services/api';
+import { aiErrorMessage, aiErrorMessageFromCode } from '../services/aiErrors';
 import { KNOWN_MODELS, DEFAULT_MODEL } from './aiProviderModels';
 import { SUPPORTED_LANGUAGES, setLanguage, type LangCode } from '../i18n';
 import { ACCOUNTING_LOCALES, type AccountingLocaleId } from './accountingLocaleConfig';
@@ -117,14 +118,15 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
       } else {
         updateForm(id, {
           testResult: 'fail',
-          errorMsg: r.error || r.providerMessage || '连接失败',
+          // R3c：按稳定 code 映射 i18n（随 uiLanguage），不再展示主进程的中文 friendly。
+          errorMsg: aiErrorMessageFromCode(r.code, t),
           errorStatus: r.status,
           errorCode: r.code,
           testing: false,
         });
       }
     } catch (e: any) {
-      updateForm(id, { testResult: 'fail', errorMsg: e?.message || '连接失败', testing: false });
+      updateForm(id, { testResult: 'fail', errorMsg: aiErrorMessage(e, t), testing: false });
     }
   };
 
@@ -146,7 +148,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
       const remaining = providers.find(p => p.provider !== id && !forms[p.provider]?.saved);
       setExpandedProvider(remaining?.provider || null);
     } catch (e: any) {
-      updateForm(id, { errorMsg: e?.message || '保存失败', saving: false });
+      updateForm(id, { errorMsg: e?.message || t('settings.ai.saveError'), saving: false });
     }
   };
 
@@ -180,7 +182,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
       }
       onComplete();
     } catch (e: any) {
-      setCompanyError(e?.message || '保存失败');
+      setCompanyError(e?.message || t('settings.ai.saveError'));
     } finally {
       setCompanySaving(false);
     }

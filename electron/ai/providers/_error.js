@@ -1,6 +1,13 @@
-// 跨 provider 共享的错误解析
-// 目标：把各家不同结构的错误 JSON 翻译为 { status, code, message, friendly }
-// 让前端能展示可操作的提示（model_not_found / 401 / 429 等）
+// 跨 provider 共享的错误解析（R3c）
+// 目标：把各家不同结构的错误归一化为带【稳定 code】的 Error（code ∈ 有限枚举）。
+// 不再生成本地化中文 friendly 串——渲染端按 code 映射到 i18n（aiError.*），
+// 错误文案随 uiLanguage。message 仅保留英文调试信息（label/status/code/providerMessage）。
+
+// 稳定错误码枚举（与渲染端 services/aiErrors.ts + i18n aiError.* 对齐）。camelCase = i18n leaf。
+const AI_ERROR_CODES = [
+  'noProvider', 'auth', 'permission', 'quota', 'modelNotFound',
+  'badRequest', 'serverError', 'parseFailed', 'network', 'timeout', 'unknown',
+];
 
 async function readBody(response) {
   try {
@@ -25,28 +32,19 @@ function pickField(obj, ...candidates) {
   return undefined;
 }
 
-function friendlyHint(status, code, message) {
-  const m = `${code || ''} ${message || ''}`.toLowerCase();
-  if (status === 401 || /invalid_api_key|unauthorized/.test(m)) {
-    return 'API Key 无效或已过期，请检查 Key 是否正确';
-  }
-  if (status === 403 || /permission|forbidden/.test(m)) {
-    return '没有访问该模型的权限，可能需要在服务商后台开通或加入白名单';
-  }
-  if (status === 429 || /rate_limit|quota|exceeded|insufficient_quota/.test(m)) {
-    return '请求超限或额度已用完，请稍后重试或前往服务商账单页面充值';
-  }
-  if (status === 404 || /model.*not.*found|invalid_model|unknown.*model|does.*not.*exist/.test(m)) {
-    return '模型 ID 不存在或不可用，请在设置页改成该服务商当前发布的可用 ID';
-  }
-  if (status === 400 || /invalid_request|bad_request/.test(m)) {
-    return '请求参数无效，常见原因：模型 ID 拼写错误、不支持的功能（如 Vision）';
-  }
-  if (status >= 500) return '服务商接口异常，请稍后重试';
-  return '';
+// 由 HTTP status + 原始 code/message 归一化到稳定枚举。
+function normalizeCode(status, rawCode, message) {
+  const m = `${rawCode || ''} ${message || ''}`.toLowerCase();
+  if (status === 401 || /invalid_api_key|unauthorized/.test(m)) return 'auth';
+  if (status === 403 || /permission|forbidden/.test(m)) return 'permission';
+  if (status === 429 || /rate_limit|quota|exceeded|insufficient_quota|spending.?cap/.test(m)) return 'quota';
+  if (status === 404 || /model.*not.*found|invalid_model|unknown.*model|does.*not.*exist|not.*supported/.test(m)) return 'modelNotFound';
+  if (status === 400 || /invalid_request|bad_request/.test(m)) return 'badRequest';
+  if (typeof status === 'number' && status >= 500) return 'serverError';
+  return 'unknown';
 }
 
-// 用于 fetch 非 2xx 响应；返回的 Error 含 status / code / friendly 字段
+// 用于 fetch 非 2xx 响应；返回的 Error 含 status / code（稳定枚举）/ providerMessage 字段。
 async function buildHttpError(response, providerLabel) {
   const { json, text } = await readBody(response);
   const status = response.status;
@@ -55,37 +53,41 @@ async function buildHttpError(response, providerLabel) {
   // OpenAI:    { error: { message, code, type } }
   // Anthropic: { type: "error", error: { type, message } }
   // Gemini:    { error: { code, message, status } }
-  const code = pickField(json,
+  const rawCode = pickField(json,
     'error.code', 'error.type', 'error.status',
     'code', 'type', 'status'
-  ) || `http_${status}`;
-  const message = pickField(json,
+  );
+  const providerMessage = pickField(json,
     'error.message', 'message', 'error.error.message'
   ) || (text ? text.slice(0, 300) : `HTTP ${status}`);
 
-  const friendly = friendlyHint(status, String(code), String(message));
+  const code = normalizeCode(status, rawCode != null ? String(rawCode) : '', String(providerMessage));
   const err = new Error(
-    `${providerLabel} ${status}` +
-    (code ? ` [${code}]` : '') +
-    (friendly ? ` — ${friendly}` : '') +
-    (message ? ` (${message})` : '')
+    `${providerLabel} ${status} [${code}] (${String(providerMessage).slice(0, 200)})`
   );
   err.status = status;
-  err.code = String(code);
-  err.providerMessage = String(message);
-  err.friendly = friendly;
+  err.code = code;
+  err.providerMessage = String(providerMessage);
   err.providerLabel = providerLabel;
   return err;
 }
 
-// 用于网络错误（fetch 抛错、超时、JSON 解析失败等）
+// 用于网络错误（fetch 抛错、超时、连接失败等）。
 function wrapNetworkError(err, providerLabel) {
   const msg = err?.message || String(err);
-  const e = new Error(`${providerLabel} 网络错误 — ${msg}`);
-  e.code = 'network_error';
-  e.friendly = '无法连接到服务商，请检查网络或代理设置';
+  const e = new Error(`${providerLabel} network error [network] (${msg})`);
+  e.code = 'network';
+  e.providerMessage = msg;
   e.providerLabel = providerLabel;
   return e;
 }
 
-module.exports = { buildHttpError, wrapNetworkError };
+// 用于 provider 返回内容解析失败（非 HTTP 错误，如 JSON / OCR 解析为空）。
+function parseError(providerLabel, detail) {
+  const e = new Error(`${providerLabel} parse failed [parseFailed]${detail ? ' (' + detail + ')' : ''}`);
+  e.code = 'parseFailed';
+  e.providerLabel = providerLabel;
+  return e;
+}
+
+module.exports = { buildHttpError, wrapNetworkError, parseError, normalizeCode, AI_ERROR_CODES };

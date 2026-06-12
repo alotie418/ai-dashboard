@@ -12,6 +12,7 @@ import {
   fetchSettings,
 } from '../services/api';
 import { getTaxLabel } from './accountingHelpers';
+import { aiErrorMessage, aiErrorMessageFromCode } from '../services/aiErrors';
 import { KNOWN_MODELS, DEFAULT_MODEL, modelLabelFor, findModelOption, shouldAutoMigrate } from './aiProviderModels';
 
 const PROVIDER_DOCS: Record<AIProviderId, { label: string; getKeyUrl: string; placeholder: string; icon: string; color: string }> = {
@@ -110,14 +111,15 @@ const ProvidersSection: React.FC = () => {
       } else {
         updateRow(id, {
           testResult: 'fail',
-          errorMsg: result.error || result.providerMessage || t('settings.ai.connectionError'),
+          // R3c：按稳定 code 映射 i18n（随 uiLanguage），不再展示主进程的中文 friendly。
+          errorMsg: aiErrorMessageFromCode(result.code, t),
           errorStatus: result.status,
           errorCode: result.code,
           testing: false,
         });
       }
     } catch (e: any) {
-      updateRow(id, { testResult: 'fail', errorMsg: e?.message || t('settings.ai.connectionError'), testing: false });
+      updateRow(id, { testResult: 'fail', errorMsg: aiErrorMessage(e, t), testing: false });
     }
   };
 

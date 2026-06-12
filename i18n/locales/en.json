@@ -847,6 +847,19 @@
     "empty": "No analysis data. Click refresh to generate.",
     "powered": "Powered by GEMINI 3 FLASH"
   },
+  "aiError": {
+    "noProvider": "No AI provider configured. Add an API key under Settings → AI Providers.",
+    "auth": "The API key is invalid or expired. Check and update it under Settings → AI Providers.",
+    "permission": "No access to this model. You may need to enable it or get allow-listed in the provider console.",
+    "quota": "Rate limit reached or quota exhausted. Retry later, or switch AI provider.",
+    "modelNotFound": "The model ID does not exist or is unavailable. Set an available model ID under Settings → AI Providers.",
+    "badRequest": "Invalid request. Common causes: a misspelled model ID or an unsupported feature.",
+    "serverError": "The AI provider's service is having issues. Please retry later.",
+    "parseFailed": "Failed to parse the AI response. Please retry; if it persists, switch model or provider.",
+    "network": "Cannot reach the AI provider. Check your network or proxy settings.",
+    "timeout": "The AI request timed out. Please retry later.",
+    "unknown": "The AI request failed. Please retry later."
+  },
   "alerts": {
     "title": "Alert Center",
     "unread": "Unread",
