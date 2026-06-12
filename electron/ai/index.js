@@ -10,11 +10,13 @@ const { getDb } = require('../db');
 const anthropic = require('./providers/anthropic');
 const openai = require('./providers/openai');
 const gemini = require('./providers/gemini');
+const deepseek = require('./providers/deepseek');
 
 const PROVIDERS = {
   anthropic,
   openai,
   gemini,
+  deepseek,
 };
 
 const VALID_IDS = Object.keys(PROVIDERS);

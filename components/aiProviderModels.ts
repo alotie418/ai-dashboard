@@ -22,12 +22,16 @@ export const KNOWN_MODELS: Record<AIProviderId, ModelOption[]> = {
   gemini: [
     { label: 'Gemini 3.5 Flash', value: 'gemini-3.5-flash' },
   ],
+  deepseek: [
+    { label: 'DeepSeek Chat (V3)', value: 'deepseek-chat' },
+  ],
 };
 
 export const DEFAULT_MODEL: Record<AIProviderId, string> = {
   anthropic: 'claude-sonnet-4-6',
   openai: 'gpt-5.5',
   gemini: 'gemini-3.5-flash',
+  deepseek: 'deepseek-chat',
 };
 
 // 给定 provider + model value，返回 ModelOption；找不到说明是用户自定义 ID
