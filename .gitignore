@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# electron-builder DMG output (build artifact, not source)
+release
+
 # Playwright E2E artifacts (screenshots + report)
 test-results
 playwright-report
