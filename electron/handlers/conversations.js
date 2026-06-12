@@ -97,11 +97,20 @@ async function appendMessage({ params, body }) {
   return { ok: true };
 }
 
-// DELETE /api/conversations/:id — 删除会话（CASCADE 删其消息）。用于「清空当前对话」。
+// PUT /api/conversations/:id — 重命名会话标题（R4a-2 侧栏）。空标题留 null（前端显「新对话」）。
+async function rename({ params, body }) {
+  const db = getDb();
+  const title = safeString(body?.title, 200).trim();
+  db.prepare("UPDATE assistant_conversations SET title = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(title || null, params.id);
+  return { ok: true };
+}
+
+// DELETE /api/conversations/:id — 删除会话（CASCADE 删其消息）。用于「清空当前对话」/侧栏删除。
 async function remove({ params }) {
   const db = getDb();
   db.prepare('DELETE FROM assistant_conversations WHERE id = ?').run(params.id);
   return { ok: true };
 }
 
-module.exports = { list, create, messages, appendMessage, remove };
+module.exports = { list, create, messages, appendMessage, rename, remove };

@@ -170,9 +170,14 @@ export function appendConversationMessage(id: string, msg: StoredMessage): Promi
   return apiFetch(`/api/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: JSON.stringify(msg) });
 }
 
-/** 删除会话（连同消息；用于「清空当前对话」） */
+/** 删除会话（连同消息；用于「清空当前对话」/侧栏删除） */
 export function deleteConversation(id: string): Promise<{ ok: boolean }> {
   return apiFetch(`/api/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+/** 重命名会话标题（R4a-2 侧栏就地编辑） */
+export function renameConversation(id: string, title: string): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/conversations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ title }) });
 }
 
 // ==================== Categories（国际化数据模型 v4）====================
