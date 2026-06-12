@@ -530,6 +530,42 @@ async function checkAIErrorCodes() {
   }
 }
 
+async function checkNoTTSResidue() {
+  // R4c: voice/TTS was removed in R1; the external supportsTTS capability field / badge
+  // and the stale "GEMINI 3 FLASH" model name must not return.
+  // NOTE: the provider adapter META `capabilities.tts: false` + dead `tts()` methods are
+  // intentionally LEFT — this check does NOT scan electron/ai/providers/*.js.
+  // (1) no supportsTTS external field / badge in the type, the IPC list(), or the consuming components
+  for (const file of ['types.ts', 'electron/ai/index.js', 'components/ProvidersSection.tsx', 'components/OnboardingWizard.tsx']) {
+    let src;
+    try { src = await readFile(join(ROOT, file), 'utf8'); } catch { continue; }
+    if (/supportsTTS/.test(src)) {
+      findings.push({
+        file, line: 0, type: 'tts-residue', token: 'supportsTTS',
+        snippet: `${file} references supportsTTS — TTS/voice was removed (R1); do not re-expose the TTS capability field/badge`,
+      });
+    }
+    if (/支持\s*TTS|支援\s*TTS/.test(src)) {
+      findings.push({
+        file, line: 0, type: 'tts-residue', token: '支持 TTS',
+        snippet: `${file} hardcodes a 「支持 TTS」 badge — TTS was removed (R1)`,
+      });
+    }
+  }
+  // (2) i18n must not carry the stale "GEMINI 3 FLASH" model name (multi-provider now)
+  for (const lang of ['zh-CN', 'zh-TW', 'en', 'ja', 'ko', 'fr']) {
+    const file = `i18n/locales/${lang}.json`;
+    let src;
+    try { src = await readFile(join(ROOT, file), 'utf8'); } catch { continue; }
+    if (/GEMINI 3 FLASH/i.test(src)) {
+      findings.push({
+        file, line: 0, type: 'stale-model-name', token: 'GEMINI 3 FLASH',
+        snippet: `${file} hardcodes the stale model name "GEMINI 3 FLASH" — use generic AI wording (multi-provider)`,
+      });
+    }
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -549,6 +585,7 @@ async function main() {
   await checkAIToolsReadonly();
   await checkAIContextInvoiceStatus();
   await checkAIErrorCodes();
+  await checkNoTTSResidue();
   await checkAnalyticsMatrixDisplay();
   await checkFinanceMoneyFormat();
 

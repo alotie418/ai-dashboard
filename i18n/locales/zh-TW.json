@@ -186,7 +186,6 @@
       "resetTo": "重設為 {{model}}",
       "configured": "已設定",
       "notConfigured": "未設定",
-      "supportsTTS": "支援 TTS",
       "supportsWebGrounding": "支援 Web Grounding",
       "providerSavedToast": "{{name}} 已儲存",
       "modelUpdatedToast": "{{name}} 模型已更新",
@@ -272,19 +271,19 @@
     "industryPlaceholder": "例如：化工貿易 / 軟體開發 / 設計顧問",
     "finishAndEnter": "完成並進入應用",
     "skipCompany": "暫時略過公司資訊，稍後在設定中填寫",
-    "localeDesc": "這兩個設定互相獨立。介面語言控制選單和標籤。會計制度控制稅制、幣種和報表。"
-  },
-  "byok": {
+    "localeDesc": "這兩個設定互相獨立。介面語言控制選單和標籤。會計制度控制稅制、幣種和報表。",
+    "brandTagline": "獨帳 · 一人公司的智能帳本",
+    "loadFailedTitle": "無法載入 AI 服務商設定",
+    "loadFailedHint": "如果你剛剛升級了 SoloLedger，請完全結束應用程式（Cmd+Q）後重新啟動。",
+    "providersEmpty": "Provider 清單為空。請完全結束 SoloLedger（Cmd+Q）後重新啟動。",
+    "savedBadge": "✓ 已儲存",
+    "clickToExpand": "點擊展開設定",
+    "defaultBadge": "預設",
     "howToGetKey": "如何取得 {{provider}} Key",
-    "apiKey": "API Key",
-    "modelHelp": "如果測試回報 model_not_found，請到服務商官網查最新可用 ID",
-    "customMarker": "自訂",
-    "supportsTTSHint": "支援 TTS"
-  },
-  "providers": {
-    "anthropic": "Claude · Anthropic",
-    "openai": "ChatGPT · OpenAI",
-    "gemini": "Gemini · Google"
+    "testing": "測試中",
+    "saving": "儲存中",
+    "saveBtn": "儲存",
+    "optional": "（可選）"
   },
   "header": {
     "yearSuffix": "年度",
@@ -371,7 +370,6 @@
     "netMarginDesc": "計算公式：淨利潤 / 銷售收入",
     "grossProfitNote": "毛利率反映商品本身的盈利能力",
     "netProfitNote": "淨利率反映扣除運營費用後的實際盈利",
-    "geminiCredit": "由 GEMINI 3 FLASH 提供算力支援",
     "grossMargin": "毛利率",
     "netMargin": "淨利率",
     "grossMarginFormula": "計算公式：毛利 / 銷售收入",
@@ -845,7 +843,7 @@
     "quotaSwitchHint": "偵測到可用的 {{providers}}，可在「設定 → AI 服務商」切換。",
     "retry": "重試",
     "empty": "暫無分析資料。點擊刷新按鈕生成。",
-    "powered": "由 GEMINI 3 FLASH 提供算力支援"
+    "powered": "由 AI 提供算力支援"
   },
   "aiError": {
     "noProvider": "尚未設定 AI 服務商，請在「設定 → AI 服務商」中新增 API Key。",

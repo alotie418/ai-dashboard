@@ -85,7 +85,6 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
   // 初始加载所有 provider 元信息
   useEffect(() => {
     listProviders().then(list => {
-      console.log('[renderer providers:list]', list);
       setProviders(list);
       const initForms: Record<string, ProviderFormState> = {};
       // 用前端白名单的默认值初始化，不依赖主进程返回的 defaultModel
@@ -198,7 +197,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-[#191918] tracking-tight">SoloLedger</h1>
-            <p className="text-xs text-[#6b6b69]">独账 · 一人公司的智能账本</p>
+            <p className="text-xs text-[#6b6b69]">{t('onboarding.brandTagline')}</p>
           </div>
         </div>
 
@@ -214,26 +213,26 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
 
         {step === 'welcome' && (
           <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-[#191918]">欢迎使用 SoloLedger</h2>
+            <h2 className="text-xl font-semibold text-[#191918]">{t('onboarding.welcomeTitle')}</h2>
             <p className="text-sm text-[#4a4a48] leading-relaxed">
-              SoloLedger 是为一人公司、个体户和 Solo SaaS 创始人打造的智能账本应用。所有数据存储在本地，AI 能力由你自带的 API Key 驱动 — 我们看不到你的任何数据。
+              {t('onboarding.welcomeDescription')}
             </p>
             <ul className="space-y-3 text-sm text-[#4a4a48]">
               <li className="flex items-start">
                 <i className="fas fa-shield-alt text-[#d97757] mt-1 mr-3 w-4 text-center"></i>
-                <span>本地 SQLite 存储，所有数据存在你的 Mac 上</span>
+                <span>{t('onboarding.feature1')}</span>
               </li>
               <li className="flex items-start">
                 <i className="fas fa-key text-[#d97757] mt-1 mr-3 w-4 text-center"></i>
-                <span>支持 <b>Claude</b> · <b>ChatGPT</b> · <b>Gemini</b>，可配置多个，按需切换默认</span>
+                <span>{t('onboarding.feature2')}</span>
               </li>
               <li className="flex items-start">
                 <i className="fas fa-lock text-[#d97757] mt-1 mr-3 w-4 text-center"></i>
-                <span>API Key 使用系统 Keychain 加密，永远不离开你的设备</span>
+                <span>{t('onboarding.feature3')}</span>
               </li>
               <li className="flex items-start">
                 <i className="fas fa-cloud-download-alt text-[#d97757] mt-1 mr-3 w-4 text-center"></i>
-                <span>支持发票 OCR、经营分析、智能告警、应收应付管理</span>
+                <span>{t('onboarding.feature4')}</span>
               </li>
             </ul>
             <button
@@ -334,27 +333,27 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
         {step === 'providers' && (
           <div className="space-y-5">
             <div>
-              <h2 className="text-xl font-semibold text-[#191918] mb-2">配置 AI 服务商</h2>
-              <p className="text-sm text-[#6b6b69]">至少配置一个即可开始使用。配置多个时可在设置中切换默认。</p>
+              <h2 className="text-xl font-semibold text-[#191918] mb-2">{t('onboarding.providerTitle')}</h2>
+              <p className="text-sm text-[#6b6b69]">{t('onboarding.providerSubtitle')}</p>
             </div>
 
             {loading && (
               <div className="flex items-center justify-center py-10 text-sm text-[#6b6b69]">
-                <i className="fas fa-spinner fa-spin mr-2 text-[#d97757]"></i>正在加载 Provider 列表...
+                <i className="fas fa-spinner fa-spin mr-2 text-[#d97757]"></i>{t('onboarding.loadingProviders')}
               </div>
             )}
 
             {loadError && (
               <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 text-sm text-rose-700">
-                <div className="font-medium mb-1"><i className="fas fa-exclamation-triangle mr-2"></i>无法加载 AI 服务商配置</div>
+                <div className="font-medium mb-1"><i className="fas fa-exclamation-triangle mr-2"></i>{t('onboarding.loadFailedTitle')}</div>
                 <div className="text-xs break-all">{loadError}</div>
-                <div className="text-xs mt-2 text-rose-600">如果你刚刚升级了 SoloLedger，请完全退出应用（Cmd+Q）后重新启动。</div>
+                <div className="text-xs mt-2 text-rose-600">{t('onboarding.loadFailedHint')}</div>
               </div>
             )}
 
             {!loading && !loadError && providers.length === 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-700">
-                Provider 列表为空。请完全退出 SoloLedger（Cmd+Q）后重新启动。
+                {t('onboarding.providersEmpty')}
               </div>
             )}
 
@@ -378,14 +377,13 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                         <div>
                           <div className="text-sm font-semibold text-[#191918]">{doc.label}</div>
                           <div className="text-[11px] text-[#7a7a78]">
-                            {form.saved ? '✓ 已保存' : '点击展开配置'}
-                            {p.supportsTTS && <span className="ml-2 text-[#d97757]">支持 TTS</span>}
+                            {form.saved ? t('onboarding.savedBadge') : t('onboarding.clickToExpand')}
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
                         {form.saved && defaultProvider === p.provider && (
-                          <span className="text-[10px] font-bold bg-[#d97757] text-white px-2 py-1 rounded uppercase">默认</span>
+                          <span className="text-[10px] font-bold bg-[#d97757] text-white px-2 py-1 rounded uppercase">{t('onboarding.defaultBadge')}</span>
                         )}
                         <i className={`fas fa-chevron-${expanded ? 'up' : 'down'} text-[#7a7a78] text-xs`}></i>
                       </div>
@@ -404,12 +402,12 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                           />
                           <a href={doc.getKeyUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-[11px] mt-1.5 hover:underline" style={{ color: doc.color }}>
                             <i className="fas fa-external-link-alt mr-1 text-[9px]"></i>
-                            如何获取 {doc.label} Key
+                            {t('onboarding.howToGetKey', { provider: doc.label })}
                           </a>
                         </div>
 
                         <div>
-                          <label className="block text-xs font-medium text-[#4a4a48] mb-2">模型选择</label>
+                          <label className="block text-xs font-medium text-[#4a4a48] mb-2">{t('settings.ai.modelSection')}</label>
                           {/* 数据源：前端白名单 KNOWN_MODELS，不依赖主进程 META，避免主进程缓存陈旧数据污染 UI */}
                           <div className="flex flex-wrap gap-2 mb-2">
                             {KNOWN_MODELS[p.provider].map(opt => {
@@ -436,7 +434,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                           <details className="text-xs">
                             <summary className="text-[#7a7a78] cursor-pointer hover:text-[#4a4a48] select-none">
                               <i className="fas fa-code text-[10px] mr-1"></i>
-                              高级：手动输入 model ID
+                              {t('settings.ai.advancedInput')}
                             </summary>
                             <input
                               type="text"
@@ -446,7 +444,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                               className="w-full mt-2 px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm bg-white focus:outline-none focus:border-[#d97757] font-mono"
                             />
                             <p className="text-[10px] text-[#7a7a78] mt-1">
-                              当前传给 API 的 model ID: <code className="bg-[#f0eeeb] px-1.5 py-0.5 rounded">{form.model}</code>
+                              {t('settings.ai.currentModelId')}: <code className="bg-[#f0eeeb] px-1.5 py-0.5 rounded">{form.model}</code>
                             </p>
                           </details>
                         </div>
@@ -454,7 +452,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                         {form.testResult === 'ok' && (
                           <div className="flex items-center text-xs text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg">
                             <i className="fas fa-check-circle mr-2"></i>
-                            模型可调用，Key 与 model ID 均通过
+                            {t('settings.ai.testOk')}
                           </div>
                         )}
                         {form.testResult === 'fail' && (
@@ -462,7 +460,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                             <i className="fas fa-exclamation-circle mr-2 mt-0.5"></i>
                             <div className="flex-1">
                               <div className="font-medium">
-                                测试失败
+                                {t('settings.ai.testFail')}
                                 {form.errorStatus ? ` · HTTP ${form.errorStatus}` : ''}
                                 {form.errorCode ? ` · ${form.errorCode}` : ''}
                               </div>
@@ -480,7 +478,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                             disabled={!form.apiKey.trim() || form.testing || form.saved}
                             className="flex-1 border border-[#e0ddd5] text-[#4a4a48] py-2 rounded-lg text-sm font-medium hover:bg-[#f0eeeb] disabled:opacity-50 transition-colors"
                           >
-                            {form.testing ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>测试中</> : '测试连接'}
+                            {form.testing ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('onboarding.testing')}</> : t('settings.ai.testConnection')}
                           </button>
                           {!form.saved ? (
                             <button
@@ -489,7 +487,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                               className="flex-1 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
                               style={{ backgroundColor: doc.color }}
                             >
-                              {form.saving ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>保存中</> : '保存'}
+                              {form.saving ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('onboarding.saving')}</> : t('onboarding.saveBtn')}
                             </button>
                           ) : (
                             defaultProvider !== p.provider && (
@@ -497,7 +495,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                                 onClick={() => handleSetDefault(p.provider)}
                                 className="flex-1 text-[#d97757] border border-[#d97757] py-2 rounded-lg text-sm font-medium hover:bg-[#d97757]/5 transition-colors"
                               >
-                                设为默认
+                                {t('settings.ai.setAsDefault')}
                               </button>
                             )
                           )}
@@ -514,14 +512,14 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                 onClick={() => setStep('welcome')}
                 className="px-5 border border-[#e0ddd5] text-[#4a4a48] py-2.5 rounded-lg font-medium hover:bg-[#f0eeeb] transition-colors"
               >
-                上一步
+                {t('common.back')}
               </button>
               <button
                 onClick={() => setStep('company')}
                 disabled={savedCount === 0}
                 className="flex-1 bg-[#d97757] text-white py-2.5 rounded-lg font-medium hover:bg-[#c4694d] disabled:opacity-40 transition-colors"
               >
-                {savedCount > 0 ? `下一步（已配置 ${savedCount} 个）` : '至少配置一个服务商'}
+                {savedCount > 0 ? t('onboarding.configuredCount', { count: savedCount }) : t('onboarding.atLeastOneRequired')}
               </button>
             </div>
           </div>
@@ -530,28 +528,28 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
         {step === 'company' && (
           <div className="space-y-5">
             <div>
-              <h2 className="text-xl font-semibold text-[#191918] mb-2">填写公司信息</h2>
-              <p className="text-sm text-[#6b6b69]">用于 AI 分析时提供企业上下文，可随时在系统设置里修改。</p>
+              <h2 className="text-xl font-semibold text-[#191918] mb-2">{t('onboarding.companyTitle')}</h2>
+              <p className="text-sm text-[#6b6b69]">{t('onboarding.companySubtitle')}</p>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#4a4a48] mb-2">公司名称</label>
+              <label className="block text-xs font-medium text-[#4a4a48] mb-2">{t('onboarding.companyName')}</label>
               <input
                 type="text"
                 value={companyName}
                 onChange={e => setCompanyName(e.target.value)}
-                placeholder="例如：上海独角兽贸易有限公司"
+                placeholder={t('onboarding.companyNamePlaceholder')}
                 className="w-full px-4 py-2.5 border border-[#e0ddd5] rounded-lg text-sm focus:outline-none focus:border-[#d97757] focus:ring-2 focus:ring-[#d97757]/20"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#4a4a48] mb-2">所属行业 <span className="text-[#7a7a78] font-normal">（可选）</span></label>
+              <label className="block text-xs font-medium text-[#4a4a48] mb-2">{t('onboarding.industry')} <span className="text-[#7a7a78] font-normal">{t('onboarding.optional')}</span></label>
               <input
                 type="text"
                 value={industry}
                 onChange={e => setIndustry(e.target.value)}
-                placeholder="例如：化工贸易 / 软件开发 / 设计咨询"
+                placeholder={t('onboarding.industryPlaceholder')}
                 className="w-full px-4 py-2.5 border border-[#e0ddd5] rounded-lg text-sm focus:outline-none focus:border-[#d97757] focus:ring-2 focus:ring-[#d97757]/20"
               />
             </div>
@@ -565,19 +563,19 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                 onClick={() => setStep('providers')}
                 className="px-6 border border-[#e0ddd5] text-[#4a4a48] py-2.5 rounded-lg font-medium hover:bg-[#f0eeeb] transition-colors"
               >
-                上一步
+                {t('common.back')}
               </button>
               <button
                 onClick={finish}
                 disabled={companySaving}
                 className="flex-1 bg-[#d97757] text-white py-2.5 rounded-lg font-medium hover:bg-[#c4694d] disabled:opacity-50 transition-colors"
               >
-                {companySaving ? <><i className="fas fa-spinner fa-spin mr-2"></i>保存中</> : '完成并进入应用'}
+                {companySaving ? <><i className="fas fa-spinner fa-spin mr-2"></i>{t('onboarding.saving')}</> : t('onboarding.finishAndEnter')}
               </button>
             </div>
 
             <button onClick={finish} className="w-full text-xs text-[#7a7a78] hover:text-[#4a4a48] py-1">
-              暂时跳过公司信息，稍后在设置中填写
+              {t('onboarding.skipCompany')}
             </button>
           </div>
         )}

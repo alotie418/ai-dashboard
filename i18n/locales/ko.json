@@ -186,7 +186,6 @@
       "resetTo": "{{model}}으로 재설정",
       "configured": "구성됨",
       "notConfigured": "미구성",
-      "supportsTTS": "TTS 지원",
       "supportsWebGrounding": "Web Grounding 지원",
       "providerSavedToast": "{{name}} 저장됨",
       "modelUpdatedToast": "{{name}} 모델 업데이트됨",
@@ -272,19 +271,19 @@
     "industryPlaceholder": "예: 화학 무역 / 소프트웨어 / 컨설팅",
     "finishAndEnter": "완료하고 앱 진입",
     "skipCompany": "회사 정보 건너뛰기, 나중에 설정에서 입력",
-    "localeDesc": "이 두 설정은 독립적입니다. UI 언어는 메뉴와 레이블을 제어합니다. 회계 제도는 세제, 통화, 보고서를 제어합니다."
-  },
-  "byok": {
+    "localeDesc": "이 두 설정은 독립적입니다. UI 언어는 메뉴와 레이블을 제어합니다. 회계 제도는 세제, 통화, 보고서를 제어합니다.",
+    "brandTagline": "SoloLedger · 1인 기업을 위한 스마트 장부",
+    "loadFailedTitle": "AI 제공업체 설정을 불러오지 못했습니다",
+    "loadFailedHint": "SoloLedger를 방금 업그레이드했다면 앱을 완전히 종료(Cmd+Q)한 후 다시 시작하세요.",
+    "providersEmpty": "제공업체 목록이 비어 있습니다. SoloLedger를 완전히 종료(Cmd+Q)한 후 다시 시작하세요.",
+    "savedBadge": "✓ 저장됨",
+    "clickToExpand": "클릭하여 구성",
+    "defaultBadge": "기본",
     "howToGetKey": "{{provider}} Key 발급 방법",
-    "apiKey": "API Key",
-    "modelHelp": "model_not_found 오류 시 서비스 공식 사이트에서 최신 사용 가능 ID 확인",
-    "customMarker": "사용자 정의",
-    "supportsTTSHint": "TTS 지원"
-  },
-  "providers": {
-    "anthropic": "Claude · Anthropic",
-    "openai": "ChatGPT · OpenAI",
-    "gemini": "Gemini · Google"
+    "testing": "테스트 중",
+    "saving": "저장 중",
+    "saveBtn": "저장",
+    "optional": "(선택)"
   },
   "header": {
     "yearSuffix": "년도",
@@ -371,7 +370,6 @@
     "netMarginDesc": "Formula: Net Profit / Revenue",
     "grossProfitNote": "Gross margin reflects product profitability",
     "netProfitNote": "Net margin reflects profitability after operating costs",
-    "geminiCredit": "Powered by GEMINI 3 FLASH",
     "grossMargin": "Gross Margin",
     "netMargin": "Net Margin",
     "grossMarginFormula": "Formula: Gross Profit / Revenue",
@@ -845,7 +843,7 @@
     "quotaSwitchHint": "{{providers}} 사용 가능 — 설정 → AI 공급자에서 전환하세요.",
     "retry": "Retry",
     "empty": "No analysis data. Click refresh to generate.",
-    "powered": "Powered by GEMINI 3 FLASH"
+    "powered": "Powered by AI"
   },
   "aiError": {
     "noProvider": "AI 제공업체가 설정되지 않았습니다. 「설정 → AI 제공업체」에서 API 키를 추가하세요.",
