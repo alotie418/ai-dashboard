@@ -678,7 +678,20 @@
     "severityHigh": "高",
     "corrStrong": "強",
     "corrModerate": "中程度",
-    "corrWeak": "弱"
+    "corrWeak": "弱",
+    "forecastIdle": "下のボタンをクリックして AI 経営予測を生成します",
+    "runForecast": "AI 予測を生成",
+    "forecastPromptIntro": "あなたは経験豊富な企業経営アナリストです。以下のすべての情報源を踏まえ、今後 3 か月の売上高と利益を予測してください。",
+    "forecastPromptHistoryTitle": "## 一、企業の月次履歴データ（12 次元）",
+    "forecastPromptHistoryLegend": "フィールド：m=月, r=売上, c=コスト, p=粗利, np=純利益, pt=仕入数量, st=販売数量, yoy=前年比%, mom=前月比%, d=デフレーター",
+    "forecastPromptFinTitle": "## 二、年間財務サマリー",
+    "forecastPromptFeaturesTitle": "## 三、ローカル統計特徴量ベクトル",
+    "forecastPromptFeaturesLegend": "説明：ma3=3か月移動平均, trendSlope=トレンド傾き(月次増分), revenuePerTon=単位あたり売上, costRatio=コスト売上比率, seasonalIndices=季節指数, avgAcceleration=成長加速度",
+    "forecastPromptVarTitle": "## 四、トレンド予測モデル",
+    "forecastPromptVarLegend": "説明：売上/コスト/販売数量の 3 変数を AR(1) で当てはめた純統計的予測です。",
+    "forecastPromptMcTitle": "## 五、モンテカルロシミュレーション 90% 信頼区間（1000 回, P5-P95）",
+    "forecastPromptMcLegend": "説明：過去のボラティリティに基づくランダムシミュレーション区間で、不確実性は予測期間とともに増大します。",
+    "forecastPromptRequirements": "## 分析要件\n1. ウェブ検索が可能な場合は、最新の関連業界の市況とマクロ経済指標を調べてください。\n2. 上記すべて（企業データ + 統計モデル + モンテカルロ区間）を統合し、科学的な予測を行ってください。\n3. トレンドモデルの予測がご自身の判断と異なる場合は、その理由と修正根拠を insights に記載してください。\n4. 参照したデータソースと主なリスク要因を insights にまとめてください。"
   },
   "accounts": {
     "receivable": "Receivables",

@@ -678,7 +678,20 @@
     "severityHigh": "높음",
     "corrStrong": "강함",
     "corrModerate": "중간",
-    "corrWeak": "약함"
+    "corrWeak": "약함",
+    "forecastIdle": "아래 버튼을 클릭하여 AI 경영 예측을 생성하세요",
+    "runForecast": "AI 예측 생성",
+    "forecastPromptIntro": "당신은 노련한 기업 경영 분석가입니다. 아래의 모든 정보원을 종합하여 향후 3개월의 매출과 이익을 예측하세요.",
+    "forecastPromptHistoryTitle": "## 1. 기업 과거 월별 데이터(12개 차원)",
+    "forecastPromptHistoryLegend": "필드: m=월, r=매출, c=비용, p=매출총이익, np=순이익, pt=매입 수량, st=판매 수량, yoy=전년 대비%, mom=전월 대비%, d=디플레이터",
+    "forecastPromptFinTitle": "## 2. 연간 재무 요약",
+    "forecastPromptFeaturesTitle": "## 3. 로컬 통계 특징 벡터",
+    "forecastPromptFeaturesLegend": "설명: ma3=3개월 이동평균, trendSlope=추세 기울기(월별 증분), revenuePerTon=단위당 매출, costRatio=비용 대비 매출 비율, seasonalIndices=계절 지수, avgAcceleration=성장 가속도",
+    "forecastPromptVarTitle": "## 4. 추세 예측 모델",
+    "forecastPromptVarLegend": "설명: 매출/비용/판매 수량 3개 변수를 AR(1)로 적합한 순수 통계적 예측입니다.",
+    "forecastPromptMcTitle": "## 5. 몬테카를로 시뮬레이션 90% 신뢰구간(1000회, P5-P95)",
+    "forecastPromptMcLegend": "설명: 과거 변동성에 기반한 무작위 시뮬레이션 구간이며, 불확실성은 예측 기간이 길어질수록 증가합니다.",
+    "forecastPromptRequirements": "## 분석 요건\n1. 웹 검색 기능이 있다면 최신 관련 업계 시황과 거시경제 지표를 조회하세요.\n2. 위의 모든 정보(기업 데이터 + 통계 모델 + 몬테카를로 구간)를 종합하여 과학적인 예측을 제시하세요.\n3. 추세 모델의 예측이 본인의 판단과 다를 경우, 그 이유와 수정 근거를 insights에 설명하세요.\n4. 참고한 데이터 출처와 주요 위험 요인을 insights에 정리하세요."
   },
   "accounts": {
     "receivable": "Receivables",

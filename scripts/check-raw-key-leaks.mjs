@@ -306,16 +306,52 @@ async function checkTransactionSummaryMoney() {
 }
 
 async function checkNoAutoAIAnalysis() {
-  // The AI business briefing (performAnalysis) must NOT auto-run on mount / navigation /
-  // HMR — it depends on assistantAccLocale (refreshed per page change) and the UI
-  // language, so an auto useEffect hammers the default provider and spams Gemini 429.
-  // AI must be user-triggered (AIInsights onRefresh button).
-  let src;
-  try { src = await readFile(join(ROOT, 'App.tsx'), 'utf8'); } catch { return; }
-  if (/useEffect\(\s*\(\)\s*=>\s*\{\s*performAnalysis\(\)\s*;?\s*\}\s*,\s*\[\s*performAnalysis\s*\]\s*\)/.test(src)) {
+  // The AI business briefing (performAnalysis, App.tsx) and the data-analysis forecast
+  // (runAnalysis, DataAnalysisPage.tsx) must NOT auto-run on mount / navigation / HMR —
+  // they depend on the accounting locale + UI language, so an auto useEffect hammers the
+  // default provider and spams Gemini 429. AI must be user-triggered (a button click).
+  let app;
+  try { app = await readFile(join(ROOT, 'App.tsx'), 'utf8'); } catch { app = null; }
+  if (app && /useEffect\(\s*\(\)\s*=>\s*\{\s*performAnalysis\(\)\s*;?\s*\}\s*,\s*\[\s*performAnalysis\s*\]\s*\)/.test(app)) {
     findings.push({
       file: 'App.tsx', line: 0, type: 'ai-auto-invoke', token: 'performAnalysis',
       snippet: 'performAnalysis() auto-runs in a useEffect — AI must be user-triggered (avoids Gemini 429 spam on mount/navigation/HMR)',
+    });
+  }
+  // R3b: DataAnalysisPage must not auto-invoke runAnalysis() from a useEffect either
+  // (the former hasRun mount effect was a guard blind spot for #74's same violation).
+  let da;
+  try { da = await readFile(join(ROOT, 'components/DataAnalysisPage.tsx'), 'utf8'); } catch { da = null; }
+  if (da && /useEffect\([\s\S]{0,200}?runAnalysis\(\)/.test(da)) {
+    findings.push({
+      file: 'components/DataAnalysisPage.tsx', line: 0, type: 'ai-auto-invoke', token: 'runAnalysis',
+      snippet: 'runAnalysis() auto-runs in a useEffect — the data-analysis forecast must be user-triggered (avoids 429 spam on mount/navigation/HMR)',
+    });
+  }
+}
+
+async function checkDataAnalysisPromptI18n() {
+  // R3b: the data-analysis forecast prompt must be assembled from i18n keys (so it follows
+  // uiLanguage), must NOT hardcode Simplified-Chinese prose, and must NOT hardcode an
+  // industry (软水盐 / soft-water salt). These are regression locks for the de-hardcode.
+  let src;
+  try { src = await readFile(join(ROOT, 'components/DataAnalysisPage.tsx'), 'utf8'); } catch { return; }
+  if (/软水盐/.test(src)) {
+    findings.push({
+      file: 'components/DataAnalysisPage.tsx', line: 0, type: 'data-analysis-industry-hardcode', token: '软水盐',
+      snippet: 'DataAnalysisPage hardcodes the 软水盐 industry — the forecast prompt must use a generic business-analysis framing (no industry hardcode)',
+    });
+  }
+  if (/你是一位精通/.test(src) || /##\s*一[、，]\s*企业历史/.test(src)) {
+    findings.push({
+      file: 'components/DataAnalysisPage.tsx', line: 0, type: 'data-analysis-prompt-hardcode', token: 'forecast-prompt',
+      snippet: 'DataAnalysisPage hardcodes the Chinese forecast prompt prose — move it to analysis.forecastPrompt* i18n keys (must follow uiLanguage)',
+    });
+  }
+  if (!/analysis\.forecastPromptIntro/.test(src)) {
+    findings.push({
+      file: 'components/DataAnalysisPage.tsx', line: 0, type: 'data-analysis-prompt-i18n-missing', token: 'forecastPromptIntro',
+      snippet: "DataAnalysisPage forecast prompt must be built from t('analysis.forecastPrompt*') keys (analysis.forecastPromptIntro not referenced)",
     });
   }
 }
@@ -434,6 +470,7 @@ async function main() {
   await checkTaxSummaryTitleNoBreak();
   await checkTransactionSummaryMoney();
   await checkNoAutoAIAnalysis();
+  await checkDataAnalysisPromptI18n();
   await checkAIQuotaCooldown();
   await checkAIToolsReadonly();
   await checkAIContextInvoiceStatus();

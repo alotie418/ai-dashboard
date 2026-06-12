@@ -140,6 +140,12 @@ const REQUIRED_I18N_KEYS = [
   'analysis.progress', 'analysis.peakMonthSub',
   'analysis.severityLow', 'analysis.severityMid', 'analysis.severityHigh',
   'analysis.corrStrong', 'analysis.corrModerate', 'analysis.corrWeak',
+  // R3b: data-analysis forecast — idle CTA + i18n-driven prompt prose (follows uiLanguage)
+  'analysis.forecastIdle', 'analysis.runForecast',
+  'analysis.forecastPromptIntro', 'analysis.forecastPromptHistoryTitle', 'analysis.forecastPromptHistoryLegend',
+  'analysis.forecastPromptFinTitle', 'analysis.forecastPromptFeaturesTitle', 'analysis.forecastPromptFeaturesLegend',
+  'analysis.forecastPromptVarTitle', 'analysis.forecastPromptVarLegend',
+  'analysis.forecastPromptMcTitle', 'analysis.forecastPromptMcLegend', 'analysis.forecastPromptRequirements',
   // US Tax Tools — required in all 6 locales (page may render under US locale + any uiLanguage)
   'usTax.title', 'usTax.notApplicable', 'usTax.mileage', 'usTax.homeOffice',
   'usTax.totalTrips', 'usTax.totalMiles', 'usTax.deduction', 'usTax.addTrip',
@@ -2660,6 +2666,28 @@ async function main() {
         const v = get(data, `analysis.${key}`);
         if (typeof v === 'string' && pattern.test(v.trim())) {
           reasons.push(`analysis.${key} is English literal in ${lang}: "${v}"`);
+        }
+      }
+    }
+    // R3b: data-analysis forecast prompt prose (moved to i18n, follows uiLanguage) —
+    //   (a) NO industry hardcode in any locale (软水盐 / soft water / brine);
+    //   (b) non-en locale must not be a byte-identical untranslated English fallback.
+    const FORECAST_PROMPT_KEYS = [
+      'forecastPromptIntro', 'forecastPromptHistoryTitle', 'forecastPromptHistoryLegend',
+      'forecastPromptFinTitle', 'forecastPromptFeaturesTitle', 'forecastPromptFeaturesLegend',
+      'forecastPromptVarTitle', 'forecastPromptVarLegend',
+      'forecastPromptMcTitle', 'forecastPromptMcLegend', 'forecastPromptRequirements',
+    ];
+    for (const key of FORECAST_PROMPT_KEYS) {
+      const v = get(data, `analysis.${key}`);
+      if (typeof v !== 'string') continue;
+      if (/软水盐|軟水鹽|soft[\s-]?water|brine/i.test(v)) {
+        reasons.push(`analysis.${key} hardcodes an industry (软水盐/soft water/brine) in ${lang}: "${v}"`);
+      }
+      if (lang !== 'en') {
+        const enV = get(locales['en'], `analysis.${key}`);
+        if (typeof enV === 'string' && v.trim() === enV.trim()) {
+          reasons.push(`analysis.${key} is an untranslated English fallback in ${lang}`);
         }
       }
     }

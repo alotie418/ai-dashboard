@@ -678,7 +678,20 @@
     "severityHigh": "高",
     "corrStrong": "強",
     "corrModerate": "中等",
-    "corrWeak": "弱"
+    "corrWeak": "弱",
+    "forecastIdle": "點擊下方按鈕生成 AI 經營預測",
+    "runForecast": "生成 AI 預測",
+    "forecastPromptIntro": "你是一位資深的企業經營分析師。請綜合以下所有資訊來源，給出未來 3 個月的營業收入和利潤預測。",
+    "forecastPromptHistoryTitle": "## 一、企業歷史月度資料（12 維度）",
+    "forecastPromptHistoryLegend": "欄位：m=月份, r=營收, c=成本, p=毛利, np=淨利潤, pt=採購數量, st=銷售數量, yoy=同比%, mom=環比%, d=平減指數",
+    "forecastPromptFinTitle": "## 二、年度財務彙總",
+    "forecastPromptFeaturesTitle": "## 三、本地統計特徵向量",
+    "forecastPromptFeaturesLegend": "說明：ma3=3月移動平均, trendSlope=趨勢斜率(月增量), revenuePerTon=單位營收, costRatio=成本收入比, seasonalIndices=季節性指數, avgAcceleration=增長加速度",
+    "forecastPromptVarTitle": "## 四、趨勢預測模型",
+    "forecastPromptVarLegend": "說明：基於營收/成本/銷售數量三變數 AR(1) 擬合的純統計預測。",
+    "forecastPromptMcTitle": "## 五、蒙地卡羅模擬 90% 信賴區間（1000 次模擬, P5-P95）",
+    "forecastPromptMcLegend": "說明：基於歷史波動率的隨機模擬區間，不確定性隨預測時間增長。",
+    "forecastPromptRequirements": "## 分析要求\n1. 如具備聯網檢索能力，請查找最新的相關行業市場行情與總體經濟指標。\n2. 綜合以上全部資訊（企業資料 + 統計模型 + 蒙地卡羅區間），給出科學預測。\n3. 如果趨勢模型預測與你自己的判斷不一致，請在 insights 中說明原因和你的修正依據。\n4. 在 insights 中總結你參考了哪些資料來源，以及主要風險因素。"
   },
   "accounts": {
     "receivable": "應收帳款",

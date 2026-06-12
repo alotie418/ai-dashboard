@@ -220,8 +220,16 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
   // ========== PREDICTION PIPELINE ==========
 
   const isAnalysingRef = useRef(false);
+  // 额度冷却时间戳（上次 429 后 5 分钟内不再发请求），复用经营简报的
+  // aiQuotaCooldownRef 模式，避免 Gemini 额度耗尽时连点刷新反复刷 429。
+  const aiQuotaCooldownRef = useRef(0);
   const runAnalysis = useCallback(async () => {
     if (isAnalysingRef.current) return;
+    // 冷却中：直接显示友好提示，不再发请求。
+    if (Date.now() < aiQuotaCooldownRef.current) {
+      setSalesForecast(t('aiInsights.quotaExceeded'));
+      return;
+    }
     isAnalysingRef.current = true;
     setIsAnalysing(true);
     setGroundingSources([]);
@@ -253,46 +261,44 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
         tax: fs.taxSurcharge, ship: fs.shippingFee, admin: fs.adminExpense
       };
 
-      let prompt = `你是一位精通软水盐行业的首席财务官。请综合以下所有信息源，给出未来 3 个月的营业收入和利润预测。
+      // Prompt prose is i18n-driven (follows uiLanguage); the JSON payloads below
+      // are locale-neutral data and are injected verbatim. No industry hardcode.
+      let prompt = `${t('analysis.forecastPromptIntro')}
 
-## 一、企业历史月度数据（12 维度）
+${t('analysis.forecastPromptHistoryTitle')}
 ${JSON.stringify(historySummary)}
-字段：m=月份, r=营收, c=成本, p=毛利, np=净利润, pt=采购吨数, st=销售吨数, yoy=同比%, mom=环比%, d=平减指数
+${t('analysis.forecastPromptHistoryLegend')}
 
-## 二、年度财务汇总
+${t('analysis.forecastPromptFinTitle')}
 ${JSON.stringify(finSummary)}`;
 
       if (features) {
         prompt += `
 
-## 三、本地统计特征向量
+${t('analysis.forecastPromptFeaturesTitle')}
 ${JSON.stringify(features)}
-说明：ma3=3月移动平均, trendSlope=趋势斜率(月增量), revenuePerTon=吨单价, costRatio=成本收入比, seasonalIndices=季节性指数, avgAcceleration=增长加速度`;
+${t('analysis.forecastPromptFeaturesLegend')}`;
       }
 
       if (varPred) {
         prompt += `
 
-## 四、趋势预测模型
+${t('analysis.forecastPromptVarTitle')}
 ${JSON.stringify(varPred)}
-说明：基于 revenue/cost/salesTons 三变量 AR(1) 拟合的纯统计预测。`;
+${t('analysis.forecastPromptVarLegend')}`;
       }
 
       if (mcOnVar) {
         prompt += `
 
-## 五、蒙特卡洛模拟 90% 置信区间 (1000次模拟, P5-P95)
+${t('analysis.forecastPromptMcTitle')}
 ${JSON.stringify(mcOnVar)}
-说明：基于历史波动率的随机模拟区间，不确定性随预测时间增长。`;
+${t('analysis.forecastPromptMcLegend')}`;
       }
 
       prompt += `
 
-## 分析要求
-1. 请同时使用 Google 搜索功能查找最新的【软水盐】市场行情、原盐价格走势和宏观经济指标。
-2. 综合以上全部信息（企业数据 + 统计模型 + 蒙特卡洛区间 + 双引擎市场搜索），给出科学预测。
-3. 如果趋势模型预测与你自己的判断不一致，请在 insights 中说明原因和你的修正依据。
-4. 在 insights 中总结你参考了哪些市场数据源，以及主要风险因素。`;
+${t('analysis.forecastPromptRequirements')}`;
 
       // STEP 6: AI synthesis (走 IPC 统一通道，桌面版不走 HTTP)
       const isElectronEnv = typeof window !== 'undefined' && !!(window as any).electronAPI?.isElectron;
@@ -380,24 +386,27 @@ ${JSON.stringify(mcOnVar)}
         { ...lastMonth, confidenceUpper: lastMonth.revenue, confidenceLower: lastMonth.revenue, isForecast: false },
         ...forecasts
       ]);
-    } catch (err) {
-      console.error(err);
-      setSalesForecast(t('analysis.aiError'));
+    } catch (err: any) {
+      // 区分「额度/限流(429)」与一般错误：429 进入 5 分钟冷却 + 友好提示，
+      // 避免连点或任何残留路径反复刷 429 刷屏控制台。
+      const msg = String(err?.message || err);
+      if (/\b429\b|http_429|quota|exceeded|spending cap|额度|超限|rate.?limit/i.test(msg)) {
+        aiQuotaCooldownRef.current = Date.now() + 5 * 60 * 1000;
+        setSalesForecast(t('aiInsights.quotaExceeded'));
+        console.warn('[AI] data-analysis quota/429 — paused 5 min, no auto-retry');
+      } else {
+        console.error(err);
+        setSalesForecast(t('analysis.aiError'));
+      }
     } finally {
       isAnalysingRef.current = false;
       setIsAnalysing(false);
       setLoadingProgress(100);
     }
-  }, [data.monthlyPerformance, data.financialStatement]);
+  }, [data.monthlyPerformance, data.financialStatement, t, i18n.language]);
 
-  const hasRun = useRef(false);
-  useEffect(() => {
-    if (!hasRun.current) {
-      hasRun.current = true;
-      runAnalysis();
-    }
-  }, [runAnalysis]);
-
+  // AI 经营预测不再在挂载 / 切页 / 热更新时自动调用 —— 改为用户点击横幅按钮
+  // (onClick={runAnalysis}) 时才触发，避免对默认 provider 反复请求刷 Gemini 429。
   const formatCurrency = (v: number) => formatCompactMoney(v, accLocale, uiLang, 1);
   const formatNum = (v: number) => v.toLocaleString();
 
@@ -434,11 +443,11 @@ ${JSON.stringify(mcOnVar)}
             ) : (
               <div className="group">
                 <p className="text-[#191918] text-2xl font-light leading-snug max-w-2xl" style={{ whiteSpace: 'pre-wrap' }}>
-                  {salesForecast || t('analysis.waitingData')}
+                  {salesForecast || t('analysis.forecastIdle')}
                 </p>
                 <div className="mt-8 flex items-center space-x-6">
                   <button onClick={runAnalysis} className="px-6 py-2.5 bg-[#d97757]/10 hover:bg-[#d97757]/20 border border-[#d97757]/30 rounded-full text-[10px] text-[#d97757] font-bold uppercase tracking-widest flex items-center transition-all active:scale-95">
-                    <i className="fas fa-sync-alt mr-2"></i> {t('analysis.rerun')}
+                    <i className="fas fa-sync-alt mr-2"></i> {salesForecast ? t('analysis.rerun') : t('analysis.runForecast')}
                   </button>
                 </div>
               </div>

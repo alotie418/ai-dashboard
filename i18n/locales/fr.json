@@ -678,7 +678,20 @@
     "severityHigh": "Élevé",
     "corrStrong": "Forte",
     "corrModerate": "Modérée",
-    "corrWeak": "Faible"
+    "corrWeak": "Faible",
+    "forecastIdle": "Cliquez sur le bouton ci-dessous pour générer la prévision d'activité par l'IA",
+    "runForecast": "Générer la prévision IA",
+    "forecastPromptIntro": "Vous êtes un analyste chevronné des opérations d'entreprise. À partir de toutes les sources d'information ci-dessous, fournissez une prévision du chiffre d'affaires et du bénéfice pour les 3 prochains mois.",
+    "forecastPromptHistoryTitle": "## 1. Données mensuelles historiques (12 dimensions)",
+    "forecastPromptHistoryLegend": "Champs : m=mois, r=chiffre d'affaires, c=coût, p=marge brute, np=bénéfice net, pt=quantité d'achat, st=quantité de vente, yoy=variation annuelle%, mom=variation mensuelle%, d=déflateur",
+    "forecastPromptFinTitle": "## 2. Synthèse financière annuelle",
+    "forecastPromptFeaturesTitle": "## 3. Vecteur de caractéristiques statistiques locales",
+    "forecastPromptFeaturesLegend": "Notes : ma3=moyenne mobile sur 3 mois, trendSlope=pente de tendance (incrément mensuel), revenuePerTon=chiffre d'affaires unitaire, costRatio=ratio coût/chiffre d'affaires, seasonalIndices=indices saisonniers, avgAcceleration=accélération de la croissance",
+    "forecastPromptVarTitle": "## 4. Modèle de prévision de tendance",
+    "forecastPromptVarLegend": "Notes : prévision purement statistique ajustée par AR(1) sur les trois séries chiffre d'affaires/coût/quantité de vente.",
+    "forecastPromptMcTitle": "## 5. Simulation de Monte-Carlo, intervalle de confiance à 90 % (1000 tirages, P5-P95)",
+    "forecastPromptMcLegend": "Notes : intervalle de simulation aléatoire fondé sur la volatilité historique ; l'incertitude augmente avec l'horizon de prévision.",
+    "forecastPromptRequirements": "## Exigences d'analyse\n1. Si vous disposez d'une recherche web, recherchez les dernières conditions de marché du secteur concerné et les indicateurs macroéconomiques.\n2. Combinez tout ce qui précède (données de l'entreprise + modèles statistiques + intervalle de Monte-Carlo) pour produire une prévision rigoureuse.\n3. Si la prévision du modèle de tendance diverge de votre propre jugement, expliquez pourquoi et votre base d'ajustement dans insights.\n4. Dans insights, résumez les sources de données que vous avez utilisées et les principaux facteurs de risque."
   },
   "accounts": {
     "receivable": "Receivables",
