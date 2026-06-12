@@ -678,7 +678,20 @@
     "severityHigh": "高",
     "corrStrong": "强",
     "corrModerate": "中等",
-    "corrWeak": "弱"
+    "corrWeak": "弱",
+    "forecastIdle": "点击下方按钮生成 AI 经营预测",
+    "runForecast": "生成 AI 预测",
+    "forecastPromptIntro": "你是一位资深的企业经营分析师。请综合以下所有信息源，给出未来 3 个月的营业收入和利润预测。",
+    "forecastPromptHistoryTitle": "## 一、企业历史月度数据（12 维度）",
+    "forecastPromptHistoryLegend": "字段：m=月份, r=营收, c=成本, p=毛利, np=净利润, pt=采购数量, st=销售数量, yoy=同比%, mom=环比%, d=平减指数",
+    "forecastPromptFinTitle": "## 二、年度财务汇总",
+    "forecastPromptFeaturesTitle": "## 三、本地统计特征向量",
+    "forecastPromptFeaturesLegend": "说明：ma3=3月移动平均, trendSlope=趋势斜率(月增量), revenuePerTon=单位营收, costRatio=成本收入比, seasonalIndices=季节性指数, avgAcceleration=增长加速度",
+    "forecastPromptVarTitle": "## 四、趋势预测模型",
+    "forecastPromptVarLegend": "说明：基于营收/成本/销售数量三变量 AR(1) 拟合的纯统计预测。",
+    "forecastPromptMcTitle": "## 五、蒙特卡洛模拟 90% 置信区间（1000 次模拟, P5-P95）",
+    "forecastPromptMcLegend": "说明：基于历史波动率的随机模拟区间，不确定性随预测时间增长。",
+    "forecastPromptRequirements": "## 分析要求\n1. 如具备联网检索能力，请查找最新的相关行业市场行情与宏观经济指标。\n2. 综合以上全部信息（企业数据 + 统计模型 + 蒙特卡洛区间），给出科学预测。\n3. 如果趋势模型预测与你自己的判断不一致，请在 insights 中说明原因和你的修正依据。\n4. 在 insights 中总结你参考了哪些数据源，以及主要风险因素。"
   },
   "accounts": {
     "receivable": "应收账款",
