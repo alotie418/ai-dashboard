@@ -566,6 +566,42 @@ async function checkNoTTSResidue() {
   }
 }
 
+async function checkConversationsNoSecrets() {
+  // R4a-1: the AI assistant conversation store (electron/handlers/conversations.js) persists
+  // chat history ONLY. It must NEVER touch the API key / encrypted storage, and must only
+  // read/write the assistant_* tables — never a business table. This is the machine lock
+  // behind "session tables don't store the key / any sensitive business detail".
+  let src;
+  try {
+    src = await readFile(join(ROOT, 'electron/handlers/conversations.js'), 'utf8');
+  } catch {
+    findings.push({
+      file: 'electron/handlers/conversations.js', line: 0, type: 'conversations-missing', token: 'conversations.js',
+      snippet: 'R4a-1 expects electron/handlers/conversations.js (the conversation persistence handler) to exist',
+    });
+    return;
+  }
+  // (1) must not reference the API key / encrypted storage / DB restore
+  if (/safeStorage|decryptKey|encryptKey|api_key|importDb|relaunch/.test(src)) {
+    findings.push({
+      file: 'electron/handlers/conversations.js', line: 0, type: 'conversations-sensitive', token: 'sensitive-ref',
+      snippet: 'conversations.js must not reference API keys / encrypted storage / DB restore (safeStorage/decryptKey/api_key/importDb/relaunch) — session store is non-sensitive',
+    });
+  }
+  // (2) every write must target an assistant_* table (never a business table)
+  const writeRe = /\b(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+([A-Za-z_][A-Za-z0-9_]*)/gi;
+  let m;
+  while ((m = writeRe.exec(src)) !== null) {
+    const table = m[2];
+    if (!/^assistant_/.test(table)) {
+      findings.push({
+        file: 'electron/handlers/conversations.js', line: 0, type: 'conversations-foreign-write', token: table,
+        snippet: `conversations.js writes to non-assistant table "${table}" — the conversation handler must only touch assistant_conversations / assistant_messages`,
+      });
+    }
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -586,6 +622,7 @@ async function main() {
   await checkAIContextInvoiceStatus();
   await checkAIErrorCodes();
   await checkNoTTSResidue();
+  await checkConversationsNoSecrets();
   await checkAnalyticsMatrixDisplay();
   await checkFinanceMoneyFormat();
 

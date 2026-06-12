@@ -131,6 +131,50 @@ export function aiAgentChat(messages: any[], systemInstruction: string): Promise
   return apiFetch('/api/ai/agent-chat', { method: 'POST', body: JSON.stringify({ messages, systemInstruction }) });
 }
 
+// ==================== AI 助手会话持久化（R4a-1；仅桌面 · 本地 SQLite）====================
+// 会话表只存聊天历史 —— 绝不存 API Key/敏感明细；toolTrace 沿用 R2b 脱敏。
+// web 模式 /api/conversations 404，调用方 try/catch 后降级为纯内存会话（不阻断聊天）。
+
+export interface ConversationMeta {
+  id: string;
+  title?: string | null;
+  acc_locale?: string | null;
+  ui_language?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StoredMessage {
+  role: 'user' | 'model';
+  text: string;
+  toolTrace?: ToolTraceItem[];
+}
+
+/** 会话列表（最近更新在前） */
+export function listConversations(): Promise<ConversationMeta[]> {
+  return apiFetch('/api/conversations');
+}
+
+/** 新建空会话（懒建：首次发消息时调用） */
+export function createConversation(opts?: { accLocale?: string; uiLanguage?: string; title?: string }): Promise<{ id: string }> {
+  return apiFetch('/api/conversations', { method: 'POST', body: JSON.stringify(opts || {}) });
+}
+
+/** 某会话全部消息（按顺序） */
+export function fetchConversationMessages(id: string): Promise<StoredMessage[]> {
+  return apiFetch(`/api/conversations/${encodeURIComponent(id)}/messages`);
+}
+
+/** 追加一条消息（首条 user 消息会自动生成标题） */
+export function appendConversationMessage(id: string, msg: StoredMessage): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: JSON.stringify(msg) });
+}
+
+/** 删除会话（连同消息；用于「清空当前对话」） */
+export function deleteConversation(id: string): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
 // ==================== Categories（国际化数据模型 v4）====================
 // AIProviderId is already imported at the top of this file; no re-import here.
 

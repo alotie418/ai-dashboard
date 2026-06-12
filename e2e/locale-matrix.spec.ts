@@ -459,6 +459,63 @@ test.describe('ai assistant tool trace (R2b-1)', () => {
   }
 });
 
+// ── AI assistant conversation persistence (R4a-1) — mocked conversation endpoints ──
+// Sending a message must lazily create a conversation (POST /api/conversations) then append
+// BOTH the user message and the model reply (POST /api/conversations/:id/messages). The mock
+// records those calls; we assert the conversation toolbar renders (new chat / clear) and that
+// create + the two appends fired with the right role/text. Persistence degrades gracefully on
+// failure (try/catch), so this only locks the happy path. Restore-on-reload is verified manually.
+test.describe('ai assistant conversation persistence (R4a-1)', () => {
+  test('conversation-persist ui=zh-CN → lazy create + append user/model', async ({ page }) => {
+    const ui = 'zh-CN';
+    await bootCombo(page, ui, 'CN');
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+
+    const calls: { kind: string; body: any }[] = [];
+    // create / list (bare /api/conversations); registered after bootCombo → takes precedence
+    await page.route('**/api/conversations', (route) => {
+      const req = route.request();
+      if (req.method() === 'POST') {
+        calls.push({ kind: 'create', body: req.postDataJSON() });
+        return route.fulfill({ json: { id: 'conv-e2e-1' } });
+      }
+      return route.fulfill({ json: [] });
+    });
+    // append / fetch messages (/api/conversations/:id/messages)
+    await page.route('**/api/conversations/*/messages', (route) => {
+      const req = route.request();
+      if (req.method() === 'POST') {
+        calls.push({ kind: 'append', body: req.postDataJSON() });
+        return route.fulfill({ json: { ok: true } });
+      }
+      return route.fulfill({ json: [] });
+    });
+    await page.route('**/api/ai/agent-chat', (route) => route.fulfill({ json: { text: 'Persisted answer 42.' } }));
+
+    await page.locator('nav i.fa-comments').first().click();
+
+    // (1) conversation toolbar renders (resolved i18n, no raw key)
+    await expect(page.getByText(loc.chat.newConversation).first()).toBeVisible({ timeout: 10_000 });
+
+    // (2) send a message via Enter (the widget toggle overlaps the send button corner)
+    const input = page.getByPlaceholder(loc.chat.placeholder).first();
+    await input.fill('保存这条消息');
+    await input.press('Enter');
+    await expect(page.getByText('Persisted answer 42.').first()).toBeVisible({ timeout: 10_000 });
+
+    // (3) lazy-created exactly one conversation, then appended user + model
+    expect(calls.filter(c => c.kind === 'create').length).toBeGreaterThanOrEqual(1);
+    const appends = calls.filter(c => c.kind === 'append');
+    expect(appends.length).toBeGreaterThanOrEqual(2);
+    expect(appends.some(a => a.body?.role === 'user' && a.body?.text === '保存这条消息')).toBeTruthy();
+    expect(appends.some(a => a.body?.role === 'model' && a.body?.text === 'Persisted answer 42.')).toBeTruthy();
+
+    // (4) no raw chat.* key leaked
+    const body = await page.locator('body').innerText();
+    expect(body, 'raw chat key leaked').not.toMatch(/chat\.[a-zA-Z]/);
+  });
+});
+
 // ── Business Documents create modal with a mocked desktop electronAPI (Phase A) ──
 // The modal is uiLanguage-only (regime tax labels render via getTaxLabel with the
 // frozen acc_locale and are covered by the matrix sweep), so one accountingLocale ×

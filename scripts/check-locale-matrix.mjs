@@ -155,6 +155,8 @@ const REQUIRED_I18N_KEYS = [
   'onboarding.providersEmpty', 'onboarding.savedBadge', 'onboarding.clickToExpand',
   'onboarding.defaultBadge', 'onboarding.howToGetKey', 'onboarding.testing',
   'onboarding.saving', 'onboarding.saveBtn', 'onboarding.optional',
+  // R4a-1: AI assistant conversation toolbar (ChatPanel header — widget + page)
+  'chat.newConversation', 'chat.clearChat', 'chat.clearConfirm', 'chat.untitledConversation',
   // US Tax Tools — required in all 6 locales (page may render under US locale + any uiLanguage)
   'usTax.title', 'usTax.notApplicable', 'usTax.mileage', 'usTax.homeOffice',
   'usTax.totalTrips', 'usTax.totalMiles', 'usTax.deduction', 'usTax.addTrip',
