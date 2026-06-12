@@ -21,6 +21,7 @@ const migrationsH = require('./migrations');
 const reportsH = require('./reports');
 const mileageH = require('./mileage');
 const homeOfficeH = require('./homeOffice');
+const conversationsH = require('./conversations');
 
 const routes = [
   // ---- Dashboard ----
@@ -118,6 +119,13 @@ const routes = [
   ['POST', '/api/ai/chat', ai.chat],
   ['POST', '/api/ai/agent-chat', ai.agentChat],
   ['POST', '/api/ai/data-analysis', ai.dataAnalysis],
+
+  // ---- AI 助手会话持久化（R4a-1；具体路径 messages 排在 :id 之前）----
+  ['GET', '/api/conversations', conversationsH.list],
+  ['POST', '/api/conversations', conversationsH.create],
+  ['GET', '/api/conversations/:id/messages', conversationsH.messages],
+  ['POST', '/api/conversations/:id/messages', conversationsH.appendMessage],
+  ['DELETE', '/api/conversations/:id', conversationsH.remove],
 ];
 
 // 所有路由都已迁移，PENDING_ROUTES 清空

@@ -404,6 +404,36 @@ const MIGRATIONS = [
     d.exec('CREATE INDEX IF NOT EXISTS idx_doc_items_doc ON business_document_items(doc_id)');
     console.log('[db] v11: business_documents + business_document_items ready');
   },
+  // v12: AI assistant conversation persistence — two tables.
+  //   Stores chat history ONLY. The API key / any decrypted secret is NEVER written here.
+  //   tool_trace holds the already-masked R2b trace (name / argsSummary / rowCount / truncated),
+  //   no raw tool results, no key.
+  (d) => {
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS assistant_conversations (
+        id TEXT PRIMARY KEY,
+        title TEXT,
+        acc_locale TEXT,
+        ui_language TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    d.exec('CREATE INDEX IF NOT EXISTS idx_asst_conv_updated ON assistant_conversations(updated_at)');
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS assistant_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id TEXT NOT NULL REFERENCES assistant_conversations(id) ON DELETE CASCADE,
+        role TEXT NOT NULL CHECK(role IN ('user','model')),
+        text TEXT NOT NULL,
+        tool_trace TEXT,
+        seq INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    d.exec('CREATE INDEX IF NOT EXISTS idx_asst_msg_conv ON assistant_messages(conversation_id, seq)');
+    console.log('[db] v12: assistant_conversations + assistant_messages ready');
+  },
 ];
 
 function runMigrations(d) {
