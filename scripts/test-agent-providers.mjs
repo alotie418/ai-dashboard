@@ -116,11 +116,34 @@ async function testGemini() {
   check('gemini multi-tool batched into single user turn', trM.role === 'user' && trM.parts.length === 2 && trM.parts[0].functionResponse.name === 'a' && trM.parts[1].functionResponse.name === 'b');
 }
 
+// R4b: token budget backstop. A fake (provider-agnostic) adapter returns tool_calls when tools
+// are present and a final when they are not (the over-round / over-budget fallback path). With a
+// tiny maxTokens and a large history, the loop must break at the TOP (before any chatWithTools
+// with tools) → fall to the tools:[] fallback → final, with NO tool rounds executed (empty trace).
+// Locks "budget reached → reuse the existing fallback to answer, never an error".
+async function testAgentBudget() {
+  console.log('Agent token budget (R4b):');
+  const { runAgentLoop } = require('../electron/ai/agent.js');
+  const fakeAdapter = {
+    chatWithTools: async (_k, _m, { tools }) => (
+      (!tools || tools.length === 0)
+        ? { type: 'final', text: 'fallback final' }
+        : { type: 'tool_calls', assistantMsg: { role: 'assistant', content: [] }, calls: [{ name: 'get_sales', args: {} }] }
+    ),
+    toToolResultsMsg: () => ({ role: 'user', content: [] }),
+  };
+  const big = [{ role: 'user', content: 'x'.repeat(5000) }];
+  const res = await runAgentLoop({ adapter: fakeAdapter, apiKey: 'k', model: 'm', history: big, system: 'sys', maxTokens: 100 });
+  check('agent token budget → breaks to fallback final (no tool rounds)',
+    res.text === 'fallback final' && Array.isArray(res.toolTrace) && res.toolTrace.length === 0, JSON.stringify(res));
+}
+
 async function main() {
   console.log('\n=== Agent Provider Round-Trip (offline) ===\n');
   await testAnthropic();
   await testOpenAI();
   await testGemini();
+  await testAgentBudget();
   console.log(`\n${failures.length === 0 ? '✓ all passed' : '✗ ' + failures.length + ' failed'}\n`);
   process.exit(failures.length === 0 ? 0 : 1);
 }
