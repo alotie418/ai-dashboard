@@ -648,6 +648,45 @@ async function checkVisionOcrNoPersist() {
   }
 }
 
+async function checkProviderLogosLocal() {
+  // BYOK provider card logos must be LOCAL assets (assets/provider-logos/, bundled via Vite) — never a
+  // remote/CDN URL or an inlined base64. providerLogos.ts is the single source; the two card renderers
+  // must use it (a local imported url), not a hardcoded <img src="http..."> or a data: image.
+  for (const rel of ['components/providerLogos.ts', 'components/ProvidersSection.tsx', 'components/OnboardingWizard.tsx']) {
+    let src;
+    try { src = await readFile(join(ROOT, rel), 'utf8'); } catch { continue; }
+    if (/src\s*=\s*["'`]\s*https?:\/\//i.test(src)) {
+      findings.push({ file: rel, line: 0, type: 'remote-logo', token: 'remote-src',
+        snippet: `${rel}: provider logo <img> must use a local imported asset, not a remote/CDN src` });
+    }
+    if (/data:image\//i.test(src)) {
+      findings.push({ file: rel, line: 0, type: 'inline-logo', token: 'data:image',
+        snippet: `${rel}: provider logos must not be inlined as base64 data: images` });
+    }
+  }
+  // providerLogos.ts must resolve from the local assets dir and reference no http(s) URL.
+  let pl;
+  try { pl = await readFile(join(ROOT, 'components/providerLogos.ts'), 'utf8'); } catch { pl = ''; }
+  if (pl) {
+    if (!/assets\/provider-logos/.test(pl)) {
+      findings.push({ file: 'components/providerLogos.ts', line: 0, type: 'logo-source', token: 'assets/provider-logos',
+        snippet: 'providerLogos.ts must resolve logos from assets/provider-logos (local, bundled)' });
+    }
+    if (/https?:\/\//i.test(pl)) {
+      findings.push({ file: 'components/providerLogos.ts', line: 0, type: 'remote-logo', token: 'http',
+        snippet: 'providerLogos.ts must not reference any http(s) URL — logos are local only' });
+    }
+  }
+  // vite.config must keep provider logos OUT of base64 inlining → emitted as standalone files,
+  // not data: URIs (Vite inlines assets < 4KB by default). Lock the assetsInlineLimit rule.
+  let vc;
+  try { vc = await readFile(join(ROOT, 'vite.config.ts'), 'utf8'); } catch { vc = ''; }
+  if (!/assetsInlineLimit/.test(vc) || !/provider-logos/.test(vc)) {
+    findings.push({ file: 'vite.config.ts', line: 0, type: 'logo-inline-guard', token: 'assetsInlineLimit',
+      snippet: 'vite.config.ts must set build.assetsInlineLimit to NOT inline provider-logos (keep them standalone files, not base64 data: URIs)' });
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -671,6 +710,7 @@ async function main() {
   await checkConversationsNoSecrets();
   await checkAgentBudget();
   await checkVisionOcrNoPersist();
+  await checkProviderLogosLocal();
   await checkAnalyticsMatrixDisplay();
   await checkFinanceMoneyFormat();
 
