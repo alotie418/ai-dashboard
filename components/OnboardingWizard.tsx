@@ -68,6 +68,13 @@ const PROVIDER_DOCS: Record<AIProviderId, { label: string; getKeyUrl: string; pl
     icon: 'fa-bolt',
     color: '#4D6BFE',
   },
+  qwen: {
+    label: '通义千问 · 阿里云',
+    getKeyUrl: 'https://bailian.console.aliyun.com/?apiKey=1',
+    placeholder: 'sk-...',
+    icon: 'fa-cloud',
+    color: '#615CED',
+  },
 };
 
 const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
