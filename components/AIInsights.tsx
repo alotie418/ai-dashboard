@@ -98,6 +98,10 @@ const AIInsights: React.FC<AIInsightsProps> = ({ analysis, loading, error, onRef
         )}
       </div>
 
+      {/* PR-E1: AI conclusions are management estimates, not professional advice. */}
+      <div className="px-4 py-2 text-[10px] text-[#7a7a78] leading-snug border-t border-[#e0ddd5]">
+        <i className="fas fa-circle-info mr-1"></i>{t('disclaimer.ai')}
+      </div>
       <div className="p-4 bg-white text-[10px] text-[#5c5c5a] text-center uppercase tracking-tighter border-t border-[#e0ddd5]">
         {t('aiInsights.powered')}
       </div>

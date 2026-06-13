@@ -311,7 +311,7 @@ ${t('analysis.forecastPromptRequirements')}`;
           path: '/api/ai/data-analysis',
           body: {
             prompt,
-            systemInstruction: t('ai.forecastSystemPrompt'),
+            systemInstruction: `${t('ai.forecastSystemPrompt')}\n\n${t('ai.boundaryDirective')}`,
             responseSchema: {
               type: 'OBJECT',
               properties: {
@@ -340,7 +340,7 @@ ${t('analysis.forecastPromptRequirements')}`;
           credentials: 'same-origin',
           body: JSON.stringify({
             prompt,
-            systemInstruction: t('ai.forecastSystemPrompt'),
+            systemInstruction: `${t('ai.forecastSystemPrompt')}\n\n${t('ai.boundaryDirective')}`,
             responseSchema: {
               type: 'OBJECT',
               properties: {
@@ -453,6 +453,8 @@ ${t('analysis.forecastPromptRequirements')}`;
                     <i className="fas fa-sync-alt mr-2"></i> {salesForecast ? t('analysis.rerun') : t('analysis.runForecast')}
                   </button>
                 </div>
+                {/* PR-E1: AI forecast is a management estimate, not professional advice. */}
+                <p className="mt-4 text-[10px] text-[#7a7a78] leading-snug max-w-2xl">{t('disclaimer.ai')}</p>
               </div>
             )}
           </div>
