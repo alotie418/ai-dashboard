@@ -224,7 +224,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
     },
     dashboardSections: ['profit_loss', 'profit_margins', 'vat_summary', 'tax_inclusive_summary'],
     reportTypes: ['income-statement', 'vat-summary', 'tax-inclusive'],
-    aiContext: 'Use Chinese VAT accounting rules. Input VAT vs Output VAT. Tax surcharge = VAT payable × 12%. Income tax 25%.',
+    aiContext: 'Use Chinese VAT accounting concepts (Input VAT vs Output VAT, the VAT surcharge, and corporate income tax). Use the tax rates the user configured in settings rather than assuming fixed rates, and treat all figures as management estimates, not statutory amounts.',
   },
 
   US: {
@@ -423,7 +423,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
     },
     dashboardSections: ['schedule_c_summary', 'deductions', 'se_tax_quarterly', 'profit_margins'],
     reportTypes: ['schedule-c', 'se-tax'],
-    aiContext: 'Use US Schedule C sole proprietor accounting. No VAT. Sales Tax only if applicable. Self-Employment Tax (SS 12.4% + Medicare 2.9%). Quarterly estimated tax.',
+    aiContext: 'Use US Schedule C sole-proprietor accounting concepts (no VAT; Sales Tax only where applicable; Self-Employment Tax = Social Security + Medicare; quarterly estimated tax). Use the tax rates the user configured rather than assuming fixed rates, and treat figures as management estimates, not statutory or filing amounts.',
   },
 
   JP: {
@@ -491,7 +491,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
     },
     dashboardSections: ['profit_loss', 'profit_margins', 'consumption_tax_summary', 'tax_inclusive_summary'],
     reportTypes: ['income-statement', 'consumption-tax'],
-    aiContext: 'Use Japanese accounting with Consumption Tax (消費税) 10% standard / 8% reduced. ひとり会社 (one-person company) context.',
+    aiContext: 'Use Japanese accounting with Consumption Tax (消費税) concepts for a one-person company (ひとり会社). Use the tax rates the user configured rather than assuming fixed rates, and treat figures as management estimates.',
   },
 
   EU: {
@@ -552,7 +552,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
     },
     dashboardSections: ['profit_loss', 'profit_margins', 'vat_summary', 'tax_inclusive_summary'],
     reportTypes: ['profit-loss', 'vat-return'],
-    aiContext: 'Use EU VAT accounting. Standard VAT ~20%. Input VAT deduction from Output VAT.',
+    aiContext: 'Use EU VAT accounting concepts (Input VAT deducted from Output VAT). VAT rates vary by member state — use the rate the user configured rather than assuming one, and treat figures as management estimates.',
   },
 
   KR: {
@@ -618,7 +618,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
     },
     dashboardSections: ['profit_loss', 'profit_margins', 'vat_summary', 'tax_inclusive_summary'],
     reportTypes: ['income-statement', 'vat-summary'],
-    aiContext: 'Use Korean VAT accounting. 부가가치세 10%. 법인세 progressive rates.',
+    aiContext: 'Use Korean VAT (부가가치세) and corporate income tax (법인세) concepts. Use the tax rates the user configured rather than assuming fixed rates, and treat figures as management estimates.',
   },
 
   TW: {
@@ -722,7 +722,7 @@ export const ACCOUNTING_LOCALES: Record<AccountingLocaleId, AccountingLocaleConf
     },
     dashboardSections: ['profit_loss', 'profit_margins', 'business_tax_summary', 'tax_inclusive_summary'],
     reportTypes: ['income-statement', 'business-tax'],
-    aiContext: 'Use Taiwan Business Tax (營業稅) 5% standard. 營利事業所得稅 20%.',
+    aiContext: 'Use Taiwan Business Tax (營業稅) and profit-seeking enterprise income tax (營利事業所得稅) concepts. Use the tax rates the user configured rather than assuming fixed rates, and treat figures as management estimates.',
   },
 };
 
