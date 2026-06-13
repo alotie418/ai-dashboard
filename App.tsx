@@ -224,7 +224,9 @@ const AppContent: React.FC = () => {
       // uiLanguage (response language) into the system prompt, so the AI
       // briefing follows the same separation rules as the chat assistant.
       const localeForAI = (freshData as any)?.locale || assistantAccLocale || 'CN';
-      const systemPrompt = `${t('ai.analyzeSystemPrompt')}\n\n${buildAIFinanceContext(localeForAI, i18n.language)}`;
+      // PR-E1: append the management-boundary directive so the briefing avoids
+      // stating statutory tax/accounting conclusions.
+      const systemPrompt = `${t('ai.analyzeSystemPrompt')}\n\n${buildAIFinanceContext(localeForAI, i18n.language)}\n\n${t('ai.boundaryDirective')}`;
       const result = await fetchAIAnalysis(freshData || dataRef.current, undefined, t('ai.languageHint'), systemPrompt);
       setAnalysis(result);
     } catch (err: any) {

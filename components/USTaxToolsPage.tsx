@@ -52,6 +52,8 @@ const USTaxToolsPage: React.FC<Props> = ({ selectedYear }) => {
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <h2 className="text-2xl font-bold text-[#191918]">{t('usTax.title', 'US Tax Tools')}</h2>
+      {/* PR-E1: these are estimates, not a tax-filing basis. */}
+      <p className="text-xs text-[#7a7a78] leading-snug -mt-3"><i className="fas fa-circle-info mr-1.5"></i>{t('disclaimer.usTax')}</p>
 
       <div className="flex border-b border-[#e0ddd5]">
         <button onClick={() => setActiveTab('mileage')} className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'mileage' ? 'border-primary text-primary' : 'border-transparent text-[#7a7a78]'}`}>

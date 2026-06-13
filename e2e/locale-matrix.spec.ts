@@ -491,6 +491,8 @@ test.describe('ai assistant page', () => {
         // (2) the page's ChatPanel is mounted: empty-state welcome + input placeholder render
         await expect(page.getByText(loc.chat.welcome).first()).toBeVisible({ timeout: 10_000 });
         await expect(page.getByPlaceholder(loc.chat.placeholder).first()).toBeVisible({ timeout: 10_000 });
+        // (PR-E1) the management-estimate disclaimer renders below the chat input
+        await expect(page.getByText(loc.disclaimer.ai).first()).toBeVisible({ timeout: 10_000 });
         // (3) no raw chat.* / nav.assistant / headerTitle.assistant key leaked into the rendered UI
         const body = await page.locator('body').innerText();
         expect(body, `[ui=${ui} acc=${acc}] raw assistant key leaked`).not.toMatch(/chat\.[a-zA-Z]|nav\.assistant|headerTitle\.assistant/);
@@ -941,7 +943,9 @@ test.describe('business documents → generate from sales (Phase C)', () => {
     // switch to statement → generator appears; the two trim-variants collapse to ONE option
     await page.locator('select[name="docType"]').selectOption('statement');
     await expect(page.locator('select[name="stmtCustomer"]')).toBeVisible({ timeout: 10_000 });
-    expect(await page.locator('select[name="stmtCustomer"] option').filter({ hasText: '对账客户' }).count()).toBe(1);
+    // Wait for the async-populated options to render before asserting the dedup count
+    // (web-first toHaveCount retries; a bare .count() snapshot races the option render).
+    await expect(page.locator('select[name="stmtCustomer"] option').filter({ hasText: '对账客户' })).toHaveCount(1, { timeout: 10_000 });
 
     await page.locator('select[name="stmtCustomer"]').selectOption('对账客户');
     await page.locator('input[name="stmtStart"]').fill('2026-06-01');

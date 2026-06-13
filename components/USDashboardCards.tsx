@@ -1,6 +1,7 @@
 // US-specific dashboard cards — Schedule C + Deductions + SE Tax + Margins
 // Labels follow uiLanguage; financial logic follows accountingLocale (always US here)
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { formatMoney, getTaxLabel } from './accountingHelpers';
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
 }
 
 const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice, accountingLocale, uiLanguage }) => {
+  const { t } = useTranslation();
   const sc = report?.scheduleC || {};
   const se = report?.selfEmploymentTax || {};
   const est = report?.estimatedTax || {};
@@ -70,6 +72,8 @@ const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice,
               {label('dueLabel')}: {est.dueDates.join(' · ')}
             </div>
           )}
+          {/* PR-E1: SE-tax / quarterly figures are estimates, not a filing basis. */}
+          <p className="px-6 pt-1 pb-3 text-[10px] text-[#7a7a78] leading-snug">{t('disclaimer.usTax')}</p>
         </div>
       </div>
 

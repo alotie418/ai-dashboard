@@ -144,7 +144,9 @@ export function useAssistant(deps: AssistantDeps): AssistantSession {
 
 ${buildAIFinanceContext(deps.accountingLocale, deps.uiLanguage)}
 
-${contextText}`;
+${contextText}
+
+${t('ai.boundaryDirective')}`;
 
       // R2b-1：改走只读查账 agent（主进程跑工具循环，API Key 不出主进程）；
       // 仍注入 60s 快照基线 context（简单问题不必触发工具），工具用于下钻取实数。

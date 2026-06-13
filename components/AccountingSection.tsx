@@ -126,6 +126,9 @@ const AccountingSection: React.FC = () => {
         })}
       </div>
 
+      {/* PR-E1: preset rates are reference values; verify against current official rates. */}
+      <p className="text-[11px] text-[#7a7a78] leading-snug"><i className="fas fa-circle-info mr-1.5"></i>{t('disclaimer.rates')}</p>
+
       {/* 当前生效参数（可手动微调） */}
       <div className="border border-[#e0ddd5] rounded-xl p-5 bg-[#f9f9f8]/30 space-y-3">
         <div className="text-sm font-semibold text-[#191918]">

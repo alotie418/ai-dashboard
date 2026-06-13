@@ -182,7 +182,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
 <div class="meta"><span>${escapeHtml(t('finance.pdfRegime'))}: ${escapeHtml(locale)}</span><span>${escapeHtml(t('finance.pdfPeriod'))}: ${escapeHtml(periodDisplay)}</span><span>${escapeHtml(t('finance.pdfCurrency'))}: ${escapeHtml(currency)}</span></div>
 </div>
 <table>${body}</table>
-<div class="footer">${escapeHtml(t('finance.pdfGeneratedAt'))}: ${escapeHtml(generatedAt)}</div>
+<div class="footer">${escapeHtml(t('disclaimer.report'))}<br>${escapeHtml(t('finance.pdfGeneratedAt'))}: ${escapeHtml(generatedAt)}</div>
 </body></html>`;
   };
 
@@ -372,6 +372,11 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
           </div>
         )}
       </div>
+
+      {/* PR-E1: the report is a management estimate, not a statutory financial statement. */}
+      <p className="text-[11px] text-[#7a7a78] leading-snug px-2">
+        <i className="fas fa-circle-info mr-1.5"></i>{t('disclaimer.report')}
+      </p>
     </div>
   );
 };
@@ -468,6 +473,8 @@ const GenericPL: React.FC<{
           <LineItem label={lbl('inputTax')} value={fmt(vatSummary.cumulativeInput || vatSummary.paid || vatSummary.inputVAT || 0)} />
           <LineItem label={lbl('outputTax')} value={fmt(vatSummary.cumulativeOutput || vatSummary.collected || vatSummary.outputVAT || 0)} />
           <LineItem label={lbl('estimatedTax')} value={fmt(vatSummary.estimatedPayable || vatSummary.payable || vatSummary.vatPayable || 0)} bold primary />
+          {/* PR-E1: estimated tax for management reference, not a filing basis. */}
+          <p className="px-4 pt-1 text-[10px] text-[#7a7a78] leading-snug">{t('disclaimer.tax')}</p>
         </div>
       )}
 

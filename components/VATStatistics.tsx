@@ -10,7 +10,7 @@ interface Props {
 }
 
 const VATStatistics: React.FC<Props> = ({ data, accountingLocale = 'CN' }) => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   if (!data) return null;
   const uiLang = i18n.language;
   const label = (key: string) => getTaxLabel(accountingLocale, uiLang, key);
@@ -48,6 +48,8 @@ const VATStatistics: React.FC<Props> = ({ data, accountingLocale = 'CN' }) => {
             <span className="text-base font-bold text-[#191918]">{label('estimatedTax')}</span>
             <span className="text-xl font-bold text-orange-500">{fmt(data.estimatedPayable)}</span>
           </div>
+          {/* PR-E1: estimated figure for management reference, not a filing basis. */}
+          <p className="mt-2 text-[10px] text-[#7a7a78] leading-snug">{t('disclaimer.tax')}</p>
         </div>
       </div>
     </div>

@@ -121,6 +121,8 @@ const ChatPanel: React.FC = () => {
             <SendIcon />
           </button>
         </form>
+        {/* PR-E1: AI answers are management estimates, not professional tax/accounting advice. */}
+        <p className="mt-2 text-[10px] text-[#7a7a78] leading-snug text-center px-2">{t('disclaimer.ai')}</p>
       </div>
     </>
   );

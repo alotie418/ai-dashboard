@@ -940,7 +940,8 @@
     "ocrPrompt": "You are a professional financial auditor. Extract the following information from this invoice image, return strictly in JSON format (no markdown code blocks):\n{\n  \"date\": \"Invoice date YYYY-MM-DD\",\n  \"customer\": \"Customer / buyer name\",\n  \"quantity\": \"Total quantity with unit\",\n  \"price\": total amount excluding tax (number),\n  \"shipping\": shipping cost (number),\n  \"invoiceNo\": \"Invoice number\",\n  \"totalWithTax\": total amount including tax (number),\n  \"unitPriceWithoutTax\": unit price excluding tax (number),\n  \"taxAmount\": total tax amount (number)\n}\nNumeric fields must be numbers not strings. Use 0 if not found.",
     "chatSystemPrompt": "You are a professional business data assistant with access to all real-time business data.\n\nYour responsibilities:\n1. Answer questions about internal operations using the complete data\n2. Perform cross-module analysis\n3. Proactively correlate data from multiple modules for comprehensive insights\n\nIMPORTANT: Strictly follow the accounting locale below for financial/tax reasoning (currency, tax regime, report structure, accounting categories), and respond in the UI language below. Do NOT infer accounting locale from UI language, and do NOT infer UI language from accounting locale.\n\nFormatting: Use **bold** only (not ***). Use clear lists and paragraphs.",
     "contextFallback": "Business summary: annual revenue {{revenue}}, gross margin {{grossMargin}}%, net margin {{netMargin}}%.",
-    "forecastSystemPrompt": "You are a CFO and market analyst. Based on historical business data and statistical model results, provide a comprehensive forecast. Return JSON with an insights string and predictions array."
+    "forecastSystemPrompt": "You are a CFO and market analyst. Based on historical business data and statistical model results, provide a comprehensive forecast. Return JSON with an insights string and predictions array.",
+    "boundaryDirective": "Boundary: provide only management-level estimates and suggestions; do not state statutory tax or accounting conclusions. When tax filing, returns, or compliance arise, state that figures are estimates and advise consulting a qualified accountant/tax professional."
   },
   "usTax": {
     "title": "US Tax Tools",
@@ -1143,5 +1144,12 @@
     "taxInvoiceYes": "Invoiced",
     "taxInvoiceNo": "Not invoiced",
     "attachmentInvalidType": "Only PDF / JPG / PNG files are supported"
+  },
+  "disclaimer": {
+    "report": "This view is a management estimate generated from your data using simplified rules. It is not a statutory financial statement — rely on a qualified accountant and official figures for tax filing and external reporting.",
+    "tax": "Estimate for management reference only — not a basis for tax filing.",
+    "ai": "AI conclusions are estimates from your data, may be inaccurate, and are not professional tax or accounting advice.",
+    "usTax": "Estimates only — not for tax filing. Consult a tax professional.",
+    "rates": "Tax rates are preset reference values and may change — verify against current official rates."
   }
 }
