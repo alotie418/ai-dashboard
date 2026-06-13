@@ -27,6 +27,7 @@
     "check:offline": "node scripts/check-offline.mjs",
     "check:disclaimer": "node scripts/check-disclaimer.mjs",
     "check:ai-tone": "node scripts/check-ai-tone.mjs",
+    "check:tax-labels": "node scripts/check-tax-labels.mjs",
     "check:locale": "npm run check:locale-matrix && npm run check:raw-keys",
     "test:locale-ui": "npm run build && playwright test",
     "build:dmg": "BUILD_TARGET=dmg npm run build && electron-builder --mac dmg --config electron-builder.dmg.yml",
