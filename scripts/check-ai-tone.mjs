@@ -52,8 +52,21 @@ for (const { where, text } of targets) {
   }
 }
 
-console.log('=== AI Tone Guard (no CFO / auditor / tax-advisor persona) ===\n');
-console.log(`Scanned: ${targets.length} AI persona strings (ai.* × ${LOCALES.length} locales + ocrPromptBuilder)`);
+// PR-E2b: the accountingLocale aiContext strings (injected into the AI system prompt
+// by buildAIFinanceContext) must NOT hardcode tax-rate numbers — the AI should defer to
+// the user-configured rate and treat figures as management estimates. The real rates
+// used in calculations live in accountingProfiles.ts and are not affected.
+const cfg = readFileSync(join(ROOT, 'components/accountingLocaleConfig.ts'), 'utf8');
+const RATE = /\d+(?:\.\d+)?\s*%/;
+let aiContextCount = 0;
+for (const m of cfg.matchAll(/aiContext:\s*'([^']*)'/g)) {
+  aiContextCount++;
+  const rate = m[1].match(RATE);
+  if (rate) findings.push(`accountingLocaleConfig.ts aiContext: hardcoded tax rate "${rate[0]}" — relativize to user-configured rates`);
+}
+
+console.log('=== AI Tone Guard (no CFO / auditor / tax-advisor persona; no hardcoded aiContext rates) ===\n');
+console.log(`Scanned: ${targets.length} AI persona strings (ai.* × ${LOCALES.length} + ocrPromptBuilder) + ${aiContextCount} aiContext values`);
 console.log(`Findings: ${findings.length}\n`);
 
 if (findings.length) {
@@ -62,4 +75,4 @@ if (findings.length) {
   process.exit(1);
 }
 
-console.log('✓ No CFO / auditor / tax-advisor persona in any AI prompt.');
+console.log('✓ No CFO / auditor / tax-advisor persona, and no hardcoded tax rates in aiContext.');
