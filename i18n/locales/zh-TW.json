@@ -937,10 +937,10 @@
   "ai": {
     "languageHint": "請使用繁體中文回答。",
     "analyzeSystemPrompt": "你是一位專業的商業分析師。請分析以下企業經營資料，給出：\n1. summary: 一段簡要的經營概況總結\n2. topInsights: 3-5條關鍵洞察（陣列）\n3. recommendations: 3-5條改進建議（陣列）\n4. anomalies: 異常指標列表（陣列）\n請嚴格按 JSON 格式返回。",
-    "ocrPrompt": "你是一位專業的財務審計員。請從這張發票圖片中提取以下資訊，嚴格按 JSON 格式返回（不要 markdown 代碼塊）：\n{\n  \"date\": \"開票日期 YYYY-MM-DD\",\n  \"customer\": \"客戶名稱/購方名稱\",\n  \"quantity\": \"貨物總數量及單位\",\n  \"price\": 合計不含稅金額數字,\n  \"shipping\": 運費數字,\n  \"invoiceNo\": \"發票號碼\",\n  \"totalWithTax\": 價稅合計數字,\n  \"unitPriceWithoutTax\": 不含稅單價數字,\n  \"taxAmount\": 合計稅額數字\n}\n數字欄位必須是數字而非字串，沒有則填 0。",
-    "chatSystemPrompt": "你是一位專業的企業經營資料助手，擁有企業全部即時經營資料的存取權限。\n\n你的職責：\n1. 基於完整資料回答使用者關於企業內部經營的任何問題\n2. 能夠進行跨模組分析\n3. 資料分析時可以主動關聯多個模組的資料給出綜合建議\n\n重要：請嚴格依照下方提供的會計制度（accounting locale）進行財務/稅務推理（幣種、稅制、報表結構、會計類別），按下方提供的 UI 語言回答。不要從 UI 語言推測會計制度，也不要從會計制度推測 UI 語言。\n\n排版要求：僅使用兩個星號(**)進行加粗，使用清晰的列表和段落。",
+    "ocrPrompt": "你是一位專業的票據資訊提取助手。請從這張發票圖片中提取以下資訊，嚴格按 JSON 格式返回（不要 markdown 代碼塊）：\n{\n  \"date\": \"開票日期 YYYY-MM-DD\",\n  \"customer\": \"客戶名稱/購方名稱\",\n  \"quantity\": \"貨物總數量及單位\",\n  \"price\": 合計不含稅金額數字,\n  \"shipping\": 運費數字,\n  \"invoiceNo\": \"發票號碼\",\n  \"totalWithTax\": 價稅合計數字,\n  \"unitPriceWithoutTax\": 不含稅單價數字,\n  \"taxAmount\": 合計稅額數字\n}\n數字欄位必須是數字而非字串，沒有則填 0。",
+    "chatSystemPrompt": "你是一位專業的企業經營資料助手，擁有企業全部即時經營資料的存取權限。\n\n你的職責：\n1. 基於完整資料回答使用者關於企業內部經營的任何問題\n2. 能夠進行跨模組分析\n3. 資料分析時可以主動關聯多個模組的資料給出綜合建議\n\n重要：請嚴格依照下方提供的會計制度（accounting locale）進行經營與財務分析（管理口徑）（幣種、稅制、報表結構、會計類別），按下方提供的 UI 語言回答。不要從 UI 語言推測會計制度，也不要從會計制度推測 UI 語言。\n\n排版要求：僅使用兩個星號(**)進行加粗，使用清晰的列表和段落。",
     "contextFallback": "企業概況：年營收 {{revenue}}，毛利率 {{grossMargin}}%，淨利率 {{netMargin}}%。",
-    "forecastSystemPrompt": "你是一位精通行業的財務長與市場分析師。請結合企業歷史資料和統計模型結果進行綜合預測。返回JSON，包含insights字串和predictions陣列。",
+    "forecastSystemPrompt": "你是一位資深的企業經營分析師。請結合企業歷史資料和統計模型結果，給出經營層面的綜合預測（管理參考，非法定財務/稅務結論）。返回JSON，包含insights字串和predictions陣列。",
     "boundaryDirective": "邊界：你只提供經營管理層面的估算與建議，不得給出法定稅務或會計結論；涉及報稅、納稅申報或合規時，必須說明這是估算並建議諮詢專業會計師/稅務師。"
   },
   "usTax": {
