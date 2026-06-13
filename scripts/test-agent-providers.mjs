@@ -181,8 +181,8 @@ async function testKimi() {
   check('kimi default model in availableModels', kimi.meta.availableModels.some(m => m.value === 'kimi-k2.6'));
   check('kimi whitelist has k2.6 / k2.5 / v1-128k / v1-32k(compat)',
     ['kimi-k2.6', 'kimi-k2.5', 'moonshot-v1-128k', 'moonshot-v1-32k'].every(v => kimi.meta.availableModels.some(m => m.value === v)));
-  check('kimi capabilities text-only (no tts/ocr/webGrounding)',
-    kimi.meta.capabilities.tts === false && kimi.meta.capabilities.ocr === false && kimi.meta.capabilities.webGrounding === false);
+  check('kimi capabilities: ocr=true (vision) + visionModel set, no tts/webGrounding',
+    kimi.meta.capabilities.tts === false && kimi.meta.capabilities.ocr === true && kimi.meta.capabilities.webGrounding === false && kimi.meta.visionModel === 'moonshot-v1-32k-vision-preview');
 
   const toolResp = { choices: [{ message: { role: 'assistant', content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'get_sales', arguments: '{}' } }] } }] };
   const finalResp = { choices: [{ message: { role: 'assistant', content: 'Sales total is 100' } }] };
@@ -219,8 +219,8 @@ async function testGLM() {
   check('glm default model in availableModels', glm.meta.availableModels.some(m => m.value === 'glm-4.6'));
   check('glm whitelist has 4.6 / 5.1 / 4.5-air / 4.7-flash',
     ['glm-4.6', 'glm-5.1', 'glm-4.5-air', 'glm-4.7-flash'].every(v => glm.meta.availableModels.some(m => m.value === v)));
-  check('glm capabilities text-only (no tts/ocr/webGrounding)',
-    glm.meta.capabilities.tts === false && glm.meta.capabilities.ocr === false && glm.meta.capabilities.webGrounding === false);
+  check('glm capabilities: ocr=true (vision) + visionModel=glm-4.6v, no tts/webGrounding',
+    glm.meta.capabilities.tts === false && glm.meta.capabilities.ocr === true && glm.meta.capabilities.webGrounding === false && glm.meta.visionModel === 'glm-4.6v');
 
   const toolResp = { choices: [{ message: { role: 'assistant', content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'get_sales', arguments: '{}' } }] } }] };
   const finalResp = { choices: [{ message: { role: 'assistant', content: 'Sales total is 100' } }] };
@@ -288,6 +288,11 @@ function testOcrProviderSelection() {
     { provider: 'gemini', isDefault: false, ocrCapable: true },
     { provider: 'doubao', isDefault: false, ocrCapable: true },
   ]) === 'doubao');
+  check('fallback: glm before kimi in priority', pickOcrProvider([
+    { provider: 'deepseek', isDefault: true, ocrCapable: false },
+    { provider: 'kimi', isDefault: false, ocrCapable: true },
+    { provider: 'glm', isDefault: false, ocrCapable: true },
+  ]) === 'glm');
   check('no OCR-capable provider → null', pickOcrProvider([
     { provider: 'deepseek', isDefault: true, ocrCapable: false },
     { provider: 'kimi', isDefault: false, ocrCapable: false },
@@ -347,6 +352,40 @@ async function testDoubaoVisionOCR() {
     Array.isArray(content)
     && content.some(c => c.type === 'text' && c.text === 'extract invoice')
     && content.some(c => c.type === 'image_url' && c.image_url && c.image_url.url === 'data:image/jpeg;base64,BBBB'));
+}
+
+// PR-3d: GLM vision OCR — glm-4.6v (thinking off by default, so NO extraBody; the request must NOT
+// carry reasoning_effort/thinking). Same image_url base64 path as Qwen/Doubao.
+async function testGLMVisionOCR() {
+  console.log('GLM Vision OCR (Chat Completions image_url):');
+  const ocrResp = { choices: [{ message: { role: 'assistant', content: '{"isInvoiceLike":true,"sellerName":"ZHIPU","grossAmount":888}' } }] };
+  setFetch([ocrResp]);
+  const out = await glm.ocr('k', 'glm-4.6', { base64Data: 'CCCC', mimeType: 'image/png', ocrPrompt: 'extract invoice' });
+  check('glm ocr returns parsed JSON', !!(out && out.isInvoiceLike === true && out.sellerName === 'ZHIPU'));
+  const body = _bodies[0];
+  check('glm ocr uses visionModel (not the passed chat model)', body.model === 'glm-4.6v');
+  const content = body.messages[0].content;
+  check('glm ocr request carries text + image_url(base64 data URL) blocks',
+    Array.isArray(content)
+    && content.some(c => c.type === 'text' && c.text === 'extract invoice')
+    && content.some(c => c.type === 'image_url' && c.image_url && c.image_url.url === 'data:image/png;base64,CCCC'));
+  check('glm ocr request has no extraBody leakage (no reasoning_effort/thinking)', !('reasoning_effort' in body) && !('thinking' in body));
+}
+
+// PR-3d: Kimi vision OCR — moonshot-v1-32k-vision-preview (non-thinking). content MUST stay an array.
+async function testKimiVisionOCR() {
+  console.log('Kimi Vision OCR (Chat Completions image_url):');
+  const ocrResp = { choices: [{ message: { role: 'assistant', content: '{"isInvoiceLike":true,"sellerName":"MOONSHOT","grossAmount":777}' } }] };
+  setFetch([ocrResp]);
+  const out = await kimi.ocr('k', 'kimi-k2.6', { base64Data: 'DDDD', mimeType: 'image/webp', ocrPrompt: 'extract invoice' });
+  check('kimi ocr returns parsed JSON', !!(out && out.isInvoiceLike === true && out.sellerName === 'MOONSHOT'));
+  const body = _bodies[0];
+  check('kimi ocr uses visionModel (not the passed chat model)', body.model === 'moonshot-v1-32k-vision-preview');
+  const content = body.messages[0].content;
+  check('kimi ocr request carries text + image_url(base64) blocks, content is ARRAY (not stringified)',
+    Array.isArray(content)
+    && content.some(c => c.type === 'text' && c.text === 'extract invoice')
+    && content.some(c => c.type === 'image_url' && c.image_url && c.image_url.url === 'data:image/webp;base64,DDDD'));
 }
 
 // Gemini uses the @google/genai SDK (not fetch), so we test its PURE functions directly with
@@ -410,6 +449,8 @@ async function main() {
   await testDoubao();
   await testQwenVisionOCR();
   await testDoubaoVisionOCR();
+  await testGLMVisionOCR();
+  await testKimiVisionOCR();
   testOcrProviderSelection();
   await testGemini();
   await testAgentBudget();
