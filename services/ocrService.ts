@@ -1,3 +1,4 @@
+import type { PurchaseRecord, SalesRecord } from './api';
 
 export interface ExtractedInvoice {
   isInvoiceLike: boolean;
@@ -145,3 +146,49 @@ export const analyzeInvoice = async (
 
   return normalizeToLegacy(raw, accountingLocale || 'CN');
 };
+
+// PR-3c: map an OCR ExtractedInvoice (already normalized to legacy fields) onto the Purchase / Sales
+// form state. PURE (no React, no Date) so it is unit-testable. Missing text → ''; missing numbers → 0;
+// taxRate is derived from the extracted tax/amount when both are present, else the page's default.
+// The page applies the result with setState ONLY (no DB write); the page's existing auto-calc effect
+// then re-derives price/taxAmount/unitPrice from totalWithTax+quantity+taxRate (no calc duplicated here).
+export function extractedToPurchaseForm(
+  e: ExtractedInvoice,
+  defaultTaxRate: string,
+): Omit<PurchaseRecord, 'status' | 'id'> {
+  const taxRate = e.price > 0 && (e.taxAmount || 0) > 0
+    ? `${Math.round(((e.taxAmount || 0) / e.price) * 100)}%`
+    : defaultTaxRate;
+  return {
+    date: e.date || '',
+    supplier: e.customer || '',
+    quantity: e.quantity || '',
+    price: e.price || 0,
+    taxRate,
+    invoiceNo: e.invoiceNo || '',
+    totalWithTax: e.totalWithTax || 0,
+    unitPriceWithoutTax: e.unitPriceWithoutTax || 0,
+    taxAmount: e.taxAmount || 0,
+  };
+}
+
+export function extractedToSalesForm(
+  e: ExtractedInvoice,
+  fallbackTaxRate: string,
+): Omit<SalesRecord, 'status' | 'id'> {
+  const taxRate = e.price > 0 && (e.taxAmount || 0) > 0
+    ? `${Math.round(((e.taxAmount || 0) / e.price) * 100)}%`
+    : fallbackTaxRate;
+  return {
+    date: e.date || '',
+    customer: e.customer || '',
+    quantity: e.quantity || '',
+    price: e.price || 0,
+    shipping: e.shipping || 0,
+    invoiceNo: e.invoiceNo || '',
+    totalWithTax: e.totalWithTax || 0,
+    unitPriceWithoutTax: e.unitPriceWithoutTax || 0,
+    taxAmount: e.taxAmount || 0,
+    taxRate,
+  };
+}

@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
-import { analyzeInvoice, type ExtractedInvoice } from '../services/ocrService';
+import { analyzeInvoice, extractedToPurchaseForm, type ExtractedInvoice } from '../services/ocrService';
 import { rasterizePdfFirstPage } from '../services/pdfRaster';
 import { fetchPurchases, createPurchase, deletePurchase, fetchSettings, listProducts, listProviders, type Product, PurchaseRecord } from '../services/api';
 import { formatMoney, getCurrencySymbol, getTaxLabel, formatLegacyQuantity, getProductUnitLabel } from './accountingHelpers';
@@ -193,7 +193,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
         alert(t('purchases.notInvoiceWarning', { type: docType }));
         return;
       }
-      // PR-3b: read-only preview only — NO DB write, NO form fill (confirm→autofill is PR-3c).
+      // Show a preview; the user confirms before anything is filled (PR-3c).
       setOcrPreview(extracted);
     } catch (err) {
       console.error(err);
@@ -202,6 +202,16 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
       setIsScanning(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  // PR-3c: "use these values" → fill the add-form state and open the modal. NO createPurchase / NO DB
+  // write — the user reviews the pre-filled form and clicks save (handleAddSubmit) to actually record.
+  const confirmOcrFill = () => {
+    if (!ocrPreview) return;
+    const filled = extractedToPurchaseForm(ocrPreview, defaultTaxRate);
+    setNewPurchase(prev => ({ ...filled, date: filled.date || prev.date }));
+    setOcrPreview(null);
+    setShowAddModal(true);
   };
 
   const handleAddSubmit = async (e: React.FormEvent) => {
@@ -500,6 +510,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                   type="text"
                   required
                   placeholder={usZh ? taxLabel('setFormPayeePh') : t('purchases.formSupplierPlaceholder')}
+                  data-testid="ocr-fill-counterparty"
                   value={newPurchase.supplier}
                   onChange={(e) => setNewPurchase({ ...newPurchase, supplier: e.target.value })}
                   className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
@@ -597,6 +608,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                     <input
                       type="number"
                       step="0.01"
+                      data-testid="ocr-fill-total"
                       value={newPurchase.totalWithTax || ''}
                       onChange={(e) => setNewPurchase({ ...newPurchase, totalWithTax: parseFloat(e.target.value) || 0 })}
                       className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all`}
@@ -632,6 +644,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
           counterpartyLabel={usZh ? taxLabel('setHeaderPayee') : t('tableHeaders.supplier')}
           fmtMoney={fmtMoney}
           onClose={() => setOcrPreview(null)}
+          onConfirm={confirmOcrFill}
         />
       )}
     </div>

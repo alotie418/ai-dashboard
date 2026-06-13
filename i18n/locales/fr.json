@@ -930,7 +930,8 @@
     "errorPdfRender": "Impossible de lire le PDF. Vérifiez que le fichier n'est pas corrompu et réessayez.",
     "noProviderConfigured": "Le service IA actuel ne prend pas en charge l'OCR. Configurez un fournisseur compatible OCR (Qwen / Gemini, etc.) dans Paramètres → Fournisseurs IA.",
     "previewTitle": "Aperçu de la reconnaissance",
-    "previewHint": "Vérifiez les champs reconnus ci-dessous. (Le remplissage automatique du formulaire après confirmation arrivera dans une mise à jour ultérieure.)",
+    "previewHint": "Vérifiez les champs reconnus, puis cliquez sur « Utiliser ces valeurs » pour remplir le formulaire (enregistrement manuel).",
+    "useResult": "Utiliser ces valeurs",
     "close": "Fermer"
   },
   "ai": {

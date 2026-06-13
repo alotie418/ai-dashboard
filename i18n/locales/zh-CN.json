@@ -930,7 +930,8 @@
     "errorPdfRender": "PDF 解析失败，请确认文件未损坏后重试。",
     "noProviderConfigured": "当前 AI 服务不支持 OCR，请在「设置 → AI 服务商」配置支持 OCR 的服务商（如通义千问 / Gemini）。",
     "previewTitle": "识别预览",
-    "previewHint": "以下为识别结果，请核对。（确认后回填表单将在后续版本支持。）",
+    "previewHint": "核对识别结果后点「确认使用」填入表单，仍需手动保存。",
+    "useResult": "确认使用",
     "close": "关闭"
   },
   "ai": {

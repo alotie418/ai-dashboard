@@ -930,7 +930,8 @@
     "errorPdfRender": "Could not read the PDF. Make sure the file isn't corrupted and try again.",
     "noProviderConfigured": "The current AI service doesn't support OCR. Configure an OCR-capable provider (e.g. Qwen / Gemini) under Settings → AI Providers.",
     "previewTitle": "Recognition preview",
-    "previewHint": "Review the recognized fields below. (Auto-filling the form after confirmation arrives in a later update.)",
+    "previewHint": "Review the recognized fields, then click \"Use these values\" to fill the form — you still save manually.",
+    "useResult": "Use these values",
     "close": "Close"
   },
   "ai": {

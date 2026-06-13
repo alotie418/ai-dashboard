@@ -22,6 +22,7 @@
     "check:metrics": "node scripts/test-metrics.mjs",
     "check:theme": "node scripts/check-theme.mjs",
     "check:providers": "node scripts/check-providers.mjs",
+    "check:ocr-mapping": "node scripts/test-ocr-mapping.mjs",
     "check:locale": "npm run check:locale-matrix && npm run check:raw-keys",
     "test:locale-ui": "npm run build && playwright test",
     "build:dmg": "BUILD_TARGET=dmg npm run build && electron-builder --mac dmg --config electron-builder.dmg.yml",
