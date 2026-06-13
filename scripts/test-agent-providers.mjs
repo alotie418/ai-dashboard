@@ -13,6 +13,7 @@ const require = createRequire(import.meta.url);
 const anthropic = require('../electron/ai/providers/anthropic.js');
 const openai = require('../electron/ai/providers/openai.js');
 const gemini = require('../electron/ai/providers/gemini.js'); // pure functions only (SDK loaded lazily, never hit here)
+const deepseek = require('../electron/ai/providers/deepseek.js'); // OpenAI Chat-Completions compatible (fetch-only)
 
 const failures = [];
 function check(name, cond, detail) {
@@ -88,6 +89,44 @@ async function testOpenAI() {
   check('openai empty tools omits tools field', !('tools' in _bodies[0]), JSON.stringify(_bodies[0]));
 }
 
+// DeepSeek = OpenAI **Chat Completions** dialect (via the shared _openaiCompatible factory):
+// tools[].function, choices[0].message.tool_calls (arguments JSON-string), role:'tool' results.
+// Distinct from OpenAI's Responses API above. Stub fetch with crafted chat-completions JSON.
+async function testDeepSeek() {
+  console.log('DeepSeek (Chat Completions):');
+  // META smoke (registry parity is covered by check:providers; here we lock the adapter shape)
+  check('deepseek meta id + default model', deepseek.meta.id === 'deepseek' && deepseek.meta.defaultModel === 'deepseek-v4-pro');
+  check('deepseek default model in availableModels', deepseek.meta.availableModels.some(m => m.value === 'deepseek-v4-pro'));
+  check('deepseek whitelist has v4-pro / v4-flash / chat(compat)',
+    ['deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-chat'].every(v => deepseek.meta.availableModels.some(m => m.value === v)));
+  check('deepseek capabilities text-only (no tts/ocr/webGrounding)',
+    deepseek.meta.capabilities.tts === false && deepseek.meta.capabilities.ocr === false && deepseek.meta.capabilities.webGrounding === false);
+
+  const toolResp = { choices: [{ message: { role: 'assistant', content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'get_sales', arguments: '{}' } }] } }] };
+  const finalResp = { choices: [{ message: { role: 'assistant', content: 'Sales total is 100' } }] };
+
+  setFetch([toolResp]);
+  const s1 = await deepseek.chatWithTools('k', 'm', { history: seed(deepseek), system: 'sys', tools: TOOLDEFS });
+  check('deepseek round1 type=tool_calls', s1.type === 'tool_calls', JSON.stringify(s1));
+  check('deepseek round1 call parsed (id + name + args object)', !!(s1.calls && s1.calls[0] && s1.calls[0].id === 'call_1' && s1.calls[0].name === 'get_sales' && typeof s1.calls[0].args === 'object'));
+  check('deepseek round1 assistantMsg single assistant turn w/ tool_calls', !!(s1.assistantMsg && s1.assistantMsg.role === 'assistant' && Array.isArray(s1.assistantMsg.tool_calls) && s1.assistantMsg.tool_calls.length === 1));
+  check('deepseek round1 request carried nested function tools + tool_choice', Array.isArray(_bodies[0].tools) && _bodies[0].tools[0].type === 'function' && _bodies[0].tools[0].function.name === 'get_sales' && _bodies[0].tool_choice === 'auto');
+  check('deepseek round1 system prepended as first message', _bodies[0].messages[0].role === 'system' && _bodies[0].messages[0].content === 'sys');
+
+  const tr = deepseek.toToolResultsMsg([{ call: s1.calls[0], result: { rows: [1, 2] } }]);
+  check('deepseek toToolResultsMsg single shape', Array.isArray(tr) && tr.length === 1 && tr[0].role === 'tool' && tr[0].tool_call_id === 'call_1' && tr[0].content === JSON.stringify({ rows: [1, 2] }));
+  const trM = deepseek.toToolResultsMsg([{ call: { id: 'c1' }, result: {} }, { call: { id: 'c2' }, result: {} }]);
+  check('deepseek multi-tool = array of 2 role:tool messages', Array.isArray(trM) && trM.length === 2 && trM[0].tool_call_id === 'c1' && trM[1].tool_call_id === 'c2');
+
+  setFetch([finalResp]);
+  const s2 = await deepseek.chatWithTools('k', 'm', { history: seed(deepseek), system: 'sys', tools: TOOLDEFS });
+  check('deepseek round2 type=final + text', s2.type === 'final' && s2.text === 'Sales total is 100', JSON.stringify(s2));
+
+  setFetch([finalResp]);
+  await deepseek.chatWithTools('k', 'm', { history: seed(deepseek), system: 'sys', tools: [] });
+  check('deepseek empty tools omits tools field', !('tools' in _bodies[0]), JSON.stringify(_bodies[0]));
+}
+
 // Gemini uses the @google/genai SDK (not fetch), so we test its PURE functions directly with
 // crafted response objects — no SDK mock, no network, no key.
 async function testGemini() {
@@ -142,6 +181,7 @@ async function main() {
   console.log('\n=== Agent Provider Round-Trip (offline) ===\n');
   await testAnthropic();
   await testOpenAI();
+  await testDeepSeek();
   await testGemini();
   await testAgentBudget();
   console.log(`\n${failures.length === 0 ? '✓ all passed' : '✗ ' + failures.length + ' failed'}\n`);

@@ -37,7 +37,7 @@ function normalizeCode(status, rawCode, message) {
   const m = `${rawCode || ''} ${message || ''}`.toLowerCase();
   if (status === 401 || /invalid_api_key|unauthorized/.test(m)) return 'auth';
   if (status === 403 || /permission|forbidden/.test(m)) return 'permission';
-  if (status === 429 || /rate_limit|quota|exceeded|insufficient_quota|spending.?cap/.test(m)) return 'quota';
+  if (status === 429 || status === 402 || /rate_limit|quota|exceeded|insufficient_quota|insufficient.?balance|spending.?cap/.test(m)) return 'quota';
   if (status === 404 || /model.*not.*found|invalid_model|unknown.*model|does.*not.*exist|not.*supported/.test(m)) return 'modelNotFound';
   if (status === 400 || /invalid_request|bad_request/.test(m)) return 'badRequest';
   if (typeof status === 'number' && status >= 500) return 'serverError';

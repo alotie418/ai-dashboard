@@ -61,6 +61,13 @@ const PROVIDER_DOCS: Record<AIProviderId, { label: string; getKeyUrl: string; pl
     icon: 'fa-gem',
     color: '#4285f4',
   },
+  deepseek: {
+    label: 'DeepSeek · 深度求索',
+    getKeyUrl: 'https://platform.deepseek.com/api_keys',
+    placeholder: 'sk-...',
+    icon: 'fa-bolt',
+    color: '#4D6BFE',
+  },
 };
 
 const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
