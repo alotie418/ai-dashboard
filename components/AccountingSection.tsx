@@ -75,7 +75,7 @@ const AccountingSection: React.FC = () => {
         <ul className="list-disc list-inside text-[11px] text-[#5c5c5a] space-y-0.5">
           <li>{t('settings.accounting.scopeYes1', 'Tax regime, tax rates, and tax concepts')}</li>
           <li>{t('settings.accounting.scopeYes2', 'Default currency and report structure')}</li>
-          <li>{t('settings.accounting.scopeYes3', 'Dashboard metrics, accounting categories, and AI finance context')}</li>
+          <li>{t('settings.accounting.scopeYes3', 'Dashboard metrics, categories, and AI finance context')}</li>
         </ul>
         <div className="text-[11px] text-[#7a7a78] mt-1">
           <i className="fas fa-exclamation-circle mr-1 text-amber-500"></i>

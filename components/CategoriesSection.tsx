@@ -104,9 +104,9 @@ const CategoriesSection: React.FC = () => {
   return (
     <section className="space-y-6">
       <div>
-        <h3 className="text-xl font-bold text-[#191918]">{t('settings.categories.title', '会计类别')}</h3>
+        <h3 className="text-xl font-bold text-[#191918]">{t('settings.categories.title', '分类管理')}</h3>
         <p className="text-xs text-[#6b6b69] mt-1">
-          {t('settings.categories.subtitle', '按当前会计制度展示预置类别。可新增自定义类别，但系统预置类别不能删除。')}
+          {t('settings.categories.subtitle', '按当前记账口径展示预置类别。可新增自定义类别，但系统预置类别不能删除。')}
         </p>
       </div>
 
