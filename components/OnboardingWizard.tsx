@@ -75,6 +75,13 @@ const PROVIDER_DOCS: Record<AIProviderId, { label: string; getKeyUrl: string; pl
     icon: 'fa-cloud',
     color: '#615CED',
   },
+  kimi: {
+    label: 'Kimi · 月之暗面',
+    getKeyUrl: 'https://platform.moonshot.cn/console/api-keys',
+    placeholder: 'sk-...',
+    icon: 'fa-moon',
+    color: '#7C3AED',
+  },
 };
 
 const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {

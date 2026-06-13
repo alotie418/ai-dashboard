@@ -12,6 +12,7 @@ const openai = require('./providers/openai');
 const gemini = require('./providers/gemini');
 const deepseek = require('./providers/deepseek');
 const qwen = require('./providers/qwen');
+const kimi = require('./providers/kimi');
 
 const PROVIDERS = {
   anthropic,
@@ -19,6 +20,7 @@ const PROVIDERS = {
   gemini,
   deepseek,
   qwen,
+  kimi,
 };
 
 const VALID_IDS = Object.keys(PROVIDERS);
