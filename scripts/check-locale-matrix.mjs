@@ -1047,7 +1047,7 @@ async function main() {
   //   `displayLabel → schedule_line`, localized via JP_TXN_CATEGORY_LABELS (applied
   //   read-time in services/api.ts, keyed by slug). Guard: every JP category slug
   //   resolves zh-CN/zh-TW label + report-line; the report-line stays Chinese-main
-  //   (损益表-… , never the raw Japanese 損益計算書/販管費) with the formal Japanese
+  //   (经营损益-… , never the raw Japanese 損益計算書/販管費) with the formal Japanese
   //   account name in parens; no CN-VAT (进项/销项/增值税/认证/电子发票) or non-JPY
   //   (人民币/RMB/CNY); and COGS↔売上原価 / advertising↔広告宣伝費 mappings hold
   //   (guards against the 广告费→売上原価 regression).
@@ -1069,12 +1069,12 @@ async function main() {
         if (!line) reasons.push(`JP cat ${slug}.scheduleLine[${lang}] missing`);
         for (const [field, v] of [['label', label], ['scheduleLine', line]]) {
           if (typeof v !== 'string') continue;
-          if (JP_HEADER_BAN.test(v)) reasons.push(`JP cat ${slug}.${field}[${lang}] uses raw JP report header (should be 损益表-…): "${v}"`);
+          if (JP_HEADER_BAN.test(v)) reasons.push(`JP cat ${slug}.${field}[${lang}] uses raw JP report header (should be 经营损益-…): "${v}"`);
           if (CN_VAT_MONEY_BAN.test(v)) reasons.push(`JP cat ${slug}.${field}[${lang}] uses CN-VAT/non-JPY term: "${v}"`);
         }
         // report-line must be Chinese-main (损益表/損益表 prefix)
-        if (typeof line === 'string' && !/^损益表-|^損益表-/.test(line)) {
-          reasons.push(`JP cat ${slug}.scheduleLine[${lang}] should start with 损益表-/損益表-: "${line}"`);
+        if (typeof line === 'string' && !/^经营损益-|^經營損益-/.test(line)) {
+          reasons.push(`JP cat ${slug}.scheduleLine[${lang}] should start with 经营损益-/經營損益-: "${line}"`);
         }
       }
     }
@@ -1250,8 +1250,8 @@ async function main() {
   //   Under EU accountingLocale + zh-CN/zh-TW UI the category dropdown shows
   //   `displayLabel → schedule_line`, localized via EU_TXN_CATEGORY_LABELS (applied
   //   read-time in services/api.ts, keyed by slug). Guard: every EU category slug
-  //   resolves zh-CN/zh-TW label + report-line; the report-line is Chinese (损益表-…
-  //   or VAT 申报), never the seeded English P&L - … / VAT Return; no CN-VAT
+  //   resolves zh-CN/zh-TW label + report-line; the report-line is Chinese (经营损益-…
+  //   or VAT 待处理), never the seeded English P&L - … / VAT Return; no CN-VAT
   //   (进项/销项/增值税/认证), JP 消费税, US Sales Tax, or non-EUR currency.
   // ────────────────────────────────────────────────
   {
@@ -1261,8 +1261,8 @@ async function main() {
     const EU_CAT_BAN = /P&L|VAT Return|进项|進項|销项|銷項|增值税|增值稅|消费税|消費稅|认证|認證|Sales Tax|人民币|人民幣|CNY|日元|日圓|JPY|美元|USD/i;
     // exact report-line pins (the agreed EU 收支记录 wording)
     const LINE_PIN = {
-      'zh-CN': { revenue: '损益表-营业收入', financial: '损益表-财务收入', purchases: '损益表-采购', rent: '损益表-租金', salaries: '损益表-工资', 'social-charges': '损益表-社会保险费', travel: '损益表-差旅费', professional: '损益表-专业服务费', marketing: '损益表-市场推广费', energy: '损益表-能源费用', amortization: '损益表-摊销', 'vat-net': 'VAT 申报' },
-      'zh-TW': { revenue: '損益表-營業收入', financial: '損益表-財務收入', purchases: '損益表-採購', rent: '損益表-租金', salaries: '損益表-工資', 'social-charges': '損益表-社會保險費', travel: '損益表-差旅費', professional: '損益表-專業服務費', marketing: '損益表-市場推廣費', energy: '損益表-能源費用', amortization: '損益表-攤銷', 'vat-net': 'VAT 申報' },
+      'zh-CN': { revenue: '经营损益-营业收入', financial: '经营损益-财务收入', purchases: '经营损益-采购', rent: '经营损益-租金', salaries: '经营损益-工资', 'social-charges': '经营损益-社会保险费', travel: '经营损益-差旅费', professional: '经营损益-专业服务费', marketing: '经营损益-市场推广费', energy: '经营损益-能源费用', amortization: '经营损益-摊销', 'vat-net': 'VAT 待处理' },
+      'zh-TW': { revenue: '經營損益-營業收入', financial: '經營損益-財務收入', purchases: '經營損益-採購', rent: '經營損益-租金', salaries: '經營損益-工資', 'social-charges': '經營損益-社會保險費', travel: '經營損益-差旅費', professional: '經營損益-專業服務費', marketing: '經營損益-市場推廣費', energy: '經營損益-能源費用', amortization: '經營損益-攤銷', 'vat-net': 'VAT 待處理' },
     };
     for (const slug of REQUIRED_SLUGS) {
       const e = M[slug];
@@ -1459,7 +1459,7 @@ async function main() {
   //   `displayLabel → schedule_line`, localized via KR_TXN_CATEGORY_LABELS (applied
   //   read-time in services/api.ts, keyed by slug). Guard: every KR category slug
   //   resolves zh-CN/zh-TW label + report-line; the report-line main text (before the
-  //   parens) is Chinese (损益表-…), never the Korean headers 손익계산서-/판관비-/판매비-;
+  //   parens) is Chinese (经营损益-…), never the Korean headers 손익계산서-/판관비-/판매비-;
   //   Korean is allowed ONLY inside （） as the formal account name. No CN-VAT
   //   (进项/销项/增值税/认证), JP 消费税, US Sales Tax, or non-KRW currency.
   // ────────────────────────────────────────────────
@@ -1476,8 +1476,8 @@ async function main() {
       'zh-TW': { sales: '營業收入', 'non-operating': '營業外收入', cogs: '銷售成本', salary: '工資', welfare: '福利', travel: '差旅', communication: '通訊', utilities: '水電費', supplies: '消耗品', entertain: '招待', advertising: '廣告', rent: '租金', depreciation: '折舊' },
     };
     const LINE_PIN = {
-      'zh-CN': { sales: '损益表-营业收入（매출）', 'non-operating': '损益表-营业外收入（영업외수익）', cogs: '损益表-销售成本（매출원가）', salary: '损益表-工资薪金（급여）', welfare: '损益表-福利费（복리후생비）', travel: '损益表-差旅费（여비교통비）', communication: '损益表-通信费（통신비）', utilities: '损益表-水电费（수도광열비）', supplies: '损益表-消耗品费（소모품비）', entertain: '损益表-招待费（접대비）', advertising: '损益表-广告宣传费（광고선전비）', rent: '损益表-租赁费（임차료）', depreciation: '损益表-折旧费（감가상각비）' },
-      'zh-TW': { sales: '損益表-營業收入（매출）', 'non-operating': '損益表-營業外收入（영업외수익）', cogs: '損益表-銷售成本（매출원가）', salary: '損益表-薪資薪金（급여）', welfare: '損益表-福利費（복리후생비）', travel: '損益表-差旅費（여비교통비）', communication: '損益表-通訊費（통신비）', utilities: '損益表-水電費（수도광열비）', supplies: '損益表-消耗品費（소모품비）', entertain: '損益表-招待費（접대비）', advertising: '損益表-廣告宣傳費（광고선전비）', rent: '損益表-租賃費（임차료）', depreciation: '損益表-折舊費（감가상각비）' },
+      'zh-CN': { sales: '经营损益-营业收入（매출）', 'non-operating': '经营损益-营业外收入（영업외수익）', cogs: '经营损益-销售成本（매출원가）', salary: '经营损益-工资薪金（급여）', welfare: '经营损益-福利费（복리후생비）', travel: '经营损益-差旅费（여비교통비）', communication: '经营损益-通信费（통신비）', utilities: '经营损益-水电费（수도광열비）', supplies: '经营损益-消耗品费（소모품비）', entertain: '经营损益-招待费（접대비）', advertising: '经营损益-广告宣传费（광고선전비）', rent: '经营损益-租赁费（임차료）', depreciation: '经营损益-折旧费（감가상각비）' },
+      'zh-TW': { sales: '經營損益-營業收入（매출）', 'non-operating': '經營損益-營業外收入（영업외수익）', cogs: '經營損益-銷售成本（매출원가）', salary: '經營損益-薪資薪金（급여）', welfare: '經營損益-福利費（복리후생비）', travel: '經營損益-差旅費（여비교통비）', communication: '經營損益-通訊費（통신비）', utilities: '經營損益-水電費（수도광열비）', supplies: '經營損益-消耗品費（소모품비）', entertain: '經營損益-招待費（접대비）', advertising: '經營損益-廣告宣傳費（광고선전비）', rent: '經營損益-租賃費（임차료）', depreciation: '經營損益-折舊費（감가상각비）' },
     };
     for (const slug of REQUIRED_SLUGS) {
       const e = M[slug];
@@ -1489,14 +1489,14 @@ async function main() {
         if (line !== LINE_PIN[lang][slug]) reasons.push(`KR cat ${slug}.scheduleLine[${lang}] should be "${LINE_PIN[lang][slug]}", got "${line}"`);
         for (const [field, v] of [['label', label], ['scheduleLine', line]]) {
           if (typeof v !== 'string') continue;
-          if (KR_HEADER_BAN.test(v)) reasons.push(`KR cat ${slug}.${field}[${lang}] uses Korean report header (should be 损益表-…): "${v}"`);
+          if (KR_HEADER_BAN.test(v)) reasons.push(`KR cat ${slug}.${field}[${lang}] uses Korean report header (should be 经营损益-…): "${v}"`);
           if (KR_CAT_BAN.test(v)) reasons.push(`KR cat ${slug}.${field}[${lang}] uses CN-VAT/JP/US/non-KRW wording: "${v}"`);
         }
         // report-line MAIN text (before the parens) must be Chinese — no Korean as main
         if (typeof line === 'string') {
           const main = line.split('（')[0];
           if (HANGUL.test(main)) reasons.push(`KR cat ${slug}.scheduleLine[${lang}] has Korean as main text (only allowed inside （）): "${line}"`);
-          if (!/^损益表-|^損益表-/.test(line)) reasons.push(`KR cat ${slug}.scheduleLine[${lang}] should start with 损益表-/損益表-: "${line}"`);
+          if (!/^经营损益-|^經營損益-/.test(line)) reasons.push(`KR cat ${slug}.scheduleLine[${lang}] should start with 经营损益-/經營損益-: "${line}"`);
         }
         // the label (left side) must be pure Chinese — no Korean
         if (typeof label === 'string' && HANGUL.test(label)) reasons.push(`KR cat ${slug}.label[${lang}] must not contain Korean: "${label}"`);
@@ -1511,9 +1511,9 @@ async function main() {
   //   类别 / 会计科目 / 付款状态·收款状态 (taxConcepts txnCategoryHeader / txnScheduleHeader /
   //   txnPaymentStatusHeader / txnReceiptStatusHeader), never 报表行 / 对应报表行 / 状态;
   //   (b) the category dropdown shows `displayLabel → schedule_line` via
-  //   TW_TXN_CATEGORY_LABELS in 中文冒号 format (损益表：… / 税务：…) — NEVER the
-  //   half-width-hyphen seed form (损益表-…); (c) 营业税 → 税务：营业税 and 营利事业所得税 →
-  //   税务：营利事业所得税 are 税务 filing lines, NOT 损益表 lines. No CN-VAT / non-TWD /
+  //   TW_TXN_CATEGORY_LABELS in 中文冒号 format (经营损益：… / 税款：…) — NEVER the
+  //   half-width-hyphen seed form (经营损益-…); (c) 营业税 → 税款：营业税 and 营利事业所得税 →
+  //   税款：营利事业所得税 are 税务 filing lines, NOT 损益表 lines. No CN-VAT / non-TWD /
   //   营利事业所得-without-税. UI stays Simplified. CN i18n (报表项目 / 对应报表项目 / 状态) and
   //   the global header year label ({{year}} 年, no 年度) are guarded too.
   // ────────────────────────────────────────────────
@@ -1527,8 +1527,8 @@ async function main() {
       'zh-TW': { sales: '銷貨收入', other: '其他營業收入', cogs: '銷貨成本', selling: '銷售費用', admin: '管理費用', rd: '研究發展費用', 'business-tax': '營業稅', 'income-tax': '營利事業所得稅' },
     };
     const LINE_PIN = {
-      'zh-CN': { sales: '损益表：营业收入', other: '损益表：其他营业收入', cogs: '损益表：销货成本', selling: '损益表：销售费用', admin: '损益表：管理费用', rd: '损益表：研究发展费用', 'business-tax': '税务：营业税', 'income-tax': '税务：营利事业所得税' },
-      'zh-TW': { sales: '損益表：營業收入', other: '損益表：其他營業收入', cogs: '損益表：銷貨成本', selling: '損益表：銷售費用', admin: '損益表：管理費用', rd: '損益表：研究發展費用', 'business-tax': '稅務：營業稅', 'income-tax': '稅務：營利事業所得稅' },
+      'zh-CN': { sales: '经营损益：营业收入', other: '经营损益：其他营业收入', cogs: '经营损益：销货成本', selling: '经营损益：销售费用', admin: '经营损益：管理费用', rd: '经营损益：研究发展费用', 'business-tax': '税款：营业税', 'income-tax': '税款：营利事业所得税' },
+      'zh-TW': { sales: '經營損益：營業收入', other: '經營損益：其他營業收入', cogs: '經營損益：銷貨成本', selling: '經營損益：銷售費用', admin: '經營損益：管理費用', rd: '經營損益：研究發展費用', 'business-tax': '稅款：營業稅', 'income-tax': '稅款：營利事業所得稅' },
     };
     for (const slug of REQUIRED_SLUGS) {
       const e = M[slug];
@@ -1554,8 +1554,8 @@ async function main() {
       for (const lang of ['zh-CN', 'zh-TW']) {
         const v = M[slug] && M[slug].scheduleLine && M[slug].scheduleLine[lang];
         if (typeof v !== 'string') continue;
-        if (/^损益表|^損益表/.test(v)) reasons.push(`TW cat ${slug}.scheduleLine[${lang}] must not be a 损益表 line (should start 税务：/稅務：): "${v}"`);
-        if (!/^税务：|^稅務：/.test(v)) reasons.push(`TW cat ${slug}.scheduleLine[${lang}] should start with 税务：/稅務：: "${v}"`);
+        if (/^经营损益|^經營損益/.test(v)) reasons.push(`TW cat ${slug}.scheduleLine[${lang}] must not be a 经营损益 line (should start 税款：/稅款：): "${v}"`);
+        if (!/^税款：|^稅款：/.test(v)) reasons.push(`TW cat ${slug}.scheduleLine[${lang}] should start with 税款：/稅款：: "${v}"`);
       }
     }
     // formal table-header taxConcepts: present for every UI language + pinned zh values
@@ -1607,8 +1607,8 @@ async function main() {
       'zh-TW': { sales: '主營業務收入', 'other-revenue': '其他業務收入', interest: '利息收入', cogs: '營業成本', selling: '銷售費用', admin: '管理費用', financial: '財務費用', 'tax-surcharge': '稅金及附加', 'income-tax': '所得稅' },
     };
     const LINE_PIN = {
-      'zh-CN': { sales: '利润表-营业收入', 'other-revenue': '利润表-其他业务收入', interest: '利润表-财务收入', cogs: '利润表-营业成本', selling: '利润表-销售费用', admin: '利润表-管理费用', financial: '利润表-财务费用', 'tax-surcharge': '利润表-税金及附加', 'income-tax': '利润表-所得税' },
-      'zh-TW': { sales: '利潤表-營業收入', 'other-revenue': '利潤表-其他業務收入', interest: '利潤表-財務收入', cogs: '利潤表-營業成本', selling: '利潤表-銷售費用', admin: '利潤表-管理費用', financial: '利潤表-財務費用', 'tax-surcharge': '利潤表-稅金及附加', 'income-tax': '利潤表-所得稅' },
+      'zh-CN': { sales: '经营损益-营业收入', 'other-revenue': '经营损益-其他业务收入', interest: '经营损益-财务收入', cogs: '经营损益-营业成本', selling: '经营损益-销售费用', admin: '经营损益-管理费用', financial: '经营损益-财务费用', 'tax-surcharge': '经营损益-税金及附加', 'income-tax': '经营损益-所得税' },
+      'zh-TW': { sales: '經營損益-營業收入', 'other-revenue': '經營損益-其他業務收入', interest: '經營損益-財務收入', cogs: '經營損益-營業成本', selling: '經營損益-銷售費用', admin: '經營損益-管理費用', financial: '經營損益-財務費用', 'tax-surcharge': '經營損益-稅金及附加', 'income-tax': '經營損益-所得稅' },
     };
     for (const slug of REQUIRED_SLUGS) {
       const e = M[slug];
@@ -1620,7 +1620,7 @@ async function main() {
         if (line !== LINE_PIN[lang][slug]) reasons.push(`CN cat ${slug}.scheduleLine[${lang}] should be "${LINE_PIN[lang][slug]}", got "${line}"`);
         for (const [field, v] of [['label', label], ['scheduleLine', line]]) {
           if (typeof v !== 'string') continue;
-          if (/损益表|損益表/.test(v)) reasons.push(`CN cat ${slug}.${field}[${lang}] must use 利润表/利潤表, not 损益表/損益表: "${v}"`);
+          if (/损益表|損益表|利润表|利潤表/.test(v)) reasons.push(`CN cat ${slug}.${field}[${lang}] must use 经营损益, not 损益表/利润表: "${v}"`);
           if (/营业税金及附加|營業稅金及附加/.test(v)) reasons.push(`CN cat ${slug}.${field}[${lang}] should be 税金及附加/稅金及附加 (drop 营业): "${v}"`);
         }
       }
@@ -2209,9 +2209,9 @@ async function main() {
       if (helpers.getTaxLabel('US', 'zh-TW', 'setCatGrossReceipts') !== '總收入 / 銷售額') reasons.push(`US setCatGrossReceipts[zh-TW] should be 總收入 / 銷售額, got "${helpers.getTaxLabel('US','zh-TW','setCatGrossReceipts')}"`);
       if (helpers.getTaxLabel('US', 'zh-CN', 'setCatUtilities') !== '水电及网络') reasons.push(`US setCatUtilities[zh-CN] should be 水电及网络, got "${helpers.getTaxLabel('US','zh-CN','setCatUtilities')}"`);
       if (helpers.getTaxLabel('US', 'zh-TW', 'setCatUtilities') !== '水電及網路') reasons.push(`US setCatUtilities[zh-TW] should be 水電及網路, got "${helpers.getTaxLabel('US','zh-TW','setCatUtilities')}"`);
-      // systemNote must match the header wording (报表项目, not the old 报表行)
-      if (!/官方报表项目/.test(get(cn, 'settings.categories.systemNote') || '') || /报表行/.test(get(cn, 'settings.categories.systemNote') || '')) reasons.push(`categories.systemNote[zh-CN] should say 官方报表项目 (not 报表行), got "${get(cn, 'settings.categories.systemNote')}"`);
-      if (!/官方報表項目/.test(get(tw, 'settings.categories.systemNote') || '') || /報表行/.test(get(tw, 'settings.categories.systemNote') || '')) reasons.push(`categories.systemNote[zh-TW] should say 官方報表項目 (not 報表行), got "${get(tw, 'settings.categories.systemNote')}"`);
+      // PR-E5: systemNote uses management-basis wording (经营管理口径), not 官方报表项目/报表行.
+      if (!/经营管理口径/.test(get(cn, 'settings.categories.systemNote') || '') || /官方报表|报表行|报表项目/.test(get(cn, 'settings.categories.systemNote') || '')) reasons.push(`categories.systemNote[zh-CN] should say 经营管理口径 (not 官方报表/报表行), got "${get(cn, 'settings.categories.systemNote')}"`);
+      if (!/經營管理口徑/.test(get(tw, 'settings.categories.systemNote') || '') || /官方報表|報表行|報表項目/.test(get(tw, 'settings.categories.systemNote') || '')) reasons.push(`categories.systemNote[zh-TW] should say 經營管理口徑 (not 官方報表/報表行), got "${get(tw, 'settings.categories.systemNote')}"`);
       if (reasons.length) fail(`categoriesWording`, reasons); else pass(`categoriesWording`);
     }
     // 采购与费用 / 销售与收入 (US) wording — expense/income-first + payee/quantity (zh only).

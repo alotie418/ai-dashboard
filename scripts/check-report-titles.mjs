@@ -36,6 +36,14 @@ const TAXPAY_TC = ['balTaxPayLabel'];                 // require estimate marker
 const TAXPAY_I18N = ['finance.balanceTaxPayable', 'finance.balanceTax'];
 const SUMMARY_TC = ['taxSummaryTitle'];               // ban filing
 
+// PR-E5: category scheduleLine + settings.categories.systemNote must not frame categories
+// as statutory report lines (损益表/利润表) / official report items / tax filings.
+const CATEGORY_BAN = [
+  /损益表/, /損益表/, /利润表/, /利潤表/,
+  /官方报表/, /官方報表/, /official report/i, /公式報告書/, /공식 보고서/, /lignes officielles/i,
+  /申报/, /申報/, /\bFiling\b/i, /报表行/, /報表行/,
+];
+
 const findings = [];
 const get = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
 
@@ -54,6 +62,9 @@ for (const line of readFileSync(join(ROOT, 'components/accountingLocaleConfig.ts
     const m = line.match(new RegExp(`^\\s*${k}:\\s*(\\{.*)$`));
     if (m) { tcCount++; const h = m[1].match(FILING); if (h) findings.push(`accountingLocaleConfig ${k}: filing wording "${h[0]}"`); }
   }
+  // category scheduleLine (*_TXN_CATEGORY_LABELS): must read as management report lines
+  const sl = line.match(/scheduleLine:\s*\{(.*)$/);
+  if (sl) { tcCount++; for (const re of CATEGORY_BAN) { const h = sl[1].match(re); if (h) findings.push(`accountingLocaleConfig scheduleLine: "${h[0]}"`); } }
 }
 
 // i18n
@@ -61,6 +72,8 @@ for (const l of LOCALES) {
   const obj = JSON.parse(readFileSync(join(ROOT, 'i18n/locales', `${l}.json`), 'utf8'));
   for (const k of TITLE_I18N) { const v = get(obj, k); if (typeof v === 'string') for (const re of STMT_NAMES) { const h = v.match(re); if (h) findings.push(`${l}.json ${k}: statutory name "${h[0]}"`); } }
   for (const k of TAXPAY_I18N) { const v = get(obj, k); if (typeof v === 'string' && !ESTIMATE.test(v)) findings.push(`${l}.json ${k}: missing estimate marker ("${v}")`); }
+  const sn = get(obj, 'settings.categories.systemNote');
+  if (typeof sn === 'string') for (const re of CATEGORY_BAN) { const h = sn.match(re); if (h) findings.push(`${l}.json settings.categories.systemNote: "${h[0]}"`); }
 }
 
 console.log('=== Report-Title Guard (management views, not statutory statements) ===\n');
