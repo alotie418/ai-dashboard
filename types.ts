@@ -161,7 +161,7 @@ export interface BatchImportResult {
 
 // ==================== AI Providers (BYOK 多服务商) ====================
 
-export type AIProviderId = 'anthropic' | 'openai' | 'gemini' | 'deepseek';
+export type AIProviderId = 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'qwen';
 
 // 主进程内部使用（带 apiKey）
 export interface AIProviderRecord {

@@ -20,6 +20,7 @@ const PROVIDER_DOCS: Record<AIProviderId, { label: string; getKeyUrl: string; pl
   openai: { label: 'ChatGPT · OpenAI', getKeyUrl: 'https://platform.openai.com/api-keys', placeholder: 'sk-proj-...', icon: 'fa-robot', color: '#10a37f' },
   gemini: { label: 'Gemini · Google', getKeyUrl: 'https://aistudio.google.com/app/apikey', placeholder: 'AIzaSy...', icon: 'fa-gem', color: '#4285f4' },
   deepseek: { label: 'DeepSeek · 深度求索', getKeyUrl: 'https://platform.deepseek.com/api_keys', placeholder: 'sk-...', icon: 'fa-bolt', color: '#4D6BFE' },
+  qwen: { label: '通义千问 · 阿里云', getKeyUrl: 'https://bailian.console.aliyun.com/?apiKey=1', placeholder: 'sk-...', icon: 'fa-cloud', color: '#615CED' },
 };
 
 interface RowState {
