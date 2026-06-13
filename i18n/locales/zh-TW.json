@@ -924,6 +924,15 @@
     "bagSuffix": "袋",
     "perTon": ""
   },
+  "ocr": {
+    "errorUnsupportedFormat": "不支援的檔案格式，請上傳 JPG / PNG / WebP 圖片或 PDF。",
+    "errorImageTooLarge": "圖片過大（上限 8MB），請壓縮後重試。",
+    "errorPdfRender": "PDF 解析失敗，請確認檔案未損毀後重試。",
+    "noProviderConfigured": "目前 AI 服務不支援 OCR，請在「設定 → AI 服務商」設定支援 OCR 的服務商（如通義千問 / Gemini）。",
+    "previewTitle": "辨識預覽",
+    "previewHint": "以下為辨識結果，請核對。（確認後回填表單將於後續版本支援。）",
+    "close": "關閉"
+  },
   "ai": {
     "languageHint": "請使用繁體中文回答。",
     "analyzeSystemPrompt": "你是一位專業的商業分析師。請分析以下企業經營資料，給出：\n1. summary: 一段簡要的經營概況總結\n2. topInsights: 3-5條關鍵洞察（陣列）\n3. recommendations: 3-5條改進建議（陣列）\n4. anomalies: 異常指標列表（陣列）\n請嚴格按 JSON 格式返回。",

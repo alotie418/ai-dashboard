@@ -17,6 +17,7 @@ const deepseek = require('../electron/ai/providers/deepseek.js'); // OpenAI Chat
 const qwen = require('../electron/ai/providers/qwen.js'); // OpenAI Chat-Completions compatible (fetch-only)
 const kimi = require('../electron/ai/providers/kimi.js'); // OpenAI Chat-Completions compatible (fetch-only)
 const glm = require('../electron/ai/providers/glm.js'); // OpenAI Chat-Completions compatible (fetch-only)
+const { pickOcrProvider } = require('../electron/ai/ocrSelect.js'); // PR-3b OCR provider selection (pure)
 
 const failures = [];
 function check(name, cond, detail) {
@@ -140,8 +141,8 @@ async function testQwen() {
   check('qwen default model in availableModels', qwen.meta.availableModels.some(m => m.value === 'qwen-plus'));
   check('qwen whitelist has plus / max / flash / turbo(compat)',
     ['qwen-plus', 'qwen-max', 'qwen-flash', 'qwen-turbo'].every(v => qwen.meta.availableModels.some(m => m.value === v)));
-  check('qwen capabilities text-only (no tts/ocr/webGrounding)',
-    qwen.meta.capabilities.tts === false && qwen.meta.capabilities.ocr === false && qwen.meta.capabilities.webGrounding === false);
+  check('qwen capabilities: ocr=true (vision OCR) but no tts/webGrounding',
+    qwen.meta.capabilities.tts === false && qwen.meta.capabilities.ocr === true && qwen.meta.capabilities.webGrounding === false);
 
   const toolResp = { choices: [{ message: { role: 'assistant', content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'get_sales', arguments: '{}' } }] } }] };
   const finalResp = { choices: [{ message: { role: 'assistant', content: 'Sales total is 100' } }] };
@@ -244,6 +245,49 @@ async function testGLM() {
   check('glm empty tools omits tools field', !('tools' in _bodies[0]), JSON.stringify(_bodies[0]));
 }
 
+// PR-3b: Qwen vision OCR over the SAME Chat Completions endpoint (image_url content block, base64
+// data URL). The vision model is always visionModel (qwen-vl-max), NOT the passed chat model. A
+// text-only factory provider (DeepSeek, no visionModel) must still refuse OCR with a stable code.
+async function testQwenVisionOCR() {
+  console.log('Qwen Vision OCR (Chat Completions image_url):');
+  check('qwen capabilities.ocr=true + visionModel=qwen-vl-max',
+    qwen.meta.capabilities.ocr === true && qwen.meta.visionModel === 'qwen-vl-max');
+  const ocrResp = { choices: [{ message: { role: 'assistant', content: '{"isInvoiceLike":true,"sellerName":"ACME","grossAmount":1130}' } }] };
+  setFetch([ocrResp]);
+  const out = await qwen.ocr('k', 'qwen-plus', { base64Data: 'AAAA', mimeType: 'image/png', ocrPrompt: 'extract invoice' });
+  check('qwen ocr returns parsed JSON', !!(out && out.isInvoiceLike === true && out.sellerName === 'ACME'));
+  const body = _bodies[0];
+  check('qwen ocr uses visionModel (not the passed chat model)', body.model === 'qwen-vl-max');
+  const content = body.messages[0].content;
+  check('qwen ocr request carries text + image_url(base64 data URL) blocks',
+    Array.isArray(content)
+    && content.some(c => c.type === 'text' && c.text === 'extract invoice')
+    && content.some(c => c.type === 'image_url' && c.image_url && c.image_url.url === 'data:image/png;base64,AAAA'));
+  let code = null;
+  try { await deepseek.ocr('k', 'm', { base64Data: 'x', mimeType: 'image/png', ocrPrompt: 'p' }); }
+  catch (e) { code = e.code; }
+  check('deepseek ocr still throws badRequest (text provider unaffected)', code === 'badRequest');
+}
+
+// PR-3b: OCR provider selection (pure). Default-if-OCR-capable, else priority fallback, else null.
+function testOcrProviderSelection() {
+  console.log('OCR provider selection (pickOcrProvider):');
+  check('default OCR-capable → default', pickOcrProvider([
+    { provider: 'deepseek', isDefault: false, ocrCapable: false },
+    { provider: 'qwen', isDefault: true, ocrCapable: true },
+  ]) === 'qwen');
+  check('default NOT OCR-capable → priority fallback (qwen before gemini)', pickOcrProvider([
+    { provider: 'deepseek', isDefault: true, ocrCapable: false },
+    { provider: 'gemini', isDefault: false, ocrCapable: true },
+    { provider: 'qwen', isDefault: false, ocrCapable: true },
+  ]) === 'qwen');
+  check('no OCR-capable provider → null', pickOcrProvider([
+    { provider: 'deepseek', isDefault: true, ocrCapable: false },
+    { provider: 'kimi', isDefault: false, ocrCapable: false },
+  ]) === null);
+  check('no providers → null', pickOcrProvider([]) === null);
+}
+
 // Gemini uses the @google/genai SDK (not fetch), so we test its PURE functions directly with
 // crafted response objects — no SDK mock, no network, no key.
 async function testGemini() {
@@ -302,6 +346,8 @@ async function main() {
   await testQwen();
   await testKimi();
   await testGLM();
+  await testQwenVisionOCR();
+  testOcrProviderSelection();
   await testGemini();
   await testAgentBudget();
   console.log(`\n${failures.length === 0 ? '✓ all passed' : '✗ ' + failures.length + ' failed'}\n`);

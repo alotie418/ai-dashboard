@@ -924,6 +924,15 @@
     "bagSuffix": "개",
     "perTon": ""
   },
+  "ocr": {
+    "errorUnsupportedFormat": "지원하지 않는 파일 형식입니다. JPG / PNG / WebP 이미지 또는 PDF를 업로드하세요.",
+    "errorImageTooLarge": "이미지가 너무 큽니다(최대 8MB). 압축한 후 다시 시도하세요.",
+    "errorPdfRender": "PDF를 읽지 못했습니다. 파일이 손상되지 않았는지 확인한 후 다시 시도하세요.",
+    "noProviderConfigured": "현재 AI 서비스는 OCR을 지원하지 않습니다. 설정 → AI 공급자에서 OCR 지원 공급자(Qwen / Gemini 등)를 설정하세요.",
+    "previewTitle": "인식 미리보기",
+    "previewHint": "아래 인식 결과를 확인하세요. (확인 후 양식 자동 채우기는 향후 업데이트에서 지원됩니다.)",
+    "close": "닫기"
+  },
   "ai": {
     "languageHint": "한국어로 답변해 주세요.",
     "analyzeSystemPrompt": "당신은 전문 비즈니스 분석가입니다. 다음 경영 데이터를 분석하고 제공하세요:\n1. summary: 간략한 경영 개요\n2. topInsights: 3-5개 핵심 인사이트 (배열)\n3. recommendations: 3-5개 개선 제안 (배열)\n4. anomalies: 이상 지표 목록 (배열)\nJSON 형식으로 엄격하게 반환하세요.",

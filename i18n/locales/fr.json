@@ -924,6 +924,15 @@
     "bagSuffix": "sacs",
     "perTon": ""
   },
+  "ocr": {
+    "errorUnsupportedFormat": "Format non pris en charge. Veuillez importer une image JPG / PNG / WebP ou un PDF.",
+    "errorImageTooLarge": "Image trop volumineuse (max 8 Mo). Veuillez la compresser puis réessayer.",
+    "errorPdfRender": "Impossible de lire le PDF. Vérifiez que le fichier n'est pas corrompu et réessayez.",
+    "noProviderConfigured": "Le service IA actuel ne prend pas en charge l'OCR. Configurez un fournisseur compatible OCR (Qwen / Gemini, etc.) dans Paramètres → Fournisseurs IA.",
+    "previewTitle": "Aperçu de la reconnaissance",
+    "previewHint": "Vérifiez les champs reconnus ci-dessous. (Le remplissage automatique du formulaire après confirmation arrivera dans une mise à jour ultérieure.)",
+    "close": "Fermer"
+  },
   "ai": {
     "languageHint": "Veuillez répondre en français.",
     "analyzeSystemPrompt": "Vous êtes un analyste commercial professionnel. Analysez les données commerciales suivantes et fournissez :\n1. summary : Un bref résumé exécutif\n2. topInsights : 3-5 informations clés (tableau)\n3. recommendations : 3-5 suggestions d'amélioration (tableau)\n4. anomalies : Liste des indicateurs anormaux (tableau)\nRetournez strictement au format JSON.",

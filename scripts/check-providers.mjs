@@ -130,6 +130,17 @@ function main() {
       if (wl.length && backendVals.length && !sortedEq(wl, backendVals)) {
         findings.push(`${id}: frontend KNOWN_MODELS [${[...wl].sort()}] ≠ backend availableModels [${[...backendVals].sort()}]`);
       }
+      // PR-3b vision invariant: a Chat-Completions (factory) provider may declare OCR ONLY with a
+      // visionModel, and a visionModel implies capabilities.ocr=true. Keeps Qwen (qwen-vl-max → ocr:true)
+      // and DeepSeek/Kimi/GLM (no visionModel → ocr:false) coherent, and catches "ocr:true but no model".
+      const usesFactory = /createOpenAICompatibleAdapter/.test(read(`electron/ai/providers/${id}.js`));
+      if (usesFactory) {
+        const hasVision = typeof meta?.visionModel === 'string' && meta.visionModel.length > 0;
+        const ocrOn = !!(meta?.capabilities && meta.capabilities.ocr === true);
+        if (hasVision !== ocrOn) {
+          findings.push(`${id}: factory OCR invariant — visionModel=${meta?.visionModel || 'none'} vs capabilities.ocr=${ocrOn} (must both be set or both unset)`);
+        }
+      }
     } catch (e) {
       findings.push(`${id}: cannot require backend adapter electron/ai/providers/${id}.js (${e.message})`);
     }
