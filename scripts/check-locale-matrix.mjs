@@ -794,21 +794,21 @@ async function main() {
         // formTaxRate for CN must say 增值税率 (Chinese VAT context)
         const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
         if (uiLang === 'zh-CN' && !/增值税/.test(rateLabel)) reasons.push(`CN formTaxRate zh-CN should say 增值税率: "${rateLabel}"`);
-        // CN certifiedInput / invoicedOutput must use the refined wording
-        // ("已认证进项税额" / "已开票销项税额"), not the older
-        // "已收进项税额 (已认证)" / "已开销项税额 (已开票)" form.
+        // PR-E3: CN certifiedInput / invoicedOutput use de-escalated total wording
+        // ("进项税额合计" / "销项税额合计") — NOT the old status-claiming
+        // "已认证进项税额" / "已开票销项税额" nor the older "已收/已开销" form.
         const certInput = helpers.getTaxLabel(accId, uiLang, 'certifiedInput');
         const invOutput = helpers.getTaxLabel(accId, uiLang, 'invoicedOutput');
         if (uiLang === 'zh-CN') {
-          if (!/已认证.*进项税额|已认证进项/.test(certInput)) reasons.push(`CN certifiedInput zh-CN should say 已认证进项税额: "${certInput}"`);
-          if (!/已开票.*销项税额|已开票销项/.test(invOutput)) reasons.push(`CN invoicedOutput zh-CN should say 已开票销项税额: "${invOutput}"`);
-          if (/已收|已开销/.test(certInput) || /已收|已开销/.test(invOutput)) {
-            reasons.push(`CN labels use deprecated 已收/已开销 wording`);
+          if (!/进项税额合计|进项税额/.test(certInput)) reasons.push(`CN certifiedInput zh-CN should say 进项税额合计: "${certInput}"`);
+          if (!/销项税额合计|销项税额/.test(invOutput)) reasons.push(`CN invoicedOutput zh-CN should say 销项税额合计: "${invOutput}"`);
+          if (/已认证|已开票|已收|已开销/.test(certInput) || /已认证|已开票|已收|已开销/.test(invOutput)) {
+            reasons.push(`CN labels use deprecated 已认证/已开票/已收/已开销 wording`);
           }
         }
         if (uiLang === 'zh-TW') {
-          if (!/已認證.*進項稅額|已認證進項/.test(certInput)) reasons.push(`CN certifiedInput zh-TW should say 已認證進項稅額: "${certInput}"`);
-          if (!/已開票.*銷項稅額|已開票銷項/.test(invOutput)) reasons.push(`CN invoicedOutput zh-TW should say 已開票銷項稅額: "${invOutput}"`);
+          if (!/進項稅額合計|進項稅額/.test(certInput)) reasons.push(`CN certifiedInput zh-TW should say 進項稅額合計: "${certInput}"`);
+          if (!/銷項稅額合計|銷項稅額/.test(invOutput)) reasons.push(`CN invoicedOutput zh-TW should say 銷項稅額合計: "${invOutput}"`);
         }
       }
       // formTaxRate cross-regime checks: non-CN locales must NOT say "增值税率"
@@ -994,14 +994,14 @@ async function main() {
     const JP_PIN = {
       'zh-CN': { inputTax: '采购消费税', outputTax: '销售消费税', navPurchase: '采购与费用', navSales: '销售与收入', invQueryTitle: '票据查询', invoiceTypeInput: '采购', invoiceTypeOutput: '销售',
                  pageTitlePurchase: '采购与费用', headerInvoiceNo: '票据号码', headerAmount: '税前金额', headerUnitPrice: '税前单价', modalTitlePurchase: '新增采购与费用记录', newPurchaseButton: '新增采购记录',
-                 plIncomeTax: '所得税/法人税', certifiedInput: '可抵扣采购消费税额', invoicedOutput: '已开票销售消费税额',
+                 plIncomeTax: '所得税/法人税', certifiedInput: '采购消费税额合计', invoicedOutput: '销售消费税额合计',
                  invFilterAll: '全部票据', invFilterInput: '采购与费用', invFilterOutput: '销售与收入',
                  invTableTitle: '票据流转全景视图', invTableSubtitle: '核对票据、库存与交易记录的一致性',
                  invPendingTax: '待处理消费税额', invHeaderAmount: '税前金额', invStatusPendingIssue: '待补票据', invEmpty: '未找到匹配的票据记录', invAmountRange: '税前金额范围',
                  taxTitle: '消费税统计', taxReportTitle: '消费税汇总' },
       'zh-TW': { inputTax: '採購消費稅', outputTax: '銷售消費稅', navPurchase: '採購與費用', navSales: '銷售與收入', invQueryTitle: '票據查詢', invoiceTypeInput: '採購', invoiceTypeOutput: '銷售',
                  pageTitlePurchase: '採購與費用', headerInvoiceNo: '票據號碼', headerAmount: '稅前金額', headerUnitPrice: '稅前單價', modalTitlePurchase: '新增採購與費用記錄', newPurchaseButton: '新增採購記錄',
-                 plIncomeTax: '所得稅/法人稅', certifiedInput: '可抵扣採購消費稅額', invoicedOutput: '已開票銷售消費稅額',
+                 plIncomeTax: '所得稅/法人稅', certifiedInput: '採購消費稅額合計', invoicedOutput: '銷售消費稅額合計',
                  invFilterAll: '全部票據', invFilterInput: '採購與費用', invFilterOutput: '銷售與收入',
                  invTableTitle: '票據流轉全景視圖', invTableSubtitle: '核對票據、庫存與交易記錄的一致性',
                  invPendingTax: '待處理消費稅額', invHeaderAmount: '稅前金額', invStatusPendingIssue: '待補票據', invEmpty: '未找到相符的票據記錄', invAmountRange: '稅前金額範圍',
@@ -1107,12 +1107,12 @@ async function main() {
     const EU_PIN = {
       'zh-CN': {
         taxTitle: 'VAT 统计', inputTax: '采购 VAT', outputTax: '销售 VAT',
-        certifiedInput: '可抵扣采购 VAT', invoicedOutput: '已开票销售 VAT', estimatedTax: '预计应缴 VAT',
+        certifiedInput: '采购 VAT 合计', invoicedOutput: '销售 VAT 合计', estimatedTax: 'VAT 估算额',
         taxSummaryTitle: 'VAT 含税汇总 (对账用)', purchaseTotal: '采购含税总额', salesTotal: '销售含税总额', taxDifference: 'VAT 差额',
       },
       'zh-TW': {
         taxTitle: 'VAT 統計', inputTax: '採購 VAT', outputTax: '銷售 VAT',
-        certifiedInput: '可抵扣採購 VAT', invoicedOutput: '已開票銷售 VAT', estimatedTax: '預計應繳 VAT',
+        certifiedInput: '採購 VAT 合計', invoicedOutput: '銷售 VAT 合計', estimatedTax: 'VAT 估算額',
         taxSummaryTitle: 'VAT 含稅匯總 (對帳用)', purchaseTotal: '採購含稅總額', salesTotal: '銷售含稅總額', taxDifference: 'VAT 差額',
       },
     };
@@ -1297,12 +1297,12 @@ async function main() {
     const KR_PIN = {
       'zh-CN': {
         taxTitle: '韩国 VAT 统计', inputTax: '采购 VAT', outputTax: '销售 VAT',
-        certifiedInput: '可抵扣采购 VAT', invoicedOutput: '已开票销售 VAT', estimatedTax: '预计应缴 VAT',
+        certifiedInput: '采购 VAT 合计', invoicedOutput: '销售 VAT 合计', estimatedTax: 'VAT 估算额',
         taxSummaryTitle: '韩国 VAT 含税汇总（对账用）', purchaseTotal: '采购含税总额', salesTotal: '销售含税总额', taxDifference: 'VAT 差额',
       },
       'zh-TW': {
         taxTitle: '韓國 VAT 統計', inputTax: '採購 VAT', outputTax: '銷售 VAT',
-        certifiedInput: '可抵扣採購 VAT', invoicedOutput: '已開票銷售 VAT', estimatedTax: '預計應繳 VAT',
+        certifiedInput: '採購 VAT 合計', invoicedOutput: '銷售 VAT 合計', estimatedTax: 'VAT 估算額',
         taxSummaryTitle: '韓國 VAT 含稅彙總（對帳用）', purchaseTotal: '採購含稅總額', salesTotal: '銷售含稅總額', taxDifference: 'VAT 差額',
       },
     };
@@ -1673,13 +1673,13 @@ async function main() {
     const TW_PIN = {
       'zh-CN': {
         taxTitle: '台湾营业税统计', inputTax: '采购进项营业税', outputTax: '销售销项营业税',
-        certifiedInput: '可抵扣采购进项营业税', invoicedOutput: '已开票销售销项营业税', estimatedTax: '预计应缴营业税',
+        certifiedInput: '进项营业税额合计', invoicedOutput: '销项营业税额合计', estimatedTax: '营业税估算额',
         taxSummaryTitle: '台湾营业税申报汇总（对账用）', purchaseTotal: '采购含税总额', salesTotal: '销售含税总额', taxDifference: '营业税差额',
         plIncomeTax: '营利事业所得税', plRevenue: '销售收入', plCost: '销货成本', plAdmin: '管理费用',
       },
       'zh-TW': {
         taxTitle: '台灣營業稅統計', inputTax: '採購進項營業稅', outputTax: '銷售銷項營業稅',
-        certifiedInput: '可抵扣採購進項營業稅', invoicedOutput: '已開票銷售銷項營業稅', estimatedTax: '預計應繳營業稅',
+        certifiedInput: '進項營業稅額合計', invoicedOutput: '銷項營業稅額合計', estimatedTax: '營業稅估算額',
         taxSummaryTitle: '臺灣營業稅申報彙總（對帳用）', purchaseTotal: '採購含稅總額', salesTotal: '銷售含稅總額', taxDifference: '營業稅差額',
         plIncomeTax: '營利事業所得稅', plRevenue: '銷售收入', plCost: '銷貨成本', plAdmin: '管理費用',
       },
@@ -2191,7 +2191,7 @@ async function main() {
       if (get(cn, 'settings.company.creditCode') !== '统一社会信用代码') reasons.push(`CN settings.company.creditCode should stay 统一社会信用代码, got "${get(cn, 'settings.company.creditCode')}"`);
       if (get(cn, 'settings.company.legalPerson') !== '法定代表人') reasons.push(`CN settings.company.legalPerson should stay 法定代表人, got "${get(cn, 'settings.company.legalPerson')}"`);
       if (!/增值税/.test(get(cn, 'settings.tax.vatRate') || '')) reasons.push(`CN settings.tax.vatRate should keep 增值税, got "${get(cn, 'settings.tax.vatRate')}"`);
-      if (get(cn, 'settings.tax.autoAuth') !== '进项发票自动认证') reasons.push(`CN settings.tax.autoAuth should stay 进项发票自动认证, got "${get(cn, 'settings.tax.autoAuth')}"`);
+      if (get(cn, 'settings.tax.autoAuth') !== '票据自动处理') reasons.push(`CN settings.tax.autoAuth should stay 票据自动处理, got "${get(cn, 'settings.tax.autoAuth')}"`);
       if (!/税金及附加/.test(get(cn, 'settings.tax.hint') || '')) reasons.push(`CN settings.tax.hint should keep 税金及附加, got "${get(cn, 'settings.tax.hint')}"`);
       if (reasons.length) fail(`cnSettingsPreserved`, reasons); else pass(`cnSettingsPreserved`);
     }
@@ -2541,9 +2541,10 @@ async function main() {
       if (helpers.getTaxLabel('CN', 'zh-CN', 'invoiceTypeInput') !== '进项') reasons.push(`CN invoiceTypeInput should stay 进项`);
       if (helpers.getTaxLabel('CN', 'zh-CN', 'invoiceTypeOutput') !== '销项') reasons.push(`CN invoiceTypeOutput should stay 销项`);
       if (get(cn, 'invoices.totalInput') !== '累计进项数量') reasons.push(`CN invoices.totalInput should stay 累计进项数量 (进项 kept, no 吨), got "${get(cn, 'invoices.totalInput')}"`);
-      if (get(cn, 'invoices.pendingTax') !== '待认证进项额') reasons.push(`CN invoices.pendingTax should stay 待认证进项额, got "${get(cn, 'invoices.pendingTax')}"`);
-      if (!/抵扣/.test(get(cn, 'invoices.deductible') || '')) reasons.push(`CN invoices.deductible should keep 抵扣, got "${get(cn, 'invoices.deductible')}"`);
-      if (!/认证/.test(get(cn, 'invoices.authenticated') || '')) reasons.push(`CN invoices.authenticated should keep 认证, got "${get(cn, 'invoices.authenticated')}"`);
+      if (get(cn, 'invoices.pendingTax') !== '待处理进项税额') reasons.push(`CN invoices.pendingTax should stay 待处理进项税额, got "${get(cn, 'invoices.pendingTax')}"`);
+      // PR-E3: deductible / authenticated de-escalated (no 抵扣 / 认证 status claim).
+      if (get(cn, 'invoices.deductible') !== '进项税额估算') reasons.push(`CN invoices.deductible should be 进项税额估算 (PR-E3), got "${get(cn, 'invoices.deductible')}"`);
+      if (get(cn, 'invoices.authenticated') !== '已核对') reasons.push(`CN invoices.authenticated should be 已核对 (PR-E3), got "${get(cn, 'invoices.authenticated')}"`);
       if (reasons.length) fail(`cnInvoiceQueryPreserved`, reasons); else pass(`cnInvoiceQueryPreserved`);
     }
   }
@@ -2573,8 +2574,8 @@ async function main() {
     // CN zh-CN must keep the China-VAT status wording
     const cnInv = (locales['zh-CN'] || {}).invoices || {};
     const CN_PIN = {
-      allStatus: '全部状态', statusVerified: '已核验', statusCertified: '已认证',
-      statusDeducted: '已抵扣', statusPendingCert: '待认证', statusPendingInvoice: '待开票', statusIssued: '已开票',
+      allStatus: '全部状态', statusVerified: '已核验', statusCertified: '已核对',
+      statusDeducted: '已抵扣', statusPendingCert: '待处理', statusPendingInvoice: '待开票', statusIssued: '已开票',
     };
     for (const [k, want] of Object.entries(CN_PIN)) {
       if (cnInv[k] !== want) reasons.push(`CN invoices.${k} should be "${want}", got "${cnInv[k]}"`);
