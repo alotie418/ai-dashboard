@@ -281,6 +281,51 @@ test('data backup → mock electronAPI: backup success + restore confirm + succe
   await expect(page.getByText(db.devModeRestart)).toBeVisible({ timeout: 10_000 });
 });
 
+// ── OCR preview → "use these values" → add-form pre-filled (PR-3c; mocked desktop electronAPI) ──
+// Mocks an OCR-capable provider (providers:list) + a canned /api/ai/ocr result, uploads an image,
+// opens the read-only preview, clicks "use these values", and asserts the add-form inputs are
+// pre-filled. NO save happens (no createPurchase/createSale) — this is the confirm→fill closed loop.
+const TINY_PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+const OCR_RAW = { isInvoiceLike: true, sellerName: 'OCR Test Vendor', netAmount: 1000, taxAmount: 130, grossAmount: 1130, invoiceNumber: 'INV-OCR-2026', quantity: '10', date: '2026-06-13', currency: 'CNY', invoiceType: 'vat' };
+const ocrInit = ({ settings, dashboard, ocr }: any) => {
+  const lists = /\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|mileage|documents|reports\/types)/;
+  (window as any).electronAPI = {
+    isElectron: true, platform: 'darwin', buildTarget: 'dmg',
+    invoke: (channel: string, payload: any) => {
+      if (channel === 'providers:hasAny') return Promise.resolve(true);
+      if (channel === 'providers:list') return Promise.resolve([{ provider: 'qwen', name: 'Qwen', hasKey: true, model: 'qwen-plus', modelLabel: 'Qwen Plus', modelIsKnown: true, availableModels: [], defaultModel: 'qwen-plus', enabled: true, isDefault: true, supportsOCR: true, supportsWebGrounding: false }]);
+      if (channel === 'api:request') {
+        const p = (payload && payload.path) || '';
+        if (p.includes('/api/ai/ocr')) return Promise.resolve(ocr);
+        if (p.includes('/api/settings')) return Promise.resolve(settings);
+        if (p.includes('/api/dashboard')) return Promise.resolve(dashboard);
+        if (lists.test(p)) return Promise.resolve([]);
+        return Promise.resolve({});
+      }
+      return Promise.resolve({});
+    },
+  };
+};
+
+for (const { navIcon, label } of [{ navIcon: 'fa-file-import', label: 'purchase' }, { navIcon: 'fa-file-export', label: 'sales' }]) {
+  test(`OCR preview → confirm → ${label} form pre-filled (no save)`, async ({ page }) => {
+    const ui = 'zh-CN';
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await page.addInitScript(ocrInit, { settings: SETTINGS('CN'), dashboard: DASHBOARD('CN'), ocr: OCR_RAW });
+    await bootCombo(page, ui, 'CN');
+    await page.locator(`i.${navIcon}`).first().click();
+    // upload an image to the hidden OCR file input (hidden inputs accept setInputFiles)
+    await page.locator('input[type="file"][accept*="image"]').setInputFiles({ name: 'invoice.png', mimeType: 'image/png', buffer: Buffer.from(TINY_PNG_B64, 'base64') });
+    // read-only preview appears
+    await expect(page.getByText(loc.ocr.previewTitle)).toBeVisible({ timeout: 15_000 });
+    // "use these values" → fills the add-form state and opens the add modal (no DB write)
+    await page.getByRole('button', { name: loc.ocr.useResult }).click();
+    // add-form pre-filled with the recognized values (counterparty text + total number)
+    await expect(page.getByTestId('ocr-fill-counterparty')).toHaveValue('OCR Test Vendor', { timeout: 10_000 });
+    await expect(page.getByTestId('ocr-fill-total')).toHaveValue('1130');
+  });
+}
+
 // ── Finance → Export PDF button (uiLanguage-only feature). The finance page renders
 //    a P&L from /api/reports/generate, so a valid report payload is mocked (empty {}
 //    would crash it). Navigation via the sidebar fa-wallet icon. ──
