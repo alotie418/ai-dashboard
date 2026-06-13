@@ -285,8 +285,8 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
         {step === 'locale' && (
           <div className="space-y-5">
             <div>
-              <h2 className="text-xl font-semibold text-[#191918] mb-2">{t('settings.language.title', 'Interface Language')} & {t('settings.accounting.title', 'Accounting Standard')}</h2>
-              <p className="text-sm text-[#6b6b69]">{t('onboarding.localeDesc', 'These are independent settings. UI language controls menus and labels. Accounting standard controls tax rules, currency, and reports.')}</p>
+              <h2 className="text-xl font-semibold text-[#191918] mb-2">{t('settings.language.title', 'Interface Language')} & {t('settings.accounting.title', 'Accounting Basis')}</h2>
+              <p className="text-sm text-[#6b6b69]">{t('onboarding.localeDesc', 'These are independent settings. UI language controls menus and labels. Accounting basis controls tax rules, currency, and reports.')}</p>
             </div>
 
             {/* UI Language */}
@@ -316,7 +316,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
             <div>
               <label className="block text-xs font-semibold text-[#4a4a48] mb-2">
                 <i className="fas fa-balance-scale mr-1.5 text-emerald-500"></i>
-                {t('settings.accounting.title', 'Accounting Standard')}
+                {t('settings.accounting.title', 'Accounting Basis')}
                 <span className="text-[#7a7a78] font-normal ml-2">— {t('settings.accounting.scopeNo', 'Controls tax rules, currency, reports')}</span>
               </label>
               <div className="grid grid-cols-3 gap-2">

@@ -22,7 +22,7 @@ const LanguageSection: React.FC = () => {
         </ul>
         <div className="text-[11px] text-[#7a7a78] mt-1">
           <i className="fas fa-exclamation-circle mr-1 text-amber-500"></i>
-          {t('settings.language.scopeNo', 'Does NOT change tax rules, currency, report structure, or accounting categories. Those are controlled by Accounting Standard.')}
+          {t('settings.language.scopeNo', 'Does NOT change tax rules, currency, report structure, or categories. Those are controlled by Accounting Basis.')}
         </div>
       </div>
 
