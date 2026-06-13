@@ -82,6 +82,13 @@ const PROVIDER_DOCS: Record<AIProviderId, { label: string; getKeyUrl: string; pl
     icon: 'fa-moon',
     color: '#7C3AED',
   },
+  glm: {
+    label: 'GLM · 智谱 AI',
+    getKeyUrl: 'https://bigmodel.cn/usercenter/proj-mgmt/apikeys',
+    placeholder: 'xxxxxxxx.xxxxxxxxxxxxxxxx',
+    icon: 'fa-brain',
+    color: '#3859FF',
+  },
 };
 
 const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {

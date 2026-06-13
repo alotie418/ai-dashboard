@@ -16,6 +16,7 @@ const gemini = require('../electron/ai/providers/gemini.js'); // pure functions 
 const deepseek = require('../electron/ai/providers/deepseek.js'); // OpenAI Chat-Completions compatible (fetch-only)
 const qwen = require('../electron/ai/providers/qwen.js'); // OpenAI Chat-Completions compatible (fetch-only)
 const kimi = require('../electron/ai/providers/kimi.js'); // OpenAI Chat-Completions compatible (fetch-only)
+const glm = require('../electron/ai/providers/glm.js'); // OpenAI Chat-Completions compatible (fetch-only)
 
 const failures = [];
 function check(name, cond, detail) {
@@ -205,6 +206,44 @@ async function testKimi() {
   check('kimi empty tools omits tools field', !('tools' in _bodies[0]), JSON.stringify(_bodies[0]));
 }
 
+// GLM = OpenAI **Chat Completions** dialect (via the shared _openaiCompatible factory), same wire
+// shape as DeepSeek/Qwen/Kimi. baseURL keeps the /api/paas/v4 path (not a bare /v1); default
+// glm-4.6. Stub fetch with chat-completions JSON.
+async function testGLM() {
+  console.log('GLM (Chat Completions):');
+  // META smoke (registry parity is covered by check:providers; here we lock the adapter shape)
+  check('glm meta id + default model', glm.meta.id === 'glm' && glm.meta.defaultModel === 'glm-4.6');
+  check('glm default model in availableModels', glm.meta.availableModels.some(m => m.value === 'glm-4.6'));
+  check('glm whitelist has 4.6 / 5.1 / 4.5-air / 4.7-flash',
+    ['glm-4.6', 'glm-5.1', 'glm-4.5-air', 'glm-4.7-flash'].every(v => glm.meta.availableModels.some(m => m.value === v)));
+  check('glm capabilities text-only (no tts/ocr/webGrounding)',
+    glm.meta.capabilities.tts === false && glm.meta.capabilities.ocr === false && glm.meta.capabilities.webGrounding === false);
+
+  const toolResp = { choices: [{ message: { role: 'assistant', content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'get_sales', arguments: '{}' } }] } }] };
+  const finalResp = { choices: [{ message: { role: 'assistant', content: 'Sales total is 100' } }] };
+
+  setFetch([toolResp]);
+  const s1 = await glm.chatWithTools('k', 'm', { history: seed(glm), system: 'sys', tools: TOOLDEFS });
+  check('glm round1 type=tool_calls', s1.type === 'tool_calls', JSON.stringify(s1));
+  check('glm round1 call parsed (id + name + args object)', !!(s1.calls && s1.calls[0] && s1.calls[0].id === 'call_1' && s1.calls[0].name === 'get_sales' && typeof s1.calls[0].args === 'object'));
+  check('glm round1 assistantMsg single assistant turn w/ tool_calls', !!(s1.assistantMsg && s1.assistantMsg.role === 'assistant' && Array.isArray(s1.assistantMsg.tool_calls) && s1.assistantMsg.tool_calls.length === 1));
+  check('glm round1 request carried nested function tools + tool_choice', Array.isArray(_bodies[0].tools) && _bodies[0].tools[0].type === 'function' && _bodies[0].tools[0].function.name === 'get_sales' && _bodies[0].tool_choice === 'auto');
+  check('glm round1 system prepended as first message', _bodies[0].messages[0].role === 'system' && _bodies[0].messages[0].content === 'sys');
+
+  const tr = glm.toToolResultsMsg([{ call: s1.calls[0], result: { rows: [1, 2] } }]);
+  check('glm toToolResultsMsg single shape', Array.isArray(tr) && tr.length === 1 && tr[0].role === 'tool' && tr[0].tool_call_id === 'call_1' && tr[0].content === JSON.stringify({ rows: [1, 2] }));
+  const trM = glm.toToolResultsMsg([{ call: { id: 'c1' }, result: {} }, { call: { id: 'c2' }, result: {} }]);
+  check('glm multi-tool = array of 2 role:tool messages', Array.isArray(trM) && trM.length === 2 && trM[0].tool_call_id === 'c1' && trM[1].tool_call_id === 'c2');
+
+  setFetch([finalResp]);
+  const s2 = await glm.chatWithTools('k', 'm', { history: seed(glm), system: 'sys', tools: TOOLDEFS });
+  check('glm round2 type=final + text', s2.type === 'final' && s2.text === 'Sales total is 100', JSON.stringify(s2));
+
+  setFetch([finalResp]);
+  await glm.chatWithTools('k', 'm', { history: seed(glm), system: 'sys', tools: [] });
+  check('glm empty tools omits tools field', !('tools' in _bodies[0]), JSON.stringify(_bodies[0]));
+}
+
 // Gemini uses the @google/genai SDK (not fetch), so we test its PURE functions directly with
 // crafted response objects — no SDK mock, no network, no key.
 async function testGemini() {
@@ -262,6 +301,7 @@ async function main() {
   await testDeepSeek();
   await testQwen();
   await testKimi();
+  await testGLM();
   await testGemini();
   await testAgentBudget();
   console.log(`\n${failures.length === 0 ? '✓ all passed' : '✗ ' + failures.length + ' failed'}\n`);
