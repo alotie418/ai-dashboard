@@ -29,5 +29,10 @@ module.exports = createOpenAICompatibleAdapter({
     { label: 'Moonshot v1 128K', value: 'moonshot-v1-128k' },
     { label: 'Moonshot v1 32K (兼容旧版)', value: 'moonshot-v1-32k' },
   ],
-  capabilities: { ocr: false, tts: false, webGrounding: false },
+  capabilities: { ocr: true, tts: false, webGrounding: false },
+  // Vision OCR model (PR-3d) — developer constant; OCR always uses this regardless of the chat model.
+  // moonshot-v1-32k-vision-preview is a NON-thinking vision model, so no extraBody is needed. It takes
+  // an image_url content block (base64 data URL — Kimi accepts base64 only, which suits local images),
+  // and the content stays an ARRAY (the factory builds it that way). Verified against Moonshot/Kimi docs.
+  visionModel: 'moonshot-v1-32k-vision-preview',
 });

@@ -29,5 +29,10 @@ module.exports = createOpenAICompatibleAdapter({
     { label: 'GLM-4.5-Air', value: 'glm-4.5-air' },
     { label: 'GLM-4.7-Flash (免费)', value: 'glm-4.7-flash' },
   ],
-  capabilities: { ocr: false, tts: false, webGrounding: false },
+  capabilities: { ocr: true, tts: false, webGrounding: false },
+  // Vision OCR model (PR-3d) — developer constant, not user-selectable / not in DB; OCR always uses
+  // this regardless of the configured chat model. glm-4.6v: latest flagship VL, thinking is OFF by
+  // default so NO extraBody is needed (the chat models above stay text-only). The /api/paas/v4
+  // endpoint accepts an image_url content block (base64 data URL). Verified against BigModel docs.
+  visionModel: 'glm-4.6v',
 });
