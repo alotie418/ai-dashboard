@@ -45,6 +45,11 @@ export const KNOWN_MODELS: Record<AIProviderId, ModelOption[]> = {
     { label: 'GLM-4.5-Air', value: 'glm-4.5-air' },
     { label: 'GLM-4.7-Flash (免费)', value: 'glm-4.7-flash' },
   ],
+  doubao: [
+    { label: 'Doubao Seed 2.0 Pro', value: 'doubao-seed-2-0-pro-260215' },
+    { label: 'Doubao Seed 2.0 Lite', value: 'doubao-seed-2-0-lite-260428' },
+    { label: 'Doubao Seed 2.0 Mini', value: 'doubao-seed-2-0-mini-260428' },
+  ],
 };
 
 export const DEFAULT_MODEL: Record<AIProviderId, string> = {
@@ -55,6 +60,7 @@ export const DEFAULT_MODEL: Record<AIProviderId, string> = {
   qwen: 'qwen-plus',
   kimi: 'kimi-k2.6',
   glm: 'glm-4.6',
+  doubao: 'doubao-seed-2-0-pro-260215',
 };
 
 // 给定 provider + model value，返回 ModelOption；找不到说明是用户自定义 ID

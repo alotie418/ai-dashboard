@@ -23,6 +23,7 @@ const PROVIDER_DOCS: Record<AIProviderId, { label: string; getKeyUrl: string; pl
   qwen: { label: '通义千问 · 阿里云', getKeyUrl: 'https://bailian.console.aliyun.com/?apiKey=1', placeholder: 'sk-...', icon: 'fa-cloud', color: '#615CED' },
   kimi: { label: 'Kimi · 月之暗面', getKeyUrl: 'https://platform.moonshot.cn/console/api-keys', placeholder: 'sk-...', icon: 'fa-moon', color: '#7C3AED' },
   glm: { label: 'GLM · 智谱 AI', getKeyUrl: 'https://bigmodel.cn/usercenter/proj-mgmt/apikeys', placeholder: 'xxxxxxxx.xxxxxxxxxxxxxxxx', icon: 'fa-brain', color: '#3859FF' },
+  doubao: { label: '豆包 · 火山方舟', getKeyUrl: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey', placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx', icon: 'fa-seedling', color: '#12B5A5' },
 };
 
 interface RowState {

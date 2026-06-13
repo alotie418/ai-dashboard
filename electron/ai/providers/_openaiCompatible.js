@@ -43,6 +43,8 @@ function createOpenAICompatibleAdapter(cfg) {
     availableModels = [],
     capabilities = { ocr: false, tts: false, webGrounding: false },
     visionModel = null,   // set → ocr() does vision OCR via this model; null → ocr() throws badRequest (text-only)
+    extraBody = {},       // provider-specific body fields merged into EVERY request (e.g. Doubao Seed 2.0
+                          // reasoning_effort:'minimal'). Default {} → other providers byte-unchanged.
   } = cfg;
 
   const LABEL = name || id;
@@ -50,12 +52,14 @@ function createOpenAICompatibleAdapter(cfg) {
   const META = { id, name, defaultModel, availableModels, capabilities, visionModel };
 
   async function callChat(apiKey, body) {
+    // extraBody first so the call's explicit fields (model/messages/tools/…) always win.
+    const finalBody = { ...extraBody, ...body };
     let res;
     try {
       res = await fetch(ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify(body),
+        body: JSON.stringify(finalBody),
       });
     } catch (e) {
       throw wrapNetworkError(e, LABEL);

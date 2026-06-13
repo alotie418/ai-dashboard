@@ -7,7 +7,7 @@
 // DeepSeek / Kimi / GLM are text-only (no visionModel → capabilities.ocr=false) so they never
 // qualify here; Qwen (qwen-vl-max) / Gemini / Anthropic / OpenAI do.
 
-const OCR_PROVIDER_PRIORITY = ['qwen', 'gemini', 'anthropic', 'openai'];
+const OCR_PROVIDER_PRIORITY = ['qwen', 'doubao', 'gemini', 'anthropic', 'openai'];
 
 // candidates: Array<{ provider: string, isDefault: boolean, ocrCapable: boolean }>
 // (each entry is already known to be enabled + configured with a key)
