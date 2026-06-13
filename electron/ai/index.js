@@ -256,13 +256,42 @@ function getDefaultRecord() {
   };
 }
 
+// OCR provider selection (PR-3b): OCR follows whichever CONFIGURED provider supports it (using that
+// provider's own key) — the default provider first if it is OCR-capable, else a priority fallback.
+// No separate OCR key. Text features keep using getDefaultRecord() unchanged, so the text default
+// provider is never affected. Returns the same { provider, apiKey(decrypted), model } shape; the key
+// is decrypted in main and injected into the adapter, never leaving the main process.
+function getOcrRecord() {
+  ensureTable();
+  const db = getDb();
+  const rows = db.prepare(
+    'SELECT provider, api_key_encrypted, model, is_default FROM ai_providers WHERE enabled = 1'
+  ).all();
+  const candidates = rows.map(r => ({
+    provider: r.provider,
+    isDefault: !!r.is_default,
+    ocrCapable: PROVIDERS[r.provider]?.meta?.capabilities?.ocr === true,
+    _enc: r.api_key_encrypted,
+    _model: r.model,
+  }));
+  const { pickOcrProvider } = require('./ocrSelect');
+  const pickedId = pickOcrProvider(candidates);
+  if (!pickedId) {
+    const err = new Error('No OCR-capable provider configured [noProvider]');
+    err.code = 'noProvider';
+    throw err;
+  }
+  const picked = candidates.find(c => c.provider === pickedId);
+  return { provider: pickedId, apiKey: decryptKey(picked._enc), model: picked._model };
+}
+
 async function analyze(body) {
   const rec = getDefaultRecord();
   return PROVIDERS[rec.provider].analyze(rec.apiKey, rec.model, body);
 }
 
 async function ocr(body) {
-  const rec = getDefaultRecord();
+  const rec = getOcrRecord();
   const { buildPrompt } = require('./ocrPromptBuilder');
   const prompt = buildPrompt(body.accountingLocale || 'CN', body.uiLanguage || 'zh-CN');
   return PROVIDERS[rec.provider].ocr(rec.apiKey, rec.model, { ...body, ocrPrompt: prompt });

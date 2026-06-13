@@ -924,6 +924,15 @@
     "bagSuffix": "bags",
     "perTon": ""
   },
+  "ocr": {
+    "errorUnsupportedFormat": "Unsupported file. Please upload a JPG / PNG / WebP image or a PDF.",
+    "errorImageTooLarge": "Image too large (max 8MB). Please compress it and try again.",
+    "errorPdfRender": "Could not read the PDF. Make sure the file isn't corrupted and try again.",
+    "noProviderConfigured": "The current AI service doesn't support OCR. Configure an OCR-capable provider (e.g. Qwen / Gemini) under Settings → AI Providers.",
+    "previewTitle": "Recognition preview",
+    "previewHint": "Review the recognized fields below. (Auto-filling the form after confirmation arrives in a later update.)",
+    "close": "Close"
+  },
   "ai": {
     "languageHint": "Please respond in English.",
     "analyzeSystemPrompt": "You are a professional business analyst. Analyze the following business data and provide:\n1. summary: A brief executive summary\n2. topInsights: 3-5 key insights (array)\n3. recommendations: 3-5 improvement suggestions (array)\n4. anomalies: List of anomalous indicators (array)\nReturn strictly in JSON format.",

@@ -618,6 +618,36 @@ async function checkAgentBudget() {
   }
 }
 
+async function checkVisionOcrNoPersist() {
+  // PR-3b: vision OCR sends the invoice image as base64 to the provider, but the image / its base64 /
+  // the extracted invoice detail must NEVER be persisted into the assistant_* conversation tables.
+  // (1) the OpenAI-compatible provider (which now does vision OCR) must stay persistence-free.
+  let factory = '';
+  try { factory = await readFile(join(ROOT, 'electron/ai/providers/_openaiCompatible.js'), 'utf8'); } catch { factory = ''; }
+  // Match real usage (calls / member access / table names), not the word in a comment.
+  if (/getDb\s*\(|safeStorage\s*\.|assistant_messages|appendMessage\s*\(|require\(['"][^'"]*conversations/.test(factory)) {
+    findings.push({
+      file: 'electron/ai/providers/_openaiCompatible.js', line: 0, type: 'vision-ocr-persist', token: 'persistence-ref',
+      snippet: 'the OpenAI-compatible provider (vision OCR) must not touch the DB / safeStorage / conversation store',
+    });
+  }
+  // (2) no source may write image base64 into the assistant_messages store.
+  for (const dir of ['electron', 'components', 'services']) {
+    const base = join(ROOT, dir);
+    try { await stat(base); } catch { continue; }
+    for await (const f of walk(base)) {
+      let src;
+      try { src = await readFile(f, 'utf8'); } catch { continue; }
+      if (/appendMessage\s*\([^)]*base64/i.test(src) || /INSERT\s+INTO\s+assistant_messages[\s\S]{0,400}base64/i.test(src)) {
+        findings.push({
+          file: f.replace(`${ROOT}/`, ''), line: 0, type: 'vision-ocr-persist', token: 'base64-into-conversation',
+          snippet: 'image base64 must never be written into assistant_messages — OCR detail stays out of chat persistence',
+        });
+      }
+    }
+  }
+}
+
 async function main() {
   for (const dir of SCAN_DIRS) {
     const full = join(ROOT, dir);
@@ -640,6 +670,7 @@ async function main() {
   await checkNoTTSResidue();
   await checkConversationsNoSecrets();
   await checkAgentBudget();
+  await checkVisionOcrNoPersist();
   await checkAnalyticsMatrixDisplay();
   await checkFinanceMoneyFormat();
 

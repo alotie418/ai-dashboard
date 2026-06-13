@@ -152,6 +152,9 @@ const REQUIRED_I18N_KEYS = [
   'aiError.noProvider', 'aiError.auth', 'aiError.permission', 'aiError.quota',
   'aiError.modelNotFound', 'aiError.badRequest', 'aiError.serverError',
   'aiError.parseFailed', 'aiError.network', 'aiError.timeout', 'aiError.unknown',
+  // PR-3b vision OCR (errors + read-only preview modal)
+  'ocr.errorUnsupportedFormat', 'ocr.errorImageTooLarge', 'ocr.errorPdfRender',
+  'ocr.noProviderConfigured', 'ocr.previewTitle', 'ocr.previewHint', 'ocr.close',
   // R4c: onboarding wizard new keys (rest of onboarding.* wired from pre-existing keys)
   'onboarding.brandTagline', 'onboarding.loadFailedTitle', 'onboarding.loadFailedHint',
   'onboarding.providersEmpty', 'onboarding.savedBadge', 'onboarding.clickToExpand',

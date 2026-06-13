@@ -42,11 +42,12 @@ function createOpenAICompatibleAdapter(cfg) {
     defaultModel,
     availableModels = [],
     capabilities = { ocr: false, tts: false, webGrounding: false },
+    visionModel = null,   // set → ocr() does vision OCR via this model; null → ocr() throws badRequest (text-only)
   } = cfg;
 
   const LABEL = name || id;
   const ENDPOINT = `${String(baseURL).replace(/\/+$/, '')}/chat/completions`;
-  const META = { id, name, defaultModel, availableModels, capabilities };
+  const META = { id, name, defaultModel, availableModels, capabilities, visionModel };
 
   async function callChat(apiKey, body) {
     let res;
@@ -153,14 +154,33 @@ function createOpenAICompatibleAdapter(cfg) {
     return parsed;
   }
 
-  // PR-1 scope: no OCR/vision for OpenAI-compatible providers (text-only default model).
-  // Surface a stable-coded error so the renderer shows a friendly aiError message rather than
-  // a crash; capabilities.ocr is false so the UI never advertises OCR for this provider.
-  async function ocr() {
-    const e = new Error(`${LABEL} OCR not supported [badRequest]`);
-    e.code = 'badRequest';
-    e.providerLabel = LABEL;
-    throw e;
+  // OCR / vision. Text-only providers (no visionModel configured) keep the PR-1 behavior: throw a
+  // stable-coded badRequest so the renderer shows a friendly aiError and the UI never advertises OCR
+  // (capabilities.ocr stays false). Providers that pass a `visionModel` (e.g. Qwen qwen-vl-max) do
+  // real OCR over the SAME Chat Completions endpoint with an image_url content block (base64 data
+  // URL). The vision model is ALWAYS `visionModel` — never the chat `model` arg. No response_format
+  // is forced (some vision models reject json_object); the ocrPrompt + tryParseJson handle the JSON.
+  async function ocr(apiKey, _model, { base64Data, mimeType, ocrPrompt } = {}) {
+    if (!visionModel) {
+      const e = new Error(`${LABEL} OCR not supported [badRequest]`);
+      e.code = 'badRequest';
+      e.providerLabel = LABEL;
+      throw e;
+    }
+    const dataUrl = `data:${mimeType || 'image/png'};base64,${base64Data || ''}`;
+    const json = await callChat(apiKey, {
+      model: visionModel,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: ocrPrompt || 'Extract invoice data as JSON.' },
+          { type: 'image_url', image_url: { url: dataUrl } },
+        ],
+      }],
+    });
+    const parsed = tryParseJson(extractText(json));
+    if (!parsed) throw parseError(LABEL, 'OCR');
+    return parsed;
   }
 
   async function dataAnalysis(apiKey, model, { prompt, systemInstruction }) {

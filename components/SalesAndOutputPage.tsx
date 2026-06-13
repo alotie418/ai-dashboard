@@ -2,11 +2,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
-import { analyzeInvoice } from '../services/ocrService';
-import { fetchSales, createSale, updateSale, deleteSale, fetchSettings, listProducts, isDesktop, type Product, type BusinessDocument, SalesRecord } from '../services/api';
+import { analyzeInvoice, type ExtractedInvoice } from '../services/ocrService';
+import { rasterizePdfFirstPage } from '../services/pdfRaster';
+import { fetchSales, createSale, updateSale, deleteSale, fetchSettings, listProducts, listProviders, isDesktop, type Product, type BusinessDocument, SalesRecord } from '../services/api';
 import { formatMoney, getCurrencySymbol, formatQuantity, formatLegacyQuantity, getTaxLabel, getProductUnitLabel } from './accountingHelpers';
 import CsvImportModal from './CsvImportModal';
 import DocumentModal from './DocumentModal';
+import OcrPreviewModal from './OcrPreviewModal';
 
 interface Props {
   data: BusinessData;
@@ -46,6 +48,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
   const [records, setRecords] = useState<SalesRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCsvImport, setShowCsvImport] = useState(false);
+  const [ocrPreview, setOcrPreview] = useState<ExtractedInvoice | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   // Phase C：从销售记录生成业务单据（仅桌面版；共享 DocumentModal 预填，
   // 金额复制记录已存值、不重算——见 DocumentModal 的锁定行机制）
@@ -143,61 +146,57 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
     }
   };
 
+  const OCR_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+  const OCR_MAX_BYTES = 8 * 1024 * 1024;
+
+  const readImageBase64 = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    const timeout = setTimeout(() => reject(new Error(t('sales.fileReadTimeout'))), 30000);
+    reader.onload = () => {
+      clearTimeout(timeout);
+      const result = reader.result as string;
+      const parts = result.split(',');
+      if (parts.length < 2) { reject(new Error(t('sales.fileFormatUnsupported'))); return; }
+      resolve(parts[1]);
+    };
+    reader.onerror = () => { clearTimeout(timeout); reject(new Error(t('sales.fileReadFailed'))); };
+    reader.readAsDataURL(file);
+  });
+
   const processFile = async (file: File) => {
+    // OCR follows a configured OCR-capable provider (its own key); if none, guide the user.
+    try {
+      const providers = await listProviders();
+      if (!providers.some(p => p.hasKey && p.supportsOCR)) { alert(t('ocr.noProviderConfigured')); return; }
+    } catch { /* fall through — backend getOcrRecord still guards */ }
+
+    const isPdf = file.type === 'application/pdf';
+    if (!isPdf && !OCR_IMAGE_TYPES.includes(file.type)) { alert(t('ocr.errorUnsupportedFormat')); return; }
+
     setIsScanning(true);
     try {
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error(t('sales.fileReadTimeout'))), 30000);
-        reader.onload = () => {
-          clearTimeout(timeout);
-          const result = reader.result as string;
-          const parts = result.split(',');
-          if (parts.length < 2) {
-            reject(new Error(t('sales.fileFormatUnsupported')));
-            return;
-          }
-          resolve(parts[1]);
-        };
-        reader.onerror = () => {
-          clearTimeout(timeout);
-          reject(new Error(t('sales.fileReadFailed')));
-        };
-      });
-      reader.readAsDataURL(file);
-      const base64 = await base64Promise;
+      let base64: string;
+      let mimeType: string;
+      if (isPdf) {
+        // Vision image_url can't take PDF → rasterize the FIRST PAGE to PNG before OCR.
+        try {
+          const png = await rasterizePdfFirstPage(file);
+          base64 = png.base64; mimeType = png.mimeType;
+        } catch (e) { console.error(e); alert(t('ocr.errorPdfRender')); return; }
+        if (base64.length * 0.75 > OCR_MAX_BYTES) { alert(t('ocr.errorImageTooLarge')); return; }
+      } else {
+        if (file.size > OCR_MAX_BYTES) { alert(t('ocr.errorImageTooLarge')); return; }
+        base64 = await readImageBase64(file); mimeType = file.type;
+      }
 
-      const extracted = await analyzeInvoice(base64, file.type, accLocale, uiLang);
-
+      const extracted = await analyzeInvoice(base64, mimeType, accLocale, uiLang);
       if (!extracted.isInvoiceLike) {
         const docType = extracted.documentType || 'unknown';
         alert(t('sales.notInvoiceWarning', { type: docType }));
         return;
       }
-
-      const taxRate = extracted.price > 0 && extracted.taxAmount > 0
-        ? `${Math.round((extracted.taxAmount / extracted.price) * 100)}%`
-        : '13%';
-
-      const newRecord: SalesRecord = {
-        id: nextSalesId(),
-        date: extracted.date,
-        customer: extracted.customer,
-        quantity: extracted.quantity || '',
-        price: extracted.price,
-        shipping: extracted.shipping || 0,
-        invoiceNo: extracted.invoiceNo,
-        status: '已开',
-        taxRate,
-        totalWithTax: extracted.totalWithTax || 0,
-        unitPriceWithoutTax: extracted.unitPriceWithoutTax || 0,
-        taxAmount: extracted.taxAmount || 0,
-        amountWithoutTax: extracted.price
-      };
-
-      await createSale(newRecord);
-      setRecords(prev => [newRecord, ...prev]);
-      alert(t('sales.recognizeSuccess'));
+      // PR-3b: read-only preview only — NO DB write, NO form fill (confirm→autofill is PR-3c).
+      setOcrPreview(extracted);
     } catch (err) {
       console.error(err);
       alert(t('sales.recognizeFailed'));
@@ -255,7 +254,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
         ref={fileInputRef}
         onChange={handleFileChange}
         className="hidden"
-        accept="image/*,application/pdf"
+        accept="image/jpeg,image/png,image/webp,application/pdf"
       />
 
       {/* Header Section */}
@@ -699,6 +698,15 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
             </form>
           </div>
         </div>
+      )}
+
+      {ocrPreview && (
+        <OcrPreviewModal
+          extracted={ocrPreview}
+          counterpartyLabel={t('tableHeaders.customer')}
+          fmtMoney={fmtMoney}
+          onClose={() => setOcrPreview(null)}
+        />
       )}
     </div>
   );

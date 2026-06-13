@@ -924,6 +924,15 @@
     "bagSuffix": "袋",
     "perTon": ""
   },
+  "ocr": {
+    "errorUnsupportedFormat": "不支持的文件格式，请上传 JPG / PNG / WebP 图片或 PDF。",
+    "errorImageTooLarge": "图片过大（上限 8MB），请压缩后重试。",
+    "errorPdfRender": "PDF 解析失败，请确认文件未损坏后重试。",
+    "noProviderConfigured": "当前 AI 服务不支持 OCR，请在「设置 → AI 服务商」配置支持 OCR 的服务商（如通义千问 / Gemini）。",
+    "previewTitle": "识别预览",
+    "previewHint": "以下为识别结果，请核对。（确认后回填表单将在后续版本支持。）",
+    "close": "关闭"
+  },
   "ai": {
     "languageHint": "请使用中文回答。",
     "analyzeSystemPrompt": "你是一位专业的商业分析师。请分析以下企业经营数据，给出：\n1. summary: 一段简要的经营概况总结\n2. topInsights: 3-5条关键洞察（数组）\n3. recommendations: 3-5条改进建议（数组）\n4. anomalies: 异常指标列表（数组）\n请严格按 JSON 格式返回。",

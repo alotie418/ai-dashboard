@@ -2,10 +2,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
-import { analyzeInvoice } from '../services/ocrService';
-import { fetchPurchases, createPurchase, deletePurchase, fetchSettings, listProducts, type Product, PurchaseRecord } from '../services/api';
+import { analyzeInvoice, type ExtractedInvoice } from '../services/ocrService';
+import { rasterizePdfFirstPage } from '../services/pdfRaster';
+import { fetchPurchases, createPurchase, deletePurchase, fetchSettings, listProducts, listProviders, type Product, PurchaseRecord } from '../services/api';
 import { formatMoney, getCurrencySymbol, getTaxLabel, formatLegacyQuantity, getProductUnitLabel } from './accountingHelpers';
 import CsvImportModal from './CsvImportModal';
+import OcrPreviewModal from './OcrPreviewModal';
 
 interface Props {
   data: BusinessData;
@@ -76,6 +78,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
   const [records, setRecords] = useState<PurchaseRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCsvImport, setShowCsvImport] = useState(false);
+  const [ocrPreview, setOcrPreview] = useState<ExtractedInvoice | null>(null);
 
   // Load records from API on mount
   useEffect(() => {
@@ -141,60 +144,57 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
     }
   };
 
+  const OCR_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+  const OCR_MAX_BYTES = 8 * 1024 * 1024;
+
+  const readImageBase64 = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    const timeout = setTimeout(() => reject(new Error(t('purchases.errorFileTimeout'))), 30000);
+    reader.onload = () => {
+      clearTimeout(timeout);
+      const result = reader.result as string;
+      const parts = result.split(',');
+      if (parts.length < 2) { reject(new Error(t('purchases.errorFileFormat'))); return; }
+      resolve(parts[1]);
+    };
+    reader.onerror = () => { clearTimeout(timeout); reject(new Error(t('purchases.errorFileRead'))); };
+    reader.readAsDataURL(file);
+  });
+
   const processFile = async (file: File) => {
+    // OCR follows a configured OCR-capable provider (its own key); if none, guide the user.
+    try {
+      const providers = await listProviders();
+      if (!providers.some(p => p.hasKey && p.supportsOCR)) { alert(t('ocr.noProviderConfigured')); return; }
+    } catch { /* fall through — backend getOcrRecord still guards */ }
+
+    const isPdf = file.type === 'application/pdf';
+    if (!isPdf && !OCR_IMAGE_TYPES.includes(file.type)) { alert(t('ocr.errorUnsupportedFormat')); return; }
+
     setIsScanning(true);
     try {
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error(t('purchases.errorFileTimeout'))), 30000);
-        reader.onload = () => {
-          clearTimeout(timeout);
-          const result = reader.result as string;
-          const parts = result.split(',');
-          if (parts.length < 2) {
-            reject(new Error(t('purchases.errorFileFormat')));
-            return;
-          }
-          resolve(parts[1]);
-        };
-        reader.onerror = () => {
-          clearTimeout(timeout);
-          reject(new Error(t('purchases.errorFileRead')));
-        };
-      });
-      reader.readAsDataURL(file);
-      const base64 = await base64Promise;
+      let base64: string;
+      let mimeType: string;
+      if (isPdf) {
+        // Vision image_url can't take PDF → rasterize the FIRST PAGE to PNG before OCR.
+        try {
+          const png = await rasterizePdfFirstPage(file);
+          base64 = png.base64; mimeType = png.mimeType;
+        } catch (e) { console.error(e); alert(t('ocr.errorPdfRender')); return; }
+        if (base64.length * 0.75 > OCR_MAX_BYTES) { alert(t('ocr.errorImageTooLarge')); return; }
+      } else {
+        if (file.size > OCR_MAX_BYTES) { alert(t('ocr.errorImageTooLarge')); return; }
+        base64 = await readImageBase64(file); mimeType = file.type;
+      }
 
-      const extracted = await analyzeInvoice(base64, file.type, accLocale, uiLang);
-
+      const extracted = await analyzeInvoice(base64, mimeType, accLocale, uiLang);
       if (!extracted.isInvoiceLike) {
         const docType = extracted.documentType || 'unknown';
         alert(t('purchases.notInvoiceWarning', { type: docType }));
         return;
       }
-
-      const taxRate = extracted.price > 0 && extracted.taxAmount > 0
-        ? `${Math.round((extracted.taxAmount / extracted.price) * 100)}%`
-        : defaultTaxRate;
-
-      const newRecord: PurchaseRecord = {
-        id: nextPurchaseId(),
-        date: extracted.date,
-        supplier: extracted.customer,
-        quantity: extracted.quantity || '',
-        price: extracted.price,
-        taxRate,
-        invoiceNo: extracted.invoiceNo,
-        status: '已收',
-        totalWithTax: extracted.totalWithTax || 0,
-        unitPriceWithoutTax: extracted.unitPriceWithoutTax || 0,
-        taxAmount: extracted.taxAmount || 0,
-        amountWithoutTax: extracted.price
-      };
-
-      await createPurchase(newRecord);
-      setRecords(prev => [newRecord, ...prev]);
-      alert(t('purchases.successRecognition'));
+      // PR-3b: read-only preview only — NO DB write, NO form fill (confirm→autofill is PR-3c).
+      setOcrPreview(extracted);
     } catch (err) {
       console.error(err);
       alert(t('purchases.errorFailed'));
@@ -243,7 +243,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
         ref={fileInputRef}
         onChange={handleFileChange}
         className="hidden"
-        accept="image/*,application/pdf"
+        accept="image/jpeg,image/png,image/webp,application/pdf"
       />
 
       {/* Header Section */}
@@ -624,6 +624,15 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
             </form>
           </div>
         </div>
+      )}
+
+      {ocrPreview && (
+        <OcrPreviewModal
+          extracted={ocrPreview}
+          counterpartyLabel={usZh ? taxLabel('setHeaderPayee') : t('tableHeaders.supplier')}
+          fmtMoney={fmtMoney}
+          onClose={() => setOcrPreview(null)}
+        />
       )}
     </div>
   );
