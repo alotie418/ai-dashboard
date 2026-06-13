@@ -14,6 +14,7 @@ import {
 import { getTaxLabel } from './accountingHelpers';
 import { aiErrorMessage, aiErrorMessageFromCode } from '../services/aiErrors';
 import { KNOWN_MODELS, DEFAULT_MODEL, modelLabelFor, findModelOption, shouldAutoMigrate } from './aiProviderModels';
+import { providerLogo } from './providerLogos';
 
 const PROVIDER_DOCS: Record<AIProviderId, { label: string; getKeyUrl: string; placeholder: string; icon: string; color: string }> = {
   anthropic: { label: 'Claude · Anthropic', getKeyUrl: 'https://console.anthropic.com/settings/keys', placeholder: 'sk-ant-api03-...', icon: 'fa-feather', color: '#274C92' },
@@ -193,6 +194,7 @@ const ProvidersSection: React.FC = () => {
       <div className="space-y-3">
         {providers.map(p => {
           const doc = PROVIDER_DOCS[p.provider];
+          const logo = providerLogo(p.provider);
           const row = rowStates[p.provider] || initRow(p.model || DEFAULT_MODEL[p.provider]);
 
           return (
@@ -200,9 +202,15 @@ const ProvidersSection: React.FC = () => {
               <div className="p-5">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center">
-                    <div className="w-10 h-10 rounded-lg flex items-center justify-center mr-3" style={{ backgroundColor: `${doc.color}15`, color: doc.color }}>
-                      <i className={`fas ${doc.icon}`}></i>
-                    </div>
+                    {logo ? (
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center mr-3 bg-[#f5f5f4]">
+                        <img src={logo} alt={doc.label} className="w-6 h-6 object-contain" />
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center mr-3" style={{ backgroundColor: `${doc.color}15`, color: doc.color }}>
+                        <i className={`fas ${doc.icon}`}></i>
+                      </div>
+                    )}
                     <div>
                       <div className="flex items-center space-x-2">
                         <h4 className="text-sm font-semibold text-[#191918]">{doc.label}</h4>
