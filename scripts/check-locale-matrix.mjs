@@ -478,7 +478,7 @@ async function main() {
               invOutputRecordCount: '{count} 条销售/收入记录',
               acctReceivableTab: '客户应收', acctPayableTab: '供应商应付',
               acctTotalReceivable: '客户应收总额', acctTotalPayable: '供应商应付总额',
-              balRecvLabel: '客户应收', balPayLabel: '供应商应付', balTaxPayLabel: '应付税款',
+              balRecvLabel: '客户应收', balPayLabel: '供应商应付', balTaxPayLabel: '估算应付税款',
               balPaidInCapital: '所有者投入', balRetainedEarnings: '留存收益',
               balLiabEquityHeader: '负债和所有者权益', balTotalLiabEquity: '负债和所有者权益总计',
               balCashflowAdd: '添加收支记录',
@@ -508,7 +508,7 @@ async function main() {
               invOutputRecordCount: '{count} 筆銷售/收入記錄',
               acctReceivableTab: '客戶應收', acctPayableTab: '供應商應付',
               acctTotalReceivable: '客戶應收總額', acctTotalPayable: '供應商應付總額',
-              balRecvLabel: '客戶應收', balPayLabel: '供應商應付', balTaxPayLabel: '應付稅款',
+              balRecvLabel: '客戶應收', balPayLabel: '供應商應付', balTaxPayLabel: '估算應付稅款',
               balPaidInCapital: '所有者投入', balRetainedEarnings: '留存收益',
               balLiabEquityHeader: '負債和所有者權益', balTotalLiabEquity: '負債和所有者權益總計',
               balCashflowAdd: '新增收支記錄',
@@ -1674,13 +1674,13 @@ async function main() {
       'zh-CN': {
         taxTitle: '台湾营业税统计', inputTax: '采购进项营业税', outputTax: '销售销项营业税',
         certifiedInput: '进项营业税额合计', invoicedOutput: '销项营业税额合计', estimatedTax: '营业税估算额',
-        taxSummaryTitle: '台湾营业税申报汇总（对账用）', purchaseTotal: '采购含税总额', salesTotal: '销售含税总额', taxDifference: '营业税差额',
+        taxSummaryTitle: '台湾营业税汇总（对账用）', purchaseTotal: '采购含税总额', salesTotal: '销售含税总额', taxDifference: '营业税差额',
         plIncomeTax: '营利事业所得税', plRevenue: '销售收入', plCost: '销货成本', plAdmin: '管理费用',
       },
       'zh-TW': {
         taxTitle: '台灣營業稅統計', inputTax: '採購進項營業稅', outputTax: '銷售銷項營業稅',
         certifiedInput: '進項營業稅額合計', invoicedOutput: '銷項營業稅額合計', estimatedTax: '營業稅估算額',
-        taxSummaryTitle: '臺灣營業稅申報彙總（對帳用）', purchaseTotal: '採購含稅總額', salesTotal: '銷售含稅總額', taxDifference: '營業稅差額',
+        taxSummaryTitle: '臺灣營業稅彙總（對帳用）', purchaseTotal: '採購含稅總額', salesTotal: '銷售含稅總額', taxDifference: '營業稅差額',
         plIncomeTax: '營利事業所得稅', plRevenue: '銷售收入', plCost: '銷貨成本', plAdmin: '管理費用',
       },
     };
@@ -1940,14 +1940,14 @@ async function main() {
       'zh-CN': {
         acctReceivableTab: '客户应收', acctPayableTab: '供应商应付',
         acctTotalReceivable: '客户应收总额', acctTotalPayable: '供应商应付总额',
-        balRecvLabel: '客户应收', balPayLabel: '供应商应付', balTaxPayLabel: '应付税款',
+        balRecvLabel: '客户应收', balPayLabel: '供应商应付', balTaxPayLabel: '估算应付税款',
         balPaidInCapital: '所有者投入', balRetainedEarnings: '留存收益', balEquityHeader: '所有者权益',
         balLiabEquityHeader: '负债和所有者权益', balTotalLiabEquity: '负债和所有者权益总计',
       },
       'zh-TW': {
         acctReceivableTab: '客戶應收', acctPayableTab: '供應商應付',
         acctTotalReceivable: '客戶應收總額', acctTotalPayable: '供應商應付總額',
-        balRecvLabel: '客戶應收', balPayLabel: '供應商應付', balTaxPayLabel: '應付稅款',
+        balRecvLabel: '客戶應收', balPayLabel: '供應商應付', balTaxPayLabel: '估算應付稅款',
         balPaidInCapital: '所有者投入', balRetainedEarnings: '留存收益', balEquityHeader: '所有者權益',
         balLiabEquityHeader: '負債和所有者權益', balTotalLiabEquity: '負債和所有者權益總計',
       },
@@ -2006,12 +2006,12 @@ async function main() {
       'zh-CN': {
         balRecvLabel: '应收帐款', balPaidInCapital: '资本', balRetainedEarnings: '保留盈余',
         balEquityHeader: '权益', balLiabEquityHeader: '负债及权益', balTotalLiabEquity: '负债及权益总计',
-        taxSummaryTitle: '台湾营业税申报汇总（对账用）',
+        taxSummaryTitle: '台湾营业税汇总（对账用）',
       },
       'zh-TW': {
         balRecvLabel: '應收帳款', balPaidInCapital: '資本', balRetainedEarnings: '保留盈餘',
         balEquityHeader: '權益', balLiabEquityHeader: '負債及權益', balTotalLiabEquity: '負債及權益總計',
-        taxSummaryTitle: '臺灣營業稅申報彙總（對帳用）',
+        taxSummaryTitle: '臺灣營業稅彙總（對帳用）',
       },
     };
     // Mainland-GAAP / pre-fix drift forbidden on TW finance keys. 应收账款 here is the
@@ -2755,8 +2755,8 @@ async function main() {
       'finance.balanceFixedAssets': '固定资产',
       'finance.balancePayable': '应付账款',
       'finance.balancePayables': '应付账款',
-      'finance.balanceTax': '应交税费',
-      'finance.balanceTaxPayable': '应交税费',
+      'finance.balanceTax': '估算应付税款',
+      'finance.balanceTaxPayable': '估算应付税款',
       'finance.balanceCapital': '实收资本',
       'finance.balancePaidInCapital': '实收资本',
       'finance.balanceRetained': '未分配利润',
