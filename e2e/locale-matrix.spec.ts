@@ -326,6 +326,46 @@ for (const { navIcon, label } of [{ navIcon: 'fa-file-import', label: 'purchase'
   });
 }
 
+// ── BYOK provider display name follows UI language (provider-name-i18n) ──
+// Under a non-Chinese UI the domestic providers must show their English brand names with NO Chinese
+// residue. Mocks an electronAPI with all 8 providers (providers:list), opens Settings → AI Providers,
+// and asserts the English names render and the Chinese brand strings do not appear anywhere.
+const PROVIDER_NAME_IDS = ['anthropic', 'openai', 'gemini', 'deepseek', 'qwen', 'kimi', 'glm', 'doubao'];
+for (const ui of ['en', 'ja']) {
+  test(`BYOK provider names follow UI language — ${ui} (no Chinese residue)`, async ({ page }) => {
+    await page.addInitScript(({ settings, dashboard, ids }: any) => {
+      const lists = /\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|mileage|documents|reports\/types)/;
+      (window as any).electronAPI = {
+        isElectron: true, platform: 'darwin', buildTarget: 'dmg',
+        invoke: (channel: string, payload: any) => {
+          if (channel === 'providers:hasAny') return Promise.resolve(true);
+          if (channel === 'providers:list') return Promise.resolve(ids.map((id: string) => ({ provider: id, name: id, hasKey: false, model: '', modelLabel: '', modelIsKnown: false, availableModels: [], defaultModel: '', enabled: false, isDefault: false, supportsOCR: false, supportsWebGrounding: false })));
+          if (channel === 'api:request') {
+            const p = (payload && payload.path) || '';
+            if (p.includes('/api/settings')) return Promise.resolve(settings);
+            if (p.includes('/api/dashboard')) return Promise.resolve(dashboard);
+            if (lists.test(p)) return Promise.resolve([]);
+            return Promise.resolve({});
+          }
+          return Promise.resolve({});
+        },
+      };
+    }, { settings: SETTINGS('CN'), dashboard: DASHBOARD('CN'), ids: PROVIDER_NAME_IDS });
+    await bootCombo(page, ui, 'CN');
+    await page.locator('i.fa-cog').first().click();        // → settings
+    await page.locator('i.fa-microchip').first().click();   // → AI providers section
+    // English brand names render (domestic providers de-sinicized under non-zh UI)
+    await expect(page.getByText('Qwen · Alibaba Cloud')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Doubao · Volcano Engine')).toBeVisible();
+    await expect(page.getByText('Kimi · Moonshot AI')).toBeVisible();
+    // No Chinese provider-name residue anywhere in the panel
+    const body = await page.locator('body').innerText();
+    for (const cn of ['深度求索', '通义千问', '阿里云', '月之暗面', '智谱', '豆包', '火山方舟']) {
+      expect(body, `${ui}: BYOK must not show "${cn}"`).not.toContain(cn);
+    }
+  });
+}
+
 // ── Finance → Export PDF button (uiLanguage-only feature). The finance page renders
 //    a P&L from /api/reports/generate, so a valid report payload is mocked (empty {}
 //    would crash it). Navigation via the sidebar fa-wallet icon. ──

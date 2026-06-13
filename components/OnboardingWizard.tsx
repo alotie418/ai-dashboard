@@ -5,6 +5,7 @@ import { listProviders, saveProvider, setDefaultProvider, testProvider, saveSett
 import { aiErrorMessage, aiErrorMessageFromCode } from '../services/aiErrors';
 import { KNOWN_MODELS, DEFAULT_MODEL } from './aiProviderModels';
 import { providerLogo } from './providerLogos';
+import { getProviderDisplayName } from './providerDisplay';
 import { SUPPORTED_LANGUAGES, setLanguage, type LangCode } from '../i18n';
 import { ACCOUNTING_LOCALES, type AccountingLocaleId } from './accountingLocaleConfig';
 import { ACCOUNTING_PROFILES } from './accountingProfiles';
@@ -397,6 +398,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
               {providers.map(p => {
                 const doc = PROVIDER_DOCS[p.provider];
                 const logo = providerLogo(p.provider);
+                const name = getProviderDisplayName(p.provider, i18n.language);
                 const form = forms[p.provider];
                 const expanded = expandedProvider === p.provider;
                 if (!form) return null;
@@ -410,7 +412,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                       <div className="flex items-center">
                         {logo ? (
                           <div className="w-9 h-9 rounded-lg flex items-center justify-center mr-3 bg-[#f5f5f4]">
-                            <img src={logo} alt={doc.label} className="w-5 h-5 object-contain" />
+                            <img src={logo} alt={name} className="w-5 h-5 object-contain" />
                           </div>
                         ) : (
                           <div className="w-9 h-9 rounded-lg flex items-center justify-center mr-3" style={{ backgroundColor: `${doc.color}15`, color: doc.color }}>
@@ -418,7 +420,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                           </div>
                         )}
                         <div>
-                          <div className="text-sm font-semibold text-[#191918]">{doc.label}</div>
+                          <div className="text-sm font-semibold text-[#191918]">{name}</div>
                           <div className="text-[11px] text-[#7a7a78]">
                             {form.saved ? t('onboarding.savedBadge') : t('onboarding.clickToExpand')}
                           </div>
@@ -445,7 +447,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                           />
                           <a href={doc.getKeyUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-[11px] mt-1.5 hover:underline" style={{ color: doc.color }}>
                             <i className="fas fa-external-link-alt mr-1 text-[9px]"></i>
-                            {t('onboarding.howToGetKey', { provider: doc.label })}
+                            {t('onboarding.howToGetKey', { provider: name })}
                           </a>
                         </div>
 
