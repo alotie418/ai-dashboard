@@ -95,8 +95,10 @@ async function testOpenAI() {
 async function testDeepSeek() {
   console.log('DeepSeek (Chat Completions):');
   // META smoke (registry parity is covered by check:providers; here we lock the adapter shape)
-  check('deepseek meta id + default model', deepseek.meta.id === 'deepseek' && deepseek.meta.defaultModel === 'deepseek-chat');
-  check('deepseek default model in availableModels', deepseek.meta.availableModels.some(m => m.value === 'deepseek-chat'));
+  check('deepseek meta id + default model', deepseek.meta.id === 'deepseek' && deepseek.meta.defaultModel === 'deepseek-v4-pro');
+  check('deepseek default model in availableModels', deepseek.meta.availableModels.some(m => m.value === 'deepseek-v4-pro'));
+  check('deepseek whitelist has v4-pro / v4-flash / chat(compat)',
+    ['deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-chat'].every(v => deepseek.meta.availableModels.some(m => m.value === v)));
   check('deepseek capabilities text-only (no tts/ocr/webGrounding)',
     deepseek.meta.capabilities.tts === false && deepseek.meta.capabilities.ocr === false && deepseek.meta.capabilities.webGrounding === false);
 
