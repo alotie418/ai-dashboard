@@ -15,6 +15,7 @@ const openai = require('../electron/ai/providers/openai.js');
 const gemini = require('../electron/ai/providers/gemini.js'); // pure functions only (SDK loaded lazily, never hit here)
 const deepseek = require('../electron/ai/providers/deepseek.js'); // OpenAI Chat-Completions compatible (fetch-only)
 const qwen = require('../electron/ai/providers/qwen.js'); // OpenAI Chat-Completions compatible (fetch-only)
+const kimi = require('../electron/ai/providers/kimi.js'); // OpenAI Chat-Completions compatible (fetch-only)
 
 const failures = [];
 function check(name, cond, detail) {
@@ -166,6 +167,44 @@ async function testQwen() {
   check('qwen empty tools omits tools field', !('tools' in _bodies[0]), JSON.stringify(_bodies[0]));
 }
 
+// Kimi = OpenAI **Chat Completions** dialect (via the shared _openaiCompatible factory), same wire
+// shape as DeepSeek/Qwen. baseURL keeps the /v1 path; default kimi-k2.6. Stub fetch with chat-
+// completions JSON. (Kimi rejects tool_choice:'required'; the factory uses 'auto', asserted below.)
+async function testKimi() {
+  console.log('Kimi (Chat Completions):');
+  // META smoke (registry parity is covered by check:providers; here we lock the adapter shape)
+  check('kimi meta id + default model', kimi.meta.id === 'kimi' && kimi.meta.defaultModel === 'kimi-k2.6');
+  check('kimi default model in availableModels', kimi.meta.availableModels.some(m => m.value === 'kimi-k2.6'));
+  check('kimi whitelist has k2.6 / k2.5 / v1-128k / v1-32k(compat)',
+    ['kimi-k2.6', 'kimi-k2.5', 'moonshot-v1-128k', 'moonshot-v1-32k'].every(v => kimi.meta.availableModels.some(m => m.value === v)));
+  check('kimi capabilities text-only (no tts/ocr/webGrounding)',
+    kimi.meta.capabilities.tts === false && kimi.meta.capabilities.ocr === false && kimi.meta.capabilities.webGrounding === false);
+
+  const toolResp = { choices: [{ message: { role: 'assistant', content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'get_sales', arguments: '{}' } }] } }] };
+  const finalResp = { choices: [{ message: { role: 'assistant', content: 'Sales total is 100' } }] };
+
+  setFetch([toolResp]);
+  const s1 = await kimi.chatWithTools('k', 'm', { history: seed(kimi), system: 'sys', tools: TOOLDEFS });
+  check('kimi round1 type=tool_calls', s1.type === 'tool_calls', JSON.stringify(s1));
+  check('kimi round1 call parsed (id + name + args object)', !!(s1.calls && s1.calls[0] && s1.calls[0].id === 'call_1' && s1.calls[0].name === 'get_sales' && typeof s1.calls[0].args === 'object'));
+  check('kimi round1 assistantMsg single assistant turn w/ tool_calls', !!(s1.assistantMsg && s1.assistantMsg.role === 'assistant' && Array.isArray(s1.assistantMsg.tool_calls) && s1.assistantMsg.tool_calls.length === 1));
+  check('kimi round1 request carried nested function tools + tool_choice=auto (not required)', Array.isArray(_bodies[0].tools) && _bodies[0].tools[0].type === 'function' && _bodies[0].tools[0].function.name === 'get_sales' && _bodies[0].tool_choice === 'auto');
+  check('kimi round1 system prepended as first message', _bodies[0].messages[0].role === 'system' && _bodies[0].messages[0].content === 'sys');
+
+  const tr = kimi.toToolResultsMsg([{ call: s1.calls[0], result: { rows: [1, 2] } }]);
+  check('kimi toToolResultsMsg single shape', Array.isArray(tr) && tr.length === 1 && tr[0].role === 'tool' && tr[0].tool_call_id === 'call_1' && tr[0].content === JSON.stringify({ rows: [1, 2] }));
+  const trM = kimi.toToolResultsMsg([{ call: { id: 'c1' }, result: {} }, { call: { id: 'c2' }, result: {} }]);
+  check('kimi multi-tool = array of 2 role:tool messages', Array.isArray(trM) && trM.length === 2 && trM[0].tool_call_id === 'c1' && trM[1].tool_call_id === 'c2');
+
+  setFetch([finalResp]);
+  const s2 = await kimi.chatWithTools('k', 'm', { history: seed(kimi), system: 'sys', tools: TOOLDEFS });
+  check('kimi round2 type=final + text', s2.type === 'final' && s2.text === 'Sales total is 100', JSON.stringify(s2));
+
+  setFetch([finalResp]);
+  await kimi.chatWithTools('k', 'm', { history: seed(kimi), system: 'sys', tools: [] });
+  check('kimi empty tools omits tools field', !('tools' in _bodies[0]), JSON.stringify(_bodies[0]));
+}
+
 // Gemini uses the @google/genai SDK (not fetch), so we test its PURE functions directly with
 // crafted response objects — no SDK mock, no network, no key.
 async function testGemini() {
@@ -222,6 +261,7 @@ async function main() {
   await testOpenAI();
   await testDeepSeek();
   await testQwen();
+  await testKimi();
   await testGemini();
   await testAgentBudget();
   console.log(`\n${failures.length === 0 ? '✓ all passed' : '✗ ' + failures.length + ' failed'}\n`);

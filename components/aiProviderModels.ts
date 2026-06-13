@@ -33,6 +33,12 @@ export const KNOWN_MODELS: Record<AIProviderId, ModelOption[]> = {
     { label: 'Qwen Flash', value: 'qwen-flash' },
     { label: 'Qwen Turbo (兼容旧版)', value: 'qwen-turbo' },
   ],
+  kimi: [
+    { label: 'Kimi K2.6', value: 'kimi-k2.6' },
+    { label: 'Kimi K2.5', value: 'kimi-k2.5' },
+    { label: 'Moonshot v1 128K', value: 'moonshot-v1-128k' },
+    { label: 'Moonshot v1 32K (兼容旧版)', value: 'moonshot-v1-32k' },
+  ],
 };
 
 export const DEFAULT_MODEL: Record<AIProviderId, string> = {
@@ -41,6 +47,7 @@ export const DEFAULT_MODEL: Record<AIProviderId, string> = {
   gemini: 'gemini-3.5-flash',
   deepseek: 'deepseek-v4-pro',
   qwen: 'qwen-plus',
+  kimi: 'kimi-k2.6',
 };
 
 // 给定 provider + model value，返回 ModelOption；找不到说明是用户自定义 ID
