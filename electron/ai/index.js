@@ -14,6 +14,7 @@ const deepseek = require('./providers/deepseek');
 const qwen = require('./providers/qwen');
 const kimi = require('./providers/kimi');
 const glm = require('./providers/glm');
+const doubao = require('./providers/doubao');
 
 const PROVIDERS = {
   anthropic,
@@ -23,6 +24,7 @@ const PROVIDERS = {
   qwen,
   kimi,
   glm,
+  doubao,
 };
 
 const VALID_IDS = Object.keys(PROVIDERS);

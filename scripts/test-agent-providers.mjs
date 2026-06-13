@@ -17,6 +17,7 @@ const deepseek = require('../electron/ai/providers/deepseek.js'); // OpenAI Chat
 const qwen = require('../electron/ai/providers/qwen.js'); // OpenAI Chat-Completions compatible (fetch-only)
 const kimi = require('../electron/ai/providers/kimi.js'); // OpenAI Chat-Completions compatible (fetch-only)
 const glm = require('../electron/ai/providers/glm.js'); // OpenAI Chat-Completions compatible (fetch-only)
+const doubao = require('../electron/ai/providers/doubao.js'); // OpenAI Chat-Completions compatible (fetch-only)
 const { pickOcrProvider } = require('../electron/ai/ocrSelect.js'); // PR-3b OCR provider selection (pure)
 
 const failures = [];
@@ -153,6 +154,7 @@ async function testQwen() {
   check('qwen round1 call parsed (id + name + args object)', !!(s1.calls && s1.calls[0] && s1.calls[0].id === 'call_1' && s1.calls[0].name === 'get_sales' && typeof s1.calls[0].args === 'object'));
   check('qwen round1 assistantMsg single assistant turn w/ tool_calls', !!(s1.assistantMsg && s1.assistantMsg.role === 'assistant' && Array.isArray(s1.assistantMsg.tool_calls) && s1.assistantMsg.tool_calls.length === 1));
   check('qwen round1 request carried nested function tools + tool_choice', Array.isArray(_bodies[0].tools) && _bodies[0].tools[0].type === 'function' && _bodies[0].tools[0].function.name === 'get_sales' && _bodies[0].tool_choice === 'auto');
+  check('qwen body has no reasoning_effort (extraBody not leaked to other providers)', !('reasoning_effort' in _bodies[0]));
   check('qwen round1 system prepended as first message', _bodies[0].messages[0].role === 'system' && _bodies[0].messages[0].content === 'sys');
 
   const tr = qwen.toToolResultsMsg([{ call: s1.calls[0], result: { rows: [1, 2] } }]);
@@ -281,11 +283,70 @@ function testOcrProviderSelection() {
     { provider: 'gemini', isDefault: false, ocrCapable: true },
     { provider: 'qwen', isDefault: false, ocrCapable: true },
   ]) === 'qwen');
+  check('fallback: doubao before gemini in priority', pickOcrProvider([
+    { provider: 'deepseek', isDefault: true, ocrCapable: false },
+    { provider: 'gemini', isDefault: false, ocrCapable: true },
+    { provider: 'doubao', isDefault: false, ocrCapable: true },
+  ]) === 'doubao');
   check('no OCR-capable provider → null', pickOcrProvider([
     { provider: 'deepseek', isDefault: true, ocrCapable: false },
     { provider: 'kimi', isDefault: false, ocrCapable: false },
   ]) === null);
   check('no providers → null', pickOcrProvider([]) === null);
+}
+
+// Doubao = OpenAI **Chat Completions** dialect (via the shared _openaiCompatible factory; Volcengine
+// Ark, baseURL keeps the /api/v3 path). Text tool-calling + a vision OCR round-trip (capabilities.ocr
+// =true, visionModel=doubao-seed-1-6-vision). Same wire shape as DeepSeek/Qwen/Kimi/GLM.
+async function testDoubao() {
+  console.log('Doubao (Chat Completions):');
+  check('doubao meta id + default model (Seed 2.0 Pro)', doubao.meta.id === 'doubao' && doubao.meta.defaultModel === 'doubao-seed-2-0-pro-260215');
+  check('doubao default model in availableModels', doubao.meta.availableModels.some(m => m.value === 'doubao-seed-2-0-pro-260215'));
+  check('doubao whitelist is Seed 2.0 pro / lite / mini',
+    ['doubao-seed-2-0-pro-260215', 'doubao-seed-2-0-lite-260428', 'doubao-seed-2-0-mini-260428'].every(v => doubao.meta.availableModels.some(m => m.value === v)));
+  check('doubao capabilities: ocr=true (vision) + visionModel=Seed 2.0 Pro, no tts/webGrounding',
+    doubao.meta.capabilities.tts === false && doubao.meta.capabilities.ocr === true && doubao.meta.capabilities.webGrounding === false && doubao.meta.visionModel === 'doubao-seed-2-0-pro-260215');
+
+  const toolResp = { choices: [{ message: { role: 'assistant', content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'get_sales', arguments: '{}' } }] } }] };
+  const finalResp = { choices: [{ message: { role: 'assistant', content: 'Sales total is 100' } }] };
+
+  setFetch([toolResp]);
+  const s1 = await doubao.chatWithTools('k', 'm', { history: seed(doubao), system: 'sys', tools: TOOLDEFS });
+  check('doubao round1 type=tool_calls', s1.type === 'tool_calls', JSON.stringify(s1));
+  check('doubao round1 call parsed (id + name + args object)', !!(s1.calls && s1.calls[0] && s1.calls[0].id === 'call_1' && s1.calls[0].name === 'get_sales' && typeof s1.calls[0].args === 'object'));
+  check('doubao round1 assistantMsg single assistant turn w/ tool_calls', !!(s1.assistantMsg && s1.assistantMsg.role === 'assistant' && Array.isArray(s1.assistantMsg.tool_calls) && s1.assistantMsg.tool_calls.length === 1));
+  check('doubao round1 request carried nested function tools + tool_choice', Array.isArray(_bodies[0].tools) && _bodies[0].tools[0].type === 'function' && _bodies[0].tools[0].function.name === 'get_sales' && _bodies[0].tool_choice === 'auto');
+  check('doubao request carries extraBody reasoning_effort=minimal (Seed 2.0 thinking off)', _bodies[0].reasoning_effort === 'minimal');
+  check('doubao round1 system prepended as first message', _bodies[0].messages[0].role === 'system' && _bodies[0].messages[0].content === 'sys');
+
+  const tr = doubao.toToolResultsMsg([{ call: s1.calls[0], result: { rows: [1, 2] } }]);
+  check('doubao toToolResultsMsg single shape', Array.isArray(tr) && tr.length === 1 && tr[0].role === 'tool' && tr[0].tool_call_id === 'call_1' && tr[0].content === JSON.stringify({ rows: [1, 2] }));
+  const trM = doubao.toToolResultsMsg([{ call: { id: 'c1' }, result: {} }, { call: { id: 'c2' }, result: {} }]);
+  check('doubao multi-tool = array of 2 role:tool messages', Array.isArray(trM) && trM.length === 2 && trM[0].tool_call_id === 'c1' && trM[1].tool_call_id === 'c2');
+
+  setFetch([finalResp]);
+  const s2 = await doubao.chatWithTools('k', 'm', { history: seed(doubao), system: 'sys', tools: TOOLDEFS });
+  check('doubao round2 type=final + text', s2.type === 'final' && s2.text === 'Sales total is 100', JSON.stringify(s2));
+
+  setFetch([finalResp]);
+  await doubao.chatWithTools('k', 'm', { history: seed(doubao), system: 'sys', tools: [] });
+  check('doubao empty tools omits tools field', !('tools' in _bodies[0]), JSON.stringify(_bodies[0]));
+}
+
+async function testDoubaoVisionOCR() {
+  console.log('Doubao Vision OCR (Chat Completions image_url):');
+  const ocrResp = { choices: [{ message: { role: 'assistant', content: '{"isInvoiceLike":true,"sellerName":"BEAN","grossAmount":520}' } }] };
+  setFetch([ocrResp]);
+  const out = await doubao.ocr('k', 'doubao-seed-2-0-lite-260428', { base64Data: 'BBBB', mimeType: 'image/jpeg', ocrPrompt: 'extract invoice' });
+  check('doubao ocr returns parsed JSON', !!(out && out.isInvoiceLike === true && out.sellerName === 'BEAN'));
+  const body = _bodies[0];
+  check('doubao ocr uses visionModel (not the passed chat model)', body.model === 'doubao-seed-2-0-pro-260215');
+  check('doubao ocr request carries extraBody reasoning_effort=minimal', body.reasoning_effort === 'minimal');
+  const content = body.messages[0].content;
+  check('doubao ocr request carries text + image_url(base64 data URL) blocks',
+    Array.isArray(content)
+    && content.some(c => c.type === 'text' && c.text === 'extract invoice')
+    && content.some(c => c.type === 'image_url' && c.image_url && c.image_url.url === 'data:image/jpeg;base64,BBBB'));
 }
 
 // Gemini uses the @google/genai SDK (not fetch), so we test its PURE functions directly with
@@ -346,7 +407,9 @@ async function main() {
   await testQwen();
   await testKimi();
   await testGLM();
+  await testDoubao();
   await testQwenVisionOCR();
+  await testDoubaoVisionOCR();
   testOcrProviderSelection();
   await testGemini();
   await testAgentBudget();

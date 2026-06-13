@@ -89,6 +89,13 @@ const PROVIDER_DOCS: Record<AIProviderId, { label: string; getKeyUrl: string; pl
     icon: 'fa-brain',
     color: '#3859FF',
   },
+  doubao: {
+    label: '豆包 · 火山方舟',
+    getKeyUrl: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey',
+    placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+    icon: 'fa-seedling',
+    color: '#12B5A5',
+  },
 };
 
 const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
