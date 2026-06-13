@@ -39,6 +39,12 @@ export const KNOWN_MODELS: Record<AIProviderId, ModelOption[]> = {
     { label: 'Moonshot v1 128K', value: 'moonshot-v1-128k' },
     { label: 'Moonshot v1 32K (兼容旧版)', value: 'moonshot-v1-32k' },
   ],
+  glm: [
+    { label: 'GLM-4.6', value: 'glm-4.6' },
+    { label: 'GLM-5.1', value: 'glm-5.1' },
+    { label: 'GLM-4.5-Air', value: 'glm-4.5-air' },
+    { label: 'GLM-4.7-Flash (免费)', value: 'glm-4.7-flash' },
+  ],
 };
 
 export const DEFAULT_MODEL: Record<AIProviderId, string> = {
@@ -48,6 +54,7 @@ export const DEFAULT_MODEL: Record<AIProviderId, string> = {
   deepseek: 'deepseek-v4-pro',
   qwen: 'qwen-plus',
   kimi: 'kimi-k2.6',
+  glm: 'glm-4.6',
 };
 
 // 给定 provider + model value，返回 ModelOption；找不到说明是用户自定义 ID
