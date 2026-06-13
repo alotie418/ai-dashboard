@@ -1,3 +1,10 @@
+/* PR-D: build-time Tailwind directives (replaces the runtime Tailwind CDN).
+   Preflight + utilities are generated here at build; brand tokens come from
+   tailwind.config.ts (which derives them from components/theme.ts). */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Markdown Styles for AI Chat */
 .markdown-body {
   font-size: 14px;

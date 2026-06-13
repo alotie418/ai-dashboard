@@ -5,29 +5,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SoloLedger 独账 — 一人公司的智能账本</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    // PR-C theme tokens — deep tech blue + gold accent, sampled from the app icon.
-    // Tailwind runs via CDN at runtime; keep these in sync with components/theme.ts.
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: { DEFAULT: '#274C92', hover: '#1E3A6E', deep: '#16264D', light: '#5B7FC4' },
-            accent: { DEFAULT: '#DDA82E' },
-          },
-        },
-      },
-    };
-  </script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.0/github-markdown-light.min.css">
+  <!-- PR-D: Tailwind, Font Awesome and github-markdown-css are now bundled at build
+       time (see index.tsx CSS imports + tailwind.config.ts, which derives the brand
+       tokens from components/theme.ts). No runtime CDN — works fully offline. -->
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
+    /* PR-D: Inter is self-hosted via @fontsource/inter (imported in index.tsx). */
     body {
       font-family: 'Inter', "Microsoft YaHei", "PingFang SC", sans-serif;
       /* Faint deep-blue gradient so Liquid Glass panels have depth to blur over (icon "微渐变") */
@@ -60,17 +44,9 @@
     }
 
   </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "react": "https://esm.sh/react@^19.2.4",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "recharts": "https://esm.sh/recharts@^3.7.0"
-  }
-}
-</script>
-  <link rel="stylesheet" href="/index.css">
+  <!-- PR-D: react / react-dom / recharts are bundled by Vite; the old module-CDN
+       import map was dead code (the built chunk never referenced it). index.css is
+       imported from index.tsx, so no manual <link> is needed. -->
 </head>
 
 <body>
