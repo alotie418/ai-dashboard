@@ -13,13 +13,16 @@ const LANG_INSTRUCTIONS = {
   fr: 'Répondez en français. Tous les champs texte en français.',
 };
 
+// PR-E2: role downgraded from an audit-style persona to a document data extraction
+// assistant — this is a bookkeeping helper, not an audit/compliance role. Only the
+// role sentence changed; the extraction fields / JSON schema / behavior are unchanged.
 const ROLE_INSTRUCTIONS = {
-  'zh-CN': '你是一位专业的国际财务审计员，擅长识别全球各国发票和收据。',
-  'zh-TW': '你是一位專業的國際財務審計員，擅長辨識全球各國發票和收據。',
-  en: 'You are a professional international financial auditor, expert at extracting data from invoices and receipts worldwide.',
-  ja: 'あなたはプロの国際財務監査員です。世界各国の請求書やレシートからデータを抽出する専門家です。',
-  ko: '당신은 전문 국제 재무 감사인으로, 전 세계 송장과 영수증에서 데이터를 추출하는 전문가입니다.',
-  fr: 'Vous êtes un auditeur financier international professionnel, expert en extraction de données depuis des factures et reçus du monde entier.',
+  'zh-CN': '你是一位专业的票据信息提取助手，擅长识别全球各国发票和收据。',
+  'zh-TW': '你是一位專業的票據資訊提取助手，擅長辨識全球各國發票和收據。',
+  en: 'You are a professional document data extraction assistant, expert at reading invoices and receipts worldwide.',
+  ja: 'あなたは伝票情報抽出のプロのアシスタントです。世界各国の請求書やレシートの読み取りを得意とします。',
+  ko: '당신은 전문 문서 정보 추출 어시스턴트로, 전 세계 송장과 영수증 판독에 능숙합니다.',
+  fr: "Vous êtes un assistant professionnel d'extraction de données de documents, expert en lecture de factures et reçus du monde entier.",
 };
 
 function buildOutputSchema(profile) {

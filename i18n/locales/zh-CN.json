@@ -937,10 +937,10 @@
   "ai": {
     "languageHint": "请使用中文回答。",
     "analyzeSystemPrompt": "你是一位专业的商业分析师。请分析以下企业经营数据，给出：\n1. summary: 一段简要的经营概况总结\n2. topInsights: 3-5条关键洞察（数组）\n3. recommendations: 3-5条改进建议（数组）\n4. anomalies: 异常指标列表（数组）\n请严格按 JSON 格式返回。",
-    "ocrPrompt": "你是一位专业的财务审计员。请从这张发票图片中提取以下信息，严格按 JSON 格式返回（不要 markdown 代码块）：\n{\n  \"date\": \"开票日期 YYYY-MM-DD\",\n  \"customer\": \"客户名称/购方名称\",\n  \"quantity\": \"货物总数量及单位\",\n  \"price\": 合计不含税金额数字,\n  \"shipping\": 运费数字,\n  \"invoiceNo\": \"发票号码\",\n  \"totalWithTax\": 价税合计数字,\n  \"unitPriceWithoutTax\": 不含税单价数字,\n  \"taxAmount\": 合计税额数字\n}\n数字字段必须是数字而非字符串，没有则填 0。",
-    "chatSystemPrompt": "你是一位专业的企业经营数据助手，拥有企业全部实时经营数据的访问权限。\n\n你的职责：\n1. 基于完整数据回答用户关于企业内部经营的任何问题\n2. 能够进行跨模块分析\n3. 数据分析时可以主动关联多个模块的数据给出综合建议\n\n重要：请严格按下方提供的会计制度（accounting locale）进行财务/税务推理（币种、税制、报表结构、会计类别等），按下方提供的 UI 语言进行回答。不要根据 UI 语言推断会计制度，也不要根据会计制度推断 UI 语言。\n\n排版要求：仅使用两个星号(**)进行加粗，使用清晰的列表和段落。",
+    "ocrPrompt": "你是一位专业的票据信息提取助手。请从这张发票图片中提取以下信息，严格按 JSON 格式返回（不要 markdown 代码块）：\n{\n  \"date\": \"开票日期 YYYY-MM-DD\",\n  \"customer\": \"客户名称/购方名称\",\n  \"quantity\": \"货物总数量及单位\",\n  \"price\": 合计不含税金额数字,\n  \"shipping\": 运费数字,\n  \"invoiceNo\": \"发票号码\",\n  \"totalWithTax\": 价税合计数字,\n  \"unitPriceWithoutTax\": 不含税单价数字,\n  \"taxAmount\": 合计税额数字\n}\n数字字段必须是数字而非字符串，没有则填 0。",
+    "chatSystemPrompt": "你是一位专业的企业经营数据助手，拥有企业全部实时经营数据的访问权限。\n\n你的职责：\n1. 基于完整数据回答用户关于企业内部经营的任何问题\n2. 能够进行跨模块分析\n3. 数据分析时可以主动关联多个模块的数据给出综合建议\n\n重要：请严格按下方提供的会计制度（accounting locale）进行经营与财务分析（管理口径）（币种、税制、报表结构、会计类别等），按下方提供的 UI 语言进行回答。不要根据 UI 语言推断会计制度，也不要根据会计制度推断 UI 语言。\n\n排版要求：仅使用两个星号(**)进行加粗，使用清晰的列表和段落。",
     "contextFallback": "企业概况：年营收 {{revenue}}，毛利率 {{grossMargin}}%，净利率 {{netMargin}}%。",
-    "forecastSystemPrompt": "你是一位精通行业的首席财务官与市场分析师。请结合企业历史数据和统计模型结果进行综合预测。返回JSON，包含insights字符串和predictions数组。",
+    "forecastSystemPrompt": "你是一位资深的企业经营分析师。请结合企业历史数据和统计模型结果，给出经营层面的综合预测（管理参考，非法定财务/税务结论）。返回JSON，包含insights字符串和predictions数组。",
     "boundaryDirective": "边界：你只提供经营管理层面的估算与建议，不得给出法定税务或会计结论；涉及报税、纳税申报或合规时，必须说明这是估算并建议咨询专业会计师/税务师。"
   },
   "usTax": {
