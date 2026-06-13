@@ -15,6 +15,7 @@ import { getTaxLabel } from './accountingHelpers';
 import { aiErrorMessage, aiErrorMessageFromCode } from '../services/aiErrors';
 import { KNOWN_MODELS, DEFAULT_MODEL, modelLabelFor, findModelOption, shouldAutoMigrate } from './aiProviderModels';
 import { providerLogo } from './providerLogos';
+import { getProviderDisplayName } from './providerDisplay';
 
 const PROVIDER_DOCS: Record<AIProviderId, { label: string; getKeyUrl: string; placeholder: string; icon: string; color: string }> = {
   anthropic: { label: 'Claude · Anthropic', getKeyUrl: 'https://console.anthropic.com/settings/keys', placeholder: 'sk-ant-api03-...', icon: 'fa-feather', color: '#274C92' },
@@ -195,6 +196,7 @@ const ProvidersSection: React.FC = () => {
         {providers.map(p => {
           const doc = PROVIDER_DOCS[p.provider];
           const logo = providerLogo(p.provider);
+          const name = getProviderDisplayName(p.provider, i18n.language);
           const row = rowStates[p.provider] || initRow(p.model || DEFAULT_MODEL[p.provider]);
 
           return (
@@ -204,7 +206,7 @@ const ProvidersSection: React.FC = () => {
                   <div className="flex items-center">
                     {logo ? (
                       <div className="w-10 h-10 rounded-lg flex items-center justify-center mr-3 bg-[#f5f5f4]">
-                        <img src={logo} alt={doc.label} className="w-6 h-6 object-contain" />
+                        <img src={logo} alt={name} className="w-6 h-6 object-contain" />
                       </div>
                     ) : (
                       <div className="w-10 h-10 rounded-lg flex items-center justify-center mr-3" style={{ backgroundColor: `${doc.color}15`, color: doc.color }}>
@@ -213,7 +215,7 @@ const ProvidersSection: React.FC = () => {
                     )}
                     <div>
                       <div className="flex items-center space-x-2">
-                        <h4 className="text-sm font-semibold text-[#191918]">{doc.label}</h4>
+                        <h4 className="text-sm font-semibold text-[#191918]">{name}</h4>
                         {p.isDefault && <span className="text-[10px] font-bold bg-primary text-white px-2 py-0.5 rounded uppercase">{t('common.default')}</span>}
                         {p.hasKey && !p.isDefault && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded uppercase">{t('settings.ai.configured')}</span>}
                         {!p.hasKey && <span className="text-[10px] font-bold text-[#7a7a78] bg-[#f0eeeb] px-2 py-0.5 rounded uppercase">{t('settings.ai.notConfigured')}</span>}
