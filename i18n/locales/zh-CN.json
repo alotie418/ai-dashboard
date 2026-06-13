@@ -165,7 +165,7 @@
       "empty": "该制度暂无此类型的类别",
       "addNew": "新增类别",
       "addNewButton": "新增自定义类别",
-      "systemNote": "系统预置类别由 SoloLedger 维护，与官方报表项目对应，不可删除（但可改名）。自建类别完全由你掌控。"
+      "systemNote": "系统预置类别由 SoloLedger 维护，按经营管理口径分类，不可删除（但可改名）。自建类别完全由你掌控。"
     },
     "ai": {
       "title": "AI 服务商 · BYOK",

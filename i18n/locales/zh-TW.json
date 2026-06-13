@@ -165,7 +165,7 @@
       "empty": "該制度暫無此類型的類別",
       "addNew": "新增類別",
       "addNewButton": "新增自訂類別",
-      "systemNote": "系統預置類別由 SoloLedger 維護，與官方報表項目對應，不可刪除（但可改名）。自訂類別完全由您掌控。"
+      "systemNote": "系統預置類別由 SoloLedger 維護，按經營管理口徑分類，不可刪除（但可改名）。自訂類別完全由您掌控。"
     },
     "ai": {
       "title": "AI 服務商 · BYOK",

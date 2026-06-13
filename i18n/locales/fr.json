@@ -165,7 +165,7 @@
       "empty": "Aucune catégorie de ce type pour cette norme",
       "addNew": "Ajouter une catégorie",
       "addNewButton": "Ajouter une catégorie personnalisée",
-      "systemNote": "Les catégories système sont maintenues par SoloLedger et mappées aux lignes officielles de rapport. Elles ne peuvent être supprimées, seulement renommées. Les catégories personnalisées sont entièrement sous votre contrôle."
+      "systemNote": "Les catégories système sont maintenues par SoloLedger et regroupées selon une logique de gestion. Elles ne peuvent être supprimées, seulement renommées. Les catégories personnalisées sont entièrement sous votre contrôle."
     },
     "ai": {
       "title": "Fournisseurs IA · BYOK",
