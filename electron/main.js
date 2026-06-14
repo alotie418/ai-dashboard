@@ -43,28 +43,43 @@ function createMainWindow() {
   });
 }
 
-app.whenReady().then(async () => {
-  // 数据库 + IPC handler 注册（Phase 1.2/1.3 落地）
-  try {
-    const { initDatabase } = require('./db');
-    initDatabase();
-  } catch (e) {
-    console.error('[db] init skipped or failed:', e?.message || e);
-  }
+// 单实例锁：防止第二个实例连到同一个 SQLite 库（WAL 并发写 / 恢复时可能损坏数据）。
+// 拿不到锁 = 已有实例在运行 → 退出本实例；已有实例收到 second-instance 后把窗口拉到前台。
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
-  try {
-    const { registerHandlers } = require('./handlers');
-    registerHandlers({ ipcMain, dialog });
-  } catch (e) {
-    console.error('[handlers] registration failed:', e?.message || e);
-  }
-
-  createMainWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
   });
-});
+
+  app.whenReady().then(async () => {
+    // 数据库 + IPC handler 注册（Phase 1.2/1.3 落地）
+    try {
+      const { initDatabase } = require('./db');
+      initDatabase();
+    } catch (e) {
+      console.error('[db] init skipped or failed:', e?.message || e);
+    }
+
+    try {
+      const { registerHandlers } = require('./handlers');
+      registerHandlers({ ipcMain, dialog });
+    } catch (e) {
+      console.error('[handlers] registration failed:', e?.message || e);
+    }
+
+    createMainWindow();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+    });
+  });
+}
 
 app.on('window-all-closed', () => {
   // macOS 习惯：关闭所有窗口不退出，留 Dock 图标
