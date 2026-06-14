@@ -2,7 +2,8 @@
 //   Quantities are kept PER product (each its own unit) — never summed across
 //   products. Total inventory cost IS summable (money). Service items
 //   (is_service=1), inactive products, and "unassigned" (product_id IS NULL)
-//   rows are excluded. Reads legacy purchases/sales `tons`; changes no calc.
+//   rows are excluded. Reads legacy purchases/sales `tons`. Cost basis is
+//   tax-EXCLUSIVE (amountWithoutTax), matching the P&L COGS basis (PR-T4).
 
 const { getDb } = require('../db');
 
@@ -20,7 +21,7 @@ function computeSummary(db) {
         COALESCE(sout.qty_out, 0) AS qty_out
       FROM products p
       LEFT JOIN (
-        SELECT product_id, SUM(tons) AS qty_in, SUM(totalAmount) AS cost_in
+        SELECT product_id, SUM(tons) AS qty_in, SUM(COALESCE(amountWithoutTax, totalAmount)) AS cost_in
         FROM purchases WHERE product_id IS NOT NULL GROUP BY product_id
       ) pin ON pin.product_id = p.id
       LEFT JOIN (
@@ -40,7 +41,7 @@ function computeSummary(db) {
   for (const r of rows) {
     const qtyOnHand = Math.round(((r.qty_in || 0) - (r.qty_out || 0)) * 100) / 100;
     if (qtyOnHand <= 0) continue; // only in-stock products
-    // cost basis: explicit default unit cost, else weighted-average purchase cost
+    // cost basis (tax-exclusive): explicit default unit cost, else weighted-average purchase cost
     const avgCost = (r.qty_in || 0) > 0 ? (r.cost_in || 0) / r.qty_in : 0;
     const unitCost = Math.round((r.default_unit_cost > 0 ? r.default_unit_cost : avgCost) * 100) / 100;
     const lineCost = Math.round(qtyOnHand * unitCost * 100) / 100;

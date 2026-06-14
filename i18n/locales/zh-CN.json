@@ -1037,7 +1037,7 @@
     "name": "名称",
     "namePlaceholder": "例如：A 型包装盒 / 咨询服务",
     "unit": "单位",
-    "cost": "默认单价",
+    "cost": "默认单价（不含税）",
     "type": "类型",
     "product": "商品",
     "service": "服务",

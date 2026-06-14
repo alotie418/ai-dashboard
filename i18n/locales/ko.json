@@ -1037,7 +1037,7 @@
     "name": "이름",
     "namePlaceholder": "예: A형 포장 상자 / 컨설팅",
     "unit": "단위",
-    "cost": "기본 단가",
+    "cost": "기본 단가(부가세 제외)",
     "type": "유형",
     "product": "상품",
     "service": "서비스",

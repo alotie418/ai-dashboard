@@ -1037,7 +1037,7 @@
     "name": "名称",
     "namePlaceholder": "例：A型梱包箱 / コンサルティング",
     "unit": "単位",
-    "cost": "既定単価",
+    "cost": "既定単価（税抜）",
     "type": "種別",
     "product": "商品",
     "service": "サービス",

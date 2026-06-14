@@ -1037,7 +1037,7 @@
     "name": "Name",
     "namePlaceholder": "e.g. Type-A packing box / Consulting",
     "unit": "Unit",
-    "cost": "Default Unit Price",
+    "cost": "Default Unit Price (excl. tax)",
     "type": "Type",
     "product": "Product",
     "service": "Service",
