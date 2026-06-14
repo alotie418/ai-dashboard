@@ -202,6 +202,7 @@ export interface Category {
   schedule_line: string | null;
   is_deductible: boolean;
   deductible_pct: number;
+  is_cogs: boolean; // PR-T5: true = cost of goods sold; false = operating expense
   parent_id: string | null;
   sort_order: number;
   is_system: boolean;
@@ -221,6 +222,7 @@ export interface CategoryUpsert {
   schedule_line?: string;
   is_deductible?: boolean;
   deductible_pct?: number;
+  is_cogs?: boolean; // PR-T5: mark a category as cost of goods sold
   parent_id?: string;
   sort_order?: number;
 }
@@ -403,6 +405,30 @@ export function fetchTransactionSummary(opts: { from?: string; to?: string } = {
   if (opts.from) qs.set('from', opts.from);
   if (opts.to) qs.set('to', opts.to);
   return apiFetch<TransactionSummary>(`/api/transactions/summary${qs.toString() ? '?' + qs.toString() : ''}`);
+}
+
+// PR-T5-2B-1: batch-move expense transactions between categories (management
+// classification only). Always preview with dryRun:true first, then commit with
+// dryRun:false; pass expectedAffected (the previewed count) so a drift since the
+// preview is rejected (409) instead of silently moving a different set.
+export interface RecategorizeResult {
+  dryRun: boolean;
+  fromCategoryId: string;
+  toCategoryId: string;
+  affected?: number; // present when dryRun:true
+  moved?: number;    // present when dryRun:false
+}
+
+export function recategorizeTransactions(
+  fromCategoryId: string,
+  toCategoryId: string,
+  dryRun: boolean,
+  expectedAffected?: number,
+): Promise<RecategorizeResult> {
+  return apiFetch('/api/transactions/recategorize', {
+    method: 'POST',
+    body: JSON.stringify({ fromCategoryId, toCategoryId, dryRun, expectedAffected }),
+  });
 }
 
 // ==================== Legacy Data Migrations（旧 sales/purchases → transactions）====================
