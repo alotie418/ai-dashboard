@@ -7,6 +7,9 @@ const reportTypes = [
 
 function generate(ctx) {
   const { incomeRows, expenseRows, categories, incomeTaxRate, currency, year, from, to } = ctx;
+  // SE-tax constants are year-keyed (see usTaxParams.js); unknown years fall
+  // back to the latest. Management estimate only — not tax-filing advice.
+  const { params: se, year: seParamYear } = require('./usTaxParams').resolveSeTaxParams(year);
 
   // Gross receipts (Line 1)
   const grossReceipts = incomeRows.reduce((s, r) => s + (r.amount || 0), 0);
@@ -48,7 +51,7 @@ function generate(ctx) {
     line22_supplies: r(expenseBySlug['supplies'] || 0),
     line23_taxes: r(expenseBySlug['taxes'] || 0),
     line24a_travel: r(expenseBySlug['travel'] || 0),
-    line24b_meals: r((expenseBySlug['meals'] || 0) * 0.5), // 50% deductible
+    line24b_meals: r((expenseBySlug['meals'] || 0) * se.mealsDeductiblePct), // meals partial-deductible (year-keyed)
     line25_utilities: r(expenseBySlug['utilities'] || 0),
     line26_wages: r(expenseBySlug['wages'] || 0),
     line27a_other: r(expenseBySlug['other'] || 0),
@@ -61,12 +64,12 @@ function generate(ctx) {
 
   const netProfit = grossIncome - totalExpenses; // Line 31
 
-  // Self-Employment Tax estimate
-  const seEarnings = netProfit * 0.9235; // 92.35% of net earnings
-  const ssTaxCap = 168600; // 2024 cap
-  const ssTax = Math.min(seEarnings, ssTaxCap) * 0.124; // 12.4%
-  const medicareTax = seEarnings * 0.029; // 2.9%
-  const additionalMedicare = seEarnings > 200000 ? (seEarnings - 200000) * 0.009 : 0;
+  // Self-Employment Tax estimate — rates/cap from usTaxParams.js (year-keyed)
+  const seEarnings = netProfit * se.seEarningsFactor; // net-earnings factor
+  const ssTaxCap = se.ssWageCap; // SSA contribution & benefit base for the year
+  const ssTax = Math.min(seEarnings, ssTaxCap) * se.ssRate;
+  const medicareTax = seEarnings * se.medicareRate;
+  const additionalMedicare = seEarnings > se.addlMedicareThreshold ? (seEarnings - se.addlMedicareThreshold) * se.addlMedicareRate : 0;
   const totalSETax = r(ssTax + medicareTax + additionalMedicare);
 
   // Quarterly estimated tax
@@ -92,6 +95,7 @@ function generate(ctx) {
       medicareTax: r(medicareTax),
       additionalMedicare: r(additionalMedicare),
       totalSETax,
+      paramYear: seParamYear,
     },
 
     estimatedTax: {

@@ -30,6 +30,7 @@
     "check:tax-labels": "node scripts/check-tax-labels.mjs",
     "check:report-titles": "node scripts/check-report-titles.mjs",
     "check:hardcoded-rates": "node scripts/check-hardcoded-rates.mjs",
+    "check:us-tax-params": "node scripts/check-us-tax-params.mjs",
     "check:locale": "npm run check:locale-matrix && npm run check:raw-keys",
     "test:locale-ui": "npm run build && playwright test",
     "build:dmg": "BUILD_TARGET=dmg npm run build && electron-builder --mac dmg --config electron-builder.dmg.yml",
