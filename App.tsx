@@ -123,16 +123,26 @@ const AppContent: React.FC = () => {
             color: 'bg-cyan-500',
           },
           {
-            label: `${t('header.yearLabel', { year: selectedYear })} ${t('dashboard.purchasesLabel')}`,
-            value: m.purchaseTotalAmount > 0 ? formatMoney(m.purchaseTotalAmount, accLocale) : '—',
-            subValue: m.purchaseTotalTons > 0 ? `${m.purchaseTotalTons}${qtySuffix}` : '—',
+            // PR fix: dashboard money KPI = report-engine canonical (matches the P&L),
+            // not legacy tax-inclusive metrics. US has no COGS line — its
+            // financialStatement.costOfSales maps to Schedule C Line 28 total expenses,
+            // so US shows a "Total Expenses" label, not "Cost of Sales". subValue is
+            // '—': legacy tons are a different (quantity) source and would mislead
+            // next to a report-engine net amount.
+            label: `${t('header.yearLabel', { year: selectedYear })} ${accLocale === 'US' ? t('dashboard.totalExpenses') : t('dashboard.cogsNoTax')}`,
+            value: enrichedFS.costOfSales > 0 ? formatMoney(enrichedFS.costOfSales, accLocale) : '—',
+            subValue: '—',
             icon: 'fa-truck-loading',
             color: 'bg-purple-500',
           },
           {
-            label: `${t('header.yearLabel', { year: selectedYear })} ${t('dashboard.salesLabel')}`,
-            value: m.salesTotalAmount > 0 ? formatMoney(m.salesTotalAmount, accLocale) : '—',
-            subValue: m.salesTotalTons > 0 ? `${m.salesTotalTons}${qtySuffix}` : '—',
+            // PR fix: operating revenue (net) from the report engine — same source as
+            // the P&L's salesRevenue. US salesRevenue = Schedule C Line 7 gross income
+            // (not a VAT "excl. tax" figure), so US uses its kpiGrossIncome label.
+            // subValue '—' (see above).
+            label: `${t('header.yearLabel', { year: selectedYear })} ${accLocale === 'US' ? getTaxLabel(accLocale, i18n.language, 'kpiGrossIncome') : t('dashboard.revenueNoTax')}`,
+            value: enrichedFS.salesRevenue > 0 ? formatMoney(enrichedFS.salesRevenue, accLocale) : '—',
+            subValue: '—',
             icon: 'fa-chart-line',
             color: 'bg-green-500',
           },
