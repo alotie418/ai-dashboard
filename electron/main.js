@@ -10,6 +10,27 @@ const BUILD_TARGET = process.env.BUILD_TARGET || (process.mas ? 'mas' : 'dmg');
 
 let mainWindow = null;
 
+// 外链 / 导航安全策略
+// - 只允许 https 外链走系统浏览器（http / file / javascript: / 自定义协议一律忽略）
+// - 应用内（dev: http://localhost:3000；prod: file://dist/index.html）以外的整页导航一律拦截
+function openExternalIfAllowed(url) {
+  try {
+    if (new URL(url).protocol === 'https:') {
+      shell.openExternal(url);
+      return true;
+    }
+  } catch {
+    // 非法 URL，忽略
+  }
+  return false;
+}
+
+function isInternalUrl(url) {
+  return isDev
+    ? url.startsWith('http://localhost:3000')
+    : url.startsWith('file://');
+}
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -36,10 +57,19 @@ function createMainWindow() {
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
 
-  // 外链走系统浏览器，不在窗口内打开
+  // 外链只允许 https 走系统浏览器，其余一律拒绝且不在窗口内打开
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http')) shell.openExternal(url);
+    openExternalIfAllowed(url);
     return { action: 'deny' };
+  });
+
+  // 防护：阻止非预期的整页跳转（本应用是 SPA，正常不会触发 will-navigate）。
+  // 非「应用内」目标一律拦截；若是 https 外链则转交系统浏览器。
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!isInternalUrl(url)) {
+      event.preventDefault();
+      openExternalIfAllowed(url);
+    }
   });
 }
 
