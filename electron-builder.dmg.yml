@@ -17,9 +17,12 @@ files:
   - package.json
   - "!**/*.{map,md}"
 
-# 原生模块（better-sqlite3 的 .node）必须从 asar 解包，否则运行时无法加载。
+# 原生模块（.node）必须从 asar 解包，否则运行时无法加载。
 asarUnpack:
   - "**/node_modules/better-sqlite3/**"
+  # @napi-rs/canvas（经 pdfjs-dist 间接依赖，含 skia.*.node）—— PDF 报表渲染所需。
+  # 显式解包，避免仅依赖 electron-builder 自动探测（依赖布局变动时可能失效，导致打包后 PDF 渲染崩）。
+  - "**/node_modules/@napi-rs/**"
 
 mac:
   category: public.app-category.finance
