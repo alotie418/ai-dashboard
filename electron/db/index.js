@@ -28,6 +28,11 @@ function initDatabase() {
   db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
+  // 单用户桌面场景加固：
+  // - synchronous=FULL：断电 / 崩溃时不丢最近一笔已提交事务（写量小，性能影响可忽略）
+  // - busy_timeout=5000：遇到库锁时最多等 5s 再报错，配合单实例锁降低 SQLITE_BUSY
+  db.pragma('synchronous = FULL');
+  db.pragma('busy_timeout = 5000');
 
   runMigrations(db);
   console.log('[db] ready at', dbPath);

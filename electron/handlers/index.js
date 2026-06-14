@@ -63,13 +63,16 @@ function registerHandlers({ ipcMain, dialog }) {
   // ====== 数据库备份 / 导出 ======
   ipcMain.handle('app:exportDb', async () => {
     const { getDbPath, getDb } = require('../db');
+    const path = require('node:path');
+    const { app } = require('electron');
     const dbPath = getDbPath();
     // 加固：备份前先把 WAL 落盘到主库，否则最近已提交事务可能还在 -wal 里，
     // 单文件拷贝会丢这部分数据。TRUNCATE 后 wal 清空，单 .db 即完整快照。
     try { getDb().pragma('wal_checkpoint(TRUNCATE)'); } catch (e) { console.warn('[app:exportDb] checkpoint failed:', e?.message || e); }
     const result = await dialog.showSaveDialog({
       title: '导出账本数据',
-      defaultPath: `sololedger-backup-${new Date().toISOString().slice(0, 10)}.db`,
+      // 默认落在「文稿」目录（持久、易找），而非进程 CWD / app bundle 旁（重装即丢）。
+      defaultPath: path.join(app.getPath('documents'), `sololedger-backup-${new Date().toISOString().slice(0, 10)}.db`),
       filters: [{ name: 'SQLite 数据库', extensions: ['db'] }],
     });
     if (result.canceled || !result.filePath) return { ok: false };
