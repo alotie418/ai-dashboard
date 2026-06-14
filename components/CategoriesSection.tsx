@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import type { LangCode } from '../i18n';
 import {
   listCategories, createCategory, updateCategory, deleteCategory,
+  recategorizeTransactions,
   type AccountingLocale, type Category, type CategoryType,
   fetchSettings,
 } from '../services/api';
@@ -40,6 +41,17 @@ const CategoriesSection: React.FC = () => {
   const [newLabel, setNewLabel] = useState('');
   const [newScheduleLine, setNewScheduleLine] = useState('');
   const [newDeductiblePct, setNewDeductiblePct] = useState<number>(100);
+
+  // PR-T5-2B-2: batch re-categorize panel (expense, non-US). A move changes only
+  // transactions' category_id — the categories list is unchanged — so a successful
+  // commit does NOT reload(), and the "moved N" success message persists. (The
+  // is_cogs toggle DOES reload(), but that only refreshes `cats`, not this state.)
+  const [recatFrom, setRecatFrom] = useState('');
+  const [recatTo, setRecatTo] = useState('');
+  const [recatPhase, setRecatPhase] = useState<'idle' | 'previewing' | 'previewed' | 'committing' | 'success'>('idle');
+  const [recatAffected, setRecatAffected] = useState<number | null>(null);
+  const [recatMoved, setRecatMoved] = useState<number | null>(null);
+  const [recatError, setRecatError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSettings().then((s: any) => {
@@ -97,9 +109,54 @@ const CategoriesSection: React.FC = () => {
     }
   };
 
+  const toggleCogs = async (c: Category) => {
+    try {
+      await updateCategory(c.id, { is_cogs: !c.is_cogs });
+      reload(); // refresh the badge; the recat panel state below is untouched
+    } catch (e: any) {
+      setError(e?.message || 'Update failed');
+    }
+  };
+
+  const resetRecat = () => { setRecatPhase('idle'); setRecatAffected(null); setRecatMoved(null); setRecatError(null); };
+  const onRecatSelect = (set: (v: string) => void) => (e: React.ChangeEvent<HTMLSelectElement>) => { set(e.target.value); resetRecat(); };
+
+  const doPreview = async () => {
+    if (!recatFrom || !recatTo || recatFrom === recatTo) {
+      setRecatError(t('settings.categories.recatSameError', '来源与目标分类需不同'));
+      return;
+    }
+    setRecatError(null); setRecatMoved(null); setRecatPhase('previewing');
+    try {
+      const res = await recategorizeTransactions(recatFrom, recatTo, true);
+      setRecatAffected(res.affected ?? 0);
+      setRecatPhase('previewed');
+    } catch {
+      // IPC drops structured err.status; treat any preview failure uniformly.
+      setRecatPhase('idle'); setRecatAffected(null);
+      setRecatError(t('settings.categories.recatPreviewFailed', '预览失败，请稍后重试'));
+    }
+  };
+
+  const doCommit = async () => {
+    if (recatAffected == null) return;
+    setRecatError(null); setRecatPhase('committing');
+    try {
+      // dryRun:false MUST carry expectedAffected (the previewed count).
+      const res = await recategorizeTransactions(recatFrom, recatTo, false, recatAffected);
+      setRecatMoved(res.moved ?? 0);
+      setRecatPhase('success'); // categories unchanged → no reload(); success message persists
+    } catch {
+      // Don't assume 409 from err.status (IPC strips it); force a fresh preview.
+      setRecatPhase('idle'); setRecatAffected(null);
+      setRecatError(t('settings.categories.recatRetryPreview', '移动失败，请重新预览后再试'));
+    }
+  };
+
   const profile = ACCOUNTING_PROFILES[locale];
   const localeName = profile?.name[lang] || profile?.name['en'] || locale;
   const localeFlag = profile?.flag || '';
+  const showCogs = activeType === 'expense' && locale !== 'US';
 
   return (
     <section className="space-y-6">
@@ -164,12 +221,13 @@ const CategoriesSection: React.FC = () => {
                 <th className="text-left px-4 py-2.5">{t('settings.categories.slug', 'Slug')}</th>
                 <th className="text-left px-4 py-2.5">{t('settings.categories.scheduleLine', '报表行')}</th>
                 <th className="text-right px-4 py-2.5">{usLabel('setDeductibleHeader', 'settings.categories.deductible', '可抵扣')}</th>
+                {showCogs && <th className="text-center px-4 py-2.5">{t('settings.categories.cogsHeader', '成本类型')}</th>}
                 <th className="text-right px-4 py-2.5 w-24"></th>
               </tr>
             </thead>
             <tbody>
               {cats.length === 0 && (
-                <tr><td colSpan={5} className="text-center text-[#7a7a78] py-6 text-xs">{t('settings.categories.empty', '该制度暂无此类型的类别')}</td></tr>
+                <tr><td colSpan={showCogs ? 6 : 5} className="text-center text-[#7a7a78] py-6 text-xs">{t('settings.categories.empty', '该制度暂无此类型的类别')}</td></tr>
               )}
               {cats.map(c => (
                 <tr key={c.id} className="border-t border-[#e0ddd5]/70 hover:bg-[#f9f9f8]/40">
@@ -186,6 +244,15 @@ const CategoriesSection: React.FC = () => {
                       <span className="text-[#7a7a78]">—</span>
                     )}
                   </td>
+                  {showCogs && (
+                    <td className="px-4 py-2 text-center">
+                      <button
+                        onClick={() => toggleCogs(c)}
+                        className={`text-[10px] px-2 py-0.5 rounded transition-colors ${c.is_cogs ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-[#f0eeeb] text-[#7a7a78] hover:bg-[#e8e6e1]'}`}>
+                        {c.is_cogs ? t('settings.categories.cogsBadge', '销售成本') : t('settings.categories.operatingBadge', '期间费用')}
+                      </button>
+                    </td>
+                  )}
                   <td className="px-4 py-2 text-right">
                     {!c.is_system && (
                       confirmDelete === c.id ? (
@@ -205,6 +272,42 @@ const CategoriesSection: React.FC = () => {
             </tbody>
           </table>
           </div>
+        </div>
+      )}
+
+      {/* PR-T5-2B-2: batch re-categorize (expense, non-US) — management
+          classification adjustment; never changes amounts or net profit. */}
+      {showCogs && (
+        <div className="border border-[#e0ddd5] rounded-xl p-4 space-y-3">
+          <div className="text-sm font-semibold text-[#191918]">{t('settings.categories.recatTitle', '批量重分类')}</div>
+          <p className="text-[11px] text-[#7a7a78]">{t('settings.categories.recatNote', '仅调整经营管理分类，不改变金额、税额与净利润。')}</p>
+          <div className="flex items-center gap-2 flex-wrap text-sm">
+            <span className="text-[#4a4a48]">{t('settings.categories.recatFrom', '从')}</span>
+            <select value={recatFrom} onChange={onRecatSelect(setRecatFrom)} className="text-xs px-2 py-1 border border-[#e0ddd5] rounded bg-white max-w-[38%]">
+              <option value="">—</option>
+              {cats.map(c => <option key={c.id} value={c.id}>{usCatLabel(c)}</option>)}
+            </select>
+            <i className="fas fa-arrow-right text-[#7a7a78]"></i>
+            <span className="text-[#4a4a48]">{t('settings.categories.recatTo', '到')}</span>
+            <select value={recatTo} onChange={onRecatSelect(setRecatTo)} className="text-xs px-2 py-1 border border-[#e0ddd5] rounded bg-white max-w-[38%]">
+              <option value="">—</option>
+              {cats.map(c => <option key={c.id} value={c.id}>{usCatLabel(c)}</option>)}
+            </select>
+            <button onClick={doPreview} disabled={recatPhase === 'previewing' || recatPhase === 'committing' || !recatFrom || !recatTo}
+              className="text-xs px-3 py-1 bg-primary text-white rounded hover:bg-primary-hover disabled:opacity-50">
+              {recatPhase === 'previewing' ? <i className="fas fa-spinner fa-spin"></i> : t('settings.categories.recatPreview', '预览')}
+            </button>
+          </div>
+          {recatPhase === 'previewed' && (
+            <div className="flex items-center gap-2 flex-wrap text-sm bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
+              <span className="text-[#191918]">{t('settings.categories.recatWillMove', { count: recatAffected ?? 0 })}</span>
+              <button onClick={doCommit} className="text-xs px-3 py-1 bg-primary text-white rounded hover:bg-primary-hover">{t('settings.categories.recatConfirm', '确认移动')}</button>
+              <button onClick={resetRecat} className="text-xs px-3 py-1 border border-[#e0ddd5] text-[#4a4a48] rounded hover:bg-[#f0eeeb]">{t('common.cancel')}</button>
+            </div>
+          )}
+          {recatPhase === 'committing' && <div className="text-xs text-[#7a7a78]"><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('settings.categories.recatConfirm', '确认移动')}…</div>}
+          {recatPhase === 'success' && <div className="text-sm text-emerald-600"><i className="fas fa-check-circle mr-1.5"></i>{t('settings.categories.recatMoved', { count: recatMoved ?? 0 })}</div>}
+          {recatError && <div className="text-sm text-rose-600"><i className="fas fa-exclamation-circle mr-1.5"></i>{recatError}</div>}
         </div>
       )}
 

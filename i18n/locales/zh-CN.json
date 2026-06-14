@@ -165,7 +165,21 @@
       "empty": "该制度暂无此类型的类别",
       "addNew": "新增类别",
       "addNewButton": "新增自定义类别",
-      "systemNote": "系统预置类别由 SoloLedger 维护，按经营管理口径分类，不可删除（但可改名）。自建类别完全由你掌控。"
+      "systemNote": "系统预置类别由 SoloLedger 维护，按经营管理口径分类，不可删除（但可改名）。自建类别完全由你掌控。",
+      "cogsHeader": "成本类型",
+      "cogsBadge": "销售成本",
+      "operatingBadge": "期间费用",
+      "recatTitle": "批量重分类",
+      "recatNote": "仅调整经营管理分类，不改变金额、税额与净利润。",
+      "recatFrom": "从",
+      "recatTo": "到",
+      "recatPreview": "预览",
+      "recatWillMove": "将移动 {{count}} 笔交易",
+      "recatConfirm": "确认移动",
+      "recatMoved": "已移动 {{count}} 笔",
+      "recatPreviewFailed": "预览失败，请稍后重试",
+      "recatRetryPreview": "移动失败，请重新预览后再试",
+      "recatSameError": "来源与目标分类需不同"
     },
     "ai": {
       "title": "AI 服务商 · BYOK",

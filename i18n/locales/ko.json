@@ -165,7 +165,21 @@
       "empty": "이 제도에는 해당 유형의 과목이 없습니다",
       "addNew": "과목 추가",
       "addNewButton": "사용자 정의 과목 추가",
-      "systemNote": "시스템 기본 과목은 SoloLedger가 관리하며 경영 관리 기준으로 분류됩니다. 삭제할 수 없지만 이름은 변경할 수 있습니다. 사용자 정의 과목은 완전히 본인이 관리합니다."
+      "systemNote": "시스템 기본 과목은 SoloLedger가 관리하며 경영 관리 기준으로 분류됩니다. 삭제할 수 없지만 이름은 변경할 수 있습니다. 사용자 정의 과목은 완전히 본인이 관리합니다.",
+      "cogsHeader": "원가 구분",
+      "cogsBadge": "매출원가",
+      "operatingBadge": "영업비용",
+      "recatTitle": "일괄 재분류",
+      "recatNote": "경영 관리용 분류만 조정하며 금액·세액·순이익은 변경되지 않습니다.",
+      "recatFrom": "보내기",
+      "recatTo": "받기",
+      "recatPreview": "미리보기",
+      "recatWillMove": "{{count}}건을 이동합니다",
+      "recatConfirm": "이동 확인",
+      "recatMoved": "{{count}}건을 이동했습니다",
+      "recatPreviewFailed": "미리보기에 실패했습니다. 잠시 후 다시 시도하세요.",
+      "recatRetryPreview": "이동에 실패했습니다. 다시 미리보기 후 시도하세요.",
+      "recatSameError": "보내기와 받기 분류는 달라야 합니다."
     },
     "ai": {
       "title": "AI 서비스 · BYOK",

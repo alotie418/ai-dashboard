@@ -165,7 +165,21 @@
       "empty": "No categories of this type for this accounting standard",
       "addNew": "Add Category",
       "addNewButton": "Add custom category",
-      "systemNote": "System categories are maintained by SoloLedger and grouped by management reporting basis. They cannot be deleted but can be renamed. Custom categories are fully under your control."
+      "systemNote": "System categories are maintained by SoloLedger and grouped by management reporting basis. They cannot be deleted but can be renamed. Custom categories are fully under your control.",
+      "cogsHeader": "Cost Type",
+      "cogsBadge": "COGS",
+      "operatingBadge": "Operating",
+      "recatTitle": "Bulk Re-categorize",
+      "recatNote": "Management classification only — does not change amounts, tax, or net profit.",
+      "recatFrom": "From",
+      "recatTo": "To",
+      "recatPreview": "Preview",
+      "recatWillMove": "Will move {{count}} transactions",
+      "recatConfirm": "Confirm move",
+      "recatMoved": "Moved {{count}} transactions",
+      "recatPreviewFailed": "Preview failed, please try again later.",
+      "recatRetryPreview": "Move failed — please preview again and retry.",
+      "recatSameError": "From and to categories must differ."
     },
     "ai": {
       "title": "AI Providers · BYOK",
