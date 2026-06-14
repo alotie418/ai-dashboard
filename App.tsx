@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { MOCK_BUSINESS_DATA } from './constants';
 import { fetchAIAnalysis } from './services/aiBriefingService';
 import { AIAnalysis, BusinessData } from './types';
-import { fetchDashboardData, fetchSales, fetchPurchases, fetchSettings, listProviders } from './services/api';
+import { fetchDashboardData, fetchPurchases, fetchSettings, listProviders } from './services/api';
 import { parseAiErrorCode, aiErrorMessage } from './services/aiErrors';
 import MetricCard from './components/MetricCard';
 import AIInsights from './components/AIInsights';
@@ -66,56 +66,25 @@ const AppContent: React.FC = () => {
       const dashboard = await fetchDashboardData(selectedYear);
       const m = dashboard.metrics;
 
-      // Enrich financialStatement with computed expense fields
+      // PR-T2: trust the backend's locale-aware financial statement verbatim.
+      // No client-side tax-rate math — taxSurcharge / incomeTax / grossProfit /
+      // netProfit / margins (and shippingFee / adminExpense) are all computed
+      // server-side (electron reports/* or worker) using the configured per-locale
+      // rates. We only pass the fields through, falling back to 0 if a field is
+      // missing; we never re-derive a formula on the client (which previously
+      // hardcoded a 12% surcharge and a 25% income tax regardless of locale).
       const fs = dashboard.financialStatement;
-      let shippingFee = fs.shippingFee;
-      let taxSurcharge = fs.taxSurcharge;
-
-      // If Worker didn't compute shippingFee, derive from sales records
-      if (shippingFee === 0) {
-        try {
-          const salesRecords = await fetchSales();
-          shippingFee = Math.round(salesRecords.reduce((sum, s) => sum + (s.shipping || 0), 0) * 100) / 100;
-        } catch { /* fallback to 0 */ }
-      }
-
-      // 税金及附加 = 应纳增值税 × 12%
-      if (taxSurcharge === 0 && dashboard.vatStatistics) {
-        const vatPayable = Math.max(0, dashboard.vatStatistics.cumulativeOutput - dashboard.vatStatistics.cumulativeInput);
-        taxSurcharge = Math.round(vatPayable * 0.12 * 100) / 100;
-      }
-
-      // 管理费用：从设置中读取
-      let adminExpense = fs.adminExpense;
-      if (adminExpense === 0) {
-        try {
-          const settings = await fetchSettings();
-          adminExpense = parseFloat(String((settings as any).admin_expense_annual)) || 0;
-        } catch { /* fallback to 0 */ }
-      }
-
-      const revenue = fs.salesRevenue;
-      const cost = fs.costOfSales;
-      const grossProfit = Math.round((revenue - cost) * 100) / 100;
-
-      // 所得税 = max(0, 利润总额) × 25%
-      const profitBeforeTax = grossProfit - taxSurcharge - shippingFee - adminExpense;
-      const incomeTax = Math.round(Math.max(0, profitBeforeTax) * 0.25 * 100) / 100;
-
-      const netProfit = Math.round((profitBeforeTax - incomeTax) * 100) / 100;
-      const grossMargin = revenue === 0 ? 0 : +(grossProfit / revenue * 100).toFixed(2);
-      const netMargin = revenue === 0 ? 0 : +(netProfit / revenue * 100).toFixed(2);
-
       const enrichedFS = {
-        ...fs,
-        shippingFee,
-        taxSurcharge,
-        adminExpense,
-        incomeTax,
-        grossProfit,
-        netProfit,
-        grossMargin,
-        netMargin,
+        salesRevenue: fs.salesRevenue ?? 0,
+        costOfSales: fs.costOfSales ?? 0,
+        taxSurcharge: fs.taxSurcharge ?? 0,
+        shippingFee: fs.shippingFee ?? 0,
+        adminExpense: fs.adminExpense ?? 0,
+        incomeTax: fs.incomeTax ?? 0,
+        grossProfit: fs.grossProfit ?? 0,
+        grossMargin: fs.grossMargin ?? 0,
+        netProfit: fs.netProfit ?? 0,
+        netMargin: fs.netMargin ?? 0,
       };
 
       // accountingLocale from dashboard response (or fallback to CN)

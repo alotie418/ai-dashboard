@@ -1080,6 +1080,74 @@ test.describe('business documents → tax invoice link (Phase D)', () => {
   });
 });
 
+// ───────────────────────────────────────────────────────────────────────────
+// PR-T2: App.tsx trusts the backend financial statement verbatim — it must NOT
+// re-apply a hardcoded 25% income tax / 12% surcharge. The dashboard profit-
+// margin widget recomputes net margin from the passed fields (using the backend
+// incomeTax), so a backend incomeTax that is NOT 25% of profit (CN) or is 0 (JP)
+// proves the client override is gone. (US is intentionally covered via JP: the US
+// dashboard is Schedule-C-card-driven and renders report.scheduleC, not the
+// enriched financialStatement, so the override never reached a US-visible surface
+// — only the AI data feed. The guard check:hardcoded-rates + these tests lock the
+// shared, locale-agnostic code path that also serves US.) The net-margin value is
+// the `span.text-emerald-500.font-bold.text-xl` containing '%' in ProfitMarginIndicators.
+// ───────────────────────────────────────────────────────────────────────────
+async function bootDashboardWithFS(
+  page: import('@playwright/test').Page,
+  ui: string,
+  acc: string,
+  financialStatement: Record<string, number>,
+) {
+  await page.route('**/auth/check', (r) => r.fulfill({ json: { authenticated: true } }));
+  await page.route('**/auth/**', (r) => r.fulfill({ json: { authenticated: true } }));
+  await page.route('**/api/**', (route) => {
+    const url = route.request().url();
+    if (url.includes('/api/settings')) return route.fulfill({ json: SETTINGS(acc) });
+    if (url.includes('/api/dashboard')) return route.fulfill({ json: { ...DASHBOARD(acc), locale: acc, financialStatement } });
+    if (/\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|documents|reports\/types)/.test(url)) {
+      return route.fulfill({ json: [] });
+    }
+    return route.fulfill({ json: {} });
+  });
+  await page.addInitScript((l) => { try { localStorage.setItem('sololedger-lang', l as string); } catch { /* ignore */ } }, ui);
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('nav', { timeout: 20_000 });
+  await page.waitForTimeout(500);
+}
+
+test.describe('PR-T2 → App.tsx trusts backend financial statement (no client tax-rate math)', () => {
+  // The net-margin value is the only emerald `text-xl font-bold` span containing
+  // '%' (gross margin is text-primary; other emerald spans are money totals).
+  const netMargin = (page: import('@playwright/test').Page) =>
+    page.locator('span.text-emerald-500.font-bold.text-xl').filter({ hasText: '%' });
+
+  test('CN: backend income tax (not 25%) flows through to the dashboard net margin', async ({ page }) => {
+    // revenue 100000 − cost 60000 = 40000 gross. Backend income tax = 2000 (e.g. a
+    // small-business ~5% estimate, NOT 25%) → net 38000 → net margin 38%.
+    // Pre-fix, App.tsx forced 25% → income tax 10000 → net margin 30%.
+    await bootDashboardWithFS(page, 'zh-CN', 'CN', {
+      salesRevenue: 100000, costOfSales: 60000, taxSurcharge: 0, shippingFee: 0,
+      adminExpense: 0, incomeTax: 2000, grossProfit: 40000, grossMargin: 40,
+      netProfit: 38000, netMargin: 38,
+    });
+    await expect(netMargin(page)).toHaveText('38%', { timeout: 10_000 });
+    await expect(page.getByText('30%')).toHaveCount(0); // not the 25%-override value
+  });
+
+  test('JP: income tax is not force-applied at 25% (zero-tax case flows through)', async ({ page }) => {
+    // JP renders ProfitMarginIndicators from financialStatement (US is Schedule-C-
+    // card-driven and does not surface it — see file header). Backend income tax = 0
+    // → net margin = gross margin = 40%. Pre-fix, App.tsx forced 25% → net 30%.
+    await bootDashboardWithFS(page, 'ja', 'JP', {
+      salesRevenue: 100000, costOfSales: 60000, taxSurcharge: 0, shippingFee: 0,
+      adminExpense: 0, incomeTax: 0, grossProfit: 40000, grossMargin: 40,
+      netProfit: 40000, netMargin: 40,
+    });
+    await expect(netMargin(page)).toHaveText('40%', { timeout: 10_000 });
+    await expect(page.getByText('30%')).toHaveCount(0); // not the 25%-override value
+  });
+});
+
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const summary = {
