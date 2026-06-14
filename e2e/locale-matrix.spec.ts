@@ -415,6 +415,20 @@ test.describe('finance → export PDF', () => {
     });
   }
 
+  // PR-T1: Balance / Cash Flow render an honest "not enabled yet" empty state
+  // (no zero-filled statement). Verify the coming-soon copy renders, not a $0 total.
+  test('balance / cashflow show coming-soon empty state', async ({ page }) => {
+    const ui = 'zh-CN';
+    await bootFinance(page, ui, 'CN');
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await page.locator('i.fa-wallet').first().click(); // → finance page
+    await page.getByRole('button', { name: loc.finance.tabBalance }).click();
+    // heading role disambiguates from the tab button, whose label may share text
+    await expect(page.getByRole('heading', { name: loc.finance.balanceComingSoonTitle })).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: loc.finance.tabCashflow }).click();
+    await expect(page.getByRole('heading', { name: loc.finance.cashflowTitle })).toBeVisible({ timeout: 10_000 });
+  });
+
   test('export-pdf → mock electronAPI success shows saved path', async ({ page }) => {
     const ui = 'zh-CN';
     await page.addInitScript(() => {
