@@ -85,12 +85,10 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
       : t('header.yearLabel', { year: selectedYear });
 
   const fmt = (v: number) => formatMoney(v, locale, i18n.language);
-  // All non-CN accountingLocales (US/JP/KR/TW/EU) show generic balance-sheet /
-  // cash-flow wording (customer/supplier framing, owner's-equity terms) instead
-  // of China-GAAP 应收账款/应付账款/应交税费/实收资本/未分配利润. Only CN keeps its
-  // finance.* i18n values (and the zh-CN GAAP lock-in) untouched. The P&L lines
-  // and tax summary already resolve per accountingLocale via getTaxLabel.
-  const localeLabel = (taxKey: string, i18nKey: string) => locale !== 'CN' ? getTaxLabel(locale, i18n.language, taxKey) : t(i18nKey);
+  // Balance Sheet / Cash Flow show a "not enabled yet" empty state (PR-T1):
+  // full calculation isn't implemented, so we no longer render a zero-filled
+  // statement that could read as a real report. P&L / Schedule C stay fully
+  // computed and locale-aware via getTaxLabel below.
 
   // Export CSV
   const exportCSV = () => {
@@ -320,55 +318,27 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
           </div>
         )}
 
-        {/* === Balance Sheet (placeholder) === */}
+        {/* === Balance Sheet — full calculation not enabled yet (PR-T1) === */}
         {activeTab === 'balance' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-[#e0ddd5]">
-            <div className="p-10">
-              <h3 className="text-lg font-bold text-[#191918] mb-6 flex items-center">
-                <i className="fas fa-coins mr-3 text-amber-500"></i> {t('finance.balanceAssets')}
-              </h3>
-              <div className="space-y-1">
-                <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2">{t('finance.balanceCurrentAssets')}</h4>
-                <LineItem label={t('finance.balanceCash')} value={fmt(0)} />
-                <LineItem label={localeLabel('balRecvLabel', 'finance.balanceReceivables')} value={fmt(0)} />
-                <LineItem label={t('finance.balanceInventory')} value={fmt(0)} />
-                <div className="border-t border-[#e0ddd5] my-4"></div>
-                <LineItem label={t('finance.balanceCurrentAssetsTotal')} value={fmt(0)} bold />
-                <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2 mt-4">{t('finance.balanceNonCurrentAssets')}</h4>
-                <LineItem label={t('finance.balanceFixedAssets')} value={fmt(0)} />
-                <div className="border-t border-[#e0ddd5] my-4"></div>
-                <LineItem label={t('finance.balanceTotalAssets')} value={fmt(0)} bold primary />
-              </div>
-            </div>
-            <div className="p-10 bg-[#f9f9f8]/20">
-              <h3 className="text-lg font-bold text-[#191918] mb-6 flex items-center">
-                <i className="fas fa-hand-holding-dollar mr-3 text-rose-500"></i> {localeLabel('balLiabEquityHeader', 'finance.balanceLiabilitiesEquity')}
-              </h3>
-              <div className="space-y-1">
-                <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2">{t('finance.balanceCurrentLiabilities')}</h4>
-                <LineItem label={localeLabel('balPayLabel', 'finance.balancePayables')} value={fmt(0)} />
-                <LineItem label={localeLabel('balTaxPayLabel', 'finance.balanceTaxPayable')} value={fmt(0)} />
-                <div className="border-t border-[#e0ddd5] my-4"></div>
-                <LineItem label={t('finance.balanceTotalLiabilities')} value={fmt(0)} bold />
-                <h4 className="text-xs font-bold text-[#5c5c5a] uppercase tracking-widest py-2 mt-4">{localeLabel('balEquityHeader', 'finance.balanceEquity')}</h4>
-                <LineItem label={localeLabel('balPaidInCapital', 'finance.balancePaidInCapital')} value={fmt(0)} />
-                <LineItem label={localeLabel('balRetainedEarnings', 'finance.balanceRetainedEarnings')} value={fmt(0)} />
-                <div className="border-t border-[#e0ddd5] my-4"></div>
-                <LineItem label={localeLabel('balTotalLiabEquity', 'finance.balanceTotalLiabilitiesEquity')} value={fmt(0)} bold primary />
-              </div>
-            </div>
+          <div className="p-20 text-center text-[#5c5c5a] flex flex-col items-center">
+            <i className="fas fa-scale-balanced text-6xl mb-6 opacity-20"></i>
+            <h3 className="text-xl font-medium">{t('finance.balanceComingSoonTitle')}</h3>
+            <p className="mt-2 text-sm max-w-md">{t('finance.balanceComingSoonDesc')}</p>
+            <span className="mt-6 inline-flex items-center px-3 py-1 rounded-full text-[11px] bg-[#f0eeeb] text-[#7a7a78] border border-[#e0ddd5]">
+              <i className="fas fa-clock mr-1.5"></i>{t('finance.comingSoonBadge')}
+            </span>
           </div>
         )}
 
-        {/* === Cashflow (placeholder) === */}
+        {/* === Cash Flow — full calculation not enabled yet (PR-T1) === */}
         {activeTab === 'cashflow' && (
           <div className="p-20 text-center text-[#5c5c5a] flex flex-col items-center">
             <i className="fas fa-faucet-drip text-6xl mb-6 opacity-20"></i>
             <h3 className="text-xl font-medium">{t('finance.cashflowTitle')}</h3>
             <p className="mt-2 text-sm max-w-md">{t('finance.cashflowDesc')}</p>
-            <button className="mt-8 px-6 py-2 bg-[#f9f9f8] rounded-xl text-sm hover:text-[#191918] transition-colors border border-[#e0ddd5]">
-              {localeLabel('balCashflowAdd', 'finance.cashflowSync')}
-            </button>
+            <span className="mt-6 inline-flex items-center px-3 py-1 rounded-full text-[11px] bg-[#f0eeeb] text-[#7a7a78] border border-[#e0ddd5]">
+              <i className="fas fa-clock mr-1.5"></i>{t('finance.comingSoonBadge')}
+            </span>
           </div>
         )}
       </div>
