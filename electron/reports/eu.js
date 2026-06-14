@@ -6,7 +6,11 @@ const reportTypes = [
 ];
 
 function generate(ctx) {
-  const { incomeRows, expenseRows, incomeTaxRate, adminExpense, currency, year, from, to } = ctx;
+  const { incomeRows, expenseRows, categories, incomeTaxRate, adminExpense, currency, year, from, to } = ctx;
+  // PR-T5: split expenses into COGS vs operating (additive fields; costOfSales
+  // and netProfit are unchanged — cogsNet + operatingExpensesNet === totalExpenseNet).
+  const { splitExpenses } = require('./_expenseSplit');
+  const { cogsNet, operatingExpensesNet } = splitExpenses(expenseRows, categories);
   const r = (v) => Math.round((v || 0) * 100) / 100;
 
   const totalIncome = incomeRows.reduce((s, row) => s + (row.amount || 0), 0);
@@ -31,6 +35,7 @@ function generate(ctx) {
     locale: 'EU', period: { from, to, year }, currency, reportTypes,
     profitLoss: {
       revenue: r(revenue), costOfSales: r(costs),
+      costOfGoodsSold: r(cogsNet), operatingExpenses: r(operatingExpensesNet),
       grossProfit: r(grossProfit), grossMargin: revenue > 0 ? r(grossProfit / revenue * 100) : 0,
       adminExpense: r(adminExpense), operatingProfit: r(operatingProfit),
       incomeTax: tax, netProfit: r(netProfit),
