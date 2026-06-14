@@ -32,6 +32,18 @@ function pickField(obj, ...candidates) {
   return undefined;
 }
 
+// 对疑似密钥/令牌片段脱敏：只替换敏感子串，保留其余调试信息（不吞错误、不改 code/status）。
+// 覆盖 Authorization: Bearer、sk-/sk-ant- 前缀（OpenAI/Anthropic/DeepSeek/Kimi/Qwen 等）、
+// JWT（含 GLM/智谱签名令牌）、以及 api_key/token/secret/authorization 字段后的取值。
+function redactSecrets(input) {
+  if (input == null) return input;
+  return String(input)
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
+    .replace(/sk-(?:ant-)?[A-Za-z0-9._-]{6,}/gi, 'sk-[REDACTED]')
+    .replace(/eyJ[A-Za-z0-9._-]{8,}\.[A-Za-z0-9._-]{8,}\.[A-Za-z0-9._-]{8,}/g, '[REDACTED_JWT]')
+    .replace(/("?(?:api[_-]?key|access[_-]?token|authorization|secret|token)"?\s*[:=]\s*"?)([A-Za-z0-9._-]{6,})/gi, '$1[REDACTED]');
+}
+
 // 由 HTTP status + 原始 code/message 归一化到稳定枚举。
 function normalizeCode(status, rawCode, message) {
   const m = `${rawCode || ''} ${message || ''}`.toLowerCase();
@@ -57,24 +69,26 @@ async function buildHttpError(response, providerLabel) {
     'error.code', 'error.type', 'error.status',
     'code', 'type', 'status'
   );
-  const providerMessage = pickField(json,
+  const rawProviderMessage = pickField(json,
     'error.message', 'message', 'error.error.message'
   ) || (text ? text.slice(0, 300) : `HTTP ${status}`);
 
-  const code = normalizeCode(status, rawCode != null ? String(rawCode) : '', String(providerMessage));
+  // code 用原始文案分类（最准确）；对外/日志展示的 message 与 providerMessage 做密钥脱敏。
+  const code = normalizeCode(status, rawCode != null ? String(rawCode) : '', String(rawProviderMessage));
+  const providerMessage = redactSecrets(String(rawProviderMessage));
   const err = new Error(
     `${providerLabel} ${status} [${code}] (${String(providerMessage).slice(0, 200)})`
   );
   err.status = status;
   err.code = code;
-  err.providerMessage = String(providerMessage);
+  err.providerMessage = providerMessage;
   err.providerLabel = providerLabel;
   return err;
 }
 
 // 用于网络错误（fetch 抛错、超时、连接失败等）。
 function wrapNetworkError(err, providerLabel) {
-  const msg = err?.message || String(err);
+  const msg = redactSecrets(err?.message || String(err));
   const e = new Error(`${providerLabel} network error [network] (${msg})`);
   e.code = 'network';
   e.providerMessage = msg;
@@ -84,10 +98,11 @@ function wrapNetworkError(err, providerLabel) {
 
 // 用于 provider 返回内容解析失败（非 HTTP 错误，如 JSON / OCR 解析为空）。
 function parseError(providerLabel, detail) {
-  const e = new Error(`${providerLabel} parse failed [parseFailed]${detail ? ' (' + detail + ')' : ''}`);
+  const safeDetail = detail != null ? redactSecrets(String(detail)) : detail;
+  const e = new Error(`${providerLabel} parse failed [parseFailed]${safeDetail ? ' (' + safeDetail + ')' : ''}`);
   e.code = 'parseFailed';
   e.providerLabel = providerLabel;
   return e;
 }
 
-module.exports = { buildHttpError, wrapNetworkError, parseError, normalizeCode, AI_ERROR_CODES };
+module.exports = { buildHttpError, wrapNetworkError, parseError, normalizeCode, redactSecrets, AI_ERROR_CODES };
