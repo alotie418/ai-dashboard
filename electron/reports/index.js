@@ -8,6 +8,7 @@ const jp = require('./jp');
 const eu = require('./eu');
 const kr = require('./kr');
 const tw = require('./tw');
+const { selectReportSource } = require('./_reportSource');
 
 const ENGINES = { CN: cn, US: us, JP: jp, EU: eu, KR: kr, TW: tw };
 
@@ -32,20 +33,22 @@ function generate(db, opts = {}) {
   const from = opts.from || `${year}-01-01`;
   const to = opts.to || `${year}-12-31`;
 
-  // 读取交易数据（优先 transactions 新表，fallback 到旧 sales/purchases）
+  // 读取交易数据：按「当前报表期间 [from,to]」决定数据源（详见 _reportSource.js）。
+  // 修复：仅当本期间内有 transaction 才用 transactions，否则 fallback 到旧
+  // sales/purchases —— 避免别的年份的一条 transaction 让本年份不再 fallback。
   let incomeRows, expenseRows;
-  const hasTransactions = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transactions'").get();
+  const hasTransactionsTable = !!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transactions'").get();
+  const periodTxnCount = hasTransactionsTable
+    ? db.prepare('SELECT COUNT(*) as c FROM transactions WHERE date >= ? AND date <= ?').get(from, to).c
+    : 0;
 
-  if (hasTransactions) {
-    const txnCount = db.prepare('SELECT COUNT(*) as c FROM transactions').get().c;
-    if (txnCount > 0) {
-      incomeRows = db.prepare(
-        "SELECT * FROM transactions WHERE type = 'income' AND date >= ? AND date <= ? ORDER BY date"
-      ).all(from, to);
-      expenseRows = db.prepare(
-        "SELECT * FROM transactions WHERE type = 'expense' AND date >= ? AND date <= ? ORDER BY date"
-      ).all(from, to);
-    }
+  if (selectReportSource({ hasTransactionsTable, periodTxnCount }) === 'transactions') {
+    incomeRows = db.prepare(
+      "SELECT * FROM transactions WHERE type = 'income' AND date >= ? AND date <= ? ORDER BY date"
+    ).all(from, to);
+    expenseRows = db.prepare(
+      "SELECT * FROM transactions WHERE type = 'expense' AND date >= ? AND date <= ? ORDER BY date"
+    ).all(from, to);
   }
 
   // Fallback: 旧表
