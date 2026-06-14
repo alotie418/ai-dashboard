@@ -434,6 +434,18 @@ const MIGRATIONS = [
     d.exec('CREATE INDEX IF NOT EXISTS idx_asst_msg_conv ON assistant_messages(conversation_id, seq)');
     console.log('[db] v12: assistant_conversations + assistant_messages ready');
   },
+  // v13: COGS classification flag (PR-T5) — split COGS from operating expenses.
+  //   Adds categories.is_cogs and backfills the seeded cost-of-goods categories
+  //   (slug 'cogs' for CN/JP/KR/TW; slug 'purchases' for EU). Operating-expense
+  //   and user-created categories stay 0. Idempotent (guarded on PRAGMA table_info).
+  (d) => {
+    const cols = d.prepare('PRAGMA table_info(categories)').all();
+    if (!cols.some((c) => c.name === 'is_cogs')) {
+      d.exec('ALTER TABLE categories ADD COLUMN is_cogs INTEGER DEFAULT 0');
+    }
+    d.exec("UPDATE categories SET is_cogs = 1 WHERE slug = 'cogs' OR (locale = 'EU' AND slug = 'purchases')");
+    console.log('[db] v13: categories.is_cogs added + backfilled');
+  },
 ];
 
 function runMigrations(d) {

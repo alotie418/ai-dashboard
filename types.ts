@@ -10,6 +10,11 @@ export interface Metric {
 export interface FinancialStatementData {
   salesRevenue: number;
   costOfSales: number;
+  // PR-T5 (backend core): COGS / operating split. Optional — populated by the
+  // report engines now; wired into the dashboard payload + renderers in stage 2.
+  costOfGoodsSold?: number;   // COGS only (is_cogs categories)
+  operatingExpenses?: number; // non-COGS expense rows (期间费用)
+  operatingProfit?: number;   // pre-income-tax operating profit
   taxSurcharge: number; // 税金及附加
   adminExpense: number; // 管理费用
   incomeTax: number; // 所得税费用
