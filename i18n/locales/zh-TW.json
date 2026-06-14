@@ -1037,7 +1037,7 @@
     "name": "名稱",
     "namePlaceholder": "例如：A 型包裝盒 / 諮詢服務",
     "unit": "單位",
-    "cost": "預設單價",
+    "cost": "預設單價（不含稅）",
     "type": "類型",
     "product": "商品",
     "service": "服務",

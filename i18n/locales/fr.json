@@ -1037,7 +1037,7 @@
     "name": "Nom",
     "namePlaceholder": "ex. : Boîte type A / Conseil",
     "unit": "Unité",
-    "cost": "Prix unitaire par défaut",
+    "cost": "Prix unitaire par défaut (HT)",
     "type": "Type",
     "product": "Produit",
     "service": "Service",
