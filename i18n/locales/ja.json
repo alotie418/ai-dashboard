@@ -165,7 +165,21 @@
       "empty": "この制度には該当する科目がありません",
       "addNew": "科目を追加",
       "addNewButton": "カスタム科目を追加",
-      "systemNote": "システム既定の科目は SoloLedger によって管理され、経営管理上の区分に従って分類されています。削除はできませんが、名前変更は可能です。カスタム科目は完全にあなたが管理できます。"
+      "systemNote": "システム既定の科目は SoloLedger によって管理され、経営管理上の区分に従って分類されています。削除はできませんが、名前変更は可能です。カスタム科目は完全にあなたが管理できます。",
+      "cogsHeader": "原価区分",
+      "cogsBadge": "売上原価",
+      "operatingBadge": "営業費用",
+      "recatTitle": "一括再分類",
+      "recatNote": "経営管理上の分類のみを調整します。金額・税額・純利益は変わりません。",
+      "recatFrom": "移動元",
+      "recatTo": "移動先",
+      "recatPreview": "プレビュー",
+      "recatWillMove": "{{count}} 件を移動します",
+      "recatConfirm": "移動を確定",
+      "recatMoved": "{{count}} 件を移動しました",
+      "recatPreviewFailed": "プレビューに失敗しました。後でお試しください。",
+      "recatRetryPreview": "移動に失敗しました。再度プレビューしてからお試しください。",
+      "recatSameError": "移動元と移動先は異なる必要があります。"
     },
     "ai": {
       "title": "AIプロバイダー · BYOK",

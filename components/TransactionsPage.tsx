@@ -76,7 +76,11 @@ const TransactionsPage: React.FC = () => {
       date: new Date().toISOString().split('T')[0],
       amount: 0,
       currency: locale === 'US' ? 'USD' : locale === 'JP' ? 'JPY' : locale === 'EU' ? 'EUR' : locale === 'KR' ? 'KRW' : locale === 'TW' ? 'TWD' : 'CNY',
-      category_id: categories.length > 0 ? categories[0].id : undefined,
+      // PR-T5-2B-2: default expense entries to the first operating (non-COGS)
+      // category so manual costs don't silently land in COGS; income unchanged.
+      category_id: activeType === 'expense'
+        ? (categories.find(c => !c.is_cogs)?.id ?? categories[0]?.id)
+        : categories[0]?.id,
       counterparty: '',
       description: '',
       payment_status: 'paid',

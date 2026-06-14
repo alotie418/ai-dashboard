@@ -1161,6 +1161,123 @@ test.describe('PR-T2 → App.tsx trusts backend financial statement (no client t
   });
 });
 
+// ───────────────────────────────────────────────────────────────────────────
+// PR-T5-2B-2: CategoriesSection is_cogs toggle + batch recategorize panel, and
+// the TransactionsPage expense smart-default. Web build → HTTP route mocking;
+// updateCategory / recategorize calls are recorded Node-side to assert payloads.
+// A commit failure is surfaced as a generic retry message — the UI must NOT rely
+// on err.status (Electron IPC strips it), so the mock returns an error WITHOUT a
+// usable status and we assert the retry copy still shows.
+// ───────────────────────────────────────────────────────────────────────────
+const RECAT_CATS = (acc: string) => ([
+  { id: 'c-cogs', locale: acc, type: 'expense', slug: 'cogs', label_zh_cn: '营业成本', label_zh_tw: '營業成本', label_en: 'COGS Cat', label_ja: '売上原価', label_ko: '매출원가', label_fr: 'COGS Cat', schedule_line: null, is_deductible: true, deductible_pct: 100, is_cogs: true, parent_id: null, sort_order: 10, is_system: true, displayLabel: 'COGS Cat' },
+  { id: 'c-op', locale: acc, type: 'expense', slug: 'admin', label_zh_cn: '管理费用', label_zh_tw: '管理費用', label_en: 'Op Cat', label_ja: '一般管理費', label_ko: '관리비', label_fr: 'Op Cat', schedule_line: null, is_deductible: true, deductible_pct: 100, is_cogs: false, parent_id: null, sort_order: 20, is_system: true, displayLabel: 'Op Cat' },
+]);
+
+async function bootRecat(page: import('@playwright/test').Page, ui: string, acc: string, opts: { commitFails?: boolean } = {}) {
+  const calls: { catUpdates: any[]; recat: any[] } = { catUpdates: [], recat: [] };
+  await page.route('**/auth/check', (r) => r.fulfill({ json: { authenticated: true } }));
+  await page.route('**/auth/**', (r) => r.fulfill({ json: { authenticated: true } }));
+  await page.route('**/api/**', (route) => {
+    const req = route.request();
+    const url = req.url().split('?')[0];
+    const method = req.method();
+    if (url.includes('/api/settings')) return route.fulfill({ json: SETTINGS(acc) });
+    if (url.includes('/api/dashboard')) return route.fulfill({ json: DASHBOARD(acc) });
+    if (url.includes('/api/transactions/recategorize')) {
+      const body = JSON.parse(req.postData() || '{}');
+      calls.recat.push(body);
+      if (opts.commitFails && body.dryRun === false) return route.fulfill({ status: 500, json: { error: 'boom' } });
+      return route.fulfill({ json: body.dryRun ? { dryRun: true, fromCategoryId: body.fromCategoryId, toCategoryId: body.toCategoryId, affected: 3 } : { dryRun: false, fromCategoryId: body.fromCategoryId, toCategoryId: body.toCategoryId, moved: 3 } });
+    }
+    if (url.includes('/api/transactions/summary')) return route.fulfill({ json: { income: { total: 0, count: 0 }, expense: { total: 0, count: 0 }, net: 0 } });
+    if (/\/api\/categories\/[^/]+$/.test(url) && method === 'PUT') {
+      calls.catUpdates.push({ url, body: JSON.parse(req.postData() || '{}') });
+      return route.fulfill({ json: { success: true } });
+    }
+    if (url.includes('/api/categories')) return route.fulfill({ json: RECAT_CATS(acc) });
+    if (/\/api\/(transactions|products|sales|purchases|receivables|payables|alerts|providers|mileage|documents|reports\/types)/.test(url)) {
+      return route.fulfill({ json: [] });
+    }
+    return route.fulfill({ json: {} });
+  });
+  await page.addInitScript((l) => { try { localStorage.setItem('sololedger-lang', l as string); } catch { /* ignore */ } }, ui);
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('nav', { timeout: 20_000 });
+  return calls;
+}
+
+const recatLoc = (ui: string) => JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8')).settings.categories;
+const withCount = (s: string, n: number) => s.replace('{{count}}', String(n));
+
+test.describe('PR-T5-2B-2 → categories is_cogs + recategorize UI', () => {
+  test('CN: recategorize preview → confirm, and is_cogs toggle calls updateCategory', async ({ page }) => {
+    const ui = 'zh-CN';
+    const calls = await bootRecat(page, ui, 'CN');
+    const c = recatLoc(ui);
+    await page.locator('i.fa-cog').first().click();
+    await page.locator('button:has(i.fa-tags)').click();
+    await expect(page.getByText(c.cogsHeader)).toBeVisible({ timeout: 10_000 });
+
+    // Recategorize: from = COGS cat, to = operating cat (recat selects are #2/#3;
+    // #1 is the locale switcher). Preview → "将移动 3 笔交易", confirm → "已移动 3 笔".
+    // The two recat selects are the only ones carrying the c-cogs option (the
+    // locale switcher does not), so filter on it rather than a fragile nth index.
+    const recatSelects = page.locator('select').filter({ has: page.locator('option[value="c-cogs"]') });
+    await recatSelects.nth(0).selectOption('c-cogs');
+    await recatSelects.nth(1).selectOption('c-op');
+    await page.getByRole('button', { name: c.recatPreview }).click();
+    await expect(page.getByText(withCount(c.recatWillMove, 3))).toBeVisible({ timeout: 10_000 });
+    expect(calls.recat.some((r) => r.dryRun === true)).toBeTruthy();
+    await page.getByRole('button', { name: c.recatConfirm }).click();
+    await expect(page.getByText(withCount(c.recatMoved, 3))).toBeVisible({ timeout: 10_000 });
+    // commit carried expectedAffected = previewed count
+    expect(calls.recat.some((r) => r.dryRun === false && r.expectedAffected === 3)).toBeTruthy();
+
+    // is_cogs toggle: click the operating category's badge → updateCategory({is_cogs})
+    await page.getByRole('button', { name: c.operatingBadge }).first().click();
+    await expect.poll(() => calls.catUpdates.length, { timeout: 10_000 }).toBeGreaterThan(0);
+    expect(calls.catUpdates.some((u) => typeof u.body.is_cogs === 'boolean')).toBeTruthy();
+  });
+
+  test('CN: commit failure shows the retry message (no reliance on err.status)', async ({ page }) => {
+    const ui = 'zh-CN';
+    await bootRecat(page, ui, 'CN', { commitFails: true });
+    const c = recatLoc(ui);
+    await page.locator('i.fa-cog').first().click();
+    await page.locator('button:has(i.fa-tags)').click();
+    // The two recat selects are the only ones carrying the c-cogs option (the
+    // locale switcher does not), so filter on it rather than a fragile nth index.
+    const recatSelects = page.locator('select').filter({ has: page.locator('option[value="c-cogs"]') });
+    await recatSelects.nth(0).selectOption('c-cogs');
+    await recatSelects.nth(1).selectOption('c-op');
+    await page.getByRole('button', { name: c.recatPreview }).click();
+    await expect(page.getByText(withCount(c.recatWillMove, 3))).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: c.recatConfirm }).click();
+    await expect(page.getByText(c.recatRetryPreview)).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('CN: new expense defaults to the operating (non-COGS) category', async ({ page }) => {
+    const ui = 'zh-CN';
+    await bootRecat(page, ui, 'CN');
+    await page.locator('i.fa-exchange-alt').first().click(); // → Transactions page
+    await page.locator('button:has(i.fa-plus)').first().click(); // → new-transaction form
+    // the category <select> (it carries the c-cogs/c-op options) defaults to operating
+    await expect(page.locator('select:has(option[value="c-op"])')).toHaveValue('c-op', { timeout: 10_000 });
+  });
+
+  test('US: recategorize panel + cost-type column are hidden', async ({ page }) => {
+    const ui = 'en';
+    await bootRecat(page, ui, 'US');
+    const c = recatLoc(ui);
+    await page.locator('i.fa-cog').first().click();
+    await page.locator('button:has(i.fa-tags)').click();
+    await page.waitForTimeout(500);
+    await expect(page.getByText(c.recatTitle)).toHaveCount(0);
+    await expect(page.getByText(c.cogsHeader)).toHaveCount(0);
+  });
+});
+
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const summary = {
