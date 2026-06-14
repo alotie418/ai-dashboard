@@ -82,6 +82,7 @@ const routes = [
   // ---- Transactions（国际化数据模型 v5，C 阶段）----
   // 具体路径排前：summary 不和 :id 冲突
   ['GET', '/api/transactions/summary', transactions.summary],
+  ['POST', '/api/transactions/recategorize', transactions.recategorize],
   ['GET', '/api/transactions', transactions.list],
   ['POST', '/api/transactions', transactions.create],
   ['GET', '/api/transactions/:id', transactions.get],

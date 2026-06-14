@@ -32,7 +32,7 @@ async function list({ query }) {
   if (type && !VALID_TYPES.includes(type)) throw new Error(`Invalid type: ${type}`);
 
   let sql = `SELECT id, locale, type, slug, label_zh_cn, label_zh_tw, label_en, label_ja, label_ko, label_fr,
-                    schedule_line, is_deductible, deductible_pct, parent_id, sort_order, is_system
+                    schedule_line, is_deductible, deductible_pct, is_cogs, parent_id, sort_order, is_system
              FROM categories WHERE locale = ?`;
   const params = [locale];
   if (type) {
@@ -48,6 +48,7 @@ async function list({ query }) {
     ...r,
     displayLabel: r[col] || r.label_en || r.label_zh_cn || r.slug,
     is_deductible: !!r.is_deductible,
+    is_cogs: !!r.is_cogs,
     is_system: !!r.is_system,
   }));
 }
@@ -56,7 +57,7 @@ async function list({ query }) {
 async function create({ body }) {
   const db = getDb();
   const { locale, type, slug, label_zh_cn, label_en, label_zh_tw, label_ja, label_ko, label_fr,
-          schedule_line, is_deductible, deductible_pct, parent_id, sort_order } = body || {};
+          schedule_line, is_deductible, deductible_pct, is_cogs, parent_id, sort_order } = body || {};
 
   if (!VALID_LOCALES.includes(locale)) throw new Error(`locale must be one of ${VALID_LOCALES.join('/')}`);
   if (!VALID_TYPES.includes(type)) throw new Error(`type must be 'income' or 'expense'`);
@@ -68,8 +69,8 @@ async function create({ body }) {
   db.prepare(`
     INSERT INTO categories
       (id, locale, type, slug, label_zh_cn, label_zh_tw, label_en, label_ja, label_ko, label_fr,
-       schedule_line, is_deductible, deductible_pct, parent_id, sort_order, is_system)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+       schedule_line, is_deductible, deductible_pct, is_cogs, parent_id, sort_order, is_system)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
   `).run(
     id, locale, type, slug,
     label_zh_cn || label_en || slug,
@@ -81,6 +82,7 @@ async function create({ body }) {
     schedule_line || null,
     is_deductible === false ? 0 : 1,
     deductible_pct == null ? 100 : deductible_pct,
+    is_cogs ? 1 : 0, // PR-T5-2B-1: default operating (0); custom COGS categories pass true
     parent_id || null,
     sort_order || 999,
   );
@@ -97,7 +99,7 @@ async function update({ params, body }) {
   if (!existing) throw new Error('Category not found');
   if (existing.is_system) {
     // 系统类别只允许修改 label / sort_order，不允许动 slug / type / locale
-    const { label_zh_cn, label_zh_tw, label_en, label_ja, label_ko, label_fr, sort_order, is_deductible, deductible_pct } = body || {};
+    const { label_zh_cn, label_zh_tw, label_en, label_ja, label_ko, label_fr, sort_order, is_deductible, deductible_pct, is_cogs } = body || {};
     const sets = [];
     const vals = [];
     if (label_zh_cn !== undefined) { sets.push('label_zh_cn = ?'); vals.push(label_zh_cn); }
@@ -109,6 +111,7 @@ async function update({ params, body }) {
     if (sort_order !== undefined)  { sets.push('sort_order = ?'); vals.push(sort_order); }
     if (is_deductible !== undefined) { sets.push('is_deductible = ?'); vals.push(is_deductible ? 1 : 0); }
     if (deductible_pct !== undefined) { sets.push('deductible_pct = ?'); vals.push(deductible_pct); }
+    if (is_cogs !== undefined) { sets.push('is_cogs = ?'); vals.push(is_cogs ? 1 : 0); } // PR-T5-2B-1
     if (sets.length === 0) return { success: true };
     vals.push(id);
     db.prepare(`UPDATE categories SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
@@ -116,13 +119,13 @@ async function update({ params, body }) {
   }
   // 用户类别：允许全字段更新（除 id / is_system）
   const fields = ['label_zh_cn', 'label_zh_tw', 'label_en', 'label_ja', 'label_ko', 'label_fr',
-                  'schedule_line', 'is_deductible', 'deductible_pct', 'parent_id', 'sort_order'];
+                  'schedule_line', 'is_deductible', 'deductible_pct', 'is_cogs', 'parent_id', 'sort_order'];
   const sets = [];
   const vals = [];
   for (const f of fields) {
     if (body[f] !== undefined) {
       sets.push(`${f} = ?`);
-      vals.push(f === 'is_deductible' ? (body[f] ? 1 : 0) : body[f]);
+      vals.push((f === 'is_deductible' || f === 'is_cogs') ? (body[f] ? 1 : 0) : body[f]);
     }
   }
   if (sets.length === 0) return { success: true };

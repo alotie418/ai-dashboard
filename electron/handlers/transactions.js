@@ -179,4 +179,11 @@ async function summary({ query }) {
   };
 }
 
-module.exports = { list, get, create, update, remove, summary };
+// POST /api/transactions/recategorize — batch-move expense transactions between
+// categories (management classification adjustment; never changes money fields).
+// Pure logic lives in _recategorize.js so it is unit-testable without sqlite.
+async function recategorize({ body }) {
+  return require('./_recategorize').recategorize({ body, db: getDb() });
+}
+
+module.exports = { list, get, create, update, remove, summary, recategorize };
