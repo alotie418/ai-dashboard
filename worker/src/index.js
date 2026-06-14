@@ -2505,6 +2505,11 @@ ${pagesText}
         const grossMargin = salesRevenue > 0 ? Math.round(grossProfit / salesRevenue * 10000) / 100 : 0;
         const shippingFee = salesAgg.totalShipping || 0;
 
+        // TODO(PR-T2): this web-only Worker path hardcodes a 12% surcharge and a
+        // 25% income tax (below) with no accounting-locale routing. It should read
+        // surcharge_rate / income_tax_rate from settings and route by locale, the
+        // way electron/reports/* already does. Left unchanged this round by design
+        // (scope limited to the App.tsx client override). See ACCOUNTING-AUDIT.md (R4).
         // 税金及附加 = 应纳增值税 × 12% (城建税7% + 教育费附加3% + 地方教育附加2%)
         const vatPayable = Math.max(0, (salesAgg.totalTaxAmount || 0) - (purchaseAgg.totalTaxAmount || 0));
         const taxSurcharge = Math.round(vatPayable * 0.12 * 100) / 100;
