@@ -151,7 +151,7 @@ Payment rate: ${payables.paymentRate || 0}%${payables.topSuppliers?.[0] ? `, top
     const f = dash.financialStatement;
     sections.push(`[Financial statement]
 Revenue: ${num(f.salesRevenue)}, COGS: ${num(f.costOfSales)}
-Gross profit: ${num(f.grossProfit)}, net profit: ${num(f.netProfit)}
+Gross profit: ${num(f.grossProfit)}, operating expenses: ${num(f.operatingExpenses)}, net profit: ${num(f.netProfit)}
 Tax surcharge: ${num(f.taxSurcharge)}, admin expense: ${num(f.adminExpense)}, shipping: ${num(f.shippingFee)}`);
   }
 

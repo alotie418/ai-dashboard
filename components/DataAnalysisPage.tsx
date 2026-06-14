@@ -260,7 +260,7 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
       const finSummary = {
         rev: fs.salesRevenue, cos: fs.costOfSales, gp: fs.grossProfit,
         gm: fs.grossMargin, np: fs.netProfit, nm: fs.netMargin,
-        tax: fs.taxSurcharge, ship: fs.shippingFee, admin: fs.adminExpense
+        tax: fs.taxSurcharge, ship: fs.shippingFee, admin: fs.adminExpense, op: fs.operatingExpenses ?? 0
       };
 
       // Prompt prose is i18n-driven (follows uiLanguage); the JSON payloads below

@@ -77,6 +77,9 @@ const AppContent: React.FC = () => {
       const enrichedFS = {
         salesRevenue: fs.salesRevenue ?? 0,
         costOfSales: fs.costOfSales ?? 0,
+        costOfGoodsSold: fs.costOfGoodsSold ?? 0,
+        operatingExpenses: fs.operatingExpenses ?? 0,
+        operatingProfit: fs.operatingProfit ?? 0,
         taxSurcharge: fs.taxSurcharge ?? 0,
         shippingFee: fs.shippingFee ?? 0,
         adminExpense: fs.adminExpense ?? 0,

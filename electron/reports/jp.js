@@ -21,10 +21,10 @@ function generate(ctx) {
   const totalExpenseTax = expenseRows.reduce((s, row) => s + (row.tax_amount || 0), 0);
 
   const salesRevenue = totalIncomeNet;
-  const costOfSales = totalExpenseNet;
-  const grossProfit = salesRevenue - costOfSales;
+  const costOfSales = cogsNet; // PR-T5-2A: COGS-only (was totalExpenseNet)
+  const grossProfit = salesRevenue - costOfSales; // now revenue − COGS
   const grossMargin = salesRevenue > 0 ? r(grossProfit / salesRevenue * 100) : 0;
-  const operatingProfit = grossProfit - adminExpense;
+  const operatingProfit = grossProfit - operatingExpensesNet - adminExpense; // PR-T5-2A: subtract operating expenses (netProfit unchanged)
   const taxPayable = r(Math.max(0, operatingProfit) * (incomeTaxRate / 100));
   const netProfit = operatingProfit - taxPayable;
 

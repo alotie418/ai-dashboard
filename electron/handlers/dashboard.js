@@ -157,7 +157,12 @@ async function summary({ query }) {
     grossMargin: is.grossMargin || 0,
     netProfit: is.netProfit || is.line31_netProfit || 0,
     netMargin: is.netMargin || 0,
-  } : { salesRevenue: 0, costOfSales: 0, taxSurcharge: 0, shippingFee: 0, adminExpense: 0, incomeTax: 0, grossProfit: 0, grossMargin: 0, netProfit: 0, netMargin: 0 };
+    // PR-T5-2A: COGS / operating split passthrough (US scheduleC has none → 0;
+    // costOfSales above is now COGS-only for the 5 non-US engines).
+    costOfGoodsSold: is.costOfGoodsSold ?? 0,
+    operatingExpenses: is.operatingExpenses ?? 0,
+    operatingProfit: is.operatingProfit ?? 0,
+  } : { salesRevenue: 0, costOfSales: 0, taxSurcharge: 0, shippingFee: 0, adminExpense: 0, incomeTax: 0, grossProfit: 0, grossMargin: 0, netProfit: 0, netMargin: 0, costOfGoodsSold: 0, operatingExpenses: 0, operatingProfit: 0 };
 
   return {
     locale,

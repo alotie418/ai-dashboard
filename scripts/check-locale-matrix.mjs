@@ -33,7 +33,7 @@ const EXPECTED_CURRENCY = {
 };
 
 // Tax keys each accountingLocale should provide in taxConcepts
-const COMMON_TAX_KEYS = ['plRevenue', 'plCost', 'plNetProfit', 'plTitle', 'tabPlLabel', 'taxSummaryTitle', 'purchaseTotal', 'salesTotal', 'taxDifference', 'invoiceTypeOutput', 'invoiceTypeInput', 'formTaxRate'];
+const COMMON_TAX_KEYS = ['plRevenue', 'plCost', 'plOperatingExpenses', 'plOperatingProfit', 'plNetProfit', 'plTitle', 'tabPlLabel', 'taxSummaryTitle', 'purchaseTotal', 'salesTotal', 'taxDifference', 'invoiceTypeOutput', 'invoiceTypeInput', 'formTaxRate'];
 const VAT_FAMILY_KEYS = ['taxTitle', 'inputTax', 'outputTax', 'estimatedTax', 'certifiedInput', 'invoicedOutput'];
 const REQUIRED_TAX_KEYS_BY_LOCALE = {
   CN: [...COMMON_TAX_KEYS, ...VAT_FAMILY_KEYS],

@@ -21,9 +21,9 @@ function generate(ctx) {
   const totalExpenseTax = expenseRows.reduce((s, row) => s + (row.tax_amount || 0), 0);
 
   const revenue = totalIncomeNet;
-  const costs = totalExpenseNet;
-  const grossProfit = revenue - costs;
-  const operatingProfit = grossProfit - adminExpense;
+  const costs = cogsNet; // PR-T5-2A: COGS-only (was totalExpenseNet)
+  const grossProfit = revenue - costs; // now revenue − COGS
+  const operatingProfit = grossProfit - operatingExpensesNet - adminExpense; // PR-T5-2A: subtract operating expenses (netProfit unchanged)
   const tax = r(Math.max(0, operatingProfit) * (incomeTaxRate / 100));
   const netProfit = operatingProfit - tax;
 

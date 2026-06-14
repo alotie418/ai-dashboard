@@ -73,19 +73,25 @@ for (const eng of ENGINES) {
   ok(!!st, `${eng.locale}: missing ${eng.key} in report`);
   if (!st) continue;
 
-  // Anchor 1+2: split partitions the SAME total that drives costOfSales.
+  // Anchor 1: COGS classification + the split partitions the FULL expense total.
+  const totalExpenseNet = expenseRows.reduce((s, r) => s + (r.amount_net || r.amount || 0), 0); // 750
   ok(approx(st.costOfGoodsSold, 600), `${eng.locale}: costOfGoodsSold expected 600, got ${st.costOfGoodsSold}`);
   ok(approx(st.operatingExpenses, 150), `${eng.locale}: operatingExpenses expected 150, got ${st.operatingExpenses}`);
-  ok(approx(st.costOfGoodsSold + st.operatingExpenses, st.costOfSales),
-    `${eng.locale}: costOfGoodsSold + operatingExpenses (${st.costOfGoodsSold}+${st.operatingExpenses}) !== costOfSales (${st.costOfSales})`);
+  ok(approx(st.costOfGoodsSold + st.operatingExpenses, totalExpenseNet),
+    `${eng.locale}: cogs + operating (${st.costOfGoodsSold}+${st.operatingExpenses}) !== totalExpenseNet (${totalExpenseNet})`);
 
-  // Anchor 3: net-profit identity from the engine's own output (split is display-neutral).
+  // Anchor 2 (PR-T5-2A flip): costOfSales is now COGS-only; gross profit = revenue − COGS.
   const revenue = st.salesRevenue != null ? st.salesRevenue : st.revenue;
+  ok(approx(st.costOfSales, st.costOfGoodsSold), `${eng.locale}: costOfSales (${st.costOfSales}) should now equal COGS (${st.costOfGoodsSold})`);
+  ok(approx(st.grossProfit, revenue - st.costOfGoodsSold), `${eng.locale}: grossProfit (${st.grossProfit}) should be revenue − COGS (${revenue - st.costOfGoodsSold})`);
+
+  // Anchor 3: net-profit identity now subtracts operating expenses too — net profit
+  // is numerically unchanged by the flip (cogs + operating === old total).
   const surcharge = eng.hasSurchargeShipping ? (st.taxSurcharge || 0) : 0;
   const shipping = eng.hasSurchargeShipping ? (st.shippingFee || 0) : 0;
-  const expectedNet = revenue - st.costOfSales - surcharge - shipping - (st.adminExpense || 0) - (st.incomeTax || 0);
+  const expectedNet = revenue - st.costOfGoodsSold - st.operatingExpenses - surcharge - shipping - (st.adminExpense || 0) - (st.incomeTax || 0);
   ok(approx(st.netProfit, expectedNet),
-    `${eng.locale}: netProfit (${st.netProfit}) !== revenue - costOfSales - surcharge - shipping - admin - incomeTax (${expectedNet})`);
+    `${eng.locale}: netProfit (${st.netProfit}) !== revenue − COGS − operating − surcharge − shipping − admin − incomeTax (${expectedNet})`);
 }
 
 console.log('\n=== COGS / Operating Split Test (PR-T5 backend core) ===\n');

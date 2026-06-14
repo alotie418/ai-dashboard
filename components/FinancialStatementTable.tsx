@@ -18,13 +18,14 @@ const FinancialStatementTable: React.FC<Props> = ({ data, accountingLocale = 'CN
 
   const recompute = () => {
     const revenue = data.salesRevenue;
-    const cost = data.costOfSales;
+    const cost = data.costOfSales; // PR-T5-2A: now COGS-only
+    const operating = data.operatingExpenses ?? 0; // 0 for US / pre-split payloads → grossProfit/netProfit unchanged there
     const tax = data.taxSurcharge;
     const shipping = data.shippingFee;
     const admin = data.adminExpense;
     const incomeTax = data.incomeTax;
-    const grossProfit = revenue - cost;
-    const netProfit = revenue - cost - tax - shipping - admin - incomeTax;
+    const grossProfit = revenue - cost; // revenue − COGS
+    const netProfit = revenue - cost - operating - tax - shipping - admin - incomeTax;
     const grossMargin = revenue === 0 ? 0 : +(grossProfit / revenue * 100).toFixed(2);
     const netMargin = revenue === 0 ? 0 : +(netProfit / revenue * 100).toFixed(2);
     return { grossProfit, netProfit, grossMargin, netMargin };
@@ -41,6 +42,7 @@ const FinancialStatementTable: React.FC<Props> = ({ data, accountingLocale = 'CN
         <LineItem label={label('plRevenue')} value={fmt(data.salesRevenue)} primary />
         <LineItem label={label('plCost')} value={`-${fmt(data.costOfSales)}`} />
         <LineItem label={label('plGrossProfit')} value={fmt(grossProfit)} bold primary />
+        {(data.operatingExpenses ?? 0) > 0 && <LineItem label={label('plOperatingExpenses')} value={`-${fmt(data.operatingExpenses as number)}`} />}
         {data.taxSurcharge > 0 && <LineItem label={label('plTaxSurcharge')} value={`-${fmt(data.taxSurcharge)}`} />}
         {data.shippingFee > 0 && <LineItem label={label('plShipping')} value={`-${fmt(data.shippingFee)}`} />}
         <LineItem label={label('plAdmin')} value={`-${fmt(data.adminExpense)}`} />

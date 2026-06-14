@@ -25,14 +25,17 @@ function generate(ctx) {
 
   // 损益表
   const salesRevenue = totalIncomeNet;
-  const costOfSales = totalExpenseNet;
-  const grossProfit = salesRevenue - costOfSales;
+  const costOfSales = cogsNet; // PR-T5-2A: COGS-only (was totalExpenseNet)
+  const grossProfit = salesRevenue - costOfSales; // now revenue − COGS (true gross profit)
   const grossMargin = salesRevenue > 0 ? Math.round(grossProfit / salesRevenue * 10000) / 100 : 0;
 
   const vatPayable = Math.max(0, totalIncomeTax - totalExpenseTax);
   const taxSurcharge = Math.round(vatPayable * (surchargeRate / 100) * 100) / 100;
 
-  const profitBeforeTax = grossProfit - taxSurcharge - totalShipping - adminExpense;
+  // PR-T5-2A: gross profit is now COGS-only, so operating expenses are subtracted
+  // here. profitBeforeTax (and netProfit) are numerically unchanged: grossProfit −
+  // operatingExpensesNet === old (revenue − totalExpenseNet).
+  const profitBeforeTax = grossProfit - operatingExpensesNet - taxSurcharge - totalShipping - adminExpense;
   const incomeTax = Math.round(Math.max(0, profitBeforeTax) * (incomeTaxRate / 100) * 100) / 100;
   const netProfit = profitBeforeTax - incomeTax;
   const netMargin = salesRevenue > 0 ? Math.round(netProfit / salesRevenue * 10000) / 100 : 0;

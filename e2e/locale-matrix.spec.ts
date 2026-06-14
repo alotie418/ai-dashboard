@@ -46,7 +46,7 @@ const DASHBOARD = (acc: string) => ({
   locale: acc,
   metrics: { inventoryTons: 0, purchaseTotalTons: 0, purchaseTotalAmount: 0, salesTotalTons: 0, salesTotalAmount: 0, avgCostPerTon: 0 },
   monthlyPerformance: [],
-  financialStatement: { salesRevenue: 0, costOfSales: 0, taxSurcharge: 0, adminExpense: 0, incomeTax: 0, shippingFee: 0, grossProfit: 0, grossMargin: 0, netProfit: 0, netMargin: 0 },
+  financialStatement: { salesRevenue: 0, costOfSales: 0, costOfGoodsSold: 0, operatingExpenses: 0, operatingProfit: 0, taxSurcharge: 0, adminExpense: 0, incomeTax: 0, shippingFee: 0, grossProfit: 0, grossMargin: 0, netProfit: 0, netMargin: 0 },
   vatStatistics: { cumulativeInput: 0, cumulativeOutput: 0, certifiedInput: 0, invoicedOutput: 0, estimatedPayable: 0 },
   taxInclusiveSummary: { purchaseTotal: 0, salesTotal: 0, difference: 0 },
   inventory: { inStockCount: 1, totalInventoryCost: 100, details: [{ product_id: 'p1', name: 'Item-A', unit: 'piece', qtyOnHand: 10, unitCost: 10, lineCost: 100 }] },
@@ -371,8 +371,8 @@ for (const ui of ['en', 'ja']) {
 //    would crash it). Navigation via the sidebar fa-wallet icon. ──
 const REPORT_MOCK = (acc: string) => ({
   locale: acc, period: { from: '2026-01-01', to: '2026-12-31', year: '2026' }, currency: '', reportTypes: [], warnings: [],
-  incomeStatement: { salesRevenue: 100000, costOfSales: 60000, grossProfit: 40000, adminExpense: 5000, operatingProfit: 35000, incomeTax: 6000, netProfit: 28000, netMargin: 28 },
-  profitLoss: { revenue: 100000, costOfSales: 60000, grossProfit: 40000, adminExpense: 5000, operatingProfit: 35000, incomeTax: 6000, netProfit: 28000, netMargin: 28 },
+  incomeStatement: { salesRevenue: 100000, costOfSales: 60000, costOfGoodsSold: 60000, operatingExpenses: 0, grossProfit: 40000, adminExpense: 5000, operatingProfit: 35000, incomeTax: 6000, netProfit: 28000, netMargin: 28 },
+  profitLoss: { revenue: 100000, costOfSales: 60000, costOfGoodsSold: 60000, operatingExpenses: 0, grossProfit: 40000, adminExpense: 5000, operatingProfit: 35000, incomeTax: 6000, netProfit: 28000, netMargin: 28 },
   scheduleC: { line1_grossReceipts: 100000, line7_grossIncome: 100000, line28_totalExpenses: 60000, line31_netProfit: 40000 },
 });
 
@@ -1145,6 +1145,19 @@ test.describe('PR-T2 → App.tsx trusts backend financial statement (no client t
     });
     await expect(netMargin(page)).toHaveText('40%', { timeout: 10_000 });
     await expect(page.getByText('30%')).toHaveCount(0); // not the 25%-override value
+  });
+
+  // PR-T5-2A: costOfSales is now COGS-only; the dashboard recompute must subtract
+  // operatingExpenses, so net margin reflects it. Pre-flip (no operating subtraction)
+  // this fixture would show a 60% net margin instead of 40%.
+  test('T5-2A: dashboard net margin subtracts operating expenses (COGS-only costOfSales)', async ({ page }) => {
+    await bootDashboardWithFS(page, 'zh-CN', 'CN', {
+      salesRevenue: 100000, costOfSales: 40000, costOfGoodsSold: 40000, operatingExpenses: 20000,
+      operatingProfit: 40000, taxSurcharge: 0, shippingFee: 0, adminExpense: 0, incomeTax: 0,
+      grossProfit: 60000, grossMargin: 60, netProfit: 40000, netMargin: 40,
+    });
+    await expect(netMargin(page)).toHaveText('40%', { timeout: 10_000 }); // net = revenue − COGS − operating
+    await expect(page.getByText('60%')).toBeVisible(); // gross margin = revenue − COGS
   });
 });
 

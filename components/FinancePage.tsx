@@ -70,9 +70,10 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
   const fallbackPL = (() => {
     const fs = data.financialStatement;
     const revenue = fs.salesRevenue;
-    const cost = fs.costOfSales;
+    const cost = fs.costOfSales; // PR-T5-2A: now COGS-only
+    const operating = fs.operatingExpenses ?? 0; // 0 for US / pre-split payloads
     const grossProfit = revenue - cost;
-    const netProfit = revenue - cost - fs.taxSurcharge - fs.shippingFee - fs.adminExpense - fs.incomeTax;
+    const netProfit = revenue - cost - operating - fs.taxSurcharge - fs.shippingFee - fs.adminExpense - fs.incomeTax;
     const grossMargin = revenue === 0 ? 0 : +(grossProfit / revenue * 100).toFixed(2);
     const netMargin = revenue === 0 ? 0 : +(netProfit / revenue * 100).toFixed(2);
     return { grossProfit, netProfit, grossMargin, netMargin };
@@ -406,6 +407,9 @@ const GenericPL: React.FC<{
   const pl = is || {
     salesRevenue: fs.salesRevenue,
     costOfSales: fs.costOfSales,
+    costOfGoodsSold: fs.costOfGoodsSold,
+    operatingExpenses: fs.operatingExpenses,
+    operatingProfit: fs.operatingProfit,
     grossProfit: fallbackPL.grossProfit,
     grossMargin: fallbackPL.grossMargin,
     taxSurcharge: fs.taxSurcharge,
@@ -425,9 +429,11 @@ const GenericPL: React.FC<{
         <LineItem label={lbl('plRevenue')} value={fmt(pl.salesRevenue || pl.revenue || 0)} bold primary />
         <LineItem label={lbl('plCost')} value={fmt(pl.costOfSales || 0)} indent />
         <LineItem label={lbl('plGrossProfit')} value={fmt(pl.grossProfit || 0)} bold primary />
+        {(pl.operatingExpenses ?? 0) > 0 && <LineItem label={lbl('plOperatingExpenses')} value={fmt(pl.operatingExpenses)} indent />}
         {pl.taxSurcharge != null && <LineItem label={lbl('plTaxSurcharge')} value={fmt(pl.taxSurcharge)} indent />}
         {pl.shippingFee != null && <LineItem label={lbl('plShipping')} value={fmt(pl.shippingFee)} indent />}
         <LineItem label={lbl('plAdmin')} value={fmt(pl.adminExpense || pl.operatingProfit != null ? (pl.adminExpense || 0) : 0)} indent />
+        {pl.operatingProfit != null && <LineItem label={lbl('plOperatingProfit')} value={fmt(pl.operatingProfit)} bold primary />}
         <LineItem label={lbl('plIncomeTax')} value={fmt(pl.incomeTax || 0)} indent />
         <LineItem label={lbl('plNetProfit')} value={fmt(pl.netProfit || 0)} bold success />
         <LineItem label={t('finance.plNetMargin')} value={`${(pl.netMargin || 0).toFixed(2)}%`} indent />
