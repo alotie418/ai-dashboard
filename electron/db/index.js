@@ -4,6 +4,10 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const { app } = require('electron');
+const { autoBackup } = require('./autoBackup');
+
+// 启动滚动快照保留份数（§2A 数据安全）。库小、单文件拷贝，10 份足够覆盖多次回滚。
+const MAX_AUTO_BACKUPS = 10;
 
 let db = null;
 
@@ -25,6 +29,7 @@ function initDatabase() {
   }
 
   const dbPath = getDbPath();
+  const existedBefore = fs.existsSync(dbPath); // 新装首启时为 false → 无数据可备，跳过备份
   db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
@@ -33,6 +38,17 @@ function initDatabase() {
   // - busy_timeout=5000：遇到库锁时最多等 5s 再报错，配合单实例锁降低 SQLITE_BUSY
   db.pragma('synchronous = FULL');
   db.pragma('busy_timeout = 5000');
+
+  // 迁移前滚动快照（§2A 数据安全）：保护「唯一账本」。仅当库此前已存在时才备份；
+  // 有待跑迁移时强制快照（迁移写错数据的唯一回滚点），否则按内容是否变化去重。
+  // 永不抛错、永不阻断启动——备份失败只记日志，迁移照常进行。
+  if (existedBefore) {
+    const pendingMigration = db.pragma('user_version', { simple: true }) < MIGRATIONS.length;
+    const res = autoBackup({ db, dbPath, force: pendingMigration, max: MAX_AUTO_BACKUPS });
+    if (res.ok) console.log('[db] auto-backup →', res.path);
+    else if (res.skipped) console.log('[db] auto-backup skipped:', res.reason);
+    else console.warn('[db] auto-backup failed:', res.error);
+  }
 
   runMigrations(db);
   console.log('[db] ready at', dbPath);
