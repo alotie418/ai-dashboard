@@ -635,7 +635,7 @@ export interface AppSettings {
   ai_model?: string;
 }
 
-// D1 schema types (what the Worker expects)
+// API record types
 interface ApiSalesRecord {
   id: string;
   date: string;

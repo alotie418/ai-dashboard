@@ -1,4 +1,4 @@
-// Purchases CRUD — 从 worker/src/index.js 第 1063-1138 行迁移
+// Purchases CRUD
 const { getDb } = require('../db');
 
 function safeString(v, maxLen = 255) {

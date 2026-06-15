@@ -1,4 +1,4 @@
-// Batch import — 从 worker/src/index.js 第 2061-2142 行迁移
+// Batch import
 const { getDb } = require('../db');
 
 function safeString(v, maxLen = 255) {

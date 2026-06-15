@@ -1,4 +1,4 @@
-// Sales CRUD — 从 worker/src/index.js 第 1139-1214 行迁移
+// Sales CRUD
 const { getDb } = require('../db');
 
 function safeString(v, maxLen = 255) {

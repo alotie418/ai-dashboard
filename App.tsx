@@ -69,7 +69,7 @@ const AppContent: React.FC = () => {
       // PR-T2: trust the backend's locale-aware financial statement verbatim.
       // No client-side tax-rate math — taxSurcharge / incomeTax / grossProfit /
       // netProfit / margins (and shippingFee / adminExpense) are all computed
-      // server-side (electron reports/* or worker) using the configured per-locale
+      // server-side (electron reports/*) using the configured per-locale
       // rates. We only pass the fields through, falling back to 0 if a field is
       // missing; we never re-derive a formula on the client (which previously
       // hardcoded a 12% surcharge and a 25% income tax regardless of locale).

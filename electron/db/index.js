@@ -1,5 +1,5 @@
 // SQLite 数据库初始化 — Phase 1.2 主体在这里
-// 表结构与原 Cloudflare D1 完全一致，用 user_version PRAGMA 管理迁移版本
+// 表结构用 user_version PRAGMA 管理迁移版本
 
 const path = require('node:path');
 const fs = require('node:fs');
@@ -60,7 +60,7 @@ function getDb() {
   return db;
 }
 
-// ====== Migrations (照搬 worker D1 schema) ======
+// ====== Migrations ======
 const MIGRATIONS = [
   // v1: 初始 schema
   (d) => {

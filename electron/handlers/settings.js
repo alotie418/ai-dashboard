@@ -1,7 +1,7 @@
-// Settings get/save — 从 worker/src/index.js 第 1218-1256 行迁移
+// Settings get/save
 const { getDb } = require('../db');
 
-// 与原 worker 保持一致的白名单
+// 字段白名单
 // AI 模型选择已移到 ai_providers 表（每 provider 独立），settings 不再存 ai_model
 const SETTINGS_ALLOWED_KEYS = new Set([
   'company_info',

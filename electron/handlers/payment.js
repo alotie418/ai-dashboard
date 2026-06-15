@@ -1,4 +1,4 @@
-// Payment 记账 — 从 worker/src/index.js 第 2203-2253 行迁移
+// Payment 记账
 const { getDb } = require('../db');
 
 function computeStatus(paid, total) {
