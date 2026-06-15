@@ -34,6 +34,7 @@
     "check:cogs-split": "node scripts/test-cogs-split.mjs",
     "check:recategorize": "node scripts/test-recategorize.mjs",
     "check:report-source": "node scripts/test-report-source.mjs",
+    "check:auto-backup": "node scripts/test-auto-backup.mjs",
     "check:locale": "npm run check:locale-matrix && npm run check:raw-keys",
     "test:locale-ui": "npm run build && playwright test",
     "build:dmg": "BUILD_TARGET=dmg npm run build && electron-builder --mac dmg --config electron-builder.dmg.yml",
