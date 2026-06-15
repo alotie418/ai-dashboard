@@ -163,7 +163,7 @@ npm run test:locale-ui        # vite build + Playwright 六语言界面验收
 └── docs/                    # ROADMAP-to-v1.md(到 v1.0 的差距路线图)等
 ```
 
-> 仓库中的 `server.js` / `server/` / `worker/`(Express + Cloudflare Worker/D1)是早期 Web 版遗留,**不进桌面包**,计划清理/归档,详见路线图 Track B。
+> 早期 Web 版遗留代码(`server.js` / `server/` / `worker/`,即 Express + Cloudflare Worker/D1)已于 #154 从仓库删除,历史保留在 `archive/web-legacy` 分支;桌面包从不包含该 Web 栈。
 
 ---
 
