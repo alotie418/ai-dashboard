@@ -27,9 +27,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts
-      # 迁移测试要在 node 下 require('better-sqlite3')：取 node ABI 的预构建 / 源码构建。
-      - name: Rebuild better-sqlite3 for node ABI
-        run: npm rebuild better-sqlite3
+      # --ignore-scripts 跳过了 electron 自身的 install（下载二进制）；多个守卫 + 迁移测试
+      # 会 require('electron')（仅取路径字符串），二进制缺失会抛「Electron failed to install
+      # correctly」。npm rebuild electron 补下二进制；同时把 better-sqlite3 重建为 node ABI
+      # 供迁移测试在 node 下跑真引擎。两者都不触发 electron-builder install-app-deps。
+      - name: Install Electron binary + rebuild better-sqlite3 for node ABI
+        run: npm rebuild electron better-sqlite3
       # 前端构建放在守卫之前：check:offline 需要扫 dist/index.html。
       - name: Build renderer
         run: npm run build
