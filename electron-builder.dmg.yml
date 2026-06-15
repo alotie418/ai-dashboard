@@ -5,6 +5,11 @@ appId: com.alotie418.sololedger
 productName: SoloLedger
 copyright: © 2026 SoloLedger
 
+# 不做自动更新：electron-updater 未安装、零引用。显式 publish:null 关闭 electron-builder
+# 默认行为——它会从 git remote 推断 GitHub provider，生成误导性的 release/latest-mac.yml
+# 与包内 app-update.yml 更新源（指向内部仓库，实则没有可用的更新通道）。
+publish: null
+
 directories:
   output: release          # 产物输出目录
   buildResources: build    # 图标等构建资源
