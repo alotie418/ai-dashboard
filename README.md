@@ -140,7 +140,7 @@ npm run check:disclaimer      # 免责声明挂载点 + i18n 齐备
 npm run test:locale-ui        # vite build + Playwright 六语言界面验收
 ```
 
-> 现状:这些守卫需手动运行(尚无 CI),且持久化层 / 数据库迁移 / 真 Electron e2e 的自动化测试仍是路线图项。
+> 现状:以上守卫、数据库迁移测试、构建与 Playwright 界面 e2e 已纳入 CI(`.github/workflows/ci.yml`,每次 push/PR 自动运行);仍待补的是**真 Electron(打包应用)端到端测试**——CI 中 e2e 由 Playwright 驱动 vite preview、`electronAPI` 被 mock,不启动 Electron 运行时。
 
 ---
 
