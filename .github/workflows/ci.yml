@@ -1,0 +1,52 @@
+# SoloLedger CI —— §2B：让 20+ 个 check:* 守卫 + 迁移测试 + e2e 在每次推送/PR 自动跑，
+# 不再只靠人工。全程不启动 Electron：
+#   - 守卫与迁移测试在 node 下跑；better-sqlite3 重建为 node ABI 供迁移测试用真引擎。
+#   - e2e 由 Playwright 驱动 vite preview（electronAPI 被 mock），同样不需要 Electron 运行时。
+# 故用 `npm ci --ignore-scripts` 跳过 postinstall（electron-builder install-app-deps 会把
+# better-sqlite3 重建为 Electron ABI，CI 不需要）。
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Guards + migrations + build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # 迁移测试要在 node 下 require('better-sqlite3')：取 node ABI 的预构建 / 源码构建。
+      - name: Rebuild better-sqlite3 for node ABI
+        run: npm rebuild better-sqlite3
+      # 前端构建放在守卫之前：check:offline 需要扫 dist/index.html。
+      - name: Build renderer
+        run: npm run build
+      - name: Run all guards + migration test
+        run: npm run check:all
+
+  e2e:
+    name: Locale-matrix e2e (Playwright)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+      - name: Build + e2e
+        run: npm run test:locale-ui
