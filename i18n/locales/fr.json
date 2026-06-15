@@ -104,7 +104,7 @@
     "security": {
       "title": "Compte & securite",
       "encryption": "Chiffrement des donnees",
-      "encryptionDesc": "Toutes les transmissions de donnees sont chiffrees via HTTPS. Les cookies de session utilisent HttpOnly + Secure + SameSite."
+      "encryptionDesc": "Toutes les donnees comptables sont stockees dans une base SQLite locale sur cet appareil (jamais televersees, sans serveur). Les cles API des fournisseurs IA sont chiffrees par le stockage securise de l'OS (safeStorage, ex. Trousseau macOS) et ne quittent jamais votre machine."
     },
     "saveButton": "Enregistrer",
     "savedToast": "Paramètres enregistrés",

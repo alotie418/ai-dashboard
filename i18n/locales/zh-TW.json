@@ -104,7 +104,7 @@
     "security": {
       "title": "帳號與安全",
       "encryption": "資料加密",
-      "encryptionDesc": "所有資料傳輸均透過 HTTPS 加密，Session Cookie 啟用 HttpOnly + Secure + SameSite 防護。"
+      "encryptionDesc": "帳本資料全部儲存在本機 SQLite 資料庫（不上傳、不經伺服器）；AI 服務商 API Key 由系統安全儲存（safeStorage，如 macOS 鑰匙圈）加密保存，全程不出本機。"
     },
     "saveButton": "儲存變更",
     "savedToast": "設定已成功儲存！",

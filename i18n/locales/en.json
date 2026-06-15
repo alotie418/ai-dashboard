@@ -104,7 +104,7 @@
     "security": {
       "title": "Account & Security",
       "encryption": "Data Encryption",
-      "encryptionDesc": "All data transmission is encrypted via HTTPS. Session cookies use HttpOnly + Secure + SameSite protection."
+      "encryptionDesc": "All ledger data is stored in a local SQLite database on this device (never uploaded, no server). AI provider API keys are encrypted by the OS secure storage (safeStorage, e.g. macOS Keychain) and never leave your machine."
     },
     "saveButton": "Save Changes",
     "savedToast": "Settings saved successfully",
