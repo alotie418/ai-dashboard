@@ -6,7 +6,6 @@ const path = require('node:path');
 const fs = require('node:fs');
 
 const isDev = !app.isPackaged;
-const BUILD_TARGET = process.env.BUILD_TARGET || (process.mas ? 'mas' : 'dmg');
 
 let mainWindow = null;
 
@@ -119,6 +118,5 @@ app.on('window-all-closed', () => {
 // 暴露给 handler 模块用的元信息
 module.exports = {
   isDev,
-  BUILD_TARGET,
   getUserDataPath: () => app.getPath('userData'),
 };

@@ -9,8 +9,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   invoke: (channel, payload) => ipcRenderer.invoke(channel, payload),
-  // 平台信息（用于条件渲染：MAS 版隐藏自动更新按钮等）
+  // 平台信息（渲染层可用于条件渲染）
   platform: process.platform,
-  buildTarget: process.env.BUILD_TARGET || 'dmg',
   isElectron: true,
 });
