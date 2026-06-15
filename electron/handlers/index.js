@@ -60,48 +60,56 @@ function registerHandlers({ ipcMain, dialog }) {
     }
   });
 
-  // ====== 数据库备份 / 导出 ======
+  // ====== 数据库备份 / 导出（文件夹 bundle：DB + 附件，§2A#3）======
+  // 导出为一个文件夹（sololedger.db + attachments/docs/*），而非单 .db——否则换机导入后
+  // tax_invoice_attachment_path 全部悬空。与 #152 启动自动备份同形，可互相恢复。
   ipcMain.handle('app:exportDb', async () => {
     const { getDbPath, getDb } = require('../db');
     const path = require('node:path');
     const { app } = require('electron');
+    const { writeExportBundle } = require('./_backupBundle');
     const dbPath = getDbPath();
-    // 加固：备份前先把 WAL 落盘到主库，否则最近已提交事务可能还在 -wal 里，
-    // 单文件拷贝会丢这部分数据。TRUNCATE 后 wal 清空，单 .db 即完整快照。
+    // 加固：备份前先把 WAL 落盘到主库，否则最近已提交事务可能还在 -wal 里，单文件拷贝会丢。
     try { getDb().pragma('wal_checkpoint(TRUNCATE)'); } catch (e) { console.warn('[app:exportDb] checkpoint failed:', e?.message || e); }
     const result = await dialog.showSaveDialog({
-      title: '导出账本数据',
-      // 默认落在「文稿」目录（持久、易找），而非进程 CWD / app bundle 旁（重装即丢）。
-      defaultPath: path.join(app.getPath('documents'), `sololedger-backup-${new Date().toISOString().slice(0, 10)}.db`),
-      filters: [{ name: 'SQLite 数据库', extensions: ['db'] }],
+      title: '导出账本数据（含附件）',
+      // 默认落在「文稿」目录（持久、易找）。bundle 是文件夹，故默认名不带扩展名。
+      defaultPath: path.join(app.getPath('documents'), `sololedger-backup-${new Date().toISOString().slice(0, 10)}`),
     });
     if (result.canceled || !result.filePath) return { ok: false };
-    const fs = require('node:fs');
-    fs.copyFileSync(dbPath, result.filePath);
-    return { ok: true, path: result.filePath };
+    const res = writeExportBundle({ dbPath, userDataDir: app.getPath('userData'), destDir: result.filePath });
+    if (!res.ok) return { ok: false, error: 'EXPORT_FAILED' };
+    return { ok: true, path: res.path, attachments: res.attachments };
   });
 
-  // ====== 数据库恢复 / 导入 ======
-  // 安全顺序：选文件 → 校验(头/quick_check/关键表/版本) → 自动备份当前库 →
-  //   关闭连接 → 原子替换 → 清旧 wal/shm → 让前端引导重启。任何一步失败即中止并回传 error。
+  // ====== 数据库恢复 / 导入（文件夹 bundle 或旧单 .db，§2A#3）======
+  // 安全顺序：选来源 → 解析(bundle/旧.db) → 校验(头/quick_check/关键表/版本) → 自动备份当前库
+  //   → 关闭连接 → 原子替换 DB → 清旧 wal/shm → 合并附件(只增不删) → 引导重启。
+  // DB 替换之前任何一步失败即中止；DB 替换成功后附件合并是 best-effort（只增不删、不回滚 DB）。
   ipcMain.handle('app:importDb', async () => {
     const fs = require('node:fs');
     const path = require('node:path');
     const { app } = require('electron');
     const { getDbPath, getDb, closeDb, SCHEMA_VERSION } = require('../db');
+    const { resolveImportSource, mergeAttachments } = require('./_backupBundle');
 
-    // 1. 选择 .db 文件
+    // 1. 选择 bundle 文件夹 或 旧单 .db 文件
     const sel = await dialog.showOpenDialog({
-      title: '选择要恢复的账本备份',
-      properties: ['openFile'],
-      filters: [{ name: 'SQLite 数据库', extensions: ['db'] }],
+      title: '选择要恢复的账本备份（文件夹或 .db）',
+      properties: ['openFile', 'openDirectory'],
+      filters: [{ name: '账本备份 / SQLite 数据库', extensions: ['db'] }],
     });
     if (sel.canceled || !sel.filePaths || !sel.filePaths[0]) return { ok: false };
-    const srcPath = sel.filePaths[0];
+    const pickedPath = sel.filePaths[0];
+
+    // 1b. 解析来源：文件夹 bundle（取内部 sololedger.db + attachments/docs）或旧单 .db
+    const resolved = resolveImportSource(pickedPath);
+    if (resolved.error) return { ok: false, error: resolved.error };
+    const { dbSrc, attachSrc } = resolved;
 
     // 2. 校验 SQLite 文件头（前 16 字节应为 "SQLite format 3\0"）
     try {
-      const fd = fs.openSync(srcPath, 'r');
+      const fd = fs.openSync(dbSrc, 'r');
       const header = Buffer.alloc(16);
       fs.readSync(fd, header, 0, 16, 0);
       fs.closeSync(fd);
@@ -114,7 +122,7 @@ function registerHandlers({ ipcMain, dialog }) {
     let probe = null;
     try {
       const Database = require('better-sqlite3');
-      probe = new Database(srcPath, { readonly: true, fileMustExist: true });
+      probe = new Database(dbSrc, { readonly: true, fileMustExist: true });
       const qc = probe.pragma('quick_check', { simple: true });
       if (qc !== 'ok') { probe.close(); return { ok: false, error: 'INTEGRITY_FAILED' }; }
       const tables = probe
@@ -133,6 +141,7 @@ function registerHandlers({ ipcMain, dialog }) {
     const dbPath = getDbPath();
 
     // 6. 恢复前自动备份当前库（安全网）。失败则中止恢复，绝不在没有备份的情况下覆盖。
+    //    附件合并是「只增不删」，现有附件不会被破坏，故无需在此快照附件即构成完整回滚点。
     let autoBackupPath;
     try {
       try { getDb().pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }
@@ -152,7 +161,7 @@ function registerHandlers({ ipcMain, dialog }) {
     // 9. 删除旧的 -wal / -shm（属于旧库；留下会让 SQLite 用过期 WAL 覆盖新库 → 损坏）
     try {
       const tmpPath = dbPath + '.restore-tmp';
-      fs.copyFileSync(srcPath, tmpPath);
+      fs.copyFileSync(dbSrc, tmpPath);
       fs.renameSync(tmpPath, dbPath);
       fs.rmSync(dbPath + '-wal', { force: true });
       fs.rmSync(dbPath + '-shm', { force: true });
@@ -160,7 +169,16 @@ function registerHandlers({ ipcMain, dialog }) {
       return { ok: false, error: 'REPLACE_FAILED', autoBackupPath };
     }
 
-    return { ok: true, restoredFrom: srcPath, autoBackupPath };
+    // 10. 合并 bundle 附件进 userData/attachments/docs（只增不删；best-effort）。
+    //     DB 已成功恢复，附件合并失败只记日志、不让整个恢复失败（缺失附件 UI 已优雅处理）。
+    let attachmentsMerged = 0;
+    if (attachSrc) {
+      const m = mergeAttachments({ attachSrc, userDataDir: app.getPath('userData') });
+      attachmentsMerged = m.merged || 0;
+      if (!m.ok) console.warn('[app:importDb] attachment merge failed:', m.error);
+    }
+
+    return { ok: true, restoredFrom: pickedPath, autoBackupPath, attachmentsMerged };
   });
 
   // ====== 重启应用（恢复完成后引导用户立即重启，拿到干净的新库状态）======
