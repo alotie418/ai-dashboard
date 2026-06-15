@@ -242,7 +242,14 @@
       "autoBackupFailed": "自動備份目前資料庫失敗，已取消還原以保護資料。",
       "desktopOnly": "資料備份僅在桌面版可用。",
       "devModeRestart": "目前為開發模式，請手動關閉應用程式並重新執行 npm run electron:dev",
-      "error": "操作失敗，請重試。"
+      "error": "操作失敗，請重試。",
+      "csvTitle": "結構化匯出（CSV）",
+      "csvHint": "把交易 / 採購 / 銷售 / 單據依表匯出為 CSV（UTF-8，含表頭），供會計師對接或遷出。",
+      "csvSuccess": "已匯出 {{rows}} 列到：{{path}}",
+      "csvTransactions": "交易",
+      "csvPurchases": "採購",
+      "csvSales": "銷售",
+      "csvDocuments": "單據"
     },
     "dataMigration": {
       "title": "資料遷移",

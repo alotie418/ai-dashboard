@@ -242,7 +242,14 @@
       "autoBackupFailed": "現在のデータベースの自動バックアップに失敗したため、データ保護のため復元を中止しました。",
       "desktopOnly": "データバックアップはデスクトップ版でのみ利用できます。",
       "devModeRestart": "開発モードです。アプリを手動で閉じて、npm run electron:dev を再実行してください。",
-      "error": "操作に失敗しました。もう一度お試しください。"
+      "error": "操作に失敗しました。もう一度お試しください。",
+      "csvTitle": "構造化エクスポート（CSV）",
+      "csvHint": "取引 / 仕入 / 売上 / 書類をテーブルごとに CSV（UTF-8、ヘッダー付き）で書き出します。会計士との連携や移行にどうぞ。",
+      "csvSuccess": "{{rows}} 行を書き出しました：{{path}}",
+      "csvTransactions": "取引",
+      "csvPurchases": "仕入",
+      "csvSales": "売上",
+      "csvDocuments": "書類"
     },
     "dataMigration": {
       "title": "データ移行",

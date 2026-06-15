@@ -181,6 +181,35 @@ function registerHandlers({ ipcMain, dialog }) {
     return { ok: true, restoredFrom: pickedPath, autoBackupPath, attachmentsMerged };
   });
 
+  // ====== 结构化 CSV 导出（§2A：供会计师对接 / 迁出，per-table）======
+  // 白名单表 → SELECT * → RFC4180+防注入 CSV → showSaveDialog → 写盘（带 UTF-8 BOM，Excel 识别中文）。
+  ipcMain.handle('app:exportTableCsv', async (_evt, payload) => {
+    const path = require('node:path');
+    const fs = require('node:fs');
+    const { app } = require('electron');
+    const { getDb } = require('../db');
+    const { tableToCsv } = require('./_csvExport');
+    const table = payload && payload.table;
+    let built;
+    try {
+      built = tableToCsv(getDb(), table);
+    } catch (e) {
+      return { ok: false, error: e?.message === 'INVALID_TABLE' ? 'INVALID_TABLE' : 'EXPORT_FAILED' };
+    }
+    const result = await dialog.showSaveDialog({
+      title: '导出 CSV',
+      defaultPath: path.join(app.getPath('documents'), `sololedger-${table}-${new Date().toISOString().slice(0, 10)}.csv`),
+      filters: [{ name: 'CSV', extensions: ['csv'] }],
+    });
+    if (result.canceled || !result.filePath) return { ok: false };
+    try {
+      fs.writeFileSync(result.filePath, '\uFEFF' + built.csv, 'utf8'); // BOM：Excel 正确识别 UTF-8 中文
+    } catch (e) {
+      return { ok: false, error: 'EXPORT_FAILED' };
+    }
+    return { ok: true, path: result.filePath, rows: built.rows };
+  });
+
   // ====== 重启应用（恢复完成后引导用户立即重启，拿到干净的新库状态）======
   ipcMain.handle('app:relaunch', async () => {
     const { app } = require('electron');
