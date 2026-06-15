@@ -104,7 +104,7 @@
     "security": {
       "title": "アカウントとセキュリティ",
       "encryption": "データ暗号化",
-      "encryptionDesc": "すべてのデータ通信はHTTPSで暗号化されています。セッションCookieはHttpOnly + Secure + SameSite保護を使用しています。"
+      "encryptionDesc": "すべての台帳データは本機のローカル SQLite データベースに保存されます（アップロードなし・サーバー不使用）。AI プロバイダーの API キーは OS のセキュアストレージ（safeStorage、例：macOS キーチェーン）で暗号化され、デバイス外に出ません。"
     },
     "saveButton": "変更を保存",
     "savedToast": "設定を保存しました",
