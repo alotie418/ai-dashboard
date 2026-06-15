@@ -1,4 +1,4 @@
-// Alerts CRUD — 从 worker/src/index.js 第 2359-2395 行迁移
+// Alerts CRUD
 const { getDb } = require('../db');
 
 async function list({ query }) {

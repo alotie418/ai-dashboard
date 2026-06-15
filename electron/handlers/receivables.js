@@ -1,4 +1,4 @@
-// Receivables / Payables summary — 从 worker/src/index.js 第 2256-2354 行迁移
+// Receivables / Payables summary
 const { getDb } = require('../db');
 
 function bucketize(daysDiff, amount, buckets) {
