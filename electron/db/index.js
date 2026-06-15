@@ -495,4 +495,6 @@ function closeDb() {
   db = null;
 }
 
-module.exports = { initDatabase, getDb, getDbPath, closeDb, SCHEMA_VERSION };
+// MIGRATIONS / runMigrations 导出仅供迁移专项测试（scripts/test-migrations.mjs）在
+// :memory: 库上跑 old→head + 幂等 + 保 row 断言；应用运行时仍只用 initDatabase。
+module.exports = { initDatabase, getDb, getDbPath, closeDb, SCHEMA_VERSION, MIGRATIONS, runMigrations };

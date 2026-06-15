@@ -1,0 +1,126 @@
+#!/usr/bin/env node
+// 迁移专项测试（§2B）—— 12 版迁移是「数据丢失炸弹」，此前零执行覆盖。
+// 在真 better-sqlite3（应用所用引擎）+ :memory: 库上验证：
+//   1. 全新库 → head：user_version === MIGRATIONS.length === SCHEMA_VERSION。
+//   2. runMigrations 幂等：再跑一次不报错、版本不变。
+//   3. 种子：v4 类别已插入、v13 is_cogs 已回填。
+//   4. 逐版幂等：把每个 MIGRATIONS[i] 直接重放到 head 库上，不报错、行数/表集不变
+//      （证明每版都靠 IF NOT EXISTS / INSERT OR IGNORE / PRAGMA 守卫安全可重入）。
+//   5. 旧→head 保 row：只建 v1、塞入 purchases/sales 行，迁到 head 后行仍在、新表已建。
+//
+// better-sqlite3 原生绑定按 Electron ABI 编（本机 / 普通 node 加载会 ERR_DLOPEN）；
+// 加载不了时优雅 SKIP（exit 0），不算失败——CI 里把它 rebuild 成 node ABI 后真跑。
+
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const require = createRequire(import.meta.url);
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+let Database;
+try {
+  Database = require('better-sqlite3');
+  // 原生绑定是惰性加载的——require 不触发，首次 new Database() 才 dlopen。
+  // 故在此实例化一次探测 ABI；不符会抛 ERR_DLOPEN_FAILED，落到下面优雅 SKIP。
+  new Database(':memory:').close();
+} catch (e) {
+  console.log('⚠ test-migrations SKIPPED: better-sqlite3 unloadable under this node (built for Electron ABI).');
+  console.log('  Runs for real in CI, where better-sqlite3 is rebuilt for the node ABI.');
+  console.log('  原因:', e?.message?.split('\n')[0] || e);
+  process.exit(0);
+}
+
+const { runMigrations, MIGRATIONS, SCHEMA_VERSION } = require(join(ROOT, 'electron/db/index.js'));
+
+const failures = [];
+const ok = (cond, msg) => { if (!cond) failures.push(msg); };
+const fresh = () => new Database(':memory:');
+const ver = (d) => d.pragma('user_version', { simple: true });
+const tableExists = (d, name) =>
+  !!d.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name);
+const colExists = (d, table, col) =>
+  d.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n;
+
+// ---- 1. 全新库 → head ----
+{
+  const d = fresh();
+  runMigrations(d);
+  ok(MIGRATIONS.length === SCHEMA_VERSION, `[1] SCHEMA_VERSION(${SCHEMA_VERSION}) must equal MIGRATIONS.length(${MIGRATIONS.length})`);
+  ok(ver(d) === MIGRATIONS.length, `[1] fresh→head should reach v${MIGRATIONS.length}, got v${ver(d)}`);
+  for (const t of ['purchases', 'sales', 'settings', 'categories', 'transactions', 'products', 'business_documents', 'assistant_conversations']) {
+    ok(tableExists(d, t), `[1] table '${t}' must exist at head`);
+  }
+  d.close();
+}
+
+// ---- 2. runMigrations 幂等 ----
+{
+  const d = fresh();
+  runMigrations(d);
+  const before = ver(d);
+  const catsBefore = count(d, 'categories');
+  let threw = null;
+  try { runMigrations(d); } catch (e) { threw = e?.message || String(e); }
+  ok(!threw, `[2] re-running runMigrations must not throw, threw: ${threw}`);
+  ok(ver(d) === before, `[2] version must stay v${before}, got v${ver(d)}`);
+  ok(count(d, 'categories') === catsBefore, `[2] category count must stay ${catsBefore}, got ${count(d, 'categories')}`);
+  d.close();
+}
+
+// ---- 3. 种子：v4 类别 + v13 is_cogs 回填 ----
+{
+  const d = fresh();
+  runMigrations(d);
+  ok(count(d, 'categories') > 0, '[3] v4 should seed categories');
+  ok(colExists(d, 'categories', 'is_cogs'), '[3] v13 should add categories.is_cogs');
+  const cogs = d.prepare('SELECT COUNT(*) AS n FROM categories WHERE is_cogs = 1').get().n;
+  ok(cogs > 0, '[3] v13 should backfill at least one is_cogs=1 category (cogs / EU purchases)');
+  d.close();
+}
+
+// ---- 4. 逐版幂等：每个迁移直接重放到 head 库上应是 no-op ----
+{
+  const d = fresh();
+  runMigrations(d);
+  const catsBefore = count(d, 'categories');
+  const tablesBefore = d.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table'").get().n;
+  for (let i = 0; i < MIGRATIONS.length; i++) {
+    let threw = null;
+    try { d.transaction(() => MIGRATIONS[i](d))(); } catch (e) { threw = e?.message || String(e); }
+    ok(!threw, `[4] replaying MIGRATIONS[${i}] (v${i + 1}) on head must not throw, threw: ${threw}`);
+  }
+  ok(count(d, 'categories') === catsBefore, `[4] replay must not change category count (${catsBefore} → ${count(d, 'categories')})`);
+  const tablesAfter = d.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table'").get().n;
+  ok(tablesAfter === tablesBefore, `[4] replay must not change table count (${tablesBefore} → ${tablesAfter})`);
+  d.close();
+}
+
+// ---- 5. 旧→head 保 row：v1 数据迁到 head 不丢 ----
+{
+  const d = fresh();
+  // 只建 v1 base schema，停在 v1
+  d.transaction(() => { MIGRATIONS[0](d); d.pragma('user_version = 1'); })();
+  d.prepare('INSERT INTO purchases (id, date, supplier) VALUES (?, ?, ?)').run('p1', '2026-01-01', 'Acme');
+  d.prepare('INSERT INTO purchases (id, date, supplier) VALUES (?, ?, ?)').run('p2', '2026-01-02', 'Beta');
+  d.prepare('INSERT INTO sales (id, date, customer) VALUES (?, ?, ?)').run('s1', '2026-01-03', 'Cust');
+
+  runMigrations(d); // v2 → head
+  ok(ver(d) === MIGRATIONS.length, `[5] should migrate v1→head, got v${ver(d)}`);
+  ok(count(d, 'purchases') === 2, `[5] purchases rows must survive migration, got ${count(d, 'purchases')}`);
+  ok(count(d, 'sales') === 1, `[5] sales rows must survive migration, got ${count(d, 'sales')}`);
+  ok(d.prepare('SELECT supplier FROM purchases WHERE id = ?').get('p1')?.supplier === 'Acme', '[5] row data must be intact after migration');
+  ok(tableExists(d, 'transactions'), '[5] v5 transactions table must be added');
+  ok(tableExists(d, 'products'), '[5] v9 products table must be added');
+  ok(colExists(d, 'purchases', 'product_id'), '[5] v10 purchases.product_id must be added');
+  ok(colExists(d, 'categories', 'is_cogs'), '[5] v13 categories.is_cogs must be added');
+  d.close();
+}
+
+if (failures.length) {
+  console.error(`✗ migrations: ${failures.length} assertion(s) failed:`);
+  for (const f of failures) console.error('  - ' + f);
+  process.exit(1);
+}
+console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation)`);
