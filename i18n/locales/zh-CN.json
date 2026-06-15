@@ -242,7 +242,14 @@
       "autoBackupFailed": "自动备份当前数据库失败，已取消恢复以保护数据。",
       "desktopOnly": "数据备份仅在桌面版可用。",
       "devModeRestart": "当前为开发模式，请手动关闭应用并重新运行 npm run electron:dev",
-      "error": "操作失败，请重试。"
+      "error": "操作失败，请重试。",
+      "csvTitle": "结构化导出（CSV）",
+      "csvHint": "把交易 / 采购 / 销售 / 单据按表导出为 CSV（UTF-8，含表头），供会计师对接或迁出。",
+      "csvSuccess": "已导出 {{rows}} 行到：{{path}}",
+      "csvTransactions": "交易",
+      "csvPurchases": "采购",
+      "csvSales": "销售",
+      "csvDocuments": "单据"
     },
     "dataMigration": {
       "title": "数据迁移",

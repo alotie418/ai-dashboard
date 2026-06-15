@@ -6,7 +6,14 @@
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { backupDatabase, restoreDatabase, relaunchApp, isDesktop } from '../services/api';
+import { backupDatabase, restoreDatabase, relaunchApp, isDesktop, exportTableCsv, type CsvExportTable } from '../services/api';
+
+const CSV_TABLES: { key: CsvExportTable; labelKey: string }[] = [
+  { key: 'transactions', labelKey: 'settings.dataBackup.csvTransactions' },
+  { key: 'purchases', labelKey: 'settings.dataBackup.csvPurchases' },
+  { key: 'sales', labelKey: 'settings.dataBackup.csvSales' },
+  { key: 'documents', labelKey: 'settings.dataBackup.csvDocuments' },
+];
 
 const DataBackupSection: React.FC = () => {
   const { t } = useTranslation();
@@ -17,6 +24,8 @@ const DataBackupSection: React.FC = () => {
   const [backupPath, setBackupPath] = useState<string | null>(null);
   const [restored, setRestored] = useState<{ autoBackupPath?: string } | null>(null);
   const [devRestart, setDevRestart] = useState(false);
+  const [csvBusy, setCsvBusy] = useState<CsvExportTable | null>(null);
+  const [csvResult, setCsvResult] = useState<{ rows: number; path: string } | null>(null);
 
   // 把后端错误码翻成本地化文案
   const errText = (code?: string): string => {
@@ -66,6 +75,20 @@ const DataBackupSection: React.FC = () => {
       setError(e?.message || t('settings.dataBackup.error'));
     } finally {
       setBusy(null);
+    }
+  };
+
+  const handleCsv = async (table: CsvExportTable) => {
+    setError(null); setCsvResult(null); setCsvBusy(table);
+    try {
+      const r = await exportTableCsv(table);
+      if (r.ok && r.path != null) setCsvResult({ rows: r.rows ?? 0, path: r.path });
+      else if (r.error) setError(t('settings.dataBackup.error'));
+      // r.ok === false 且无 error = 用户取消保存框 → 静默
+    } catch (e: any) {
+      setError(e?.message || t('settings.dataBackup.error'));
+    } finally {
+      setCsvBusy(null);
     }
   };
 
@@ -169,6 +192,33 @@ const DataBackupSection: React.FC = () => {
           >
             <i className="fas fa-rotate-left mr-2"></i>{t('settings.dataBackup.restoreButton')}
           </button>
+        )}
+      </div>
+
+      {/* 结构化 CSV 导出（供会计师对接 / 迁出） */}
+      <div className="border border-[#e0ddd5] rounded-xl p-5 bg-white space-y-3">
+        <div>
+          <p className="text-sm font-bold text-[#191918]">{t('settings.dataBackup.csvTitle')}</p>
+          <p className="text-xs text-[#6b6b69] mt-1">{t('settings.dataBackup.csvHint')}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {CSV_TABLES.map(({ key, labelKey }) => (
+            <button
+              key={key}
+              onClick={() => handleCsv(key)}
+              disabled={!desktop || csvBusy !== null}
+              className="border border-[#e0ddd5] text-[#4a4a48] px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#f7f6f2] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {csvBusy === key
+                ? <><i className="fas fa-spinner fa-spin mr-2"></i>{t('common.loading')}</>
+                : <><i className="fas fa-file-csv mr-2"></i>{t(labelKey)}</>}
+            </button>
+          ))}
+        </div>
+        {csvResult && (
+          <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 break-all">
+            <i className="fas fa-check-circle mr-2"></i>{t('settings.dataBackup.csvSuccess', { rows: csvResult.rows, path: csvResult.path })}
+          </div>
         )}
       </div>
     </section>

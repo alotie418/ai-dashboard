@@ -242,7 +242,14 @@
       "autoBackupFailed": "Échec de la sauvegarde automatique de la base de données actuelle. Restauration annulée pour protéger vos données.",
       "desktopOnly": "La sauvegarde des données est disponible uniquement dans l'application de bureau.",
       "devModeRestart": "Mode développement : veuillez fermer l'application manuellement et relancer npm run electron:dev.",
-      "error": "L'opération a échoué. Veuillez réessayer."
+      "error": "L'opération a échoué. Veuillez réessayer.",
+      "csvTitle": "Export structuré (CSV)",
+      "csvHint": "Exportez les transactions / achats / ventes / documents en CSV par table (UTF-8, avec en-têtes) — pour votre comptable ou pour migrer.",
+      "csvSuccess": "{{rows}} lignes exportées vers : {{path}}",
+      "csvTransactions": "Transactions",
+      "csvPurchases": "Achats",
+      "csvSales": "Ventes",
+      "csvDocuments": "Documents"
     },
     "dataMigration": {
       "title": "Migration de données",

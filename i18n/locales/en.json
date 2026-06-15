@@ -242,7 +242,14 @@
       "autoBackupFailed": "Failed to auto-back up the current database. Restore was cancelled to protect your data.",
       "desktopOnly": "Data backup is available in the desktop app only.",
       "devModeRestart": "Development mode: please close the app manually and run npm run electron:dev again.",
-      "error": "Operation failed. Please try again."
+      "error": "Operation failed. Please try again.",
+      "csvTitle": "Structured export (CSV)",
+      "csvHint": "Export transactions / purchases / sales / documents as per-table CSV (UTF-8, with headers) — for your accountant or to migrate out.",
+      "csvSuccess": "Exported {{rows}} rows to: {{path}}",
+      "csvTransactions": "Transactions",
+      "csvPurchases": "Purchases",
+      "csvSales": "Sales",
+      "csvDocuments": "Documents"
     },
     "dataMigration": {
       "title": "Data Migration",

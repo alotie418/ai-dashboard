@@ -242,7 +242,14 @@
       "autoBackupFailed": "현재 데이터베이스 자동 백업에 실패하여 데이터 보호를 위해 복원을 취소했습니다.",
       "desktopOnly": "데이터 백업은 데스크톱 앱에서만 사용할 수 있습니다.",
       "devModeRestart": "개발 모드입니다. 앱을 수동으로 종료한 후 npm run electron:dev 를 다시 실행하세요.",
-      "error": "작업에 실패했습니다. 다시 시도해 주세요."
+      "error": "작업에 실패했습니다. 다시 시도해 주세요.",
+      "csvTitle": "구조화 내보내기 (CSV)",
+      "csvHint": "거래 / 매입 / 매출 / 문서를 테이블별 CSV(UTF-8, 헤더 포함)로 내보냅니다. 회계사 연계나 이전에 사용하세요.",
+      "csvSuccess": "{{rows}}행을 내보냈습니다: {{path}}",
+      "csvTransactions": "거래",
+      "csvPurchases": "매입",
+      "csvSales": "매출",
+      "csvDocuments": "문서"
     },
     "dataMigration": {
       "title": "데이터 마이그레이션",

@@ -49,6 +49,22 @@ export function relaunchApp(): Promise<{ ok: boolean; devMode?: boolean }> {
   return electronInvoke<{ ok: boolean; devMode?: boolean }>('app:relaunch');
 }
 
+// ==================== 结构化 CSV 导出（§2A · 仅桌面版 · 供会计师对接/迁出）====================
+
+export type CsvExportTable = 'transactions' | 'purchases' | 'sales' | 'documents';
+
+export interface CsvExportResult {
+  ok: boolean;
+  path?: string;   // 成功时：CSV 保存路径
+  rows?: number;   // 成功时：导出行数
+  error?: string;  // 失败时：错误码（INVALID_TABLE / EXPORT_FAILED）
+}
+
+/** 把指定表导出为 CSV（UTF-8 BOM，含表头）。ok=false 且无 error 表示用户取消保存框。 */
+export function exportTableCsv(table: CsvExportTable): Promise<CsvExportResult> {
+  return electronInvoke<CsvExportResult>('app:exportTableCsv', { table });
+}
+
 // ==================== 财务报表 PDF 导出（仅桌面版）====================
 
 export interface PdfExportResult {
