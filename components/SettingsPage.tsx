@@ -46,58 +46,6 @@ const SettingsPage: React.FC = () => {
   const [vatRate, setVatRate] = useState('13');
   const [adminExpenseAnnual, setAdminExpenseAnnual] = useState('0');
 
-  // Password change state
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState('');
-  const [changingPassword, setChangingPassword] = useState(false);
-
-  const handleChangePassword = async () => {
-    setPasswordError('');
-    setPasswordSuccess('');
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setPasswordError(t('settings.security.errorAllFields'));
-      return;
-    }
-    if (newPassword.length < 6) {
-      setPasswordError(t('settings.security.errorMinLength'));
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setPasswordError(t('settings.security.errorMismatch'));
-      return;
-    }
-    setChangingPassword(true);
-    try {
-      const res = await fetch('/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setPasswordError(data.error || t('settings.security.errorChangeFailed'));
-        return;
-      }
-      setPasswordSuccess(t('settings.security.passwordChanged'));
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setTimeout(() => {
-        setShowPasswordModal(false);
-        setPasswordSuccess('');
-      }, 1500);
-    } catch {
-      setPasswordError(t('settings.security.errorNetwork'));
-    } finally {
-      setChangingPassword(false);
-    }
-  };
-
   // Apply fetched settings to state
   const applySettings = (s: any) => {
     if (s.accounting_locale) setAccLocale(s.accounting_locale);
@@ -303,54 +251,11 @@ const SettingsPage: React.FC = () => {
               <section className="space-y-6">
                 <h3 className="text-xl font-bold text-[#191918] mb-6">{t('settings.security.title')}</h3>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-5 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5]">
-                    <div>
-                      <p className="text-sm font-bold text-[#191918]">{t('settings.security.password')}</p>
-                      <p className="text-xs text-[#5c5c5a]">{t('settings.security.passwordDesc')}</p>
-                    </div>
-                    <button
-                      onClick={() => { setShowPasswordModal(true); setPasswordError(''); setPasswordSuccess(''); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }}
-                      className="px-5 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-xl transition-all active:scale-95"
-                    >
-                      {t('settings.security.changePassword')}
-                    </button>
-                  </div>
                   <div className="p-5 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5]">
                     <p className="text-sm font-bold text-[#191918] mb-1">{t('settings.security.encryption')}</p>
                     <p className="text-xs text-[#5c5c5a]">{t('settings.security.encryptionDesc')}</p>
                   </div>
                 </div>
-
-                {/* Password Change Modal */}
-                {showPasswordModal && (
-                  <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/30" onClick={() => setShowPasswordModal(false)}>
-                    <div className="bg-white rounded-2xl border border-[#e0ddd5] p-8 w-full max-w-sm" style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }} onClick={e => e.stopPropagation()}>
-                      <h4 className="text-lg font-bold text-[#191918] mb-6">{t('settings.security.modalTitle')}</h4>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-xs font-medium text-[#4a4a48] mb-1.5">{t('settings.security.currentPassword')}</label>
-                          <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="w-full px-4 py-3 bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl text-sm outline-none focus:border-primary transition-colors" autoComplete="current-password" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-[#4a4a48] mb-1.5">{t('settings.security.newPassword')}</label>
-                          <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full px-4 py-3 bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl text-sm outline-none focus:border-primary transition-colors" autoComplete="new-password" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-[#4a4a48] mb-1.5">{t('settings.security.confirmPassword')}</label>
-                          <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-4 py-3 bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl text-sm outline-none focus:border-primary transition-colors" autoComplete="new-password" />
-                        </div>
-                        {passwordError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{passwordError}</p>}
-                        {passwordSuccess && <p className="text-sm text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2">{passwordSuccess}</p>}
-                      </div>
-                      <div className="flex space-x-3 mt-6">
-                        <button onClick={() => setShowPasswordModal(false)} className="flex-1 py-3 bg-[#f9f9f8] text-[#4a4a48] border border-[#e0ddd5] rounded-xl text-sm font-medium hover:bg-[#f0eeeb] transition-all">{t('common.cancel')}</button>
-                        <button onClick={handleChangePassword} disabled={changingPassword} className="flex-1 py-3 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-hover disabled:opacity-40 transition-all">
-                          {changingPassword ? <><i className="fas fa-spinner fa-spin mr-2"></i>{t('settings.security.changing')}</> : t('settings.security.confirmChange')}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </section>
             )}
 
