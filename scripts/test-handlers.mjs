@@ -30,6 +30,15 @@
 //       summary?year= 年份过滤 + trips·totalMiles·totalDeduction / update 重算 generated / delete）·homeOffice
 //       （get 默认结构 / simplified·cap·actual deduction〔显式 rate=4·max=250 锁算法·不锁 5/300 默认〕/ COALESCE
 //       partial 保留未传字段 / invalid method CHECK throw）。**只用显式非默认输入锁算法，绝不锁 IRS 政策默认常量。**
+// 覆盖（第七批 §2B legacy data-migration handler）：electron/handlers/migrations.js（数据迁移 handler，
+//       ≠ schema 迁移 test-migrations.mjs）。detectLegacy（空 head 库 exists:true + 计数全 0 + hasLegacy:false /
+//       seed 后 pending 正确）· migrateAll〔sales→income · purchases→expense · 字段映射 totalAmount→amount ·
+//       amountWithoutTax→amount_net · customer/supplier→counterparty · invoiceStatus 已开·已收→issued /
+//       待开·待收→pending / 其它·null→n/a · source_meta 含 migrated_from·legacy_id · category 已赋值且为真实类别
+//       〔不锁具体 id〕· 无 body 时默认 currency=CNY〕· idempotency（重跑迁 0 · 无重复 txn · legacy_migrations 数不变）·
+//       detect-after-run（migrated=total · pending=0 · hasLegacy:false）· rollback（removed 正确 · 删迁移 txn ·
+//       清 legacy_migrations · 原 sales/purchases 保留）· rerun-after-rollback（映射真清 · 可再迁）· body override
+//       （defaultIncome/ExpenseCategoryId + currency 采用，category id 不锁默认值）。**只锁现有行为，不锁默认 category id。**
 //
 // better-sqlite3 原生绑定按 Electron ABI 编（本机/普通 node 加载会 ERR_DLOPEN）；
 // 加载不了时优雅 SKIP（exit 0）——CI 里 rebuild 成 node ABI 后真跑（同 test-migrations）。
@@ -810,9 +819,135 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   await expectThrow(() => call('PUT', '/api/home-office', { method: 'bogus' }), '[ho] invalid method → CHECK constraint throws');
 }
 
+// ───────────── §2B Batch 7: legacy data-migration handler (sales/purchases → transactions) ─────────────
+// 对象：electron/handlers/migrations.js（detectLegacy / migrateAll / rollback）。纯 DB，零 fs/electron。
+// ≠ schema 迁移（test-migrations.mjs，勿碰）。只锁现有行为；category 只断言「已赋值且为真实类别」，不锁具体默认 id。
+{
+  const db = freshDb();
+
+  // A. detectLegacy on empty head DB — tables exist, all counts 0, no legacy
+  const d0 = await call('GET', '/api/migrations/detect-legacy', null);
+  ok(d0.sales.exists === true && d0.purchases.exists === true, '[mig] empty: sales/purchases tables exist');
+  ok(d0.sales.total === 0 && d0.sales.migrated === 0 && d0.sales.pending === 0, `[mig] empty: sales counts all 0, got ${JSON.stringify(d0.sales)}`);
+  ok(d0.purchases.total === 0 && d0.purchases.migrated === 0 && d0.purchases.pending === 0, `[mig] empty: purchases counts all 0, got ${JSON.stringify(d0.purchases)}`);
+  ok(d0.hasLegacy === false, '[mig] empty: hasLegacy false');
+
+  // B. seed legacy rows (arrange via direct INSERT — no single-row legacy create handler exists), then detect
+  const insSale = db.prepare('INSERT INTO sales (id, date, customer, tons, pricePerTon, totalAmount, amountWithoutTax, taxAmount, taxRate, invoiceNumber, invoiceStatus) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
+  const insPur = db.prepare('INSERT INTO purchases (id, date, supplier, tons, pricePerTon, totalAmount, amountWithoutTax, taxAmount, taxRate, invoiceNumber, invoiceStatus) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
+  insSale.run('s1', `${YEAR}-03-01`, 'Cust A', 10, 200, 2260, 2000, 260, 13, 'INV-S1', '已开'); // → issued
+  insSale.run('s2', `${YEAR}-03-02`, 'Cust B', 5, 100, 1130, 1000, 130, 13, 'INV-S2', '待收');  // → pending
+  insPur.run('p1', `${YEAR}-03-03`, 'Sup A', 8, 50, 565, 500, 65, 13, 'INV-P1', '已收');         // → issued
+  insPur.run('p2', `${YEAR}-03-04`, 'Sup B', 4, 30, 339, 300, 39, 13, null, 'foo');              // → n/a
+
+  const d1 = await call('GET', '/api/migrations/detect-legacy', null);
+  ok(d1.sales.total === 2 && d1.sales.migrated === 0 && d1.sales.pending === 2, `[mig] seeded: sales pending 2, got ${JSON.stringify(d1.sales)}`);
+  ok(d1.purchases.total === 2 && d1.purchases.migrated === 0 && d1.purchases.pending === 2, `[mig] seeded: purchases pending 2, got ${JSON.stringify(d1.purchases)}`);
+  ok(d1.hasLegacy === true, '[mig] seeded: hasLegacy true');
+
+  // C. run migration — sales→income · purchases→expense · field mapping · default currency CNY (no body, no settings 'currency')
+  const run1 = await call('POST', '/api/migrations/run', {});
+  ok(run1.salesMigrated === 2 && run1.purchasesMigrated === 2, `[mig] run: 2 sales + 2 purchases migrated, got ${JSON.stringify(run1)}`);
+  ok(run1.salesSkipped === 0 && run1.purchasesSkipped === 0 && run1.errors.length === 0, `[mig] run: no skips/errors, got ${JSON.stringify(run1)}`);
+
+  const incomeTxns = db.prepare("SELECT * FROM transactions WHERE type='income'").all();
+  const expenseTxns = db.prepare("SELECT * FROM transactions WHERE type='expense'").all();
+  ok(incomeTxns.length === 2, `[mig] run: 2 income transactions, got ${incomeTxns.length}`);
+  ok(expenseTxns.length === 2, `[mig] run: 2 expense transactions, got ${expenseTxns.length}`);
+
+  // sales s1 → income field mapping (locate via source_meta.legacy_id; never assert by generated txn id)
+  const tS1 = incomeTxns.find((t) => JSON.parse(t.source_meta).legacy_id === 's1');
+  ok(!!tS1, '[mig] run: income txn for s1 exists');
+  ok(tS1.counterparty === 'Cust A', '[mig] map: sales.customer → counterparty');
+  ok(approx(tS1.amount, 2260), `[mig] map: totalAmount → amount (2260), got ${tS1.amount}`);
+  ok(approx(tS1.amount_net, 2000), `[mig] map: amountWithoutTax → amount_net (2000), got ${tS1.amount_net}`);
+  ok(approx(tS1.tax_amount, 260), `[mig] map: taxAmount → tax_amount (260), got ${tS1.tax_amount}`);
+  ok(tS1.invoice_no === 'INV-S1', '[mig] map: invoiceNumber → invoice_no');
+  ok(tS1.invoice_status === 'issued', '[mig] map: invoiceStatus 已开 → issued');
+  ok(tS1.currency === 'CNY', `[mig] run: default currency CNY (no body, no settings), got ${tS1.currency}`);
+  ok(tS1.category_id != null, '[mig] run: income category assigned (id not locked)');
+  ok(!!db.prepare('SELECT 1 FROM categories WHERE id=?').get(tS1.category_id), '[mig] run: income category_id is a real category');
+  const smS1 = JSON.parse(tS1.source_meta);
+  ok(smS1.migrated_from === 'sales' && smS1.legacy_id === 's1', '[mig] run: source_meta has migrated_from/legacy_id (sales)');
+
+  // purchases p1 → expense field mapping
+  const tP1 = expenseTxns.find((t) => JSON.parse(t.source_meta).legacy_id === 'p1');
+  ok(!!tP1 && tP1.counterparty === 'Sup A', '[mig] map: purchases.supplier → counterparty');
+  ok(tP1.invoice_status === 'issued', '[mig] map: invoiceStatus 已收 → issued');
+  ok(tP1.category_id != null && !!db.prepare('SELECT 1 FROM categories WHERE id=?').get(tP1.category_id), '[mig] run: expense category assigned (real category, id not locked)');
+  ok(JSON.parse(tP1.source_meta).migrated_from === 'purchases', '[mig] run: source_meta migrated_from purchases');
+
+  // D. idempotency — re-run skips everything, no dup transactions, mapping count stable
+  const mapBefore = db.prepare('SELECT COUNT(*) AS n FROM legacy_migrations').get().n;
+  const run2 = await call('POST', '/api/migrations/run', {});
+  ok(run2.salesMigrated === 0 && run2.purchasesMigrated === 0, `[mig] idempotent: re-run migrates 0, got ${JSON.stringify(run2)}`);
+  ok(db.prepare('SELECT COUNT(*) AS n FROM transactions').get().n === 4, '[mig] idempotent: still 4 transactions (no dup)');
+  ok(db.prepare('SELECT COUNT(*) AS n FROM legacy_migrations').get().n === mapBefore, '[mig] idempotent: legacy_migrations count unchanged');
+
+  // E. detect after run — migrated=total, pending=0, hasLegacy false
+  const d2 = await call('GET', '/api/migrations/detect-legacy', null);
+  ok(d2.sales.migrated === 2 && d2.sales.pending === 0, `[mig] post-run: sales migrated=total, pending 0, got ${JSON.stringify(d2.sales)}`);
+  ok(d2.purchases.migrated === 2 && d2.purchases.pending === 0, `[mig] post-run: purchases migrated=total, pending 0, got ${JSON.stringify(d2.purchases)}`);
+  ok(d2.hasLegacy === false, '[mig] post-run: hasLegacy false');
+
+  // F. rollback — removes migrated transactions + clears mapping; legacy rows untouched
+  const rb = await call('POST', '/api/migrations/rollback', {});
+  ok(rb.success === true && rb.removed === 4, `[mig] rollback: removed 4, got ${JSON.stringify(rb)}`);
+  ok(db.prepare('SELECT COUNT(*) AS n FROM transactions').get().n === 0, '[mig] rollback: transactions cleared');
+  ok(db.prepare('SELECT COUNT(*) AS n FROM legacy_migrations').get().n === 0, '[mig] rollback: legacy_migrations cleared');
+  ok(db.prepare('SELECT COUNT(*) AS n FROM sales').get().n === 2, '[mig] rollback: legacy sales preserved');
+  ok(db.prepare('SELECT COUNT(*) AS n FROM purchases').get().n === 2, '[mig] rollback: legacy purchases preserved');
+
+  // G. rerun after rollback — mapping truly cleared, migrates again
+  const run3 = await call('POST', '/api/migrations/run', {});
+  ok(run3.salesMigrated === 2 && run3.purchasesMigrated === 2, `[mig] rerun-after-rollback: re-migrates 2+2, got ${JSON.stringify(run3)}`);
+  ok(db.prepare('SELECT COUNT(*) AS n FROM transactions').get().n === 4, '[mig] rerun-after-rollback: 4 transactions again');
+}
+
+// H. invoiceStatus mapping matrix (已开·已收→issued / 待开·待收→pending / else·null→n/a)
+{
+  const db = freshDb();
+  const insSale = db.prepare('INSERT INTO sales (id, date, customer, totalAmount, invoiceStatus) VALUES (?,?,?,?,?)');
+  insSale.run('m_open', `${YEAR}-04-01`, 'C1', 100, '已开');  // → issued
+  insSale.run('m_recv', `${YEAR}-04-02`, 'C2', 100, '已收');  // → issued
+  insSale.run('m_topn', `${YEAR}-04-03`, 'C3', 100, '待开');  // → pending
+  insSale.run('m_trcv', `${YEAR}-04-04`, 'C4', 100, '待收');  // → pending
+  insSale.run('m_othr', `${YEAR}-04-05`, 'C5', 100, '草稿');  // → n/a
+  insSale.run('m_null', `${YEAR}-04-06`, 'C6', 100, null);    // → n/a
+  await call('POST', '/api/migrations/run', {});
+  const rows = db.prepare("SELECT invoice_status, source_meta FROM transactions WHERE type='income'").all();
+  const statusOf = (lid) => {
+    const t = rows.find((r) => JSON.parse(r.source_meta).legacy_id === lid);
+    return t && t.invoice_status;
+  };
+  ok(statusOf('m_open') === 'issued' && statusOf('m_recv') === 'issued', '[mig] map: 已开/已收 → issued');
+  ok(statusOf('m_topn') === 'pending' && statusOf('m_trcv') === 'pending', '[mig] map: 待开/待收 → pending');
+  ok(statusOf('m_othr') === 'n/a' && statusOf('m_null') === 'n/a', '[mig] map: other/null → n/a');
+}
+
+// I. body override — defaultIncomeCategoryId / defaultExpenseCategoryId / currency honored (passed ids used verbatim, not locked to defaults)
+{
+  const db = freshDb();
+  // pick real category ids without hardcoding which: take the LAST by sort_order so override is provably distinct from the handler default (first by sort_order)
+  const incCats = db.prepare("SELECT id FROM categories WHERE locale='CN' AND type='income' ORDER BY sort_order").all();
+  const expCats = db.prepare("SELECT id FROM categories WHERE locale='CN' AND type='expense' ORDER BY sort_order").all();
+  ok(incCats.length > 0 && expCats.length > 0, '[mig] override: CN income/expense categories seeded (precondition)');
+  const pickedInc = incCats[incCats.length - 1].id;
+  const pickedExp = expCats[expCats.length - 1].id;
+  db.prepare('INSERT INTO sales (id, date, customer, totalAmount) VALUES (?,?,?,?)').run('ov_s', `${YEAR}-05-01`, 'OvCust', 500);
+  db.prepare('INSERT INTO purchases (id, date, supplier, totalAmount) VALUES (?,?,?,?)').run('ov_p', `${YEAR}-05-02`, 'OvSup', 400);
+  const runOv = await call('POST', '/api/migrations/run', { defaultIncomeCategoryId: pickedInc, defaultExpenseCategoryId: pickedExp, currency: 'USD' });
+  ok(runOv.salesMigrated === 1 && runOv.purchasesMigrated === 1, `[mig] override: 1+1 migrated, got ${JSON.stringify(runOv)}`);
+  const ti = db.prepare("SELECT * FROM transactions WHERE type='income'").get();
+  const te = db.prepare("SELECT * FROM transactions WHERE type='expense'").get();
+  ok(ti.category_id === pickedInc, '[mig] override: income uses body defaultIncomeCategoryId');
+  ok(te.category_id === pickedExp, '[mig] override: expense uses body defaultExpenseCategoryId');
+  ok(ti.currency === 'USD' && te.currency === 'USD', `[mig] override: body currency USD applied, got income=${ti.currency} expense=${te.currency}`);
+}
+
 if (failures.length) {
   console.error(`✗ handlers: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations) via real dispatch on :memory: DB');
