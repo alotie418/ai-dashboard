@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { SETTINGS, DASHBOARD } from './helpers/fixtures';
+import { bootComboIPC, gotoApp } from './helpers/electronMock';
 
 // ───────────────────────────────────────────────────────────────────────────
 // Page-level 6×6 = 36-combination display acceptance.
@@ -33,24 +35,8 @@ const TRAD_ONLY = '務報單發資應進銷項額總戶營關轉庫類數據顯�
 
 const SCREENSHOT_DIR = path.join('test-results', 'locale-matrix');
 
-const SETTINGS = (acc: string) => ({
-  accounting_locale: acc,
-  product_unit: 'ton',
-  company_name: 'Test Co',
-  legal_person: 'Tester',
-  vat_rate: acc === 'TW' ? '5%' : acc === 'US' ? '7%' : '13%',
-  industry: 'Trade',
-});
-
-const DASHBOARD = (acc: string) => ({
-  locale: acc,
-  metrics: { inventoryTons: 0, purchaseTotalTons: 0, purchaseTotalAmount: 0, salesTotalTons: 0, salesTotalAmount: 0, avgCostPerTon: 0 },
-  monthlyPerformance: [],
-  financialStatement: { salesRevenue: 0, costOfSales: 0, costOfGoodsSold: 0, operatingExpenses: 0, operatingProfit: 0, taxSurcharge: 0, adminExpense: 0, incomeTax: 0, shippingFee: 0, grossProfit: 0, grossMargin: 0, netProfit: 0, netMargin: 0 },
-  vatStatistics: { cumulativeInput: 0, cumulativeOutput: 0, certifiedInput: 0, invoicedOutput: 0, estimatedPayable: 0 },
-  taxInclusiveSummary: { purchaseTotal: 0, salesTotal: 0, difference: 0 },
-  inventory: { inStockCount: 1, totalInventoryCost: 100, details: [{ product_id: 'p1', name: 'Item-A', unit: 'piece', qtyOnHand: 10, unitCost: 10, lineCost: 100 }] },
-});
+// SETTINGS / DASHBOARD now live in ./helpers/fixtures (shared by the Web-boot
+// bootCombo path and the IPC-boot installElectronMock path) — see Phase 3 doc.
 
 type Failure = { ui: string; acc: string; page: string; word: string; rule: string; snippet: string; screenshot: string };
 const failures: Failure[] = [];
@@ -64,24 +50,9 @@ function snippetAround(text: string, word: string): string {
 for (const acc of ACCOUNTING_LOCALES) {
   for (const ui of UI_LANGUAGES) {
     test(`ui=${ui} acc=${acc}`, async ({ page }) => {
-      // ── mock auth + API so the SPA boots and resolves this accountingLocale ──
-      await page.route('**/auth/check', (r) => r.fulfill({ json: { authenticated: true } }));
-      await page.route('**/auth/**', (r) => r.fulfill({ json: { authenticated: true } }));
-      await page.route('**/api/**', (route) => {
-        const url = route.request().url();
-        if (url.includes('/api/settings')) return route.fulfill({ json: SETTINGS(acc) });
-        if (url.includes('/api/dashboard')) return route.fulfill({ json: DASHBOARD(acc) });
-        if (/\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|documents|reports\/types)/.test(url)) {
-          return route.fulfill({ json: [] });
-        }
-        return route.fulfill({ json: {} }); // catch-all → empty object
-      });
-      // set UI language before the app boots (i18n reads localStorage 'sololedger-lang')
-      await page.addInitScript((l) => { try { localStorage.setItem('sololedger-lang', l as string); } catch { /* ignore */ } }, ui);
-
-      await page.goto('/', { waitUntil: 'domcontentloaded' });
-      // sidebar nav is the anchor that the dashboard has rendered
-      await page.waitForSelector('nav', { timeout: 20_000 });
+      // ── IPC-boot: inject mock electronAPI so the SPA boots through the desktop
+      //    IPC path and resolves this accountingLocale (Phase 3 PR-3.1) ──
+      await bootComboIPC(page, ui, acc);
       await page.waitForTimeout(500);
 
       fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
@@ -119,28 +90,14 @@ for (const acc of ACCOUNTING_LOCALES) {
 // ── Settings → Products/Services sub-tab opens & renders across all 36 combos ──
 // Navigation uses stable, language-independent icons (sidebar fa-cog → settings;
 // sub-tab fa-box → products), so no fragile cross-language text selectors and no UI change.
-async function bootCombo(page: import('@playwright/test').Page, ui: string, acc: string) {
-  await page.route('**/auth/check', (r) => r.fulfill({ json: { authenticated: true } }));
-  await page.route('**/auth/**', (r) => r.fulfill({ json: { authenticated: true } }));
-  await page.route('**/api/**', (route) => {
-    const url = route.request().url();
-    if (url.includes('/api/settings')) return route.fulfill({ json: SETTINGS(acc) });
-    if (url.includes('/api/dashboard')) return route.fulfill({ json: DASHBOARD(acc) });
-    if (/\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|documents|reports\/types)/.test(url)) {
-      return route.fulfill({ json: [] });
-    }
-    return route.fulfill({ json: {} });
-  });
-  await page.addInitScript((l) => { try { localStorage.setItem('sololedger-lang', l as string); } catch { /* ignore */ } }, ui);
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('nav', { timeout: 20_000 });
-}
-
+// Phase 3 PR-3.7: the legacy Web-boot bootCombo() helper was removed — every test now
+// boots through the IPC mock (bootComboIPC / installElectronMock + gotoApp).
 test.describe('settings → products/services tab', () => {
   for (const acc of ACCOUNTING_LOCALES) {
     for (const ui of UI_LANGUAGES) {
       test(`products-tab ui=${ui} acc=${acc}`, async ({ page }) => {
-        await bootCombo(page, ui, acc);
+        await bootComboIPC(page, ui, acc); // Phase 3 PR-3.2
+
         const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
         const expectedTitle: string = loc.products.title;
         const expectedEmpty: string = loc.products.empty;
@@ -172,7 +129,7 @@ test.describe('purchase modal → product picker (Phase 2)', () => {
   const acc = 'CN';
   for (const ui of UI_LANGUAGES) {
     test(`purchase-picker ui=${ui}`, async ({ page }) => {
-      await bootCombo(page, ui, acc);
+      await bootComboIPC(page, ui, acc); // Phase 3 PR-3.2 (acc='CN')
       const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
       const selectLabel: string = loc.products.selectLabel;
       const unassigned: string = loc.products.unassigned;
@@ -192,25 +149,29 @@ test.describe('purchase modal → product picker (Phase 2)', () => {
 });
 
 // ── Settings → Data Backup sub-tab opens & renders across all 36 combos ──
-// uiLanguage-only feature. The preview build has no window.electronAPI, so the
-// section must render the desktop-only notice and NOT crash. Navigation uses
-// stable icons (sidebar fa-cog → settings; sub-tab fa-box-archive → data backup).
+// uiLanguage-only feature. Navigation uses stable icons (sidebar fa-cog → settings;
+// sub-tab fa-box-archive → data backup).
+// Phase 3 PR-3.7: IPC-only boot. The desktop build always HAS electronAPI, so this
+// now verifies the real desktop UI: the section renders its title + enabled
+// backup / restore action buttons and does NOT show the desktop-only notice — the
+// no-electronAPI degradation is no longer the contract under test.
 test.describe('settings → data backup tab', () => {
   for (const acc of ACCOUNTING_LOCALES) {
     for (const ui of UI_LANGUAGES) {
       test(`data-backup-tab ui=${ui} acc=${acc}`, async ({ page }) => {
-        await bootCombo(page, ui, acc);
+        await bootComboIPC(page, ui, acc);
         const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
-        const expectedTitle: string = loc.settings.dataBackup.title;
-        const expectedDesktopOnly: string = loc.settings.dataBackup.desktopOnly;
+        const db = loc.settings.dataBackup;
 
         await page.locator('i.fa-cog').first().click();
         await page.locator('button:has(i.fa-box-archive)').click();
 
         // (1) title heading renders the resolved translation (proves the key is not a raw leak)
-        await expect(page.getByRole('heading', { name: expectedTitle })).toBeVisible({ timeout: 10_000 });
-        // (2) web/preview build has no electronAPI → desktop-only notice shown, app does not crash
-        await expect(page.getByText(expectedDesktopOnly)).toBeVisible({ timeout: 10_000 });
+        await expect(page.getByRole('heading', { name: db.title })).toBeVisible({ timeout: 10_000 });
+        // (2) desktop mode → real backup/restore action buttons render, no desktop-only notice
+        await expect(page.getByRole('button', { name: db.backupButton })).toBeVisible({ timeout: 10_000 });
+        await expect(page.getByRole('button', { name: db.restoreButton })).toBeVisible();
+        await expect(page.getByText(db.desktopOnly)).toHaveCount(0);
         // (3) no raw settings.dataBackup.* / settings.nav.* key leaked into the rendered UI
         const body = await page.locator('body').innerText();
         expect(body, `[ui=${ui} acc=${acc}] raw i18n key leaked`).not.toMatch(/settings\.dataBackup\.[a-zA-Z]|settings\.nav\.[a-zA-Z]/);
@@ -255,7 +216,7 @@ test('data backup → mock electronAPI: backup success + restore confirm + succe
     };
   }, { settings: SETTINGS('CN'), dashboard: DASHBOARD('CN') });
 
-  await bootCombo(page, ui, 'CN');
+  await gotoApp(page, ui); // Phase 3 PR-3.7: test injects its own electronAPI above
   await page.locator('i.fa-cog').first().click();
   await page.locator('button:has(i.fa-box-archive)').click();
 
@@ -312,7 +273,7 @@ for (const { navIcon, label } of [{ navIcon: 'fa-file-import', label: 'purchase'
     const ui = 'zh-CN';
     const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
     await page.addInitScript(ocrInit, { settings: SETTINGS('CN'), dashboard: DASHBOARD('CN'), ocr: OCR_RAW });
-    await bootCombo(page, ui, 'CN');
+    await gotoApp(page, ui); // Phase 3 PR-3.7: test injects its own electronAPI
     await page.locator(`i.${navIcon}`).first().click();
     // upload an image to the hidden OCR file input (hidden inputs accept setInputFiles)
     await page.locator('input[type="file"][accept*="image"]').setInputFiles({ name: 'invoice.png', mimeType: 'image/png', buffer: Buffer.from(TINY_PNG_B64, 'base64') });
@@ -351,7 +312,7 @@ for (const ui of ['en', 'ja']) {
         },
       };
     }, { settings: SETTINGS('CN'), dashboard: DASHBOARD('CN'), ids: PROVIDER_NAME_IDS });
-    await bootCombo(page, ui, 'CN');
+    await gotoApp(page, ui); // Phase 3 PR-3.7: test injects its own electronAPI
     await page.locator('i.fa-cog').first().click();        // → settings
     await page.locator('i.fa-microchip').first().click();   // → AI providers section
     // English brand names render (domestic providers de-sinicized under non-zh UI)
@@ -375,30 +336,21 @@ const REPORT_MOCK = (acc: string) => ({
   profitLoss: { revenue: 100000, costOfSales: 60000, costOfGoodsSold: 60000, operatingExpenses: 0, grossProfit: 40000, adminExpense: 5000, operatingProfit: 35000, incomeTax: 6000, netProfit: 28000, netMargin: 28 },
   scheduleC: { line1_grossReceipts: 100000, line7_grossIncome: 100000, line28_totalExpenses: 60000, line31_netProfit: 40000 },
 });
-
-async function bootFinance(page: import('@playwright/test').Page, ui: string, acc: string) {
-  await page.route('**/auth/check', (r) => r.fulfill({ json: { authenticated: true } }));
-  await page.route('**/auth/**', (r) => r.fulfill({ json: { authenticated: true } }));
-  await page.route('**/api/**', (route) => {
-    const url = route.request().url();
-    if (url.includes('/api/settings')) return route.fulfill({ json: SETTINGS(acc) });
-    if (url.includes('/api/dashboard')) return route.fulfill({ json: DASHBOARD(acc) });
-    if (url.includes('/api/reports/generate')) return route.fulfill({ json: REPORT_MOCK(acc) });
-    if (/\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|documents|reports\/types)/.test(url)) {
-      return route.fulfill({ json: [] });
-    }
-    return route.fulfill({ json: {} });
-  });
-  await page.addInitScript((l) => { try { localStorage.setItem('sololedger-lang', l as string); } catch { /* ignore */ } }, ui);
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('nav', { timeout: 20_000 });
-}
+// Phase 3 PR-3.7: the legacy Web-boot bootFinance() helper was removed; the finance
+// tests boot through bootComboIPC with REPORT_MOCK supplied via apiResponses.
 
 test.describe('finance → export PDF', () => {
   const FINANCE_COMBOS = [{ ui: 'zh-CN', acc: 'CN' }, { ui: 'en', acc: 'US' }, { ui: 'ja', acc: 'JP' }];
   for (const { ui, acc } of FINANCE_COMBOS) {
+    // Phase 3 PR-3.7: IPC-only boot. The desktop build always HAS electronAPI, so
+    // clicking export now goes through the app:exportReportPdf IPC and surfaces the
+    // saved path (was: the no-electronAPI desktop-only notice). The finance page
+    // also needs a valid /api/reports/generate payload (empty {} would crash it).
     test(`export-pdf button ui=${ui} acc=${acc}`, async ({ page }) => {
-      await bootFinance(page, ui, acc);
+      await bootComboIPC(page, ui, acc, {
+        apiResponses: [{ match: '/api/reports/generate', json: REPORT_MOCK(acc) }],
+        appChannels: { 'app:exportReportPdf': { ok: true, path: '/Users/test/Reports/finance-export.pdf' } },
+      });
       const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
       await page.locator('i.fa-wallet').first().click(); // → finance page
       const btn = page.locator('button:has(i.fa-file-pdf)');
@@ -406,9 +358,9 @@ test.describe('finance → export PDF', () => {
       // report tab labels must follow UI language (regression lock: ja/ko/fr Balance Sheet / Cash Flow)
       await expect(page.getByRole('button', { name: loc.finance.tabBalance })).toBeVisible();
       await expect(page.getByRole('button', { name: loc.finance.tabCashflow })).toBeVisible();
-      // web/preview build has no electronAPI → clicking shows the desktop-only notice, no crash
+      // desktop mode → clicking exports via IPC and shows the saved path, no crash
       await btn.click();
-      await expect(page.getByText(loc.finance.pdfDesktopOnly)).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByText(/finance-export\.pdf/)).toBeVisible({ timeout: 10_000 });
       // no raw finance.pdf* / finance.exportPdf key leaked
       const body = await page.locator('body').innerText();
       expect(body, `[ui=${ui} acc=${acc}] raw finance.pdf key`).not.toMatch(/finance\.pdf[A-Za-z]|finance\.exportPdf/);
@@ -419,7 +371,8 @@ test.describe('finance → export PDF', () => {
   // (no zero-filled statement). Verify the coming-soon copy renders, not a $0 total.
   test('balance / cashflow show coming-soon empty state', async ({ page }) => {
     const ui = 'zh-CN';
-    await bootFinance(page, ui, 'CN');
+    // Phase 3 PR-3.3: IPC-boot; the finance P&L tab needs /api/reports/generate.
+    await bootComboIPC(page, ui, 'CN', { apiResponses: [{ match: '/api/reports/generate', json: REPORT_MOCK('CN') }] });
     const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
     await page.locator('i.fa-wallet').first().click(); // → finance page
     await page.getByRole('button', { name: loc.finance.tabBalance }).click();
@@ -448,10 +401,7 @@ test.describe('finance → export PDF', () => {
         },
       };
     });
-    await page.route('**/auth/**', (r) => r.fulfill({ json: { authenticated: true } }));
-    await page.addInitScript((l) => { try { localStorage.setItem('sololedger-lang', l as string); } catch { /* ignore */ } }, ui);
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('nav', { timeout: 20_000 });
+    await gotoApp(page, ui); // Phase 3 PR-3.7: test injects its own electronAPI above
     await page.locator('i.fa-wallet').first().click();
     await page.locator('button:has(i.fa-file-pdf)').click();
     await expect(page.getByText(/SoloLedger-CN-pl-2026\.pdf/)).toBeVisible({ timeout: 10_000 });
@@ -459,23 +409,28 @@ test.describe('finance → export PDF', () => {
 });
 
 // ── Business Documents page renders across all 36 combos (Phase A) ──
-// Desktop-only feature: the web/preview build has no window.electronAPI (and the
-// deployed web mode has no /api/documents routes), so the page must render its title
-// + the desktop-only notice and NOT crash / NOT fetch. Navigation uses the sidebar
-// fa-file-contract icon, scoped to <nav> (NavItem is a <div>, not a <button>).
+// uiLanguage-only feature. Navigation uses the sidebar fa-file-contract icon, scoped
+// to <nav> (NavItem is a <div>, not a <button>).
+// Phase 3 PR-3.7: IPC-only boot. The desktop build always HAS electronAPI, so this
+// now verifies the real desktop UI: the page renders its title, the empty-list state
+// (GET /api/documents → []), and the enabled new-document button — and does NOT show
+// the desktop-only notice. The create / from-sales / tax-invoice groups below exercise
+// the deeper IPC flows via injectDocsElectronAPI.
 test.describe('business documents page', () => {
   for (const acc of ACCOUNTING_LOCALES) {
     for (const ui of UI_LANGUAGES) {
       test(`documents-page ui=${ui} acc=${acc}`, async ({ page }) => {
-        await bootCombo(page, ui, acc);
+        await bootComboIPC(page, ui, acc);
         const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
 
         await page.locator('nav i.fa-file-contract').first().click();
 
         // (1) title renders the resolved translation (proves the key is not a raw leak)
         await expect(page.getByRole('heading', { name: loc.documents.title }).first()).toBeVisible({ timeout: 10_000 });
-        // (2) web/preview build → desktop-only notice shown, app does not crash
-        await expect(page.getByText(loc.documents.desktopOnly)).toBeVisible({ timeout: 10_000 });
+        // (2) desktop mode → real UI: empty-list state + new-document button, no desktop-only notice
+        await expect(page.getByText(loc.documents.empty)).toBeVisible({ timeout: 10_000 });
+        await expect(page.locator('button:has(i.fa-plus)').first()).toBeVisible();
+        await expect(page.getByText(loc.documents.desktopOnly)).toHaveCount(0);
         // (3) no raw documents.* / nav.documents key leaked into the rendered UI
         const body = await page.locator('body').innerText();
         expect(body, `[ui=${ui} acc=${acc}] raw documents key leaked`).not.toMatch(/documents\.[a-zA-Z]|nav\.documents|headerTitle\.documents/);
@@ -495,7 +450,7 @@ test.describe('ai assistant page', () => {
   for (const acc of ACCOUNTING_LOCALES) {
     for (const ui of UI_LANGUAGES) {
       test(`assistant-page ui=${ui} acc=${acc}`, async ({ page }) => {
-        await bootCombo(page, ui, acc);
+        await bootComboIPC(page, ui, acc); // Phase 3 PR-3.4
         const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
 
         await page.locator('nav i.fa-comments').first().click();
@@ -517,25 +472,28 @@ test.describe('ai assistant page', () => {
 
 // ── AI assistant read-only tool trace (R2b-1) — mocked agent-chat happy path ──
 // The assistant page now sends through aiAgentChat (POST /api/ai/agent-chat). We mock that
-// endpoint (registered after bootCombo → takes precedence) to return a deterministic answer +
+// endpoint (via bootComboIPC apiResponses) to return a deterministic answer +
 // a toolTrace, then assert the chat renders BOTH the final answer AND the localized "已查询 …"
 // tool-trace line, with no raw chat.* key leaking. uiLanguage axis (acc fixed to CN — the tool
 // labels are regime-neutral). This locks the trace rendering + the per-tool i18n labels.
 test.describe('ai assistant tool trace (R2b-1)', () => {
   for (const ui of UI_LANGUAGES) {
     test(`agent-trace ui=${ui}`, async ({ page }) => {
-      await bootCombo(page, ui, 'CN');
+      // Phase 3 PR-3.4: IPC-boot; the mocked agent-chat response is supplied via
+      // apiResponses (matched before settings/dashboard/lists in api:request).
+      await bootComboIPC(page, ui, 'CN', {
+        apiResponses: [{
+          match: '/api/ai/agent-chat',
+          json: {
+            text: 'Annual sales total is 123,456.',
+            toolTrace: [
+              { name: 'get_sales', argsSummary: '', rowCount: 3, truncated: false },
+              { name: 'get_dashboard', argsSummary: '{"year":"2026"}', rowCount: 0, truncated: false },
+            ],
+          },
+        }],
+      });
       const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
-
-      await page.route('**/api/ai/agent-chat', (route) => route.fulfill({
-        json: {
-          text: 'Annual sales total is 123,456.',
-          toolTrace: [
-            { name: 'get_sales', argsSummary: '', rowCount: 3, truncated: false },
-            { name: 'get_dashboard', argsSummary: '{"year":"2026"}', rowCount: 0, truncated: false },
-          ],
-        },
-      }));
 
       await page.locator('nav i.fa-comments').first().click();
 
@@ -566,32 +524,23 @@ test.describe('ai assistant tool trace (R2b-1)', () => {
 // records those calls; we assert the conversation toolbar renders (new chat / clear) and that
 // create + the two appends fired with the right role/text. Persistence degrades gracefully on
 // failure (try/catch), so this only locks the happy path. Restore-on-reload is verified manually.
+// Phase 3 PR-3.7: IPC-boot. Conversation endpoints are answered via apiResponses;
+// the lazy create + the user/model appends are recorded browser-side (window.__calls)
+// and read back via page.evaluate (replacing the legacy Node-side page.route recording).
 test.describe('ai assistant conversation persistence (R4a-1)', () => {
   test('conversation-persist ui=zh-CN → lazy create + append user/model', async ({ page }) => {
     const ui = 'zh-CN';
-    await bootCombo(page, ui, 'CN');
+    await bootComboIPC(page, ui, 'CN', {
+      recordCalls: true,
+      apiResponses: [
+        { match: '^/api/conversations/[^/]+/messages$', method: 'POST', json: { ok: true } },
+        { match: '^/api/conversations/[^/]+/messages$', method: 'GET', json: [] },
+        { match: '^/api/conversations$', method: 'POST', json: { id: 'conv-e2e-1' } },
+        { match: '^/api/conversations$', method: 'GET', json: [] },
+        { match: '/api/ai/agent-chat', json: { text: 'Persisted answer 42.' } },
+      ],
+    });
     const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
-
-    const calls: { kind: string; body: any }[] = [];
-    // create / list (bare /api/conversations); registered after bootCombo → takes precedence
-    await page.route('**/api/conversations', (route) => {
-      const req = route.request();
-      if (req.method() === 'POST') {
-        calls.push({ kind: 'create', body: req.postDataJSON() });
-        return route.fulfill({ json: { id: 'conv-e2e-1' } });
-      }
-      return route.fulfill({ json: [] });
-    });
-    // append / fetch messages (/api/conversations/:id/messages)
-    await page.route('**/api/conversations/*/messages', (route) => {
-      const req = route.request();
-      if (req.method() === 'POST') {
-        calls.push({ kind: 'append', body: req.postDataJSON() });
-        return route.fulfill({ json: { ok: true } });
-      }
-      return route.fulfill({ json: [] });
-    });
-    await page.route('**/api/ai/agent-chat', (route) => route.fulfill({ json: { text: 'Persisted answer 42.' } }));
 
     await page.locator('nav i.fa-comments').first().click();
 
@@ -604,12 +553,21 @@ test.describe('ai assistant conversation persistence (R4a-1)', () => {
     await input.press('Enter');
     await expect(page.getByText('Persisted answer 42.').first()).toBeVisible({ timeout: 10_000 });
 
-    // (3) lazy-created exactly one conversation, then appended user + model
-    expect(calls.filter(c => c.kind === 'create').length).toBeGreaterThanOrEqual(1);
-    const appends = calls.filter(c => c.kind === 'append');
+    // (3) lazy-created exactly one conversation, then appended user + model — read the
+    //     browser-recorded IPC calls (the model append fires just after the reply renders,
+    //     so poll until both appends land before snapshotting the bodies).
+    const appendCount = async () => page.evaluate(() => ((window as any).__calls || [])
+      .filter((c: any) => c.channel === 'api:request' && c.method === 'POST' && /^\/api\/conversations\/[^/]+\/messages$/.test(String(c.path || '').split('?')[0])).length);
+    await expect.poll(appendCount, { timeout: 10_000 }).toBeGreaterThanOrEqual(2);
+
+    const calls = await page.evaluate(() => (window as any).__calls || []);
+    const clean = (c: any) => String(c.path || '').split('?')[0];
+    const creates = calls.filter((c: any) => c.channel === 'api:request' && c.method === 'POST' && /^\/api\/conversations$/.test(clean(c)));
+    const appends = calls.filter((c: any) => c.channel === 'api:request' && c.method === 'POST' && /^\/api\/conversations\/[^/]+\/messages$/.test(clean(c)));
+    expect(creates.length).toBeGreaterThanOrEqual(1);
     expect(appends.length).toBeGreaterThanOrEqual(2);
-    expect(appends.some(a => a.body?.role === 'user' && a.body?.text === '保存这条消息')).toBeTruthy();
-    expect(appends.some(a => a.body?.role === 'model' && a.body?.text === 'Persisted answer 42.')).toBeTruthy();
+    expect(appends.some((a: any) => a.body?.role === 'user' && a.body?.text === '保存这条消息')).toBeTruthy();
+    expect(appends.some((a: any) => a.body?.role === 'model' && a.body?.text === 'Persisted answer 42.')).toBeTruthy();
 
     // (4) no raw chat.* key leaked
     const body = await page.locator('body').innerText();
@@ -625,29 +583,25 @@ test.describe('ai assistant conversation persistence (R4a-1)', () => {
 test.describe('ai assistant conversation history (R4a-2)', () => {
   test('conversation-sidebar ui=zh-CN → list + switch + rename + delete', async ({ page }) => {
     const ui = 'zh-CN';
-    await bootCombo(page, ui, 'CN');
+    // Phase 3 PR-3.7: IPC-boot; seeded list/messages via apiResponses, rename/delete
+    // recorded browser-side (window.__calls) and read back via page.evaluate.
+    await bootComboIPC(page, ui, 'CN', {
+      recordCalls: true,
+      apiResponses: [
+        { match: '^/api/conversations/[^/]+/messages$', method: 'POST', json: { ok: true } },
+        { match: '^/api/conversations/[^/]+/messages$', method: 'GET', json: [{ role: 'user', text: '历史问题' }, { role: 'model', text: '历史回答' }] },
+        { match: '^/api/conversations/[^/]+$', method: 'PUT', json: { ok: true } },
+        { match: '^/api/conversations/[^/]+$', method: 'DELETE', json: { ok: true } },
+        { match: '^/api/conversations$', method: 'POST', json: { id: 'conv-new' } },
+        { match: '^/api/conversations$', method: 'GET', json: [{ id: 'conv-prev', title: '历史对话', updated_at: '2026-06-10 09:00:00' }] },
+        { match: '/api/ai/agent-chat', json: { text: 'ok.' } },
+      ],
+    });
     const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
 
-    const calls: { kind: string; url: string; body: any }[] = [];
-    await page.route('**/api/conversations', (route) => {
-      const req = route.request();
-      if (req.method() === 'POST') return route.fulfill({ json: { id: 'conv-new' } });
-      // GET list → one prior conversation
-      return route.fulfill({ json: [{ id: 'conv-prev', title: '历史对话', updated_at: '2026-06-10 09:00:00' }] });
-    });
-    await page.route('**/api/conversations/*/messages', (route) => {
-      const req = route.request();
-      if (req.method() === 'POST') return route.fulfill({ json: { ok: true } });
-      // GET messages for the prior conversation
-      return route.fulfill({ json: [{ role: 'user', text: '历史问题' }, { role: 'model', text: '历史回答' }] });
-    });
-    await page.route('**/api/conversations/*', (route) => {
-      const req = route.request();
-      if (req.method() === 'PUT') { calls.push({ kind: 'rename', url: req.url(), body: req.postDataJSON() }); return route.fulfill({ json: { ok: true } }); }
-      if (req.method() === 'DELETE') { calls.push({ kind: 'delete', url: req.url(), body: null }); return route.fulfill({ json: { ok: true } }); }
-      return route.fulfill({ json: {} });
-    });
-    await page.route('**/api/ai/agent-chat', (route) => route.fulfill({ json: { text: 'ok.' } }));
+    // helpers: read the browser-recorded rename/delete IPC calls
+    const recordedByMethod = (method: string) => page.evaluate((m) => ((window as any).__calls || [])
+      .filter((c: any) => c.channel === 'api:request' && c.method === m && /^\/api\/conversations\/[^/]+$/.test(String(c.path || '').split('?')[0])), method);
 
     await page.locator('nav i.fa-comments').first().click();
     await expect(page.getByText(loc.chat.historyTitle).first()).toBeVisible({ timeout: 10_000 });
@@ -667,15 +621,16 @@ test.describe('ai assistant conversation history (R4a-2)', () => {
     const renameInput = page.getByPlaceholder(loc.chat.renamePlaceholder).first();
     await renameInput.fill('改名了');
     await renameInput.press('Enter');
-    await expect.poll(() => calls.filter(c => c.kind === 'rename').length, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
-    expect(calls.find(c => c.kind === 'rename')?.url).toContain('conv-prev');
-    expect(calls.find(c => c.kind === 'rename')?.body?.title).toBe('改名了');
+    await expect.poll(async () => (await recordedByMethod('PUT')).length, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
+    const renames = await recordedByMethod('PUT');
+    expect(renames[0]?.path).toContain('conv-prev');
+    expect(renames[0]?.body?.title).toBe('改名了');
 
     // (4) two-click delete → DELETE /api/conversations/conv-prev
     await page.getByTitle(loc.chat.deleteConversation).first().click();
     await page.getByText(loc.chat.deleteConfirm).first().click();
-    await expect.poll(() => calls.filter(c => c.kind === 'delete').length, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
-    expect(calls.find(c => c.kind === 'delete')?.url).toContain('conv-prev');
+    await expect.poll(async () => (await recordedByMethod('DELETE')).length, { timeout: 10_000 }).toBeGreaterThanOrEqual(1);
+    expect((await recordedByMethod('DELETE'))[0]?.path).toContain('conv-prev');
 
     // (5) no raw chat.* key leaked
     const body = await page.locator('body').innerText();
@@ -773,7 +728,7 @@ test.describe('business documents → create modal (desktop mock)', () => {
     test(`documents-modal ui=${ui}`, async ({ page }) => {
       const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
       await injectDocsElectronAPI(page);
-      await bootCombo(page, ui, 'CN');
+      await gotoApp(page, ui); // Phase 3 PR-3.7: test injects its own electronAPI
       await page.locator('nav i.fa-file-contract').first().click();
 
       // desktop mode → no desktop-only banner; the new-document button opens the modal
@@ -798,7 +753,7 @@ test.describe('business documents → create modal (desktop mock)', () => {
     const ui = 'zh-CN';
     const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
     await injectDocsElectronAPI(page);
-    await bootCombo(page, ui, 'CN');
+    await gotoApp(page, ui); // Phase 3 PR-3.7: test injects its own electronAPI
     await page.locator('nav i.fa-file-contract').first().click();
     await page.locator('button:has(i.fa-plus)').first().click();
     await expect(page.locator('input[name="docNumber"]')).toHaveValue('QT-2026-0001', { timeout: 10_000 });
@@ -826,7 +781,7 @@ test.describe('business documents → create modal (desktop mock)', () => {
       doc_date: '2026-06-01', customer_name: 'Frozen Co', acc_locale: 'US',
       subtotal: 100, tax_amount: 7, total: 107,
     }]);
-    await bootCombo(page, 'ja', 'JP');
+    await gotoApp(page, 'ja'); // Phase 3 PR-3.7: test injects its own electronAPI
     await page.locator('nav i.fa-file-contract').first().click();
 
     // the US-frozen document keeps the $ symbol (not the live JP regime's ¥)
@@ -851,7 +806,7 @@ test.describe('business documents → create modal (desktop mock)', () => {
       subtotal: 100, tax_amount: 13, total: 113,
       items: [{ id: 1, description: '咨询服务', quantity: 2, unit: 'session', unit_price: 50, tax_rate: '13%', tax_amount: 13, amount: 100, line_no: 0 }],
     }]);
-    await bootCombo(page, ui, 'CN');
+    await gotoApp(page, ui); // Phase 3 PR-3.7: test injects its own electronAPI
     await page.locator('nav i.fa-file-contract').first().click();
     await expect(page.getByText('QT-2026-0042')).toBeVisible({ timeout: 10_000 });
 
@@ -883,7 +838,7 @@ test.describe('business documents → generate from sales (Phase C)', () => {
     test(`from-sales modal ui=${ui}`, async ({ page }) => {
       const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
       await injectDocsElectronAPI(page, 'CN', [], [SALES_SEED]);
-      await bootCombo(page, ui, 'CN');
+      await gotoApp(page, ui); // Phase 3 PR-3.7: test injects its own electronAPI
       await page.locator('nav i.fa-file-export').first().click();
 
       // the seeded row renders, the per-row generate button opens the shared modal
@@ -912,7 +867,7 @@ test.describe('business documents → generate from sales (Phase C)', () => {
     const ui = 'zh-CN';
     const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
     await injectDocsElectronAPI(page, 'CN', [], [SALES_SEED]);
-    await bootCombo(page, ui, 'CN');
+    await gotoApp(page, ui); // Phase 3 PR-3.7: test injects its own electronAPI
     await page.locator('nav i.fa-file-export').first().click();
     await expect(page.getByText('单据测试客户').first()).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: loc.documents.generateFromSale }).click();
@@ -949,7 +904,7 @@ test.describe('business documents → generate from sales (Phase C)', () => {
       { id: 'sale-s-2', date: '2026-06-05', customer: '对账客户 ', tons: 2, pricePerTon: 100, totalAmount: 226, amountWithoutTax: 200, taxAmount: 26, taxRate: 13, shippingCost: 0, invoiceNumber: 'INV-9', invoiceStatus: '已开', product_id: null, product_name_snapshot: null, unit_snapshot: null },
       { id: 'sale-s-3', date: '2026-07-01', customer: '对账客户', tons: 1, pricePerTon: 100, totalAmount: 113, amountWithoutTax: 100, taxAmount: 13, taxRate: 13, shippingCost: 0, invoiceNumber: '', invoiceStatus: '已开', product_id: 'p1', product_name_snapshot: '货物A', unit_snapshot: 'ton' },
     ]);
-    await bootCombo(page, ui, 'CN');
+    await gotoApp(page, ui); // Phase 3 PR-3.7: test injects its own electronAPI
     await page.locator('nav i.fa-file-contract').first().click();
     await page.locator('button:has(i.fa-plus)').first().click();
     await expect(page.locator('input[name="docNumber"]')).toHaveValue('QT-2026-0001', { timeout: 10_000 });
@@ -999,7 +954,7 @@ test.describe('business documents → tax invoice link (Phase D)', () => {
     test(`tax-invoice modal ui=${ui}`, async ({ page }) => {
       const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
       await injectDocsElectronAPI(page, 'CN', [{ ...TAX_DOC_SEED }]);
-      await bootCombo(page, ui, 'CN');
+      await gotoApp(page, ui); // Phase 3 PR-3.7: test injects its own electronAPI
       await page.locator('nav i.fa-file-contract').first().click();
 
       await expect(page.getByText('CI-2026-0007')).toBeVisible({ timeout: 10_000 });
@@ -1025,7 +980,7 @@ test.describe('business documents → tax invoice link (Phase D)', () => {
     const ui = 'zh-CN';
     const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
     await injectDocsElectronAPI(page, 'CN', [{ ...TAX_DOC_SEED }]);
-    await bootCombo(page, ui, 'CN');
+    await gotoApp(page, ui); // Phase 3 PR-3.7: test injects its own electronAPI
     await page.locator('nav i.fa-file-contract').first().click();
     await expect(page.getByText('CI-2026-0007')).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: loc.documents.taxInvoiceAction }).click();
@@ -1064,7 +1019,7 @@ test.describe('business documents → tax invoice link (Phase D)', () => {
       tax_invoice_issued: 1, tax_invoice_number: 'INV-EXT-009', tax_invoice_date: '2026-06-01',
       tax_invoice_attachment_path: 'attachments/docs/doc-tax-void-old.pdf',
     }]);
-    await bootCombo(page, ui, 'CN');
+    await gotoApp(page, ui); // Phase 3 PR-3.7: test injects its own electronAPI
     await page.locator('nav i.fa-file-contract').first().click();
     await expect(page.getByText('CI-2026-0008')).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: loc.documents.taxInvoiceAction }).click();
@@ -1098,20 +1053,9 @@ async function bootDashboardWithFS(
   acc: string,
   financialStatement: Record<string, number>,
 ) {
-  await page.route('**/auth/check', (r) => r.fulfill({ json: { authenticated: true } }));
-  await page.route('**/auth/**', (r) => r.fulfill({ json: { authenticated: true } }));
-  await page.route('**/api/**', (route) => {
-    const url = route.request().url();
-    if (url.includes('/api/settings')) return route.fulfill({ json: SETTINGS(acc) });
-    if (url.includes('/api/dashboard')) return route.fulfill({ json: { ...DASHBOARD(acc), locale: acc, financialStatement } });
-    if (/\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|providers|mileage|documents|reports\/types)/.test(url)) {
-      return route.fulfill({ json: [] });
-    }
-    return route.fulfill({ json: {} });
-  });
-  await page.addInitScript((l) => { try { localStorage.setItem('sololedger-lang', l as string); } catch { /* ignore */ } }, ui);
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('nav', { timeout: 20_000 });
+  // Phase 3 PR-3.6: IPC-boot with a custom dashboard financialStatement (no call
+  // recording in this group, so a straight bootComboIPC suffices).
+  await bootComboIPC(page, ui, acc, { dashboard: { ...DASHBOARD(acc), locale: acc, financialStatement } });
   await page.waitForTimeout(500);
 }
 
@@ -1166,8 +1110,11 @@ test.describe('PR-T2 → App.tsx trusts backend financial statement (no client t
 // the TransactionsPage expense smart-default. Web build → HTTP route mocking;
 // updateCategory / recategorize calls are recorded Node-side to assert payloads.
 // A commit failure is surfaced as a generic retry message — the UI must NOT rely
-// on err.status (Electron IPC strips it), so the mock returns an error WITHOUT a
+// on err.status (Electron IPC strips it), so the mock REJECTS the commit without a
 // usable status and we assert the retry copy still shows.
+// Phase 3 PR-3.7: IPC-boot. recategorize is body-dependent (dryRun preview vs commit)
+// and the commit-fail path rejects; the recat / updateCategory calls are recorded
+// browser-side (window.__calls) and read back via page.evaluate.
 // ───────────────────────────────────────────────────────────────────────────
 const RECAT_CATS = (acc: string) => ([
   { id: 'c-cogs', locale: acc, type: 'expense', slug: 'cogs', label_zh_cn: '营业成本', label_zh_tw: '營業成本', label_en: 'COGS Cat', label_ja: '売上原価', label_ko: '매출원가', label_fr: 'COGS Cat', schedule_line: null, is_deductible: true, deductible_pct: 100, is_cogs: true, parent_id: null, sort_order: 10, is_system: true, displayLabel: 'COGS Cat' },
@@ -1175,37 +1122,26 @@ const RECAT_CATS = (acc: string) => ([
 ]);
 
 async function bootRecat(page: import('@playwright/test').Page, ui: string, acc: string, opts: { commitFails?: boolean } = {}) {
-  const calls: { catUpdates: any[]; recat: any[] } = { catUpdates: [], recat: [] };
-  await page.route('**/auth/check', (r) => r.fulfill({ json: { authenticated: true } }));
-  await page.route('**/auth/**', (r) => r.fulfill({ json: { authenticated: true } }));
-  await page.route('**/api/**', (route) => {
-    const req = route.request();
-    const url = req.url().split('?')[0];
-    const method = req.method();
-    if (url.includes('/api/settings')) return route.fulfill({ json: SETTINGS(acc) });
-    if (url.includes('/api/dashboard')) return route.fulfill({ json: DASHBOARD(acc) });
-    if (url.includes('/api/transactions/recategorize')) {
-      const body = JSON.parse(req.postData() || '{}');
-      calls.recat.push(body);
-      if (opts.commitFails && body.dryRun === false) return route.fulfill({ status: 500, json: { error: 'boom' } });
-      return route.fulfill({ json: body.dryRun ? { dryRun: true, fromCategoryId: body.fromCategoryId, toCategoryId: body.toCategoryId, affected: 3 } : { dryRun: false, fromCategoryId: body.fromCategoryId, toCategoryId: body.toCategoryId, moved: 3 } });
-    }
-    if (url.includes('/api/transactions/summary')) return route.fulfill({ json: { income: { total: 0, count: 0 }, expense: { total: 0, count: 0 }, net: 0 } });
-    if (/\/api\/categories\/[^/]+$/.test(url) && method === 'PUT') {
-      calls.catUpdates.push({ url, body: JSON.parse(req.postData() || '{}') });
-      return route.fulfill({ json: { success: true } });
-    }
-    if (url.includes('/api/categories')) return route.fulfill({ json: RECAT_CATS(acc) });
-    if (/\/api\/(transactions|products|sales|purchases|receivables|payables|alerts|providers|mileage|documents|reports\/types)/.test(url)) {
-      return route.fulfill({ json: [] });
-    }
-    return route.fulfill({ json: {} });
+  const commitResp = opts.commitFails
+    ? { match: '/api/transactions/recategorize', method: 'POST', bodyMatch: { dryRun: false }, reject: 'boom' }
+    : { match: '/api/transactions/recategorize', method: 'POST', bodyMatch: { dryRun: false }, json: { dryRun: false, fromCategoryId: 'c-cogs', toCategoryId: 'c-op', moved: 3 } };
+  await bootComboIPC(page, ui, acc, {
+    recordCalls: true,
+    apiResponses: [
+      { match: '/api/transactions/recategorize', method: 'POST', bodyMatch: { dryRun: true }, json: { dryRun: true, fromCategoryId: 'c-cogs', toCategoryId: 'c-op', affected: 3 } },
+      commitResp,
+      { match: '/api/transactions/summary', json: { income: { total: 0, count: 0 }, expense: { total: 0, count: 0 }, net: 0 } },
+      { match: '^/api/categories/[^/]+$', method: 'PUT', json: { success: true } },
+      { match: '^/api/categories$', method: 'GET', json: RECAT_CATS(acc) },
+    ],
   });
-  await page.addInitScript((l) => { try { localStorage.setItem('sololedger-lang', l as string); } catch { /* ignore */ } }, ui);
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('nav', { timeout: 20_000 });
-  return calls;
 }
+
+// Read the browser-recorded recategorize / updateCategory IPC calls (Phase 3 PR-3.7).
+const recatRecorded = (page: import('@playwright/test').Page) =>
+  page.evaluate(() => ((window as any).__calls || []).filter((c: any) => c.channel === 'api:request' && c.method === 'POST' && /\/api\/transactions\/recategorize/.test(String(c.path || '').split('?')[0])));
+const catUpdatesRecorded = (page: import('@playwright/test').Page) =>
+  page.evaluate(() => ((window as any).__calls || []).filter((c: any) => c.channel === 'api:request' && c.method === 'PUT' && /^\/api\/categories\/[^/]+$/.test(String(c.path || '').split('?')[0])));
 
 const recatLoc = (ui: string) => JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8')).settings.categories;
 const withCount = (s: string, n: number) => s.replace('{{count}}', String(n));
@@ -1213,7 +1149,7 @@ const withCount = (s: string, n: number) => s.replace('{{count}}', String(n));
 test.describe('PR-T5-2B-2 → categories is_cogs + recategorize UI', () => {
   test('CN: recategorize preview → confirm, and is_cogs toggle calls updateCategory', async ({ page }) => {
     const ui = 'zh-CN';
-    const calls = await bootRecat(page, ui, 'CN');
+    await bootRecat(page, ui, 'CN');
     const c = recatLoc(ui);
     await page.locator('i.fa-cog').first().click();
     await page.locator('button:has(i.fa-tags)').click();
@@ -1228,16 +1164,16 @@ test.describe('PR-T5-2B-2 → categories is_cogs + recategorize UI', () => {
     await recatSelects.nth(1).selectOption('c-op');
     await page.getByRole('button', { name: c.recatPreview }).click();
     await expect(page.getByText(withCount(c.recatWillMove, 3))).toBeVisible({ timeout: 10_000 });
-    expect(calls.recat.some((r) => r.dryRun === true)).toBeTruthy();
+    await expect.poll(async () => (await recatRecorded(page)).some((r: any) => r.body?.dryRun === true), { timeout: 10_000 }).toBe(true);
     await page.getByRole('button', { name: c.recatConfirm }).click();
     await expect(page.getByText(withCount(c.recatMoved, 3))).toBeVisible({ timeout: 10_000 });
     // commit carried expectedAffected = previewed count
-    expect(calls.recat.some((r) => r.dryRun === false && r.expectedAffected === 3)).toBeTruthy();
+    await expect.poll(async () => (await recatRecorded(page)).some((r: any) => r.body?.dryRun === false && r.body?.expectedAffected === 3), { timeout: 10_000 }).toBe(true);
 
     // is_cogs toggle: click the operating category's badge → updateCategory({is_cogs})
     await page.getByRole('button', { name: c.operatingBadge }).first().click();
-    await expect.poll(() => calls.catUpdates.length, { timeout: 10_000 }).toBeGreaterThan(0);
-    expect(calls.catUpdates.some((u) => typeof u.body.is_cogs === 'boolean')).toBeTruthy();
+    await expect.poll(async () => (await catUpdatesRecorded(page)).length, { timeout: 10_000 }).toBeGreaterThan(0);
+    expect((await catUpdatesRecorded(page)).some((u: any) => typeof u.body?.is_cogs === 'boolean')).toBeTruthy();
   });
 
   test('CN: commit failure shows the retry message (no reliance on err.status)', async ({ page }) => {
