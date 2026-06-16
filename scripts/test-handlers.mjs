@@ -15,6 +15,12 @@
 //       · receivables/payables summary（totalReceivable·totalPayable / details 仅 unpaid>0 /
 //       collectionRate·paymentRate（无单据=100）/ topCustomers·topSuppliers 排名 / 相对日期 aging
 //       buckets（mid-bucket offset，绝不写固定过期日）/ 已付且有 due_date 不 inflate 应收·应付）。
+// 覆盖（第四批 §2B Batch 4）：settings（GET/PUT 白名单读写双向过滤 / JSON 往返 / oversized→warnings /
+//       array body throw / null body no-op）· reports（types locale 路由 + unknown→[] / generate 结构 +
+//       period echo + monthlyBreakdown12 / **非税不变量** salesRevenue=Σamount_net·costOfSales=0·
+//       grossProfit=revenue / incomeTax·netProfit·taxSurcharge 仅 typeof number 不锁值（T11/T12 不锁）/
+//       unsupported throw / US smoke）· batch（sales·purchases 批量插入 / success·failed·errors / 部分成功 /
+//       empty·>500 throw / 默认值 payment_status=paid·invoiceStatus / due_date persisted）。
 //
 // better-sqlite3 原生绑定按 Electron ABI 编（本机/普通 node 加载会 ERR_DLOPEN）；
 // 加载不了时优雅 SKIP（exit 0）——CI 里 rebuild 成 node ABI 后真跑（同 test-migrations）。
@@ -481,9 +487,135 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
     '[pay] no purchases → paymentRate 100, payable 0, no details');
 }
 
+// ───────────────────────── §2B Batch 4: settings + reports + batch ─────────────────────────
+
+// ───────────────────────── settings (whitelist read+write filter, JSON round-trip) ─────────────────────────
+{
+  const db = freshDb();
+
+  // save then get round-trips a whitelisted object + scalar; JSON value preserved
+  await call('PUT', '/api/settings', { company_info: { name: 'Acme', industry: 'Steel' }, accounting_locale: 'US' });
+  const s1 = await call('GET', '/api/settings', null);
+  ok(s1.company_info && s1.company_info.name === 'Acme' && s1.company_info.industry === 'Steel', '[set] company_info object round-trips (JSON preserved)');
+  ok(s1.accounting_locale === 'US', '[set] scalar accounting_locale round-trips');
+
+  // save-time whitelist enforcement: non-whitelisted key skipped, whitelisted kept
+  const saveRes = await call('PUT', '/api/settings', { evil_key: 'pwned', currency: 'USD' });
+  ok(saveRes?.success === true, '[set] save returns {success:true}');
+  const s2 = await call('GET', '/api/settings', null);
+  ok(s2.currency === 'USD' && !('evil_key' in s2), '[set] save skips non-whitelisted evil_key, keeps currency');
+
+  // read-time whitelist enforcement: a non-whitelisted row already in DB is filtered out by get
+  db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run('not_allowed_key', JSON.stringify('x'));
+  ok(!('not_allowed_key' in (await call('GET', '/api/settings', null))), '[set] get filters non-whitelisted DB rows');
+
+  // oversized value (>10000 serialized) is skipped + named in warnings; prior value left untouched
+  const big = await call('PUT', '/api/settings', { company_info: 'x'.repeat(10001) });
+  ok(typeof big.warnings === 'string' && big.warnings.includes('company_info'), '[set] oversized value → warnings names company_info');
+  const s3 = await call('GET', '/api/settings', null);
+  ok(s3.company_info && s3.company_info.name === 'Acme', '[set] oversized value skipped — prior company_info unchanged (not overwritten)');
+
+  // non-object / array body throws
+  await expectThrow(() => call('PUT', '/api/settings', [1, 2]), '[set] array body throws');
+
+  // null body is a no-op per existing contract (body || {} → {})
+  ok((await call('PUT', '/api/settings', null))?.success === true, '[set] null body → {success:true} no-op');
+}
+
+// ───────────── reports (structural + non-tax invariants ONLY; never lock T11/T12 amounts) ─────────────
+{
+  freshDb();
+  const YR = '2023', FROM = '2023-01-01', TO = '2023-12-31';
+
+  // types: locale routing
+  const cnTypes = await call('GET', '/api/reports/types?locale=CN', null);
+  ok(Array.isArray(cnTypes) && cnTypes.some((t) => t.id === 'income-statement'), '[rep] CN types include income-statement');
+  const usTypes = await call('GET', '/api/reports/types?locale=US', null);
+  ok(Array.isArray(usTypes) && usTypes.length > 0 && usTypes.some((t) => t.id === 'schedule-c'), '[rep] US types non-empty (schedule-c) — smoke');
+  ok((await call('GET', '/api/reports/types?locale=XX', null)).length === 0, '[rep] unknown locale types → []');
+  ok((await call('GET', '/api/reports/types', null)).some((t) => t.id === 'income-statement'), '[rep] no locale → defaults to CN types');
+
+  // seed income via real round-trip. amount(gross) deliberately ≠ amount_net so salesRevenue proves NET basis.
+  await call('POST', '/api/transactions', { id: 'rep-i1', type: 'income', date: '2023-03-01', amount: 6000, amount_net: 5000 });
+  await call('POST', '/api/transactions', { id: 'rep-i2', type: 'income', date: '2023-07-01', amount: 3000, amount_net: 2500 });
+
+  const rep = await call('POST', '/api/reports/generate', { locale: 'CN', year: YR, from: FROM, to: TO });
+  // structure
+  ok(rep.locale === 'CN', '[rep] generate result.locale === CN');
+  ok(rep.period && rep.period.from === FROM && rep.period.to === TO && rep.period.year === YR, '[rep] period echoes from/to/year');
+  ok(Array.isArray(rep.reportTypes) && rep.reportTypes.length > 0, '[rep] reportTypes present');
+  ok(Array.isArray(rep.monthlyBreakdown) && rep.monthlyBreakdown.length === 12, '[rep] monthlyBreakdown has 12 months');
+  ok(Array.isArray(rep.warnings), '[rep] warnings is an array');
+  ok(rep.incomeStatement && rep.vatSummary && rep.taxInclusiveSummary, '[rep] incomeStatement + vatSummary + taxInclusiveSummary present');
+  // non-tax invariants (income-only seed): salesRevenue = Σ amount_net = 7500 (NOT gross 9000); costOfSales 0; grossProfit = revenue
+  ok(approx(rep.incomeStatement.salesRevenue, 7500), `[rep] salesRevenue = Σ amount_net (5000+2500) = 7500 NET (not gross 9000), got ${rep.incomeStatement.salesRevenue}`);
+  ok(approx(rep.incomeStatement.costOfSales, 0), `[rep] income-only seed → costOfSales 0, got ${rep.incomeStatement.costOfSales}`);
+  ok(approx(rep.incomeStatement.grossProfit, rep.incomeStatement.salesRevenue), '[rep] grossProfit === salesRevenue (no COGS)');
+  // tax/net fields exist but ARE NOT value-locked (T11/T12 unsettled) — type-only assertion
+  ok(typeof rep.incomeStatement.incomeTax === 'number'
+    && typeof rep.incomeStatement.netProfit === 'number'
+    && typeof rep.incomeStatement.taxSurcharge === 'number', '[rep] incomeTax/netProfit/taxSurcharge are numbers (values intentionally NOT locked)');
+
+  // unsupported locale throws
+  await expectThrow(() => call('POST', '/api/reports/generate', { locale: 'XX', year: YR, from: FROM, to: TO }), '[rep] unsupported locale generate throws');
+
+  // US smoke: locale echo only (engine-specific shape intentionally NOT asserted)
+  ok((await call('POST', '/api/reports/generate', { locale: 'US', year: YR, from: FROM, to: TO })).locale === 'US', '[rep] US generate result.locale === US (smoke)');
+}
+
+// ───────────────────────── batch import (sales + purchases bulk) ─────────────────────────
+{
+  freshDb();
+  const due = '2025-09-30'; // fixed date — persistence only, not aging
+
+  // valid batchSales — omit payment/invoice fields to exercise defaults; set due_date (batch is the only writer)
+  const okRes = await call('POST', '/api/sales/batch', {
+    records: [
+      { id: 'bs1', date: '2023-01-05', customer: 'C1', tons: 2, totalAmount: 1000, due_date: due },
+      { id: 'bs2', date: '2023-01-06', customer: 'C2', tons: 3, totalAmount: 2000, due_date: due },
+    ],
+  });
+  ok(okRes.success === 2 && okRes.failed === 0, `[batch] sales valid → success 2 failed 0, got ${JSON.stringify(okRes)}`);
+  const sales = await call('GET', '/api/sales', null);
+  const bs1 = sales.find((s) => s.id === 'bs1');
+  ok(sales.length === 2 && bs1, '[batch] GET /api/sales reflects 2 inserted');
+  ok(bs1.payment_status === 'paid' && approx(bs1.paid_amount, 1000), '[batch] sales defaults payment_status=paid, paid_amount=totalAmount');
+  ok(bs1.invoiceStatus === '待开', '[batch] sales default invoiceStatus=待开');
+  ok(bs1.due_date === due, '[batch] sales due_date persisted');
+
+  // partial: valid + missing-date + negative-tons
+  freshDb();
+  const part = await call('POST', '/api/sales/batch', {
+    records: [
+      { id: 'v1', date: '2023-02-01', customer: 'Ok', tons: 1, totalAmount: 500 },
+      { id: 'bad-date', customer: 'NoDate', tons: 1, totalAmount: 100 },                 // missing date
+      { id: 'bad-tons', date: '2023-02-02', customer: 'Neg', tons: -5, totalAmount: 100 }, // negative tons
+    ],
+  });
+  ok(part.success === 1 && part.failed === 2, `[batch] partial → success 1 failed 2, got ${JSON.stringify(part)}`);
+  ok(Array.isArray(part.errors) && part.errors.length === 2 && part.errors.every((e) => e.row && Array.isArray(e.errors)), '[batch] errors carry {row, errors[]}');
+  ok((await call('GET', '/api/sales', null)).length === 1, '[batch] only the valid row inserted');
+
+  // empty + over-cap throw
+  await expectThrow(() => call('POST', '/api/sales/batch', { records: [] }), '[batch] empty records throws');
+  const over = Array.from({ length: 501 }, (_, i) => ({ id: `o${i}`, date: '2023-01-01', tons: 1, totalAmount: 1 }));
+  await expectThrow(() => call('POST', '/api/sales/batch', { records: over }), '[batch] >500 records throws');
+
+  // batchPurchases symmetric smoke
+  freshDb();
+  const pRes = await call('POST', '/api/purchases/batch', {
+    records: [{ id: 'bp1', date: '2023-03-01', supplier: 'S1', tons: 4, totalAmount: 1500, due_date: due }],
+  });
+  ok(pRes.success === 1 && pRes.failed === 0, `[batch] purchases valid → success 1, got ${JSON.stringify(pRes)}`);
+  const purch = await call('GET', '/api/purchases', null);
+  const bp1 = purch.find((p) => p.id === 'bp1');
+  ok(purch.length === 1 && bp1 && bp1.due_date === due, '[batch] GET /api/purchases reflects insert + due_date persisted');
+  ok(bp1.invoiceStatus === '已收', '[batch] purchases default invoiceStatus=已收');
+}
+
 if (failures.length) {
   console.error(`✗ handlers: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch) via real dispatch on :memory: DB');
