@@ -39,6 +39,21 @@
 //       detect-after-run（migrated=total · pending=0 · hasLegacy:false）· rollback（removed 正确 · 删迁移 txn ·
 //       清 legacy_migrations · 原 sales/purchases 保留）· rerun-after-rollback（映射真清 · 可再迁）· body override
 //       （defaultIncome/ExpenseCategoryId + currency 采用，category id 不锁默认值）。**只锁现有行为，不锁默认 category id。**
+// 覆盖（第八批 §2B documents handler — fs-free 子集）：electron/handlers/documents.js。next-number（空库
+//       PREFIX-YYYY-0001 / 同类型已有编号后缀递增 / 缺·非法 type throw）· create（doc_type·doc_number·
+//       customer_name·doc_date 必填校验 / 成功 {success,id} / status 默认 draft / acc_locale 创建冻结）·
+//       DOC_NUMBER_EXISTS（同 doc_type+doc_number 重复 throw / 复合唯一：不同 doc_type 同号放行）· get/list
+//       （header+items / ?type 过滤·all·无 type 全量 / 非法 type throw / 不存在 'Document not found' / doc_date DESC）·
+//       items+totals（sumTotals 只对已存 amount·tax_amount 求和〔不重算 qty×price〕/ line_no 排序 / 空白 description
+//       行 sanitizeItems 丢弃）· update（draft 改字段·items·notes 重算 totals / acc_locale 更新忽略·冻结 /
+//       空 body no-op / 状态机 draft→issued→void·void 终态·非法值 throw / 非 draft 改字段 'Only draft …'）·
+//       updateTaxInvoice **fs-free 子集**（首次设 issued/number/date·首次设合法 path〔oldPathToDelete 恒 null·不触
+//       safeDeleteAttachment〕/ 空 body no-op / issued 布尔强转 / INVALID_ATTACHMENT_PATH 纯正则先抛 / ATTACHMENT_IN_USE
+//       共享守卫先抛 / void→DOC_VOID_TAX_INVOICE_READONLY）· remove **fs-free 子集**（draft 删除 + items FK CASCADE /
+//       不存在 'Document not found' / issued→DOC_ISSUED_VOID_FIRST / void 且**无附件**可删）。
+//       **out-of-scope（本批故意不覆盖，留真 Electron e2e / attachment IPC）**：updateTaxInvoice 替换·清除已有
+//       attachment path 时的 safeDeleteAttachment fs 分支；remove 带 tax_invoice_attachment_path 的 void 单据时的
+//       safeDeleteAttachment fs 分支。两者需 require('electron').app（本测试环境为 undefined）→ 不 mock 整个 electron、不做真实 fs。
 //
 // better-sqlite3 原生绑定按 Electron ABI 编（本机/普通 node 加载会 ERR_DLOPEN）；
 // 加载不了时优雅 SKIP（exit 0）——CI 里 rebuild 成 node ABI 后真跑（同 test-migrations）。
@@ -945,9 +960,229 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   ok(ti.currency === 'USD' && te.currency === 'USD', `[mig] override: body currency USD applied, got income=${ti.currency} expense=${te.currency}`);
 }
 
+// ───────────── §2B Batch 8: business documents handler (fs-free subset) ─────────────
+// 对象：electron/handlers/documents.js（next-number / list / create / get / update / tax-invoice / remove）。
+// 只覆盖无 fs 子集——绝不触发 safeDeleteAttachment 的真实 fs 删除路径（require('electron').app 在本测试环境为 undefined）。
+// OUT-OF-SCOPE（本批故意不覆盖，留真 Electron e2e / attachment IPC 测试）：
+//   1) updateTaxInvoice 替换/清除「已有」attachment path 时的 safeDeleteAttachment fs 分支（oldPathToDelete 非空）。
+//   2) remove 带 tax_invoice_attachment_path 的 void 单据时的 safeDeleteAttachment fs 分支。
+// 为守住该边界，本批：任何被赋予 attachment path 的单据都不再改路径、不再 remove；不 mock electron、不做真实 fs。
+
+// A. next-number — empty→PREFIX-YYYY-0001 · suffix bumps after a matching number · missing/invalid type throws
+{
+  freshDb();
+  const n0 = await call('GET', '/api/documents/next-number?type=quotation', null);
+  ok(n0.number === `QT-${YEAR}-0001`, `[doc] next-number empty quotation = QT-${YEAR}-0001, got ${n0.number}`);
+  ok(n0.number.startsWith(`QT-${YEAR}-`), '[doc] next-number includes prefix + current year');
+  // seed a matching number (QT-YEAR-####) → suffix max bumps
+  await call('POST', '/api/documents', { doc_type: 'quotation', doc_number: `QT-${YEAR}-0007`, customer_name: 'C', doc_date: `${YEAR}-01-01` });
+  const n1 = await call('GET', '/api/documents/next-number?type=quotation', null);
+  ok(n1.number === `QT-${YEAR}-0008`, `[doc] next-number bumps to QT-${YEAR}-0008, got ${n1.number}`);
+  // a custom (non PREFIX-YEAR-####) number must not pollute the max
+  await call('POST', '/api/documents', { doc_type: 'quotation', doc_number: 'CUSTOM-9999', customer_name: 'C', doc_date: `${YEAR}-01-02` });
+  ok((await call('GET', '/api/documents/next-number?type=quotation', null)).number === `QT-${YEAR}-0008`, '[doc] custom number does not pollute next-number max');
+  await expectThrow(() => call('GET', '/api/documents/next-number', null), '[doc] next-number missing type throws');
+  await expectThrow(() => call('GET', '/api/documents/next-number?type=bogus', null), '[doc] next-number invalid type throws');
+}
+
+// B. create validation — each missing required field throws; invalid doc_type throws
+{
+  freshDb();
+  await expectThrow(() => call('POST', '/api/documents', { doc_number: 'X-1', customer_name: 'C', doc_date: `${YEAR}-01-01` }), '[doc] create missing doc_type throws');
+  await expectThrow(() => call('POST', '/api/documents', { doc_type: 'quotation', customer_name: 'C', doc_date: `${YEAR}-01-01` }), '[doc] create missing doc_number throws');
+  await expectThrow(() => call('POST', '/api/documents', { doc_type: 'quotation', doc_number: 'X-1', doc_date: `${YEAR}-01-01` }), '[doc] create missing customer_name throws');
+  await expectThrow(() => call('POST', '/api/documents', { doc_type: 'quotation', doc_number: 'X-1', customer_name: 'C' }), '[doc] create missing doc_date throws');
+  await expectThrow(() => call('POST', '/api/documents', { doc_type: 'bogus', doc_number: 'X-1', customer_name: 'C', doc_date: `${YEAR}-01-01` }), '[doc] create invalid doc_type throws');
+}
+
+// C. create success — {success,id} · default status draft · acc_locale frozen at create (from body, distinct from settings)
+{
+  freshDb();
+  const r = await call('POST', '/api/documents', {
+    id: 'ignored-by-handler', doc_type: 'quotation', doc_number: 'QT-FIX-001', customer_name: 'Acme Co', doc_date: `${YEAR}-02-01`,
+    acc_locale: 'CN',
+    items: [{ description: 'Item A', amount: 100, tax_amount: 13 }, { description: 'Item B', amount: 200, tax_amount: 26 }],
+  });
+  ok(r && r.success === true && typeof r.id === 'string', `[doc] create → {success,id}, got ${JSON.stringify(r)}`);
+  ok(r.id !== 'ignored-by-handler' && r.id.startsWith('doc-'), '[doc] create generates its own id (body.id ignored)');
+  const doc = await call('GET', `/api/documents/${r.id}`, null);
+  ok(doc.status === 'draft', `[doc] create default status draft, got ${doc.status}`);
+  ok(doc.acc_locale === 'CN', `[doc] acc_locale frozen CN, got ${doc.acc_locale}`);
+  ok(doc.doc_number === 'QT-FIX-001' && doc.customer_name === 'Acme Co', '[doc] create persists number + customer');
+  ok(doc.items.length === 2, `[doc] create persists 2 items, got ${doc.items.length}`);
+  ok(approx(doc.subtotal, 300) && approx(doc.tax_amount, 39) && approx(doc.total, 339), `[doc] header totals = Σamount/Σtax/total, got ${JSON.stringify({ s: doc.subtotal, t: doc.tax_amount, tot: doc.total })}`);
+  // acc_locale honored from body (JP), proving the frozen value is the create-time input, not the CN setting
+  const r2 = await call('POST', '/api/documents', { doc_type: 'quotation', doc_number: 'QT-FIX-002', customer_name: 'JP Co', doc_date: `${YEAR}-02-02`, acc_locale: 'JP' });
+  ok((await call('GET', `/api/documents/${r2.id}`, null)).acc_locale === 'JP', '[doc] acc_locale honors body value (JP, not settings CN)');
+}
+
+// D. DOC_NUMBER_EXISTS — composite unique is (doc_type, doc_number)
+{
+  freshDb();
+  const a = await call('POST', '/api/documents', { doc_type: 'quotation', doc_number: 'DUP-1', customer_name: 'C', doc_date: `${YEAR}-01-01` });
+  ok(a.success, '[doc] dup: first create ok');
+  let dupErr = null;
+  try { await call('POST', '/api/documents', { doc_type: 'quotation', doc_number: 'DUP-1', customer_name: 'C2', doc_date: `${YEAR}-01-02` }); } catch (e) { dupErr = e?.message || String(e); }
+  ok(dupErr === 'DOC_NUMBER_EXISTS', `[doc] same type+number → DOC_NUMBER_EXISTS, got ${dupErr}`);
+  // different doc_type, same doc_number → allowed (unique is on the (doc_type, doc_number) pair)
+  const b = await call('POST', '/api/documents', { doc_type: 'sales_order', doc_number: 'DUP-1', customer_name: 'C3', doc_date: `${YEAR}-01-03` });
+  ok(b.success === true, '[doc] different doc_type, same doc_number → allowed (composite unique)');
+}
+
+// E. get / list — header+items · type filter · all · no-type · invalid type throw · missing id throw · doc_date DESC
+{
+  freshDb();
+  const q1 = await call('POST', '/api/documents', { doc_type: 'quotation', doc_number: 'L-1', customer_name: 'C1', doc_date: `${YEAR}-01-01`, items: [{ description: 'x', amount: 10 }] });
+  await call('POST', '/api/documents', { doc_type: 'quotation', doc_number: 'L-2', customer_name: 'C2', doc_date: `${YEAR}-03-01` });
+  await call('POST', '/api/documents', { doc_type: 'sales_order', doc_number: 'SO-1', customer_name: 'C3', doc_date: `${YEAR}-02-01` });
+
+  const got = await call('GET', `/api/documents/${q1.id}`, null);
+  ok(got.id === q1.id && Array.isArray(got.items) && got.items.length === 1, '[doc] get returns header + items');
+
+  const lq = await call('GET', '/api/documents?type=quotation', null);
+  ok(lq.length === 2 && lq.every((d) => d.doc_type === 'quotation'), `[doc] list?type=quotation → 2 quotations, got ${lq.length}`);
+  ok(lq[0].doc_number === 'L-2' && lq[1].doc_number === 'L-1', `[doc] list ordered by doc_date DESC, got ${lq.map((d) => d.doc_number)}`);
+
+  ok((await call('GET', '/api/documents?type=all', null)).length === 3, '[doc] list?type=all → 3');
+  ok((await call('GET', '/api/documents', null)).length === 3, '[doc] list no type → all 3');
+  await expectThrow(() => call('GET', '/api/documents?type=bogus', null), '[doc] list invalid type throws');
+
+  let getErr = null;
+  try { await call('GET', '/api/documents/nope', null); } catch (e) { getErr = e?.message || String(e); }
+  ok(getErr === 'Document not found', `[doc] get missing id → 'Document not found', got ${getErr}`);
+}
+
+// F. items / totals — sumTotals sums stored amount/tax_amount ONLY (never recompute qty×price) · line_no order · blank desc dropped
+{
+  freshDb();
+  const r = await call('POST', '/api/documents', {
+    doc_type: 'quotation', doc_number: 'IT-1', customer_name: 'C', doc_date: `${YEAR}-01-01`,
+    items: [
+      { description: 'second', amount: 50, tax_amount: 5, line_no: 2 },
+      { description: 'first', amount: 100, tax_amount: 13, line_no: 1 },
+      { description: '   ', amount: 999, tax_amount: 999 }, // blank description → dropped by sanitizeItems
+    ],
+  });
+  const doc = await call('GET', `/api/documents/${r.id}`, null);
+  ok(doc.items.length === 2, `[doc] blank-description row dropped → 2 items, got ${doc.items.length}`);
+  ok(doc.items[0].line_no === 1 && doc.items[0].description === 'first', '[doc] items ordered by line_no ASC (1st)');
+  ok(doc.items[1].line_no === 2 && doc.items[1].description === 'second', '[doc] items ordered by line_no ASC (2nd)');
+  ok(approx(doc.subtotal, 150), `[doc] subtotal = 100+50 = 150 (blank excluded), got ${doc.subtotal}`);
+  ok(approx(doc.tax_amount, 18), `[doc] tax_amount = 13+5 = 18, got ${doc.tax_amount}`);
+  ok(approx(doc.total, 168), `[doc] total = subtotal+tax = 168, got ${doc.total}`);
+}
+
+// G. update — draft edits + totals recompute · acc_locale ignored (frozen) · empty no-op · state machine · non-draft edit rejected
+{
+  freshDb();
+  const r = await call('POST', '/api/documents', {
+    doc_type: 'quotation', doc_number: 'UP-1', customer_name: 'Old Name', doc_date: `${YEAR}-01-01`, acc_locale: 'CN',
+    items: [{ description: 'orig', amount: 10, tax_amount: 1 }], notes: 'orig notes',
+  });
+
+  await call('PUT', `/api/documents/${r.id}`, {
+    customer_name: 'New Name', notes: 'new notes',
+    items: [{ description: 'a', amount: 20, tax_amount: 2 }, { description: 'b', amount: 30, tax_amount: 3 }],
+    acc_locale: 'US', // must be IGNORED (frozen at create)
+  });
+  const d1 = await call('GET', `/api/documents/${r.id}`, null);
+  ok(d1.customer_name === 'New Name' && d1.notes === 'new notes', '[doc] update edits customer_name/notes');
+  ok(d1.items.length === 2 && approx(d1.subtotal, 50) && approx(d1.tax_amount, 5), '[doc] update replaces items + recomputes totals');
+  ok(d1.acc_locale === 'CN', '[doc] update IGNORES acc_locale (frozen at create)');
+
+  // empty body → no-op success (draft state preserved)
+  const noop = await call('PUT', `/api/documents/${r.id}`, {});
+  ok(noop && noop.success === true, '[doc] empty update body → no-op success');
+
+  // invalid status value rejected (still draft here)
+  await expectThrow(() => call('PUT', `/api/documents/${r.id}`, { status: 'bogus' }), '[doc] invalid status value rejected');
+
+  // draft → issued
+  ok((await call('PUT', `/api/documents/${r.id}`, { status: 'issued' })).success === true, '[doc] draft → issued ok');
+  ok((await call('GET', `/api/documents/${r.id}`, null)).status === 'issued', '[doc] status now issued');
+
+  // issued: editing EDITABLE fields rejected (Only draft can be edited)
+  await expectThrow(() => call('PUT', `/api/documents/${r.id}`, { customer_name: 'Nope' }), '[doc] issued: field edit rejected');
+
+  // issued → void (status-only transition allowed)
+  ok((await call('PUT', `/api/documents/${r.id}`, { status: 'void' })).success === true, '[doc] issued → void ok');
+  ok((await call('GET', `/api/documents/${r.id}`, null)).status === 'void', '[doc] status now void');
+
+  // void terminal: void → issued rejected
+  await expectThrow(() => call('PUT', `/api/documents/${r.id}`, { status: 'issued' }), '[doc] void → issued rejected (terminal)');
+}
+
+// H. updateTaxInvoice (fs-free subset) — see OUT-OF-SCOPE note above; never sets oldPathToDelete, never triggers safeDeleteAttachment
+{
+  // doc1: set issued/number/date (no path), then a VALID path FIRST time (existing path null → oldPathToDelete stays null)
+  const d1c = await call('POST', '/api/documents', { doc_type: 'commercial_invoice', doc_number: 'TI-1', customer_name: 'C1', doc_date: `${YEAR}-01-01` });
+  const u1 = await call('PUT', `/api/documents/${d1c.id}/tax-invoice`, { tax_invoice_issued: true, tax_invoice_number: 'FP-12345', tax_invoice_date: `${YEAR}-01-05` });
+  ok(u1.success === true, '[doc] tax-invoice set issued/number/date → success');
+  const g1 = await call('GET', `/api/documents/${d1c.id}`, null);
+  ok(g1.tax_invoice_issued === 1 && g1.tax_invoice_number === 'FP-12345' && g1.tax_invoice_date === `${YEAR}-01-05`, '[doc] tax invoice fields persisted (issued stored as 1)');
+  const u2 = await call('PUT', `/api/documents/${d1c.id}/tax-invoice`, { tax_invoice_attachment_path: 'attachments/docs/ti-1-abc.pdf' });
+  ok(u2.success === true, '[doc] first-time attachment path set → success (no fs: previous path was null)');
+  ok((await call('GET', `/api/documents/${d1c.id}`, null)).tax_invoice_attachment_path === 'attachments/docs/ti-1-abc.pdf', '[doc] attachment path persisted');
+  // NOTE: d1c now holds a path → it is deliberately never re-pathed or removed below (would hit the fs branch).
+
+  // empty tax-invoice body → no-op success
+  ok((await call('PUT', `/api/documents/${d1c.id}/tax-invoice`, {})).success === true, '[doc] empty tax-invoice body → no-op success');
+
+  // d2: issued boolean coercion (false → 0) on a separate doc with NO path
+  const d2c = await call('POST', '/api/documents', { doc_type: 'commercial_invoice', doc_number: 'TI-2', customer_name: 'C2', doc_date: `${YEAR}-01-02` });
+  await call('PUT', `/api/documents/${d2c.id}/tax-invoice`, { tax_invoice_issued: false });
+  ok((await call('GET', `/api/documents/${d2c.id}`, null)).tax_invoice_issued === 0, '[doc] tax_invoice_issued false → stored 0');
+
+  // INVALID_ATTACHMENT_PATH — pure regex throws before any fs (d2 has no existing path)
+  let invErr = null;
+  try { await call('PUT', `/api/documents/${d2c.id}/tax-invoice`, { tax_invoice_attachment_path: '../escape.pdf' }); } catch (e) { invErr = e?.message || String(e); }
+  ok(invErr === 'INVALID_ATTACHMENT_PATH', `[doc] invalid attachment path → INVALID_ATTACHMENT_PATH, got ${invErr}`);
+
+  // ATTACHMENT_IN_USE — first-time set of a path already owned by d1c throws before sets/oldPathToDelete (no fs)
+  let useErr = null;
+  try { await call('PUT', `/api/documents/${d2c.id}/tax-invoice`, { tax_invoice_attachment_path: 'attachments/docs/ti-1-abc.pdf' }); } catch (e) { useErr = e?.message || String(e); }
+  ok(useErr === 'ATTACHMENT_IN_USE', `[doc] shared attachment path → ATTACHMENT_IN_USE, got ${useErr}`);
+
+  // void document → tax-invoice readonly (throws before any path logic / fs)
+  const d3c = await call('POST', '/api/documents', { doc_type: 'commercial_invoice', doc_number: 'TI-3', customer_name: 'C3', doc_date: `${YEAR}-01-03` });
+  await call('PUT', `/api/documents/${d3c.id}`, { status: 'void' });
+  let voErr = null;
+  try { await call('PUT', `/api/documents/${d3c.id}/tax-invoice`, { tax_invoice_number: 'X' }); } catch (e) { voErr = e?.message || String(e); }
+  ok(voErr === 'DOC_VOID_TAX_INVOICE_READONLY', `[doc] void doc tax-invoice → DOC_VOID_TAX_INVOICE_READONLY, got ${voErr}`);
+}
+
+// I. remove (fs-free subset) — only documents WITHOUT an attachment path (see OUT-OF-SCOPE note)
+{
+  const db = freshDb();
+  // draft with items → delete → gone + items FK CASCADE
+  const dr = await call('POST', '/api/documents', { doc_type: 'quotation', doc_number: 'RM-1', customer_name: 'C', doc_date: `${YEAR}-01-01`, items: [{ description: 'x', amount: 10 }, { description: 'y', amount: 20 }] });
+  ok(db.prepare('SELECT COUNT(*) AS n FROM business_document_items WHERE doc_id = ?').get(dr.id).n === 2, '[doc] precondition: 2 items inserted');
+  ok((await call('DELETE', `/api/documents/${dr.id}`, null)).success === true, '[doc] delete draft → success');
+  await expectThrow(() => call('GET', `/api/documents/${dr.id}`, null), '[doc] deleted doc get → throws');
+  ok(db.prepare('SELECT COUNT(*) AS n FROM business_document_items WHERE doc_id = ?').get(dr.id).n === 0, '[doc] items removed via FK CASCADE');
+
+  // non-existent id → Document not found
+  let rmErr = null;
+  try { await call('DELETE', '/api/documents/nope', null); } catch (e) { rmErr = e?.message || String(e); }
+  ok(rmErr === 'Document not found', `[doc] delete missing id → 'Document not found', got ${rmErr}`);
+
+  // issued doc → DOC_ISSUED_VOID_FIRST
+  const di = await call('POST', '/api/documents', { doc_type: 'quotation', doc_number: 'RM-2', customer_name: 'C', doc_date: `${YEAR}-01-02` });
+  await call('PUT', `/api/documents/${di.id}`, { status: 'issued' });
+  let issErr = null;
+  try { await call('DELETE', `/api/documents/${di.id}`, null); } catch (e) { issErr = e?.message || String(e); }
+  ok(issErr === 'DOC_ISSUED_VOID_FIRST', `[doc] delete issued → DOC_ISSUED_VOID_FIRST, got ${issErr}`);
+
+  // void doc WITHOUT attachment path → deletable (no safeDeleteAttachment fs branch)
+  const dv = await call('POST', '/api/documents', { doc_type: 'quotation', doc_number: 'RM-3', customer_name: 'C', doc_date: `${YEAR}-01-03` });
+  await call('PUT', `/api/documents/${dv.id}`, { status: 'void' });
+  ok((await call('DELETE', `/api/documents/${dv.id}`, null)).success === true, '[doc] delete void (no attachment) → success');
+  await expectThrow(() => call('GET', `/api/documents/${dv.id}`, null), '[doc] deleted void doc gone');
+}
+
 if (failures.length) {
   console.error(`✗ handlers: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free)) via real dispatch on :memory: DB');
