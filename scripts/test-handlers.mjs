@@ -21,6 +21,10 @@
 //       grossProfit=revenue / incomeTax·netProfit·taxSurcharge 仅 typeof number 不锁值（T11/T12 不锁）/
 //       unsupported throw / US smoke）· batch（sales·purchases 批量插入 / success·failed·errors / 部分成功 /
 //       empty·>500 throw / 默认值 payment_status=paid·invoiceStatus / due_date persisted）。
+// 覆盖（第五批 §2B Batch 5）：conversations（create/list 字段持久化 + 列含 created_at/updated_at /
+//       list 排序按 updated_at DESC〔直插 updated_at 保证确定性，不靠真实时间〕/ append 缺会话 throw +
+//       seq 顺序 + role 归一化〔非 model→user〕/ auto-title〔首条 user 派生·≤40·空白折叠·后续不覆盖·
+//       model-first 保持 null〕/ toolTrace array 往返〔无则不带 key〕/ rename〔空/纯空白→null〕/ delete + CASCADE 删消息）。
 //
 // better-sqlite3 原生绑定按 Electron ABI 编（本机/普通 node 加载会 ERR_DLOPEN）；
 // 加载不了时优雅 SKIP（exit 0）——CI 里 rebuild 成 node ABI 后真跑（同 test-migrations）。
@@ -613,9 +617,116 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   ok(bp1.invoiceStatus === '已收', '[batch] purchases default invoiceStatus=已收');
 }
 
+// ───────────────────────── §2B Batch 5: conversations (chat history persistence) ─────────────────────────
+
+// ── create / list (fields persist; documented columns) ──
+{
+  freshDb();
+  const c1 = await call('POST', '/api/conversations', {});
+  ok(c1?.id && typeof c1.id === 'string', `[conv] create → {id}, got ${JSON.stringify(c1)}`);
+  const list1 = await call('GET', '/api/conversations', null);
+  ok(list1.length === 1 && list1[0].id === c1.id && list1[0].title === null, '[conv] empty create → list 1 row, title null');
+
+  const c2 = await call('POST', '/api/conversations', { title: 'My Chat', accLocale: 'CN', uiLanguage: 'zh-CN' });
+  const row2 = (await call('GET', '/api/conversations', null)).find((c) => c.id === c2.id);
+  ok(row2 && row2.title === 'My Chat' && row2.acc_locale === 'CN' && row2.ui_language === 'zh-CN', '[conv] create with title/accLocale/uiLanguage persists');
+  ok('created_at' in row2 && 'updated_at' in row2, '[conv] list rows carry created_at/updated_at');
+}
+
+// ── list ordering by updated_at DESC (deterministic via direct UPDATE — datetime(now) is second-res) ──
+{
+  const db = freshDb();
+  const a = (await call('POST', '/api/conversations', { title: 'A' })).id;
+  const b = (await call('POST', '/api/conversations', { title: 'B' })).id;
+  db.prepare("UPDATE assistant_conversations SET updated_at = ? WHERE id = ?").run('2024-01-01 00:00:02', a);
+  db.prepare("UPDATE assistant_conversations SET updated_at = ? WHERE id = ?").run('2024-01-01 00:00:01', b);
+  const ordered = await call('GET', '/api/conversations', null);
+  ok(ordered[0].id === a && ordered[1].id === b, '[conv] list ordered by updated_at DESC (newest first)');
+}
+
+// ── append: missing-conv throw, seq order, role normalization ──
+{
+  freshDb();
+  await expectThrow(() => call('POST', '/api/conversations/ghost/messages', { role: 'user', text: 'hi' }), '[conv] append to missing conversation throws');
+
+  const cid = (await call('POST', '/api/conversations', {})).id;
+  ok((await call('POST', `/api/conversations/${cid}/messages`, { role: 'user', text: 'first' }))?.ok === true, '[conv] append returns {ok:true}');
+  await call('POST', `/api/conversations/${cid}/messages`, { role: 'model', text: 'second' });
+  await call('POST', `/api/conversations/${cid}/messages`, { role: 'weird', text: 'third' }); // non-model → user
+
+  const msgs = await call('GET', `/api/conversations/${cid}/messages`, null);
+  ok(msgs.length === 3, `[conv] messages → 3 in seq order, got ${msgs.length}`);
+  ok(msgs[0].role === 'user' && msgs[0].text === 'first', '[conv] msg1 user/first');
+  ok(msgs[1].role === 'model' && msgs[1].text === 'second', '[conv] msg2 model/second');
+  ok(msgs[2].role === 'user' && msgs[2].text === 'third', '[conv] msg3 role normalized (weird → user)');
+}
+
+// ── auto-title: first user message derives title (≤40, not overwritten); model-first stays null ──
+{
+  freshDb();
+  const cid = (await call('POST', '/api/conversations', {})).id;
+  await call('POST', `/api/conversations/${cid}/messages`, { role: 'user', text: 'What is my Q1 revenue?' });
+  let row = (await call('GET', '/api/conversations', null)).find((c) => c.id === cid);
+  ok(row.title === 'What is my Q1 revenue?' && row.title.length <= 40, '[conv] auto-title from first user message (≤40)');
+  await call('POST', `/api/conversations/${cid}/messages`, { role: 'user', text: 'A completely different question' });
+  row = (await call('GET', '/api/conversations', null)).find((c) => c.id === cid);
+  ok(row.title === 'What is my Q1 revenue?', '[conv] second user message does NOT overwrite title');
+
+  // title is truncated to 40 chars
+  const cidLong = (await call('POST', '/api/conversations', {})).id;
+  await call('POST', `/api/conversations/${cidLong}/messages`, { role: 'user', text: 'x'.repeat(50) });
+  ok((await call('GET', '/api/conversations', null)).find((c) => c.id === cidLong).title.length === 40, '[conv] auto-title truncated to 40 chars');
+
+  // model-first: title stays null until a user message arrives
+  freshDb();
+  const cid2 = (await call('POST', '/api/conversations', {})).id;
+  await call('POST', `/api/conversations/${cid2}/messages`, { role: 'model', text: 'I can help.' });
+  ok((await call('GET', '/api/conversations', null)).find((c) => c.id === cid2).title === null, '[conv] model-first message leaves title null');
+  await call('POST', `/api/conversations/${cid2}/messages`, { role: 'user', text: 'Hello there' });
+  ok((await call('GET', '/api/conversations', null)).find((c) => c.id === cid2).title === 'Hello there', '[conv] user message after model derives title');
+}
+
+// ── toolTrace round-trip (array present; absent → no key) ──
+{
+  freshDb();
+  const cid = (await call('POST', '/api/conversations', {})).id;
+  await call('POST', `/api/conversations/${cid}/messages`, { role: 'model', text: 'traced', toolTrace: [{ name: 'queryLedger', rowCount: 3 }] });
+  await call('POST', `/api/conversations/${cid}/messages`, { role: 'user', text: 'plain' });
+  const msgs = await call('GET', `/api/conversations/${cid}/messages`, null);
+  const traced = msgs.find((m) => m.text === 'traced');
+  const plain = msgs.find((m) => m.text === 'plain');
+  ok(Array.isArray(traced.toolTrace) && traced.toolTrace.length === 1 && traced.toolTrace[0].name === 'queryLedger', '[conv] toolTrace array round-trips');
+  ok(!('toolTrace' in plain), '[conv] message without toolTrace has no toolTrace key');
+}
+
+// ── rename (empty / whitespace → null) ──
+{
+  freshDb();
+  const cid = (await call('POST', '/api/conversations', { title: 'Old' })).id;
+  await call('PUT', `/api/conversations/${cid}`, { title: 'New Title' });
+  ok((await call('GET', '/api/conversations', null)).find((c) => c.id === cid).title === 'New Title', '[conv] rename updates title');
+  await call('PUT', `/api/conversations/${cid}`, { title: '' });
+  ok((await call('GET', '/api/conversations', null)).find((c) => c.id === cid).title === null, '[conv] rename empty title → null');
+  await call('PUT', `/api/conversations/${cid}`, { title: '   ' });
+  ok((await call('GET', '/api/conversations', null)).find((c) => c.id === cid).title === null, '[conv] rename whitespace title → null');
+}
+
+// ── delete + CASCADE (messages removed; missing conv → []) ──
+{
+  freshDb();
+  const cid = (await call('POST', '/api/conversations', { title: 'ToDelete' })).id;
+  await call('POST', `/api/conversations/${cid}/messages`, { role: 'user', text: 'm1' });
+  await call('POST', `/api/conversations/${cid}/messages`, { role: 'model', text: 'm2' });
+  ok((await call('GET', `/api/conversations/${cid}/messages`, null)).length === 2, '[conv] 2 messages before delete');
+  ok((await call('DELETE', `/api/conversations/${cid}`, null))?.ok === true, '[conv] delete returns {ok:true}');
+  ok(!(await call('GET', '/api/conversations', null)).some((c) => c.id === cid), '[conv] deleted conversation gone from list');
+  ok((await call('GET', `/api/conversations/${cid}/messages`, null)).length === 0, '[conv] CASCADE removed its messages (foreign_keys=ON)');
+  ok((await call('GET', '/api/conversations/never/messages', null)).length === 0, '[conv] messages on never-existed conv → [] (no throw)');
+}
+
 if (failures.length) {
   console.error(`✗ handlers: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations) via real dispatch on :memory: DB');
