@@ -37,6 +37,10 @@ jobs:
       # 前端构建放在守卫之前：check:offline 需要扫 dist/index.html。
       - name: Build renderer
         run: npm run build
+      # 类型检查门禁（tsc --noEmit）：vite/esbuild 编译不做类型检查，这里补上。
+      # 纯类型检查，无原生/浏览器/ABI 依赖；放在 build 之后、check:all 之前。
+      - name: Typecheck
+        run: npm run typecheck
       - name: Run all guards + migration test
         run: npm run check:all
 
