@@ -11,6 +11,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -53,3 +54,31 @@ jobs:
         run: npx playwright install chromium
       - name: Build + e2e
         run: npm run test:locale-ui
+
+  # 真 Electron e2e（PR-1 #176 documents fs 分支 + PR-2 #177 attachment IPC）。
+  # 仅 workflow_dispatch 手动触发：push/PR 一律不跑、永不作为 merge 门、不入 required checks。
+  #   - 与 checks/e2e 两 job 不同，这里要 Electron 二进制 + better-sqlite3 的 ELECTRON ABI
+  #     （checks 用的是 node ABI，二者互斥，故必须独立 job）。
+  #   - macOS runner 计费 10×，且历史上遇过 spending-limit 阻断，故先手动起步（PR-A）。
+  #     待手动跑通且 billing 稳定，再放宽到 push:[main] / PR label（后续 PR-B/PR-C）。
+  electron-e2e:
+    name: Electron e2e (real main process)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # --ignore-scripts 跳过了 electron 二进制下载 + postinstall 的原生重建。
+      # test:electron 在真 Electron 进程内跑，需要：Electron 二进制 + better-sqlite3 的
+      # ELECTRON ABI（npm run electron:rebuild = electron-rebuild -f -w better-sqlite3）。
+      # 不需要 chromium、也不需要 build（test:electron 既不进浏览器也不读 dist）。
+      - name: Install Electron binary
+        run: npm rebuild electron
+      - name: Rebuild better-sqlite3 for Electron ABI
+        run: npm run electron:rebuild
+      - name: Run real-Electron e2e
+        run: npm run test:electron
