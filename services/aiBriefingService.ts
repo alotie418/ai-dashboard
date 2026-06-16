@@ -1,35 +1,15 @@
-// AI 简报服务（经营看板右侧）— 走 apiFetch 统一通道（桌面版 IPC / Web 版 HTTP）
+// AI 简报服务（经营看板右侧）— 走 Electron IPC（api:request）统一通道
 // 多 provider（Anthropic/OpenAI/Gemini）经 /api/ai/analyze 由主进程按默认 provider 分发。
 
 import { AIAnalysis, BusinessData } from "../types";
 
-const API_BASE = '';
-
-function isElectron(): boolean {
-  return typeof window !== 'undefined' && !!(window as any).electronAPI?.isElectron;
-}
-
 async function aiApiFetch<T>(path: string, body: any): Promise<T> {
-  if (isElectron()) {
-    const electronAPI = (window as any).electronAPI;
-    return electronAPI.invoke('api:request', {
-      method: 'POST',
-      path,
-      body,
-    });
-  }
-  // Web 版 fallback
-  const response = await fetch(`${API_BASE}${path}`, {
+  const electronAPI = (window as any).electronAPI;
+  return electronAPI.invoke('api:request', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'same-origin',
-    body: JSON.stringify(body),
+    path,
+    body,
   });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(err.error || `AI request failed (${response.status})`);
-  }
-  return response.json();
 }
 
 export const fetchAIAnalysis = async (data: BusinessData, marketSummary?: string, languageHint?: string, analyzeSystemPrompt?: string): Promise<AIAnalysis> => {

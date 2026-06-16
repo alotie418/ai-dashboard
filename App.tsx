@@ -24,7 +24,6 @@ import USTaxToolsPage from './components/USTaxToolsPage';
 import USDashboardCards from './components/USDashboardCards';
 import { formatMoney, getTaxLabel, getDashboardSections, getCurrencySymbol, buildAIFinanceContext, getInventoryUnitLabel, getProductUnitLabel } from './components/accountingHelpers';
 import AlertCenter from './components/AlertCenter';
-import LoginPage from './components/LoginPage';
 import OnboardingWizard from './components/OnboardingWizard';
 import { AssistantProvider } from './components/assistant/AssistantProvider';
 import AssistantWidget from './components/assistant/AssistantWidget';
@@ -372,19 +371,6 @@ const AppContent: React.FC = () => {
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="w-full flex items-center justify-center p-2 rounded-lg bg-[#f0eeeb] hover:bg-[#e0ddd5] transition-colors text-[#6b6b69]">
             <i className={`fas ${sidebarOpen ? 'fa-angle-double-left' : 'fa-angle-double-right'}`}></i>
           </button>
-          {!isElectronEnv && (
-            <button
-              onClick={async () => {
-                await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' });
-                window.location.reload();
-              }}
-              className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-red-50 transition-colors text-[#6b6b69] hover:text-red-600"
-              title={t('nav.logout')}
-            >
-              <i className="fas fa-sign-out-alt"></i>
-              {sidebarOpen && <span className="ml-2 text-sm">{t('nav.logout')}</span>}
-            </button>
-          )}
         </div>
       </aside>
 
@@ -458,46 +444,21 @@ const AppContent: React.FC = () => {
   );
 };
 
-// Auth wrapper — 桌面版默认无需登录，Web 版保持后端 session 校验
+// Auth wrapper — 桌面版默认无需登录；启动时检测 BYOK 是否已配置 API Key，未配置则进入 Onboarding
 const isElectronEnv = typeof window !== 'undefined' && !!(window as any).electronAPI?.isElectron;
 
 const AuthWrapper: React.FC = () => {
-  const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'unauthenticated'>(
-    isElectronEnv ? 'authenticated' : 'checking'
-  );
   // 桌面版需要 BYOK：启动时检测是否已配置 API Key，未配置时显示 Onboarding
   const [onboardingState, setOnboardingState] = useState<'checking' | 'needed' | 'done'>(
     isElectronEnv ? 'checking' : 'done'
   );
 
   useEffect(() => {
-    if (isElectronEnv) {
-      const electronAPI = (window as any).electronAPI;
-      electronAPI.invoke('providers:hasAny')
-        .then((has: boolean) => setOnboardingState(has ? 'done' : 'needed'))
-        .catch(() => setOnboardingState('needed'));
-      return; // 桌面版跳过远程 session 校验
-    }
-    fetch('/auth/check', { credentials: 'same-origin' })
-      .then(r => r.json())
-      .then(data => setAuthState(data.authenticated ? 'authenticated' : 'unauthenticated'))
-      .catch(() => setAuthState('unauthenticated'));
+    const electronAPI = (window as any).electronAPI;
+    electronAPI.invoke('providers:hasAny')
+      .then((has: boolean) => setOnboardingState(has ? 'done' : 'needed'))
+      .catch(() => setOnboardingState('needed'));
   }, []);
-
-  if (authState === 'checking') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f9f9f8]">
-        <div className="flex items-center space-x-3 text-[#6b6b69]">
-          <i className="fas fa-spinner fa-spin text-primary"></i>
-          <span className="text-sm">加载中...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (authState === 'unauthenticated') {
-    return <LoginPage onLogin={() => setAuthState('authenticated')} />;
-  }
 
   if (onboardingState === 'checking') {
     return (

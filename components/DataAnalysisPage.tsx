@@ -303,68 +303,33 @@ ${t('analysis.forecastPromptMcLegend')}`;
 ${t('analysis.forecastPromptRequirements')}`;
 
       // STEP 6: AI synthesis (走 IPC 统一通道，桌面版不走 HTTP)
-      const isElectronEnv = typeof window !== 'undefined' && !!(window as any).electronAPI?.isElectron;
-      let result: any;
-      if (isElectronEnv) {
-        result = await (window as any).electronAPI.invoke('api:request', {
-          method: 'POST',
-          path: '/api/ai/data-analysis',
-          body: {
-            prompt,
-            systemInstruction: `${t('ai.forecastSystemPrompt')}\n\n${t('ai.boundaryDirective')}`,
-            responseSchema: {
-              type: 'OBJECT',
-              properties: {
-                insights: { type: 'STRING' },
-                predictions: {
-                  type: 'ARRAY',
-                  items: {
-                    type: 'OBJECT',
-                    properties: {
-                      name: { type: 'STRING' },
-                      revenue: { type: 'NUMBER' },
-                      profit: { type: 'NUMBER' },
-                      confidenceUpper: { type: 'NUMBER' },
-                      confidenceLower: { type: 'NUMBER' }
-                    }
+      const result: any = await (window as any).electronAPI.invoke('api:request', {
+        method: 'POST',
+        path: '/api/ai/data-analysis',
+        body: {
+          prompt,
+          systemInstruction: `${t('ai.forecastSystemPrompt')}\n\n${t('ai.boundaryDirective')}`,
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              insights: { type: 'STRING' },
+              predictions: {
+                type: 'ARRAY',
+                items: {
+                  type: 'OBJECT',
+                  properties: {
+                    name: { type: 'STRING' },
+                    revenue: { type: 'NUMBER' },
+                    profit: { type: 'NUMBER' },
+                    confidenceUpper: { type: 'NUMBER' },
+                    confidenceLower: { type: 'NUMBER' }
                   }
                 }
               }
             }
-          },
-        });
-      } else {
-        const aiResponse = await fetch('/api/ai/data-analysis', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({
-            prompt,
-            systemInstruction: `${t('ai.forecastSystemPrompt')}\n\n${t('ai.boundaryDirective')}`,
-            responseSchema: {
-              type: 'OBJECT',
-              properties: {
-                insights: { type: 'STRING' },
-                predictions: {
-                  type: 'ARRAY',
-                  items: {
-                    type: 'OBJECT',
-                    properties: {
-                      name: { type: 'STRING' },
-                      revenue: { type: 'NUMBER' },
-                      profit: { type: 'NUMBER' },
-                      confidenceUpper: { type: 'NUMBER' },
-                      confidenceLower: { type: 'NUMBER' }
-                    }
-                  }
-                }
-              }
-            }
-          }),
-        });
-        if (!aiResponse.ok) throw new Error('AI analysis request failed');
-        result = await aiResponse.json();
-      }
+          }
+        },
+      });
       setSalesForecast(result.insights || t('analysis.forecastDefault'));
 
       // Extract Google Search grounding sources from server response
