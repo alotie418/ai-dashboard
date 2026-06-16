@@ -1,7 +1,5 @@
-// API client — 桌面版走 Electron IPC，Web 版仍走 fetch（开发兼容）
+// API client — 桌面版走 Electron IPC（api:request）；不再有 Web fetch 路径
 // Field mapping 在下方保持不变
-
-const API_BASE = '';
 
 // 判断是否运行在 Electron 桌面壳内
 function isElectron(): boolean {
@@ -806,59 +804,19 @@ async function apiFetch<T>(path: string, options?: RequestInit & { signal?: Abor
   const body = options?.body ? JSON.parse(options.body as string) : undefined;
   const userSignal = options?.signal;
 
-  // ===== Electron 桌面版：走 IPC，跳过 HTTP =====
-  if (isElectron()) {
-    if (userSignal?.aborted) throw new Error('cancelled');
-    const electronAPI = (window as any).electronAPI;
+  // 桌面版：所有请求走 Electron IPC（api:request），不经过 HTTP
+  if (userSignal?.aborted) throw new Error('cancelled');
+  const electronAPI = (window as any).electronAPI;
 
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error(`AI_ERR:timeout (request timeout ${API_TIMEOUT_MS / 1000}s: ${path})`)), API_TIMEOUT_MS);
-    });
-    const cancelPromise = new Promise<never>((_, reject) => {
-      userSignal?.addEventListener('abort', () => reject(new Error('cancelled')), { once: true });
-    });
-    const invokePromise = electronAPI.invoke('api:request', { method, path, body });
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`AI_ERR:timeout (request timeout ${API_TIMEOUT_MS / 1000}s: ${path})`)), API_TIMEOUT_MS);
+  });
+  const cancelPromise = new Promise<never>((_, reject) => {
+    userSignal?.addEventListener('abort', () => reject(new Error('cancelled')), { once: true });
+  });
+  const invokePromise = electronAPI.invoke('api:request', { method, path, body });
 
-    return Promise.race([invokePromise, timeoutPromise, cancelPromise]) as Promise<T>;
-  }
-
-  // ===== Web 版：保留原 fetch 逻辑 =====
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-
-  const timeoutController = new AbortController();
-  const timeoutId = setTimeout(() => timeoutController.abort(), API_TIMEOUT_MS);
-
-  const onUserAbort = () => timeoutController.abort();
-  if (userSignal) {
-    if (userSignal.aborted) { clearTimeout(timeoutId); throw new Error('cancelled'); }
-    userSignal.addEventListener('abort', onUserAbort, { once: true });
-  }
-
-  try {
-    const res = await fetch(`${API_BASE}${path}`, {
-      ...options,
-      signal: timeoutController.signal,
-      credentials: 'same-origin',
-      headers: {
-        ...headers,
-        ...(options?.headers || {}),
-      },
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`API ${method} ${path} failed (${res.status}): ${err.slice(0, 300)}`);
-    }
-    return res.json() as Promise<T>;
-  } catch (err: any) {
-    if (userSignal?.aborted) throw new Error('cancelled');
-    if (err?.name === 'AbortError') throw new Error(`AI_ERR:timeout (request timeout ${API_TIMEOUT_MS / 1000}s: ${path})`);
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
-    if (userSignal) userSignal.removeEventListener('abort', onUserAbort);
-  }
+  return Promise.race([invokePromise, timeoutPromise, cancelPromise]) as Promise<T>;
 }
 
 // --- Sales ---

@@ -111,10 +111,6 @@ export function normalizeToLegacy(raw: any, accountingLocale: string): Extracted
   return base as ExtractedInvoice;
 }
 
-function isElectron(): boolean {
-  return typeof window !== 'undefined' && !!(window as any).electronAPI?.isElectron;
-}
-
 export const analyzeInvoice = async (
   base64Data: string,
   mimeType: string,
@@ -123,26 +119,12 @@ export const analyzeInvoice = async (
 ): Promise<ExtractedInvoice> => {
   const body = { base64Data, mimeType, accountingLocale, uiLanguage };
 
-  let raw: any;
-  if (isElectron()) {
-    raw = await (window as any).electronAPI.invoke('api:request', {
-      method: 'POST',
-      path: '/api/ai/ocr',
-      body,
-    });
-  } else {
-    const response = await fetch('/api/ai/ocr', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(err.error || `OCR failed (${response.status})`);
-    }
-    raw = await response.json();
-  }
+  // 桌面版：OCR 走 Electron IPC（api:request → /api/ai/ocr），不经过 HTTP
+  const raw = await (window as any).electronAPI.invoke('api:request', {
+    method: 'POST',
+    path: '/api/ai/ocr',
+    body,
+  });
 
   return normalizeToLegacy(raw, accountingLocale || 'CN');
 };
