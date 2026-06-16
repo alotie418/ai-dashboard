@@ -25,6 +25,11 @@
 //       list 排序按 updated_at DESC〔直插 updated_at 保证确定性，不靠真实时间〕/ append 缺会话 throw +
 //       seq 顺序 + role 归一化〔非 model→user〕/ auto-title〔首条 user 派生·≤40·空白折叠·后续不覆盖·
 //       model-first 保持 null〕/ toolTrace array 往返〔无则不带 key〕/ rename〔空/纯空白→null〕/ delete + CASCADE 删消息）。
+// 覆盖（第六批 §2B mileage + homeOffice）：mileage（create 校验 date/miles>0 / one-way·round-trip deduction
+//       〔**generated column** miles·rate_per_mile·(1+round_trip)，用显式 rate=0.5 锁公式·不锁 0.67 默认〕/
+//       summary?year= 年份过滤 + trips·totalMiles·totalDeduction / update 重算 generated / delete）·homeOffice
+//       （get 默认结构 / simplified·cap·actual deduction〔显式 rate=4·max=250 锁算法·不锁 5/300 默认〕/ COALESCE
+//       partial 保留未传字段 / invalid method CHECK throw）。**只用显式非默认输入锁算法，绝不锁 IRS 政策默认常量。**
 //
 // better-sqlite3 原生绑定按 Electron ABI 编（本机/普通 node 加载会 ERR_DLOPEN）；
 // 加载不了时优雅 SKIP（exit 0）——CI 里 rebuild 成 node ABI 后真跑（同 test-migrations）。
@@ -724,9 +729,90 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   ok((await call('GET', '/api/conversations/never/messages', null)).length === 0, '[conv] messages on never-existed conv → [] (no throw)');
 }
 
+// ───────────────────────── §2B: mileage + homeOffice (US Schedule C, deduction estimates) ─────────────────────────
+// NOTE: lock arithmetic via EXPLICIT non-default inputs only. NEVER assert the IRS policy defaults
+// (mileage rate_per_mile 0.67; home-office rate_per_sqft 5 / max_sqft 300) — those are policy constants.
+
+// ── mileage: validation, generated `deduction` column, year filter, recompute, delete ──
+{
+  freshDb();
+  // validation: date required; miles must be a number > 0
+  await expectThrow(() => call('POST', '/api/mileage', { miles: 10 }), '[mile] missing date throws');
+  await expectThrow(() => call('POST', '/api/mileage', { date: '2023-01-01', miles: 0 }), '[mile] miles 0 throws');
+  await expectThrow(() => call('POST', '/api/mileage', { date: '2023-01-01', miles: -5 }), '[mile] miles -5 throws');
+  await expectThrow(() => call('POST', '/api/mileage', { date: '2023-01-01', miles: '10' }), '[mile] non-number miles throws');
+
+  // one-way: deduction = miles * rate_per_mile * (1 + round_trip) = 100 * 0.5 * 1 = 50 (generated column)
+  const c1 = await call('POST', '/api/mileage', { date: '2023-03-01', miles: 100, rate_per_mile: 0.5, round_trip: false });
+  ok(c1?.success && c1.id, `[mile] create → {success,id}, got ${JSON.stringify(c1)}`);
+  let m1 = (await call('GET', '/api/mileage', null)).find((r) => r.id === c1.id);
+  ok(m1 && m1.round_trip === 0, '[mile] one-way round_trip stored 0');
+  ok(approx(m1.deduction, 50), `[mile] one-way deduction = 100*0.5*(1+0) = 50, got ${m1.deduction}`);
+
+  // round-trip doubles via the (1 + round_trip) factor: 40 * 0.5 * 2 = 40
+  const c2 = await call('POST', '/api/mileage', { date: '2023-03-02', miles: 40, rate_per_mile: 0.5, round_trip: true });
+  const m2 = (await call('GET', '/api/mileage', null)).find((r) => r.id === c2.id);
+  ok(m2 && m2.round_trip === 1, '[mile] round-trip round_trip stored 1');
+  ok(approx(m2.deduction, 40), `[mile] round-trip deduction = 40*0.5*(1+1) = 40 (locks the (1+round_trip) factor), got ${m2.deduction}`);
+
+  // a 2022 trip must be EXCLUDED from summary?year=2023
+  await call('POST', '/api/mileage', { date: '2022-12-31', miles: 999, rate_per_mile: 0.5, round_trip: false });
+
+  const sum = await call('GET', '/api/mileage/summary?year=2023', null);
+  ok(sum.trips === 2, `[mile] summary?year=2023 trips = 2 (2022 excluded), got ${sum.trips}`);
+  ok(approx(sum.totalMiles, 140), `[mile] totalMiles = 100+40 = 140, got ${sum.totalMiles}`);
+  ok(approx(sum.totalDeduction, 90), `[mile] totalDeduction = 50+40 = 90, got ${sum.totalDeduction}`);
+
+  // update a base column → generated deduction recomputes: 200 * 0.5 * 1 = 100
+  await call('PUT', `/api/mileage/${c1.id}`, { miles: 200 });
+  const m1b = (await call('GET', '/api/mileage', null)).find((r) => r.id === c1.id);
+  ok(approx(m1b.deduction, 100), `[mile] update miles 200 → deduction recomputes = 200*0.5*1 = 100, got ${m1b.deduction}`);
+
+  // delete
+  await call('DELETE', `/api/mileage/${c2.id}`, null);
+  ok(!(await call('GET', '/api/mileage', null)).some((r) => r.id === c2.id), '[mile] delete removes row');
+}
+
+// ── homeOffice: singleton get/save, simplified/cap/actual deduction, COALESCE partial, method CHECK ──
+{
+  freshDb();
+  // default seeded singleton — structure only (deduction 0 because sqft 0; not a policy assertion)
+  const def = await call('GET', '/api/home-office', null);
+  ok(def.method === 'simplified' && approx(def.sqft, 0) && typeof def.deduction === 'number' && approx(def.deduction, 0),
+    '[ho] default get: simplified, sqft 0, deduction 0');
+
+  // simplified with EXPLICIT rate=4 (not the IRS 5) → deduction = min(100,300)*4 = 400
+  const r1 = await call('PUT', '/api/home-office', { method: 'simplified', sqft: 100, rate_per_sqft: 4, max_sqft: 300 });
+  ok(approx(r1.deduction, 400), `[ho] simplified deduction = min(100,300)*4 = 400 (reads stored rate, not 5), got ${r1.deduction}`);
+  const g1 = await call('GET', '/api/home-office', null);
+  ok(g1.method === 'simplified' && approx(g1.sqft, 100) && approx(g1.rate_per_sqft, 4) && approx(g1.max_sqft, 300), '[ho] save persists fields');
+  ok(approx(g1.deduction, 400), '[ho] get recomputes deduction 400');
+
+  // cap with EXPLICIT max=250 (not the IRS 300): min(400,250)*4 = 1000
+  const r2 = await call('PUT', '/api/home-office', { sqft: 400, rate_per_sqft: 4, max_sqft: 250 });
+  ok(approx(r2.deduction, 1000), `[ho] cap: min(400,250)*4 = 1000 (reads stored cap), got ${r2.deduction}`);
+
+  // actual: round((rent+utilities+insurance+depreciation) * sqft/total_home_sqft) = round(13000*0.2) = 2600
+  const r3 = await call('PUT', '/api/home-office', {
+    method: 'actual', sqft: 200, total_home_sqft: 1000,
+    annual_rent: 10000, annual_utilities: 2000, annual_insurance: 500, annual_depreciation: 500,
+  });
+  ok(approx(r3.deduction, 2600), `[ho] actual deduction = round(13000 * 200/1000) = 2600, got ${r3.deduction}`);
+
+  // COALESCE partial: save only sqft → other fields retained
+  await call('PUT', '/api/home-office', { sqft: 300 });
+  const g4 = await call('GET', '/api/home-office', null);
+  ok(g4.method === 'actual' && approx(g4.rate_per_sqft, 4) && approx(g4.max_sqft, 250) && approx(g4.total_home_sqft, 1000),
+    '[ho] partial save retains untouched fields (COALESCE)');
+  ok(approx(g4.sqft, 300), '[ho] partial save updated sqft');
+
+  // invalid method violates CHECK(method IN ('simplified','actual')) → throws
+  await expectThrow(() => call('PUT', '/api/home-office', { method: 'bogus' }), '[ho] invalid method → CHECK constraint throws');
+}
+
 if (failures.length) {
   console.error(`✗ handlers: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice) via real dispatch on :memory: DB');
