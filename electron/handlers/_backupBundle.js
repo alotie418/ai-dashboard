@@ -42,7 +42,8 @@ function writeExportBundle({ dbPath, userDataDir, destDir } = {}) {
     return { ok: true, path: destDir, attachments };
   } catch (e) {
     try { fs.rmSync(destDir, { recursive: true, force: true }); } catch { /* ignore */ }
-    return { ok: false, error: e?.message || String(e) };
+    // 透传原始 e.code（如 SQLITE_FULL / ENOSPC / EROFS），供调用方 diskErrorCode 分类（§2A PR-1）。
+    return { ok: false, error: e?.message || String(e), code: e?.code };
   }
 }
 

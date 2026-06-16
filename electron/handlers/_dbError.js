@@ -42,4 +42,18 @@ function classifyFsDbError(err) {
   return null;
 }
 
-module.exports = { classifyFsDbError };
+// 类别 → 稳定错误码（前端按此码映射可操作 i18n：systemError.*）。
+const KIND_TO_CODE = { diskFull: 'DISK_FULL', diskIo: 'DISK_IO', readonly: 'READONLY' };
+
+/**
+ * 把 SQLite / fs 写失败归一化为稳定错误码（供 handler 在 catch 中贴码，§2A PR-1）。
+ * 命中→'DISK_FULL'|'DISK_IO'|'READONLY'；未命中→null（调用方回退到原有错误码，行为不变）。
+ * @param {*} err
+ * @returns {'DISK_FULL'|'DISK_IO'|'READONLY'|null}
+ */
+function diskErrorCode(err) {
+  const kind = classifyFsDbError(err);
+  return kind ? KIND_TO_CODE[kind] : null;
+}
+
+module.exports = { classifyFsDbError, diskErrorCode };

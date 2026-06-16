@@ -5,6 +5,9 @@
 
 const { dispatch } = require('./router');
 const aiCore = require('../ai');
+// §2A PR-1：把 SQLite/fs 写失败（磁盘满/IO/只读）归一化为稳定码，供备份·附件 catch 贴码。
+// 仅用于 app:* 备份/附件路径；不触碰 api:request CRUD 保存路径（那是 PR-2 范围）。
+const { diskErrorCode } = require('./_dbError');
 
 function registerHandlers({ ipcMain, dialog }) {
   // ====== 业务统一路由 ======
@@ -78,7 +81,7 @@ function registerHandlers({ ipcMain, dialog }) {
     });
     if (result.canceled || !result.filePath) return { ok: false };
     const res = writeExportBundle({ dbPath, userDataDir: app.getPath('userData'), destDir: result.filePath });
-    if (!res.ok) return { ok: false, error: 'EXPORT_FAILED' };
+    if (!res.ok) return { ok: false, error: diskErrorCode(res) || 'EXPORT_FAILED' };
     return { ok: true, path: res.path, attachments: res.attachments };
   });
 
@@ -151,11 +154,11 @@ function registerHandlers({ ipcMain, dialog }) {
       autoBackupPath = path.join(backupsDir, `sololedger-autobackup-before-restore-${stamp}.db`);
       fs.copyFileSync(dbPath, autoBackupPath);
     } catch (e) {
-      return { ok: false, error: 'AUTOBACKUP_FAILED' };
+      return { ok: false, error: diskErrorCode(e) || 'AUTOBACKUP_FAILED' };
     }
 
     // 7. 关闭当前连接（checkpoint + close + null）
-    try { closeDb(); } catch (e) { return { ok: false, error: 'CLOSE_FAILED', autoBackupPath }; }
+    try { closeDb(); } catch (e) { return { ok: false, error: diskErrorCode(e) || 'CLOSE_FAILED', autoBackupPath }; }
 
     // 8. 原子替换：先拷到同目录临时文件，再 rename 覆盖主库（同盘 rename 原子，防半成品）
     // 9. 删除旧的 -wal / -shm（属于旧库；留下会让 SQLite 用过期 WAL 覆盖新库 → 损坏）
@@ -166,7 +169,7 @@ function registerHandlers({ ipcMain, dialog }) {
       fs.rmSync(dbPath + '-wal', { force: true });
       fs.rmSync(dbPath + '-shm', { force: true });
     } catch (e) {
-      return { ok: false, error: 'REPLACE_FAILED', autoBackupPath };
+      return { ok: false, error: diskErrorCode(e) || 'REPLACE_FAILED', autoBackupPath };
     }
 
     // 10. 合并 bundle 附件进 userData/attachments/docs（只增不删；best-effort）。
@@ -296,7 +299,7 @@ function registerHandlers({ ipcMain, dialog }) {
       fs.copyFileSync(srcPath, path.join(root, name));
       return { ok: true, relPath: `attachments/docs/${name}`, fileName: path.basename(srcPath) };
     } catch (e) {
-      return { ok: false, error: 'COPY_FAILED' };
+      return { ok: false, error: diskErrorCode(e) || 'COPY_FAILED' };
     }
   });
 
@@ -334,7 +337,7 @@ function registerHandlers({ ipcMain, dialog }) {
       safeDeleteAttachment(rel);
       return { ok: true };
     } catch (e) {
-      return { ok: false, error: 'DISCARD_FAILED' };
+      return { ok: false, error: diskErrorCode(e) || 'DISCARD_FAILED' };
     }
   });
 

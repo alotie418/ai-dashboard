@@ -37,6 +37,12 @@ const DataBackupSection: React.FC = () => {
         return t('settings.dataBackup.newerVersion');
       case 'AUTOBACKUP_FAILED':
         return t('settings.dataBackup.autoBackupFailed');
+      case 'DISK_FULL':
+        return t('systemError.diskFull');
+      case 'DISK_IO':
+        return t('systemError.diskIo');
+      case 'READONLY':
+        return t('systemError.readonly');
       default:
         return t('settings.dataBackup.error');
     }
