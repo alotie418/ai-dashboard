@@ -10,6 +10,11 @@
 //       · products（unit 白名单 / default_unit_cost 负数·NaN→0 / is_service·is_active flags）
 //       · inventory summary（qtyOnHand=in−out / 仅在库 / 默认成本 vs 加权平均 / 含税排除（tax-exclusive）/
 //       service·inactive 排除 / 不同单位不合并）。
+// 覆盖（第三批 §2B Batch 3）：alerts（list 仅未 dismiss / created_at DESC / unread_only / count /
+//       mark-read·read-all·dismiss / limit / 非数字 id throw；无 create route→直插 DB seed）
+//       · receivables/payables summary（totalReceivable·totalPayable / details 仅 unpaid>0 /
+//       collectionRate·paymentRate（无单据=100）/ topCustomers·topSuppliers 排名 / 相对日期 aging
+//       buckets（mid-bucket offset，绝不写固定过期日）/ 已付且有 due_date 不 inflate 应收·应付）。
 //
 // better-sqlite3 原生绑定按 Electron ABI 编（本机/普通 node 加载会 ERR_DLOPEN）；
 // 加载不了时优雅 SKIP（exit 0）——CI 里 rebuild 成 node ABI 后真跑（同 test-migrations）。
@@ -348,9 +353,137 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(d1.unit !== d2.unit, '[inv] different-unit products stay separate rows (kg vs ton, never summed)');
 }
 
+// §2B Batch 3 — relative-date helper so aging tests never go stale. Use mid-bucket offsets
+// (15/45/75/120), NEVER boundary values (30/60/90): the handler's daysDiff is a floor, so a
+// boundary row could flip buckets on a sub-day/UTC edge. Both test and handler derive dates
+// via toISOString() UTC, so daysDiff is exact integer days and mid-bucket offsets absorb edges.
+const dayMs = 86400000;
+const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().split('T')[0];
+
+// ───────────────────────── alerts (no create route → seed directly) ─────────────────────────
+{
+  const db = freshDb();
+  // alerts has no POST/create handler → arrange via direct insert. Explicit DISTINCT created_at
+  // makes ORDER BY created_at DESC deterministic (avoids same-second ties from datetime('now')).
+  // created_at may be fixed strings here: it drives ordering only, never aging.
+  const seed = (title, isRead, isDismissed, createdAt) =>
+    Number(db.prepare(
+      'INSERT INTO alerts (type, severity, title, body, is_read, is_dismissed, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run('test', 'info', title, 'body', isRead, isDismissed, createdAt).lastInsertRowid);
+  const A1 = seed('A1-newest-unread', 0, 0, '2024-01-01 00:00:03');
+  const A2 = seed('A2-mid-unread',    0, 0, '2024-01-01 00:00:02');
+  const A3 = seed('A3-oldest-read',   1, 0, '2024-01-01 00:00:01');
+
+  // list: only non-dismissed, newest-first
+  const list = await call('GET', '/api/alerts', null);
+  ok(list.length === 3, `[alert] list → 3 non-dismissed, got ${list.length}`);
+  ok(list[0].id === A1 && list[1].id === A2 && list[2].id === A3, '[alert] list ordered created_at DESC');
+
+  // unread_only → is_read=0 AND not dismissed (A3 is read → excluded)
+  const unread = await call('GET', '/api/alerts?unread_only=true', null);
+  ok(unread.length === 2 && !unread.some((a) => a.id === A3), '[alert] unread_only excludes read A3');
+
+  // count = unread AND undismissed
+  ok((await call('GET', '/api/alerts/count', null)).count === 2, '[alert] count = 2 unread+undismissed');
+
+  // limit caps rows
+  ok((await call('GET', '/api/alerts?limit=1', null)).length === 1, '[alert] limit=1 → 1 row');
+
+  // non-numeric id → throw (parseInt → NaN)
+  await expectThrow(() => call('PUT', '/api/alerts/abc/read', null), '[alert] read non-numeric id throws');
+  await expectThrow(() => call('DELETE', '/api/alerts/xyz', null), '[alert] dismiss non-numeric id throws');
+
+  // mark one read → count drops
+  await call('PUT', `/api/alerts/${A1}/read`, null);
+  ok((await call('GET', '/api/alerts/count', null)).count === 1, '[alert] after read A1 → count 1');
+
+  // read-all → count 0
+  await call('PUT', '/api/alerts/read-all', null);
+  ok((await call('GET', '/api/alerts/count', null)).count === 0, '[alert] read-all → count 0');
+
+  // dismiss → drops from list
+  await call('DELETE', `/api/alerts/${A2}`, null);
+  const afterDismiss = await call('GET', '/api/alerts', null);
+  ok(afterDismiss.length === 2 && !afterDismiss.some((a) => a.id === A2), '[alert] dismissed A2 removed from list');
+}
+
+// ───────────── receivables summary (aging via relative dates; sales round-trip) ─────────────
+{
+  const db = freshDb();
+  // base records via real round-trip: create (defaults payment_status='unpaid', paid_amount=0) + payment route.
+  // `date` is not aging-relevant; only due_date (set below) is. isoDay used just for a valid date.
+  await call('POST', '/api/sales', { id: 's1', date: isoDay(30), customer: 'Cust-A', tons: 1, totalAmount: 1000 });
+  await call('POST', '/api/sales', { id: 's2', date: isoDay(30), customer: 'Cust-B', tons: 1, totalAmount: 2000 });
+  await call('POST', '/api/sales', { id: 's3', date: isoDay(30), customer: 'Cust-C', tons: 1, totalAmount: 800 });
+  ok((await call('PUT', '/api/sales/s2/payment', { paid_amount: 500 })).payment_status === 'partial', '[recv] s2 → partial');
+  ok((await call('PUT', '/api/sales/s3/payment', { paid_amount: 800 })).payment_status === 'paid', '[recv] s3 → paid');
+
+  const r1 = await call('GET', '/api/receivables/summary', null);
+  ok(approx(r1.totalReceivable, 2500), `[recv] totalReceivable = 1000 + 1500 = 2500, got ${r1.totalReceivable}`);
+  ok(r1.details.length === 2 && !r1.details.some((d) => d.id === 's3'), '[recv] details = unpaid>0 only (s3 paid excluded)');
+  // collectionRate = totalPaid/totalSales × 100 = 1300/3800 ≈ 34.21 (handler rounds to 2dp)
+  ok(approx(r1.collectionRate, 34.21), `[recv] collectionRate = 1300/3800 ≈ 34.21, got ${r1.collectionRate}`);
+  // topCustomers ranked by unpaid desc: Cust-B (1500) > Cust-A (1000); Cust-C (0) absent
+  ok(r1.topCustomers[0].name === 'Cust-B' && approx(r1.topCustomers[0].amount, 1500), '[recv] topCustomers[0] = Cust-B 1500');
+  ok(r1.topCustomers[1].name === 'Cust-A' && r1.topCustomers.length === 2, '[recv] topCustomers[1] = Cust-A, length 2');
+
+  // aging: set due_dates via direct UPDATE (no handler sets due_date). Relative, mid-bucket.
+  db.prepare('UPDATE sales SET due_date = ? WHERE id = ?').run(isoDay(45), 's1');   // overdue → 31-60
+  db.prepare('UPDATE sales SET due_date = ? WHERE id = ?').run(isoDay(-10), 's2');  // future → not overdue
+  db.prepare('UPDATE sales SET due_date = ? WHERE id = ?').run(isoDay(20), 's3');   // paid + due_date → must NOT inflate
+
+  const r2 = await call('GET', '/api/receivables/summary', null);
+  ok(approx(r2.totalReceivable, 2500), `[recv] paid s3 w/ due_date does NOT inflate totalReceivable, got ${r2.totalReceivable}`);
+  ok(approx(r2.totalOverdue, 1000), `[recv] totalOverdue = s1 only (s2 future) = 1000, got ${r2.totalOverdue}`);
+  ok(approx(r2.agingBuckets['31-60'], 1000), `[recv] s1 (45d overdue) lands in 31-60, got ${r2.agingBuckets['31-60']}`);
+  ok(approx(r2.agingBuckets['0-30'], 0) && approx(r2.agingBuckets['61-90'], 0) && approx(r2.agingBuckets['90+'], 0),
+    '[recv] no other aging buckets populated');
+
+  // collectionRate = 100 when there are no sales at all
+  freshDb();
+  const empty = await call('GET', '/api/receivables/summary', null);
+  ok(empty.collectionRate === 100 && approx(empty.totalReceivable, 0) && empty.details.length === 0,
+    '[recv] no sales → collectionRate 100, receivable 0, no details');
+}
+
+// ───────────── payables summary (symmetric to receivables; 61-90 bucket for variety) ─────────────
+{
+  const db = freshDb();
+  await call('POST', '/api/purchases', { id: 'p1', date: isoDay(30), supplier: 'Supp-A', tons: 1, totalAmount: 1000 });
+  await call('POST', '/api/purchases', { id: 'p2', date: isoDay(30), supplier: 'Supp-B', tons: 1, totalAmount: 2000 });
+  await call('POST', '/api/purchases', { id: 'p3', date: isoDay(30), supplier: 'Supp-C', tons: 1, totalAmount: 800 });
+  ok((await call('PUT', '/api/purchases/p2/payment', { paid_amount: 500 })).payment_status === 'partial', '[pay] p2 → partial');
+  ok((await call('PUT', '/api/purchases/p3/payment', { paid_amount: 800 })).payment_status === 'paid', '[pay] p3 → paid');
+
+  const q1 = await call('GET', '/api/payables/summary', null);
+  ok(approx(q1.totalPayable, 2500), `[pay] totalPayable = 1000 + 1500 = 2500, got ${q1.totalPayable}`);
+  ok(q1.details.length === 2 && !q1.details.some((d) => d.id === 'p3'), '[pay] details = unpaid>0 only (p3 paid excluded)');
+  ok(approx(q1.paymentRate, 34.21), `[pay] paymentRate = 1300/3800 ≈ 34.21, got ${q1.paymentRate}`);
+  ok(q1.topSuppliers[0].name === 'Supp-B' && approx(q1.topSuppliers[0].amount, 1500), '[pay] topSuppliers[0] = Supp-B 1500');
+  ok(q1.topSuppliers[1].name === 'Supp-A' && q1.topSuppliers.length === 2, '[pay] topSuppliers[1] = Supp-A, length 2');
+
+  // aging — 61-90 bucket here (mid-bucket offset 75) for variety vs receivables' 31-60
+  db.prepare('UPDATE purchases SET due_date = ? WHERE id = ?').run(isoDay(75), 'p1');  // overdue → 61-90
+  db.prepare('UPDATE purchases SET due_date = ? WHERE id = ?').run(isoDay(-5), 'p2');  // future
+  db.prepare('UPDATE purchases SET due_date = ? WHERE id = ?').run(isoDay(20), 'p3');  // paid + due_date
+
+  const q2 = await call('GET', '/api/payables/summary', null);
+  ok(approx(q2.totalPayable, 2500), `[pay] paid p3 w/ due_date does NOT inflate totalPayable, got ${q2.totalPayable}`);
+  ok(approx(q2.totalOverdue, 1000), `[pay] totalOverdue = p1 only = 1000, got ${q2.totalOverdue}`);
+  ok(approx(q2.agingBuckets['61-90'], 1000), `[pay] p1 (75d overdue) lands in 61-90, got ${q2.agingBuckets['61-90']}`);
+  ok(approx(q2.agingBuckets['0-30'], 0) && approx(q2.agingBuckets['31-60'], 0) && approx(q2.agingBuckets['90+'], 0),
+    '[pay] no other aging buckets populated');
+
+  // paymentRate = 100 when no purchases
+  freshDb();
+  const empty = await call('GET', '/api/payables/summary', null);
+  ok(empty.paymentRate === 100 && approx(empty.totalPayable, 0) && empty.details.length === 0,
+    '[pay] no purchases → paymentRate 100, payable 0, no details');
+}
+
 if (failures.length) {
   console.error(`✗ handlers: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging) via real dispatch on :memory: DB');
