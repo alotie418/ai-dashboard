@@ -349,7 +349,7 @@
     "fileFormatUnsupported": "檔案格式不支援",
     "fileReadFailed": "檔案讀取失敗",
     "notInvoice": "目前檔案看起來不像發票或收據（偵測為：{{type}}）。請確認檔案是否正確。",
-    "invoiceExtractResult": "發票辨識成功！\n\n日期: {{date}}\n客戶/供應商: {{partner}}\n數量: {{quantity}}\n金額: {{amount}}\n運費: {{shipping}}\n發票號: {{invoiceNo}}\n\n以上資訊已從發票中擷取。如需記帳，請前往「採購與進項」或「銷售與銷項」頁面錄入。",
+    "invoiceExtractResult": "發票辨識成功！\n\n日期: {{date}}\n客戶/供應商: {{partner}}\n數量: {{quantity}}\n金額: {{amount}}\n運費: {{shipping}}\n發票號: {{invoiceNo}}\n\n以上資訊已從發票中擷取。如需記帳，請前往「採購」或「銷售」頁面錄入。",
     "invoiceRecognizeFailed": "發票辨識失敗，請確保上傳清晰的發票圖片後重試。",
     "quickPromptUploadInvoice": "我想上傳一張發票進行記帳",
     "quickPromptFinanceQuery": "幫我查詢最新的財務報表摘要",
