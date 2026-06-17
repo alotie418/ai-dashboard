@@ -16,6 +16,7 @@
     "success": "Success",
     "error": "Error",
     "retry": "Retry",
+    "operationFailed": "Operation failed. Please try again later.",
     "back": "Back",
     "next": "Next",
     "skip": "Skip",

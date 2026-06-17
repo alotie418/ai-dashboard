@@ -49,7 +49,8 @@ const TransactionsPage: React.FC = () => {
       setCategories(cats);
       setSummary(sum);
     } catch (e: any) {
-      setError(e?.message || 'Failed to load');
+      console.error(e);
+      setError(t('common.operationFailed'));
     } finally {
       setLoading(false);
     }
@@ -109,7 +110,8 @@ const TransactionsPage: React.FC = () => {
       setForm({});
       await reload();
     } catch (e: any) {
-      setError(getSystemErrorText(e, t) || e?.message || 'Save failed');
+      console.error(e);
+      setError(getSystemErrorText(e, t) || t('common.operationFailed'));
     } finally {
       setSaving(false);
     }
@@ -121,7 +123,8 @@ const TransactionsPage: React.FC = () => {
       setConfirmDelete(null);
       await reload();
     } catch (e: any) {
-      setError(getSystemErrorText(e, t) || e?.message || 'Delete failed');
+      console.error(e);
+      setError(getSystemErrorText(e, t) || t('common.operationFailed'));
     }
   };
 

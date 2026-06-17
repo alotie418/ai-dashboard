@@ -31,7 +31,8 @@ const ProductsSection: React.FC = () => {
     try {
       setItems(await listProducts());
     } catch (e: any) {
-      setError(e?.message || 'Load failed');
+      console.error(e);
+      setError(t('common.operationFailed'));
     } finally {
       setLoading(false);
     }
@@ -46,7 +47,8 @@ const ProductsSection: React.FC = () => {
       setNewName(''); setNewUnit('piece'); setNewCost(0); setNewIsService(false);
       reload();
     } catch (e: any) {
-      setError(getSystemErrorText(e, t) || e?.message || 'Create failed');
+      console.error(e);
+      setError(getSystemErrorText(e, t) || t('common.operationFailed'));
     } finally {
       setSaving(false);
     }
@@ -54,12 +56,12 @@ const ProductsSection: React.FC = () => {
 
   const handleToggleActive = async (p: Product) => {
     try { await updateProduct(p.id, { is_active: !p.is_active }); reload(); }
-    catch (e: any) { setError(getSystemErrorText(e, t) || e?.message || 'Update failed'); }
+    catch (e: any) { console.error(e); setError(getSystemErrorText(e, t) || t('common.operationFailed')); }
   };
 
   const handleDelete = async (id: string) => {
     try { await deleteProduct(id); setConfirmDelete(null); reload(); }
-    catch (e: any) { setError(getSystemErrorText(e, t) || e?.message || 'Delete failed'); setConfirmDelete(null); }
+    catch (e: any) { console.error(e); setError(getSystemErrorText(e, t) || t('common.operationFailed')); setConfirmDelete(null); }
   };
 
   return (

@@ -16,6 +16,7 @@
     "success": "성공",
     "error": "실패",
     "retry": "재시도",
+    "operationFailed": "작업에 실패했습니다. 잠시 후 다시 시도하세요.",
     "back": "이전",
     "next": "다음",
     "skip": "건너뛰기",

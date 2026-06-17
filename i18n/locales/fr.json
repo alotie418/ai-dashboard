@@ -16,6 +16,7 @@
     "success": "Succès",
     "error": "Échec",
     "retry": "Réessayer",
+    "operationFailed": "L'opération a échoué. Veuillez réessayer plus tard.",
     "back": "Précédent",
     "next": "Suivant",
     "skip": "Ignorer",

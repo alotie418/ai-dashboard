@@ -1261,6 +1261,26 @@ test.describe('§2A disk-full surfaced in CRUD pages (PR-2b)', () => {
   });
 });
 
+// Generic CRUD error hygiene: a NON-disk error (e.g. SQLITE_CONSTRAINT) must NOT leak the raw
+// AI_ERR:<code> technical string to the user — it falls back to the localized common.operationFailed.
+test('CRUD non-disk error → common.operationFailed, no AI_ERR leak', async ({ page }) => {
+  const ui = 'zh-CN';
+  const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+  await bootComboIPC(page, ui, 'CN', {
+    apiResponses: [{ match: '/api/products', method: 'POST', reject: 'AI_ERR:SQLITE_CONSTRAINT (UNIQUE constraint failed)' }],
+  });
+  // Settings → Products/Services sub-tab (stable icons: fa-cog → fa-box)
+  await page.locator('i.fa-cog').first().click();
+  await page.locator('button:has(i.fa-box)').click();
+  await page.getByRole('button', { name: loc.products.addButton }).click();
+  await page.getByPlaceholder(loc.products.namePlaceholder).fill('Dup');
+  await page.getByRole('button', { name: loc.common.save, exact: true }).click();
+  // non-disk → getSystemErrorText returns null → generic localized message, never the raw AI_ERR string
+  await expect(page.getByText(loc.common.operationFailed)).toBeVisible({ timeout: 10_000 });
+  const body = await page.locator('body').innerText();
+  expect(body, 'raw AI_ERR technical string must not leak to the user').not.toContain('AI_ERR');
+});
+
 // §2A: CSV export disk-full → backend exportTableCsv returns DISK_FULL, DataBackupSection
 // errText maps it to the actionable systemError.diskFull (not the generic export error).
 test('§2A: CSV export disk-full → systemError.diskFull', async ({ page }) => {
