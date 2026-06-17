@@ -251,7 +251,7 @@ const TransactionsPage: React.FC = () => {
                   <td className="px-4 py-2.5 text-right font-mono font-medium whitespace-nowrap">{fmt(txn.amount)}</td>
                   <td className="px-4 py-2.5 text-center whitespace-nowrap">
                     <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${txn.payment_status === 'paid' ? 'bg-emerald-50 text-emerald-600' : txn.payment_status === 'partial' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
-                      {txn.payment_status}
+                      {txn.payment_status === 'paid' ? t('transactions.paid') : txn.payment_status === 'partial' ? t('transactions.partial') : t('transactions.unpaid')}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-right space-x-2 whitespace-nowrap">
