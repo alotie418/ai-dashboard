@@ -1,66 +1,305 @@
 # CLAUDE.md
 
-本文件固定项目定位与 Claude Code 在本仓库的工作边界。每个新会话开始前请先读完本文件，并在整个会话中遵守这里的约束。
+## Project direction
 
----
+This project is a local-first Electron desktop application for accounting, bookkeeping, invoicing, inventory, and business operations management.
 
-## 1. 项目定位
+The target users are small businesses, solo operators, cross-border sellers, and lightweight business owners who need a local desktop tool to manage:
 
-- **本地 Electron 会计 / 经营管理桌面应用**：数据全部存放在用户本机，无云端后端依赖。
-- 面向**小微企业、个体经营者、跨境卖家**。
-- 核心能力：**本地记账、采购、销售、库存、发票、经营看板、辅助报表**。
-- 多会计制度（accountingLocale：CN / US / JP / EU / KR / TW）× 多 UI 语言（zh-CN / zh-TW / en / ja / ko / fr）双轴解耦：会计口径只决定「用什么财务逻辑」，UI 语言只决定「用什么语言显示」，二者互不推导。
-- AI 助手为 BYOK（自带 Key）多 provider，仅做**只读查账 / 票据 OCR / 经营分析辅助**，不替代会计判断。
+* Sales and purchases
+* Products, inventory, and cost tracking
+* Customers and suppliers
+* Invoices, quotations, and business documents
+* Receivables and payables
+* Payment status tracking
+* Local SQLite data storage
+* Local backup and restore
+* CSV import/export
+* Business dashboards
+* Financial summaries and management reports
+* Multi-language UI
+* Optional future e-commerce platform data import/sync
 
-## 2. 产品边界（这不是什么）
+The product should be positioned as a business bookkeeping and financial analysis assistant, not as an official tax filing, audit, or statutory accounting compliance system.
 
-- **不是官方报税系统。**
-- **不是审计级财务系统。**
-- 报表为**经营管理口径的估算**，不是法定财务报表；**复杂会计 / 税务口径必须由用户或会计师人工确认**。
-- AI 的回答、看板指标、辅助报表都用于经营管理参考，不构成报税、申报或合规依据。
+## Product boundary
 
-## 3. 架构概要
+This app is not intended to replace a licensed accountant, tax advisor, auditor, or statutory compliance system.
 
-- **本地优先**：Electron 主进程 + `better-sqlite3`（SQLite），凭据用系统 safeStorage，附件 / 备份均在本机。
-- **前端**：React + Vite + Tailwind（`App.tsx` / `components/*` / `services/*` / `i18n/*`）。
-- **后端**：`electron/handlers/*`，前端经 IPC（`api:request`）调用，**桌面唯一入口，无 Web fetch 兜底**。
-- **报表引擎**：`electron/reports/*`；会计制度配置：`components/accountingProfiles.ts` / `accountingLocaleConfig.ts`。
-- 旧 Web / 云端栈（Cloud Run / Cloudflare Worker / D1）已退役，历史代码归档在 `archive/web-legacy`（保留，勿删）。
+Do not present estimated reports, simplified tax calculations, or incomplete accounting modules as official tax filings, audit-ready statements, or legally compliant reports.
 
-## 4. 电商集成方向（后期）
+Complex accounting and tax outputs should be treated as:
 
-- 后期可接入电商平台 API，但定位是**订单、费用、库存、结算等数据的导入 / 同步助手**。
-- **不是自动税务合规引擎**：平台数据进来后仍按本地经营管理口径处理，税务 / 合规结论需人工确认。
+* Business reference
+* Management analysis
+* Estimated summary
+* User-configurable helper output
+* Subject to professional review when used for tax, audit, or legal reporting
 
-## 5. 高风险禁区（点名才动）
+When a feature is not fully implemented, the UI should say so clearly. Do not show placeholder values as if they are official financial metrics.
 
-以下涉及金额正确性与会计口径，**未经用户明确要求，任何任务都不得修改**；尤其禁止在文案 / 展示 / i18n PR 内顺手改动：
+Examples:
 
-- 报表公式、税率、COGS（销售成本）口径
-- inventory 成本计算（加权平均等）
-- `accountingProfiles` / 会计制度配置
-- `electron/reports/*` 报表引擎
-- schema / migrations
+* If the balance sheet is not implemented, do not show formal debt ratio or current ratio cards.
+* If cash flow is not implemented, do not show fake or hardcoded cash flow metrics.
+* If a value is an estimate, label it as an estimate.
+* If a calculation depends on accounting policy, do not silently choose a policy without documentation.
 
-这些改动需要会计师或用户明确确认；展示层 / 空状态 / 文案问题与会计口径问题必须严格区分。
+## Accounting calculation principles
 
-## 6. 工作方式与 PR 流程
+Claude may safely help with:
 
-- **每个任务先只读分析**：先定位、确认范围，再动手。
-- **小 PR 推进**：一任务一分支一 PR，只包含相关文件。
-- **默认不 commit**；除非用户明确要求，先给改动 + 最小验证。
-- **未经明确要求不要 merge**：合并由用户执行；合并后再做本地收尾（`git fetch --prune` → 快进 main → 删本地分支，`archive/web-legacy` 不删）。
-- **git 远端操作仅在授权后执行，且不输出任何凭证 / Key。**
-- 用户要求「审计 / 只读」时：只读不改代码、不 commit、出报告即停。
+* Fixing obvious UI display bugs
+* Fixing localization issues
+* Fixing raw enum display such as UNPAID, PAID, PARTIAL
+* Fixing empty-state display such as showing N/A instead of misleading 100%
+* Fixing misleading labels
+* Fixing error messages
+* Fixing missing fields in handlers when the schema already supports them
+* Adding tests for existing behavior
+* Improving validation and guard scripts
+* Improving code clarity without changing accounting meaning
 
-## 7. 验证命令
+Claude must not casually change core accounting formulas.
 
-提交前按需运行（涉及哪类改动就跑哪些）：
+Do not modify the following without explicit user approval and a prior read-only analysis:
 
-- `npm run typecheck` — TypeScript 类型检查（`.ts` / `.tsx`）。
-- `npm run check:all` — 守卫聚合（locale 矩阵、原始 key 泄漏、provider、报表标题、税率硬编码、磁盘错误等多项）。
-- `npm run build` — Vite 生产构建。
-- `npm run test:locale-ui` — `build` + Playwright e2e（注入 mock electronAPI 走 IPC）。
-- `npm run check:handlers` — handler 往返测试。本机 `better-sqlite3` 为 Electron ABI 时会 **SKIP**（CI 会 rebuild 为 node ABI 真跑）；本机要真验证需 `npm rebuild better-sqlite3` → 跑 → `npm run electron:rebuild` 还原。
+* electron/reports/*
+* accounting profiles
+* tax rate defaults
+* income tax formulas
+* VAT/GST/sales tax formulas
+* COGS logic
+* _expenseSplit
+* inventory cost formulas
+* weighted average cost logic
+* shipping cost treatment
+* asset/liability calculations
+* cash flow formulas
+* balance sheet formulas
+* statutory report mappings
+* schema or migrations related to accounting meaning
 
-CI 仅跑 checks / e2e / typecheck；真 Electron e2e 为手动触发（`workflow_dispatch`）。
+If an issue involves accounting judgment, tax law, national accounting standards, or industry-specific cost treatment, do not guess. Mark it as requiring user/accountant confirmation.
+
+The preferred rule is:
+
+AI may implement confirmed formulas, but AI must not invent accounting policy.
+
+## Multi-country accounting scope
+
+The app may support multiple UI languages and multiple accounting profiles, but this does not mean it is automatically compliant with every country or region.
+
+Supported accounting profiles should be treated as configurable business-analysis profiles unless professionally reviewed.
+
+Do not claim or imply that the app automatically satisfies official reporting requirements for:
+
+* China
+* United States
+* Japan
+* European Union
+* South Korea
+* Taiwan
+* Any other country or region
+
+When adding or changing country-specific accounting behavior, first do read-only analysis and identify whether the change is:
+
+1. A clear software bug
+2. A UI/display issue
+3. A configurable business assumption
+4. A tax/accounting policy decision requiring professional review
+
+Only category 1 and category 2 should be fixed directly.
+
+## E-commerce platform integration direction
+
+Future versions may support optional marketplace and e-commerce platform integrations.
+
+Possible platforms include:
+
+* Amazon
+* Temu
+* eBay
+* Shopee
+* Shopify
+* TikTok Shop
+* Taobao / Tmall
+* JD
+* Pinduoduo
+* 1688
+* Other marketplaces
+
+These integrations should be designed as data import and synchronization helpers, not as automatic tax compliance engines.
+
+Allowed future integration scope:
+
+* Orders
+* Order items
+* Refunds
+* Returns
+* Platform fees
+* Advertising fees
+* Shipping fees
+* Payouts
+* Settlement reports
+* Products and SKUs
+* Inventory movement
+* Platform invoices
+* Customer/buyer records where legally and technically available
+
+Preferred architecture:
+
+* Each platform connector converts platform-specific data into internal normalized records.
+* The accounting app should consume internal normalized records, not platform-specific raw structures everywhere.
+* Platform integrations should be optional.
+* Credentials and API keys must be stored securely.
+* No platform integration should bypass local-first data ownership principles.
+
+Do not market marketplace integrations as automatic VAT/GST/sales-tax filing or official compliance unless reviewed by qualified professionals.
+
+## Architecture boundary
+
+This is a local Electron application.
+
+The current target architecture is:
+
+* Electron desktop app
+* Local SQLite database
+* Local filesystem attachments
+* Electron IPC
+* Local api:request routing
+* No required cloud backend for core app usage
+
+Do not restore retired web/cloud architecture unless explicitly requested.
+
+Do not reintroduce:
+
+* Web fallback
+* Cloudflare Worker API
+* Cloudflare D1
+* Cloudflare KV
+* Cloudflare Pages dependency
+* Google Cloud Run dependency
+* Remote auth gate
+* LoginPage requirement for local usage
+* Required hosted backend for local accounting features
+
+The app should remain usable as a local desktop app.
+
+## PR workflow
+
+Use small, focused PRs.
+
+Each PR should solve one clearly defined problem.
+
+Do not mix unrelated changes such as:
+
+* UI wording and accounting formulas
+* Schema migrations and display fixes
+* CI changes and business logic
+* Electron IPC changes and report formula changes
+* i18n cleanup and tax calculation changes
+
+Recommended workflow:
+
+1. Start with read-only analysis.
+2. Identify exact files and risk level.
+3. Ask for confirmation before implementation when risk is medium or high.
+4. Create a focused branch.
+5. Implement only the approved scope.
+6. Run the relevant verification commands.
+7. Commit and push.
+8. Create a PR.
+9. Do not merge unless explicitly instructed.
+
+When finishing a task, report:
+
+* Branch name
+* Commit hash
+* PR link and number
+* Files changed
+* Validation commands and results
+* Whether merge was performed
+* Whether any out-of-scope files were changed
+
+## Validation commands
+
+For frontend, UI, display, and i18n changes, usually run:
+
+```
+npm run check:all
+npm run typecheck
+npm run build
+npm run test:locale-ui
+```
+
+For handler/backend route changes, usually run:
+
+```
+npm run check:handlers
+npm run check:all
+npm run typecheck
+npm run build
+```
+
+If better-sqlite3 ABI prevents local handler tests from running, use the established local flow:
+
+```
+npm rebuild better-sqlite3
+npm run check:handlers
+npm run electron:rebuild
+```
+
+For Electron IPC, attachment, filesystem, or real main-process changes, run:
+
+```
+npm run test:electron
+```
+
+Do not run test:electron unnecessarily for pure UI or pure i18n changes.
+
+## Testing and quality principles
+
+Prefer guard tests for previously fixed bugs.
+
+Important existing safety themes:
+
+* Locale matrix should not regress.
+* Raw i18n keys should not leak.
+* TypeScript should pass tsc --noEmit.
+* Handler round-trip tests should protect local SQLite routes.
+* Electron e2e should protect real IPC/filesystem behavior when relevant.
+* Error messages should be user-actionable and localized.
+* UI should not display raw backend enum values or technical error strings.
+
+## User communication preference
+
+The user prefers Chinese explanations.
+
+Responses should be direct and operational.
+
+When giving implementation instructions, provide concrete commands or a copy-paste prompt.
+
+When a task is risky, clearly state:
+
+* What is safe to change
+* What must not be changed
+* What needs accountant/user confirmation
+* What tests should be run
+
+Avoid vague advice.
+
+## Current strategic rule
+
+Before packaging, signing, notarization, or public release, prioritize:
+
+1. Clear product positioning
+2. Stable local desktop behavior
+3. No misleading financial displays
+4. Clean localization
+5. Reliable local data handling
+6. Backup/restore safety
+7. Focused business workflows
+8. Guard tests for known regressions
+
+Do not rush into packaging if core accounting displays, UI clarity, or local data safety still need cleanup.
