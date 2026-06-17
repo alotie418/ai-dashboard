@@ -5,6 +5,7 @@ import { BusinessData } from '../types';
 import { analyzeInvoice, extractedToSalesForm, type ExtractedInvoice } from '../services/ocrService';
 import { rasterizePdfFirstPage } from '../services/pdfRaster';
 import { fetchSales, createSale, updateSale, deleteSale, fetchSettings, listProducts, listProviders, isDesktop, type Product, type BusinessDocument, SalesRecord } from '../services/api';
+import { getSystemErrorText } from '../services/systemErrors';
 import { formatMoney, getCurrencySymbol, formatQuantity, formatLegacyQuantity, getTaxLabel, getProductUnitLabel } from './accountingHelpers';
 import CsvImportModal from './CsvImportModal';
 import DocumentModal from './DocumentModal';
@@ -249,7 +250,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
       });
     } catch (err) {
       console.error(err);
-      alert(editingId ? t('sales.updateFailed') : t('sales.saveFailed'));
+      alert(getSystemErrorText(err, t) || (editingId ? t('sales.updateFailed') : t('sales.saveFailed')));
     }
   };
 
@@ -441,7 +442,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                           setRecords(prev => prev.filter(r => r.id !== row.id));
                         } catch (err) {
                           console.error(err);
-                          alert(t('sales.deleteFailed'));
+                          alert(getSystemErrorText(err, t) || t('sales.deleteFailed'));
                         }
                       }}
                       className="text-rose-500 hover:text-rose-400 transition-colors"
