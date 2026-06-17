@@ -89,7 +89,7 @@ const DataBackupSection: React.FC = () => {
     try {
       const r = await exportTableCsv(table);
       if (r.ok && r.path != null) setCsvResult({ rows: r.rows ?? 0, path: r.path });
-      else if (r.error) setError(t('settings.dataBackup.error'));
+      else if (r.error) setError(errText(r.error)); // §2A：DISK_* → systemError.*；其余仍回退通用导出失败
       // r.ok === false 且无 error = 用户取消保存框 → 静默
     } catch (e: any) {
       setError(e?.message || t('settings.dataBackup.error'));

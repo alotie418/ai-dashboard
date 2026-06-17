@@ -208,7 +208,8 @@ function registerHandlers({ ipcMain, dialog }) {
     try {
       fs.writeFileSync(result.filePath, '\uFEFF' + built.csv, 'utf8'); // BOM：Excel 正确识别 UTF-8 中文
     } catch (e) {
-      return { ok: false, error: 'EXPORT_FAILED' };
+      // §2A：磁盘满/IO/只读 → 可操作码（前端 errText 映射 systemError.*）；未命中保持 EXPORT_FAILED。
+      return { ok: false, error: diskErrorCode(e) || 'EXPORT_FAILED' };
     }
     return { ok: true, path: result.filePath, rows: built.rows };
   });
