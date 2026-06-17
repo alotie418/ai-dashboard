@@ -37,8 +37,8 @@
   "nav": {
     "dashboard": "經營看板",
     "assistant": "AI 助手",
-    "purchase": "採購與進項",
-    "sales": "銷售與銷項",
+    "purchase": "採購",
+    "sales": "銷售",
     "inventory": "發票查詢",
     "documents": "業務單據",
     "analysis": "資料分析",
@@ -52,8 +52,8 @@
   "headerTitle": {
     "dashboard": "經營資料概覽",
     "assistant": "AI 助手",
-    "sales": "銷售與銷項",
-    "purchase": "採購與進項",
+    "sales": "銷售",
+    "purchase": "採購",
     "analysis": "資料分析中心",
     "inventory": "發票查詢",
     "documents": "業務單據",
@@ -415,7 +415,7 @@
     "taxSummaryNote2": "核心財務決策應基於不含稅金額進行分析"
   },
   "purchases": {
-    "title": "採購與進項",
+    "title": "採購",
     "batchImport": "批量匯入",
     "scanInvoice": "掃描發票",
     "scanning": "正在識別...",
@@ -474,7 +474,7 @@
     "notInvoiceWarning": "目前檔案看起來不像發票或收據（偵測為：{{type}}）。請確認檔案是否正確，或手動填寫。"
   },
   "sales": {
-    "title": "銷售與銷項",
+    "title": "銷售",
     "batchImport": "批量匯入",
     "scanInvoice": "掃描發票",
     "scanning": "正在識別...",
