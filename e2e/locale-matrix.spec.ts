@@ -408,6 +408,82 @@ test.describe('finance → export PDF', () => {
   });
 });
 
+// ── Accounting display clarity (fix/accounting-display-clarity) ──
+// Display-only fixes (no accounting-formula change):
+//   1. FinancePage non-US drops the misleading "debt ratio" / "current ratio" KPI cards
+//      (debt ratio rendered gross margin under a balance-sheet label; current ratio was a
+//      hardcoded 0.0) and shows real net-profit / gross-margin / net-margin cards instead.
+//   2. Dashboard: a zero cost of sales renders as ¥0, not "—" (— reads as "no data").
+//   3. Dashboard: the purchase quantity sub-label is label-first ("采购总量: N"), not a
+//      bare "N 采购" whose meaning was unclear.
+//   4. Accounts: empty receivables/payables show an N/A collection/payment rate, not a
+//      fabricated 100%.
+test.describe('accounting display clarity', () => {
+  // (1) non-US FinancePage KPI row: real profit-margin cards, no balance-sheet ratios
+  test('finance non-US KPIs: no debt/current ratio, show profit margins', async ({ page }) => {
+    const ui = 'zh-CN';
+    await bootComboIPC(page, ui, 'CN', {
+      apiResponses: [{ match: '/api/reports/generate', json: REPORT_MOCK('CN') }],
+    });
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await page.locator('i.fa-wallet').first().click(); // → finance page
+
+    // real, correctly-labeled KPI cards render
+    await expect(page.getByText(loc.finance.kpiNetProfit).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(loc.finance.kpiGrossMargin).first()).toBeVisible();
+
+    // the misleading balance-sheet ratio labels must be gone
+    const body = await page.locator('body').innerText();
+    expect(body, 'non-US finance must not show a debt-ratio card').not.toContain('资产负债率');
+    expect(body, 'non-US finance must not show a current-ratio card').not.toContain('流动比率');
+  });
+
+  // (2) dashboard: zero cost of sales → ¥0.00 (the default DASHBOARD fixture has costOfSales 0)
+  test('dashboard: zero cost of sales shows ¥0, not a dash', async ({ page }) => {
+    const ui = 'zh-CN';
+    await bootComboIPC(page, ui, 'CN');
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    const costCard = page.locator('div.glass-card', { hasText: loc.dashboard.cogsNoTax });
+    await expect(costCard.locator('p[title]').first()).toHaveText('¥0.00', { timeout: 10_000 });
+  });
+
+  // (3) dashboard: purchase quantity sub-label is label-first, not a bare "N 采购"
+  test('dashboard: purchase quantity wording is labeled', async ({ page }) => {
+    const ui = 'zh-CN';
+    const base = DASHBOARD('CN');
+    const dashboard = { ...base, metrics: { ...base.metrics, purchaseTotalTons: 269.6, avgCostPerTon: 500 } };
+    await bootComboIPC(page, ui, 'CN', { dashboard });
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+
+    // sub-label reads "采购总量: 269.6 …" (label-first)
+    await expect(page.getByText(new RegExp(`${loc.dashboard.purchasesLabel}[:：]`)).first()).toBeVisible({ timeout: 10_000 });
+    // never a bare "<number> 采购" (digit immediately followed by 采购 not part of 采购总量)
+    const body = await page.locator('body').innerText();
+    expect(body, 'purchase sub-label must not be a bare "<num> 采购"').not.toMatch(/\d\s*采购(?!总量)/);
+  });
+
+  // (4) accounts: empty data → N/A rate, never a fabricated 100%
+  test('accounts: empty receivables show N/A rate, not 100%', async ({ page }) => {
+    const ui = 'zh-CN';
+    const emptyBuckets = { '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 };
+    await bootComboIPC(page, ui, 'CN', {
+      apiResponses: [
+        { match: '/api/receivables', json: { totalReceivable: 0, totalOverdue: 0, agingBuckets: emptyBuckets, topCustomers: [], collectionRate: null, details: [] } },
+        { match: '/api/payables', json: { totalPayable: 0, totalOverdue: 0, agingBuckets: emptyBuckets, topSuppliers: [], paymentRate: null, details: [] } },
+      ],
+    });
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await page.locator('nav i.fa-handshake').first().click(); // → accounts page
+
+    // the collection-rate card shows the N/A empty state
+    const rateCard = page.locator('div.bg-white.rounded-xl', { hasText: loc.accounts.collectionRate });
+    await expect(rateCard.getByText(loc.accounts.rateNa)).toBeVisible({ timeout: 10_000 });
+    // and never a fabricated 100% collection rate
+    const body = await page.locator('body').innerText();
+    expect(body, 'empty receivables must not show a fabricated 100%').not.toContain('100.0%');
+  });
+});
+
 // ── Business Documents page renders across all 36 combos (Phase A) ──
 // uiLanguage-only feature. Navigation uses the sidebar fa-file-contract icon, scoped
 // to <nav> (NavItem is a <div>, not a <button>).
