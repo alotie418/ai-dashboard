@@ -1298,6 +1298,27 @@ test('§2A: CSV export disk-full → systemError.diskFull', async ({ page }) => 
   await expect(page.getByText(loc.systemError.diskFull)).toBeVisible({ timeout: 10_000 });
 });
 
+// 收支记录 (TransactionsPage) payment status must be localized — the raw backend enum
+// (unpaid/partial/paid) must NOT leak into the CN UI; it shows transactions.unpaid (未付) etc.
+test('收支记录 payment status localized (zh-CN, no raw enum leak)', async ({ page }) => {
+  const ui = 'zh-CN';
+  const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+  await bootComboIPC(page, ui, 'CN', {
+    apiResponses: [
+      { match: '/api/transactions/summary', method: 'GET', json: { income: { total: 0, count: 0 }, expense: { total: 0, count: 0 }, net: 0 } },
+      { match: '^/api/transactions$', method: 'GET', json: [
+        { id: 't-unpaid', type: 'expense', date: '2026-06-01', amount: 100, amount_net: 100, category_id: null, payment_status: 'unpaid' },
+      ] },
+    ],
+  });
+  // sidebar → 收支记录 (stable icon fa-exchange-alt)
+  await page.locator('i.fa-exchange-alt').first().click();
+  // the localized status label renders (未付), and no raw 'unpaid' enum leaks anywhere
+  await expect(page.getByText(loc.transactions.unpaid).first()).toBeVisible({ timeout: 10_000 });
+  const body = await page.locator('body').innerText();
+  expect(body, 'raw payment_status enum must not leak in CN UI').not.toMatch(/unpaid/i);
+});
+
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const summary = {
