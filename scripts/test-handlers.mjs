@@ -218,11 +218,10 @@ async function expectThrow(fn, label) {
   await expectThrow(() => call('GET', '/api/this-route-does-not-exist', null), '[router] unknown route throws');
 }
 
-// §2B Batch 2 helper: products.create derives its id from Date.now() ONLY (no random/seq
-// suffix), so two creates inside the same millisecond collide on the PRIMARY KEY. Real UI
-// pace never hits this; rapid programmatic creates do. Space product creates ≥2ms apart so
-// each lands on a distinct timestamp — deterministic, and WITHOUT touching the handler.
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// §2B Batch 2 note: products.create now appends a short random suffix to its Date.now() id
+// (prod-<ts>-<rand>, mirroring documents.create), so rapid same-millisecond creates no longer
+// collide on the PRIMARY KEY — the former sleep(2) spacing workaround is removed (the burst
+// uniqueness test below exercises the hardened path directly).
 
 // ───────────────────────── categories (i18n master data) ─────────────────────────
 {
@@ -290,7 +289,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // ───────────────────────── products (per-item unit master data) ─────────────────────────
 {
   freshDb();
-  const mkProduct = async (body) => { await sleep(2); return call('POST', '/api/products', body); };
+  const mkProduct = async (body) => call('POST', '/api/products', body);
 
   ok((await call('GET', '/api/products', null)).length === 0, '[prod] list starts empty');
 
@@ -336,10 +335,27 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await expectThrow(() => call('DELETE', '/api/products/nope', null), '[prod] delete missing throws');
 }
 
+// ───────────── products.create id hardening (prod-<ts>-<rand>) ─────────────
+// A tight loop with no spacing lands many creates on the SAME millisecond; the random suffix
+// must keep every id unique (no PRIMARY KEY collision). Pre-fix (pure Date.now) this collides.
+{
+  freshDb();
+  const N = 50;
+  let allOk = true;
+  const ids = new Set();
+  for (let i = 0; i < N; i++) {
+    try {
+      const r = await call('POST', '/api/products', { name: `Burst-${i}` });
+      if (r?.success && typeof r.id === 'string') ids.add(r.id); else allOk = false;
+    } catch { allOk = false; }
+  }
+  ok(allOk && ids.size === N, `[prod] ${N} rapid same-ms creates all succeed + unique ids (no PK collision), got ok=${allOk} unique=${ids.size}`);
+}
+
 // ───────────── inventory summary (per-product on-hand + tax-exclusive cost) ─────────────
 {
   freshDb();
-  const mkProduct = async (body) => { await sleep(2); return (await call('POST', '/api/products', body)).id; };
+  const mkProduct = async (body) => (await call('POST', '/api/products', body)).id;
   const byId = (details, id) => details.find((d) => d.product_id === id);
 
   // P1 weighted-avg basis (default_unit_cost=0); P2 explicit default cost overrides avg;
