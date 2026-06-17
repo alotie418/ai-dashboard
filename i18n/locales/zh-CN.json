@@ -37,8 +37,8 @@
   "nav": {
     "dashboard": "经营看板",
     "assistant": "AI 助手",
-    "purchase": "采购与进项",
-    "sales": "销售与销项",
+    "purchase": "采购",
+    "sales": "销售",
     "inventory": "发票查询",
     "documents": "业务单据",
     "analysis": "数据分析",
@@ -52,8 +52,8 @@
   "headerTitle": {
     "dashboard": "经营数据概览",
     "assistant": "AI 助手",
-    "sales": "销售与销项",
-    "purchase": "采购与进项",
+    "sales": "销售",
+    "purchase": "采购",
     "analysis": "数据分析中心",
     "inventory": "发票查询",
     "documents": "业务单据",
@@ -349,7 +349,7 @@
     "fileFormatUnsupported": "文件格式不支持",
     "fileReadFailed": "文件读取失败",
     "notInvoice": "当前文件看起来不像发票或收据（检测为：{{type}}）。请确认文件是否正确。",
-    "invoiceExtractResult": "发票识别成功！\n\n日期: {{date}}\n客户/供应商: {{partner}}\n数量: {{quantity}}\n金额: {{amount}}\n运费: {{shipping}}\n发票号: {{invoiceNo}}\n\n以上信息已从发票中提取。如需记账，请前往「采购与进项」或「销售与销项」页面录入。",
+    "invoiceExtractResult": "发票识别成功！\n\n日期: {{date}}\n客户/供应商: {{partner}}\n数量: {{quantity}}\n金额: {{amount}}\n运费: {{shipping}}\n发票号: {{invoiceNo}}\n\n以上信息已从发票中提取。如需记账，请前往「采购」或「销售」页面录入。",
     "invoiceRecognizeFailed": "发票识别失败，请确保上传清晰的发票图片后重试。",
     "quickPromptUploadInvoice": "我想上传一张发票进行记账",
     "quickPromptFinanceQuery": "帮我查询最新的财务报表摘要",
@@ -415,7 +415,7 @@
     "taxSummaryNote2": "核心财务决策应基于不含税金额进行分析"
   },
   "purchases": {
-    "title": "采购与进项",
+    "title": "采购",
     "batchImport": "批量导入",
     "scanInvoice": "扫描发票",
     "scanning": "正在识别...",
@@ -474,7 +474,7 @@
     "notInvoiceWarning": "当前文件看起来不像发票或收据（检测为：{{type}}）。请确认文件是否正确，或手动填写。"
   },
   "sales": {
-    "title": "销售与销项",
+    "title": "销售",
     "batchImport": "批量导入",
     "scanInvoice": "扫描发票",
     "scanning": "正在识别...",

@@ -1904,13 +1904,13 @@ async function main() {
       }
       if (reasons.length) fail(`genericNonCn:${accId}`, reasons); else pass(`genericNonCn:${accId}`);
     }
-    // CN must KEEP its VAT wording (regression guard the other way): CN nav i18n
-    // should still read 采购与进项 / 销售与销项 / 发票查询.
+    // CN main-entry nav i18n uses the simplified 采购 / 销售 (主入口文案简化);
+    // 发票查询 stays. Pin so the labels don't regress back to the long form.
     {
       const cn = locales['zh-CN'];
       const reasons = [];
-      if (get(cn, 'nav.purchase') !== '采购与进项') reasons.push(`CN nav.purchase should stay 采购与进项, got "${get(cn, 'nav.purchase')}"`);
-      if (get(cn, 'nav.sales') !== '销售与销项') reasons.push(`CN nav.sales should stay 销售与销项, got "${get(cn, 'nav.sales')}"`);
+      if (get(cn, 'nav.purchase') !== '采购') reasons.push(`CN nav.purchase should be 采购, got "${get(cn, 'nav.purchase')}"`);
+      if (get(cn, 'nav.sales') !== '销售') reasons.push(`CN nav.sales should be 销售, got "${get(cn, 'nav.sales')}"`);
       if (reasons.length) fail(`cnVatPreserved`, reasons); else pass(`cnVatPreserved`);
     }
   }
@@ -2601,8 +2601,8 @@ async function main() {
 
   // ────────────────────────────────────────────────
   // PART G0l: AI assistant document-extraction result (chat.invoiceExtractResult).
-  //   CN renders the chat.invoiceExtractResult i18n message (keeps 发票 / 采购与进项
-  //   / 销售与销项 / 发票号). Non-CN renders the chatExtractResult taxConcept, which
+  //   CN renders the chat.invoiceExtractResult i18n message (keeps 发票 / 采购
+  //   / 销售 / 发票号). Non-CN renders the chatExtractResult taxConcept, which
   //   must use the generic 票据 / 采购与费用 / 销售与收入 framing — never CN-VAT
   //   采购与进项 / 销售与销项 / 进项 / 销项 / 增值税 / 电子发票 / 发票号(码) — and must
   //   keep all six {date/partner/quantity/amount/shipping/invoiceNo} tokens so the
@@ -2638,15 +2638,15 @@ async function main() {
       }
       if (reasons.length) fail(`chatExtractNonCn:${accId}`, reasons); else pass(`chatExtractNonCn:${accId}`);
     }
-    // CN regression guard: CN keeps its VAT-invoice chat message + nav口径.
+    // CN regression guard: CN chat message points at the simplified 采购 / 销售 pages.
     {
       const cn = locales['zh-CN'];
       const reasons = [];
       const msg = get(cn, 'chat.invoiceExtractResult');
       if (typeof msg !== 'string') reasons.push(`CN chat.invoiceExtractResult missing`);
       else {
-        if (!/采购与进项/.test(msg)) reasons.push(`CN chat.invoiceExtractResult should keep 采购与进项, got "${msg}"`);
-        if (!/销售与销项/.test(msg)) reasons.push(`CN chat.invoiceExtractResult should keep 销售与销项, got "${msg}"`);
+        if (!/采购/.test(msg)) reasons.push(`CN chat.invoiceExtractResult should reference 采购, got "${msg}"`);
+        if (!/销售/.test(msg)) reasons.push(`CN chat.invoiceExtractResult should reference 销售, got "${msg}"`);
       }
       if (reasons.length) fail(`cnChatExtractPreserved`, reasons); else pass(`cnChatExtractPreserved`);
     }
