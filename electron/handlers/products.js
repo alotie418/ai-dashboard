@@ -25,7 +25,8 @@ async function create({ body }) {
   const u = unit || 'piece';
   if (!VALID_UNITS.includes(u)) throw new Error(`unit must be one of ${VALID_UNITS.join('/')}`);
   const cost = Number(default_unit_cost);
-  const id = `prod-${Date.now().toString(36)}`;
+  // 随机后缀防同毫秒重复创建撞 PRIMARY KEY（与 documents.create 同形）。
+  const id = `prod-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   db.prepare(
     `INSERT INTO products (id, name, unit, default_unit_cost, is_service, is_active, sort_order)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
