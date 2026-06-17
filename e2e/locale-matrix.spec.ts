@@ -1261,6 +1261,23 @@ test.describe('§2A disk-full surfaced in CRUD pages (PR-2b)', () => {
   });
 });
 
+// §2A: CSV export disk-full → backend exportTableCsv returns DISK_FULL, DataBackupSection
+// errText maps it to the actionable systemError.diskFull (not the generic export error).
+test('§2A: CSV export disk-full → systemError.diskFull', async ({ page }) => {
+  const ui = 'zh-CN';
+  const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+  await bootComboIPC(page, ui, 'CN', {
+    appChannels: { 'app:exportTableCsv': { ok: false, error: 'DISK_FULL' } },
+  });
+  // Settings → Data Backup sub-tab (stable icons: fa-cog → fa-box-archive)
+  await page.locator('i.fa-cog').first().click();
+  await page.locator('button:has(i.fa-box-archive)').click();
+  // click the first structured-CSV-export button → handleCsv → {ok:false, error:'DISK_FULL'}
+  await page.locator('button:has(i.fa-file-csv)').first().click();
+  // errText('DISK_FULL') surfaces the actionable disk-full message
+  await expect(page.getByText(loc.systemError.diskFull)).toBeVisible({ timeout: 10_000 });
+});
+
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const summary = {
