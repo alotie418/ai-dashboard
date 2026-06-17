@@ -43,6 +43,9 @@ const TaxInvoiceModal: React.FC<Props> = ({ doc, onClose, onSaved }) => {
       case 'FILE_TOO_LARGE': return t('documents.attachmentTooLarge');
       case 'INVALID_FILE_TYPE': return t('documents.attachmentInvalidType');
       case 'ATTACHMENT_NOT_FOUND': return t('documents.attachmentMissing');
+      case 'DISK_FULL': return t('systemError.diskFull');
+      case 'DISK_IO': return t('systemError.diskIo');
+      case 'READONLY': return t('systemError.readonly');
       default: return t('documents.attachmentFailed');
     }
   };

@@ -11,12 +11,19 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const { classifyFsDbError } = require(join(ROOT, 'electron/handlers/_dbError.js'));
+const { classifyFsDbError, diskErrorCode } = require(join(ROOT, 'electron/handlers/_dbError.js'));
 
 const failures = [];
+let total = 0;
 const eq = (input, expected, label) => {
+  total++;
   const got = classifyFsDbError(input);
-  if (got !== expected) failures.push(`${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(got)}`);
+  if (got !== expected) failures.push(`classify ${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(got)}`);
+};
+const ce = (input, expected, label) => {
+  total++;
+  const got = diskErrorCode(input);
+  if (got !== expected) failures.push(`diskErrorCode ${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(got)}`);
 };
 
 // ── 磁盘满 / 配额 → 'diskFull' ──
@@ -47,10 +54,20 @@ eq('SQLITE_FULL', null, 'string input (no .code property)');
 eq(null, null, 'null');
 eq(undefined, null, 'undefined');
 
-const total = 20;
+// ── diskErrorCode: 类别 → 稳定错误码（命中→DISK_*；未命中→null，handler 回退原码）──
+ce({ code: 'SQLITE_FULL' }, 'DISK_FULL', 'SQLITE_FULL → DISK_FULL');
+ce({ code: 'ENOSPC' }, 'DISK_FULL', 'ENOSPC → DISK_FULL');
+ce({ code: 'SQLITE_IOERR_WRITE' }, 'DISK_IO', 'SQLITE_IOERR_WRITE → DISK_IO');
+ce({ code: 'SQLITE_READONLY' }, 'READONLY', 'SQLITE_READONLY → READONLY');
+ce({ code: 'EROFS' }, 'READONLY', 'EROFS → READONLY');
+ce({ code: 'EACCES' }, 'READONLY', 'EACCES → READONLY');
+ce({ code: 'COPY_FAILED' }, null, 'COPY_FAILED → null (handler keeps its own code)');
+ce(new Error('boom'), null, 'plain Error → null');
+ce(null, null, 'null → null');
+
 if (failures.length) {
   console.error(`✗ db-errors: ${failures.length}/${total} case(s) failed`);
   for (const f of failures) console.error('  -', f);
   process.exit(1);
 }
-console.log(`✓ db-errors: all ${total} cases passed (SQLite FULL/IOERR*/READONLY* + fs ENOSPC/EDQUOT/EROFS/EACCES → diskFull/diskIo/readonly; CONSTRAINT/BUSY/unknown/null → null)`);
+console.log(`✓ db-errors: all ${total} cases passed (classifyFsDbError + diskErrorCode: SQLite FULL/IOERR*/READONLY* + fs ENOSPC/EDQUOT/EROFS/EACCES → diskFull/diskIo/readonly → DISK_FULL/DISK_IO/READONLY; CONSTRAINT/BUSY/unknown/null → null)`);

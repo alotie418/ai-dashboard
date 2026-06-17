@@ -1,4 +1,9 @@
 {
+  "systemError": {
+    "diskFull": "Not enough disk space. Free up space and try again.",
+    "diskIo": "A disk read/write error occurred. Check your disk and try again.",
+    "readonly": "The database or target folder is not writable. Check file permissions and try again."
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",

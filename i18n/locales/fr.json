@@ -1,4 +1,9 @@
 {
+  "systemError": {
+    "diskFull": "Espace disque insuffisant. Libérez de l'espace puis réessayez.",
+    "diskIo": "Erreur de lecture/écriture du disque. Vérifiez le disque puis réessayez.",
+    "readonly": "La base de données ou le dossier cible n'est pas accessible en écriture. Vérifiez les autorisations puis réessayez."
+  },
   "common": {
     "save": "Enregistrer",
     "cancel": "Annuler",
