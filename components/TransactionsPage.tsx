@@ -11,6 +11,7 @@ import {
   type AccountingLocale, type TransactionType,
 } from '../services/api';
 import { getTaxLabel, formatMoney } from './accountingHelpers';
+import { getSystemErrorText } from '../services/systemErrors';
 
 const TransactionsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -108,7 +109,7 @@ const TransactionsPage: React.FC = () => {
       setForm({});
       await reload();
     } catch (e: any) {
-      setError(e?.message || 'Save failed');
+      setError(getSystemErrorText(e, t) || e?.message || 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -120,7 +121,7 @@ const TransactionsPage: React.FC = () => {
       setConfirmDelete(null);
       await reload();
     } catch (e: any) {
-      setError(e?.message || 'Delete failed');
+      setError(getSystemErrorText(e, t) || e?.message || 'Delete failed');
     }
   };
 

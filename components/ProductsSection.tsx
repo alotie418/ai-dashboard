@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LangCode } from '../i18n';
 import { listProducts, createProduct, updateProduct, deleteProduct, type Product } from '../services/api';
+import { getSystemErrorText } from '../services/systemErrors';
 import { PRODUCT_UNIT_KEYS, getProductUnitLabel } from './accountingHelpers';
 
 const ProductsSection: React.FC = () => {
@@ -45,7 +46,7 @@ const ProductsSection: React.FC = () => {
       setNewName(''); setNewUnit('piece'); setNewCost(0); setNewIsService(false);
       reload();
     } catch (e: any) {
-      setError(e?.message || 'Create failed');
+      setError(getSystemErrorText(e, t) || e?.message || 'Create failed');
     } finally {
       setSaving(false);
     }
@@ -53,12 +54,12 @@ const ProductsSection: React.FC = () => {
 
   const handleToggleActive = async (p: Product) => {
     try { await updateProduct(p.id, { is_active: !p.is_active }); reload(); }
-    catch (e: any) { setError(e?.message || 'Update failed'); }
+    catch (e: any) { setError(getSystemErrorText(e, t) || e?.message || 'Update failed'); }
   };
 
   const handleDelete = async (id: string) => {
     try { await deleteProduct(id); setConfirmDelete(null); reload(); }
-    catch (e: any) { setError(e?.message || 'Delete failed'); setConfirmDelete(null); }
+    catch (e: any) { setError(getSystemErrorText(e, t) || e?.message || 'Delete failed'); setConfirmDelete(null); }
   };
 
   return (

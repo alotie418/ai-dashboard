@@ -11,6 +11,7 @@ import {
   updateDocTaxInvoice, pickDocAttachment, openDocAttachment, discardDocAttachment,
   type BusinessDocument,
 } from '../services/api';
+import { getSystemErrorText } from '../services/systemErrors';
 
 interface Props {
   doc: BusinessDocument;
@@ -108,8 +109,8 @@ const TaxInvoiceModal: React.FC<Props> = ({ doc, onClose, onSaved }) => {
       });
       if (pickedUnsaved) setSavedPath(pickedUnsaved.relPath);
       onSaved();
-    } catch {
-      setMsg({ type: 'error', text: t('documents.saveFailed') });
+    } catch (e) {
+      setMsg({ type: 'error', text: getSystemErrorText(e, t) || t('documents.saveFailed') });
     } finally {
       setSaving(false);
     }

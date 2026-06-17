@@ -11,6 +11,7 @@ import {
 } from '../services/api';
 import { ACCOUNTING_PROFILES } from './accountingProfiles';
 import { getTaxLabel } from './accountingHelpers';
+import { getSystemErrorText } from '../services/systemErrors';
 
 const CategoriesSection: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -94,7 +95,7 @@ const CategoriesSection: React.FC = () => {
       setNewSlug(''); setNewLabel(''); setNewScheduleLine(''); setNewDeductiblePct(100);
       reload();
     } catch (e: any) {
-      setError(e?.message || 'Create failed');
+      setError(getSystemErrorText(e, t) || e?.message || 'Create failed');
     }
   };
 
@@ -104,7 +105,7 @@ const CategoriesSection: React.FC = () => {
       setConfirmDelete(null);
       reload();
     } catch (e: any) {
-      setError(e?.message || 'Delete failed');
+      setError(getSystemErrorText(e, t) || e?.message || 'Delete failed');
       setConfirmDelete(null);
     }
   };
@@ -114,7 +115,7 @@ const CategoriesSection: React.FC = () => {
       await updateCategory(c.id, { is_cogs: !c.is_cogs });
       reload(); // refresh the badge; the recat panel state below is untouched
     } catch (e: any) {
-      setError(e?.message || 'Update failed');
+      setError(getSystemErrorText(e, t) || e?.message || 'Update failed');
     }
   };
 

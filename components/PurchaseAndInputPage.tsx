@@ -5,6 +5,7 @@ import { BusinessData } from '../types';
 import { analyzeInvoice, extractedToPurchaseForm, type ExtractedInvoice } from '../services/ocrService';
 import { rasterizePdfFirstPage } from '../services/pdfRaster';
 import { fetchPurchases, createPurchase, deletePurchase, fetchSettings, listProducts, listProviders, type Product, PurchaseRecord } from '../services/api';
+import { getSystemErrorText } from '../services/systemErrors';
 import { formatMoney, getCurrencySymbol, getTaxLabel, formatLegacyQuantity, getProductUnitLabel } from './accountingHelpers';
 import CsvImportModal from './CsvImportModal';
 import OcrPreviewModal from './OcrPreviewModal';
@@ -238,7 +239,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
       });
     } catch (err) {
       console.error(err);
-      alert(t('purchases.errorSaveFailed'));
+      alert(getSystemErrorText(err, t) || t('purchases.errorSaveFailed'));
     }
   };
 
@@ -392,7 +393,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                           setRecords(prev => prev.filter(r => r.id !== row.id));
                         } catch (err) {
                           console.error(err);
-                          alert(t('purchases.errorDeleteFailed'));
+                          alert(getSystemErrorText(err, t) || t('purchases.errorDeleteFailed'));
                         }
                       }}
                       className="text-rose-500 hover:text-rose-400 transition-colors"

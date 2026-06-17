@@ -14,6 +14,7 @@ import {
   type BusinessDocument, type BusinessDocType, type Product,
 } from '../services/api';
 import { formatMoney, getTaxLabel, getProductUnitLabel } from './accountingHelpers';
+import { getSystemErrorText } from '../services/systemErrors';
 import { buildDocumentHtml } from './documentPdf';
 import DocumentModal from './DocumentModal';
 import TaxInvoiceModal from './TaxInvoiceModal';
@@ -99,7 +100,7 @@ const DocumentsPage: React.FC = () => {
       load();
     } catch (err) {
       console.error(err);
-      setError(t('documents.saveFailed'));
+      setError(getSystemErrorText(err, t) || t('documents.saveFailed'));
     }
   };
 
@@ -110,7 +111,7 @@ const DocumentsPage: React.FC = () => {
       setDocs((prev) => prev.filter((d) => d.id !== id));
     } catch (err) {
       console.error(err);
-      setError(t('documents.saveFailed'));
+      setError(getSystemErrorText(err, t) || t('documents.saveFailed'));
     }
   };
 

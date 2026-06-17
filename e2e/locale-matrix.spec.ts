@@ -1214,6 +1214,53 @@ test.describe('PR-T5-2B-2 → categories is_cogs + recategorize UI', () => {
   });
 });
 
+// ── §2A PR-2b: disk-full / fs write errors surface actionable systemError.* text ──
+// When a CRUD save rejects with the backend AI_ERR:SQLITE_FULL wrapper, getSystemErrorText
+// upgrades the generic "save failed" to the localized systemError.diskFull message.
+// One B-class page (Products, setError → DOM, also fixes the raw-AI_ERR leak) + one
+// A-class page (Purchase, alert). Regime-neutral feature → one ui×acc combo suffices.
+test.describe('§2A disk-full surfaced in CRUD pages (PR-2b)', () => {
+  const ui = 'zh-CN';
+  const SQLITE_FULL = 'AI_ERR:SQLITE_FULL · HTTP 0 (database or disk is full)';
+
+  test('B-class: Products create reject → systemError.diskFull (setError, no AI_ERR leak)', async ({ page }) => {
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await bootComboIPC(page, ui, 'CN', {
+      apiResponses: [{ match: '/api/products', method: 'POST', reject: SQLITE_FULL }],
+    });
+    // Settings → Products/Services sub-tab (stable icons: fa-cog → fa-box)
+    await page.locator('i.fa-cog').first().click();
+    await page.locator('button:has(i.fa-box)').click();
+    // open add form, fill name, save → POST /api/products rejects with the disk-full code
+    await page.getByRole('button', { name: loc.products.addButton }).click();
+    await page.getByPlaceholder(loc.products.namePlaceholder).fill('Disk Full Test');
+    await page.getByRole('button', { name: loc.common.save, exact: true }).click();
+    // surfaces the actionable disk-full message, NOT the raw AI_ERR technical string
+    await expect(page.getByText(loc.systemError.diskFull)).toBeVisible({ timeout: 10_000 });
+    const body = await page.locator('body').innerText();
+    expect(body, 'raw AI_ERR string must not leak to the user').not.toContain('AI_ERR');
+  });
+
+  test('A-class: Purchase save reject → systemError.diskFull (alert)', async ({ page }) => {
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await bootComboIPC(page, ui, 'CN', {
+      apiResponses: [{ match: '/api/purchases', method: 'POST', reject: SQLITE_FULL }],
+    });
+    let dialogMsg: string | null = null;
+    page.on('dialog', async (d) => { dialogMsg = d.message(); await d.dismiss(); });
+    // 采购页 → 新增记录 modal (stable icons: fa-file-import → fa-plus)
+    await page.locator('i.fa-file-import').first().click();
+    await page.locator('button:has(i.fa-plus)').first().click();
+    // fill all HTML5-required fields (date is pre-filled with today): supplier + quantity + amount
+    await page.locator('[data-testid="ocr-fill-counterparty"]').fill('Acme');
+    await page.getByPlaceholder(loc.purchases.formQuantityPlaceholder).fill('10');
+    await page.locator('input[type="number"][required]').fill('100');
+    await page.getByRole('button', { name: loc.purchases.formSubmit }).click();
+    // the rejected save alerts the actionable disk-full message
+    await expect.poll(() => dialogMsg, { timeout: 10_000 }).toBe(loc.systemError.diskFull);
+  });
+});
+
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const summary = {
