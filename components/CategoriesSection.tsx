@@ -73,7 +73,8 @@ const CategoriesSection: React.FC = () => {
       const list = await listCategories({ locale, type: activeType, lang });
       setCats(list);
     } catch (e: any) {
-      setError(e?.message || 'Load failed');
+      console.error(e);
+      setError(t('common.operationFailed'));
     } finally {
       setLoading(false);
     }
@@ -95,7 +96,8 @@ const CategoriesSection: React.FC = () => {
       setNewSlug(''); setNewLabel(''); setNewScheduleLine(''); setNewDeductiblePct(100);
       reload();
     } catch (e: any) {
-      setError(getSystemErrorText(e, t) || e?.message || 'Create failed');
+      console.error(e);
+      setError(getSystemErrorText(e, t) || t('common.operationFailed'));
     }
   };
 
@@ -105,7 +107,8 @@ const CategoriesSection: React.FC = () => {
       setConfirmDelete(null);
       reload();
     } catch (e: any) {
-      setError(getSystemErrorText(e, t) || e?.message || 'Delete failed');
+      console.error(e);
+      setError(getSystemErrorText(e, t) || t('common.operationFailed'));
       setConfirmDelete(null);
     }
   };
@@ -115,7 +118,8 @@ const CategoriesSection: React.FC = () => {
       await updateCategory(c.id, { is_cogs: !c.is_cogs });
       reload(); // refresh the badge; the recat panel state below is untouched
     } catch (e: any) {
-      setError(getSystemErrorText(e, t) || e?.message || 'Update failed');
+      console.error(e);
+      setError(getSystemErrorText(e, t) || t('common.operationFailed'));
     }
   };
 

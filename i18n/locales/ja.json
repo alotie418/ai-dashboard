@@ -16,6 +16,7 @@
     "success": "成功",
     "error": "失敗",
     "retry": "再試行",
+    "operationFailed": "操作に失敗しました。しばらくしてから再試行してください。",
     "back": "戻る",
     "next": "次へ",
     "skip": "スキップ",
