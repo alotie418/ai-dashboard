@@ -13,7 +13,7 @@
 // 覆盖（第三批 §2B Batch 3）：alerts（list 仅未 dismiss / created_at DESC / unread_only / count /
 //       mark-read·read-all·dismiss / limit / 非数字 id throw；无 create route→直插 DB seed）
 //       · receivables/payables summary（totalReceivable·totalPayable / details 仅 unpaid>0 /
-//       collectionRate·paymentRate（无单据=100）/ topCustomers·topSuppliers 排名 / 相对日期 aging
+//       collectionRate·paymentRate（无单据=null）/ topCustomers·topSuppliers 排名 / 相对日期 aging
 //       buckets（mid-bucket offset，绝不写固定过期日）/ 已付且有 due_date 不 inflate 应收·应付）。
 // 覆盖（第四批 §2B Batch 4）：settings（GET/PUT 白名单读写双向过滤 / JSON 往返 / oversized→warnings /
 //       array body throw / null body no-op）· reports（types locale 路由 + unknown→[] / generate 结构 +
@@ -524,11 +524,12 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   ok(approx(r2.agingBuckets['0-30'], 0) && approx(r2.agingBuckets['61-90'], 0) && approx(r2.agingBuckets['90+'], 0),
     '[recv] no other aging buckets populated');
 
-  // collectionRate = 100 when there are no sales at all
+  // collectionRate = null (NOT 100) when there are no sales at all — no billing base,
+  // so the rate is undefined and the UI shows an N/A empty state instead of a fake 100%.
   freshDb();
   const empty = await call('GET', '/api/receivables/summary', null);
-  ok(empty.collectionRate === 100 && approx(empty.totalReceivable, 0) && empty.details.length === 0,
-    '[recv] no sales → collectionRate 100, receivable 0, no details');
+  ok(empty.collectionRate === null && approx(empty.totalReceivable, 0) && empty.details.length === 0,
+    '[recv] no sales → collectionRate null, receivable 0, no details');
 }
 
 // ───────────── payables summary (symmetric to receivables; 61-90 bucket for variety) ─────────────
@@ -559,11 +560,11 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   ok(approx(q2.agingBuckets['0-30'], 0) && approx(q2.agingBuckets['31-60'], 0) && approx(q2.agingBuckets['90+'], 0),
     '[pay] no other aging buckets populated');
 
-  // paymentRate = 100 when no purchases
+  // paymentRate = null (NOT 100) when no purchases — see receivables empty case above.
   freshDb();
   const empty = await call('GET', '/api/payables/summary', null);
-  ok(empty.paymentRate === 100 && approx(empty.totalPayable, 0) && empty.details.length === 0,
-    '[pay] no purchases → paymentRate 100, payable 0, no details');
+  ok(empty.paymentRate === null && approx(empty.totalPayable, 0) && empty.details.length === 0,
+    '[pay] no purchases → paymentRate null, payable 0, no details');
 }
 
 // ───────────────────────── §2B Batch 4: settings + reports + batch ─────────────────────────

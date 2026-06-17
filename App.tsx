@@ -129,7 +129,9 @@ const AppContent: React.FC = () => {
             // '—': legacy tons are a different (quantity) source and would mislead
             // next to a report-engine net amount.
             label: `${t('header.yearLabel', { year: selectedYear })} ${accLocale === 'US' ? t('dashboard.totalExpenses') : t('dashboard.cogsNoTax')}`,
-            value: enrichedFS.costOfSales > 0 ? formatMoney(enrichedFS.costOfSales, accLocale) : '—',
+            // A zero cost of sales is a real figure (e.g. a service business with no COGS),
+            // so render it as ¥0 rather than '—', which would read as "no data".
+            value: formatMoney(enrichedFS.costOfSales, accLocale),
             subValue: '—',
             icon: 'fa-truck-loading',
             color: 'bg-purple-500',
@@ -148,7 +150,9 @@ const AppContent: React.FC = () => {
           {
             label: t('dashboard.avgCost'),
             value: m.avgCostPerTon > 0 ? `${sym}${m.avgCostPerTon.toLocaleString()}${perUnit}` : '—',
-            subValue: m.purchaseTotalTons > 0 ? `${m.purchaseTotalTons}${qtySuffix} ${t('dashboard.purchasesLabel')}` : '—',
+            // Label-first so the number reads as a labeled quantity ("采购总量: 269.6 吨")
+            // instead of a bare "269.6 采购", whose meaning was unclear.
+            subValue: m.purchaseTotalTons > 0 ? `${t('dashboard.purchasesLabel')}: ${m.purchaseTotalTons}${qtySuffix}` : '—',
             icon: 'fa-tags',
             color: 'bg-orange-500',
           },

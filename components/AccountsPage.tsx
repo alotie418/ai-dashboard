@@ -130,8 +130,10 @@ const AccountsPage: React.FC = () => {
             </div>
             <div className="bg-white rounded-xl p-4 border border-[#e0ddd5]">
               <p className="text-xs text-[#7a7a78] mb-1">{activeTab === 'receivable' ? t('accounts.collectionRate') : t('accounts.paymentRate')}</p>
-              <p className={`text-xl font-bold ${(rate || 0) >= 80 ? 'text-green-500' : (rate || 0) >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>
-                {rate?.toFixed(1)}%
+              {/* null/undefined rate = no billing base (no sales/purchases): show an N/A
+                  empty state instead of a misleading fabricated 100%. */}
+              <p className={`text-xl font-bold ${rate == null ? 'text-[#7a7a78]' : rate >= 80 ? 'text-green-500' : rate >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>
+                {rate == null ? t('accounts.rateNa') : `${rate.toFixed(1)}%`}
               </p>
             </div>
           </div>

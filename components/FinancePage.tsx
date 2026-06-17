@@ -232,24 +232,31 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
         </div>
       )}
 
-      {/* Quick KPIs */}
+      {/* Quick KPIs.
+          US keeps its 3 legitimate cards (net profit / Schedule C gross income / quarterly tax).
+          Non-US shows real, already-computed P&L figures: net profit / gross margin / net margin.
+          The previous non-US cards were misleading — "debt ratio" actually rendered the gross
+          margin under a balance-sheet label, and "current ratio" was a hardcoded 0.0. Neither is
+          computed (the Balance Sheet stays a "not enabled yet" tab), so they are removed. This is
+          display-only: grossMargin / netMargin come from the report engine (with the existing
+          fallbackPL), no new accounting calculation. */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white/80 border border-[#e0ddd5] p-6 rounded-xl">
-          <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">{t('finance.kpiNetAssets')}</p>
+          <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">{locale === 'US' ? t('finance.kpiNetAssets') : t('finance.kpiNetProfit')}</p>
           <h4 className="text-2xl font-bold text-[#191918] tracking-tight">{fmt(report?.incomeStatement?.netProfit || report?.profitLoss?.netProfit || report?.scheduleC?.line31_netProfit || 0)}</h4>
         </div>
         <div className="bg-white/80 border border-[#e0ddd5] p-6 rounded-xl">
-          <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">{locale === 'US' ? getTaxLabel(locale, i18n.language, 'kpiGrossIncome') : t('finance.kpiDebtRatio')}</p>
+          <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">{locale === 'US' ? getTaxLabel(locale, i18n.language, 'kpiGrossIncome') : t('finance.kpiGrossMargin')}</p>
           <h4 className="text-2xl font-bold text-[#191918] tracking-tight">
-            {locale === 'US' ? fmt(report?.scheduleC?.line7_grossIncome || 0) : `${getIncomeStatement()?.grossMargin || 0}%`}
+            {locale === 'US' ? fmt(report?.scheduleC?.line7_grossIncome || 0) : `${(getIncomeStatement()?.grossMargin ?? fallbackPL.grossMargin) || 0}%`}
           </h4>
         </div>
         <div className="bg-white/80 border border-[#e0ddd5] p-6 rounded-xl">
           <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">
-            {locale === 'US' ? getTaxLabel(locale, i18n.language, 'kpiQuarterlyTax') : t('finance.kpiCurrentRatio')}
+            {locale === 'US' ? getTaxLabel(locale, i18n.language, 'kpiQuarterlyTax') : t('finance.kpiNetMargin')}
           </p>
           <h4 className="text-2xl font-bold text-[#191918] tracking-tight">
-            {locale === 'US' ? fmt(report?.estimatedTax?.quarterlyPayment || 0) : '0.0'}
+            {locale === 'US' ? fmt(report?.estimatedTax?.quarterlyPayment || 0) : `${(getIncomeStatement()?.netMargin ?? fallbackPL.netMargin) || 0}%`}
           </h4>
         </div>
       </div>

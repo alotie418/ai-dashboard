@@ -123,7 +123,7 @@ export interface ReceivablesSummary {
   totalOverdue: number;
   agingBuckets: AgingBucket;
   topCustomers: { name: string; amount: number }[];
-  collectionRate: number;
+  collectionRate: number | null; // null when there are no sales (no billing base)
   details: any[];
 }
 
@@ -132,7 +132,7 @@ export interface PayablesSummary {
   totalOverdue: number;
   agingBuckets: AgingBucket;
   topSuppliers: { name: string; amount: number }[];
-  paymentRate: number;
+  paymentRate: number | null; // null when there are no purchases (no billing base)
   details: any[];
 }
 

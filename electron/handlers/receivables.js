@@ -43,9 +43,12 @@ async function receivablesSummary() {
 
   const totalPaid = db.prepare('SELECT COALESCE(SUM(paid_amount), 0) as total FROM sales').get().total;
   const totalSales = db.prepare('SELECT COALESCE(SUM(totalAmount), 0) as total FROM sales').get().total;
+  // null (not 100) when there are no sales: a collection rate is undefined with no
+  // billed base, and surfacing a fabricated 100% reads as "fully collected" when
+  // there is simply nothing to collect. The UI renders null as an N/A empty state.
   const collectionRate = totalSales > 0
     ? Math.round((totalPaid / totalSales) * 10000) / 100
-    : 100;
+    : null;
 
   return {
     totalReceivable, totalOverdue, agingBuckets, topCustomers, collectionRate,
@@ -88,9 +91,10 @@ async function payablesSummary() {
 
   const totalPaid = db.prepare('SELECT COALESCE(SUM(paid_amount), 0) as total FROM purchases').get().total;
   const totalPurch = db.prepare('SELECT COALESCE(SUM(totalAmount), 0) as total FROM purchases').get().total;
+  // null (not 100) when there are no purchases — see receivablesSummary above.
   const paymentRate = totalPurch > 0
     ? Math.round((totalPaid / totalPurch) * 10000) / 100
-    : 100;
+    : null;
 
   return {
     totalPayable, totalOverdue, agingBuckets, topSuppliers, paymentRate,
