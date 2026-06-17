@@ -190,6 +190,36 @@ async function expectThrow(fn, label) {
   ok((await call('GET', '/api/sales', null)).length === 0, '[sal] delete → empty');
 }
 
+// ───────────── due_date round-trip (single-record create/update; gap A) ─────────────
+// Single-record create/update now carry due_date; update only sets it when explicitly
+// provided (omitting it preserves the existing value, never clears it). list = SELECT *.
+{
+  freshDb();
+  const DUE1 = `${YEAR}-07-15`, DUE2 = `${YEAR}-08-20`;
+  const getPur = async (id) => (await call('GET', '/api/purchases', null)).find((p) => p.id === id);
+  const getSal = async (id) => (await call('GET', '/api/sales', null)).find((s) => s.id === id);
+
+  // purchases
+  await call('POST', '/api/purchases', { id: 'pd-1', date: `${YEAR}-06-01`, supplier: 'DueCo', tons: 1, totalAmount: 100, due_date: DUE1 });
+  ok((await getPur('pd-1')).due_date === DUE1, '[pur] create persists due_date');
+  await call('PUT', '/api/purchases/pd-1', { date: `${YEAR}-06-02`, supplier: 'DueCo2', tons: 2, totalAmount: 200 });
+  ok((await getPur('pd-1')).due_date === DUE1, '[pur] update WITHOUT due_date preserves existing (not cleared)');
+  await call('PUT', '/api/purchases/pd-1', { date: `${YEAR}-06-02`, supplier: 'DueCo2', tons: 2, totalAmount: 200, due_date: DUE2 });
+  ok((await getPur('pd-1')).due_date === DUE2, '[pur] update WITH due_date changes it');
+  await call('POST', '/api/purchases', { id: 'pd-0', date: `${YEAR}-06-01`, supplier: 'NoDue', tons: 1, totalAmount: 100 });
+  ok((await getPur('pd-0')).due_date === null, '[pur] create WITHOUT due_date → null');
+
+  // sales
+  await call('POST', '/api/sales', { id: 'sd-1', date: `${YEAR}-06-01`, customer: 'DueCust', tons: 1, totalAmount: 100, due_date: DUE1 });
+  ok((await getSal('sd-1')).due_date === DUE1, '[sal] create persists due_date');
+  await call('PUT', '/api/sales/sd-1', { date: `${YEAR}-06-02`, customer: 'DueCust2', tons: 2, totalAmount: 200 });
+  ok((await getSal('sd-1')).due_date === DUE1, '[sal] update WITHOUT due_date preserves existing (not cleared)');
+  await call('PUT', '/api/sales/sd-1', { date: `${YEAR}-06-02`, customer: 'DueCust2', tons: 2, totalAmount: 200, due_date: DUE2 });
+  ok((await getSal('sd-1')).due_date === DUE2, '[sal] update WITH due_date changes it');
+  await call('POST', '/api/sales', { id: 'sd-0', date: `${YEAR}-06-01`, customer: 'NoDue', tons: 1, totalAmount: 100 });
+  ok((await getSal('sd-0')).due_date === null, '[sal] create WITHOUT due_date → null');
+}
+
 // ───────────── dashboard end-to-end (settings → report engine → financialStatement) ─────────────
 {
   const db = freshDb();

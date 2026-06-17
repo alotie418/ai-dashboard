@@ -37,8 +37,8 @@ async function create({ body }) {
 
   const snap = productSnapshot(db, data.product_id);
   db.prepare(`
-    INSERT INTO sales (id, date, customer, tons, pricePerTon, totalAmount, amountWithoutTax, taxAmount, taxRate, shippingCost, invoiceNumber, invoiceStatus, product_id, product_name_snapshot, unit_snapshot)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO sales (id, date, customer, tons, pricePerTon, totalAmount, amountWithoutTax, taxAmount, taxRate, shippingCost, invoiceNumber, invoiceStatus, product_id, product_name_snapshot, unit_snapshot, due_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     data.id,
     data.date,
@@ -55,6 +55,7 @@ async function create({ body }) {
     snap.id,
     snap.name,
     snap.unit,
+    data.due_date || null, // 未传/空 → null（与 list SELECT * 一致；payment 字段不在此处理）
   );
   return { success: true, id: data.id };
 }
@@ -85,12 +86,9 @@ async function update({ params, body }) {
     pid = snap.id; pname = snap.name; punit = snap.unit;
   }
 
-  const info = db.prepare(`
-    UPDATE sales SET date=?, customer=?, tons=?, pricePerTon=?, totalAmount=?,
-      amountWithoutTax=?, taxAmount=?, taxRate=?, shippingCost=?, invoiceNumber=?, invoiceStatus=?,
-      product_id=?, product_name_snapshot=?, unit_snapshot=?
-    WHERE id=?
-  `).run(
+  // due_date 仅在 body 显式提供时纳入 SET（部分更新）；未传则保留库中已有 due_date，不清空。
+  const setDueDate = data.due_date !== undefined;
+  const args = [
     data.date,
     safeString(data.customer),
     data.tons,
@@ -105,8 +103,15 @@ async function update({ params, body }) {
     pid,
     pname,
     punit,
-    id,
-  );
+  ];
+  if (setDueDate) args.push(data.due_date || null);
+  args.push(id);
+  const info = db.prepare(`
+    UPDATE sales SET date=?, customer=?, tons=?, pricePerTon=?, totalAmount=?,
+      amountWithoutTax=?, taxAmount=?, taxRate=?, shippingCost=?, invoiceNumber=?, invoiceStatus=?,
+      product_id=?, product_name_snapshot=?, unit_snapshot=?${setDueDate ? ', due_date=?' : ''}
+    WHERE id=?
+  `).run(...args);
   if (info.changes === 0) throw new Error('Sale not found');
   return { success: true };
 }
