@@ -1491,6 +1491,80 @@ test.describe('PR-2 → invoice query reconciliation ledger filter', () => {
     await expect(page.getByText('采购未收')).toHaveCount(0);
     await expect(page.getByText('销售待开')).toHaveCount(0);
   });
+
+  // The 进项明细 / 销项明细 tabs filter BOTH the ledger rows AND the summary stat cards
+  // by record type: 进项 = purchases (input), 销项 = sales (output). 全部发票 shows both.
+  // (Stat-card titles: 累计进项数量 / 累计销项数量 / 待处理进项税额.)
+  test('tabs filter rows + stat cards by type (进项明细 / 销项明细)', async ({ page }) => {
+    await bootComboIPC(page, ui, 'CN', {
+      apiResponses: [
+        { match: '/api/purchases', method: 'GET', json: purchasesSeed },
+        { match: '/api/sales', method: 'GET', json: salesSeed },
+      ],
+    });
+    await page.locator('i.fa-search-dollar').first().click();
+    await expect(page.getByText('发票核对台账')).toBeVisible({ timeout: 10_000 });
+    // Assert on the table TYPE column itself (进项 = purchase/input, 销项 = sale/output
+    // badges inside <tbody>), NOT on partner names — a row leaking into the wrong tab is
+    // caught by its actual type. After the ledger filter: 2 purchases pass (已收 + blank→已收),
+    // 1 sale passes (已开); 未收 / 待开 are hidden.
+    const inputBadges = page.locator('table tbody').getByText('进项', { exact: true });
+    const outputBadges = page.locator('table tbody').getByText('销项', { exact: true });
+
+    // 全部发票: the table holds both types + both summary cards
+    await expect(inputBadges).toHaveCount(2);
+    await expect(outputBadges).toHaveCount(1);
+    await expect(page.getByText('累计进项数量')).toBeVisible();
+    await expect(page.getByText('累计销项数量')).toBeVisible();
+
+    // 销项明细 (output) → the TYPE column must show NO 进项 row; 进项 cards hidden
+    await page.getByRole('button', { name: '销项明细' }).click();
+    await expect(outputBadges).toHaveCount(1);
+    await expect(inputBadges).toHaveCount(0);
+    await expect(page.getByText('累计销项数量')).toBeVisible();
+    await expect(page.getByText('累计进项数量')).toHaveCount(0);
+    await expect(page.getByText('待处理进项税额')).toHaveCount(0);
+
+    // 进项明细 (input) → the TYPE column must show NO 销项 row; 销项 card hidden
+    await page.getByRole('button', { name: '进项明细' }).click();
+    await expect(inputBadges).toHaveCount(2);
+    await expect(outputBadges).toHaveCount(0);
+    await expect(page.getByText('累计进项数量')).toBeVisible();
+    await expect(page.getByText('累计销项数量')).toHaveCount(0);
+  });
+
+  // Real-world repro: invoiceNo is optional, so blank-invoice rows fall back to a
+  // date+partner React key. When the SAME company is both a supplier and a customer on
+  // the SAME day, the purchase and the sale collide on that key — React can leave a stale
+  // row of the wrong type on the page when the tab filter changes. The TYPE column must
+  // still show zero 进项 under 销项明细.
+  test('row key collision (same partner+date, blank invoice) does not leak 进项 into 销项明细', async ({ page }) => {
+    await bootComboIPC(page, ui, 'CN', {
+      apiResponses: [
+        { match: '/api/purchases', method: 'GET', json: [
+          { id: 'pc-1', date: '2026-06-20', supplier: '甲公司', tons: 1, pricePerTon: 100, totalAmount: 113, amountWithoutTax: 100, taxAmount: 13, taxRate: 13, invoiceNumber: '', invoiceStatus: '已收', product_id: null },
+        ] },
+        { match: '/api/sales', method: 'GET', json: [
+          { id: 'sc-1', date: '2026-06-20', customer: '甲公司', tons: 1, pricePerTon: 100, totalAmount: 113, amountWithoutTax: 100, taxAmount: 13, taxRate: 13, shippingCost: 0, invoiceNumber: '', invoiceStatus: '已开', product_id: null },
+        ] },
+      ],
+    });
+    await page.locator('i.fa-search-dollar').first().click();
+    await expect(page.getByText('发票核对台账')).toBeVisible({ timeout: 10_000 });
+    const inputBadges = page.locator('table tbody').getByText('进项', { exact: true });
+    const outputBadges = page.locator('table tbody').getByText('销项', { exact: true });
+    // 全部发票: one of each type
+    await expect(inputBadges).toHaveCount(1);
+    await expect(outputBadges).toHaveCount(1);
+    // 销项明细: the colliding 进项 purchase must NOT remain in the table
+    await page.getByRole('button', { name: '销项明细' }).click();
+    await expect(outputBadges).toHaveCount(1);
+    await expect(inputBadges).toHaveCount(0);
+    // 进项明细: the colliding 销项 sale must NOT remain
+    await page.getByRole('button', { name: '进项明细' }).click();
+    await expect(inputBadges).toHaveCount(1);
+    await expect(outputBadges).toHaveCount(0);
+  });
 });
 
 test.afterAll(async () => {

@@ -85,7 +85,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
       const amountNoTax = Math.round(r.price / (1 + taxRate) * 100) / 100;
       const taxAmt = Math.round((r.price - amountNoTax) * 100) / 100;
       return {
-        date: r.date, typeKey: 'output' as const, partner: r.customer,
+        id: r.id, date: r.date, typeKey: 'output' as const, partner: r.customer,
         weight: `${parseTons(r.quantity)} ${unitLabel}`, amount: amountNoTax, tax: taxAmt,
         invoiceNo: r.invoiceNo, statusKey: r.status === '已开' ? 'issued' : 'pendingIssue',
         invoiceStatus: r.status,
@@ -96,7 +96,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
       const amountNoTax = Math.round(r.price / (1 + rate) * 100) / 100;
       const taxAmt = Math.round((r.price - amountNoTax) * 100) / 100;
       return {
-        date: r.date, typeKey: 'input' as const, partner: r.supplier,
+        id: r.id, date: r.date, typeKey: 'input' as const, partner: r.supplier,
         weight: `${parseTons(r.quantity)} ${unitLabel}`, amount: amountNoTax, tax: taxAmt,
         invoiceNo: r.invoiceNo, statusKey: r.status === '已收' ? 'certified' : 'pendingCert',
         invoiceStatus: r.status,
@@ -182,6 +182,11 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           color="text-amber-500"
           bg="bg-amber-500/10"
         />
+        {/* Stat cards follow the active ledger tab so the input/output views don't carry
+            the other type's summary: 进项 cards (累计进项 + 待认证 input tax) show on
+            全部/进项明细, 销项 card shows on 全部/销项明细; 当前库存 is a neutral KPI shown
+            always. Display-only — the stat computations in `stats` are unchanged. */}
+        {filterType !== 'output' && (
         <StatCard
           title={genLabel('invTotalInput', 'invoices.totalInput')}
           value={stats.totalInputWeight}
@@ -190,6 +195,8 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           color="text-primary"
           bg="bg-primary/10"
         />
+        )}
+        {filterType !== 'input' && (
         <StatCard
           title={genLabel('invTotalOutput', 'invoices.totalOutput')}
           value={stats.totalOutputWeight}
@@ -198,6 +205,8 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           color="text-emerald-600"
           bg="bg-emerald-500/10"
         />
+        )}
+        {filterType !== 'output' && (
         <StatCard
           title={genLabel('invPendingTax', 'invoices.pendingTax')}
           value={stats.pendingCertification}
@@ -206,6 +215,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           color="text-primary"
           bg="bg-primary/10"
         />
+        )}
       </div>
 
       {/* Search and Filters */}
@@ -344,7 +354,10 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
             </thead>
             <tbody className="divide-y divide-[#e0ddd5]">
               {filteredInvoices.map((inv) => (
-                <tr key={inv.invoiceNo || inv.date + inv.partner} className="group hover:bg-[#f9f9f8]/40 transition-all">
+                // Type-prefixed, id-based key so a purchase and a sale can never collide on
+                // the same React key (e.g. same partner+date with a blank invoice number),
+                // which could otherwise leave a stale wrong-type row when the tab changes.
+                <tr key={`${inv.typeKey}-${inv.id || inv.invoiceNo || inv.date + inv.partner}`} className="group hover:bg-[#f9f9f8]/40 transition-all">
                   <td className="px-8 py-5 text-sm text-[#4a4a48] whitespace-nowrap min-w-[7rem]">{inv.date}</td>
                   <td className="px-8 py-5 whitespace-nowrap min-w-[5rem]">
                     <span className={`inline-block whitespace-nowrap px-2 py-1 rounded text-[10px] font-bold ${inv.typeKey === 'output' ? 'bg-primary/10 text-primary' : 'bg-amber-500/10 text-amber-400'}`}>
