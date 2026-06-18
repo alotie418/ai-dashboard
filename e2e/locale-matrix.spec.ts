@@ -1565,6 +1565,26 @@ test.describe('PR-2 → invoice query reconciliation ledger filter', () => {
     await expect(inputBadges).toHaveCount(1);
     await expect(outputBadges).toHaveCount(0);
   });
+
+  // Pure UI color highlight: the real-time inventory number and the 进项 (input) type
+  // badge render red; the 销项 (output) badge keeps the primary color (unchanged).
+  test('UI colors: inventory number + 进项 badge red, 销项 stays primary', async ({ page }) => {
+    await bootComboIPC(page, ui, 'CN', {
+      apiResponses: [
+        { match: '/api/purchases', method: 'GET', json: purchasesSeed },
+        { match: '/api/sales', method: 'GET', json: salesSeed },
+      ],
+    });
+    await page.locator('i.fa-search-dollar').first().click();
+    await expect(page.getByText('发票核对台账')).toBeVisible({ timeout: 10_000 });
+    // real-time inventory number is red
+    await expect(page.locator('[data-testid="inventory-quantity"]')).toHaveClass(/text-rose-600/);
+    // 进项 (input) badge is red; 销项 (output) badge keeps the primary color (not red)
+    await expect(page.locator('table tbody').getByText('进项', { exact: true }).first()).toHaveClass(/text-rose-600/);
+    const outputBadge = page.locator('table tbody').getByText('销项', { exact: true }).first();
+    await expect(outputBadge).toHaveClass(/text-primary/);
+    await expect(outputBadge).not.toHaveClass(/text-rose-600/);
+  });
 });
 
 test.afterAll(async () => {
