@@ -242,21 +242,21 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
 
       {/* Main Data Table */}
       <div className="bg-white/80 border border-[#e0ddd5] rounded-xl overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
-        <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center bg-[#f9f9f8]/20">
-          <div>
+        <div className="p-8 border-b border-[#e0ddd5] flex flex-wrap justify-between items-center gap-4 bg-[#f9f9f8]/20">
+          <div className="min-w-0">
             <h3 className="text-xl font-bold text-[#191918]">{genLabel('invTableTitle', 'invoices.tableTitle')}</h3>
             <p className="text-sm text-[#5c5c5a] mt-1">{genLabel('invTableSubtitle', 'invoices.tableSubtitle')}</p>
           </div>
-          <div className="flex space-x-3">
+          <div className="flex space-x-3 shrink-0">
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center ${showAdvanced || hasAdvancedFilters ? 'bg-primary/10 text-primary border border-primary/30' : 'text-[#4a4a48] hover:text-[#191918] hover:bg-[#f0eeeb] border border-transparent'}`}
+              className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center whitespace-nowrap ${showAdvanced || hasAdvancedFilters ? 'bg-primary/10 text-primary border border-primary/30' : 'text-[#4a4a48] hover:text-[#191918] hover:bg-[#f0eeeb] border border-transparent'}`}
             >
               <i className={`fas fa-filter mr-2 ${hasAdvancedFilters ? 'text-primary' : ''}`}></i>
               {t('invoices.advancedFilter')}
               {hasAdvancedFilters && <span className="ml-2 w-2 h-2 bg-primary rounded-full"></span>}
             </button>
-            <button className="px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary-hover transition-all" style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}>
+            <button className="px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary-hover transition-all whitespace-nowrap" style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}>
               <i className="fas fa-download mr-2"></i> {t('invoices.export')}
             </button>
           </div>
@@ -366,11 +366,11 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                       {taxLabel(inv.typeKey === 'output' ? 'invoiceTypeOutput' : 'invoiceTypeInput')}
                     </span>
                   </td>
-                  <td className="px-8 py-5 text-sm font-bold text-[#191918] group-hover:text-[#191918] transition-colors">{inv.partner}</td>
+                  <td className="px-8 py-5 text-sm font-bold text-[#191918] group-hover:text-[#191918] transition-colors whitespace-nowrap">{inv.partner}</td>
                   <td className="px-8 py-5 text-sm font-mono text-[#5c5c5a]">{inv.weight}</td>
-                  <td className="px-8 py-5 text-sm text-right font-bold text-[#191918]">{fmtMoney(inv.amount)}</td>
-                  <td className="px-8 py-5 text-sm text-right text-[#4a4a48]">{fmtMoney(inv.tax)}</td>
-                  <td className="px-8 py-5 text-sm font-mono text-[#5c5c5a] tracking-tighter">{inv.invoiceNo}</td>
+                  <td className="px-8 py-5 text-sm text-right font-bold text-[#191918] whitespace-nowrap">{fmtMoney(inv.amount)}</td>
+                  <td className="px-8 py-5 text-sm text-right text-[#4a4a48] whitespace-nowrap">{fmtMoney(inv.tax)}</td>
+                  <td className="px-8 py-5 text-sm font-mono text-[#5c5c5a] tracking-tighter whitespace-nowrap">{inv.invoiceNo}</td>
                   <td className="px-8 py-5 text-center">
                     <StatusBadge statusKey={inv.statusKey} accLocale={accLocale} uiLang={uiLang} />
                   </td>
