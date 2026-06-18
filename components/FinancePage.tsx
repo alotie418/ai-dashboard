@@ -276,7 +276,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
 
       {/* Loading / Error */}
       {loading && (
-        <div className="text-center py-8 text-sm text-[#7a7a78]">
+        <div className="text-center py-8 text-sm text-[#5c5c5a]">
           <i className="fas fa-spinner fa-spin mr-2 text-primary"></i>{t('common.loading')}
         </div>
       )}
@@ -332,7 +332,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
             <i className="fas fa-scale-balanced text-6xl mb-6 opacity-20"></i>
             <h3 className="text-xl font-medium">{t('finance.balanceComingSoonTitle')}</h3>
             <p className="mt-2 text-sm max-w-md">{t('finance.balanceComingSoonDesc')}</p>
-            <span className="mt-6 inline-flex items-center px-3 py-1 rounded-full text-[11px] bg-[#f0eeeb] text-[#7a7a78] border border-[#e0ddd5]">
+            <span className="mt-6 inline-flex items-center px-3 py-1 rounded-full text-[11px] bg-[#f0eeeb] text-[#5c5c5a] border border-[#e0ddd5]">
               <i className="fas fa-clock mr-1.5"></i>{t('finance.comingSoonBadge')}
             </span>
           </div>
@@ -344,7 +344,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
             <i className="fas fa-faucet-drip text-6xl mb-6 opacity-20"></i>
             <h3 className="text-xl font-medium">{t('finance.cashflowTitle')}</h3>
             <p className="mt-2 text-sm max-w-md">{t('finance.cashflowDesc')}</p>
-            <span className="mt-6 inline-flex items-center px-3 py-1 rounded-full text-[11px] bg-[#f0eeeb] text-[#7a7a78] border border-[#e0ddd5]">
+            <span className="mt-6 inline-flex items-center px-3 py-1 rounded-full text-[11px] bg-[#f0eeeb] text-[#5c5c5a] border border-[#e0ddd5]">
               <i className="fas fa-clock mr-1.5"></i>{t('finance.comingSoonBadge')}
             </span>
           </div>
@@ -352,12 +352,12 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
       </div>
 
       {/* PR-E1: the report is a management estimate, not a statutory financial statement. */}
-      <p className="text-[11px] text-[#7a7a78] leading-snug px-2">
+      <p className="text-[11px] text-[#5c5c5a] leading-snug px-2">
         <i className="fas fa-circle-info mr-1.5"></i>{t('disclaimer.report')}
       </p>
       {/* Phase 2: gentle data-source notice — business records and 收支记录 are separate
           ledgers; reconcile when both are used in the same period. */}
-      <p className="text-[11px] text-[#7a7a78] leading-snug px-2">
+      <p className="text-[11px] text-[#5c5c5a] leading-snug px-2">
         <i className="fas fa-circle-info mr-1.5"></i>{t('common.dataSourceNote')}
       </p>
     </div>
@@ -462,7 +462,7 @@ const GenericPL: React.FC<{
           <LineItem label={lbl('outputTax')} value={fmt(vatSummary.cumulativeOutput || vatSummary.collected || vatSummary.outputVAT || 0)} />
           <LineItem label={lbl('estimatedTax')} value={fmt(vatSummary.estimatedPayable || vatSummary.payable || vatSummary.vatPayable || 0)} bold primary />
           {/* PR-E1: estimated tax for management reference, not a filing basis. */}
-          <p className="px-4 pt-1 text-[10px] text-[#7a7a78] leading-snug">{t('disclaimer.tax')}</p>
+          <p className="px-4 pt-1 text-[10px] text-[#5c5c5a] leading-snug">{t('disclaimer.tax')}</p>
         </div>
       )}
 

@@ -86,7 +86,7 @@ const ChatPanel: React.FC = () => {
               )}
               {/* R2b-1：只读查账工具轨迹「已查询：…」。未知工具名兜底显示原始名，绝不裸 key。 */}
               {m.role !== 'user' && m.toolTrace && m.toolTrace.length > 0 && (
-                <div className="mt-2 pt-2 border-t border-[#e0ddd5] flex items-center flex-wrap gap-x-1 text-[10px] text-[#7a7a78]">
+                <div className="mt-2 pt-2 border-t border-[#e0ddd5] flex items-center flex-wrap gap-x-1 text-[10px] text-[#5c5c5a]">
                   <i className="fas fa-search mr-1 text-primary"></i>
                   <span className="font-semibold">{t('chat.toolTraceTitle')}：</span>
                   <span>{m.toolTrace.map((tt) => t(`chat.toolLabel.${tt.name}`, { defaultValue: tt.name })).join(' · ')}</span>
@@ -95,7 +95,7 @@ const ChatPanel: React.FC = () => {
             </div>
           </div>
         ))}
-        {isTyping && <div className="text-[#7a7a78] text-[10px] font-bold uppercase tracking-widest animate-pulse flex items-center space-x-2"><div className="w-1 h-1 bg-[#a0a09c] rounded-full"></div><span>{t('chat.thinking')}</span></div>}
+        {isTyping && <div className="text-[#5c5c5a] text-[10px] font-bold uppercase tracking-widest animate-pulse flex items-center space-x-2"><div className="w-1 h-1 bg-[#a0a09c] rounded-full"></div><span>{t('chat.thinking')}</span></div>}
         <div ref={chatEndRef} />
       </div>
 
@@ -115,14 +115,14 @@ const ChatPanel: React.FC = () => {
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
             placeholder={t('chat.placeholder')}
-            className="flex-1 bg-white border border-[#e0ddd5] rounded-xl px-5 py-3.5 text-xs outline-none focus:border-primary text-[#191918] placeholder:text-[#7a7a78] transition-all"
+            className="flex-1 bg-white border border-[#e0ddd5] rounded-xl px-5 py-3.5 text-xs outline-none focus:border-primary text-[#191918] placeholder:text-[#5c5c5a] transition-all"
           />
           <button type="submit" disabled={!chatInput.trim() || isTyping} className="w-12 h-12 bg-primary rounded-xl text-white hover:bg-primary-hover disabled:opacity-30 transition-all flex items-center justify-center shrink-0 active:scale-90" style={{ boxShadow: '0 4px 24px rgba(39,76,146,0.2)' }}>
             <SendIcon />
           </button>
         </form>
         {/* PR-E1: AI answers are management estimates, not professional tax/accounting advice. */}
-        <p className="mt-2 text-[10px] text-[#7a7a78] leading-snug text-center px-2">{t('disclaimer.ai')}</p>
+        <p className="mt-2 text-[10px] text-[#5c5c5a] leading-snug text-center px-2">{t('disclaimer.ai')}</p>
       </div>
     </>
   );

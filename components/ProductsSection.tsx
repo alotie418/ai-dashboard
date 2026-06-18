@@ -78,7 +78,7 @@ const ProductsSection: React.FC = () => {
       )}
 
       {loading ? (
-        <div className="text-sm text-[#7a7a78] py-6 text-center">
+        <div className="text-sm text-[#5c5c5a] py-6 text-center">
           <i className="fas fa-spinner fa-spin mr-2"></i>{t('common.loading')}
         </div>
       ) : (
@@ -97,7 +97,7 @@ const ProductsSection: React.FC = () => {
             </thead>
             <tbody>
               {items.length === 0 && (
-                <tr><td colSpan={6} className="text-center text-[#7a7a78] py-6 text-xs">{t('products.empty')}</td></tr>
+                <tr><td colSpan={6} className="text-center text-[#5c5c5a] py-6 text-xs">{t('products.empty')}</td></tr>
               )}
               {items.map(p => (
                 <tr key={p.id} className="border-t border-[#e0ddd5]/70 hover:bg-[#f9f9f8]/40">
@@ -173,7 +173,7 @@ const ProductsSection: React.FC = () => {
           </div>
         </div>
       ) : (
-        <button onClick={() => setShowAddForm(true)} className="w-full border-2 border-dashed border-[#e0ddd5] text-sm text-[#7a7a78] hover:text-primary hover:border-primary/50 rounded-xl py-3 transition-colors">
+        <button onClick={() => setShowAddForm(true)} className="w-full border-2 border-dashed border-[#e0ddd5] text-sm text-[#5c5c5a] hover:text-primary hover:border-primary/50 rounded-xl py-3 transition-colors">
           <i className="fas fa-plus mr-1.5"></i>{t('products.addButton')}
         </button>
       )}

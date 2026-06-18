@@ -36,12 +36,12 @@ const ConversationSidebar: React.FC = () => {
           <i className="fas fa-plus mr-2 text-[10px]"></i>{t('chat.newConversation')}
         </button>
       </div>
-      <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-[#7a7a78] shrink-0">
+      <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-[#5c5c5a] shrink-0">
         {t('chat.historyTitle')}
       </div>
       <div className="flex-1 overflow-y-auto custom-scrollbar px-2 pb-3 space-y-1">
         {conversations.length === 0 && (
-          <p className="px-2 py-3 text-[11px] text-[#7a7a78] italic">{t('chat.noHistory')}</p>
+          <p className="px-2 py-3 text-[11px] text-[#5c5c5a] italic">{t('chat.noHistory')}</p>
         )}
         {conversations.map((c) => {
           const active = c.id === activeConversationId;
@@ -89,14 +89,14 @@ const ConversationSidebar: React.FC = () => {
                     <button
                       onClick={(e) => { e.stopPropagation(); startRename(c.id, c.title || ''); }}
                       title={t('chat.renameConversation')}
-                      className="text-[#7a7a78] hover:text-primary text-[10px] w-5 h-5 flex items-center justify-center"
+                      className="text-[#5c5c5a] hover:text-primary text-[10px] w-5 h-5 flex items-center justify-center"
                     >
                       <i className="fas fa-pen"></i>
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(c.id); }}
                       title={t('chat.deleteConversation')}
-                      className="text-[#7a7a78] hover:text-rose-500 text-[10px] w-5 h-5 flex items-center justify-center"
+                      className="text-[#5c5c5a] hover:text-rose-500 text-[10px] w-5 h-5 flex items-center justify-center"
                     >
                       <i className="fas fa-trash"></i>
                     </button>

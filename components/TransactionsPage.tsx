@@ -174,29 +174,29 @@ const TransactionsPage: React.FC = () => {
           <div className="bg-white/80 border border-[#e0ddd5] p-5 rounded-xl">
             <p className="text-[10px] uppercase tracking-widest text-[#5c5c5a] font-bold">{t('transactions.totalIncome', 'Total Income')}</p>
             <p className="text-xl font-bold text-emerald-600 mt-1">{money(summary.income.total)}</p>
-            <p className="text-[11px] text-[#7a7a78]">{summary.income.count} {t('transactions.items', 'items')}</p>
+            <p className="text-[11px] text-[#5c5c5a]">{summary.income.count} {t('transactions.items', 'items')}</p>
           </div>
           <div className="bg-white/80 border border-[#e0ddd5] p-5 rounded-xl">
             <p className="text-[10px] uppercase tracking-widest text-[#5c5c5a] font-bold">{t('transactions.totalExpense', 'Total Expense')}</p>
             <p className="text-xl font-bold text-rose-500 mt-1">{money(summary.expense.total)}</p>
-            <p className="text-[11px] text-[#7a7a78]">{summary.expense.count} {t('transactions.items', 'items')}</p>
+            <p className="text-[11px] text-[#5c5c5a]">{summary.expense.count} {t('transactions.items', 'items')}</p>
           </div>
           <div className="bg-white/80 border border-[#e0ddd5] p-5 rounded-xl">
             <p className="text-[10px] uppercase tracking-widest text-[#5c5c5a] font-bold">{t('transactions.netIncome', 'Net Income')}</p>
             <p className={`text-xl font-bold mt-1 ${summary.net >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>{money(summary.net)}</p>
             {/* Net income shows a formula hint, never a record count (it is income − expense, not a list) */}
-            <p className="text-[11px] text-[#7a7a78]">{t('transactions.netIncomeFormula', 'Income - Expense')}</p>
+            <p className="text-[11px] text-[#5c5c5a]">{t('transactions.netIncomeFormula', 'Income - Expense')}</p>
           </div>
         </div>
       )}
       {/* PR-B: tax-basis note for the income/expense totals (kept off the tight 10px card titles) */}
-      {summary && <p className="text-[11px] text-[#7a7a78] px-1">{t('transactions.amountBasisNote')}</p>}
+      {summary && <p className="text-[11px] text-[#5c5c5a] px-1">{t('transactions.amountBasisNote')}</p>}
 
       {/* Income / Expense Tab */}
       <div className="flex border-b border-[#e0ddd5]">
         {(['expense', 'income'] as TransactionType[]).map(tp => (
           <button key={tp} onClick={() => setActiveType(tp)}
-            className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeType === tp ? 'border-primary text-primary' : 'border-transparent text-[#7a7a78] hover:text-[#4a4a48]'}`}>
+            className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeType === tp ? 'border-primary text-primary' : 'border-transparent text-[#5c5c5a] hover:text-[#4a4a48]'}`}>
             {tp === 'expense' ? t('transactions.expense', 'Expenses') : t('transactions.income', 'Income')}
           </button>
         ))}
@@ -210,7 +210,7 @@ const TransactionsPage: React.FC = () => {
 
       {/* Table */}
       {loading ? (
-        <div className="text-center py-10 text-sm text-[#7a7a78]"><i className="fas fa-spinner fa-spin mr-2 text-primary"></i>{t('common.loading')}</div>
+        <div className="text-center py-10 text-sm text-[#5c5c5a]"><i className="fas fa-spinner fa-spin mr-2 text-primary"></i>{t('common.loading')}</div>
       ) : (
         <div className="border border-[#e0ddd5] rounded-xl overflow-hidden bg-white/80">
           {/* overflow-x-auto: small screens scroll horizontally instead of squeezing columns */}
@@ -244,7 +244,7 @@ const TransactionsPage: React.FC = () => {
             </thead>
             <tbody>
               {transactions.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-10 text-[#7a7a78]">{t('transactions.empty', 'No transactions yet. Click "New Transaction" to add one.')}</td></tr>
+                <tr><td colSpan={7} className="text-center py-10 text-[#5c5c5a]">{t('transactions.empty', 'No transactions yet. Click "New Transaction" to add one.')}</td></tr>
               ) : transactions.map(txn => (
                 <tr key={txn.id} className="border-t border-[#e0ddd5]/70 hover:bg-[#f9f9f8]/40">
                   <td className="px-4 py-2.5 text-[#191918] whitespace-nowrap">{fmtDate(txn.date)}</td>
@@ -252,7 +252,7 @@ const TransactionsPage: React.FC = () => {
                   <td className="px-4 py-2.5 truncate">
                     <span className="inline-block max-w-full truncate align-middle text-xs bg-[#f0eeeb] px-2 py-0.5 rounded" title={getCategoryLabel(txn.category_id)}>{getCategoryLabel(txn.category_id)}</span>
                   </td>
-                  <td className="px-4 py-2.5 text-[11px] text-[#7a7a78] font-mono truncate" title={getCategoryScheduleLine(txn.category_id) || ''}>{getCategoryScheduleLine(txn.category_id) || '—'}</td>
+                  <td className="px-4 py-2.5 text-[11px] text-[#5c5c5a] font-mono truncate" title={getCategoryScheduleLine(txn.category_id) || ''}>{getCategoryScheduleLine(txn.category_id) || '—'}</td>
                   <td className="px-4 py-2.5 text-right font-mono font-medium whitespace-nowrap">{fmt(txn.amount)}</td>
                   <td className="px-4 py-2.5 text-center whitespace-nowrap">
                     <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${txn.payment_status === 'paid' ? 'bg-emerald-50 text-emerald-600' : txn.payment_status === 'partial' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
@@ -309,7 +309,7 @@ const TransactionsPage: React.FC = () => {
             <div>
               <label className="block text-xs font-medium text-[#4a4a48] mb-1">
                 {catHeaderLabel}
-                <span className="text-[#7a7a78] font-normal ml-2">→ {mapsToLabel}</span>
+                <span className="text-[#5c5c5a] font-normal ml-2">→ {mapsToLabel}</span>
               </label>
               <select value={form.category_id || ''} onChange={e => setForm(f => ({ ...f, category_id: e.target.value || undefined }))}
                 className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm bg-white">

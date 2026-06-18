@@ -420,7 +420,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                   </button>
                 </div>
                 {/* PR-E1: AI forecast is a management estimate, not professional advice. */}
-                <p className="mt-4 text-[10px] text-[#7a7a78] leading-snug max-w-2xl">{t('disclaimer.ai')}</p>
+                <p className="mt-4 text-[10px] text-[#5c5c5a] leading-snug max-w-2xl">{t('disclaimer.ai')}</p>
               </div>
             )}
           </div>
@@ -491,7 +491,7 @@ ${t('analysis.forecastPromptRequirements')}`;
             ) : (
               /* 全期 mom/yoy 均无基期 → 不画假趋势，显式空态 */
               <div className="h-[260px] flex items-center justify-center text-center px-4">
-                <p className="text-xs text-[#7a7a78] italic">{t('analysis.insufficientHistory')}</p>
+                <p className="text-xs text-[#5c5c5a] italic">{t('analysis.insufficientHistory')}</p>
               </div>
             )}
           </PanoramaCard>

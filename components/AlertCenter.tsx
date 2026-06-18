@@ -117,7 +117,7 @@ const AlertCenter: React.FC = () => {
       {/* Bell Icon */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-lg hover:bg-[#f0eeeb] transition-colors text-[#7a7a78] hover:text-[#191918]"
+        className="relative p-2 rounded-lg hover:bg-[#f0eeeb] transition-colors text-[#5c5c5a] hover:text-[#191918]"
         title={t('alerts.notifications')}
       >
         <i className="fas fa-bell text-lg"></i>
@@ -136,7 +136,7 @@ const AlertCenter: React.FC = () => {
             <h4 className="text-sm font-bold text-[#191918]">
               <i className="fas fa-bell mr-1.5 text-primary"></i>
               {t('alerts.title')}
-              {unreadCount > 0 && <span className="ml-2 text-xs text-[#7a7a78]">({unreadCount} {t('alerts.unread')})</span>}
+              {unreadCount > 0 && <span className="ml-2 text-xs text-[#5c5c5a]">({unreadCount} {t('alerts.unread')})</span>}
             </h4>
             {unreadCount > 0 && (
               <button onClick={handleMarkAllRead} className="text-xs text-primary hover:text-primary-hover">
@@ -152,7 +152,7 @@ const AlertCenter: React.FC = () => {
                 <i className="fas fa-spinner fa-spin text-primary"></i>
               </div>
             ) : alerts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-[#7a7a78]">
+              <div className="flex flex-col items-center justify-center py-12 text-[#5c5c5a]">
                 <i className="fas fa-check-circle text-3xl text-green-400 mb-2"></i>
                 <p className="text-sm">{t('alerts.empty')}</p>
               </div>
@@ -177,7 +177,7 @@ const AlertCenter: React.FC = () => {
                           {!alert.is_read && <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>}
                         </div>
                         <p className="text-sm font-medium text-[#191918] truncate">{alert.title}</p>
-                        <p className="text-xs text-[#7a7a78] mt-0.5 line-clamp-2">{alert.message}</p>
+                        <p className="text-xs text-[#5c5c5a] mt-0.5 line-clamp-2">{alert.message}</p>
                         <p className="text-[10px] text-[#b0b0ae] mt-1">{formatTime(alert.created_at)}</p>
                       </div>
                       <button

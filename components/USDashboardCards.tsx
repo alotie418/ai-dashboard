@@ -68,12 +68,12 @@ const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice,
           <div className="border-t border-[#e0ddd5] mx-4 my-1"></div>
           <Row label={label('quarterlyTax')} value={fmt(est.quarterlyPayment)} bold primary />
           {est.dueDates && (
-            <div className="px-6 py-1 text-[10px] text-[#7a7a78]">
+            <div className="px-6 py-1 text-[10px] text-[#5c5c5a]">
               {label('dueLabel')}: {est.dueDates.join(' · ')}
             </div>
           )}
           {/* PR-E1: SE-tax / quarterly figures are estimates, not a filing basis. */}
-          <p className="px-6 pt-1 pb-3 text-[10px] text-[#7a7a78] leading-snug">{t('disclaimer.usTax')}</p>
+          <p className="px-6 pt-1 pb-3 text-[10px] text-[#5c5c5a] leading-snug">{t('disclaimer.usTax')}</p>
         </div>
       </div>
 
