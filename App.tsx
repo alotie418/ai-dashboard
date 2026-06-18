@@ -357,15 +357,22 @@ const AppContent: React.FC = () => {
         </div>
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
           <NavItem icon="fa-th-large" label={t('nav.dashboard')} active={currentPage === 'dashboard'} expanded={sidebarOpen} onClick={() => setCurrentPage('dashboard')} />
+
+          {/* 业务记录 — business records */}
+          <NavSection label={t('nav.sectionBusiness')} expanded={sidebarOpen} />
           <NavItem icon="fa-file-import" label={assistantAccLocale !== 'CN' ? getTaxLabel(assistantAccLocale, i18n.language, 'navPurchase') : t('nav.purchase')} active={currentPage === 'purchase'} expanded={sidebarOpen} onClick={() => setCurrentPage('purchase')} />
           <NavItem icon="fa-file-export" label={assistantAccLocale !== 'CN' ? getTaxLabel(assistantAccLocale, i18n.language, 'navSales') : t('nav.sales')} active={currentPage === 'sales'} expanded={sidebarOpen} onClick={() => setCurrentPage('sales')} />
-          <NavItem icon="fa-search-dollar" label={assistantAccLocale !== 'CN' ? getTaxLabel(assistantAccLocale, i18n.language, 'invQueryTitle') : t('nav.inventory')} active={currentPage === 'inventory'} expanded={sidebarOpen} onClick={() => setCurrentPage('inventory')} />
           <NavItem icon="fa-file-contract" label={t('nav.documents')} active={currentPage === 'documents'} expanded={sidebarOpen} onClick={() => setCurrentPage('documents')} />
+
+          {/* 账务核对 — accounting reconciliation */}
+          <NavSection label={t('nav.sectionAccounting')} expanded={sidebarOpen} />
+          <NavItem icon="fa-search-dollar" label={assistantAccLocale !== 'CN' ? getTaxLabel(assistantAccLocale, i18n.language, 'invQueryTitle') : t('nav.inventory')} active={currentPage === 'inventory'} expanded={sidebarOpen} onClick={() => setCurrentPage('inventory')} />
+          <NavItem icon="fa-handshake" label={t('nav.accounts')} active={currentPage === 'accounts'} expanded={sidebarOpen} onClick={() => setCurrentPage('accounts')} />
+          <NavItem icon="fa-exchange-alt" label={t('nav.transactions')} active={currentPage === 'transactions'} expanded={sidebarOpen} onClick={() => setCurrentPage('transactions')} />
+          <NavItem icon="fa-wallet" label={t('nav.finance')} active={currentPage === 'finance'} expanded={sidebarOpen} onClick={() => setCurrentPage('finance')} />
+
           <NavItem icon="fa-chart-pie" label={t('nav.analysis')} active={currentPage === 'analysis'} expanded={sidebarOpen} onClick={() => setCurrentPage('analysis')} />
           <NavItem icon="fa-comments" label={t('nav.assistant')} active={currentPage === 'assistant'} expanded={sidebarOpen} onClick={() => setCurrentPage('assistant')} />
-          <NavItem icon="fa-handshake" label={t('nav.accounts')} active={currentPage === 'accounts'} expanded={sidebarOpen} onClick={() => setCurrentPage('accounts')} />
-          <NavItem icon="fa-wallet" label={t('nav.finance')} active={currentPage === 'finance'} expanded={sidebarOpen} onClick={() => setCurrentPage('finance')} />
-          <NavItem icon="fa-exchange-alt" label={t('nav.transactions')} active={currentPage === 'transactions'} expanded={sidebarOpen} onClick={() => setCurrentPage('transactions')} />
           {assistantAccLocale === 'US' && (
             <NavItem icon="fa-flag-usa" label={t('nav.usTax')} active={currentPage === 'ustax'} expanded={sidebarOpen} onClick={() => setCurrentPage('ustax')} />
           )}
@@ -487,6 +494,15 @@ const NavItem: React.FC<{ icon: string; label: string; active?: boolean; expande
     <i className={`fas ${icon} text-base ${expanded ? 'mr-4' : 'mx-auto'} w-5 text-center group-hover:scale-110 transition-transform`}></i>
     {expanded && <span className="text-sm font-medium">{label}</span>}
   </div>
+);
+
+// Sidebar section header (业务记录 / 账务核对). Visual grouping only — no routing change.
+// Expanded: a small uppercase label. Collapsed: a divider so groups stay separated
+// without text misaligning the icon-only rail.
+const NavSection: React.FC<{ label: string; expanded?: boolean }> = ({ label, expanded = true }) => (
+  expanded
+    ? <p className="px-3 pt-4 pb-1 text-[10px] font-bold text-[#9c9c9a] uppercase tracking-widest select-none">{label}</p>
+    : <div className="mx-3 my-2 border-t border-[#e0ddd5]" aria-hidden="true" />
 );
 
 export default AuthWrapper;

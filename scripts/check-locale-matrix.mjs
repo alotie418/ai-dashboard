@@ -99,6 +99,8 @@ const US_SCHEDULE_LINE_KEYS = [
 
 // i18n keys that MUST exist in every locale file
 const REQUIRED_I18N_KEYS = [
+  // sidebar nav section headers (Phase 1b grouping)
+  'nav.sectionBusiness', 'nav.sectionAccounting',
   // chat panel
   'chat.title', 'chat.status', 'chat.welcome', 'chat.welcomeDesc', 'chat.placeholder',
   'chat.uploadInvoice', 'chat.financeQuery', 'chat.trendAnalysis', 'chat.marketAnalysis', 'chat.inventoryQuery',

@@ -47,6 +47,8 @@
     "settings": "시스템 설정",
     "transactions": "거래 기록",
     "usTax": "미국 세무 도구",
+    "sectionBusiness": "업무 기록",
+    "sectionAccounting": "장부 대조",
     "logout": "로그아웃"
   },
   "headerTitle": {

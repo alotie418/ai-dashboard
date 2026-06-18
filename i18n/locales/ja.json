@@ -47,6 +47,8 @@
     "settings": "システム設定",
     "transactions": "取引記録",
     "usTax": "米国税務ツール",
+    "sectionBusiness": "業務記録",
+    "sectionAccounting": "帳簿照合",
     "logout": "ログアウト"
   },
   "headerTitle": {
