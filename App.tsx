@@ -262,7 +262,7 @@ const AppContent: React.FC = () => {
               </div>
               {/* Phase 2: gentle data-source notice — business records and 收支记录 are
                   separate ledgers; reconcile when both are used in the same period. */}
-              <p className="text-[11px] text-[#7a7a78] leading-snug px-1">
+              <p className="text-[11px] text-[#5c5c5a] leading-snug px-1">
                 <i className="fas fa-circle-info mr-1.5"></i>{t('common.dataSourceNote')}
               </p>
               {/* Phase 3: per-product inventory detail (each line keeps its own unit) */}

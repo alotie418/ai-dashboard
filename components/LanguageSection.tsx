@@ -20,7 +20,7 @@ const LanguageSection: React.FC = () => {
           <li>{t('settings.language.scopeYes1', 'Menus, buttons, labels, help text')}</li>
           <li>{t('settings.language.scopeYes2', 'AI response language')}</li>
         </ul>
-        <div className="text-[11px] text-[#7a7a78] mt-1">
+        <div className="text-[11px] text-[#5c5c5a] mt-1">
           <i className="fas fa-exclamation-circle mr-1 text-amber-500"></i>
           {t('settings.language.scopeNo', 'Does NOT change tax rules, currency, report structure, or categories. Those are controlled by Accounting Basis.')}
         </div>
@@ -43,7 +43,7 @@ const LanguageSection: React.FC = () => {
               <span className="text-2xl mr-3">{lang.flag}</span>
               <div className="flex-1 text-left">
                 <div className="text-sm font-semibold text-[#191918]">{lang.label}</div>
-                <div className="text-[10px] text-[#7a7a78] mt-0.5 font-mono">{lang.code}</div>
+                <div className="text-[10px] text-[#5c5c5a] mt-0.5 font-mono">{lang.code}</div>
               </div>
               {selected && <i className="fas fa-check-circle text-primary text-lg"></i>}
             </button>
@@ -51,7 +51,7 @@ const LanguageSection: React.FC = () => {
         })}
       </div>
 
-      <div className="text-[11px] text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3">
+      <div className="text-[11px] text-[#5c5c5a] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3">
         <i className="fas fa-info-circle mr-1.5 text-primary"></i>
         {t('settings.language.note')}
       </div>

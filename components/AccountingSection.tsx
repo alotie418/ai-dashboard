@@ -77,7 +77,7 @@ const AccountingSection: React.FC = () => {
           <li>{t('settings.accounting.scopeYes2', 'Default currency and report structure')}</li>
           <li>{t('settings.accounting.scopeYes3', 'Dashboard metrics, categories, and AI finance context')}</li>
         </ul>
-        <div className="text-[11px] text-[#7a7a78] mt-1">
+        <div className="text-[11px] text-[#5c5c5a] mt-1">
           <i className="fas fa-exclamation-circle mr-1 text-amber-500"></i>
           {t('settings.accounting.scopeNo', 'Does NOT change the display language. Menus and labels stay in your chosen UI Language.')}
         </div>
@@ -127,7 +127,7 @@ const AccountingSection: React.FC = () => {
       </div>
 
       {/* PR-E1: preset rates are reference values; verify against current official rates. */}
-      <p className="text-[11px] text-[#7a7a78] leading-snug"><i className="fas fa-circle-info mr-1.5"></i>{t('disclaimer.rates')}</p>
+      <p className="text-[11px] text-[#5c5c5a] leading-snug"><i className="fas fa-circle-info mr-1.5"></i>{t('disclaimer.rates')}</p>
 
       {/* 当前生效参数（可手动微调） */}
       <div className="border border-[#e0ddd5] rounded-xl p-5 bg-[#f9f9f8]/30 space-y-3">
@@ -175,7 +175,7 @@ const AccountingSection: React.FC = () => {
           {saving ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('common.saving')}</> : t('common.save')}
         </button>
         {(profile.notesByLang?.[lang] || profile.notes) && (
-          <div className="text-[10px] text-[#7a7a78] bg-white border border-[#e0ddd5] rounded p-2 mt-2">
+          <div className="text-[10px] text-[#5c5c5a] bg-white border border-[#e0ddd5] rounded p-2 mt-2">
             <i className="fas fa-info-circle mr-1 text-primary"></i>
             {profile.notesByLang?.[lang] || profile.notes}
           </div>

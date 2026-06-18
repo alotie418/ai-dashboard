@@ -294,7 +294,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
               <label className="block text-xs font-semibold text-[#4a4a48] mb-2">
                 <i className="fas fa-language mr-1.5 text-blue-500"></i>
                 {t('settings.language.title', 'Interface Language')}
-                <span className="text-[#7a7a78] font-normal ml-2">— {t('settings.language.scopeNo', 'Only affects menus, buttons, labels')}</span>
+                <span className="text-[#5c5c5a] font-normal ml-2">— {t('settings.language.scopeNo', 'Only affects menus, buttons, labels')}</span>
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {SUPPORTED_LANGUAGES.map(lang => {
@@ -317,7 +317,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
               <label className="block text-xs font-semibold text-[#4a4a48] mb-2">
                 <i className="fas fa-balance-scale mr-1.5 text-emerald-500"></i>
                 {t('settings.accounting.title', 'Accounting Basis')}
-                <span className="text-[#7a7a78] font-normal ml-2">— {t('settings.accounting.scopeNo', 'Controls tax rules, currency, reports')}</span>
+                <span className="text-[#5c5c5a] font-normal ml-2">— {t('settings.accounting.scopeNo', 'Controls tax rules, currency, reports')}</span>
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {(Object.keys(ACCOUNTING_PROFILES) as string[]).map(code => {
@@ -331,7 +331,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                       <span className="text-lg mr-2">{p.flag}</span>
                       <div className="flex-1 text-left">
                         <span className="font-medium text-[#191918]">{name}</span>
-                        <div className="text-[10px] text-[#7a7a78]">{p.currency} {p.currencySymbol}</div>
+                        <div className="text-[10px] text-[#5c5c5a]">{p.currency} {p.currencySymbol}</div>
                       </div>
                       {sel && <i className="fas fa-check-circle text-emerald-500 ml-auto"></i>}
                     </button>
@@ -421,7 +421,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                         )}
                         <div>
                           <div className="text-sm font-semibold text-[#191918]">{name}</div>
-                          <div className="text-[11px] text-[#7a7a78]">
+                          <div className="text-[11px] text-[#5c5c5a]">
                             {form.saved ? t('onboarding.savedBadge') : t('onboarding.clickToExpand')}
                           </div>
                         </div>
@@ -430,7 +430,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                         {form.saved && defaultProvider === p.provider && (
                           <span className="text-[10px] font-bold bg-primary text-white px-2 py-1 rounded uppercase">{t('onboarding.defaultBadge')}</span>
                         )}
-                        <i className={`fas fa-chevron-${expanded ? 'up' : 'down'} text-[#7a7a78] text-xs`}></i>
+                        <i className={`fas fa-chevron-${expanded ? 'up' : 'down'} text-[#5c5c5a] text-xs`}></i>
                       </div>
                     </button>
 
@@ -477,7 +477,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                           </div>
                           {/* 自由编辑 model ID（高级用法：代理网关 / 自定义模型） */}
                           <details className="text-xs">
-                            <summary className="text-[#7a7a78] cursor-pointer hover:text-[#4a4a48] select-none">
+                            <summary className="text-[#5c5c5a] cursor-pointer hover:text-[#4a4a48] select-none">
                               <i className="fas fa-code text-[10px] mr-1"></i>
                               {t('settings.ai.advancedInput')}
                             </summary>
@@ -488,7 +488,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                               placeholder={p.defaultModel}
                               className="w-full mt-2 px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm bg-white focus:outline-none focus:border-primary font-mono"
                             />
-                            <p className="text-[10px] text-[#7a7a78] mt-1">
+                            <p className="text-[10px] text-[#5c5c5a] mt-1">
                               {t('settings.ai.currentModelId')}: <code className="bg-[#f0eeeb] px-1.5 py-0.5 rounded">{form.model}</code>
                             </p>
                           </details>
@@ -589,7 +589,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#4a4a48] mb-2">{t('onboarding.industry')} <span className="text-[#7a7a78] font-normal">{t('onboarding.optional')}</span></label>
+              <label className="block text-xs font-medium text-[#4a4a48] mb-2">{t('onboarding.industry')} <span className="text-[#5c5c5a] font-normal">{t('onboarding.optional')}</span></label>
               <input
                 type="text"
                 value={industry}
@@ -619,7 +619,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
               </button>
             </div>
 
-            <button onClick={finish} className="w-full text-xs text-[#7a7a78] hover:text-[#4a4a48] py-1">
+            <button onClick={finish} className="w-full text-xs text-[#5c5c5a] hover:text-[#4a4a48] py-1">
               {t('onboarding.skipCompany')}
             </button>
           </div>

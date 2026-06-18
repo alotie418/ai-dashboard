@@ -175,7 +175,7 @@ const CategoriesSection: React.FC = () => {
       {/* Locale 切换器 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center text-sm">
-          <span className="text-[#7a7a78] mr-2">{t('settings.accounting.currentLocale', '当前制度')}:</span>
+          <span className="text-[#5c5c5a] mr-2">{t('settings.accounting.currentLocale', '当前制度')}:</span>
           <span className="text-2xl mr-1.5">{localeFlag}</span>
           <span className="font-semibold text-[#191918]">{localeName}</span>
         </div>
@@ -197,7 +197,7 @@ const CategoriesSection: React.FC = () => {
             key={t_}
             onClick={() => setActiveType(t_)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              activeType === t_ ? 'border-primary text-primary' : 'border-transparent text-[#7a7a78] hover:text-[#4a4a48]'
+              activeType === t_ ? 'border-primary text-primary' : 'border-transparent text-[#5c5c5a] hover:text-[#4a4a48]'
             }`}
           >
             {t_ === 'expense' ? t('settings.categories.expense', '支出') : t('settings.categories.income', '收入')}
@@ -213,7 +213,7 @@ const CategoriesSection: React.FC = () => {
 
       {/* 类别列表 */}
       {loading ? (
-        <div className="text-sm text-[#7a7a78] py-6 text-center">
+        <div className="text-sm text-[#5c5c5a] py-6 text-center">
           <i className="fas fa-spinner fa-spin mr-2"></i>{t('common.loading')}
         </div>
       ) : (
@@ -232,7 +232,7 @@ const CategoriesSection: React.FC = () => {
             </thead>
             <tbody>
               {cats.length === 0 && (
-                <tr><td colSpan={showCogs ? 6 : 5} className="text-center text-[#7a7a78] py-6 text-xs">{t('settings.categories.empty', '该制度暂无此类型的类别')}</td></tr>
+                <tr><td colSpan={showCogs ? 6 : 5} className="text-center text-[#5c5c5a] py-6 text-xs">{t('settings.categories.empty', '该制度暂无此类型的类别')}</td></tr>
               )}
               {cats.map(c => (
                 <tr key={c.id} className="border-t border-[#e0ddd5]/70 hover:bg-[#f9f9f8]/40">
@@ -240,20 +240,20 @@ const CategoriesSection: React.FC = () => {
                     {usCatLabel(c)}
                     {!c.is_system && <span className="ml-2 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">{t('settings.categories.userMade', '自建')}</span>}
                   </td>
-                  <td className="px-4 py-2 font-mono text-[11px] text-[#7a7a78]">{c.slug}</td>
+                  <td className="px-4 py-2 font-mono text-[11px] text-[#5c5c5a]">{c.slug}</td>
                   <td className="px-4 py-2 text-[11px] text-[#5c5c5a]">{c.schedule_line || '—'}</td>
                   <td className="px-4 py-2 text-right text-[11px]">
                     {c.is_deductible ? (
                       <span className="text-emerald-600">{c.deductible_pct < 100 ? `${c.deductible_pct}%` : '✓'}</span>
                     ) : (
-                      <span className="text-[#7a7a78]">—</span>
+                      <span className="text-[#5c5c5a]">—</span>
                     )}
                   </td>
                   {showCogs && (
                     <td className="px-4 py-2 text-center">
                       <button
                         onClick={() => toggleCogs(c)}
-                        className={`text-[10px] px-2 py-0.5 rounded transition-colors ${c.is_cogs ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-[#f0eeeb] text-[#7a7a78] hover:bg-[#e8e6e1]'}`}>
+                        className={`text-[10px] px-2 py-0.5 rounded transition-colors ${c.is_cogs ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-[#f0eeeb] text-[#5c5c5a] hover:bg-[#e8e6e1]'}`}>
                         {c.is_cogs ? t('settings.categories.cogsBadge', '销售成本') : t('settings.categories.operatingBadge', '期间费用')}
                       </button>
                     </td>
@@ -285,14 +285,14 @@ const CategoriesSection: React.FC = () => {
       {showCogs && (
         <div className="border border-[#e0ddd5] rounded-xl p-4 space-y-3">
           <div className="text-sm font-semibold text-[#191918]">{t('settings.categories.recatTitle', '批量重分类')}</div>
-          <p className="text-[11px] text-[#7a7a78]">{t('settings.categories.recatNote', '仅调整经营管理分类，不改变金额、税额与净利润。')}</p>
+          <p className="text-[11px] text-[#5c5c5a]">{t('settings.categories.recatNote', '仅调整经营管理分类，不改变金额、税额与净利润。')}</p>
           <div className="flex items-center gap-2 flex-wrap text-sm">
             <span className="text-[#4a4a48]">{t('settings.categories.recatFrom', '从')}</span>
             <select value={recatFrom} onChange={onRecatSelect(setRecatFrom)} className="text-xs px-2 py-1 border border-[#e0ddd5] rounded bg-white max-w-[38%]">
               <option value="">—</option>
               {cats.map(c => <option key={c.id} value={c.id}>{usCatLabel(c)}</option>)}
             </select>
-            <i className="fas fa-arrow-right text-[#7a7a78]"></i>
+            <i className="fas fa-arrow-right text-[#5c5c5a]"></i>
             <span className="text-[#4a4a48]">{t('settings.categories.recatTo', '到')}</span>
             <select value={recatTo} onChange={onRecatSelect(setRecatTo)} className="text-xs px-2 py-1 border border-[#e0ddd5] rounded bg-white max-w-[38%]">
               <option value="">—</option>
@@ -310,7 +310,7 @@ const CategoriesSection: React.FC = () => {
               <button onClick={resetRecat} className="text-xs px-3 py-1 border border-[#e0ddd5] text-[#4a4a48] rounded hover:bg-[#f0eeeb]">{t('common.cancel')}</button>
             </div>
           )}
-          {recatPhase === 'committing' && <div className="text-xs text-[#7a7a78]"><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('settings.categories.recatConfirm', '确认移动')}…</div>}
+          {recatPhase === 'committing' && <div className="text-xs text-[#5c5c5a]"><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('settings.categories.recatConfirm', '确认移动')}…</div>}
           {recatPhase === 'success' && <div className="text-sm text-emerald-600"><i className="fas fa-check-circle mr-1.5"></i>{t('settings.categories.recatMoved', { count: recatMoved ?? 0 })}</div>}
           {recatError && <div className="text-sm text-rose-600"><i className="fas fa-exclamation-circle mr-1.5"></i>{recatError}</div>}
         </div>
@@ -334,7 +334,7 @@ const CategoriesSection: React.FC = () => {
                 className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white font-mono" />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{t('settings.categories.scheduleLine', '报表行')} <span className="text-[#7a7a78]">({t('common.optional')})</span></label>
+              <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{t('settings.categories.scheduleLine', '报表行')} <span className="text-[#5c5c5a]">({t('common.optional')})</span></label>
               <input value={newScheduleLine} onChange={e => setNewScheduleLine(e.target.value)} placeholder="e.g. Schedule C Line 22"
                 className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white" />
             </div>
@@ -355,13 +355,13 @@ const CategoriesSection: React.FC = () => {
           </div>
         </div>
       ) : (
-        <button onClick={() => setShowAddForm(true)} className="w-full border-2 border-dashed border-[#e0ddd5] text-sm text-[#7a7a78] hover:text-primary hover:border-primary/50 rounded-xl py-3 transition-colors">
+        <button onClick={() => setShowAddForm(true)} className="w-full border-2 border-dashed border-[#e0ddd5] text-sm text-[#5c5c5a] hover:text-primary hover:border-primary/50 rounded-xl py-3 transition-colors">
           <i className="fas fa-plus mr-1.5"></i>
           {t('settings.categories.addNewButton', '新增自定义类别')}
         </button>
       )}
 
-      <div className="text-[10px] text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3">
+      <div className="text-[10px] text-[#5c5c5a] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3">
         <i className="fas fa-info-circle mr-1.5 text-primary"></i>
         {t('settings.categories.systemNote', '系统预置类别由 SoloLedger 维护，与官方报表行对应，不可删除（但可改名）。自建类别完全由你掌控。')}
       </div>

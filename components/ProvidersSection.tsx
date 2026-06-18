@@ -218,7 +218,7 @@ const ProvidersSection: React.FC = () => {
                         <h4 className="text-sm font-semibold text-[#191918]">{name}</h4>
                         {p.isDefault && <span className="text-[10px] font-bold bg-primary text-white px-2 py-0.5 rounded uppercase">{t('common.default')}</span>}
                         {p.hasKey && !p.isDefault && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded uppercase">{t('settings.ai.configured')}</span>}
-                        {!p.hasKey && <span className="text-[10px] font-bold text-[#7a7a78] bg-[#f0eeeb] px-2 py-0.5 rounded uppercase">{t('settings.ai.notConfigured')}</span>}
+                        {!p.hasKey && <span className="text-[10px] font-bold text-[#5c5c5a] bg-[#f0eeeb] px-2 py-0.5 rounded uppercase">{t('settings.ai.notConfigured')}</span>}
                       </div>
                       {/* 用前端白名单解析 label，与 chip 渲染同源 */}
                       {(() => {
@@ -228,7 +228,7 @@ const ProvidersSection: React.FC = () => {
                         const fallbackDefault = DEFAULT_MODEL[p.provider];
                         return (
                           <>
-                            <div className="text-[11px] text-[#7a7a78] mt-0.5">
+                            <div className="text-[11px] text-[#5c5c5a] mt-0.5">
                               {t('settings.ai.modelLabel')} <span className="font-medium text-[#4a4a48]">{label}</span>
                               {isKnown && (
                                 <code className="ml-1.5 bg-[#f0eeeb] px-1.5 py-0.5 rounded text-[10px]">{p.model}</code>
@@ -290,7 +290,7 @@ const ProvidersSection: React.FC = () => {
                   <div className="space-y-3 pt-3 border-t border-[#e0ddd5]/60">
                     <div>
                       <label className="block text-xs font-medium text-[#4a4a48] mb-2">
-                        {t('settings.ai.apiKeyLabel')} {p.hasKey && <span className="text-[#7a7a78] font-normal">{t('settings.ai.apiKeyOverrideHint')}</span>}
+                        {t('settings.ai.apiKeyLabel')} {p.hasKey && <span className="text-[#5c5c5a] font-normal">{t('settings.ai.apiKeyOverrideHint')}</span>}
                       </label>
                       <input
                         type="password"
@@ -330,7 +330,7 @@ const ProvidersSection: React.FC = () => {
                         })}
                       </div>
                       <details className="text-xs">
-                        <summary className="text-[#7a7a78] cursor-pointer hover:text-[#4a4a48] select-none">
+                        <summary className="text-[#5c5c5a] cursor-pointer hover:text-[#4a4a48] select-none">
                           <i className="fas fa-code text-[10px] mr-1"></i>
                           {t('settings.ai.advancedInput')}
                         </summary>
@@ -341,7 +341,7 @@ const ProvidersSection: React.FC = () => {
                           placeholder={DEFAULT_MODEL[p.provider] || p.defaultModel}
                           className="w-full mt-2 px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm bg-white focus:outline-none focus:border-primary font-mono"
                         />
-                        <p className="text-[10px] text-[#7a7a78] mt-1">
+                        <p className="text-[10px] text-[#5c5c5a] mt-1">
                           {t('settings.ai.currentModelId')}: <code className="bg-[#f0eeeb] px-1.5 py-0.5 rounded">{row.model}</code>
                         </p>
                       </details>
@@ -389,7 +389,7 @@ const ProvidersSection: React.FC = () => {
                       <button
                         onClick={() => handleSave(p.provider, 'modelOnly')}
                         disabled={row.saving || row.model.trim() === p.model}
-                        className="w-full text-xs text-[#7a7a78] hover:text-[#4a4a48] disabled:opacity-40 py-1"
+                        className="w-full text-xs text-[#5c5c5a] hover:text-[#4a4a48] disabled:opacity-40 py-1"
                       >
                         {t('settings.ai.modelOnly')}
                       </button>
@@ -402,7 +402,7 @@ const ProvidersSection: React.FC = () => {
         })}
       </div>
 
-      <div className="text-xs text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl p-4">
+      <div className="text-xs text-[#5c5c5a] bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl p-4">
         <div className="font-semibold text-[#4a4a48] mb-2">
           <i className="fas fa-shield-alt mr-1.5 text-primary"></i>
           {t('settings.ai.security.title')}

@@ -95,13 +95,13 @@ const AccountsPage: React.FC = () => {
       <div className="flex items-center gap-1 bg-[#f0eeeb] rounded-xl p-1 w-fit">
         <button
           onClick={() => setActiveTab('receivable')}
-          className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'receivable' ? 'bg-white text-primary shadow-sm' : 'text-[#7a7a78] hover:text-[#191918]'}`}
+          className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'receivable' ? 'bg-white text-primary shadow-sm' : 'text-[#5c5c5a] hover:text-[#191918]'}`}
         >
           <i className="fas fa-arrow-circle-down mr-1.5"></i>{localeLabel('acctReceivableTab', 'accounts.receivable')}
         </button>
         <button
           onClick={() => setActiveTab('payable')}
-          className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'payable' ? 'bg-white text-primary shadow-sm' : 'text-[#7a7a78] hover:text-[#191918]'}`}
+          className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'payable' ? 'bg-white text-primary shadow-sm' : 'text-[#5c5c5a] hover:text-[#191918]'}`}
         >
           <i className="fas fa-arrow-circle-up mr-1.5"></i>{localeLabel('acctPayableTab', 'accounts.payable')}
         </button>
@@ -116,24 +116,24 @@ const AccountsPage: React.FC = () => {
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-xl p-4 border border-[#e0ddd5]">
-              <p className="text-xs text-[#7a7a78] mb-1">{activeTab === 'receivable' ? localeLabel('acctTotalReceivable', 'accounts.totalReceivable') : localeLabel('acctTotalPayable', 'accounts.totalPayable')}</p>
+              <p className="text-xs text-[#5c5c5a] mb-1">{activeTab === 'receivable' ? localeLabel('acctTotalReceivable', 'accounts.totalReceivable') : localeLabel('acctTotalPayable', 'accounts.totalPayable')}</p>
               <p className="text-xl font-bold text-[#191918]">{formatCurrency(totalAmount || 0)}</p>
             </div>
             <div className="bg-white rounded-xl p-4 border border-[#e0ddd5]">
-              <p className="text-xs text-[#7a7a78] mb-1">{t('accounts.overdueAmount')}</p>
+              <p className="text-xs text-[#5c5c5a] mb-1">{t('accounts.overdueAmount')}</p>
               <p className={`text-xl font-bold ${(overdueAmount || 0) > 0 ? 'text-red-500' : 'text-green-500'}`}>
                 {formatCurrency(overdueAmount || 0)}
               </p>
             </div>
             <div className="bg-white rounded-xl p-4 border border-[#e0ddd5]">
-              <p className="text-xs text-[#7a7a78] mb-1">{activeTab === 'receivable' ? t('accounts.unpaidCountReceivable') : t('accounts.unpaidCount')}</p>
+              <p className="text-xs text-[#5c5c5a] mb-1">{activeTab === 'receivable' ? t('accounts.unpaidCountReceivable') : t('accounts.unpaidCount')}</p>
               <p className="text-xl font-bold text-[#191918]">{details.length}</p>
             </div>
             <div className="bg-white rounded-xl p-4 border border-[#e0ddd5]">
-              <p className="text-xs text-[#7a7a78] mb-1">{activeTab === 'receivable' ? t('accounts.collectionRate') : t('accounts.paymentRate')}</p>
+              <p className="text-xs text-[#5c5c5a] mb-1">{activeTab === 'receivable' ? t('accounts.collectionRate') : t('accounts.paymentRate')}</p>
               {/* null/undefined rate = no billing base (no sales/purchases): show an N/A
                   empty state instead of a misleading fabricated 100%. */}
-              <p className={`text-xl font-bold ${rate == null ? 'text-[#7a7a78]' : rate >= 80 ? 'text-green-500' : rate >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>
+              <p className={`text-xl font-bold ${rate == null ? 'text-[#5c5c5a]' : rate >= 80 ? 'text-green-500' : rate >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>
                 {rate == null ? t('accounts.rateNa') : `${rate.toFixed(1)}%`}
               </p>
             </div>
@@ -157,7 +157,7 @@ const AccountsPage: React.FC = () => {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-[200px] text-[#7a7a78] text-sm">{t('accounts.emptyAging')}</div>
+                <div className="flex items-center justify-center h-[200px] text-[#5c5c5a] text-sm">{t('accounts.emptyAging')}</div>
               )}
             </div>
 
@@ -180,7 +180,7 @@ const AccountsPage: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-[200px] text-[#7a7a78] text-sm">{t('accounts.emptyRanking')}</div>
+                <div className="flex items-center justify-center h-[200px] text-[#5c5c5a] text-sm">{t('accounts.emptyRanking')}</div>
               )}
             </div>
           </div>
@@ -191,13 +191,13 @@ const AccountsPage: React.FC = () => {
               <h4 className="text-sm font-bold text-[#191918]">
                 <i className="fas fa-list-alt mr-2 text-primary"></i>{twAcct(activeTab === 'receivable' ? 'acctDetailsReceivable' : 'acctDetailsPayable', 'accounts.details')}
               </h4>
-              <span className="text-xs text-[#7a7a78]">{t('accounts.count')} {details.length} {t('accounts.unit')}</span>
+              <span className="text-xs text-[#5c5c5a]">{t('accounts.count')} {details.length} {t('accounts.unit')}</span>
             </div>
             {details.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm data-table">
                   <thead>
-                    <tr className="bg-[#f9f9f8] text-[#7a7a78] text-xs">
+                    <tr className="bg-[#f9f9f8] text-[#5c5c5a] text-xs">
                       <th className="px-4 py-2 text-left">{t('accounts.headerDate')}</th>
                       <th className="px-4 py-2 text-left">{activeTab === 'receivable' ? t('accounts.headerCustomer') : t('accounts.headerSupplier')}</th>
                       <th className="px-4 py-2 text-right">{t('accounts.headerTotal')}</th>
@@ -251,7 +251,7 @@ const AccountsPage: React.FC = () => {
                 </table>
               </div>
             ) : (
-              <div className="flex items-center justify-center py-16 text-[#7a7a78]">
+              <div className="flex items-center justify-center py-16 text-[#5c5c5a]">
                 <div className="text-center">
                   <i className="fas fa-check-circle text-3xl text-green-400 mb-2"></i>
                   <p className="text-sm">{twAcct(activeTab === 'receivable' ? 'acctAllClearedReceivable' : 'acctAllClearedPayable', 'accounts.allCleared')}</p>
@@ -272,23 +272,23 @@ const AccountsPage: React.FC = () => {
             </h3>
             <div className="space-y-3 mb-6">
               <div className="flex justify-between text-sm">
-                <span className="text-[#7a7a78]">{paymentModal.type === 'sale' ? t('accounts.headerCustomer') : t('accounts.headerSupplier')}</span>
+                <span className="text-[#5c5c5a]">{paymentModal.type === 'sale' ? t('accounts.headerCustomer') : t('accounts.headerSupplier')}</span>
                 <span className="font-medium">{paymentModal.name}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-[#7a7a78]">{t('accounts.headerTotal')}</span>
+                <span className="text-[#5c5c5a]">{t('accounts.headerTotal')}</span>
                 <span className="font-medium">{formatCurrency(paymentModal.total)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-[#7a7a78]">{t('accounts.modalPaidAmount')}</span>
+                <span className="text-[#5c5c5a]">{t('accounts.modalPaidAmount')}</span>
                 <span className="font-medium text-green-600">{formatCurrency(paymentModal.paid)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-[#7a7a78]">{t('accounts.modalRemaining')}</span>
+                <span className="text-[#5c5c5a]">{t('accounts.modalRemaining')}</span>
                 <span className="font-medium text-red-500">{formatCurrency(paymentModal.total - paymentModal.paid)}</span>
               </div>
               <div className="pt-2">
-                <label className="block text-xs text-[#7a7a78] mb-1">{t('accounts.modalThisPayment', { type: paymentModal.type === 'sale' ? t('accounts.modalReceive') : t('accounts.modalPay') })}</label>
+                <label className="block text-xs text-[#5c5c5a] mb-1">{t('accounts.modalThisPayment', { type: paymentModal.type === 'sale' ? t('accounts.modalReceive') : t('accounts.modalPay') })}</label>
                 <input
                   type="number"
                   value={paymentAmount}
@@ -300,12 +300,12 @@ const AccountsPage: React.FC = () => {
               <div className="flex gap-2 pt-1">
                 <button
                   onClick={() => setPaymentAmount(String(paymentModal.total - paymentModal.paid))}
-                  className="text-xs px-3 py-1 bg-[#f0eeeb] text-[#7a7a78] rounded-lg hover:bg-[#e0ddd5]"
+                  className="text-xs px-3 py-1 bg-[#f0eeeb] text-[#5c5c5a] rounded-lg hover:bg-[#e0ddd5]"
                 >{t('accounts.modalFullPayment')}</button>
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => { setPaymentModal(null); setPaymentAmount(''); }} className="flex-1 py-2 text-sm text-[#7a7a78] border border-[#e0ddd5] rounded-lg hover:bg-[#f0eeeb]">{t('accounts.modalCancel')}</button>
+              <button onClick={() => { setPaymentModal(null); setPaymentAmount(''); }} className="flex-1 py-2 text-sm text-[#5c5c5a] border border-[#e0ddd5] rounded-lg hover:bg-[#f0eeeb]">{t('accounts.modalCancel')}</button>
               <button onClick={handlePayment} disabled={!paymentAmount || parseFloat(paymentAmount) <= 0} className="flex-1 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50">{t('accounts.modalConfirm')}</button>
             </div>
           </div>

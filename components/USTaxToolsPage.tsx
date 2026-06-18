@@ -53,13 +53,13 @@ const USTaxToolsPage: React.FC<Props> = ({ selectedYear }) => {
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <h2 className="text-2xl font-bold text-[#191918]">{t('usTax.title', 'US Tax Tools')}</h2>
       {/* PR-E1: these are estimates, not a tax-filing basis. */}
-      <p className="text-xs text-[#7a7a78] leading-snug -mt-3"><i className="fas fa-circle-info mr-1.5"></i>{t('disclaimer.usTax')}</p>
+      <p className="text-xs text-[#5c5c5a] leading-snug -mt-3"><i className="fas fa-circle-info mr-1.5"></i>{t('disclaimer.usTax')}</p>
 
       <div className="flex border-b border-[#e0ddd5]">
-        <button onClick={() => setActiveTab('mileage')} className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'mileage' ? 'border-primary text-primary' : 'border-transparent text-[#7a7a78]'}`}>
+        <button onClick={() => setActiveTab('mileage')} className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'mileage' ? 'border-primary text-primary' : 'border-transparent text-[#5c5c5a]'}`}>
           <i className="fas fa-car mr-2"></i>{t('usTax.mileage', 'Mileage Tracking')}
         </button>
-        <button onClick={() => setActiveTab('homeOffice')} className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'homeOffice' ? 'border-primary text-primary' : 'border-transparent text-[#7a7a78]'}`}>
+        <button onClick={() => setActiveTab('homeOffice')} className={`px-6 py-2.5 text-sm font-medium border-b-2 transition-colors ${activeTab === 'homeOffice' ? 'border-primary text-primary' : 'border-transparent text-[#5c5c5a]'}`}>
           <i className="fas fa-home mr-2"></i>{t('usTax.homeOffice', 'Home Office')}
         </button>
       </div>
@@ -172,7 +172,7 @@ const MileageSection: React.FC<{ mileageRate: string; mileageYear: number }> = (
 
       {/* Table */}
       {loading ? (
-        <div className="text-center py-8 text-sm text-[#7a7a78]"><i className="fas fa-spinner fa-spin mr-2"></i></div>
+        <div className="text-center py-8 text-sm text-[#5c5c5a]"><i className="fas fa-spinner fa-spin mr-2"></i></div>
       ) : (
         <div className="border border-[#e0ddd5] rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
@@ -189,7 +189,7 @@ const MileageSection: React.FC<{ mileageRate: string; mileageYear: number }> = (
             </thead>
             <tbody>
               {logs.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-8 text-[#7a7a78]">{t('usTax.noTrips', 'No trips logged yet.')}</td></tr>
+                <tr><td colSpan={6} className="text-center py-8 text-[#5c5c5a]">{t('usTax.noTrips', 'No trips logged yet.')}</td></tr>
               ) : logs.map(log => (
                 <tr key={log.id} className="border-t border-[#e0ddd5]/70 hover:bg-[#f9f9f8]/40">
                   <td className="px-4 py-2.5">{log.date}</td>
@@ -208,7 +208,7 @@ const MileageSection: React.FC<{ mileageRate: string; mileageYear: number }> = (
         </div>
       )}
 
-      <div className="text-[10px] text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3">
+      <div className="text-[10px] text-[#5c5c5a] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3">
         <i className="fas fa-info-circle mr-1.5 text-primary"></i>
         {t('usTax.mileageNote', { rate: mileageRate, year: mileageYear, defaultValue: 'IRS standard mileage rate: ${{rate}}/mile ({{year}}). Deduction auto-calculated and maps to Schedule C Line 9 (Car & Truck Expenses).' })}
       </div>
@@ -236,7 +236,7 @@ const HomeOfficeSection: React.FC = () => {
     setSaving(false);
   };
 
-  if (loading || !data) return <div className="text-center py-8 text-sm text-[#7a7a78]"><i className="fas fa-spinner fa-spin mr-2"></i></div>;
+  if (loading || !data) return <div className="text-center py-8 text-sm text-[#5c5c5a]"><i className="fas fa-spinner fa-spin mr-2"></i></div>;
 
   return (
     <div className="space-y-6">
@@ -271,7 +271,7 @@ const HomeOfficeSection: React.FC = () => {
               <input type="number" value={data.rate_per_sqft} disabled className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm bg-[#f9f9f8]" />
             </div>
           </div>
-          <p className="text-xs text-[#7a7a78]">{t('usTax.simplifiedCalc', 'Calculation')}: min({t('usTax.officeArea', 'office area')}, {data.max_sqft}) × ${data.rate_per_sqft} = <b>${data.deduction}</b></p>
+          <p className="text-xs text-[#5c5c5a]">{t('usTax.simplifiedCalc', 'Calculation')}: min({t('usTax.officeArea', 'office area')}, {data.max_sqft}) × ${data.rate_per_sqft} = <b>${data.deduction}</b></p>
         </div>
       )}
 
@@ -305,13 +305,13 @@ const HomeOfficeSection: React.FC = () => {
               <input type="number" value={data.annual_depreciation} onChange={e => handleSave({ annual_depreciation: Number(e.target.value) })} className="w-full px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm" />
             </div>
           </div>
-          <p className="text-xs text-[#7a7a78]">
+          <p className="text-xs text-[#5c5c5a]">
             {t('usTax.actualCalc', 'Calculation')}: ({data.sqft} / {data.total_home_sqft || 1}) × (${data.annual_rent} + ${data.annual_utilities} + ${data.annual_insurance} + ${data.annual_depreciation}) = <b>${data.deduction}</b>
           </p>
         </div>
       )}
 
-      <div className="text-[10px] text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3">
+      <div className="text-[10px] text-[#5c5c5a] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3">
         <i className="fas fa-info-circle mr-1.5 text-primary"></i>
         {t('usTax.homeOfficeNote', 'Simplified method: max $1,500 (300 sqft × $5). Actual method requires tracking actual expenses and prorating by area. Maps to Schedule C Line 30 / Form 8829.')}
       </div>

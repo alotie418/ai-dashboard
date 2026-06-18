@@ -97,7 +97,7 @@ const DataMigrationSection: React.FC = () => {
       )}
 
       {loading ? (
-        <div className="text-sm text-[#7a7a78] py-6 text-center">
+        <div className="text-sm text-[#5c5c5a] py-6 text-center">
           <i className="fas fa-spinner fa-spin mr-2"></i>{t('common.loading')}
         </div>
       ) : detect && (!detect.sales.exists && !detect.purchases.exists) ? (
@@ -110,7 +110,7 @@ const DataMigrationSection: React.FC = () => {
           {/* 状态卡 */}
           <div className="grid grid-cols-2 gap-3">
             <div className="border border-[#e0ddd5] rounded-xl p-4 bg-white">
-              <div className="text-[10px] uppercase tracking-wider text-[#7a7a78] mb-1">{usText('dmCardSales', 'sales（旧表 → income）')}</div>
+              <div className="text-[10px] uppercase tracking-wider text-[#5c5c5a] mb-1">{usText('dmCardSales', 'sales（旧表 → income）')}</div>
               <div className="text-2xl font-bold text-[#191918]">{detect.sales.total}</div>
               <div className="text-[11px] text-[#5c5c5a] mt-1">
                 <span className="text-emerald-600">{t('settings.dataMigration.migrated', '已迁移')}: {detect.sales.migrated}</span>
@@ -119,7 +119,7 @@ const DataMigrationSection: React.FC = () => {
               </div>
             </div>
             <div className="border border-[#e0ddd5] rounded-xl p-4 bg-white">
-              <div className="text-[10px] uppercase tracking-wider text-[#7a7a78] mb-1">{usText('dmCardPurchases', 'purchases（旧表 → expense）')}</div>
+              <div className="text-[10px] uppercase tracking-wider text-[#5c5c5a] mb-1">{usText('dmCardPurchases', 'purchases（旧表 → expense）')}</div>
               <div className="text-2xl font-bold text-[#191918]">{detect.purchases.total}</div>
               <div className="text-[11px] text-[#5c5c5a] mt-1">
                 <span className="text-emerald-600">{t('settings.dataMigration.migrated', '已迁移')}: {detect.purchases.migrated}</span>
@@ -204,7 +204,7 @@ const DataMigrationSection: React.FC = () => {
             )}
           </div>
 
-          <div className="text-[10px] text-[#7a7a78] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3 space-y-1">
+          <div className="text-[10px] text-[#5c5c5a] bg-[#f9f9f8] border border-[#e0ddd5] rounded-lg p-3 space-y-1">
             <div><i className="fas fa-info-circle mr-1.5 text-primary"></i>{usLabel('dmNote1', 'settings.dataMigration.note1', 'sales → income / purchases → expense; defaults to the current accounting locale’s first income / COGS category')}</div>
             <div className="ml-4">{usLabel('dmNote2', 'settings.dataMigration.note2', 'Legacy tables are kept and can be rolled back at any time')}</div>
             <div className="ml-4">{usLabel('dmNote3', 'settings.dataMigration.note3', 'Migration records are written to legacy_migrations to prevent duplicates')}</div>
