@@ -1908,13 +1908,15 @@ async function main() {
       }
       if (reasons.length) fail(`genericNonCn:${accId}`, reasons); else pass(`genericNonCn:${accId}`);
     }
-    // CN main-entry nav i18n uses the simplified 采购 / 销售 (主入口文案简化);
-    // 发票查询 stays. Pin so the labels don't regress back to the long form.
+    // CN main-entry nav i18n uses the simplified 采购 / 销售 (主入口文案简化) and the
+    // reconciliation entry 发票核对 (Phase 1: 发票查询 → 发票核对). Pin so they don't regress.
     {
       const cn = locales['zh-CN'];
       const reasons = [];
       if (get(cn, 'nav.purchase') !== '采购') reasons.push(`CN nav.purchase should be 采购, got "${get(cn, 'nav.purchase')}"`);
       if (get(cn, 'nav.sales') !== '销售') reasons.push(`CN nav.sales should be 销售, got "${get(cn, 'nav.sales')}"`);
+      if (get(cn, 'nav.inventory') !== '发票核对') reasons.push(`CN nav.inventory should be 发票核对, got "${get(cn, 'nav.inventory')}"`);
+      if (get(cn, 'headerTitle.inventory') !== '发票核对') reasons.push(`CN headerTitle.inventory should be 发票核对, got "${get(cn, 'headerTitle.inventory')}"`);
       if (reasons.length) fail(`cnVatPreserved`, reasons); else pass(`cnVatPreserved`);
     }
   }

@@ -1479,7 +1479,7 @@ test.describe('PR-2 → invoice query reconciliation ledger filter', () => {
         { match: '/api/sales', method: 'GET', json: salesSeed },
       ],
     });
-    // sidebar → 发票查询 (stable icon fa-search-dollar)
+    // sidebar → 发票核对 (stable icon fa-search-dollar)
     await page.locator('i.fa-search-dollar').first().click();
     // the page now reads as an invoice reconciliation ledger
     await expect(page.getByText('发票核对台账')).toBeVisible({ timeout: 10_000 });
