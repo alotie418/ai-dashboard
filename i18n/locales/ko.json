@@ -416,6 +416,9 @@
   },
   "purchases": {
     "title": "Purchases & Input Tax",
+    "formInvoiceStatus": "송장 상태",
+    "invoiceStatusReceived": "송장 수령함",
+    "invoiceStatusPending": "송장 미수령",
     "batchImport": "Batch Import",
     "scanInvoice": "Scan Invoice",
     "scanning": "Scanning...",
@@ -475,6 +478,9 @@
   },
   "sales": {
     "title": "Sales & Output Tax",
+    "formInvoiceStatus": "송장 상태",
+    "invoiceStatusIssued": "송장 발행함",
+    "invoiceStatusPending": "송장 미발행",
     "batchImport": "Batch Import",
     "scanInvoice": "Scan Invoice",
     "scanning": "Scanning...",

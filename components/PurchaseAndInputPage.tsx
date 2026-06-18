@@ -106,6 +106,11 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
     taxAmount: 0
   });
 
+  // Invoice status selector. Maps to the existing invoiceStatus column via
+  // PurchaseRecord.status. Default '未收' — a record only counts as having an
+  // invoice once the user explicitly marks 已收 (PR-1; no schema change).
+  const [purchaseInvoiceStatus, setPurchaseInvoiceStatus] = useState('未收');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-calculate: when totalWithTax + quantity + taxRate change, compute price/unitPrice/taxAmount
@@ -211,6 +216,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
     if (!ocrPreview) return;
     const filled = extractedToPurchaseForm(ocrPreview, defaultTaxRate);
     setNewPurchase(prev => ({ ...filled, date: filled.date || prev.date }));
+    setPurchaseInvoiceStatus('未收');
     setOcrPreview(null);
     setShowAddModal(true);
   };
@@ -221,7 +227,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
       alert(t('purchases.errorRequiredFields'));
       return;
     }
-    const recordToAdd: PurchaseRecord = { id: nextPurchaseId(), ...newPurchase, status: '已收' };
+    const recordToAdd: PurchaseRecord = { id: nextPurchaseId(), ...newPurchase, status: purchaseInvoiceStatus };
     try {
       await createPurchase(recordToAdd);
       setRecords(prev => [recordToAdd, ...prev]);
@@ -237,6 +243,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
         unitPriceWithoutTax: 0,
         taxAmount: 0
       });
+      setPurchaseInvoiceStatus('未收');
     } catch (err) {
       console.error(err);
       alert(getSystemErrorText(err, t) || t('purchases.errorSaveFailed'));
@@ -276,7 +283,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
             {isScanning ? t('purchases.scanning') : (accLocale === 'KR' ? taxLabel('scanDocButton') : t('purchases.scanInvoice'))}
           </button>
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => { setPurchaseInvoiceStatus('未收'); setShowAddModal(true); }}
             className="flex items-center px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors text-sm font-medium" style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}
           >
             <i className="fas fa-plus mr-2"></i> {accLocale !== 'CN' ? taxLabel('newPurchaseButton') : t('purchases.newPurchase')}
@@ -382,6 +389,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                     <button
                       onClick={() => {
                         setNewPurchase({ date: row.date, supplier: row.supplier, productId: row.productId || '', quantity: row.quantity, price: row.price, taxRate: row.taxRate, invoiceNo: row.invoiceNo, totalWithTax: row.totalWithTax || 0, unitPriceWithoutTax: row.unitPriceWithoutTax || 0, taxAmount: row.taxAmount || 0 });
+                        setPurchaseInvoiceStatus(row.status || '未收');
                         setShowAddModal(true);
                       }}
                       className="text-primary hover:text-primary-hover transition-colors"
@@ -503,6 +511,19 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                     className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale !== 'CN' ? taxLabel('invStatusFilter') : t('purchases.formInvoiceStatus')}</label>
+                <select
+                  data-testid="purchase-invoice-status"
+                  value={purchaseInvoiceStatus}
+                  onChange={(e) => setPurchaseInvoiceStatus(e.target.value)}
+                  className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
+                >
+                  <option value="未收">{accLocale !== 'CN' ? taxLabel('invStatusPendingCert') : t('purchases.invoiceStatusPending')}</option>
+                  <option value="已收">{accLocale !== 'CN' ? taxLabel('invStatusCertified') : t('purchases.invoiceStatusReceived')}</option>
+                </select>
               </div>
 
               <div className="space-y-2">

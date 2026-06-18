@@ -1395,6 +1395,65 @@ test('收支记录 payment status localized (zh-CN, no raw enum leak)', async ({
   expect(body, 'raw payment_status enum must not leak in CN UI').not.toMatch(/unpaid/i);
 });
 
+// ── PR-1: invoice status selectors on the purchase / sales add-record modals ──
+// The status is a ledger/display flag stored in the EXISTING invoiceStatus column
+// (no schema change, no handler change — the create body already carried invoiceStatus).
+// New records default to the pending state (采购 未收 / 销售 待开) and only count as
+// "has invoice" once the user explicitly marks 已收 / 已开. These tests prove the old
+// hardcoded 已收 / 已开 default is gone and the chosen value flows into the create body.
+// Regime-neutral form control → one CN×CN combo suffices.
+test.describe('PR-1 → invoice status selectors (purchase / sales add modal)', () => {
+  const ui = 'zh-CN';
+  const postedBodies = (page: import('@playwright/test').Page, resource: string) =>
+    page.evaluate((res) => ((window as any).__calls || [])
+      .filter((c: any) => c.channel === 'api:request' && c.method === 'POST' && new RegExp(`/api/${res}$`).test(String(c.path || '').split('?')[0]))
+      .map((c: any) => c.body), resource);
+
+  test('purchase: defaults to 未收 and the chosen 已收 flows to the create body', async ({ page }) => {
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await bootComboIPC(page, ui, 'CN', {
+      recordCalls: true,
+      apiResponses: [{ match: '/api/purchases', method: 'POST', json: { success: true, id: 'p-new' } }],
+    });
+    // 采购页 → 新增记录 modal (stable icons: fa-file-import → fa-plus)
+    await page.locator('i.fa-file-import').first().click();
+    await page.locator('button:has(i.fa-plus)').first().click();
+    // default is the pending state — proves the old hardcoded 已收 default is gone
+    await expect(page.locator('[data-testid="purchase-invoice-status"]')).toHaveValue('未收');
+    // fill required fields, explicitly mark 已收, save
+    await page.locator('[data-testid="ocr-fill-counterparty"]').fill('Acme');
+    await page.getByPlaceholder(loc.purchases.formQuantityPlaceholder).fill('10');
+    await page.locator('input[type="number"][required]').fill('113');
+    await page.locator('[data-testid="purchase-invoice-status"]').selectOption('已收');
+    await page.getByRole('button', { name: loc.purchases.formSubmit }).click();
+    // the create call carries the explicitly chosen invoiceStatus, not a hardcoded value
+    await expect.poll(async () => (await postedBodies(page, 'purchases')).some((b: any) => b?.invoiceStatus === '已收'), { timeout: 10_000 }).toBe(true);
+  });
+
+  test('sales: defaults to 待开 and that default (not a hardcoded 已开) flows to the create body', async ({ page }) => {
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await bootComboIPC(page, ui, 'CN', {
+      recordCalls: true,
+      apiResponses: [{ match: '/api/sales', method: 'POST', json: { success: true, id: 's-new' } }],
+    });
+    // 销售页 → 新增记录 modal (stable icons: fa-file-export → fa-plus)
+    await page.locator('i.fa-file-export').first().click();
+    await page.locator('button:has(i.fa-plus)').first().click();
+    // default is the pending state — proves the old hardcoded 已开 default is gone
+    await expect(page.locator('[data-testid="sale-invoice-status"]')).toHaveValue('待开');
+    // fill required fields, leave the status at its default, save
+    await page.locator('[data-testid="ocr-fill-counterparty"]').fill('Buyer');
+    await page.getByPlaceholder(loc.sales.formQuantityPlaceholder).fill('5');
+    await page.locator('input[type="number"][required]').fill('565');
+    await page.getByRole('button', { name: loc.sales.formSubmitNew }).click();
+    // the create call carries 待开 (the default), NOT the old hardcoded 已开
+    await expect.poll(async () => {
+      const bodies = await postedBodies(page, 'sales');
+      return bodies.length > 0 && bodies.every((b: any) => b?.invoiceStatus === '待开');
+    }, { timeout: 10_000 }).toBe(true);
+  });
+});
+
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const summary = {

@@ -114,8 +114,12 @@ const REQUIRED_I18N_KEYS = [
   'purchases.taxStandard', 'purchases.taxNone', 'purchases.taxJpStandard',
   'purchases.taxEuStandard', 'purchases.taxKrStandard', 'purchases.taxTwStandard',
   'purchases.notInvoiceWarning',
+  // PR-1: invoice-status selector on the purchase add modal (reuses invoiceStatus column)
+  'purchases.formInvoiceStatus', 'purchases.invoiceStatusReceived', 'purchases.invoiceStatusPending',
   'sales.title', 'sales.formCancel', 'sales.formSubmitNew', 'sales.formSubmitEdit',
   'sales.notInvoiceWarning',
+  // PR-1: invoice-status selector on the sales add modal (reuses invoiceStatus column)
+  'sales.formInvoiceStatus', 'sales.invoiceStatusIssued', 'sales.invoiceStatusPending',
   // invoice-query advanced-filter "clear all" button (was leaking as raw key
   // invoices.clearAll because it was undefined in every locale file)
   'invoices.advancedFilter', 'invoices.clearAll',

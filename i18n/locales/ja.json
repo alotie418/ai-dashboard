@@ -416,6 +416,9 @@
   },
   "purchases": {
     "title": "Purchases & Input Tax",
+    "formInvoiceStatus": "請求書ステータス",
+    "invoiceStatusReceived": "請求書受領済み",
+    "invoiceStatusPending": "請求書未受領",
     "batchImport": "Batch Import",
     "scanInvoice": "Scan Invoice",
     "scanning": "Scanning...",
@@ -475,6 +478,9 @@
   },
   "sales": {
     "title": "Sales & Output Tax",
+    "formInvoiceStatus": "請求書ステータス",
+    "invoiceStatusIssued": "請求書発行済み",
+    "invoiceStatusPending": "請求書未発行",
     "batchImport": "Batch Import",
     "scanInvoice": "Scan Invoice",
     "scanning": "Scanning...",
