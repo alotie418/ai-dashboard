@@ -1598,6 +1598,9 @@ test('sidebar groups nav into 业务记录 / 账务核对 sections', async ({ pa
   // larger style — not the faint 10px gray.
   await expect(nav.getByText('业务记录')).toHaveClass(/font-semibold/);
   await expect(nav.getByText('业务记录')).toHaveClass(/text-xs/);
+  // alignment (fix/sidebar-collapsed-alignment): the header sits in a fixed-height slot
+  // shared by both expanded and collapsed states, so toggling doesn't shift items below.
+  await expect(nav.getByText('业务记录').locator('..')).toHaveClass(/h-9/);
 });
 
 test.afterAll(async () => {
