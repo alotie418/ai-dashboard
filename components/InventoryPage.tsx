@@ -181,6 +181,8 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           icon="fa-warehouse"
           color="text-amber-500"
           bg="bg-amber-500/10"
+          valueColor="text-rose-600"
+          valueTestId="inventory-quantity"
         />
         {/* Stat cards follow the active ledger tab so the input/output views don't carry
             the other type's summary: 进项 cards (累计进项 + 待认证 input tax) show on
@@ -360,7 +362,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
                 <tr key={`${inv.typeKey}-${inv.id || inv.invoiceNo || inv.date + inv.partner}`} className="group hover:bg-[#f9f9f8]/40 transition-all">
                   <td className="px-8 py-5 text-sm text-[#4a4a48] whitespace-nowrap min-w-[7rem]">{inv.date}</td>
                   <td className="px-8 py-5 whitespace-nowrap min-w-[5rem]">
-                    <span className={`inline-block whitespace-nowrap px-2 py-1 rounded text-[10px] font-bold ${inv.typeKey === 'output' ? 'bg-primary/10 text-primary' : 'bg-amber-500/10 text-amber-400'}`}>
+                    <span className={`inline-block whitespace-nowrap px-2 py-1 rounded text-[10px] font-bold ${inv.typeKey === 'output' ? 'bg-primary/10 text-primary' : 'bg-rose-500/10 text-rose-600'}`}>
                       {taxLabel(inv.typeKey === 'output' ? 'invoiceTypeOutput' : 'invoiceTypeInput')}
                     </span>
                   </td>
@@ -397,7 +399,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
   );
 };
 
-const StatCard: React.FC<{ title: string, value: string, sub: string, icon: string, color: string, bg: string }> = ({ title, value, sub, icon, color, bg }) => (
+const StatCard: React.FC<{ title: string, value: string, sub: string, icon: string, color: string, bg: string, valueColor?: string, valueTestId?: string }> = ({ title, value, sub, icon, color, bg, valueColor, valueTestId }) => (
   <div className="glass-card p-6 rounded-xl group hover:border-primary/30 transition-all duration-300" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
     <div className="flex items-center justify-between mb-4">
       <div className={`w-12 h-12 ${bg} rounded-xl flex items-center justify-center ${color} group-hover:scale-110 transition-transform`}>
@@ -405,7 +407,7 @@ const StatCard: React.FC<{ title: string, value: string, sub: string, icon: stri
       </div>
       <div className="text-right">
         <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest">{title}</p>
-        <p className={`text-2xl font-bold ${color} tracking-tighter`}>{value}</p>
+        <p data-testid={valueTestId} className={`text-2xl font-bold ${valueColor || color} tracking-tighter`}>{value}</p>
       </div>
     </div>
     <p className="text-[#5c5c5a] text-xs italic">{sub}</p>
