@@ -1037,6 +1037,7 @@
   },
   "transactions": {
     "title": "Transactions",
+    "pageSubtitle": "Cash-flow log — record actual income and expenses to help reconcile business and accounting changes.",
     "add": "New Transaction",
     "totalIncome": "Total Income",
     "totalExpense": "Total Expense",

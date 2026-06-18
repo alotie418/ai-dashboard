@@ -1037,6 +1037,7 @@
   },
   "transactions": {
     "title": "Transactions",
+    "pageSubtitle": "Flux de trésorerie : enregistrez les recettes et dépenses réelles pour aider à rapprocher les opérations et la comptabilité.",
     "add": "Nouvelle transaction",
     "totalIncome": "Total revenus",
     "totalExpense": "Total dépenses",

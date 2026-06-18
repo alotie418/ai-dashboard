@@ -1037,6 +1037,7 @@
   },
   "transactions": {
     "title": "取引記録",
+    "pageSubtitle": "資金フロー：実際の収入と支出を記録し、仕入・売上・帳簿の変化の照合を補助します。",
     "add": "新規追加",
     "totalIncome": "総収入",
     "totalExpense": "総支出",

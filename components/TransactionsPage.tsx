@@ -159,7 +159,10 @@ const TransactionsPage: React.FC = () => {
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-[#191918]">{t('transactions.title', 'Transactions')}</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-[#191918]">{t('transactions.title', 'Transactions')}</h2>
+          <p className="text-sm text-[#5c5c5a] mt-1">{t('transactions.pageSubtitle')}</p>
+        </div>
         <button onClick={openNew} className="flex items-center px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-sm font-medium transition-all" style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}>
           <i className="fas fa-plus mr-2"></i> {t('transactions.add', 'New Transaction')}
         </button>
