@@ -1594,6 +1594,10 @@ test('sidebar groups nav into 业务记录 / 账务核对 sections', async ({ pa
   const nav = page.locator('nav').first();
   await expect(nav.getByText('业务记录')).toBeVisible({ timeout: 10_000 });
   await expect(nav.getByText('账务核对')).toBeVisible();
+  // contrast (fix/sidebar-section-label-contrast): labels use the darker, semibold,
+  // larger style — not the faint 10px gray.
+  await expect(nav.getByText('业务记录')).toHaveClass(/font-semibold/);
+  await expect(nav.getByText('业务记录')).toHaveClass(/text-xs/);
 });
 
 test.afterAll(async () => {
