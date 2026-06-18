@@ -1454,6 +1454,45 @@ test.describe('PR-1 → invoice status selectors (purchase / sales add modal)', 
   });
 });
 
+// ── PR-2: invoice query page is an INVOICE RECONCILIATION LEDGER ──
+// Only records that actually carry an invoice are listed: purchases with 已收, sales
+// with 已开. Explicit-pending (未收 / 待开) records are hidden. A record stored with a
+// blank invoiceStatus stays visible (legacy compatibility — services/api.ts defaults a
+// blank purchase status to 已收). Display-only: business P&L / dashboard / tax statistics
+// are untouched. Regime-neutral filter → one CN×CN combo suffices.
+test.describe('PR-2 → invoice query reconciliation ledger filter', () => {
+  const ui = 'zh-CN';
+  const purchasesSeed = [
+    { id: 'p-received', date: '2026-06-10', supplier: '采购已收', tons: 1, pricePerTon: 100, totalAmount: 113, amountWithoutTax: 100, taxAmount: 13, taxRate: 13, invoiceNumber: 'P-1', invoiceStatus: '已收', product_id: null },
+    { id: 'p-pending',  date: '2026-06-11', supplier: '采购未收', tons: 1, pricePerTon: 100, totalAmount: 113, amountWithoutTax: 100, taxAmount: 13, taxRate: 13, invoiceNumber: '',    invoiceStatus: '未收', product_id: null },
+    { id: 'p-legacy',   date: '2026-06-12', supplier: '采购空值', tons: 1, pricePerTon: 100, totalAmount: 113, amountWithoutTax: 100, taxAmount: 13, taxRate: 13, invoiceNumber: '',    invoiceStatus: '',     product_id: null },
+  ];
+  const salesSeed = [
+    { id: 's-issued',  date: '2026-06-13', customer: '销售已开', tons: 1, pricePerTon: 100, totalAmount: 113, amountWithoutTax: 100, taxAmount: 13, taxRate: 13, shippingCost: 0, invoiceNumber: 'S-1', invoiceStatus: '已开', product_id: null },
+    { id: 's-pending', date: '2026-06-14', customer: '销售待开', tons: 1, pricePerTon: 100, totalAmount: 113, amountWithoutTax: 100, taxAmount: 13, taxRate: 13, shippingCost: 0, invoiceNumber: '',    invoiceStatus: '待开', product_id: null },
+  ];
+
+  test('ledger shows 已收/已开 + legacy blank, hides 未收/待开', async ({ page }) => {
+    await bootComboIPC(page, ui, 'CN', {
+      apiResponses: [
+        { match: '/api/purchases', method: 'GET', json: purchasesSeed },
+        { match: '/api/sales', method: 'GET', json: salesSeed },
+      ],
+    });
+    // sidebar → 发票查询 (stable icon fa-search-dollar)
+    await page.locator('i.fa-search-dollar').first().click();
+    // the page now reads as an invoice reconciliation ledger
+    await expect(page.getByText('发票核对台账')).toBeVisible({ timeout: 10_000 });
+    // shown: 采购 已收, 销售 已开, and the legacy blank purchase (api defaults blank → 已收)
+    await expect(page.getByText('采购已收')).toBeVisible();
+    await expect(page.getByText('销售已开')).toBeVisible();
+    await expect(page.getByText('采购空值')).toBeVisible();
+    // hidden: explicit-pending 采购 未收 / 销售 待开
+    await expect(page.getByText('采购未收')).toHaveCount(0);
+    await expect(page.getByText('销售待开')).toHaveCount(0);
+  });
+});
+
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const summary = {
