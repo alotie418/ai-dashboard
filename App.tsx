@@ -260,6 +260,11 @@ const AppContent: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {data.metrics.map((m, i) => <MetricCard key={i} metric={m} />)}
               </div>
+              {/* Phase 2: gentle data-source notice — business records and 收支记录 are
+                  separate ledgers; reconcile when both are used in the same period. */}
+              <p className="text-[11px] text-[#7a7a78] leading-snug px-1">
+                <i className="fas fa-circle-info mr-1.5"></i>{t('common.dataSourceNote')}
+              </p>
               {/* Phase 3: per-product inventory detail (each line keeps its own unit) */}
               {data.inventory && data.inventory.details.length > 0 && (
                 <div className="bg-white border border-[#e0ddd5] rounded-2xl overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
