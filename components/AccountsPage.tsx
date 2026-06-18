@@ -202,8 +202,8 @@ const AccountsPage: React.FC = () => {
                       <th className="px-4 py-2 text-left">{activeTab === 'receivable' ? t('accounts.headerCustomer') : t('accounts.headerSupplier')}</th>
                       <th className="px-4 py-2 text-right">{t('accounts.headerTotal')}</th>
                       <th className="px-4 py-2 text-right">{t('accounts.headerPaid')}</th>
-                      <th className="px-4 py-2 text-right">{t('accounts.headerOwed')}</th>
-                      <th className="px-4 py-2 text-center">{t('accounts.headerDue')}</th>
+                      <th className="px-4 py-2 text-right">{t('accounts.headerUnpaid')}</th>
+                      <th className="px-4 py-2 text-center">{t('accounts.headerDueDate')}</th>
                       <th className="px-4 py-2 text-center">{t('accounts.headerStatus')}</th>
                       <th className="px-4 py-2 text-center">{t('accounts.headerAction')}</th>
                     </tr>

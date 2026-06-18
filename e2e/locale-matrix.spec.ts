@@ -1616,6 +1616,40 @@ test('dashboard + finance show the data-source reconciliation notice', async ({ 
   await expect(page.getByText(loc.common.dataSourceNote)).toBeVisible({ timeout: 10_000 });
 });
 
+// PR-A: the AR/AP details table only renders when there is data, so check:raw-keys (which
+// scans the no-data boot) missed that AccountsPage referenced non-existent accounts.headerOwed
+// / accounts.headerDue. Render the table WITH data and assert the localized headers show and no
+// raw accounts.header* key leaks. (Fix points the component at the existing headerUnpaid /
+// headerDueDate keys — no new i18n.)
+test('accounts table headers are localized (no raw accounts.header* key leak)', async ({ page }) => {
+  const ui = 'zh-CN';
+  const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+  const recv = {
+    totalReceivable: 1130, totalOverdue: 0, collectionRate: 50,
+    agingBuckets: { '0-30': 1130, '31-60': 0, '61-90': 0, '90+': 0 },
+    topCustomers: [],
+    details: [{ id: 'r1', date: '2026-06-10', customer: '客户甲', totalAmount: 1130, paid_amount: 0, payment_status: 'unpaid', due_date: '2026-07-10' }],
+  };
+  const pay = {
+    totalPayable: 0, totalOverdue: 0, paymentRate: 100,
+    agingBuckets: { '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 },
+    topSuppliers: [], details: [],
+  };
+  await bootComboIPC(page, ui, 'CN', {
+    apiResponses: [
+      { match: '/api/receivables/summary', json: recv },
+      { match: '/api/payables/summary', json: pay },
+    ],
+  });
+  // sidebar → 应收应付 (stable icon fa-handshake)
+  await page.locator('i.fa-handshake').first().click();
+  // the details table (renders because details > 0) shows localized headers, not raw keys
+  await expect(page.locator('table thead').getByText(loc.accounts.headerUnpaid)).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('table thead').getByText(loc.accounts.headerDueDate)).toBeVisible();
+  const body = await page.locator('body').innerText();
+  expect(body, 'no raw accounts.header* i18n key may leak').not.toContain('accounts.header');
+});
+
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const summary = {
