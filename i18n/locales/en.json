@@ -416,6 +416,9 @@
   },
   "purchases": {
     "title": "Purchases & Input Tax",
+    "formInvoiceStatus": "Invoice Status",
+    "invoiceStatusReceived": "Invoice Received",
+    "invoiceStatusPending": "No Invoice Yet",
     "batchImport": "Batch Import",
     "scanInvoice": "Scan Invoice",
     "scanning": "Scanning...",
@@ -475,6 +478,9 @@
   },
   "sales": {
     "title": "Sales & Output Tax",
+    "formInvoiceStatus": "Invoice Status",
+    "invoiceStatusIssued": "Invoice Issued",
+    "invoiceStatusPending": "Invoice Pending",
     "batchImport": "Batch Import",
     "scanInvoice": "Scan Invoice",
     "scanning": "Scanning...",

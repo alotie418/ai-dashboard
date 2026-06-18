@@ -416,6 +416,9 @@
   },
   "purchases": {
     "title": "采购",
+    "formInvoiceStatus": "发票状态",
+    "invoiceStatusReceived": "已收发票",
+    "invoiceStatusPending": "未收发票",
     "batchImport": "批量导入",
     "scanInvoice": "扫描发票",
     "scanning": "正在识别...",
@@ -475,6 +478,9 @@
   },
   "sales": {
     "title": "销售",
+    "formInvoiceStatus": "发票状态",
+    "invoiceStatusIssued": "已开发票",
+    "invoiceStatusPending": "待开发票",
     "batchImport": "批量导入",
     "scanInvoice": "扫描发票",
     "scanning": "正在识别...",

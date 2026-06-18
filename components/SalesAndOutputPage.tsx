@@ -82,6 +82,11 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
     taxAmount: 0
   });
 
+  // Invoice status selector. Maps to the existing invoiceStatus column via
+  // SalesRecord.status. Default '待开' — a record only counts as having an invoice
+  // once the user explicitly marks 已开 (PR-1; no schema change).
+  const [saleInvoiceStatus, setSaleInvoiceStatus] = useState<'已开' | '待开'>('待开');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-calculate: when totalWithTax + quantity change, compute price/unitPrice/taxAmount
@@ -213,6 +218,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
     if (!ocrPreview) return;
     const filled = extractedToSalesForm(ocrPreview, '13%');
     setNewSale(prev => ({ ...filled, date: filled.date || prev.date }));
+    setSaleInvoiceStatus('待开');
     setOcrPreview(null);
     setShowAddModal(true);
   };
@@ -226,12 +232,12 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
     try {
       if (editingId) {
         // Update existing record
-        const recordToUpdate: SalesRecord = { id: editingId, ...newSale, status: '已开' };
+        const recordToUpdate: SalesRecord = { id: editingId, ...newSale, status: saleInvoiceStatus };
         await updateSale(editingId, recordToUpdate);
         setRecords(prev => prev.map(r => r.id === editingId ? recordToUpdate : r));
       } else {
         // Create new record
-        const recordToAdd: SalesRecord = { id: nextSalesId(), ...newSale, status: '已开' };
+        const recordToAdd: SalesRecord = { id: nextSalesId(), ...newSale, status: saleInvoiceStatus };
         await createSale(recordToAdd);
         setRecords(prev => [recordToAdd, ...prev]);
       }
@@ -248,6 +254,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
         unitPriceWithoutTax: 0,
         taxAmount: 0
       });
+      setSaleInvoiceStatus('待开');
     } catch (err) {
       console.error(err);
       alert(getSystemErrorText(err, t) || (editingId ? t('sales.updateFailed') : t('sales.saveFailed')));
@@ -287,7 +294,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
             {isScanning ? t('sales.scanning') : (accLocale === 'KR' ? taxLabel('scanDocButton') : t('sales.scanInvoice'))}
           </button>
           <button
-            onClick={() => { setEditingId(null); setShowAddModal(true); }}
+            onClick={() => { setEditingId(null); setSaleInvoiceStatus('待开'); setShowAddModal(true); }}
             className="flex items-center px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors text-sm font-medium" style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}
           >
             <i className="fas fa-plus mr-2"></i> {accLocale !== 'CN' ? taxLabel('newSaleButton') : t('sales.newSale')}
@@ -431,6 +438,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                       onClick={() => {
                         setEditingId(row.id);
                         setNewSale({ date: row.date, customer: row.customer, productId: row.productId || '', quantity: row.quantity, price: row.price, shipping: row.shipping, invoiceNo: row.invoiceNo, totalWithTax: row.totalWithTax || 0, unitPriceWithoutTax: row.unitPriceWithoutTax || 0, taxAmount: row.taxAmount || 0 });
+                        setSaleInvoiceStatus(row.status || '待开');
                         setShowAddModal(true);
                       }}
                       className="text-primary hover:text-primary-hover transition-colors"
@@ -575,6 +583,19 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                     className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale !== 'CN' ? taxLabel('invStatusFilter') : t('sales.formInvoiceStatus')}</label>
+                <select
+                  data-testid="sale-invoice-status"
+                  value={saleInvoiceStatus}
+                  onChange={(e) => setSaleInvoiceStatus(e.target.value as '已开' | '待开')}
+                  className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
+                >
+                  <option value="待开">{accLocale !== 'CN' ? taxLabel('invStatusPendingIssue') : t('sales.invoiceStatusPending')}</option>
+                  <option value="已开">{accLocale !== 'CN' ? taxLabel('invStatusIssued') : t('sales.invoiceStatusIssued')}</option>
+                </select>
               </div>
 
               <div className="space-y-2">
