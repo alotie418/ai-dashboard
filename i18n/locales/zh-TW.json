@@ -1037,6 +1037,7 @@
   },
   "transactions": {
     "title": "收支記錄",
+    "pageSubtitle": "資金流水：記錄實際收入與支出，輔助核對採購、銷售及帳務變化。",
     "add": "新增記錄",
     "totalIncome": "總收入",
     "totalExpense": "總支出",

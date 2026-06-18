@@ -1037,6 +1037,7 @@
   },
   "transactions": {
     "title": "收支记录",
+    "pageSubtitle": "资金流水：记录实际收入与支出，辅助核对采购、销售及账务变化。",
     "add": "新增记录",
     "totalIncome": "总收入",
     "totalExpense": "总支出",
