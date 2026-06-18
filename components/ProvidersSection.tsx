@@ -202,8 +202,8 @@ const ProvidersSection: React.FC = () => {
           return (
             <div key={p.provider} className={`border rounded-xl ${p.isDefault ? 'border-primary bg-primary/5' : 'border-[#e0ddd5] bg-white'}`}>
               <div className="p-5">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center">
+                <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+                  <div className="flex items-center min-w-0 flex-1">
                     {logo ? (
                       <div className="w-10 h-10 rounded-lg flex items-center justify-center mr-3 bg-[#f5f5f4]">
                         <img src={logo} alt={name} className="w-6 h-6 object-contain" />
@@ -213,7 +213,7 @@ const ProvidersSection: React.FC = () => {
                         <i className={`fas ${doc.icon}`}></i>
                       </div>
                     )}
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center space-x-2">
                         <h4 className="text-sm font-semibold text-[#191918]">{name}</h4>
                         {p.isDefault && <span className="text-[10px] font-bold bg-primary text-white px-2 py-0.5 rounded uppercase">{t('common.default')}</span>}
@@ -254,31 +254,31 @@ const ProvidersSection: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2 flex-wrap shrink-0">
                     {p.hasKey && !p.isDefault && (
-                      <button onClick={() => handleSetDefault(p.provider)} className="text-xs px-3 py-1.5 border border-primary text-primary rounded-lg hover:bg-primary/5">
+                      <button onClick={() => handleSetDefault(p.provider)} className="text-xs px-3 py-1.5 border border-primary text-primary rounded-lg hover:bg-primary/5 whitespace-nowrap">
                         {t('settings.ai.setAsDefault')}
                       </button>
                     )}
                     {!row.editing ? (
-                      <button onClick={() => startEdit(p)} className="text-xs px-3 py-1.5 border border-[#e0ddd5] text-[#4a4a48] rounded-lg hover:bg-[#f0eeeb]">
+                      <button onClick={() => startEdit(p)} className="text-xs px-3 py-1.5 border border-[#e0ddd5] text-[#4a4a48] rounded-lg hover:bg-[#f0eeeb] whitespace-nowrap">
                         <i className={`fas ${p.hasKey ? 'fa-edit' : 'fa-plus'} mr-1.5`}></i>
                         {p.hasKey ? usLabel('setEditKey', 'settings.ai.editKey') : usLabel('setAddKey', 'settings.ai.addKey')}
                       </button>
                     ) : (
-                      <button onClick={() => cancelEdit(p.provider)} className="text-xs px-3 py-1.5 border border-[#e0ddd5] text-[#4a4a48] rounded-lg hover:bg-[#f0eeeb]">
+                      <button onClick={() => cancelEdit(p.provider)} className="text-xs px-3 py-1.5 border border-[#e0ddd5] text-[#4a4a48] rounded-lg hover:bg-[#f0eeeb] whitespace-nowrap">
                         {t('common.cancel')}
                       </button>
                     )}
                     {p.hasKey && !row.editing && (
                       confirmDelete === p.provider ? (
-                        <div className="flex items-center space-x-1.5 bg-rose-50 px-2 py-1 rounded-lg">
+                        <div className="flex items-center space-x-1.5 bg-rose-50 px-2 py-1 rounded-lg whitespace-nowrap">
                           <span className="text-xs text-rose-600">{t('settings.ai.removeConfirm')}</span>
-                          <button onClick={() => handleDelete(p.provider)} className="text-xs px-2 py-0.5 bg-rose-600 text-white rounded">{t('common.delete')}</button>
-                          <button onClick={() => setConfirmDelete(null)} className="text-xs px-2 py-0.5 border border-rose-300 text-rose-600 rounded">{t('common.cancel')}</button>
+                          <button onClick={() => handleDelete(p.provider)} className="text-xs px-2 py-0.5 bg-rose-600 text-white rounded whitespace-nowrap">{t('common.delete')}</button>
+                          <button onClick={() => setConfirmDelete(null)} className="text-xs px-2 py-0.5 border border-rose-300 text-rose-600 rounded whitespace-nowrap">{t('common.cancel')}</button>
                         </div>
                       ) : (
-                        <button onClick={() => setConfirmDelete(p.provider)} className="text-xs px-3 py-1.5 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50">
+                        <button onClick={() => setConfirmDelete(p.provider)} className="text-xs px-3 py-1.5 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50 whitespace-nowrap">
                           <i className="fas fa-trash mr-1.5"></i>{t('common.delete')}
                         </button>
                       )
