@@ -497,12 +497,15 @@ const NavItem: React.FC<{ icon: string; label: string; active?: boolean; expande
 );
 
 // Sidebar section header (业务记录 / 账务核对). Visual grouping only — no routing change.
-// Expanded: a small, readable section label. Collapsed: a divider so groups stay
-// separated without text misaligning the icon-only rail.
+// Both states render in the SAME fixed-height slot (h-9, bottom-aligned) so toggling
+// expand/collapse never shifts the items below: expanded shows the readable label,
+// collapsed shows a divider at the same vertical position.
 const NavSection: React.FC<{ label: string; expanded?: boolean }> = ({ label, expanded = true }) => (
-  expanded
-    ? <p className="px-3 mt-4 mb-2 text-xs font-semibold text-[#5c5c5a] tracking-wide select-none">{label}</p>
-    : <div className="mx-3 my-2 border-t border-[#e0ddd5]" aria-hidden="true" />
+  <div className="h-9 flex items-end px-3 pb-1 select-none">
+    {expanded
+      ? <span className="text-xs font-semibold text-[#5c5c5a] tracking-wide">{label}</span>
+      : <span className="block w-full border-t border-[#e0ddd5]" aria-hidden="true" />}
+  </div>
 );
 
 export default AuthWrapper;
