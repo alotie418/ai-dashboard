@@ -182,6 +182,11 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           color="text-amber-500"
           bg="bg-amber-500/10"
         />
+        {/* Stat cards follow the active ledger tab so the input/output views don't carry
+            the other type's summary: 进项 cards (累计进项 + 待认证 input tax) show on
+            全部/进项明细, 销项 card shows on 全部/销项明细; 当前库存 is a neutral KPI shown
+            always. Display-only — the stat computations in `stats` are unchanged. */}
+        {filterType !== 'output' && (
         <StatCard
           title={genLabel('invTotalInput', 'invoices.totalInput')}
           value={stats.totalInputWeight}
@@ -190,6 +195,8 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           color="text-primary"
           bg="bg-primary/10"
         />
+        )}
+        {filterType !== 'input' && (
         <StatCard
           title={genLabel('invTotalOutput', 'invoices.totalOutput')}
           value={stats.totalOutputWeight}
@@ -198,6 +205,8 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           color="text-emerald-600"
           bg="bg-emerald-500/10"
         />
+        )}
+        {filterType !== 'output' && (
         <StatCard
           title={genLabel('invPendingTax', 'invoices.pendingTax')}
           value={stats.pendingCertification}
@@ -206,6 +215,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
           color="text-primary"
           bg="bg-primary/10"
         />
+        )}
       </div>
 
       {/* Search and Filters */}

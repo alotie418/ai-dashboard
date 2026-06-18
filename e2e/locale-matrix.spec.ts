@@ -1491,6 +1491,38 @@ test.describe('PR-2 → invoice query reconciliation ledger filter', () => {
     await expect(page.getByText('采购未收')).toHaveCount(0);
     await expect(page.getByText('销售待开')).toHaveCount(0);
   });
+
+  // The 进项明细 / 销项明细 tabs filter BOTH the ledger rows AND the summary stat cards
+  // by record type: 进项 = purchases (input), 销项 = sales (output). 全部发票 shows both.
+  // (Stat-card titles: 累计进项数量 / 累计销项数量 / 待处理进项税额.)
+  test('tabs filter rows + stat cards by type (进项明细 / 销项明细)', async ({ page }) => {
+    await bootComboIPC(page, ui, 'CN', {
+      apiResponses: [
+        { match: '/api/purchases', method: 'GET', json: purchasesSeed },
+        { match: '/api/sales', method: 'GET', json: salesSeed },
+      ],
+    });
+    await page.locator('i.fa-search-dollar').first().click();
+    await expect(page.getByText('发票核对台账')).toBeVisible({ timeout: 10_000 });
+    // 全部发票: both rows AND both summary cards present
+    await expect(page.getByText('采购已收')).toBeVisible();
+    await expect(page.getByText('销售已开')).toBeVisible();
+    await expect(page.getByText('累计进项数量')).toBeVisible();
+    await expect(page.getByText('累计销项数量')).toBeVisible();
+    // 销项明细 (output) → only sales rows; 进项 cards (累计进项 + 待认证) hidden, 销项 card shown
+    await page.getByRole('button', { name: '销项明细' }).click();
+    await expect(page.getByText('销售已开')).toBeVisible();
+    await expect(page.getByText('采购已收')).toHaveCount(0);
+    await expect(page.getByText('累计销项数量')).toBeVisible();
+    await expect(page.getByText('累计进项数量')).toHaveCount(0);
+    await expect(page.getByText('待处理进项税额')).toHaveCount(0);
+    // 进项明细 (input) → only purchase rows; 销项 card hidden, 进项 cards shown
+    await page.getByRole('button', { name: '进项明细' }).click();
+    await expect(page.getByText('采购已收')).toBeVisible();
+    await expect(page.getByText('销售已开')).toHaveCount(0);
+    await expect(page.getByText('累计进项数量')).toBeVisible();
+    await expect(page.getByText('累计销项数量')).toHaveCount(0);
+  });
 });
 
 test.afterAll(async () => {
