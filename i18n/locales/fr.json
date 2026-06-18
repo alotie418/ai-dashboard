@@ -734,8 +734,8 @@
     "receivable": "Receivables",
     "pageSubtitle": "Suivez les créances/dettes et l'ancienneté selon le statut de paiement des achats / ventes.",
     "payable": "Payables",
-    "totalReceivable": "Total Receivable",
-    "totalPayable": "Total Payable",
+    "totalReceivable": "Total Receivable (incl. tax)",
+    "totalPayable": "Total Payable (incl. tax)",
     "overdueAmount": "Overdue",
     "unpaidCount": "Unpaid Items",
     "unpaidCountReceivable": "Uncollected Items",
@@ -1038,6 +1038,7 @@
   },
   "transactions": {
     "title": "Transactions",
+    "amountBasisNote": "Les totaux de recettes/dépenses sont TTC (selon les montants saisis).",
     "pageSubtitle": "Flux de trésorerie : enregistrez les recettes et dépenses réelles pour aider à rapprocher les opérations et la comptabilité.",
     "add": "Nouvelle transaction",
     "totalIncome": "Total revenus",
@@ -1083,7 +1084,7 @@
   },
   "inventory": {
     "inStockCount": "Produits en stock",
-    "totalCost": "Coût total du stock",
+    "totalCost": "Coût total du stock (HT)",
     "detailTitle": "Détail du stock",
     "colProduct": "Produit",
     "colQty": "En stock",
