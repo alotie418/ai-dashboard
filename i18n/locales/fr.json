@@ -418,6 +418,7 @@
   },
   "purchases": {
     "title": "Purchases & Input Tax",
+    "pageSubtitle": "Registre des achats : enregistrez chaque achat au fil de l'eau ; le résultat est basé sur les enregistrements.",
     "formInvoiceStatus": "Statut de la facture",
     "invoiceStatusReceived": "Facture reçue",
     "invoiceStatusPending": "Facture non reçue",
@@ -480,6 +481,7 @@
   },
   "sales": {
     "title": "Sales & Output Tax",
+    "pageSubtitle": "Registre des ventes : enregistrez chaque vente au fil de l'eau ; le résultat est basé sur les enregistrements.",
     "formInvoiceStatus": "Statut de la facture",
     "invoiceStatusIssued": "Facture émise",
     "invoiceStatusPending": "Facture à émettre",
@@ -729,6 +731,7 @@
   },
   "accounts": {
     "receivable": "Receivables",
+    "pageSubtitle": "Suivez les créances/dettes et l'ancienneté selon le statut de paiement des achats / ventes.",
     "payable": "Payables",
     "totalReceivable": "Total Receivable",
     "totalPayable": "Total Payable",

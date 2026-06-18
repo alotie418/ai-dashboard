@@ -418,6 +418,7 @@
   },
   "purchases": {
     "title": "採購",
+    "pageSubtitle": "採購業務台帳：逐筆記錄採購發生，經營損益以業務記錄為準。",
     "formInvoiceStatus": "發票狀態",
     "invoiceStatusReceived": "已收發票",
     "invoiceStatusPending": "未收發票",
@@ -480,6 +481,7 @@
   },
   "sales": {
     "title": "銷售",
+    "pageSubtitle": "銷售業務台帳：逐筆記錄銷售發生，經營損益以業務記錄為準。",
     "formInvoiceStatus": "發票狀態",
     "invoiceStatusIssued": "已開發票",
     "invoiceStatusPending": "待開發票",
@@ -729,6 +731,7 @@
   },
   "accounts": {
     "receivable": "應收帳款",
+    "pageSubtitle": "依採購/銷售的付款狀態追蹤應收應付與帳齡。",
     "payable": "應付帳款",
     "totalReceivable": "應收總額",
     "totalPayable": "應付總額",

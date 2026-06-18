@@ -266,7 +266,10 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
 
       {/* Header Section */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[#191918]">{(accLocale !== 'CN') ? taxLabel('pageTitlePurchase') : t('purchases.title')}</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-[#191918]">{(accLocale !== 'CN') ? taxLabel('pageTitlePurchase') : t('purchases.title')}</h1>
+          <p className="text-sm text-[#5c5c5a] mt-1">{t('purchases.pageSubtitle')}</p>
+        </div>
         <div className="flex space-x-3">
           <button
             onClick={() => setShowCsvImport(true)}

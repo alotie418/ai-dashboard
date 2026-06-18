@@ -418,6 +418,7 @@
   },
   "purchases": {
     "title": "Purchases & Input Tax",
+    "pageSubtitle": "仕入業務台帳：仕入の発生をその都度記録します。損益は業務記録を基準とします。",
     "formInvoiceStatus": "請求書ステータス",
     "invoiceStatusReceived": "請求書受領済み",
     "invoiceStatusPending": "請求書未受領",
@@ -480,6 +481,7 @@
   },
   "sales": {
     "title": "Sales & Output Tax",
+    "pageSubtitle": "売上業務台帳：売上の発生をその都度記録します。損益は業務記録を基準とします。",
     "formInvoiceStatus": "請求書ステータス",
     "invoiceStatusIssued": "請求書発行済み",
     "invoiceStatusPending": "請求書未発行",
@@ -729,6 +731,7 @@
   },
   "accounts": {
     "receivable": "Receivables",
+    "pageSubtitle": "仕入・売上の支払ステータスに基づき、売掛金・買掛金と年齢分析を管理します。",
     "payable": "Payables",
     "totalReceivable": "Total Receivable",
     "totalPayable": "Total Payable",
