@@ -418,6 +418,7 @@
   },
   "purchases": {
     "title": "Purchases & Input Tax",
+    "pageSubtitle": "Purchase business ledger — record each purchase as it happens; profit & loss is based on business records.",
     "formInvoiceStatus": "Invoice Status",
     "invoiceStatusReceived": "Invoice Received",
     "invoiceStatusPending": "No Invoice Yet",
@@ -480,6 +481,7 @@
   },
   "sales": {
     "title": "Sales & Output Tax",
+    "pageSubtitle": "Sales business ledger — record each sale as it happens; profit & loss is based on business records.",
     "formInvoiceStatus": "Invoice Status",
     "invoiceStatusIssued": "Invoice Issued",
     "invoiceStatusPending": "Invoice Pending",
@@ -729,6 +731,7 @@
   },
   "accounts": {
     "receivable": "Receivables",
+    "pageSubtitle": "Track receivables/payables and aging by the payment status of purchases / sales.",
     "payable": "Payables",
     "totalReceivable": "Total Receivable",
     "totalPayable": "Total Payable",

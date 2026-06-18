@@ -418,6 +418,7 @@
   },
   "purchases": {
     "title": "采购",
+    "pageSubtitle": "采购业务台账：逐笔记录采购发生，经营损益以业务记录为准。",
     "formInvoiceStatus": "发票状态",
     "invoiceStatusReceived": "已收发票",
     "invoiceStatusPending": "未收发票",
@@ -480,6 +481,7 @@
   },
   "sales": {
     "title": "销售",
+    "pageSubtitle": "销售业务台账：逐笔记录销售发生，经营损益以业务记录为准。",
     "formInvoiceStatus": "发票状态",
     "invoiceStatusIssued": "已开发票",
     "invoiceStatusPending": "待开发票",
@@ -729,6 +731,7 @@
   },
   "accounts": {
     "receivable": "应收账款",
+    "pageSubtitle": "按采购/销售的付款状态跟踪应收应付与账龄。",
     "payable": "应付账款",
     "totalReceivable": "应收总额",
     "totalPayable": "应付总额",

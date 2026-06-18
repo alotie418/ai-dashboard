@@ -90,6 +90,7 @@ const AccountsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <p className="text-sm text-[#5c5c5a]">{t('accounts.pageSubtitle')}</p>
       {/* Tab Switcher */}
       <div className="flex items-center gap-1 bg-[#f0eeeb] rounded-xl p-1 w-fit">
         <button
