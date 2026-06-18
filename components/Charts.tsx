@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 import { ChartData, CategoryData } from '../types';
 import { CHART_COLORS } from './theme';
+import { localizeMonthName } from './monthLabel';
 
 // Chart series palette — series-1 = brand blue (THEME.primary); rest stay semantic.
 const COLORS = CHART_COLORS;
@@ -38,6 +39,7 @@ export const PLStatementChart: React.FC<{ data: ChartData[]; currencySymbol?: st
           axisLine={false}
           fontSize={12}
           dy={10}
+          tickFormatter={(value) => localizeMonthName(value, t)}
         />
         <YAxis
           stroke="#6b6b69"
@@ -49,6 +51,7 @@ export const PLStatementChart: React.FC<{ data: ChartData[]; currencySymbol?: st
         <Tooltip
           contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
           itemStyle={{ color: '#333330' }}
+          labelFormatter={(label) => localizeMonthName(label, t)}
         />
         <Legend
           verticalAlign="top"
@@ -65,17 +68,19 @@ export const PLStatementChart: React.FC<{ data: ChartData[]; currencySymbol?: st
 };
 
 export const ProfitBarChart: React.FC<{ data: ChartData[]; currencySymbol?: string }> = ({ data, currencySymbol = '¥' }) => {
+  const { t } = useTranslation();
   if (!data || data.length === 0) return <EmptyChartPlaceholder />;
   return (
   <div className="h-80 w-full">
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e0ddd5" vertical={false} />
-        <XAxis dataKey="name" stroke="#6b6b69" tickLine={false} axisLine={false} fontSize={12} dy={10} />
+        <XAxis dataKey="name" stroke="#6b6b69" tickLine={false} axisLine={false} fontSize={12} dy={10} tickFormatter={(value) => localizeMonthName(value, t)} />
         <YAxis stroke="#6b6b69" tickLine={false} axisLine={false} fontSize={12} tickFormatter={(value) => `${currencySymbol}${value/1000}k`} />
         <Tooltip
           contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
           itemStyle={{ color: '#333330' }}
+          labelFormatter={(label) => localizeMonthName(label, t)}
         />
         <Bar dataKey="profit" fill="#274C92" radius={[4, 4, 0, 0]} barSize={40} />
       </BarChart>
@@ -85,13 +90,14 @@ export const ProfitBarChart: React.FC<{ data: ChartData[]; currencySymbol?: stri
 };
 
 export const ProfitabilityBarChart: React.FC<{ data: ChartData[]; currencySymbol?: string }> = ({ data, currencySymbol = '¥' }) => {
+  const { t } = useTranslation();
   if (!data || data.length === 0) return <EmptyChartPlaceholder />;
   return (
   <div className="h-80 w-full">
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e0ddd5" vertical={false} />
-        <XAxis dataKey="name" stroke="#6b6b69" tickLine={false} axisLine={false} fontSize={12} dy={10} />
+        <XAxis dataKey="name" stroke="#6b6b69" tickLine={false} axisLine={false} fontSize={12} dy={10} tickFormatter={(value) => localizeMonthName(value, t)} />
         <YAxis
           stroke="#6b6b69"
           tickLine={false}
@@ -103,6 +109,7 @@ export const ProfitabilityBarChart: React.FC<{ data: ChartData[]; currencySymbol
           cursor={{fill: 'rgba(39, 76, 146, 0.06)'}}
           contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
           itemStyle={{ color: '#333330' }}
+          labelFormatter={(label) => localizeMonthName(label, t)}
         />
         <Bar dataKey="profit" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} />
       </BarChart>

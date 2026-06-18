@@ -1666,6 +1666,30 @@ test('transactions page shows the tax-basis note', async ({ page }) => {
   await expect(page.getByText(loc.transactions.amountBasisNote)).toBeVisible({ timeout: 10_000 });
 });
 
+// PR-B (month i18n): the backend emits Chinese month names ("1月"…) regardless of
+// UI language; the analysis page localizes them at render time via header.monthNN,
+// so under an English UI the panorama matrix shows "Jan", not "1月".
+test('analysis month labels follow UI language (en → Jan, not 1月)', async ({ page }) => {
+  const en = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', 'en.json'), 'utf8'));
+  const dashboard = {
+    ...DASHBOARD('CN'),
+    locale: 'CN',
+    monthlyPerformance: [
+      { name: '1月', revenue: 1000, cost: 600, profit: 400, netProfit: 400, purchaseTons: 0, salesTons: 0, yoy: null, mom: null, deflator: null },
+    ],
+  };
+  await bootComboIPC(page, 'en', 'CN', { dashboard });
+  // sidebar → data analysis (stable icon fa-chart-pie); default tab = panorama matrix
+  await page.locator('i.fa-chart-pie').first().click();
+  // the matrix month label (a <p>, not the hidden period-selector <option>) is localized
+  // to the en header.month01 ("Jan"), not the raw backend "1月"
+  await expect(page.locator('p', { hasText: en.header.month01 }).first()).toBeVisible({ timeout: 10_000 });
+  // scoped to the analysis page <main> (excludes the floating AI assistant widget, which is
+  // a separate out-of-scope component): no raw Chinese backend month label leaks here.
+  const mainText = await page.locator('main').innerText();
+  expect(mainText, 'no raw Chinese backend month label may leak in the analysis page under en UI').not.toContain('1月');
+});
+
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const summary = {
