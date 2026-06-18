@@ -734,8 +734,8 @@
     "receivable": "Receivables",
     "pageSubtitle": "仕入・売上の支払ステータスに基づき、売掛金・買掛金と年齢分析を管理します。",
     "payable": "Payables",
-    "totalReceivable": "Total Receivable",
-    "totalPayable": "Total Payable",
+    "totalReceivable": "Total Receivable (incl. tax)",
+    "totalPayable": "Total Payable (incl. tax)",
     "overdueAmount": "Overdue",
     "unpaidCount": "Unpaid Items",
     "unpaidCountReceivable": "Uncollected Items",
@@ -1038,6 +1038,7 @@
   },
   "transactions": {
     "title": "取引記録",
+    "amountBasisNote": "総収入・総支出は税込合計（入力額ベース）です。",
     "pageSubtitle": "資金フロー：実際の収入と支出を記録し、仕入・売上・帳簿の変化の照合を補助します。",
     "add": "新規追加",
     "totalIncome": "総収入",
@@ -1083,7 +1084,7 @@
   },
   "inventory": {
     "inStockCount": "在庫商品数",
-    "totalCost": "在庫総原価",
+    "totalCost": "在庫総原価（税抜）",
     "detailTitle": "在庫明細",
     "colProduct": "商品",
     "colQty": "在庫数",

@@ -189,6 +189,8 @@ const TransactionsPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* PR-B: tax-basis note for the income/expense totals (kept off the tight 10px card titles) */}
+      {summary && <p className="text-[11px] text-[#7a7a78] px-1">{t('transactions.amountBasisNote')}</p>}
 
       {/* Income / Expense Tab */}
       <div className="flex border-b border-[#e0ddd5]">

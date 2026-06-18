@@ -734,8 +734,8 @@
     "receivable": "Receivables",
     "pageSubtitle": "Track receivables/payables and aging by the payment status of purchases / sales.",
     "payable": "Payables",
-    "totalReceivable": "Total Receivable",
-    "totalPayable": "Total Payable",
+    "totalReceivable": "Total Receivable (incl. tax)",
+    "totalPayable": "Total Payable (incl. tax)",
     "overdueAmount": "Overdue",
     "unpaidCount": "Unpaid Items",
     "unpaidCountReceivable": "Uncollected Items",
@@ -1038,6 +1038,7 @@
   },
   "transactions": {
     "title": "Transactions",
+    "amountBasisNote": "Total income/expense are tax-inclusive totals (as entered).",
     "pageSubtitle": "Cash-flow log — record actual income and expenses to help reconcile business and accounting changes.",
     "add": "New Transaction",
     "totalIncome": "Total Income",
@@ -1083,7 +1084,7 @@
   },
   "inventory": {
     "inStockCount": "Products in Stock",
-    "totalCost": "Total Inventory Cost",
+    "totalCost": "Total Inventory Cost (excl. tax)",
     "detailTitle": "Inventory Detail",
     "colProduct": "Product",
     "colQty": "On Hand",

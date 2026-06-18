@@ -734,8 +734,8 @@
     "receivable": "應收帳款",
     "pageSubtitle": "依採購/銷售的付款狀態追蹤應收應付與帳齡。",
     "payable": "應付帳款",
-    "totalReceivable": "應收總額",
-    "totalPayable": "應付總額",
+    "totalReceivable": "應收總額（含稅）",
+    "totalPayable": "應付總額（含稅）",
     "overdueAmount": "逾期金額",
     "unpaidCount": "未付筆數",
     "unpaidCountReceivable": "未收筆數",
@@ -1038,6 +1038,7 @@
   },
   "transactions": {
     "title": "收支記錄",
+    "amountBasisNote": "總收入、總支出為含稅合計（按錄入金額）。",
     "pageSubtitle": "資金流水：記錄實際收入與支出，輔助核對採購、銷售及帳務變化。",
     "add": "新增記錄",
     "totalIncome": "總收入",
@@ -1083,7 +1084,7 @@
   },
   "inventory": {
     "inStockCount": "庫存商品數",
-    "totalCost": "庫存總成本",
+    "totalCost": "庫存總成本（不含稅）",
     "detailTitle": "庫存明細",
     "colProduct": "商品",
     "colQty": "在庫數量",

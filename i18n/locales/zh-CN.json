@@ -734,8 +734,8 @@
     "receivable": "应收账款",
     "pageSubtitle": "按采购/销售的付款状态跟踪应收应付与账龄。",
     "payable": "应付账款",
-    "totalReceivable": "应收总额",
-    "totalPayable": "应付总额",
+    "totalReceivable": "应收总额（含税）",
+    "totalPayable": "应付总额（含税）",
     "overdueAmount": "逾期金额",
     "unpaidCount": "未付笔数",
     "unpaidCountReceivable": "未收笔数",
@@ -1038,6 +1038,7 @@
   },
   "transactions": {
     "title": "收支记录",
+    "amountBasisNote": "总收入、总支出为含税合计（按录入金额）。",
     "pageSubtitle": "资金流水：记录实际收入与支出，辅助核对采购、销售及账务变化。",
     "add": "新增记录",
     "totalIncome": "总收入",
@@ -1083,7 +1084,7 @@
   },
   "inventory": {
     "inStockCount": "库存商品数",
-    "totalCost": "库存总成本",
+    "totalCost": "库存总成本（不含税）",
     "detailTitle": "库存明细",
     "colProduct": "商品",
     "colQty": "在库数量",

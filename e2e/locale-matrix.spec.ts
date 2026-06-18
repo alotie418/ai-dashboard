@@ -1648,6 +1648,22 @@ test('accounts table headers are localized (no raw accounts.header* key leak)', 
   await expect(page.locator('table thead').getByText(loc.accounts.headerDueDate)).toBeVisible();
   const body = await page.locator('body').innerText();
   expect(body, 'no raw accounts.header* i18n key may leak').not.toContain('accounts.header');
+  // PR-B: the AR total card carries the (含税) tax-basis suffix
+  await expect(page.getByText(loc.accounts.totalReceivable)).toBeVisible();
+});
+
+// PR-B: the income/expense totals carry a tax-basis note (kept off the tight card titles).
+test('transactions page shows the tax-basis note', async ({ page }) => {
+  const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', 'zh-CN.json'), 'utf8'));
+  await bootComboIPC(page, 'zh-CN', 'CN', {
+    apiResponses: [
+      { match: '/api/transactions/summary', json: { income: { total: 1000, count: 2 }, expense: { total: 500, count: 1 }, net: 500 } },
+      { match: '/api/transactions', json: [] },
+    ],
+  });
+  // sidebar → 收支记录 (stable icon fa-exchange-alt)
+  await page.locator('i.fa-exchange-alt').first().click();
+  await expect(page.getByText(loc.transactions.amountBasisNote)).toBeVisible({ timeout: 10_000 });
 });
 
 test.afterAll(async () => {
