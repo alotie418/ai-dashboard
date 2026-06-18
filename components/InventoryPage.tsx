@@ -343,7 +343,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
-              <tr className="bg-[#f9f9f8]/30 text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest">
+              <tr className="bg-[#f9f9f8]/30 text-[#333330] text-[10px] uppercase font-bold tracking-widest whitespace-nowrap">
                 <th className="px-8 py-5">{genLabel('invHeaderDate', 'invoices.headerDate')}</th>
                 <th className="px-8 py-5">{t('invoices.headerType')}</th>
                 <th className="px-8 py-5">{t('invoices.headerPartner')}</th>

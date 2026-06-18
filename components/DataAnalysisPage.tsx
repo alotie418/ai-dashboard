@@ -809,7 +809,7 @@ ${t('analysis.forecastPromptRequirements')}`;
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[1400px]">
               <thead>
-                <tr className="bg-[#f9f9f8]/70 text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest">
+                <tr className="bg-[#f9f9f8]/70 text-[#333330] text-[10px] uppercase font-bold tracking-widest">
                   <th className="px-10 py-6 border-r border-[#e0ddd5]/70 sticky left-0 bg-white">{t('analysis.tableMonth')}</th>
                   <th className="px-10 py-6 text-center border-r border-[#e0ddd5]/70">{t('analysis.tableHeaderPurchase')}</th>
                   <th className="px-10 py-6 text-center border-r border-[#e0ddd5]/70">{t('analysis.tableHeaderSales')}</th>
