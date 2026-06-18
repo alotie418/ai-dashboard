@@ -9,6 +9,7 @@ import { BusinessData } from '../types';
 import { fetchSettings } from '../services/api';
 import { parseAiErrorCode, aiErrorMessage } from '../services/aiErrors';
 import { formatMoney, getCurrencySymbol, getInventoryUnitLabel, formatCompactMoney } from './accountingHelpers';
+import { localizeMonthName } from './monthLabel';
 // AI calls moved to server-side proxy
 
 interface Props {
@@ -468,7 +469,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0ddd5" vertical={false} />
                 <XAxis dataKey="name" hide />
                 <YAxis hide domain={['auto', 'auto']} />
-                <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} />
+                <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} labelFormatter={(label) => localizeMonthName(label, t)} />
                 <Area type="monotone" dataKey="revenue" stroke="#274C92" fill="url(#p_rev)" strokeWidth={2} />
                 <Area type="monotone" dataKey="cost" stroke="#ef4444" fill="transparent" strokeWidth={1} strokeDasharray="3 3" />
               </AreaChart>
@@ -482,7 +483,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                 <ComposedChart data={data.monthlyPerformance}>
                   <XAxis dataKey="name" hide />
                   <YAxis hide />
-                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} />
+                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} labelFormatter={(label) => localizeMonthName(label, t)} />
                   <Bar dataKey="mom" name={t('analysis.chartMom')} fill="#274C92" radius={[4, 4, 0, 0]} barSize={8} />
                   <Line type="monotone" dataKey="yoy" name={t('analysis.chartYoy')} stroke="#10b981" strokeWidth={2} dot={{ r: 2 }} connectNulls={false} />
                 </ComposedChart>
@@ -501,7 +502,7 @@ ${t('analysis.forecastPromptRequirements')}`;
               <BarChart data={data.monthlyPerformance}>
                 <XAxis dataKey="name" hide />
                 <YAxis hide />
-                <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} />
+                <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '12px' }} labelFormatter={(label) => localizeMonthName(label, t)} />
                 <Bar dataKey="purchaseTons" name={t('analysis.chartPurchase')} fill="#5B7FC4" opacity={0.6} radius={[2, 2, 0, 0]} />
                 <Bar dataKey="salesTons" name={t('analysis.chartSales')} fill="#10b981" radius={[2, 2, 0, 0]} />
               </BarChart>
@@ -542,7 +543,7 @@ ${t('analysis.forecastPromptRequirements')}`;
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
               {data.monthlyPerformance.map((item, idx) => (
                 <div key={idx} className="bg-[#f9f9f8]/60 border border-[#e0ddd5]/70 p-4 rounded-xl hover:border-primary/40 transition-all hover:bg-[#f9f9f8]/80 group">
-                  <p className="text-[#5c5c5a] text-[11px] font-bold uppercase mb-2 whitespace-nowrap group-hover:text-primary transition-colors">{item.name}</p>
+                  <p className="text-[#5c5c5a] text-[11px] font-bold uppercase mb-2 whitespace-nowrap group-hover:text-primary transition-colors">{localizeMonthName(item.name, t)}</p>
                   <p className="text-[#191918] text-lg font-bold">{formatMoney(item.revenue, accLocale, uiLang)}</p>
                   <div className="mt-3 space-y-1">
                     <div className="flex justify-between items-center gap-2 text-[11px] whitespace-nowrap">
@@ -583,11 +584,12 @@ ${t('analysis.forecastPromptRequirements')}`;
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={data.monthlyPerformance}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e0ddd5" vertical={false} />
-                  <XAxis dataKey="name" stroke="#6b6b69" fontSize={11} tickLine={false} axisLine={false} dy={10} />
+                  <XAxis dataKey="name" stroke="#6b6b69" fontSize={11} tickLine={false} axisLine={false} dy={10} tickFormatter={(v) => localizeMonthName(v, t)} />
                   <YAxis yAxisId="left" stroke="#6b6b69" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => dimension === 'volume' ? `${v} ${unitLabel}` : formatCurrency(v)} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}
                     cursor={{ stroke: '#274C92', strokeWidth: 1 }}
+                    labelFormatter={(label) => localizeMonthName(label, t)}
                   />
                   <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: '30px' }} />
                   {dimension === 'financial' && (
@@ -621,8 +623,8 @@ ${t('analysis.forecastPromptRequirements')}`;
           </div>
 
           <div className="space-y-6">
-            <SummaryMiniCard title={t('analysis.peakMonth')} value={data.monthlyPerformance.length > 0 ? [...data.monthlyPerformance].sort((a, b) => b.revenue - a.revenue)[0].name : '—'} sub={t('analysis.peakMonthSub')} icon="fa-crown" color="text-amber-600" />
-            <SummaryMiniCard title={t('analysis.fastest')} value={data.monthlyPerformance.some(p => p.mom != null) ? [...data.monthlyPerformance].sort((a, b) => (b.mom ?? -Infinity) - (a.mom ?? -Infinity))[0].name : '—'} sub={t('analysis.fastestSub')} icon="fa-bolt" color="text-primary" />
+            <SummaryMiniCard title={t('analysis.peakMonth')} value={data.monthlyPerformance.length > 0 ? localizeMonthName([...data.monthlyPerformance].sort((a, b) => b.revenue - a.revenue)[0].name, t) : '—'} sub={t('analysis.peakMonthSub')} icon="fa-crown" color="text-amber-600" />
+            <SummaryMiniCard title={t('analysis.fastest')} value={data.monthlyPerformance.some(p => p.mom != null) ? localizeMonthName([...data.monthlyPerformance].sort((a, b) => (b.mom ?? -Infinity) - (a.mom ?? -Infinity))[0].name, t) : '—'} sub={t('analysis.fastestSub')} icon="fa-bolt" color="text-primary" />
             <div className="bg-white/80 border border-[#e0ddd5] rounded-xl p-8" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
               <h4 className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-[0.2em] mb-6">{t('analysis.anomalyTitle')}</h4>
               <div className="space-y-5">
@@ -712,7 +714,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e0ddd5" vertical={false} />
-                  <XAxis dataKey="name" stroke="#6b6b69" fontSize={11} tickLine={false} axisLine={false} />
+                  <XAxis dataKey="name" stroke="#6b6b69" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => localizeMonthName(v, t)} />
                   <YAxis stroke="#6b6b69" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => formatCurrency(v)} />
                   <Tooltip
                     content={({ active, payload, label }) => {
@@ -720,7 +722,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                         const d = payload[0].payload;
                         return (
                           <div className="bg-white border border-[#e0ddd5] p-6 rounded-xl backdrop-blur-xl ring-1 ring-[#e0ddd5]" style={{ boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}>
-                            <p className="text-[#5c5c5a] text-[10px] font-bold uppercase mb-3 tracking-[0.2em]">{label} {d.isForecast ? t('analysis.forecastValue') : t('analysis.forecastActual')}</p>
+                            <p className="text-[#5c5c5a] text-[10px] font-bold uppercase mb-3 tracking-[0.2em]">{localizeMonthName(label, t)} {d.isForecast ? t('analysis.forecastValue') : t('analysis.forecastActual')}</p>
                             <div className="space-y-3">
                               <p className="text-[#191918] text-2xl font-bold">{currSym}{formatNum(d.revenue)}</p>
                               {d.isForecast && (
@@ -823,7 +825,7 @@ ${t('analysis.forecastPromptRequirements')}`;
               <tbody className="divide-y divide-[#e0ddd5]">
                 {data.monthlyPerformance.map((row, idx) => (
                   <tr key={idx} className="hover:bg-primary/5 transition-colors group">
-                    <td className="px-10 py-6 text-sm font-bold text-[#333330] border-r border-[#e0ddd5]/70 sticky left-0 bg-white/90 group-hover:bg-[#f0eeeb] transition-colors">{row.name}</td>
+                    <td className="px-10 py-6 text-sm font-bold text-[#333330] border-r border-[#e0ddd5]/70 sticky left-0 bg-white/90 group-hover:bg-[#f0eeeb] transition-colors">{localizeMonthName(row.name, t)}</td>
                     <td className="px-10 py-6 text-sm text-center font-mono text-[#4a4a48] border-r border-[#e0ddd5]/70">{row.purchaseTons}</td>
                     <td className="px-10 py-6 text-sm text-center font-mono text-[#4a4a48] border-r border-[#e0ddd5]/70">{row.salesTons}</td>
                     <td className="px-10 py-6 text-sm text-right font-bold text-[#191918] border-r border-[#e0ddd5]/70">{row.revenue.toLocaleString()}</td>
