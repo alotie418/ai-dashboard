@@ -355,6 +355,11 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
       <p className="text-[11px] text-[#7a7a78] leading-snug px-2">
         <i className="fas fa-circle-info mr-1.5"></i>{t('disclaimer.report')}
       </p>
+      {/* Phase 2: gentle data-source notice — business records and 收支记录 are separate
+          ledgers; reconcile when both are used in the same period. */}
+      <p className="text-[11px] text-[#7a7a78] leading-snug px-2">
+        <i className="fas fa-circle-info mr-1.5"></i>{t('common.dataSourceNote')}
+      </p>
     </div>
   );
 };

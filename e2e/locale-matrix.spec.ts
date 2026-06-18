@@ -1603,6 +1603,19 @@ test('sidebar groups nav into 业务记录 / 账务核对 sections', async ({ pa
   await expect(nav.getByText('业务记录').locator('..')).toHaveClass(/h-9/);
 });
 
+// Phase 2 (PR-2.1): a gentle, static data-source notice on the dashboard + finance pages
+// clarifies that business records and 收支记录 are separate ledgers and should be reconciled
+// when both are used in the same period. Display-only — no source detection, no formula.
+test('dashboard + finance show the data-source reconciliation notice', async ({ page }) => {
+  const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', 'zh-CN.json'), 'utf8'));
+  await bootComboIPC(page, 'zh-CN', 'CN', {});
+  // dashboard is the default page on boot
+  await expect(page.getByText(loc.common.dataSourceNote)).toBeVisible({ timeout: 10_000 });
+  // finance report page (sidebar fa-wallet) carries the same notice
+  await page.locator('i.fa-wallet').first().click();
+  await expect(page.getByText(loc.common.dataSourceNote)).toBeVisible({ timeout: 10_000 });
+});
+
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const summary = {
