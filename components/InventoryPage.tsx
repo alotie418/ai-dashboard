@@ -88,6 +88,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
         date: r.date, typeKey: 'output' as const, partner: r.customer,
         weight: `${parseTons(r.quantity)} ${unitLabel}`, amount: amountNoTax, tax: taxAmt,
         invoiceNo: r.invoiceNo, statusKey: r.status === '已开' ? 'issued' : 'pendingIssue',
+        invoiceStatus: r.status,
       };
     });
     const input = purchaseRecords.map(r => {
@@ -98,14 +99,34 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
         date: r.date, typeKey: 'input' as const, partner: r.supplier,
         weight: `${parseTons(r.quantity)} ${unitLabel}`, amount: amountNoTax, tax: taxAmt,
         invoiceNo: r.invoiceNo, statusKey: r.status === '已收' ? 'certified' : 'pendingCert',
+        invoiceStatus: r.status,
       };
     });
     return [...output, ...input].sort((a, b) => b.date.localeCompare(a.date));
   }, [salesRecords, purchaseRecords]);
 
+  // PR-2: the invoice query page is an INVOICE RECONCILIATION LEDGER — it lists only
+  // records that actually carry an invoice, not every business record.
+  //   • Purchases (typeKey 'input'): kept when the invoice is received ('已收'); a record
+  //     that opts out writes '未收' and is hidden.
+  //   • Sales (typeKey 'output'): kept when the invoice is issued ('已开'); a record that
+  //     opts out writes '待开' and is hidden.
+  //   • Legacy compatibility: a record with a blank/empty invoiceStatus is KEPT visible so
+  //     old data never silently disappears. (services/api.ts already defaults a blank
+  //     purchase status to '已收'; it collapses a blank sale status to '待开', so a truly
+  //     blank legacy sale reads as pending here — surfacing it would need an api.ts change,
+  //     intentionally out of scope for PR-2.)
+  // Display-only: business P&L, the dashboard, and tax/进项-销项 statistics read every
+  // record straight from the backend and never consult this filtered ledger view.
+  const ledgerInvoices = useMemo(() => allInvoices.filter(inv => {
+    const s = (inv.invoiceStatus || '').trim();
+    if (s === '') return true; // legacy blank invoiceStatus → keep visible (compat)
+    return inv.typeKey === 'input' ? s === '已收' : s === '已开';
+  }), [allInvoices]);
+
 
   const filteredInvoices = useMemo(() => {
-    return allInvoices.filter(inv => {
+    return ledgerInvoices.filter(inv => {
       const matchesSearch = inv.partner.toLowerCase().includes(searchTerm.toLowerCase()) ||
         inv.invoiceNo.includes(searchTerm);
       const matchesType = filterType === 'all' || filterType === inv.typeKey;
@@ -126,7 +147,7 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
         matchesWeightMin && matchesWeightMax &&
         matchesStatus;
     });
-  }, [allInvoices, searchTerm, filterType, dateFrom, dateTo, amountMin, amountMax, weightMin, weightMax, statusFilter]);
+  }, [ledgerInvoices, searchTerm, filterType, dateFrom, dateTo, amountMin, amountMax, weightMin, weightMax, statusFilter]);
 
   const stats = useMemo(() => {
     const totalInputTons = purchaseRecords.reduce((s, r) => s + parseTons(r.quantity), 0);
