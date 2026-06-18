@@ -47,6 +47,8 @@
     "settings": "Paramètres système",
     "transactions": "Transactions",
     "usTax": "Outils fiscaux US",
+    "sectionBusiness": "Opérations",
+    "sectionAccounting": "Rapprochement",
     "logout": "Déconnexion"
   },
   "headerTitle": {

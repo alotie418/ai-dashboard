@@ -47,6 +47,8 @@
     "settings": "系統設定",
     "transactions": "收支記錄",
     "usTax": "美國稅務工具",
+    "sectionBusiness": "業務記錄",
+    "sectionAccounting": "帳務核對",
     "logout": "退出登錄"
   },
   "headerTitle": {

@@ -47,6 +47,8 @@
     "settings": "Settings",
     "transactions": "Transactions",
     "usTax": "US Tax Tools",
+    "sectionBusiness": "Business Records",
+    "sectionAccounting": "Reconciliation",
     "logout": "Log Out"
   },
   "headerTitle": {

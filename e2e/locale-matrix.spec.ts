@@ -1587,6 +1587,15 @@ test.describe('PR-2 → invoice query reconciliation ledger filter', () => {
   });
 });
 
+// Phase 1b: the sidebar groups nav into 业务记录 / 账务核对 sections (visual grouping
+// only — routing keys unchanged). Assert both section headers render in the sidebar.
+test('sidebar groups nav into 业务记录 / 账务核对 sections', async ({ page }) => {
+  await bootComboIPC(page, 'zh-CN', 'CN', {});
+  const nav = page.locator('nav').first();
+  await expect(nav.getByText('业务记录')).toBeVisible({ timeout: 10_000 });
+  await expect(nav.getByText('账务核对')).toBeVisible();
+});
+
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const summary = {
