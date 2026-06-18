@@ -497,11 +497,11 @@ const NavItem: React.FC<{ icon: string; label: string; active?: boolean; expande
 );
 
 // Sidebar section header (业务记录 / 账务核对). Visual grouping only — no routing change.
-// Expanded: a small uppercase label. Collapsed: a divider so groups stay separated
-// without text misaligning the icon-only rail.
+// Expanded: a small, readable section label. Collapsed: a divider so groups stay
+// separated without text misaligning the icon-only rail.
 const NavSection: React.FC<{ label: string; expanded?: boolean }> = ({ label, expanded = true }) => (
   expanded
-    ? <p className="px-3 pt-4 pb-1 text-[10px] font-bold text-[#9c9c9a] uppercase tracking-widest select-none">{label}</p>
+    ? <p className="px-3 mt-4 mb-2 text-xs font-semibold text-[#5c5c5a] tracking-wide select-none">{label}</p>
     : <div className="mx-3 my-2 border-t border-[#e0ddd5]" aria-hidden="true" />
 );
 
