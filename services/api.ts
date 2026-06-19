@@ -498,6 +498,18 @@ export interface ReportResult {
   businessTax?: any;
   // Common
   monthlyBreakdown?: Array<{ month: number; revenue: number; cost: number; profit: number }>;
+  // PR-7C: management-basis operating cash-flow (cash basis). Operating figures are real;
+  // investing/financing/beginningCash/endingCash are null = "not configured" (UI never shows 0).
+  cashflowStatement?: {
+    basis: string;
+    statutory: boolean;
+    source: string;
+    operating: { inflow: number; outflow: number; net: number };
+    investing: null;
+    financing: null;
+    beginningCash: null;
+    endingCash: null;
+  };
   warnings: string[];
 }
 
