@@ -10,7 +10,13 @@ const MetricCard: React.FC<MetricCardProps> = ({ metric }) => {
   return (
     <div className="glass-card rounded-xl p-6 hover:shadow-sm transition-all duration-300 flex flex-col justify-between" style={{boxShadow: '0 4px 24px rgba(0,0,0,0.06)'}}>
       <div className="space-y-1">
-        <h3 className="text-[#4a4a48] text-sm font-medium">{metric.label}</h3>
+        <h3 className="text-[#4a4a48] text-sm font-medium">
+          {metric.label}
+          {/* Tax-basis suffix (e.g. （不含税）) as a stable second line: the title shows two
+              lines consistently at any card width, not only when the card is narrow enough
+              for CSS to wrap the combined string. Same size/weight — no font shrink. */}
+          {metric.subtitle && <span className="block">{metric.subtitle}</span>}
+        </h3>
         <p className="text-[clamp(1rem,1.45vw,1.875rem)] font-bold text-[#191918] tracking-tight tabular-nums whitespace-nowrap overflow-hidden text-ellipsis" title={metric.value}>{metric.value}</p>
       </div>
       <div className="mt-4 pt-4 border-t border-[#e0ddd5]/50">

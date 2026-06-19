@@ -40,6 +40,17 @@ const MONTHS = ['全部', '01月', '02月', '03月', '04月', '05月', '06月', 
 const DATA_VERSION = 'cleared-2026-02-11';
 const FILTER_SUPPORTED_PAGES: PageId[] = ['dashboard', 'sales', 'purchase', 'analysis', 'inventory', 'finance'];
 
+// Dashboard KPI titles carry a parenthetical tax-basis suffix (e.g. "（不含税）",
+// "(excl. tax)", "(HT)"). Split it off so MetricCard can render the title and the
+// suffix as two stable lines — consistent at any card width — instead of relying on
+// CSS to wrap the combined string (which only happens when the card is narrow).
+// Locale-agnostic: matches a trailing full-width （）or half-width () group. No
+// match (e.g. US "Total Expenses") → subtitle undefined → single line, unchanged.
+const splitTaxBasis = (full: string): { label: string; subtitle?: string } => {
+  const m = full.match(/^(.*?)\s*([（(][^（）()]*[）)])\s*$/);
+  return m ? { label: m[1], subtitle: m[2] } : { label: full };
+};
+
 const AppContent: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [data, setData] = useState<BusinessData>(MOCK_BUSINESS_DATA);
@@ -115,7 +126,7 @@ const AppContent: React.FC = () => {
             color: 'bg-blue-500',
           },
           {
-            label: t('inventory.totalCost'),
+            ...splitTaxBasis(t('inventory.totalCost')),
             value: inv.totalInventoryCost > 0 ? formatMoney(inv.totalInventoryCost, accLocale) : `${sym}0`,
             subValue: '—',
             icon: 'fa-coins',
@@ -128,7 +139,7 @@ const AppContent: React.FC = () => {
             // so US shows a "Total Expenses" label, not "Cost of Sales". subValue is
             // '—': legacy tons are a different (quantity) source and would mislead
             // next to a report-engine net amount.
-            label: `${t('header.yearLabel', { year: selectedYear })} ${accLocale === 'US' ? t('dashboard.totalExpenses') : t('dashboard.cogsNoTax')}`,
+            ...splitTaxBasis(`${t('header.yearLabel', { year: selectedYear })} ${accLocale === 'US' ? t('dashboard.totalExpenses') : t('dashboard.cogsNoTax')}`),
             // A zero cost of sales is a real figure (e.g. a service business with no COGS),
             // so render it as ¥0 rather than '—', which would read as "no data".
             value: formatMoney(enrichedFS.costOfSales, accLocale),
@@ -141,7 +152,7 @@ const AppContent: React.FC = () => {
             // the P&L's salesRevenue. US salesRevenue = Schedule C Line 7 gross income
             // (not a VAT "excl. tax" figure), so US uses its kpiGrossIncome label.
             // subValue '—' (see above).
-            label: `${t('header.yearLabel', { year: selectedYear })} ${accLocale === 'US' ? getTaxLabel(accLocale, i18n.language, 'kpiGrossIncome') : t('dashboard.revenueNoTax')}`,
+            ...splitTaxBasis(`${t('header.yearLabel', { year: selectedYear })} ${accLocale === 'US' ? getTaxLabel(accLocale, i18n.language, 'kpiGrossIncome') : t('dashboard.revenueNoTax')}`),
             value: enrichedFS.salesRevenue > 0 ? formatMoney(enrichedFS.salesRevenue, accLocale) : '—',
             subValue: '—',
             icon: 'fa-chart-line',
