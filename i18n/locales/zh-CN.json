@@ -938,6 +938,7 @@
     "taxAmount": "合计税额"
   },
   "common2": {
+    "dueDate": "到期日",
     "edit": "编辑",
     "delete": "删除",
     "noData": "暂无数据",

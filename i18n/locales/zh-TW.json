@@ -938,6 +938,7 @@
     "taxAmount": "合計稅額"
   },
   "common2": {
+    "dueDate": "到期日",
     "edit": "編輯",
     "delete": "刪除",
     "noData": "暫無資料",

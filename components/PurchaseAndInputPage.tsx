@@ -101,6 +101,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
     price: 0,
     taxRate: defaultTaxRate,
     invoiceNo: '',
+    dueDate: '',
     totalWithTax: 0,
     unitPriceWithoutTax: 0,
     taxAmount: 0
@@ -239,6 +240,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
         price: 0,
         taxRate: defaultTaxRate,
         invoiceNo: '',
+        dueDate: '',
         totalWithTax: 0,
         unitPriceWithoutTax: 0,
         taxAmount: 0
@@ -391,7 +393,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                   <td className="px-5 py-5 text-xs font-medium space-x-3">
                     <button
                       onClick={() => {
-                        setNewPurchase({ date: row.date, supplier: row.supplier, productId: row.productId || '', quantity: row.quantity, price: row.price, taxRate: row.taxRate, invoiceNo: row.invoiceNo, totalWithTax: row.totalWithTax || 0, unitPriceWithoutTax: row.unitPriceWithoutTax || 0, taxAmount: row.taxAmount || 0 });
+                        setNewPurchase({ date: row.date, supplier: row.supplier, productId: row.productId || '', quantity: row.quantity, price: row.price, taxRate: row.taxRate, invoiceNo: row.invoiceNo, dueDate: row.dueDate || '', totalWithTax: row.totalWithTax || 0, unitPriceWithoutTax: row.unitPriceWithoutTax || 0, taxAmount: row.taxAmount || 0 });
                         setPurchaseInvoiceStatus(row.status || '未收');
                         setShowAddModal(true);
                       }}
@@ -514,6 +516,16 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                     className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('common2.dueDate')}</label>
+                <input
+                  type="date"
+                  value={newPurchase.dueDate || ''}
+                  onChange={(e) => setNewPurchase({ ...newPurchase, dueDate: e.target.value })}
+                  className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
+                />
               </div>
 
               <div className="space-y-2">

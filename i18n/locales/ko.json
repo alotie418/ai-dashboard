@@ -938,6 +938,7 @@
     "taxAmount": "세액 합계"
   },
   "common2": {
+    "dueDate": "만기일",
     "edit": "Edit",
     "delete": "Delete",
     "noData": "No data",

@@ -938,6 +938,7 @@
     "taxAmount": "税額合計"
   },
   "common2": {
+    "dueDate": "支払期日",
     "edit": "Edit",
     "delete": "Delete",
     "noData": "No data",
