@@ -832,7 +832,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                     <td className="px-10 py-6 text-sm text-right font-bold text-emerald-600 border-r border-[#e0ddd5]/70">{row.netProfit.toLocaleString()}</td>
                     <td className="px-10 py-6 text-center border-r border-[#e0ddd5]/70">
                       {row.yoy == null ? (
-                        <span className="text-[10px] text-[#a0a09c]">—</span>
+                        <span className="text-[10px] text-[#5c5c5a]">—</span>
                       ) : (
                         <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${row.yoy >= 0 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-500'}`}>
                           {row.yoy > 0 ? '+' : ''}{row.yoy.toFixed(1)}%
@@ -841,14 +841,14 @@ ${t('analysis.forecastPromptRequirements')}`;
                     </td>
                     <td className="px-10 py-6 text-center border-r border-[#e0ddd5]/70">
                       {row.mom == null ? (
-                        <span className="text-[10px] text-[#a0a09c]">—</span>
+                        <span className="text-[10px] text-[#5c5c5a]">—</span>
                       ) : (
                         <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${row.mom >= 0 ? 'bg-primary/10 text-primary' : 'bg-rose-500/10 text-rose-500'}`}>
                           {row.mom > 0 ? '+' : ''}{row.mom.toFixed(1)}%
                         </span>
                       )}
                     </td>
-                    <td className="px-10 py-6 text-sm text-center font-bold text-amber-500 bg-amber-500/5">{row.deflator == null ? <span className="text-[#a0a09c]">—</span> : row.deflator}</td>
+                    <td className="px-10 py-6 text-sm text-center font-bold text-amber-500 bg-amber-500/5">{row.deflator == null ? <span className="text-[#5c5c5a]">—</span> : row.deflator}</td>
                   </tr>
                 ))}
               </tbody>

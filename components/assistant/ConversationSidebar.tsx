@@ -74,7 +74,7 @@ const ConversationSidebar: React.FC = () => {
             >
               <button onClick={() => switchConversation(c.id)} className="w-full text-left pr-12">
                 <div className={`text-xs font-medium truncate ${active ? 'text-primary' : 'text-[#4a4a48]'}`} title={title}>{title}</div>
-                {c.updated_at && <div className="text-[9px] text-[#a0a09c] mt-0.5">{c.updated_at.slice(0, 10)}</div>}
+                {c.updated_at && <div className="text-[9px] text-[#5c5c5a] mt-0.5">{c.updated_at.slice(0, 10)}</div>}
               </button>
               <div className={`absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center space-x-1 transition-opacity ${armed ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                 {armed ? (
