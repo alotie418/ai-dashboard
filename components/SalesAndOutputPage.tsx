@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
-import { analyzeInvoice, extractedToSalesForm, type ExtractedInvoice } from '../services/ocrService';
+import { analyzeInvoice, extractedToSalesForm, salesCounterparty, type ExtractedInvoice } from '../services/ocrService';
 import { rasterizePdfFirstPage } from '../services/pdfRaster';
 import { fetchSales, createSale, updateSale, deleteSale, fetchSettings, listProducts, listProviders, isDesktop, type Product, type BusinessDocument, SalesRecord } from '../services/api';
 import { getSystemErrorText } from '../services/systemErrors';
@@ -753,6 +753,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
         <OcrPreviewModal
           extracted={ocrPreview}
           counterpartyLabel={t('tableHeaders.customer')}
+          counterparty={salesCounterparty(ocrPreview)}
           fmtMoney={fmtMoney}
           onClose={() => setOcrPreview(null)}
           onConfirm={confirmOcrFill}

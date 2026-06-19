@@ -134,6 +134,15 @@ export const analyzeInvoice = async (
 // taxRate is derived from the extracted tax/amount when both are present, else the page's default.
 // The page applies the result with setState ONLY (no DB write); the page's existing auto-calc effect
 // then re-derives price/taxAmount/unitPrice from totalWithTax+quantity+taxRate (no calc duplicated here).
+// PR Bug-3: the counterparty shown/used for a SALES (output) invoice is the BUYER (购方).
+// normalizeToLegacy flattens `customer` to the seller (right for purchases, where the seller
+// is the supplier), so sales prefers buyerName and only falls back to that flattened value
+// when no buyer was found (US receipts / legacy data). Single source of truth — used by both
+// the OCR preview modal and the sales-form fill so they always agree.
+export function salesCounterparty(e: ExtractedInvoice): string {
+  return e.buyerName || e.customer || '';
+}
+
 export function extractedToPurchaseForm(
   e: ExtractedInvoice,
   defaultTaxRate: string,
@@ -163,7 +172,8 @@ export function extractedToSalesForm(
     : fallbackTaxRate;
   return {
     date: e.date || '',
-    customer: e.customer || '',
+    // PR Bug-3: sales counterparty = buyer (see salesCounterparty); same source as the preview.
+    customer: salesCounterparty(e),
     quantity: e.quantity || '',
     price: e.price || 0,
     shipping: e.shipping || 0,
