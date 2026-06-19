@@ -5,7 +5,7 @@
 // Locks: legacy-field → form mapping, missing text → '', missing numbers → 0 (never NaN/undefined),
 // taxRate derived from tax/amount else the default, and sales-only `shipping`.
 
-import { extractedToPurchaseForm, extractedToSalesForm } from '../services/ocrService.ts';
+import { extractedToPurchaseForm, extractedToSalesForm, salesCounterparty } from '../services/ocrService.ts';
 
 const failures = [];
 const check = (name, cond) => { if (cond) console.log(`  ✓ ${name}`); else { console.log(`  ✗ ${name}`); failures.push(name); } };
@@ -58,6 +58,13 @@ check('sales has no supplier key (uses customer)', !('supplier' in s));
 // buyerName empty → sales customer falls back to the flattened seller/customer (US receipts / legacy)
 const sNoBuyer = extractedToSalesForm({ ...full, buyerName: '' }, '13%');
 check('sales customer falls back to seller/customer when buyerName empty', sNoBuyer.customer === 'ACME Vendor');
+
+console.log('Sales counterparty (shared by OCR preview + form fill):');
+// salesCounterparty is the single source the preview modal AND extractedToSalesForm use,
+// so the preview "客户" and the filled customer always agree (= buyer, not seller).
+check('salesCounterparty ← buyerName (preview shows buyer)', salesCounterparty(full) === 'Buyer Co');
+check('salesCounterparty falls back to seller/customer when buyerName empty', salesCounterparty({ ...full, buyerName: '' }) === 'ACME Vendor');
+check('preview value === filled customer (consistent)', salesCounterparty(full) === extractedToSalesForm(full, '13%').customer);
 
 console.log(`\n${failures.length === 0 ? '✓ all passed' : '✗ ' + failures.length + ' failed'}\n`);
 process.exit(failures.length === 0 ? 0 : 1);

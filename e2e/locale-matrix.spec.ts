@@ -247,7 +247,7 @@ test('data backup → mock electronAPI: backup success + restore confirm + succe
 // opens the read-only preview, clicks "use these values", and asserts the add-form inputs are
 // pre-filled. NO save happens (no createPurchase/createSale) — this is the confirm→fill closed loop.
 const TINY_PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-const OCR_RAW = { isInvoiceLike: true, sellerName: 'OCR Test Vendor', netAmount: 1000, taxAmount: 130, grossAmount: 1130, invoiceNumber: 'INV-OCR-2026', quantity: '10', date: '2026-06-13', currency: 'CNY', invoiceType: 'vat' };
+const OCR_RAW = { isInvoiceLike: true, sellerName: 'OCR Test Vendor', buyerName: 'OCR Buyer Co', netAmount: 1000, taxAmount: 130, grossAmount: 1130, invoiceNumber: 'INV-OCR-2026', quantity: '10', date: '2026-06-13', currency: 'CNY', invoiceType: 'vat' };
 const ocrInit = ({ settings, dashboard, ocr }: any) => {
   const lists = /\/api\/(categories|products|transactions|sales|purchases|receivables|payables|alerts|mileage|documents|reports\/types)/;
   (window as any).electronAPI = {
@@ -268,7 +268,11 @@ const ocrInit = ({ settings, dashboard, ocr }: any) => {
   };
 };
 
-for (const { navIcon, label } of [{ navIcon: 'fa-file-import', label: 'purchase' }, { navIcon: 'fa-file-export', label: 'sales' }]) {
+// Bug-3: purchase counterparty = seller (supplier); sales counterparty = buyer (customer).
+for (const { navIcon, label, expectedCounterparty } of [
+  { navIcon: 'fa-file-import', label: 'purchase', expectedCounterparty: 'OCR Test Vendor' },
+  { navIcon: 'fa-file-export', label: 'sales', expectedCounterparty: 'OCR Buyer Co' },
+]) {
   test(`OCR preview → confirm → ${label} form pre-filled (no save)`, async ({ page }) => {
     const ui = 'zh-CN';
     const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
@@ -277,12 +281,13 @@ for (const { navIcon, label } of [{ navIcon: 'fa-file-import', label: 'purchase'
     await page.locator(`i.${navIcon}`).first().click();
     // upload an image to the hidden OCR file input (hidden inputs accept setInputFiles)
     await page.locator('input[type="file"][accept*="image"]').setInputFiles({ name: 'invoice.png', mimeType: 'image/png', buffer: Buffer.from(TINY_PNG_B64, 'base64') });
-    // read-only preview appears
+    // read-only preview appears — and shows the scenario-correct counterparty (purchase=seller, sales=buyer)
     await expect(page.getByText(loc.ocr.previewTitle)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(expectedCounterparty)).toBeVisible();
     // "use these values" → fills the add-form state and opens the add modal (no DB write)
     await page.getByRole('button', { name: loc.ocr.useResult }).click();
     // add-form pre-filled with the recognized values (counterparty text + total number)
-    await expect(page.getByTestId('ocr-fill-counterparty')).toHaveValue('OCR Test Vendor', { timeout: 10_000 });
+    await expect(page.getByTestId('ocr-fill-counterparty')).toHaveValue(expectedCounterparty, { timeout: 10_000 });
     await expect(page.getByTestId('ocr-fill-total')).toHaveValue('1130');
   });
 }

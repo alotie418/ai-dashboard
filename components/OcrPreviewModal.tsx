@@ -5,6 +5,10 @@ import type { ExtractedInvoice } from '../services/ocrService';
 interface Props {
   extracted: ExtractedInvoice;
   counterpartyLabel: string;            // 供应商 (purchase) / 客户 (sales)
+  // Bug-3: scenario-resolved counterparty to display (sales → buyer, purchase → seller).
+  // Falls back to extracted.customer (the flattened seller) when not provided, so the
+  // preview always shows the SAME value the form will be filled with.
+  counterparty?: string;
   fmtMoney: (val: number) => string;
   onClose: () => void;
   onConfirm?: () => void;               // PR-3c: "use these values" → fill the form (no DB write)
@@ -13,11 +17,11 @@ interface Props {
 // PR-3b/3c: preview of a vision-OCR result. Shows the recognized fields; when onConfirm is provided,
 // a "use these values" button fills the page's add-form state (NO DB write — the user still saves
 // manually). Nothing here is persisted; the extracted detail lives only in React state.
-const OcrPreviewModal: React.FC<Props> = ({ extracted, counterpartyLabel, fmtMoney, onClose, onConfirm }) => {
+const OcrPreviewModal: React.FC<Props> = ({ extracted, counterpartyLabel, counterparty, fmtMoney, onClose, onConfirm }) => {
   const { t } = useTranslation();
   const rows: { label: string; value: string }[] = [
     { label: t('tableHeaders.date'), value: extracted.date || '—' },
-    { label: counterpartyLabel, value: extracted.customer || '—' },
+    { label: counterpartyLabel, value: (counterparty ?? extracted.customer) || '—' },
     { label: t('tableHeaders.quantity'), value: extracted.quantity || '—' },
     { label: t('tableHeaders.totalAmountWithoutTax'), value: fmtMoney(extracted.price || 0) },
     { label: t('tableHeaders.totalTax'), value: fmtMoney(extracted.taxAmount || 0) },
