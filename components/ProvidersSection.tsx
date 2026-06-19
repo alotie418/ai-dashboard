@@ -385,13 +385,18 @@ const ProvidersSection: React.FC = () => {
                         {row.saving ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('common.saving')}</> : (p.hasKey ? t('settings.ai.updateBoth') : t('common.save'))}
                       </button>
                     </div>
-                    {p.hasKey && (
+                    {/* Bug 4: model-only save. Shown as a prominent primary-style button (matching
+                        the main save) only when the model actually changed on an already-keyed
+                        provider — so switching model has a clear, enabled Save without re-entering
+                        the API key. Hidden when the model is unchanged. Reuses handleSave('modelOnly'). */}
+                    {p.hasKey && row.model.trim() !== p.model && (
                       <button
                         onClick={() => handleSave(p.provider, 'modelOnly')}
-                        disabled={row.saving || row.model.trim() === p.model}
-                        className="w-full text-xs text-[#5c5c5a] hover:text-[#4a4a48] disabled:opacity-40 py-1"
+                        disabled={row.saving}
+                        className="w-full text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+                        style={{ backgroundColor: doc.color }}
                       >
-                        {t('settings.ai.modelOnly')}
+                        {row.saving ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('common.saving')}</> : t('settings.ai.modelOnly')}
                       </button>
                     )}
                   </div>
