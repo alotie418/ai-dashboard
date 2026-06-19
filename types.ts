@@ -1,6 +1,9 @@
 
 export interface Metric {
   label: string;
+  // Optional second title line (e.g. a tax-basis suffix like "（不含税）"). When set,
+  // MetricCard renders it on its own line so the title stays two lines at any width.
+  subtitle?: string;
   value: string;
   subValue: string;
   icon: string;
