@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, Legend, ComposedChart, Cell, ScatterChart, Scatter, ZAxis
@@ -12,17 +12,44 @@ import { formatMoney, getCurrencySymbol, getInventoryUnitLabel, formatCompactMon
 import { localizeMonthName } from './monthLabel';
 // AI calls moved to server-side proxy
 
+// Bug 1: forecast task state is owned by AppContent (survives sidebar navigation) and
+// passed in here. The page reads/writes it via these props instead of local useState,
+// so switching pages mid-run no longer drops the running state or the result.
+export interface ForecastState {
+  isAnalysing: boolean;
+  setIsAnalysing: React.Dispatch<React.SetStateAction<boolean>>;
+  salesForecast: string;
+  setSalesForecast: React.Dispatch<React.SetStateAction<string>>;
+  predictedData: any[];
+  setPredictedData: React.Dispatch<React.SetStateAction<any[]>>;
+  groundingSources: { title: string; uri: string }[];
+  setGroundingSources: React.Dispatch<React.SetStateAction<{ title: string; uri: string }[]>>;
+  isAnalysingRef: React.MutableRefObject<boolean>;
+  aiQuotaCooldownRef: React.MutableRefObject<number>;
+}
+
 interface Props {
   data: BusinessData;
   selectedYear: string;
   selectedQuarter: string;
   selectedMonth: string;
+  forecast: ForecastState;
 }
 
 type AnalysisDimension = 'financial' | 'volume' | 'efficiency';
 
-const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
+const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth, forecast }) => {
   const { t, i18n } = useTranslation();
+  // Forecast task state lives in AppContent (lifted) — read/write via props so it
+  // survives this page unmounting on sidebar navigation. Destructured with the same
+  // names the rest of this component already uses (no downstream changes needed).
+  const {
+    isAnalysing, setIsAnalysing,
+    salesForecast, setSalesForecast,
+    predictedData, setPredictedData,
+    groundingSources, setGroundingSources,
+    isAnalysingRef, aiQuotaCooldownRef,
+  } = forecast;
   const [accLocale, setAccLocale] = useState<string>('CN');
   const [productUnit, setProductUnit] = useState<string>('ton');
   useEffect(() => {
@@ -43,12 +70,11 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
     t('analysis.loading5'),
   ], [t]);
   const [activeTab, setActiveTab] = useState<'trends' | 'table' | 'forecast' | 'panorama'>('panorama');
-  const [salesForecast, setSalesForecast] = useState<string>('');
-  const [predictedData, setPredictedData] = useState<any[]>([]);
-  const [isAnalysing, setIsAnalysing] = useState(false);
+  // salesForecast / predictedData / isAnalysing / groundingSources are lifted to
+  // AppContent (see destructure above). loadingProgress/loadingMessage are the local
+  // progress animation only — fine to reset on remount.
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState('');
-  const [groundingSources, setGroundingSources] = useState<{ title: string, uri: string }[]>([]);
 
   const stats = useMemo(() => {
     const perf = data.monthlyPerformance;
@@ -222,10 +248,8 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
 
   // ========== PREDICTION PIPELINE ==========
 
-  const isAnalysingRef = useRef(false);
-  // 额度冷却时间戳（上次 429 后 5 分钟内不再发请求），复用经营简报的
-  // aiQuotaCooldownRef 模式，避免 Gemini 额度耗尽时连点刷新反复刷 429。
-  const aiQuotaCooldownRef = useRef(0);
+  // isAnalysingRef (concurrency guard) + aiQuotaCooldownRef (429 cooldown) are lifted to
+  // AppContent too, so切页后再回来仍能防重复发起 / 维持冷却（见上方 forecast 解构）。
   const runAnalysis = useCallback(async () => {
     if (isAnalysingRef.current) return;
     // 冷却中：直接显示友好提示，不再发请求。
