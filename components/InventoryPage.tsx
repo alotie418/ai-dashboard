@@ -81,7 +81,11 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
 
   const allInvoices = useMemo(() => {
     const output = salesRecords.map(r => {
-      const taxRate = 0.13;
+      // Use the sale's own tax rate (same as the purchase/input side below) instead of a
+      // hardcoded 13%, so the ledger's 不含税金额/税额 columns are correct for non-13%
+      // sales (e.g. TW 5%, reduced-rate goods). parseTaxRate falls back to 0.13 only when
+      // the record carries no parseable rate. Display-only: backend accounting is unaffected.
+      const taxRate = parseTaxRate(r.taxRate || '');
       const amountNoTax = Math.round(r.price / (1 + taxRate) * 100) / 100;
       const taxAmt = Math.round((r.price - amountNoTax) * 100) / 100;
       return {
