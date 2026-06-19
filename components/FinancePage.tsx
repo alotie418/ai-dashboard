@@ -338,16 +338,50 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
           </div>
         )}
 
-        {/* === Cash Flow — full calculation not enabled yet (PR-T1) === */}
-        {activeTab === 'cashflow' && (
-          <div className="p-20 text-center text-[#5c5c5a] flex flex-col items-center">
-            <i className="fas fa-faucet-drip text-6xl mb-6 opacity-20"></i>
-            <h3 className="text-xl font-medium">{t('finance.cashflowTitle')}</h3>
-            <p className="mt-2 text-sm max-w-md">{t('finance.cashflowDesc')}</p>
-            <span className="mt-6 inline-flex items-center px-3 py-1 rounded-full text-[11px] bg-[#f0eeeb] text-[#5c5c5a] border border-[#e0ddd5]">
-              <i className="fas fa-clock mr-1.5"></i>{t('finance.comingSoonBadge')}
-            </span>
-          </div>
+        {/* === Cash Flow — operating activities MVP (management / cash basis, PR-7C) ===
+            Real operating figures from recorded payments; investing / financing /
+            beginning / ending cash render as "not configured" (never 0). Falls back to
+            the coming-soon state if the engine did not attach a cashflowStatement. */}
+        {activeTab === 'cashflow' && !loading && (
+          report?.cashflowStatement ? (
+            <div className="p-10">
+              <div className="max-w-3xl mx-auto space-y-6">
+                <div className="text-center mb-2">
+                  <h2 className="text-2xl font-bold text-[#191918]">{t('finance.cashflowOperatingTitle')}</h2>
+                  <p className="text-[#5c5c5a] text-sm">{periodDisplay}</p>
+                </div>
+                {/* Basis notice: management / cash basis / NOT statutory; differs from the accrual P&L. */}
+                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 space-y-1">
+                  <p><i className="fas fa-info-circle mr-1.5"></i>{t('finance.cashflowBasisNote')}</p>
+                  <p>{t('finance.cashflowVsPlNote')}</p>
+                </div>
+                {/* Operating activities — real figures */}
+                <div className="border border-[#e0ddd5] rounded-xl overflow-hidden">
+                  <div className="bg-[#f9f9f8]/60 px-6 py-3 text-sm font-bold text-[#191918]">{t('finance.cashflowOperatingTitle')}</div>
+                  <div className="divide-y divide-[#e0ddd5]">
+                    <div className="flex justify-between px-6 py-3 text-sm"><span className="text-[#4a4a48]">{t('finance.cashflowInflow')}</span><span className="font-mono text-[#191918]">{fmt(report.cashflowStatement.operating.inflow)}</span></div>
+                    <div className="flex justify-between px-6 py-3 text-sm"><span className="text-[#4a4a48]">{t('finance.cashflowOutflow')}</span><span className="font-mono text-[#191918]">{fmt(report.cashflowStatement.operating.outflow)}</span></div>
+                    <div className="flex justify-between px-6 py-3 text-sm font-bold bg-[#f9f9f8]/40"><span className="text-[#191918]">{t('finance.cashflowNet')}</span><span className="font-mono text-[#191918]">{fmt(report.cashflowStatement.operating.net)}</span></div>
+                  </div>
+                </div>
+                {/* Investing / Financing / Beginning / Ending cash — not configured (never 0) */}
+                <div className="border border-[#e0ddd5] rounded-xl overflow-hidden divide-y divide-[#e0ddd5]">
+                  {[t('finance.cashflowInvesting'), t('finance.cashflowFinancing'), t('finance.cashflowBeginning'), t('finance.cashflowEnding')].map((label, i) => (
+                    <div key={i} className="flex justify-between px-6 py-3 text-sm"><span className="text-[#4a4a48]">{label}</span><span className="text-[#5c5c5a] italic">{t('finance.cashflowNotConfigured')}</span></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-20 text-center text-[#5c5c5a] flex flex-col items-center">
+              <i className="fas fa-faucet-drip text-6xl mb-6 opacity-20"></i>
+              <h3 className="text-xl font-medium">{t('finance.cashflowTitle')}</h3>
+              <p className="mt-2 text-sm max-w-md">{t('finance.cashflowDesc')}</p>
+              <span className="mt-6 inline-flex items-center px-3 py-1 rounded-full text-[11px] bg-[#f0eeeb] text-[#5c5c5a] border border-[#e0ddd5]">
+                <i className="fas fa-clock mr-1.5"></i>{t('finance.comingSoonBadge')}
+              </span>
+            </div>
+          )
         )}
       </div>
 

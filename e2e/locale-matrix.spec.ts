@@ -382,6 +382,32 @@ test.describe('finance → export PDF', () => {
     await expect(page.getByRole('heading', { name: loc.finance.cashflowTitle })).toBeVisible({ timeout: 10_000 });
   });
 
+  // PR-7C: when the engine attaches a cashflowStatement, the cash-flow tab renders the
+  // operating MVP (real figures) and shows investing/financing/beginning/ending as
+  // "not configured" (never 0), plus the management / cash-basis disclaimer.
+  test('cash flow tab renders operating MVP + not-configured sections', async ({ page }) => {
+    const ui = 'zh-CN';
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    const report = {
+      ...REPORT_MOCK('CN'),
+      cashflowStatement: {
+        basis: 'cash', statutory: false, source: 'legacy',
+        operating: { inflow: 1000, outflow: 600, net: 400 },
+        investing: null, financing: null, beginningCash: null, endingCash: null,
+      },
+    };
+    await bootComboIPC(page, ui, 'CN', { apiResponses: [{ match: '/api/reports/generate', json: report }] });
+    await page.locator('i.fa-wallet').first().click(); // → finance page
+    await page.getByRole('button', { name: loc.finance.tabCashflow }).click();
+    // real operating view (NOT the coming-soon state)
+    await expect(page.getByRole('heading', { name: loc.finance.cashflowOperatingTitle })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: loc.finance.cashflowTitle })).toHaveCount(0);
+    // management / cash-basis disclaimer present
+    await expect(page.getByText(loc.finance.cashflowBasisNote)).toBeVisible();
+    // investing / financing / beginning / ending → "not configured" (4 rows, never 0)
+    await expect(page.getByText(loc.finance.cashflowNotConfigured)).toHaveCount(4);
+  });
+
   test('export-pdf → mock electronAPI success shows saved path', async ({ page }) => {
     const ui = 'zh-CN';
     await page.addInitScript(() => {

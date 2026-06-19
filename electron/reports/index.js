@@ -9,6 +9,7 @@ const eu = require('./eu');
 const kr = require('./kr');
 const tw = require('./tw');
 const { selectReportSource } = require('./_reportSource');
+const { computeOperatingCashflow } = require('./_cashflow');
 
 const ENGINES = { CN: cn, US: us, JP: jp, EU: eu, KR: kr, TW: tw };
 
@@ -82,7 +83,11 @@ function generate(db, opts = {}) {
     vatRate, surchargeRate, incomeTaxRate, adminExpense, currency,
   };
 
-  return engine.generate(context);
+  // PR-7C (additive): attach a management-basis operating cash-flow block alongside the
+  // engine output. Does NOT modify incomeStatement / vatSummary / scheduleC or any P&L /
+  // VAT / tax formula — it only aggregates existing payment columns by payment date.
+  const result = engine.generate(context);
+  return { ...result, cashflowStatement: computeOperatingCashflow(db, { from, to }) };
 }
 
 // 获取支持的报表类型列表
