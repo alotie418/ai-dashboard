@@ -181,6 +181,8 @@
       "modelSection": "Model Selection",
       "advancedInput": "Advanced: enter model ID manually",
       "currentModelId": "Current model ID sent to API",
+      "advancedInputDesc": "If the default model isn't available on your account, enter a model ID that's currently available in the provider's console. Saving this does not change your API Key.",
+      "modelMaybeUnavailable": "This model may not be enabled on your account, may have been renamed or retired, or may need to be activated in the provider's console. Enter an available model ID under \"Advanced\" below — no need to re-enter your API Key.",
       "addKey": "Add Key",
       "editKey": "Edit Key",
       "setAsDefault": "Set as default",

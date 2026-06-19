@@ -181,6 +181,8 @@
       "modelSection": "모델 선택",
       "advancedInput": "고급: 직접 model ID 입력",
       "currentModelId": "현재 API에 전송하는 model ID",
+      "advancedInputDesc": "기본 모델을 계정에서 사용할 수 없는 경우, 제공업체 콘솔에서 현재 사용 가능한 model ID를 입력하세요. 저장해도 API 키는 변경되지 않습니다.",
+      "modelMaybeUnavailable": "현재 모델이 계정에서 활성화되지 않았거나, 이름이 변경 또는 중단되었거나, 제공업체 콘솔에서 활성화가 필요할 수 있습니다. 아래 '고급'에서 사용 가능한 model ID를 입력하세요. API 키를 다시 입력할 필요는 없습니다.",
       "addKey": "Key 추가",
       "editKey": "Key 편집",
       "setAsDefault": "기본으로 설정",

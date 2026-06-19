@@ -181,6 +181,8 @@
       "modelSection": "模型选择",
       "advancedInput": "高级：手动输入 model ID",
       "currentModelId": "当前传给 API 的 model ID",
+      "advancedInputDesc": "若默认模型在你的账号不可用，可在此填写服务商控制台中当前可用的 model ID。保存时不会更改已保存的 API Key。",
+      "modelMaybeUnavailable": "当前模型可能未在你的账号开通、已改名、已下线，或需要在服务商控制台启用。你可以在下方「高级」中手动填写该供应商当前可用的 model ID，无需重新输入 API Key。",
       "addKey": "添加 Key",
       "editKey": "修改 Key",
       "setAsDefault": "设为默认",

@@ -12,7 +12,7 @@ import {
   fetchSettings,
 } from '../services/api';
 import { getTaxLabel } from './accountingHelpers';
-import { aiErrorMessage, aiErrorMessageFromCode } from '../services/aiErrors';
+import { aiErrorMessage, aiErrorMessageFromCode, looksLikeModelError } from '../services/aiErrors';
 import { KNOWN_MODELS, DEFAULT_MODEL, modelLabelFor, findModelOption, shouldAutoMigrate } from './aiProviderModels';
 import { providerLogo } from './providerLogos';
 import { getProviderDisplayName } from './providerDisplay';
@@ -37,6 +37,8 @@ interface RowState {
   errorMsg: string;
   errorStatus?: number;
   errorCode?: string;
+  errorProviderMessage?: string; // 主进程已脱敏的原始错误（仅用于「疑似模型问题」判定，不渲染）
+  advancedOpen?: boolean;        // 受控「高级模型 ID」折叠区；疑似模型错误时自动展开
   saving: boolean;
 }
 
@@ -116,13 +118,17 @@ const ProvidersSection: React.FC = () => {
       if (result.ok) {
         updateRow(id, { testResult: 'ok', testing: false });
       } else {
+        // 疑似「模型不可用」时自动展开高级 model ID 输入，引导用户改填账号可用的 ID。
+        const modelErr = looksLikeModelError(result.code, result.providerMessage);
         updateRow(id, {
           testResult: 'fail',
           // R3c：按稳定 code 映射 i18n（随 uiLanguage），不再展示主进程的中文 friendly。
           errorMsg: aiErrorMessageFromCode(result.code, t),
           errorStatus: result.status,
           errorCode: result.code,
+          errorProviderMessage: result.providerMessage,
           testing: false,
+          ...(modelErr ? { advancedOpen: true } : {}),
         });
       }
     } catch (e: any) {
@@ -198,6 +204,8 @@ const ProvidersSection: React.FC = () => {
           const logo = providerLogo(p.provider);
           const name = getProviderDisplayName(p.provider, i18n.language);
           const row = rowStates[p.provider] || initRow(p.model || DEFAULT_MODEL[p.provider]);
+          // 上次测试失败且疑似「模型不可用」→ 引导用户去高级 model ID 输入框改填可用 ID。
+          const modelHintActive = row.testResult === 'fail' && looksLikeModelError(row.errorCode, row.errorProviderMessage);
 
           return (
             <div key={p.provider} className={`border rounded-xl ${p.isDefault ? 'border-primary bg-primary/5' : 'border-[#e0ddd5] bg-white'}`}>
@@ -329,8 +337,12 @@ const ProvidersSection: React.FC = () => {
                           );
                         })}
                       </div>
-                      <details className="text-xs">
-                        <summary className="text-[#5c5c5a] cursor-pointer hover:text-[#4a4a48] select-none">
+                      <details
+                        className={`text-xs ${modelHintActive ? 'rounded-lg ring-1 ring-amber-300 bg-amber-50/50 p-2 -mx-2' : ''}`}
+                        open={row.advancedOpen}
+                        onToggle={e => updateRow(p.provider, { advancedOpen: e.currentTarget.open })}
+                      >
+                        <summary className={`cursor-pointer select-none ${modelHintActive ? 'text-amber-800 font-medium' : 'text-[#5c5c5a] hover:text-[#4a4a48]'}`}>
                           <i className="fas fa-code text-[10px] mr-1"></i>
                           {t('settings.ai.advancedInput')}
                         </summary>
@@ -341,6 +353,7 @@ const ProvidersSection: React.FC = () => {
                           placeholder={DEFAULT_MODEL[p.provider] || p.defaultModel}
                           className="w-full mt-2 px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm bg-white focus:outline-none focus:border-primary font-mono"
                         />
+                        <p className="text-[10px] text-[#5c5c5a] mt-1.5">{t('settings.ai.advancedInputDesc')}</p>
                         <p className="text-[10px] text-[#5c5c5a] mt-1">
                           {t('settings.ai.currentModelId')}: <code className="bg-[#f0eeeb] px-1.5 py-0.5 rounded">{row.model}</code>
                         </p>
@@ -361,6 +374,12 @@ const ProvidersSection: React.FC = () => {
                           {row.errorCode ? ` · ${row.errorCode}` : ''}
                         </div>
                         <div className="mt-1 break-all">{row.errorMsg}</div>
+                      </div>
+                    )}
+                    {modelHintActive && (
+                      <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+                        <i className="fas fa-lightbulb mr-1.5"></i>
+                        {t('settings.ai.modelMaybeUnavailable')}
                       </div>
                     )}
                     {row.errorMsg && row.testResult !== 'fail' && (

@@ -181,6 +181,8 @@
       "modelSection": "モデル選択",
       "advancedInput": "詳細：手動でmodel IDを入力",
       "currentModelId": "現在APIに送信するmodel ID",
+      "advancedInputDesc": "既定のモデルがアカウントで利用できない場合は、プロバイダーのコンソールで現在利用可能な model ID を入力してください。保存しても API キーは変更されません。",
+      "modelMaybeUnavailable": "このモデルはお使いのアカウントで有効になっていない、名称変更・提供終了、またはプロバイダーのコンソールでの有効化が必要な可能性があります。下の「詳細」で利用可能な model ID を入力してください。API キーの再入力は不要です。",
       "addKey": "Keyを追加",
       "editKey": "Keyを編集",
       "setAsDefault": "デフォルトに設定",

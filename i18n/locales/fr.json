@@ -181,6 +181,8 @@
       "modelSection": "Sélection du modèle",
       "advancedInput": "Avancé : saisir le model ID manuellement",
       "currentModelId": "model ID actuellement envoyé à l'API",
+      "advancedInputDesc": "Si le modèle par défaut n'est pas disponible sur votre compte, saisissez un model ID actuellement disponible dans la console du fournisseur. L'enregistrement ne modifie pas votre clé API.",
+      "modelMaybeUnavailable": "Ce modèle n'est peut-être pas activé sur votre compte, a pu être renommé ou retiré, ou doit être activé dans la console du fournisseur. Saisissez un model ID disponible sous « Avancé » ci-dessous — sans ressaisir votre clé API.",
       "addKey": "Ajouter une clé",
       "editKey": "Modifier la clé",
       "setAsDefault": "Définir par défaut",
