@@ -13,7 +13,7 @@ import {
 } from '../services/api';
 import { getTaxLabel } from './accountingHelpers';
 import { aiErrorMessage, aiErrorMessageFromCode, looksLikeModelError } from '../services/aiErrors';
-import { KNOWN_MODELS, DEFAULT_MODEL, modelLabelFor, findModelOption, shouldAutoMigrate } from './aiProviderModels';
+import { DEFAULT_MODEL, modelLabelFor, findModelOption, shouldAutoMigrate } from './aiProviderModels';
 import { providerLogo } from './providerLogos';
 import { getProviderDisplayName } from './providerDisplay';
 
@@ -38,7 +38,6 @@ interface RowState {
   errorStatus?: number;
   errorCode?: string;
   errorProviderMessage?: string; // 主进程已脱敏的原始错误（仅用于「疑似模型问题」判定，不渲染）
-  advancedOpen?: boolean;        // 受控「高级模型 ID」折叠区；疑似模型错误时自动展开
   saving: boolean;
 }
 
@@ -118,17 +117,15 @@ const ProvidersSection: React.FC = () => {
       if (result.ok) {
         updateRow(id, { testResult: 'ok', testing: false });
       } else {
-        // 疑似「模型不可用」时自动展开高级 model ID 输入，引导用户改填账号可用的 ID。
-        const modelErr = looksLikeModelError(result.code, result.providerMessage);
         updateRow(id, {
           testResult: 'fail',
           // R3c：按稳定 code 映射 i18n（随 uiLanguage），不再展示主进程的中文 friendly。
           errorMsg: aiErrorMessageFromCode(result.code, t),
           errorStatus: result.status,
           errorCode: result.code,
+          // 仅用于渲染时判定「疑似模型不可用」并高亮 model ID 输入 + 显示提示（不渲染原文）。
           errorProviderMessage: result.providerMessage,
           testing: false,
-          ...(modelErr ? { advancedOpen: true } : {}),
         });
       }
     } catch (e: any) {
@@ -314,50 +311,16 @@ const ProvidersSection: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-[#4a4a48] mb-2">{t('settings.ai.modelSection')}</label>
-                      {/* 数据源：前端白名单 KNOWN_MODELS，不依赖主进程 META */}
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {KNOWN_MODELS[p.provider].map(opt => {
-                          const selected = row.model === opt.value;
-                          return (
-                            <button
-                              key={opt.value}
-                              type="button"
-                              onClick={() => updateRow(p.provider, { model: opt.value, testResult: null })}
-                              title={opt.value}
-                              className={`text-sm font-medium px-4 py-2 rounded-full border transition-colors ${
-                                selected
-                                  ? 'text-white border-transparent shadow-sm'
-                                  : 'bg-white border-[#e0ddd5] text-[#4a4a48] hover:bg-[#f0eeeb]'
-                              }`}
-                              style={selected ? { backgroundColor: doc.color } : {}}
-                            >
-                              {opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <details
-                        className={`text-xs ${modelHintActive ? 'rounded-lg ring-1 ring-amber-300 bg-amber-50/50 p-2 -mx-2' : ''}`}
-                        open={row.advancedOpen}
-                        onToggle={e => updateRow(p.provider, { advancedOpen: e.currentTarget.open })}
-                      >
-                        <summary className={`cursor-pointer select-none ${modelHintActive ? 'text-amber-800 font-medium' : 'text-[#5c5c5a] hover:text-[#4a4a48]'}`}>
-                          <i className="fas fa-code text-[10px] mr-1"></i>
-                          {t('settings.ai.advancedInput')}
-                        </summary>
-                        <input
-                          type="text"
-                          value={row.model}
-                          onChange={e => updateRow(p.provider, { model: e.target.value, testResult: null })}
-                          placeholder={DEFAULT_MODEL[p.provider] || p.defaultModel}
-                          className="w-full mt-2 px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm bg-white focus:outline-none focus:border-primary font-mono"
-                        />
-                        <p className="text-[10px] text-[#5c5c5a] mt-1.5">{t('settings.ai.advancedInputDesc')}</p>
-                        <p className="text-[10px] text-[#5c5c5a] mt-1">
-                          {t('settings.ai.currentModelId')}: <code className="bg-[#f0eeeb] px-1.5 py-0.5 rounded">{row.model}</code>
-                        </p>
-                      </details>
+                      <label className="block text-xs font-medium text-[#4a4a48] mb-2">{t('settings.ai.modelIdLabel')}</label>
+                      {/* 唯一入口：手动输入 model ID（填账号当前可用的 ID）。model 列表数据仍服务卡片头 label + 引导页 chips。 */}
+                      <input
+                        type="text"
+                        value={row.model}
+                        onChange={e => updateRow(p.provider, { model: e.target.value, testResult: null })}
+                        placeholder={DEFAULT_MODEL[p.provider] || p.defaultModel}
+                        className={`w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:border-primary font-mono ${modelHintActive ? 'border-amber-400 ring-1 ring-amber-300' : 'border-[#e0ddd5]'}`}
+                      />
+                      <p className="text-[10px] text-[#5c5c5a] mt-1.5">{t('settings.ai.modelIdDesc')}</p>
                     </div>
 
                     {row.testResult === 'ok' && (
