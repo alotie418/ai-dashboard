@@ -358,7 +358,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
         </div>
         <div className="flex items-center space-x-2 text-xs text-[#5c5c5a]">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>{t('sales.aiStatus', { engine: recognitionMode === 'ai' ? 'Gemini 3 Flash' : 'Local OCR Engine' })}</span>
+          <span>{t('sales.aiStatus')}</span>
         </div>
       </div>
 
