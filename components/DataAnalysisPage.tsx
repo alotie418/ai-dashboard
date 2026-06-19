@@ -401,7 +401,14 @@ ${t('analysis.forecastPromptRequirements')}`;
   // AI 经营预测不再在挂载 / 切页 / 热更新时自动调用 —— 改为用户点击横幅按钮
   // (onClick={runAnalysis}) 时才触发，避免对默认 provider 反复请求刷 Gemini 429。
   const formatCurrency = (v: number) => formatCompactMoney(v, accLocale, uiLang, 1);
-  const formatNum = (v: number) => v.toLocaleString();
+  // Defensive: a forecast point may carry an undefined/null numeric field (e.g. the AI
+  // response omits profit/revenue/confidence), which previously crashed the page with
+  // `undefined.toLocaleString()`. Fall back to '0' for any non-finite value; format is
+  // unchanged for real numbers.
+  const formatNum = (v: number | null | undefined) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n.toLocaleString() : '0';
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
