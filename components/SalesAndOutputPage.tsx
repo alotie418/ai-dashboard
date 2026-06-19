@@ -77,6 +77,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
     price: 0,
     shipping: 0,
     invoiceNo: '',
+    dueDate: '',
     totalWithTax: 0,
     unitPriceWithoutTax: 0,
     taxAmount: 0
@@ -250,6 +251,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
         price: 0,
         shipping: 0,
         invoiceNo: '',
+        dueDate: '',
         totalWithTax: 0,
         unitPriceWithoutTax: 0,
         taxAmount: 0
@@ -440,7 +442,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                     <button
                       onClick={() => {
                         setEditingId(row.id);
-                        setNewSale({ date: row.date, customer: row.customer, productId: row.productId || '', quantity: row.quantity, price: row.price, shipping: row.shipping, invoiceNo: row.invoiceNo, totalWithTax: row.totalWithTax || 0, unitPriceWithoutTax: row.unitPriceWithoutTax || 0, taxAmount: row.taxAmount || 0 });
+                        setNewSale({ date: row.date, customer: row.customer, productId: row.productId || '', quantity: row.quantity, price: row.price, shipping: row.shipping, invoiceNo: row.invoiceNo, dueDate: row.dueDate || '', totalWithTax: row.totalWithTax || 0, unitPriceWithoutTax: row.unitPriceWithoutTax || 0, taxAmount: row.taxAmount || 0 });
                         setSaleInvoiceStatus(row.status || '待开');
                         setShowAddModal(true);
                       }}
@@ -586,6 +588,16 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                     className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('common2.dueDate')}</label>
+                <input
+                  type="date"
+                  value={newSale.dueDate || ''}
+                  onChange={(e) => setNewSale({ ...newSale, dueDate: e.target.value })}
+                  className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
+                />
               </div>
 
               <div className="space-y-2">

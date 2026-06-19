@@ -938,6 +938,7 @@
     "taxAmount": "Taxe totale"
   },
   "common2": {
+    "dueDate": "Date d'échéance",
     "edit": "Edit",
     "delete": "Delete",
     "noData": "No data",

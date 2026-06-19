@@ -715,6 +715,10 @@ function toApiSales(r: SalesRecord): ApiSalesRecord {
     shippingCost: r.shipping,
     invoiceNumber: r.invoiceNo,
     invoiceStatus: r.status,
+    // Carry the AR/AP due date through to the backend (was previously dropped here).
+    // Empty → undefined so it is omitted: on create the backend defaults it to null;
+    // on update the backend only writes due_date when present, preserving the old value.
+    due_date: r.dueDate || undefined,
     product_id: r.productId || null,
   };
 }
@@ -766,6 +770,10 @@ function toApiPurchase(r: PurchaseRecord): ApiPurchaseRecord {
     taxRate,
     invoiceNumber: r.invoiceNo,
     invoiceStatus: r.status,
+    // Carry the AR/AP due date through to the backend (was previously dropped here).
+    // Empty → undefined so it is omitted: on create the backend defaults it to null;
+    // on update the backend only writes due_date when present, preserving the old value.
+    due_date: r.dueDate || undefined,
     product_id: r.productId || null,
   };
 }

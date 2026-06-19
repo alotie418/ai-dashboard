@@ -938,6 +938,7 @@
     "taxAmount": "Total Tax"
   },
   "common2": {
+    "dueDate": "Due date",
     "edit": "Edit",
     "delete": "Delete",
     "noData": "No data",
