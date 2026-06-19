@@ -12,8 +12,8 @@ import {
   fetchSettings,
 } from '../services/api';
 import { getTaxLabel } from './accountingHelpers';
-import { aiErrorMessage, aiErrorMessageFromCode } from '../services/aiErrors';
-import { KNOWN_MODELS, DEFAULT_MODEL, modelLabelFor, findModelOption, shouldAutoMigrate } from './aiProviderModels';
+import { aiErrorMessage, aiErrorMessageFromCode, looksLikeModelError } from '../services/aiErrors';
+import { DEFAULT_MODEL, modelLabelFor, findModelOption, shouldAutoMigrate } from './aiProviderModels';
 import { providerLogo } from './providerLogos';
 import { getProviderDisplayName } from './providerDisplay';
 
@@ -37,6 +37,7 @@ interface RowState {
   errorMsg: string;
   errorStatus?: number;
   errorCode?: string;
+  errorProviderMessage?: string; // 主进程已脱敏的原始错误（仅用于「疑似模型问题」判定，不渲染）
   saving: boolean;
 }
 
@@ -109,7 +110,9 @@ const ProvidersSection: React.FC = () => {
 
   const handleTest = async (id: AIProviderId) => {
     const r = rowStates[id];
-    if (!r?.apiKey.trim()) return;
+    const p = providers.find(x => x.provider === id);
+    // 已配置 Key 的 provider 可不重输 Key 直接测试（apiKey 传空串 → 后端用本地已存 Key）。
+    if (!r?.apiKey.trim() && !p?.hasKey) return;
     updateRow(id, { testing: true, testResult: null, errorMsg: '', errorStatus: undefined, errorCode: undefined });
     try {
       const result = await testProvider({ provider: id, apiKey: r.apiKey.trim(), model: r.model.trim() });
@@ -122,6 +125,8 @@ const ProvidersSection: React.FC = () => {
           errorMsg: aiErrorMessageFromCode(result.code, t),
           errorStatus: result.status,
           errorCode: result.code,
+          // 仅用于渲染时判定「疑似模型不可用」并高亮 model ID 输入 + 显示提示（不渲染原文）。
+          errorProviderMessage: result.providerMessage,
           testing: false,
         });
       }
@@ -198,6 +203,8 @@ const ProvidersSection: React.FC = () => {
           const logo = providerLogo(p.provider);
           const name = getProviderDisplayName(p.provider, i18n.language);
           const row = rowStates[p.provider] || initRow(p.model || DEFAULT_MODEL[p.provider]);
+          // 上次测试失败且疑似「模型不可用」→ 引导用户去高级 model ID 输入框改填可用 ID。
+          const modelHintActive = row.testResult === 'fail' && looksLikeModelError(row.errorCode, row.errorProviderMessage);
 
           return (
             <div key={p.provider} className={`border rounded-xl ${p.isDefault ? 'border-primary bg-primary/5' : 'border-[#e0ddd5] bg-white'}`}>
@@ -306,45 +313,16 @@ const ProvidersSection: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-[#4a4a48] mb-2">{t('settings.ai.modelSection')}</label>
-                      {/* 数据源：前端白名单 KNOWN_MODELS，不依赖主进程 META */}
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {KNOWN_MODELS[p.provider].map(opt => {
-                          const selected = row.model === opt.value;
-                          return (
-                            <button
-                              key={opt.value}
-                              type="button"
-                              onClick={() => updateRow(p.provider, { model: opt.value, testResult: null })}
-                              title={opt.value}
-                              className={`text-sm font-medium px-4 py-2 rounded-full border transition-colors ${
-                                selected
-                                  ? 'text-white border-transparent shadow-sm'
-                                  : 'bg-white border-[#e0ddd5] text-[#4a4a48] hover:bg-[#f0eeeb]'
-                              }`}
-                              style={selected ? { backgroundColor: doc.color } : {}}
-                            >
-                              {opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <details className="text-xs">
-                        <summary className="text-[#5c5c5a] cursor-pointer hover:text-[#4a4a48] select-none">
-                          <i className="fas fa-code text-[10px] mr-1"></i>
-                          {t('settings.ai.advancedInput')}
-                        </summary>
-                        <input
-                          type="text"
-                          value={row.model}
-                          onChange={e => updateRow(p.provider, { model: e.target.value, testResult: null })}
-                          placeholder={DEFAULT_MODEL[p.provider] || p.defaultModel}
-                          className="w-full mt-2 px-3 py-2 border border-[#e0ddd5] rounded-lg text-sm bg-white focus:outline-none focus:border-primary font-mono"
-                        />
-                        <p className="text-[10px] text-[#5c5c5a] mt-1">
-                          {t('settings.ai.currentModelId')}: <code className="bg-[#f0eeeb] px-1.5 py-0.5 rounded">{row.model}</code>
-                        </p>
-                      </details>
+                      <label className="block text-xs font-medium text-[#4a4a48] mb-2">{t('settings.ai.modelIdLabel')}</label>
+                      {/* 唯一入口：手动输入 model ID（填账号当前可用的 ID）。model 列表数据仍服务卡片头 label + 引导页 chips。 */}
+                      <input
+                        type="text"
+                        value={row.model}
+                        onChange={e => updateRow(p.provider, { model: e.target.value, testResult: null })}
+                        placeholder={DEFAULT_MODEL[p.provider] || p.defaultModel}
+                        className={`w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:border-primary font-mono ${modelHintActive ? 'border-amber-400 ring-1 ring-amber-300' : 'border-[#e0ddd5]'}`}
+                      />
+                      <p className="text-[10px] text-[#5c5c5a] mt-1.5">{t('settings.ai.modelIdDesc')}</p>
                     </div>
 
                     {row.testResult === 'ok' && (
@@ -363,6 +341,12 @@ const ProvidersSection: React.FC = () => {
                         <div className="mt-1 break-all">{row.errorMsg}</div>
                       </div>
                     )}
+                    {modelHintActive && (
+                      <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+                        <i className="fas fa-lightbulb mr-1.5"></i>
+                        {t('settings.ai.modelMaybeUnavailable')}
+                      </div>
+                    )}
                     {row.errorMsg && row.testResult !== 'fail' && (
                       <div className="text-xs text-rose-600 bg-rose-50 px-3 py-2 rounded-lg">{row.errorMsg}</div>
                     )}
@@ -370,9 +354,9 @@ const ProvidersSection: React.FC = () => {
                     <div className="flex space-x-2">
                       <button
                         onClick={() => handleTest(p.provider)}
-                        disabled={!row.apiKey.trim() || row.testing}
+                        disabled={(!row.apiKey.trim() && !p.hasKey) || row.testing}
                         className="flex-1 border border-[#e0ddd5] text-[#4a4a48] py-2 rounded-lg text-sm font-medium hover:bg-[#f0eeeb] disabled:opacity-50"
-                        title={!row.apiKey.trim() ? t('settings.ai.enterKeyFirst') : ''}
+                        title={(!row.apiKey.trim() && !p.hasKey) ? t('settings.ai.enterKeyFirst') : ''}
                       >
                         {row.testing ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('common.testing')}</> : t('settings.ai.testConnection')}
                       </button>

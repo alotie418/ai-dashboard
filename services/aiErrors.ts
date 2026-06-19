@@ -38,6 +38,21 @@ export function parseAiErrorCode(err: any): AiErrorCode {
   return 'unknown';
 }
 
+// 疑似「模型不存在 / 模型不可用 / 需在控制台启用」的 provider 原文特征（已脱敏，仅用于判定，不展示）。
+// 覆盖各家常见英文措辞 + 中文措辞；DeepSeek 实测返回 "Model Not Exist"（→ "model not exist"）。
+const MODEL_ERROR_PATTERN =
+  /model\s*(?:not\s*found|does\s*not\s*exist|not\s*exist|unavailable|not\s*supported)|invalid\s*model|unsupported\s*model|unknown\s*model|模型不存在|模型不可用|模型不支持/i;
+
+/**
+ * 测试连接失败时，判断是否「疑似模型不可用」，用于在设置页引导用户改填账号当前可用的 model ID。
+ * 触发：稳定 code 为 modelNotFound；或 providerMessage（已在主进程脱敏）命中模型不存在/不可用关键词
+ * —— 后者覆盖了「badRequest 下 provider 原文提示模型问题」的情形。provider 中立、不显示原始错误串。
+ */
+export function looksLikeModelError(code: string | undefined | null, providerMessage?: string | null): boolean {
+  if (safeAiErrorCode(code) === 'modelNotFound') return true;
+  return !!providerMessage && MODEL_ERROR_PATTERN.test(String(providerMessage));
+}
+
 /** code → 本地化文案（用于已拿到结构化 code 的场景，如 providers:test 回传）。 */
 export function aiErrorMessageFromCode(code: string | undefined | null, t: TFn): string {
   return t(`aiError.${safeAiErrorCode(code)}`);

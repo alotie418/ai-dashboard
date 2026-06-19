@@ -225,9 +225,17 @@ function setDefault({ provider }) {
 
 async function test({ provider, apiKey, model }) {
   if (!VALID_IDS.includes(provider)) throw new Error(`Unknown provider: ${provider}`);
-  if (!apiKey) throw new Error('apiKey is required for test');
   const adapter = PROVIDERS[provider];
-  return await adapter.test(apiKey.trim(), model);
+  // apiKey 留空 = 已配置的 provider 想用本地已保存的 Key 测试连接（不必重新粘贴 Key）。
+  // 解密只发生在主进程并直接注入 adapter，明文 Key 绝不回传渲染端（与 getDefaultRecord 同源）。
+  let key = (apiKey && typeof apiKey === 'string') ? apiKey.trim() : '';
+  if (!key) {
+    ensureTable();
+    const existing = getDb().prepare('SELECT api_key_encrypted FROM ai_providers WHERE provider = ?').get(provider);
+    if (!existing) throw new Error('apiKey is required for test');
+    key = decryptKey(existing.api_key_encrypted);
+  }
+  return await adapter.test(key, model);
 }
 
 // ============================================================
