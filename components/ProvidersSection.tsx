@@ -110,7 +110,9 @@ const ProvidersSection: React.FC = () => {
 
   const handleTest = async (id: AIProviderId) => {
     const r = rowStates[id];
-    if (!r?.apiKey.trim()) return;
+    const p = providers.find(x => x.provider === id);
+    // 已配置 Key 的 provider 可不重输 Key 直接测试（apiKey 传空串 → 后端用本地已存 Key）。
+    if (!r?.apiKey.trim() && !p?.hasKey) return;
     updateRow(id, { testing: true, testResult: null, errorMsg: '', errorStatus: undefined, errorCode: undefined });
     try {
       const result = await testProvider({ provider: id, apiKey: r.apiKey.trim(), model: r.model.trim() });
@@ -352,9 +354,9 @@ const ProvidersSection: React.FC = () => {
                     <div className="flex space-x-2">
                       <button
                         onClick={() => handleTest(p.provider)}
-                        disabled={!row.apiKey.trim() || row.testing}
+                        disabled={(!row.apiKey.trim() && !p.hasKey) || row.testing}
                         className="flex-1 border border-[#e0ddd5] text-[#4a4a48] py-2 rounded-lg text-sm font-medium hover:bg-[#f0eeeb] disabled:opacity-50"
-                        title={!row.apiKey.trim() ? t('settings.ai.enterKeyFirst') : ''}
+                        title={(!row.apiKey.trim() && !p.hasKey) ? t('settings.ai.enterKeyFirst') : ''}
                       >
                         {row.testing ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('common.testing')}</> : t('settings.ai.testConnection')}
                       </button>
