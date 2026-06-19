@@ -14,15 +14,18 @@ const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 console.log('\n=== OCR → form mapping (PR-3c) ===\n');
 
 // A full, normalized ExtractedInvoice (legacy fields are what the pages consume).
+// `customer` is the seller/counterparty flattened by normalizeToLegacy (= the supplier on a
+// purchase invoice); buyerName is the purchaser (= the customer on a sales invoice). They must
+// NOT be swapped: purchase.supplier ← seller, sales.customer ← buyer (Bug-3 reversal guard).
 const full = {
   isInvoiceLike: true, date: '2026-06-13', currency: 'CNY', invoiceType: 'vat',
-  customer: 'ACME Vendor', quantity: '10', price: 1000, taxAmount: 130,
+  customer: 'ACME Vendor', buyerName: 'Buyer Co', quantity: '10', price: 1000, taxAmount: 130,
   totalWithTax: 1130, unitPriceWithoutTax: 100, invoiceNo: 'INV-1', shipping: 50,
 };
 
 console.log('Purchase (full invoice):');
 const p = extractedToPurchaseForm(full, '13%');
-check('supplier ← customer', p.supplier === 'ACME Vendor');
+check('supplier ← seller (not buyer — no reversal)', p.supplier === 'ACME Vendor');
 check('date', p.date === '2026-06-13');
 check('quantity', p.quantity === '10');
 check('totalWithTax number', p.totalWithTax === 1130 && isNum(p.totalWithTax));
@@ -44,7 +47,7 @@ check('taxRate falls back to default', p2.taxRate === '9%');
 
 console.log('Sales:');
 const s = extractedToSalesForm(full, '13%');
-check('customer ← customer', s.customer === 'ACME Vendor');
+check('customer ← buyerName (sales uses buyer, not seller — Bug-3 reversal guard)', s.customer === 'Buyer Co');
 check('shipping ← extracted.shipping', s.shipping === 50 && isNum(s.shipping));
 check('totalWithTax', s.totalWithTax === 1130);
 check('taxRate derived = 13%', s.taxRate === '13%');
@@ -52,6 +55,9 @@ const s2 = extractedToSalesForm(sparse, '13%');
 check('sales missing shipping → 0', s2.shipping === 0 && isNum(s2.shipping));
 check('sales taxRate fallback', s2.taxRate === '13%');
 check('sales has no supplier key (uses customer)', !('supplier' in s));
+// buyerName empty → sales customer falls back to the flattened seller/customer (US receipts / legacy)
+const sNoBuyer = extractedToSalesForm({ ...full, buyerName: '' }, '13%');
+check('sales customer falls back to seller/customer when buyerName empty', sNoBuyer.customer === 'ACME Vendor');
 
 console.log(`\n${failures.length === 0 ? '✓ all passed' : '✗ ' + failures.length + ' failed'}\n`);
 process.exit(failures.length === 0 ? 0 : 1);

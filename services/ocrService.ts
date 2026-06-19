@@ -163,7 +163,11 @@ export function extractedToSalesForm(
     : fallbackTaxRate;
   return {
     date: e.date || '',
-    customer: e.customer || '',
+    // PR Bug-3: a SALES (output) invoice's counterparty is the BUYER (购方), not the seller.
+    // normalizeToLegacy flattens `customer` to the seller (correct for purchases, where the
+    // seller is the supplier), so for sales we prefer the extracted buyerName and only fall
+    // back to that flattened value when no buyer was found (e.g. US receipts / legacy data).
+    customer: e.buyerName || e.customer || '',
     quantity: e.quantity || '',
     price: e.price || 0,
     shipping: e.shipping || 0,
