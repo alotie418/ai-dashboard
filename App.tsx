@@ -70,6 +70,17 @@ const AppContent: React.FC = () => {
   // Ref to always hold latest data for AI analysis (avoids stale closure / infinite loop)
   const dataRef = useRef<BusinessData>(MOCK_BUSINESS_DATA);
 
+  // Bug 1: the data-analysis "AI forecast" task state is lifted here so it survives
+  // sidebar navigation (DataAnalysisPage unmounts on page switch, which previously
+  // discarded the running state + result). The page reads/writes these via the
+  // `forecast` prop; an in-flight result lands here even if the page already unmounted.
+  const [forecastAnalysing, setForecastAnalysing] = useState(false);
+  const [forecastText, setForecastText] = useState('');
+  const [forecastData, setForecastData] = useState<any[]>([]);
+  const [forecastGrounding, setForecastGrounding] = useState<{ title: string; uri: string }[]>([]);
+  const forecastAnalysingRef = useRef(false);
+  const forecastCooldownRef = useRef(0);
+
   // Load real dashboard data from API (returns data directly to avoid ref race condition)
   const loadDashboardData = useCallback(async (): Promise<BusinessData | null> => {
     try {
@@ -335,7 +346,13 @@ const AppContent: React.FC = () => {
       }
       case 'sales': return <SalesAndOutputPage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'purchase': return <PurchaseAndInputPage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
-      case 'analysis': return <DataAnalysisPage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
+      case 'analysis': return <DataAnalysisPage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} forecast={{
+        isAnalysing: forecastAnalysing, setIsAnalysing: setForecastAnalysing,
+        salesForecast: forecastText, setSalesForecast: setForecastText,
+        predictedData: forecastData, setPredictedData: setForecastData,
+        groundingSources: forecastGrounding, setGroundingSources: setForecastGrounding,
+        isAnalysingRef: forecastAnalysingRef, aiQuotaCooldownRef: forecastCooldownRef,
+      }} />;
       case 'inventory': return <InventoryPage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'finance': return <FinancePage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'accounts': return <AccountsPage />;
