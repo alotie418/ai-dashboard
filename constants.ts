@@ -2,36 +2,10 @@
 import { BusinessData } from './types';
 
 export const MOCK_BUSINESS_DATA: BusinessData = {
-  metrics: [
-    {
-      label: '库存余量 (实时)',
-      value: '—',
-      subValue: '—',
-      icon: 'fa-boxes',
-      color: 'bg-blue-500'
-    },
-    {
-      label: '2026年度 采购',
-      value: '—',
-      subValue: '—',
-      icon: 'fa-truck-loading',
-      color: 'bg-purple-500'
-    },
-    {
-      label: '2026年度 销售',
-      value: '—',
-      subValue: '—',
-      icon: 'fa-chart-line',
-      color: 'bg-green-500'
-    },
-    {
-      label: '平均成本',
-      value: '—',
-      subValue: '—',
-      icon: 'fa-tags',
-      color: 'bg-orange-500'
-    },
-  ],
+  // Initial / fetch-failure fallback: render no KPI cards (a brief empty state) instead
+  // of hardcoded zh-CN labels in an outdated 4-card shape. The real, locale-aware (i18n)
+  // 5-card set comes from loadDashboardData(), which replaces this on success.
+  metrics: [],
   monthlyPerformance: [
     { name: '1月', revenue: 0, cost: 0, profit: 0, purchaseTons: 0, salesTons: 0, netProfit: 0, yoy: 0, mom: 0, deflator: 0 },
     { name: '2月', revenue: 0, cost: 0, profit: 0, purchaseTons: 0, salesTons: 0, netProfit: 0, yoy: 0, mom: 0, deflator: 0 },
