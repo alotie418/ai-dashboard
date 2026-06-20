@@ -80,7 +80,8 @@
       "products": "상품 / 서비스",
       "dataBackup": "데이터 백업",
       "cashAccounts": "계좌·기초잔액",
-      "liabilities": "부채·차입"
+      "liabilities": "부채·차입",
+      "fixedAssets": "고정자산"
     },
     "company": {
       "title": "기업 기본 정보",
@@ -1259,5 +1260,36 @@
     "addButton": "부채·차입 추가",
     "addTitle": "새 부채·차입",
     "editTitle": "부채·차입 편집"
+  },
+  "fixedAssets": {
+    "title": "고정자산 등록 대장",
+    "subtitle": "고정자산(설비, 차량, 사무용 가구 등)의 수기 대장으로, 이후 관리 분석에 사용합니다.",
+    "notBalanceSheetNote": "여기서는 고정자산(관리 기준)만 기록하며, 재무상태표가 아니고 잔액 대사도 하지 않습니다.",
+    "notDepreciationNote": "여기서는 등록만 하며, 감가상각·장부가액·감가상각비를 전혀 다루지 않습니다.",
+    "name": "자산명",
+    "namePlaceholder": "예: 업무용 노트북",
+    "category": "분류",
+    "categoryPlaceholder": "예: 전자기기(자유 입력)",
+    "acquisitionDate": "취득일",
+    "originalValue": "취득원가",
+    "originalValueHint": "취득원가는 기록용이며, 감가상각이나 어떤 계산에도 사용되지 않습니다. 보통 음수가 아니지만 강제하지 않습니다.",
+    "currency": "통화",
+    "currencyPlaceholder": "예: KRW / USD",
+    "supplier": "공급처·취득처",
+    "supplierPlaceholder": "예: ○○상사",
+    "serialNo": "일련번호",
+    "note": "비고",
+    "notePlaceholder": "선택",
+    "status": "사용 상태",
+    "statusInUse": "사용 중",
+    "statusIdle": "유휴",
+    "statusDisposed": "처분됨",
+    "recordStatus": "대장",
+    "active": "사용",
+    "inactive": "사용 안 함",
+    "empty": "고정자산 기록이 없습니다. 아래 버튼으로 추가하세요.",
+    "addButton": "고정자산 추가",
+    "addTitle": "새 고정자산",
+    "editTitle": "고정자산 편집"
   }
 }

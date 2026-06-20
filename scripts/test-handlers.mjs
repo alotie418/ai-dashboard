@@ -489,6 +489,67 @@ async function expectThrow(fn, label) {
   await expectThrow(() => call('DELETE', '/api/liabilities/nope', null), '[liab] delete missing throws');
 }
 
+// ───────────────────────── fixed_assets (fixed-assets register, PR-7D-3 pipeline) ─────────────────────────
+// 管道层 round-trip：证明固定资产能录入·保存·读取·编辑·删除·停用，且边界守得住——仅登记，
+// 不折旧、不出净值、不接资产负债表、不出表。锁住：create 默认值（status=in_use·is_active=true）/
+// status 白名单（in_use·idle·disposed）/ original_value 可负·NaN→0·缺省→0 / category 自由文本 /
+// name·status 校验 / partial update 不清空 / 编辑 name·category·status / disposed 仅存标签 /
+// 停用(is_active=false)持久 / delete + delete-missing。
+{
+  freshDb();
+  const mkAsset = async (body) => call('POST', '/api/fixed-assets', body);
+
+  ok((await call('GET', '/api/fixed-assets', null)).length === 0, '[asset] list starts empty');
+
+  // create defaults: status→in_use, is_active→true; original_value/category/etc kept
+  const a1 = await mkAsset({ name: '办公电脑', category: '电子设备', original_value: 6800, currency: 'CNY', acquisition_date: '2026-01-15', supplier: '京东', serial_no: 'SN-001' });
+  ok(a1?.success && a1.id, `[asset] create → {success,id}, got ${JSON.stringify(a1)}`);
+  const r1 = (await call('GET', '/api/fixed-assets', null)).find((a) => a.id === a1.id);
+  ok(r1 && r1.status === 'in_use' && r1.original_value === 6800, '[asset] create defaults status=in_use, original_value kept');
+  ok(r1.category === '电子设备' && r1.supplier === '京东' && r1.serial_no === 'SN-001' && r1.acquisition_date === '2026-01-15', '[asset] category/supplier/serial/acq date persist');
+  ok(typeof r1.is_active === 'boolean' && r1.is_active === true, '[asset] is_active coerced to boolean, defaults true');
+
+  // status whitelist: invalid throws (handler guard before DB); idle/disposed accepted
+  await expectThrow(() => call('POST', '/api/fixed-assets', { name: 'Bad', status: 'sold' }), '[asset] invalid status throws');
+  const a2 = await mkAsset({ name: '旧打印机', status: 'disposed' });
+  ok((await call('GET', '/api/fixed-assets', null)).find((a) => a.id === a2.id).status === 'disposed', '[asset] disposed status accepted (登记标签)');
+
+  // original_value: negative allowed, NaN → 0, missing → 0
+  const aNeg = await mkAsset({ name: '负值', original_value: -50 });
+  const aNaN = await mkAsset({ name: 'NaN', original_value: 'oops' });
+  const aMiss = await mkAsset({ name: 'Bare' });
+  const after = await call('GET', '/api/fixed-assets', null);
+  ok(after.find((a) => a.id === aNeg.id).original_value === -50, '[asset] negative original_value preserved (不 clamp)');
+  ok(after.find((a) => a.id === aNaN.id).original_value === 0, '[asset] NaN original_value coerced to 0');
+  ok(after.find((a) => a.id === aMiss.id).original_value === 0, '[asset] missing original_value defaults to 0');
+
+  // name required (create + update); update validates status; missing id throws
+  await expectThrow(() => call('POST', '/api/fixed-assets', { name: '   ' }), '[asset] blank name throws');
+  await expectThrow(() => call('PUT', `/api/fixed-assets/${a1.id}`, { name: '' }), '[asset] update blank name throws');
+  await expectThrow(() => call('PUT', `/api/fixed-assets/${a1.id}`, { status: 'scrapped' }), '[asset] update invalid status throws');
+  await expectThrow(() => call('PUT', '/api/fixed-assets/nope', { name: 'x' }), '[asset] update missing id throws');
+
+  // partial update: only provided field changes; untouched fields preserved (not cleared)
+  await call('PUT', `/api/fixed-assets/${a1.id}`, { original_value: 5000 });
+  const u1 = (await call('GET', '/api/fixed-assets', null)).find((a) => a.id === a1.id);
+  ok(u1.original_value === 5000 && u1.name === '办公电脑' && u1.category === '电子设备' && u1.supplier === '京东',
+    '[asset] partial update changes only original_value, leaves name/category/supplier intact');
+
+  // edit name + category + status together; disposed is just a recorded label
+  await call('PUT', `/api/fixed-assets/${a1.id}`, { name: '办公电脑(旧)', category: '办公设备', status: 'disposed' });
+  const u2 = (await call('GET', '/api/fixed-assets', null)).find((a) => a.id === a1.id);
+  ok(u2.name === '办公电脑(旧)' && u2.category === '办公设备' && u2.status === 'disposed', '[asset] edit applies name/category/status');
+
+  // toggle active (停用) persists as boolean false
+  await call('PUT', `/api/fixed-assets/${a2.id}`, { is_active: false });
+  ok((await call('GET', '/api/fixed-assets', null)).find((a) => a.id === a2.id).is_active === false, '[asset] is_active=false (停用) persists');
+
+  // delete removes; delete missing throws
+  await call('DELETE', `/api/fixed-assets/${a2.id}`, null);
+  ok(!(await call('GET', '/api/fixed-assets', null)).some((a) => a.id === a2.id), '[asset] delete removes row');
+  await expectThrow(() => call('DELETE', '/api/fixed-assets/nope', null), '[asset] delete missing throws');
+}
+
 // ───────────── products.create id hardening (prod-<ts>-<rand>) ─────────────
 // A tight loop with no spacing lands many creates on the SAME millisecond; the random suffix
 // must keep every id unique (no PRIMARY KEY collision). Pre-fix (pure Date.now) this collides.
@@ -1531,4 +1592,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');

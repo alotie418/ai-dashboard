@@ -80,7 +80,8 @@
       "products": "Products",
       "dataBackup": "Data Backup",
       "cashAccounts": "Accounts",
-      "liabilities": "Liabilities"
+      "liabilities": "Liabilities",
+      "fixedAssets": "Fixed Assets"
     },
     "company": {
       "title": "Company Information",
@@ -1259,5 +1260,36 @@
     "addButton": "Add liability/loan",
     "addTitle": "New liability/loan",
     "editTitle": "Edit liability/loan"
+  },
+  "fixedAssets": {
+    "title": "Fixed Assets Register",
+    "subtitle": "A manual register of fixed assets (equipment, vehicles, office furniture, etc.) for later management analysis.",
+    "notBalanceSheetNote": "This only records fixed assets (management basis). It is not a balance sheet and performs no balancing.",
+    "notDepreciationNote": "This is registration only — no depreciation, no net book value, no depreciation expense.",
+    "name": "Asset name",
+    "namePlaceholder": "e.g. Office laptop",
+    "category": "Category",
+    "categoryPlaceholder": "e.g. Electronics (free text)",
+    "acquisitionDate": "Acquisition date",
+    "originalValue": "Original / purchase value",
+    "originalValueHint": "The original value is recorded only; it does not feed depreciation or any calculation. Usually non-negative, but not enforced.",
+    "currency": "Currency",
+    "currencyPlaceholder": "e.g. USD / EUR",
+    "supplier": "Supplier / source",
+    "supplierPlaceholder": "e.g. Amazon",
+    "serialNo": "Serial number",
+    "note": "Note",
+    "notePlaceholder": "Optional",
+    "status": "Status",
+    "statusInUse": "In use",
+    "statusIdle": "Idle",
+    "statusDisposed": "Disposed",
+    "recordStatus": "Record",
+    "active": "Active",
+    "inactive": "Inactive",
+    "empty": "No fixed assets yet. Click below to add one.",
+    "addButton": "Add fixed asset",
+    "addTitle": "New fixed asset",
+    "editTitle": "Edit fixed asset"
   }
 }

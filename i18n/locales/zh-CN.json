@@ -80,7 +80,8 @@
       "products": "商品 / 服务",
       "dataBackup": "数据备份",
       "cashAccounts": "账户与期初",
-      "liabilities": "负债/借款"
+      "liabilities": "负债/借款",
+      "fixedAssets": "固定资产"
     },
     "company": {
       "title": "企业基础信息",
@@ -1259,5 +1260,36 @@
     "addButton": "添加负债/借款",
     "addTitle": "新增负债/借款",
     "editTitle": "编辑负债/借款"
+  },
+  "fixedAssets": {
+    "title": "固定资产登记台账",
+    "subtitle": "登记固定资产（设备、车辆、办公家具等）的手工台账，用于后续管理分析。",
+    "notBalanceSheetNote": "这里仅登记固定资产（管理口径），不是资产负债表，也不做平衡核算。",
+    "notDepreciationNote": "此处仅作登记，不计折旧、不出净值、不生成折旧费用。",
+    "name": "资产名称",
+    "namePlaceholder": "如：办公电脑",
+    "category": "资产类别",
+    "categoryPlaceholder": "如：电子设备（自由填写）",
+    "acquisitionDate": "购置日期",
+    "originalValue": "原值/购置金额",
+    "originalValueHint": "原值仅作记录，不参与折旧或任何计算；通常应为非负数，但不强制。",
+    "currency": "币种",
+    "currencyPlaceholder": "如：CNY / USD",
+    "supplier": "供应商/来源",
+    "supplierPlaceholder": "如：京东",
+    "serialNo": "序列号",
+    "note": "备注",
+    "notePlaceholder": "可选",
+    "status": "使用状态",
+    "statusInUse": "在用",
+    "statusIdle": "闲置",
+    "statusDisposed": "已处置",
+    "recordStatus": "台账状态",
+    "active": "启用",
+    "inactive": "停用",
+    "empty": "暂无固定资产记录，点击下方按钮添加。",
+    "addButton": "添加固定资产",
+    "addTitle": "新增固定资产",
+    "editTitle": "编辑固定资产"
   }
 }

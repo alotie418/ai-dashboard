@@ -24,6 +24,7 @@ const homeOfficeH = require('./homeOffice');
 const conversationsH = require('./conversations');
 const cashAccountsH = require('./cashAccounts');
 const liabilitiesH = require('./liabilities');
+const fixedAssetsH = require('./fixedAssets');
 
 const routes = [
   // ---- Dashboard ----
@@ -83,6 +84,12 @@ const routes = [
   ['POST', '/api/liabilities', liabilitiesH.create],
   ['PUT', '/api/liabilities/:id', liabilitiesH.update],
   ['DELETE', '/api/liabilities/:id', liabilitiesH.remove],
+
+  // ---- Fixed Assets: 固定资产登记台账（PR-7D-3 管道层；仅登记不折旧·不出表；路径与其它账款不冲突）----
+  ['GET', '/api/fixed-assets', fixedAssetsH.list],
+  ['POST', '/api/fixed-assets', fixedAssetsH.create],
+  ['PUT', '/api/fixed-assets/:id', fixedAssetsH.update],
+  ['DELETE', '/api/fixed-assets/:id', fixedAssetsH.remove],
 
   // ---- Business Documents（业务单据 Phase A；next-number/tax-invoice 排在 :id 前）----
   ['GET', '/api/documents/next-number', documentsH.nextNumber],

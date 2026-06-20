@@ -80,7 +80,8 @@
       "products": "Produits",
       "dataBackup": "Sauvegarde des données",
       "cashAccounts": "Comptes",
-      "liabilities": "Passifs"
+      "liabilities": "Passifs",
+      "fixedAssets": "Immobilisations"
     },
     "company": {
       "title": "Informations entreprise",
@@ -1259,5 +1260,36 @@
     "addButton": "Ajouter un passif/emprunt",
     "addTitle": "Nouveau passif/emprunt",
     "editTitle": "Modifier le passif/emprunt"
+  },
+  "fixedAssets": {
+    "title": "Registre des immobilisations",
+    "subtitle": "Un registre manuel des immobilisations (équipements, véhicules, mobilier de bureau, etc.) pour l'analyse de gestion.",
+    "notBalanceSheetNote": "Cette section enregistre uniquement les immobilisations (base de gestion). Ce n'est pas un bilan et n'effectue aucun équilibrage.",
+    "notDepreciationNote": "Il s'agit d'un simple enregistrement — aucun amortissement, aucune valeur nette comptable, aucune charge d'amortissement.",
+    "name": "Nom de l'actif",
+    "namePlaceholder": "ex. : Ordinateur portable de bureau",
+    "category": "Catégorie",
+    "categoryPlaceholder": "ex. : Électronique (texte libre)",
+    "acquisitionDate": "Date d'acquisition",
+    "originalValue": "Valeur d'origine / d'achat",
+    "originalValueHint": "La valeur d'origine est enregistrée à titre indicatif uniquement ; elle n'alimente aucun amortissement ni calcul. Généralement non négative, mais non imposée.",
+    "currency": "Devise",
+    "currencyPlaceholder": "ex. : EUR / USD",
+    "supplier": "Fournisseur / source",
+    "supplierPlaceholder": "ex. : Amazon",
+    "serialNo": "Numéro de série",
+    "note": "Note",
+    "notePlaceholder": "Facultatif",
+    "status": "Statut",
+    "statusInUse": "En service",
+    "statusIdle": "Inutilisé",
+    "statusDisposed": "Cédé",
+    "recordStatus": "Fiche",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "empty": "Aucune immobilisation pour l'instant. Cliquez ci-dessous pour en ajouter une.",
+    "addButton": "Ajouter une immobilisation",
+    "addTitle": "Nouvelle immobilisation",
+    "editTitle": "Modifier l'immobilisation"
   }
 }
