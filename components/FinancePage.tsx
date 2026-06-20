@@ -359,13 +359,25 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
                     return blk.currency ? `${blk.currency} ${num}` : num;
                   };
                   const lineLabel = (key: string) => {
+                    // P2-3：固定资产行显示「固定资产（净值）」。
+                    if (key === 'fixedAssets') return t('finance.balanceFixedNet');
                     const e = (BALANCE_CLASSIFICATION as Record<string, { labelKey: string }>)[key];
                     return e ? t(e.labelKey) : key;
                   };
-                  const lineRow = (l: { key: string; amount: number }, pfx: string, i: number) => (
-                    <div key={`${pfx}${i}`} className="flex justify-between px-6 py-2.5 text-sm">
-                      <span className="text-[#4a4a48] pl-3">{lineLabel(l.key)}</span>
-                      <span className="font-mono text-[#191918]">{ccyAmt(l.amount)}</span>
+                  type Meta = { originalValue: number; accumulatedDepreciation: number };
+                  const lineRow = (l: { key: string; amount: number; meta?: Meta }, pfx: string, i: number) => (
+                    <div key={`${pfx}${i}`} className="px-6 py-2.5">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-[#4a4a48] pl-3">{lineLabel(l.key)}</span>
+                        <span className="font-mono text-[#191918]">{ccyAmt(l.amount)}</span>
+                      </div>
+                      {/* P2-3 固定资产净值辅助说明：原值 / 累计折旧（直线法估算，非法定/税务折旧）。 */}
+                      {l.key === 'fixedAssets' && l.meta && (
+                        <div className="pl-3 mt-0.5 text-[10px] text-[#8a8a88]">
+                          {t('finance.balanceOriginalValue')} {ccyAmt(l.meta.originalValue)} · {t('finance.balanceAccumulatedDepreciation')} {ccyAmt(l.meta.accumulatedDepreciation)}
+                          <span className="ml-1">· {t('finance.balanceFixedNetHint')}</span>
+                        </div>
+                      )}
                     </div>
                   );
                   const subHdr = (label: string) => (

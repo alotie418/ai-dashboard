@@ -657,9 +657,18 @@ export function fetchCashPosition(opts: { from?: string; to?: string; year?: str
 // 现金来自 cash-position endingEstimate；固定资产按原值（不折旧）；借款按 maturity_date 一年线分；
 // 权益取 equity.amount 之和（不做结转）；税不进合计；多币种不折算、不跨币种合计；只读不写回。
 
+// PR-7B P2-3：仅 fixedAssets 行携带；amount=净值，meta 含原值/累计折旧供 UI 辅助说明。
+export interface BalanceLineMeta {
+  originalValue: number;
+  accumulatedDepreciation: number;
+  netBookValue: number;
+  estimate: boolean;
+  hasWarnings?: boolean;
+}
 export interface BalanceLine {
   key: string;       // = accountingClassification BALANCE_CLASSIFICATION 的 key（前端据此取标签）
-  amount: number;
+  amount: number;    // fixedAssets：净值（netBookValue）
+  meta?: BalanceLineMeta;
 }
 export interface BalanceCurrencyBlock {
   currency: string | null;

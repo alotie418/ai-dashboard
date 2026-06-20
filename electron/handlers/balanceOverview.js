@@ -14,6 +14,7 @@ const { getDb } = require('../db');
 const cashPosition = require('./cashPosition');
 const { receivablesSummary, payablesSummary } = require('./receivables');
 const inventory = require('./inventory');
+const depreciationPreview = require('./depreciationPreview');   // PR-7B P2-3：固定资产用净值（只读复用）
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -66,8 +67,18 @@ async function overview({ query } = {}) {
   const totalPayable = round2(pay?.totalPayable);
   const totalInventory = round2(inv?.totalInventoryCost);
 
-  // ── 3) 固定资产(原值) / 权益：按币种 ──
-  const fixedMap = sumByCurrency(db, 'fixed_assets', 'original_value');
+  // ── 3) 固定资产：PR-7B P2-3 改用「净值」（复用 depreciation-preview，同 asOf；disposed 已排除）/ 权益：按币种 ──
+  const dep = await depreciationPreview.preview({ query: { asOf } });
+  const fixedNetMap = new Map();   // currency|null → { net, original, accum, hasWarnings }
+  for (const b of dep.byCurrency) {
+    const hasWarnings = b.assets.some((a) => Array.isArray(a.warnings) && a.warnings.length > 0);
+    fixedNetMap.set(b.currency, {
+      net: round2(b.totals.netBookValue),
+      original: round2(b.totals.originalValue),
+      accum: round2(b.totals.accumulatedDepreciation),
+      hasWarnings,
+    });
+  }
   const equityMap = sumByCurrency(db, 'equity', 'amount');
 
   // ── 4) 借款：按币种 + 一年线分流动/非流动（空到期日→流动+warning）──
@@ -90,7 +101,7 @@ async function overview({ query } = {}) {
 
   // ── 5) 组装：币种并集（含本位币，给 AR/AP/存货）──
   const currencies = new Set([
-    ...cashMap.keys(), ...fixedMap.keys(), ...equityMap.keys(),
+    ...cashMap.keys(), ...fixedNetMap.keys(), ...equityMap.keys(),
     ...borrowCurrent.keys(), ...borrowNonCurrent.keys(),
     baseCurrency,
   ]);
@@ -109,8 +120,16 @@ async function overview({ query } = {}) {
       assetsCurrent.push({ key: 'receivables', amount: totalReceivable });
       assetsCurrent.push({ key: 'inventory', amount: totalInventory });
     }
-    // 资产·非流动（固定资产原值）
-    if (fixedMap.has(ccy)) assetsNonCurrent.push({ key: 'fixedAssets', amount: fixedMap.get(ccy) });
+    // 资产·非流动（固定资产净值，P2-3：来自 depreciation-preview；disposed 已排除）
+    if (fixedNetMap.has(ccy)) {
+      const fnm = fixedNetMap.get(ccy);
+      assetsNonCurrent.push({
+        key: 'fixedAssets',
+        amount: fnm.net,
+        meta: { originalValue: fnm.original, accumulatedDepreciation: fnm.accum, netBookValue: fnm.net, estimate: true, hasWarnings: fnm.hasWarnings },
+      });
+      if (fnm.hasWarnings) warnings.push('fixedAssetsDepreciationWarnings');
+    }
     // 负债·流动
     if (ccy === baseCurrency) liabilitiesCurrent.push({ key: 'payables', amount: totalPayable });
     if (borrowCurrent.has(ccy)) liabilitiesCurrent.push({ key: 'borrowings', amount: borrowCurrent.get(ccy) });
@@ -150,7 +169,7 @@ async function overview({ query } = {}) {
       '管理口径概览，非法定资产负债表，不做法定严格平衡；balanceDifference 为待调整项',
       'balanceDifference = 资产 − 负债 − 权益（按币种）；非 0 为常态（权益取自台账，未做利润结转/配平）',
       '现金为期末估算（来自 cash-position：期初+实收−实付，仅经营活动，未含投资/筹资现金）',
-      '固定资产按原值列示，未做折旧/累计折旧/净值（属 P2）',
+      '固定资产按直线法估算净值（P2-3，来自 depreciation-preview，非法定/税务折旧；行 meta 含原值/累计折旧）；已处置资产不计入净值',
       '应收/应付/存货为 as-of 当前快照，与现金的期间口径不完全一致',
       '多币种分别列示，不折算、不跨币种合计；每币种各自算 balanceDifference',
       '只读：不写回任何数据',

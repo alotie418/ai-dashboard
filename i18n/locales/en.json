@@ -875,7 +875,11 @@
     "balanceNonCurrentLiabilities": "Non-current liabilities",
     "balanceDifference": "Balance difference / to be adjusted",
     "balanceBorrowingsNullMaturity": "Includes borrowings without a maturity date, shown as current for now",
-    "balanceCurrencyUnspecified": "Unspecified currency"
+    "balanceCurrencyUnspecified": "Unspecified currency",
+    "balanceFixedNet": "Fixed assets (net)",
+    "balanceOriginalValue": "Cost",
+    "balanceAccumulatedDepreciation": "Accumulated depreciation",
+    "balanceFixedNetHint": "straight-line estimate"
   },
   "usSchedule": {
     "line1": "Line 1 — Gross Receipts",
