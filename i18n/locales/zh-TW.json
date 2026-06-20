@@ -194,7 +194,7 @@
       "testOk": "模型可呼叫，Key 與 model ID 均通過",
       "testFail": "測試失敗",
       "providerErrorDetail": "服務商返回",
-      "staleModelHint": "目前使用自訂或舊版 model ID，建議重設。",
+      "customModelHint": "目前使用自訂 Model ID，請確認它在你的帳號中可用。",
       "resetTo": "重設為 {{model}}",
       "configured": "已設定",
       "notConfigured": "未設定",

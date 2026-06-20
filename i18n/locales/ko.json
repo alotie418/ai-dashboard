@@ -194,7 +194,7 @@
       "testOk": "모델 호출 성공, Key와 ID 모두 유효",
       "testFail": "테스트 실패",
       "providerErrorDetail": "제공업체 응답",
-      "staleModelHint": "현재 사용자 정의 또는 이전 model ID 사용 중. 재설정 권장.",
+      "customModelHint": "사용자 지정 model ID를 사용 중입니다. 계정에서 사용 가능한지 확인하세요.",
       "resetTo": "{{model}}으로 재설정",
       "configured": "구성됨",
       "notConfigured": "미구성",
