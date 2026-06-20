@@ -506,6 +506,30 @@ test.describe('finance → export PDF', () => {
     expect(calls.some((c: any) => c.channel === 'providers:test')).toBe(false);
   });
 
+  // PR-6 §N (N3): the API-key input is masked (type=password) and a typed key never appears as
+  // page text; a configured provider's stored key is never rendered (card shows only a "configured"
+  // badge). Uses a dummy key — no real key needed.
+  test('PR-6 §N: API key input is masked + typed/stored key not rendered (N3)', async ({ page }) => {
+    const ui = 'zh-CN';
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await bootComboIPC(page, ui, 'CN', {
+      hasProvider: true,
+      providers: [{ provider: 'deepseek', name: 'DeepSeek', hasKey: true, model: 'deepseek-chat', modelLabel: 'DeepSeek Chat', modelIsKnown: true, availableModels: [], defaultModel: 'deepseek-chat', enabled: true, isDefault: true, supportsOCR: false, supportsWebGrounding: false }],
+    });
+    await page.locator('i.fa-cog').first().click();        // → settings
+    await page.locator('i.fa-microchip').first().click();   // → AI providers section
+    // configured card must not render the stored key (only a "configured" badge / hasKey state)
+    await expect(page.locator('body')).not.toContainText('sk-');
+    await page.getByRole('button', { name: loc.settings.ai.editKey }).click();
+    // the key field is a password input (masked)
+    const keyInput = page.locator('input[type="password"]').first();
+    await expect(keyInput).toBeVisible();
+    // typing a dummy key keeps it out of the page's rendered text (masked, value lives in the input)
+    const DUMMY = 'sk-DUMMY-DONOTSHOW-0123456789';
+    await keyInput.fill(DUMMY);
+    await expect(page.locator('body')).not.toContainText(DUMMY);
+  });
+
   test('export-pdf → mock electronAPI success shows saved path', async ({ page }) => {
     const ui = 'zh-CN';
     await page.addInitScript(() => {
