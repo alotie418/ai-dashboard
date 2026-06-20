@@ -691,6 +691,56 @@ export function fetchBalanceOverview(opts: { from?: string; to?: string; year?: 
   return apiFetch<BalanceOverview>(`/api/balance-overview${suffix}`);
 }
 
+// ==================== Depreciation Preview（固定资产直线法折旧只读预览，PR-7B P2-2）====================
+// 只读：每资产累计折旧/账面净值/月折旧（直线法）。不写回 fixed_assets、不进 P&L、不接概览、不碰 reports。
+// 空 useful_life_months/salvage_rate 回退类别默认；disposed 不计入 totals；多币种分别列示不折算。
+
+export interface DepreciationAsset {
+  id: string;
+  name: string;
+  category: string | null;
+  currency: string | null;
+  originalValue: number;
+  usefulLifeMonths: number;
+  salvageRate: number;
+  salvageValue: number;
+  depreciableAmount: number;
+  monthlyDepreciation: number;
+  monthsElapsed: number;
+  accumulatedDepreciation: number;
+  netBookValue: number;
+  acquisitionDate: string | null;
+  depreciationStartPolicy: string;
+  disposalDate: string | null;
+  status: string;
+  disposed: boolean;
+  usedDefaults: { usefulLifeMonths: boolean; salvageRate: boolean };
+  categoryResolved: string;   // canonical 类别（含 'DEFAULT_FALLBACK'）
+  warnings: string[];         // code（前端映射 i18n）
+}
+export interface DepreciationCurrencyBlock {
+  currency: string | null;
+  assets: DepreciationAsset[];
+  totals: { originalValue: number; accumulatedDepreciation: number; netBookValue: number };  // disposed 不计入
+}
+export interface DepreciationPreview {
+  estimate: boolean;
+  reportType: 'depreciation_preview';
+  asOf: string;
+  baseCurrency: string;
+  byCurrency: DepreciationCurrencyBlock[];
+  limitations: string[];
+  disclaimerKey: string;
+}
+
+export function fetchDepreciationPreview(opts: { asOf?: string; year?: string } = {}): Promise<DepreciationPreview> {
+  const qs = new URLSearchParams();
+  if (opts.asOf) qs.set('asOf', opts.asOf);
+  if (opts.year) qs.set('year', opts.year);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return apiFetch<DepreciationPreview>(`/api/depreciation-preview${suffix}`);
+}
+
 // ==================== Transactions（国际化数据模型 v5，C 阶段）====================
 
 export type TransactionType = 'income' | 'expense';

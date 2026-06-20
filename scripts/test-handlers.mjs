@@ -912,6 +912,64 @@ const Q = '?from=2026-01-01&to=2026-12-31';
   ok(db.prepare("SELECT COUNT(*) AS c FROM tax_payments").get().c === 1, '[bo] read-only: tax_payments unchanged');
 }
 
+// ───────────────────────── depreciation-preview (直线法折旧只读预览, PR-7B P2-2) ─────────────────────────
+// 只读：累计折旧/净值/月折旧。锁住：next_month/same_month 计提月数·useful/salvage 空回退默认·
+// clamp 到可折旧额·净值≥残值·disposed+日期处置次月停·disposed 无日期 warning·无购置日 warning·
+// daily fallback warning·多币种分组·disposed 不计入 totals·**不写回 fixed_assets**·category 解析。
+{
+  const db = freshDb();
+  const asOf = '?asOf=2026-12-31';
+  const mk = async (body) => call('POST', '/api/fixed-assets', body);
+  await mk({ name: 'A1', original_value: 12000, salvage_rate: 0.1, useful_life_months: 12, acquisition_date: '2026-01-15', depreciation_start_policy: 'next_month', currency: 'CNY' });
+  await mk({ name: 'A2', original_value: 12000, salvage_rate: 0, useful_life_months: 12, acquisition_date: '2026-01-15', depreciation_start_policy: 'same_month', currency: 'CNY' });
+  await mk({ name: 'A3', category: '办公电脑', original_value: 6000, acquisition_date: '2026-01-15', currency: 'CNY' });   // useful/salvage 空 → 默认
+  await mk({ name: 'A4', original_value: 10000, salvage_rate: 0, useful_life_months: 4, acquisition_date: '2025-01-15', depreciation_start_policy: 'next_month', currency: 'CNY' }); // clamp 超龄
+  await mk({ name: 'A5', original_value: 12000, salvage_rate: 0, useful_life_months: 12, acquisition_date: '2026-01-15', depreciation_start_policy: 'next_month', currency: 'CNY', status: 'disposed', disposal_date: '2026-06-30' });
+  await mk({ name: 'A6', original_value: 6000, useful_life_months: 12, acquisition_date: '2026-01-15', currency: 'CNY', status: 'disposed' });   // disposed 无日期
+  await mk({ name: 'A7', original_value: 5000, useful_life_months: 12, currency: 'CNY' });                       // 无购置日期
+  await mk({ name: 'A8', original_value: 12000, salvage_rate: 0, useful_life_months: 12, acquisition_date: '2026-01-15', depreciation_start_policy: 'daily', currency: 'CNY' });
+  await mk({ name: 'A9', original_value: 1000, salvage_rate: 0, useful_life_months: 12, acquisition_date: '2026-01-15', currency: 'USD' });
+
+  const dp = await call('GET', `/api/depreciation-preview${asOf}`, null);
+  ok(dp.estimate === true && dp.reportType === 'depreciation_preview' && dp.asOf === '2026-12-31', '[dp] estimate/reportType/asOf');
+  const cny = dp.byCurrency.find((b) => b.currency === 'CNY');
+  const usd = dp.byCurrency.find((b) => b.currency === 'USD');
+  const A = (n) => cny.assets.find((a) => a.name === n);
+
+  // next_month：A1 月数 11、累计 9900、净值 2100（depreciable 10800, monthly 900）
+  ok(A('A1').monthsElapsed === 11 && approx(A('A1').accumulatedDepreciation, 9900) && approx(A('A1').netBookValue, 2100), `[dp] A1 next_month 11mo acc=9900 net=2100, got ${JSON.stringify({m:A('A1').monthsElapsed,a:A('A1').accumulatedDepreciation,n:A('A1').netBookValue})}`);
+  // same_month：A2 月数 12、净值 0（== 残值 0）
+  ok(A('A2').monthsElapsed === 12 && approx(A('A2').netBookValue, 0), '[dp] A2 same_month 12mo net=0');
+  // 默认回退：A3 useful 空→36、salvage 空→0.05、category→electronics
+  ok(A('A3').usefulLifeMonths === 36 && approx(A('A3').salvageRate, 0.05), '[dp] A3 useful/salvage default (36mo / 0.05)');
+  ok(A('A3').usedDefaults.usefulLifeMonths === true && A('A3').usedDefaults.salvageRate === true && A('A3').categoryResolved === 'electronics', '[dp] A3 usedDefaults flags + categoryResolved=electronics');
+  // clamp + 净值≥残值：A4 超龄 → 累计=可折旧额=10000、净值=残值=0
+  ok(approx(A('A4').accumulatedDepreciation, A('A4').depreciableAmount) && approx(A('A4').accumulatedDepreciation, 10000) && approx(A('A4').netBookValue, 0), '[dp] A4 clamp accumulated=depreciable=10000, net=0 (≥salvage)');
+  // disposed + 日期：A5 处置次月停 → 月数 5（Feb..June）
+  ok(A('A5').disposed === true && A('A5').monthsElapsed === 5, `[dp] A5 disposed+date → 5mo (Feb..June), got ${A('A5').monthsElapsed}`);
+  // disposed 无日期：A6 warning disposedNoDate
+  ok(A('A6').disposed === true && A('A6').warnings.includes('disposedNoDate'), '[dp] A6 disposedNoDate warning');
+  // 无购置日期：A7 warning + 不计提
+  ok(A('A7').warnings.includes('noAcquisitionDate') && A('A7').accumulatedDepreciation === 0 && approx(A('A7').netBookValue, 5000), '[dp] A7 noAcquisitionDate → 0 accumulated, net=original');
+  // daily fallback：A8 warning + 按次月口径（月数 11）
+  ok(A('A8').warnings.includes('dailyPolicyFallback') && A('A8').monthsElapsed === 11, '[dp] A8 dailyPolicyFallback + computed as next_month (11mo)');
+  // 多币种分组：USD 独立块
+  ok(usd && usd.assets.length === 1 && usd.assets[0].name === 'A9', '[dp] multi-currency: USD block separate');
+  // 净值 + 累计 = 原值（不变量，robust，不受 round2 口径影响）；月数 11
+  ok(usd.assets[0].monthsElapsed === 11 && approx(usd.assets[0].netBookValue + usd.assets[0].accumulatedDepreciation, 1000), '[dp] USD A9 computed in its own block (net+accumulated=original, 11mo)');
+
+  // disposed 不计入 totals：CNY totals.originalValue = 在用 6 项 = 57000（A5/A6 排除）
+  ok(approx(cny.totals.originalValue, 57000), `[dp] CNY totals.originalValue=57000 (disposed A5/A6 excluded), got ${cny.totals.originalValue}`);
+  // totals.netBookValue 仅在用资产（不含 disposed）
+  ok(cny.totals.netBookValue < cny.totals.originalValue, '[dp] CNY totals.netBookValue < originalValue (depreciated)');
+
+  // **不写回 fixed_assets**：调用后 original_value / 折旧参数列不变，且无 accumulated/net 列写入
+  const a1Row = db.prepare("SELECT original_value, useful_life_months, salvage_rate FROM fixed_assets WHERE name='A1'").get();
+  ok(a1Row.original_value === 12000 && a1Row.useful_life_months === 12 && a1Row.salvage_rate === 0.1, '[dp] read-only: fixed_assets A1 params unchanged');
+  const cols = db.prepare("PRAGMA table_info(fixed_assets)").all().map((c) => c.name);
+  ok(!cols.includes('accumulated_depreciation') && !cols.includes('net_book_value'), '[dp] read-only: no accumulated/net columns written to schema');
+}
+
 // ───────────── products.create id hardening (prod-<ts>-<rand>) ─────────────
 // A tight loop with no spacing lands many creates on the SAME millisecond; the random suffix
 // must keep every id unique (no PRIMARY KEY collision). Pre-fix (pure Date.now) this collides.
@@ -1954,4 +2012,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');

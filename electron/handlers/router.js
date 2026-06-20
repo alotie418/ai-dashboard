@@ -30,6 +30,7 @@ const taxPaymentsH = require('./taxPayments');
 const ledgerSummaryH = require('./ledgerSummary');
 const cashPositionH = require('./cashPosition');
 const balanceOverviewH = require('./balanceOverview');
+const depreciationPreviewH = require('./depreciationPreview');
 
 const routes = [
   // ---- Dashboard ----
@@ -116,6 +117,9 @@ const routes = [
 
   // ---- Balance Overview: 管理口径资产负债概览（PR-7B P1-3 只读聚合；非法定 B/S·显式 balanceDifference·只读·不走 reports formula）----
   ['GET', '/api/balance-overview', balanceOverviewH.overview],
+
+  // ---- Depreciation Preview: 固定资产直线法折旧只读预览（PR-7B P2-2；算净值/累计折旧·不写回·不走 reports formula）----
+  ['GET', '/api/depreciation-preview', depreciationPreviewH.preview],
 
   // ---- Business Documents（业务单据 Phase A；next-number/tax-invoice 排在 :id 前）----
   ['GET', '/api/documents/next-number', documentsH.nextNumber],
