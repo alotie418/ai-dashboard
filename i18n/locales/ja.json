@@ -81,7 +81,8 @@
       "dataBackup": "データバックアップ",
       "cashAccounts": "口座・期首残高",
       "liabilities": "負債・借入",
-      "fixedAssets": "固定資産"
+      "fixedAssets": "固定資産",
+      "equity": "資本・出資"
     },
     "company": {
       "title": "企業基本情報",
@@ -1291,5 +1292,34 @@
     "addButton": "固定資産を追加",
     "addTitle": "固定資産の新規作成",
     "editTitle": "固定資産の編集"
+  },
+  "equity": {
+    "title": "資本・出資登録台帳",
+    "subtitle": "資本・出資の事項（増資、出資引出、調整など）の手動台帳で、以後の管理分析に利用します。",
+    "notBalanceSheetNote": "ここでは資本・出資の事項（管理ベース）を記録するだけで、貸借対照表ではなく、残高照合も行いません。",
+    "notRollupNote": "ここでは登録のみで、純資産の合計・利益剰余金/繰越利益の振替・科目の対応付けは一切行いません。",
+    "name": "事項名",
+    "namePlaceholder": "例：創業者の増資",
+    "owner": "出資者・株主",
+    "ownerPlaceholder": "例：山田太郎",
+    "type": "種別",
+    "typeCapitalContribution": "出資・増資",
+    "typeOwnerDraw": "出資引出",
+    "typeAdjustment": "調整",
+    "typeOther": "その他",
+    "amount": "金額",
+    "amountHint": "金額は記録用で、符号の解釈・合計・振替は行いません。マイナスも入力できます。",
+    "currency": "通貨",
+    "currencyPlaceholder": "例：JPY / USD",
+    "eventDate": "発生日",
+    "note": "備考",
+    "notePlaceholder": "任意",
+    "status": "状態",
+    "active": "有効",
+    "inactive": "無効",
+    "empty": "資本・出資の記録がありません。下のボタンから追加してください。",
+    "addButton": "資本・出資を追加",
+    "addTitle": "資本・出資の新規作成",
+    "editTitle": "資本・出資の編集"
   }
 }

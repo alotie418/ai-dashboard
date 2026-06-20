@@ -81,7 +81,8 @@
       "dataBackup": "Data Backup",
       "cashAccounts": "Accounts",
       "liabilities": "Liabilities",
-      "fixedAssets": "Fixed Assets"
+      "fixedAssets": "Fixed Assets",
+      "equity": "Equity & Capital"
     },
     "company": {
       "title": "Company Information",
@@ -1291,5 +1292,34 @@
     "addButton": "Add fixed asset",
     "addTitle": "New fixed asset",
     "editTitle": "Edit fixed asset"
+  },
+  "equity": {
+    "title": "Equity & Capital Ledger",
+    "subtitle": "A manual ledger of equity/capital events (capital contributions, owner draws, adjustments, etc.) for later management analysis.",
+    "notBalanceSheetNote": "This only records equity/capital events (management basis). It is not a balance sheet and performs no balancing.",
+    "notRollupNote": "This is registration only — no equity totals, no retained-earnings / profit carry-forward, no chart-of-accounts mapping.",
+    "name": "Item name",
+    "namePlaceholder": "e.g. Founder capital injection",
+    "owner": "Owner / shareholder",
+    "ownerPlaceholder": "e.g. John Doe",
+    "type": "Type",
+    "typeCapitalContribution": "Capital contribution",
+    "typeOwnerDraw": "Owner draw",
+    "typeAdjustment": "Adjustment",
+    "typeOther": "Other",
+    "amount": "Amount",
+    "amountHint": "The amount is recorded only; the app does not interpret its sign, total it, or carry it forward. Negatives are allowed.",
+    "currency": "Currency",
+    "currencyPlaceholder": "e.g. USD / EUR",
+    "eventDate": "Event date",
+    "note": "Note",
+    "notePlaceholder": "Optional",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "empty": "No equity/capital entries yet. Click below to add one.",
+    "addButton": "Add equity/capital entry",
+    "addTitle": "New equity/capital entry",
+    "editTitle": "Edit equity/capital entry"
   }
 }

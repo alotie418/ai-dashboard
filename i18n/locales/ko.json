@@ -81,7 +81,8 @@
       "dataBackup": "데이터 백업",
       "cashAccounts": "계좌·기초잔액",
       "liabilities": "부채·차입",
-      "fixedAssets": "고정자산"
+      "fixedAssets": "고정자산",
+      "equity": "자본·출자"
     },
     "company": {
       "title": "기업 기본 정보",
@@ -1291,5 +1292,34 @@
     "addButton": "고정자산 추가",
     "addTitle": "새 고정자산",
     "editTitle": "고정자산 편집"
+  },
+  "equity": {
+    "title": "자본·출자 등록 대장",
+    "subtitle": "자본·출자 사항(증자, 출자 인출, 조정 등)의 수기 대장으로, 이후 관리 분석에 사용합니다.",
+    "notBalanceSheetNote": "여기서는 자본·출자 사항(관리 기준)만 기록하며, 재무상태표가 아니고 잔액 대사도 하지 않습니다.",
+    "notRollupNote": "여기서는 등록만 하며, 자본 합계·이익잉여금/당기순이익 대체·계정과목 매핑을 전혀 하지 않습니다.",
+    "name": "사항명",
+    "namePlaceholder": "예: 창업자 증자",
+    "owner": "출자자·주주",
+    "ownerPlaceholder": "예: 홍길동",
+    "type": "유형",
+    "typeCapitalContribution": "출자·증자",
+    "typeOwnerDraw": "출자 인출",
+    "typeAdjustment": "조정",
+    "typeOther": "기타",
+    "amount": "금액",
+    "amountHint": "금액은 기록용이며, 부호 해석·합계·대체를 하지 않습니다. 음수도 입력할 수 있습니다.",
+    "currency": "통화",
+    "currencyPlaceholder": "예: KRW / USD",
+    "eventDate": "발생일",
+    "note": "비고",
+    "notePlaceholder": "선택",
+    "status": "상태",
+    "active": "사용",
+    "inactive": "사용 안 함",
+    "empty": "자본·출자 기록이 없습니다. 아래 버튼으로 추가하세요.",
+    "addButton": "자본·출자 추가",
+    "addTitle": "새 자본·출자",
+    "editTitle": "자본·출자 편집"
   }
 }

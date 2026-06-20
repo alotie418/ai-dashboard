@@ -81,7 +81,8 @@
       "dataBackup": "Sauvegarde des données",
       "cashAccounts": "Comptes",
       "liabilities": "Passifs",
-      "fixedAssets": "Immobilisations"
+      "fixedAssets": "Immobilisations",
+      "equity": "Capitaux propres"
     },
     "company": {
       "title": "Informations entreprise",
@@ -1291,5 +1292,34 @@
     "addButton": "Ajouter une immobilisation",
     "addTitle": "Nouvelle immobilisation",
     "editTitle": "Modifier l'immobilisation"
+  },
+  "equity": {
+    "title": "Registre des capitaux propres",
+    "subtitle": "Un registre manuel des opérations de capitaux propres (apports, prélèvements de l'exploitant, ajustements, etc.) pour l'analyse de gestion.",
+    "notBalanceSheetNote": "Cette section enregistre uniquement les opérations de capitaux propres (base de gestion). Ce n'est pas un bilan et n'effectue aucun équilibrage.",
+    "notRollupNote": "Il s'agit d'un simple enregistrement — aucun total des capitaux propres, aucun report de résultat / report à nouveau, aucune correspondance de comptes.",
+    "name": "Intitulé de l'opération",
+    "namePlaceholder": "ex. : Apport du fondateur",
+    "owner": "Apporteur / associé",
+    "ownerPlaceholder": "ex. : Jean Dupont",
+    "type": "Type",
+    "typeCapitalContribution": "Apport en capital",
+    "typeOwnerDraw": "Prélèvement de l'exploitant",
+    "typeAdjustment": "Ajustement",
+    "typeOther": "Autre",
+    "amount": "Montant",
+    "amountHint": "Le montant est enregistré à titre indicatif uniquement ; l'application n'interprète pas son signe, ne le totalise pas et ne le reporte pas. Les valeurs négatives sont autorisées.",
+    "currency": "Devise",
+    "currencyPlaceholder": "ex. : EUR / USD",
+    "eventDate": "Date de l'opération",
+    "note": "Note",
+    "notePlaceholder": "Facultatif",
+    "status": "Statut",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "empty": "Aucune opération de capitaux propres pour l'instant. Cliquez ci-dessous pour en ajouter une.",
+    "addButton": "Ajouter une opération",
+    "addTitle": "Nouvelle opération",
+    "editTitle": "Modifier l'opération"
   }
 }

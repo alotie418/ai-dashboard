@@ -81,7 +81,8 @@
       "dataBackup": "数据备份",
       "cashAccounts": "账户与期初",
       "liabilities": "负债/借款",
-      "fixedAssets": "固定资产"
+      "fixedAssets": "固定资产",
+      "equity": "权益/资本"
     },
     "company": {
       "title": "企业基础信息",
@@ -1291,5 +1292,34 @@
     "addButton": "添加固定资产",
     "addTitle": "新增固定资产",
     "editTitle": "编辑固定资产"
+  },
+  "equity": {
+    "title": "权益/资本登记台账",
+    "subtitle": "登记权益/资本事项（增资、撤资、所有者支取、调整等）的手工台账，用于后续管理分析。",
+    "notBalanceSheetNote": "这里仅登记权益/资本事项（管理口径），不是资产负债表，也不做平衡核算。",
+    "notRollupNote": "此处仅作登记，不做权益合计、不做留存收益/未分配利润/本年利润结转、不做科目映射。",
+    "name": "事项名称",
+    "namePlaceholder": "如：创始人增资",
+    "owner": "出资人/股东",
+    "ownerPlaceholder": "如：张三",
+    "type": "类型",
+    "typeCapitalContribution": "出资/增资",
+    "typeOwnerDraw": "所有者支取",
+    "typeAdjustment": "调整",
+    "typeOther": "其他",
+    "amount": "金额",
+    "amountHint": "金额仅作登记，系统不解释正负方向、不汇总、不结转；可填负数。",
+    "currency": "币种",
+    "currencyPlaceholder": "如：CNY / USD",
+    "eventDate": "发生日期",
+    "note": "备注",
+    "notePlaceholder": "可选",
+    "status": "状态",
+    "active": "启用",
+    "inactive": "停用",
+    "empty": "暂无权益/资本记录，点击下方按钮添加。",
+    "addButton": "添加权益/资本事项",
+    "addTitle": "新增权益/资本事项",
+    "editTitle": "编辑权益/资本事项"
   }
 }
