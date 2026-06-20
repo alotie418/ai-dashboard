@@ -33,9 +33,31 @@ function walk(obj, path) {
 }
 walk(DEPRECIATION_DEFAULTS, 'DEPRECIATION_DEFAULTS');
 
+// ── 4. parity：后端副本 electron/handlers/_depreciationDefaults.js 必须与前端 .ts 完全一致 ──
+//   后端运行时无法 require 前端 .ts，故保留 JS 副本；此守卫钉死两副本不漂移（仿 check:providers parity）。
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+const require = createRequire(import.meta.url);
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const backend = require(join(ROOT, 'electron/handlers/_depreciationDefaults.js'));
+ok(JSON.stringify(backend.DEPRECIATION_DEFAULTS) === JSON.stringify(DEPRECIATION_DEFAULTS),
+  '[4] backend _depreciationDefaults.js DEPRECIATION_DEFAULTS must EQUAL frontend depreciationDefaults.ts');
+ok(typeof backend.resolveCategory === 'function', '[4] backend exports resolveCategory()');
+// canonical 关键词表覆盖 5 个非 fallback 类别
+for (const c of EXPECTED.filter((k) => k !== 'DEFAULT_FALLBACK')) {
+  ok(Array.isArray(backend.CANONICAL_CATEGORY_KEYWORDS?.[c]) && backend.CANONICAL_CATEGORY_KEYWORDS[c].length > 0,
+    `[4] CANONICAL_CATEGORY_KEYWORDS.${c} must be a non-empty keyword array`);
+}
+// resolveCategory 行为抽样：命中 + 无匹配→DEFAULT_FALLBACK + 空→DEFAULT_FALLBACK
+ok(backend.resolveCategory('办公电脑') === 'electronics', "[4] resolveCategory('办公电脑') → electronics");
+ok(backend.resolveCategory('公司货车') === 'vehicle', "[4] resolveCategory('公司货车') → vehicle");
+ok(backend.resolveCategory('zzz-unknown') === 'DEFAULT_FALLBACK', "[4] resolveCategory(unknown) → DEFAULT_FALLBACK");
+ok(backend.resolveCategory(null) === 'DEFAULT_FALLBACK', '[4] resolveCategory(null) → DEFAULT_FALLBACK');
+
 if (failures.length) {
   console.error(`✗ deprec-defaults: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log(`✓ deprec-defaults: ${EXPECTED.length} category defaults (usefulLifeYears + salvageRate, salvage 0.05) · NO depreciation compute / accumulated / net-value / function`);
+console.log(`✓ deprec-defaults: ${EXPECTED.length} category defaults (usefulLifeYears + salvageRate, salvage 0.05) · NO depreciation compute/function · backend↔frontend parity + resolveCategory matcher`);
