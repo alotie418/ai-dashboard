@@ -610,6 +610,68 @@ async function expectThrow(fn, label) {
   await expectThrow(() => call('DELETE', '/api/equity/nope', null), '[equity] delete missing throws');
 }
 
+// ───────────────────────── tax_payments (tax-payments ledger, PR-7D-5 pipeline) ─────────────────────────
+// 管道层 round-trip：证明已缴税款能录入·保存·读取·编辑·删除·停用，且边界守得住——仅登记，
+// 不算税额、不抵扣、不对冲、不与估算勾稽、不入报表。锁住：create 默认值（tax_type=vat·is_active=true）/
+// tax_type 白名单（6 中性值）/ amount 可负（退税）·NaN→0·缺省→0（系统不解释方向）/ period_start·
+// period_end·authority·reference_no 往返 / name·type 校验 / partial update 不清空 / 编辑 name·type·amount /
+// 停用(is_active=false)持久 / delete + delete-missing。
+{
+  freshDb();
+  const mkTax = async (body) => call('POST', '/api/tax-payments', body);
+
+  ok((await call('GET', '/api/tax-payments', null)).length === 0, '[tax] list starts empty');
+
+  // create defaults: tax_type→vat, is_active→true; amount/period/authority/ref kept
+  const t1 = await mkTax({ name: '2026Q1 增值税', amount: 12000, currency: 'CNY', payment_date: '2026-04-15', period_start: '2026-01-01', period_end: '2026-03-31', authority: '国家税务总局', reference_no: 'PAY-2026-001' });
+  ok(t1?.success && t1.id, `[tax] create → {success,id}, got ${JSON.stringify(t1)}`);
+  const r1 = (await call('GET', '/api/tax-payments', null)).find((x) => x.id === t1.id);
+  ok(r1 && r1.tax_type === 'vat' && r1.amount === 12000, '[tax] create defaults tax_type=vat, amount kept');
+  ok(r1.period_start === '2026-01-01' && r1.period_end === '2026-03-31' && r1.authority === '国家税务总局' && r1.reference_no === 'PAY-2026-001', '[tax] period/authority/reference persist');
+  ok(typeof r1.is_active === 'boolean' && r1.is_active === true, '[tax] is_active coerced to boolean, defaults true');
+
+  // type whitelist: invalid throws (handler guard before DB); the 6 neutral labels accepted
+  await expectThrow(() => call('POST', '/api/tax-payments', { name: 'Bad', tax_type: 'tariff' }), '[tax] invalid tax_type throws');
+  const t2 = await mkTax({ name: '退税', tax_type: 'vat', amount: -500 });
+  const r2 = (await call('GET', '/api/tax-payments', null)).find((x) => x.id === t2.id);
+  ok(r2.amount === -500, '[tax] negative amount preserved (退税/冲正; sign not interpreted)');
+  const t3 = await mkTax({ name: '所得税', tax_type: 'income_tax' });
+  ok((await call('GET', '/api/tax-payments', null)).find((x) => x.id === t3.id).tax_type === 'income_tax', '[tax] income_tax type accepted');
+
+  // amount: NaN → 0, missing → 0
+  const tNaN = await mkTax({ name: 'NaN', amount: 'oops' });
+  const tMiss = await mkTax({ name: 'Bare' });
+  const after = await call('GET', '/api/tax-payments', null);
+  ok(after.find((x) => x.id === tNaN.id).amount === 0, '[tax] NaN amount coerced to 0');
+  ok(after.find((x) => x.id === tMiss.id).amount === 0, '[tax] missing amount defaults to 0');
+
+  // name required (create + update); update validates type; missing id throws
+  await expectThrow(() => call('POST', '/api/tax-payments', { name: '   ' }), '[tax] blank name throws');
+  await expectThrow(() => call('PUT', `/api/tax-payments/${t1.id}`, { name: '' }), '[tax] update blank name throws');
+  await expectThrow(() => call('PUT', `/api/tax-payments/${t1.id}`, { tax_type: 'duty' }), '[tax] update invalid type throws');
+  await expectThrow(() => call('PUT', '/api/tax-payments/nope', { name: 'x' }), '[tax] update missing id throws');
+
+  // partial update: only provided field changes; untouched fields preserved (not cleared)
+  await call('PUT', `/api/tax-payments/${t1.id}`, { amount: 11000 });
+  const u1 = (await call('GET', '/api/tax-payments', null)).find((x) => x.id === t1.id);
+  ok(u1.amount === 11000 && u1.name === '2026Q1 增值税' && u1.authority === '国家税务总局' && u1.reference_no === 'PAY-2026-001',
+    '[tax] partial update changes only amount, leaves name/authority/reference intact');
+
+  // edit name + type + amount together
+  await call('PUT', `/api/tax-payments/${t1.id}`, { name: '2026Q1 增值税(调整)', tax_type: 'surcharge', amount: 800 });
+  const u2 = (await call('GET', '/api/tax-payments', null)).find((x) => x.id === t1.id);
+  ok(u2.name === '2026Q1 增值税(调整)' && u2.tax_type === 'surcharge' && u2.amount === 800, '[tax] edit applies name/type/amount');
+
+  // toggle active (停用) persists as boolean false
+  await call('PUT', `/api/tax-payments/${t2.id}`, { is_active: false });
+  ok((await call('GET', '/api/tax-payments', null)).find((x) => x.id === t2.id).is_active === false, '[tax] is_active=false (停用) persists');
+
+  // delete removes; delete missing throws
+  await call('DELETE', `/api/tax-payments/${t2.id}`, null);
+  ok(!(await call('GET', '/api/tax-payments', null)).some((x) => x.id === t2.id), '[tax] delete removes row');
+  await expectThrow(() => call('DELETE', '/api/tax-payments/nope', null), '[tax] delete missing throws');
+}
+
 // ───────────── products.create id hardening (prod-<ts>-<rand>) ─────────────
 // A tight loop with no spacing lands many creates on the SAME millisecond; the random suffix
 // must keep every id unique (no PRIMARY KEY collision). Pre-fix (pure Date.now) this collides.
@@ -1652,4 +1714,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');

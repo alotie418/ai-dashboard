@@ -82,7 +82,8 @@
       "cashAccounts": "账户与期初",
       "liabilities": "负债/借款",
       "fixedAssets": "固定资产",
-      "equity": "权益/资本"
+      "equity": "权益/资本",
+      "taxPayments": "已缴税款"
     },
     "company": {
       "title": "企业基础信息",
@@ -1321,5 +1322,39 @@
     "addButton": "添加权益/资本事项",
     "addTitle": "新增权益/资本事项",
     "editTitle": "编辑权益/资本事项"
+  },
+  "taxPayments": {
+    "title": "已缴税款登记台账",
+    "subtitle": "登记已缴纳税款（历史缴税流水）的手工台账，用于后续管理分析。",
+    "notBalanceSheetNote": "这里仅登记已缴税款（管理口径），不是资产负债表，也不做平衡核算。",
+    "notComputeNote": "此处仅作登记，不计算税额、不抵扣、不对冲，也不与系统的税额估算勾稽、不进报表。",
+    "name": "税款事项名称",
+    "namePlaceholder": "如：2026年第一季度增值税",
+    "taxType": "税种",
+    "typeVat": "增值税",
+    "typeIncomeTax": "所得税",
+    "typeSurcharge": "附加税费",
+    "typePayrollTax": "工资税",
+    "typeSalesTax": "销售税",
+    "typeOther": "其他",
+    "amount": "金额",
+    "amountHint": "金额仅作登记，通常为已缴金额（正数）；退税/冲正可记负数，系统不据此抵扣、不解释方向、不汇总。",
+    "currency": "币种",
+    "currencyPlaceholder": "如：CNY / USD",
+    "paymentDate": "缴税日期",
+    "periodStart": "所属期间开始",
+    "periodEnd": "所属期间结束",
+    "authority": "税务机关/收款方",
+    "authorityPlaceholder": "如：国家税务总局",
+    "referenceNo": "凭证号/参考号",
+    "note": "备注",
+    "notePlaceholder": "可选",
+    "status": "状态",
+    "active": "启用",
+    "inactive": "停用",
+    "empty": "暂无已缴税款记录，点击下方按钮添加。",
+    "addButton": "添加已缴税款",
+    "addTitle": "新增已缴税款",
+    "editTitle": "编辑已缴税款"
   }
 }

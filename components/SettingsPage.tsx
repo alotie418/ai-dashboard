@@ -12,6 +12,7 @@ import AccountsSection from './AccountsSection';
 import LiabilitiesSection from './LiabilitiesSection';
 import FixedAssetsSection from './FixedAssetsSection';
 import EquitySection from './EquitySection';
+import TaxPaymentsSection from './TaxPaymentsSection';
 import DataMigrationSection from './DataMigrationSection';
 import DataBackupSection from './DataBackupSection';
 
@@ -115,6 +116,7 @@ const SettingsPage: React.FC = () => {
           <SettingsNavLink active={activeSection === 'liabilities'} onClick={() => setActiveSection('liabilities')} icon="fa-hand-holding-dollar" label={t('settings.nav.liabilities')} />
           <SettingsNavLink active={activeSection === 'fixedAssets'} onClick={() => setActiveSection('fixedAssets')} icon="fa-warehouse" label={t('settings.nav.fixedAssets')} />
           <SettingsNavLink active={activeSection === 'equity'} onClick={() => setActiveSection('equity')} icon="fa-sack-dollar" label={t('settings.nav.equity')} />
+          <SettingsNavLink active={activeSection === 'taxPayments'} onClick={() => setActiveSection('taxPayments')} icon="fa-receipt" label={t('settings.nav.taxPayments')} />
           <SettingsNavLink active={activeSection === 'dataMigration'} onClick={() => setActiveSection('dataMigration')} icon="fa-database" label={t('settings.nav.dataMigration')} />
           <SettingsNavLink active={activeSection === 'dataBackup'} onClick={() => setActiveSection('dataBackup')} icon="fa-box-archive" label={t('settings.nav.dataBackup')} />
           <SettingsNavLink active={activeSection === 'notifications'} onClick={() => setActiveSection('notifications')} icon="fa-bell" label={t('settings.nav.notifications')} />
@@ -244,6 +246,7 @@ const SettingsPage: React.FC = () => {
             {!isLoading && !loadError && activeSection === 'liabilities' && <LiabilitiesSection />}
             {!isLoading && !loadError && activeSection === 'fixedAssets' && <FixedAssetsSection />}
             {!isLoading && !loadError && activeSection === 'equity' && <EquitySection />}
+            {!isLoading && !loadError && activeSection === 'taxPayments' && <TaxPaymentsSection />}
             {!isLoading && !loadError && activeSection === 'dataMigration' && <DataMigrationSection />}
             {!isLoading && !loadError && activeSection === 'dataBackup' && <DataBackupSection />}
 
