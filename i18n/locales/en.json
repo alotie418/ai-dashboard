@@ -82,7 +82,8 @@
       "cashAccounts": "Accounts",
       "liabilities": "Liabilities",
       "fixedAssets": "Fixed Assets",
-      "equity": "Equity & Capital"
+      "equity": "Equity & Capital",
+      "taxPayments": "Tax Payments"
     },
     "company": {
       "title": "Company Information",
@@ -1321,5 +1322,39 @@
     "addButton": "Add equity/capital entry",
     "addTitle": "New equity/capital entry",
     "editTitle": "Edit equity/capital entry"
+  },
+  "taxPayments": {
+    "title": "Tax Payments Ledger",
+    "subtitle": "A manual ledger of taxes already paid (historical payment records) for later management analysis.",
+    "notBalanceSheetNote": "This only records taxes paid (management basis). It is not a balance sheet and performs no balancing.",
+    "notComputeNote": "This is registration only — no tax calculation, no deduction, no offsetting, no reconciliation with the app's tax estimates, and nothing enters reports.",
+    "name": "Item name",
+    "namePlaceholder": "e.g. 2026 Q1 VAT",
+    "taxType": "Tax type",
+    "typeVat": "VAT",
+    "typeIncomeTax": "Income tax",
+    "typeSurcharge": "Surcharge",
+    "typePayrollTax": "Payroll tax",
+    "typeSalesTax": "Sales tax",
+    "typeOther": "Other",
+    "amount": "Amount",
+    "amountHint": "The amount is recorded only; it is usually the amount paid (positive). Refunds/corrections may be negative — the app does not deduct, interpret the sign, or total it.",
+    "currency": "Currency",
+    "currencyPlaceholder": "e.g. USD / EUR",
+    "paymentDate": "Payment date",
+    "periodStart": "Period start",
+    "periodEnd": "Period end",
+    "authority": "Tax authority / payee",
+    "authorityPlaceholder": "e.g. Tax authority",
+    "referenceNo": "Voucher / reference no.",
+    "note": "Note",
+    "notePlaceholder": "Optional",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "empty": "No tax payments yet. Click below to add one.",
+    "addButton": "Add tax payment",
+    "addTitle": "New tax payment",
+    "editTitle": "Edit tax payment"
   }
 }

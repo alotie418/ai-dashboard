@@ -82,7 +82,8 @@
       "cashAccounts": "Comptes",
       "liabilities": "Passifs",
       "fixedAssets": "Immobilisations",
-      "equity": "Capitaux propres"
+      "equity": "Capitaux propres",
+      "taxPayments": "Taxes payées"
     },
     "company": {
       "title": "Informations entreprise",
@@ -1321,5 +1322,39 @@
     "addButton": "Ajouter une opération",
     "addTitle": "Nouvelle opération",
     "editTitle": "Modifier l'opération"
+  },
+  "taxPayments": {
+    "title": "Registre des taxes payées",
+    "subtitle": "Un registre manuel des taxes déjà payées (historique des paiements) pour l'analyse de gestion.",
+    "notBalanceSheetNote": "Cette section enregistre uniquement les taxes payées (base de gestion). Ce n'est pas un bilan et n'effectue aucun équilibrage.",
+    "notComputeNote": "Il s'agit d'un simple enregistrement — aucun calcul de taxe, aucune déduction, aucune compensation, aucun rapprochement avec les estimations de taxe de l'application et rien n'entre dans les rapports.",
+    "name": "Intitulé",
+    "namePlaceholder": "ex. : TVA T1 2026",
+    "taxType": "Type de taxe",
+    "typeVat": "TVA",
+    "typeIncomeTax": "Impôt sur le revenu",
+    "typeSurcharge": "Surtaxe",
+    "typePayrollTax": "Charges salariales",
+    "typeSalesTax": "Taxe de vente",
+    "typeOther": "Autre",
+    "amount": "Montant",
+    "amountHint": "Le montant est enregistré à titre indicatif ; il s'agit généralement du montant payé (positif). Les remboursements/corrections peuvent être négatifs — l'application ne déduit pas, n'interprète pas le signe et ne totalise pas.",
+    "currency": "Devise",
+    "currencyPlaceholder": "ex. : EUR / USD",
+    "paymentDate": "Date de paiement",
+    "periodStart": "Début de période",
+    "periodEnd": "Fin de période",
+    "authority": "Administration fiscale / bénéficiaire",
+    "authorityPlaceholder": "ex. : Administration fiscale",
+    "referenceNo": "N° de pièce / référence",
+    "note": "Note",
+    "notePlaceholder": "Facultatif",
+    "status": "Statut",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "empty": "Aucune taxe payée pour l'instant. Cliquez ci-dessous pour en ajouter une.",
+    "addButton": "Ajouter une taxe payée",
+    "addTitle": "Nouvelle taxe payée",
+    "editTitle": "Modifier la taxe payée"
   }
 }

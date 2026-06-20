@@ -26,6 +26,7 @@ const cashAccountsH = require('./cashAccounts');
 const liabilitiesH = require('./liabilities');
 const fixedAssetsH = require('./fixedAssets');
 const equityH = require('./equity');
+const taxPaymentsH = require('./taxPayments');
 
 const routes = [
   // ---- Dashboard ----
@@ -97,6 +98,12 @@ const routes = [
   ['POST', '/api/equity', equityH.create],
   ['PUT', '/api/equity/:id', equityH.update],
   ['DELETE', '/api/equity/:id', equityH.remove],
+
+  // ---- Tax Payments: 已缴税款登记台账（PR-7D-5 管道层；仅登记不算税·不抵扣·不对冲·不入报表；路径不冲突）----
+  ['GET', '/api/tax-payments', taxPaymentsH.list],
+  ['POST', '/api/tax-payments', taxPaymentsH.create],
+  ['PUT', '/api/tax-payments/:id', taxPaymentsH.update],
+  ['DELETE', '/api/tax-payments/:id', taxPaymentsH.remove],
 
   // ---- Business Documents（业务单据 Phase A；next-number/tax-invoice 排在 :id 前）----
   ['GET', '/api/documents/next-number', documentsH.nextNumber],

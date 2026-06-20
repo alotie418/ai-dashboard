@@ -525,6 +525,60 @@ export function deleteEquity(id: string): Promise<{ success: boolean }> {
   return apiFetch(`/api/equity/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
+// ==================== Tax Payments（已缴税款登记台账，PR-7D-5 管道层）====================
+// 政策中性主数据：仅录入/读取/编辑/删除·停用。不算税额/税率、不抵扣 VAT、不对冲所得税/附加税、
+// 不确认税费费用、不进 cashflow、不联动 accounts/transactions、不接资产负债表、不碰 reports，
+// 且不与 estimatedPayable/estimatedTax/vatSummary 做任何勾稽。tax_type 仅中性分类无科目映射；
+// amount 用户手输（NaN→0，不 clamp，允许负——仅退税/冲正记录，系统不解释方向）。
+
+export type TaxType = 'vat' | 'income_tax' | 'surcharge' | 'payroll_tax' | 'sales_tax' | 'other';
+
+export interface TaxPayment {
+  id: string;
+  name: string;
+  tax_type: TaxType;
+  amount: number;
+  currency: string | null;
+  payment_date: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  authority: string | null;
+  reference_no: string | null;
+  note: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TaxPaymentUpsert {
+  name: string;
+  tax_type?: TaxType;
+  amount?: number;
+  currency?: string | null;
+  payment_date?: string | null;
+  period_start?: string | null;
+  period_end?: string | null;
+  authority?: string | null;
+  reference_no?: string | null;
+  note?: string | null;
+  is_active?: boolean;
+  sort_order?: number;
+}
+
+export function listTaxPayments(): Promise<TaxPayment[]> {
+  return apiFetch<TaxPayment[]>('/api/tax-payments');
+}
+export function createTaxPayment(payload: TaxPaymentUpsert): Promise<{ success: boolean; id: string }> {
+  return apiFetch('/api/tax-payments', { method: 'POST', body: JSON.stringify(payload) });
+}
+export function updateTaxPayment(id: string, payload: Partial<TaxPaymentUpsert>): Promise<{ success: boolean }> {
+  return apiFetch(`/api/tax-payments/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+export function deleteTaxPayment(id: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/tax-payments/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
 // ==================== Transactions（国际化数据模型 v5，C 阶段）====================
 
 export type TransactionType = 'income' | 'expense';

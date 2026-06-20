@@ -49,7 +49,7 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   runMigrations(d);
   ok(MIGRATIONS.length === SCHEMA_VERSION, `[1] SCHEMA_VERSION(${SCHEMA_VERSION}) must equal MIGRATIONS.length(${MIGRATIONS.length})`);
   ok(ver(d) === MIGRATIONS.length, `[1] fresh→head should reach v${MIGRATIONS.length}, got v${ver(d)}`);
-  for (const t of ['purchases', 'sales', 'settings', 'categories', 'transactions', 'products', 'business_documents', 'assistant_conversations', 'accounts', 'liabilities', 'fixed_assets', 'equity']) {
+  for (const t of ['purchases', 'sales', 'settings', 'categories', 'transactions', 'products', 'business_documents', 'assistant_conversations', 'accounts', 'liabilities', 'fixed_assets', 'equity', 'tax_payments']) {
     ok(tableExists(d, t), `[1] table '${t}' must exist at head`);
   }
   d.close();
@@ -119,6 +119,7 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   ok(tableExists(d, 'liabilities'), '[5] v15 liabilities table must be added');
   ok(tableExists(d, 'fixed_assets'), '[5] v16 fixed_assets table must be added');
   ok(tableExists(d, 'equity'), '[5] v17 equity table must be added');
+  ok(tableExists(d, 'tax_payments'), '[5] v18 tax_payments table must be added');
   d.close();
 }
 
@@ -219,9 +220,36 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   d.close();
 }
 
+// ---- 10. v18 tax_payments schema：列齐 + tax_type CHECK + amount 可负 + 无计算/抵扣列 ----
+{
+  const d = fresh();
+  runMigrations(d);
+  ok(tableExists(d, 'tax_payments'), '[10] v18 tax_payments table exists');
+  for (const c of ['id', 'name', 'tax_type', 'amount', 'currency', 'payment_date', 'period_start',
+                   'period_end', 'authority', 'reference_no', 'note', 'is_active', 'sort_order',
+                   'created_at', 'updated_at']) {
+    ok(colExists(d, 'tax_payments', c), `[10] tax_payments.${c} column must exist`);
+  }
+  // 故意不应存在计算/抵扣/对冲列（留 PR-7B / 后续税务政策 PR）
+  for (const c of ['rate', 'tax_rate', 'deductible', 'deductible_amount', 'payable', 'offset', 'credited']) {
+    ok(!colExists(d, 'tax_payments', c), `[10] tax_payments must NOT carry calc/deduction/offset column '${c}' (deferred to PR-7B / tax-policy PR)`);
+  }
+  // tax_type CHECK：六个中性值放行，其它在 DB 层拒绝
+  let badType = null;
+  try { d.prepare("INSERT INTO tax_payments (id, name, tax_type) VALUES ('t-bad', 'X', 'tariff')").run(); }
+  catch (e) { badType = e?.message || String(e); }
+  ok(badType, '[10] tax_payments.tax_type CHECK rejects values other than the 6 neutral labels');
+  d.prepare("INSERT INTO tax_payments (id, name, tax_type, amount) VALUES ('t-ok', 'Refund', 'vat', -888.8)").run();
+  const row = d.prepare("SELECT tax_type, amount, is_active FROM tax_payments WHERE id = 't-ok'").get();
+  ok(row.tax_type === 'vat', '[10] vat type accepted (中性标签，不触发税务计算)');
+  ok(row.amount === -888.8, '[10] amount accepts negative (退税/冲正；NaN→0 仅在 handler，DB 不强制方向)');
+  ok(row.is_active === 1, '[10] is_active defaults to 1');
+  d.close();
+}
+
 if (failures.length) {
   console.error(`✗ migrations: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema + v15 liabilities schema + v16 fixed_assets schema + v17 equity schema)`);
+console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema + v15 liabilities schema + v16 fixed_assets schema + v17 equity schema + v18 tax_payments schema)`);

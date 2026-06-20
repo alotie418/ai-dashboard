@@ -594,6 +594,43 @@ const MIGRATIONS = [
     `);
     console.log('[db] v17: equity table ready');
   },
+
+  // v18: tax-payments ledger (PR-7D-5, pipeline layer) — the final 7D pipeline slice.
+  //   Manual ledger of taxes ALREADY PAID (a historical payment record). POLICY-NEUTRAL:
+  //   every value is user-entered; the app computes NOTHING. It does NOT compute tax
+  //   liability or rates, does NOT deduct input VAT, does NOT offset income tax /
+  //   surcharge, does NOT recognise tax expense (no P&L), does NOT enter cashflow, does
+  //   NOT auto-link to accounts/transactions, does NOT build a balance sheet or roll up
+  //   payable/paid tax, and — critically — does NOT reconcile against the report engine's
+  //   tax ESTIMATES (vatSummary.estimatedPayable / estimatedTax). That offset is PR-7B /
+  //   a later tax-policy PR under accountant confirmation. tax_type is a NEUTRAL label
+  //   only — it maps to NO chart-of-accounts code and triggers NO tax calculation.
+  //   amount: NaN→0, never clamped; negatives allowed (refunds / corrections only) and
+  //   the sign is NOT interpreted. NO rate/tax_rate/deductible/payable/offset columns.
+  //   Idempotent via CREATE TABLE IF NOT EXISTS.
+  (d) => {
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS tax_payments (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        tax_type TEXT NOT NULL DEFAULT 'vat'
+          CHECK (tax_type IN ('vat','income_tax','surcharge','payroll_tax','sales_tax','other')),
+        amount REAL DEFAULT 0,
+        currency TEXT,
+        payment_date TEXT,
+        period_start TEXT,
+        period_end TEXT,
+        authority TEXT,
+        reference_no TEXT,
+        note TEXT,
+        is_active INTEGER DEFAULT 1,
+        sort_order INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT
+      )
+    `);
+    console.log('[db] v18: tax_payments table ready');
+  },
 ];
 
 function runMigrations(d) {

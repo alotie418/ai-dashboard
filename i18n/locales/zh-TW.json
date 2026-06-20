@@ -82,7 +82,8 @@
       "cashAccounts": "帳戶與期初",
       "liabilities": "負債/借款",
       "fixedAssets": "固定資產",
-      "equity": "權益/資本"
+      "equity": "權益/資本",
+      "taxPayments": "已繳稅款"
     },
     "company": {
       "title": "企業基礎資料",
@@ -1321,5 +1322,39 @@
     "addButton": "新增權益/資本事項",
     "addTitle": "新增權益/資本事項",
     "editTitle": "編輯權益/資本事項"
+  },
+  "taxPayments": {
+    "title": "已繳稅款登記台帳",
+    "subtitle": "登記已繳納稅款（歷史繳稅流水）的手工台帳，供後續管理分析使用。",
+    "notBalanceSheetNote": "此處僅登記已繳稅款（管理口徑），並非資產負債表，也不做平衡核算。",
+    "notComputeNote": "此處僅作登記，不計算稅額、不抵扣、不對沖，也不與系統的稅額估算勾稽、不進報表。",
+    "name": "稅款事項名稱",
+    "namePlaceholder": "如：2026年第一季營業稅",
+    "taxType": "稅種",
+    "typeVat": "增值稅",
+    "typeIncomeTax": "所得稅",
+    "typeSurcharge": "附加稅費",
+    "typePayrollTax": "薪資稅",
+    "typeSalesTax": "銷售稅",
+    "typeOther": "其他",
+    "amount": "金額",
+    "amountHint": "金額僅作登記，通常為已繳金額（正數）；退稅/沖正可記負數，系統不據此抵扣、不解釋方向、不彙總。",
+    "currency": "幣別",
+    "currencyPlaceholder": "如：TWD / USD",
+    "paymentDate": "繳稅日期",
+    "periodStart": "所屬期間開始",
+    "periodEnd": "所屬期間結束",
+    "authority": "稅務機關/收款方",
+    "authorityPlaceholder": "如：財政部國稅局",
+    "referenceNo": "憑證號/參考號",
+    "note": "備註",
+    "notePlaceholder": "選填",
+    "status": "狀態",
+    "active": "啟用",
+    "inactive": "停用",
+    "empty": "尚無已繳稅款記錄，點擊下方按鈕新增。",
+    "addButton": "新增已繳稅款",
+    "addTitle": "新增已繳稅款",
+    "editTitle": "編輯已繳稅款"
   }
 }
