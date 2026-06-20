@@ -464,6 +464,48 @@ test.describe('finance → export PDF', () => {
     await expect(page.getByText(loc.finance.cashflowNotConfigured)).toHaveCount(4);
   });
 
+  // PR-6 §J (step 3 · error-path UI): a configured provider's test-connection FAILURE renders the
+  // localized error (auth = J2/J5) + the redacted provider response, and never leaks the API key (J9).
+  // providers:test is mocked via appChannels (a generic non-api channel); a single provider card is
+  // mocked so the edit/test buttons are unambiguous.
+  test('PR-6 §J: provider test failure shows localized auth error, redacted, no key leak', async ({ page }) => {
+    const ui = 'zh-CN';
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await bootComboIPC(page, ui, 'CN', {
+      hasProvider: true,
+      providers: [{ provider: 'deepseek', name: 'DeepSeek', hasKey: true, model: 'deepseek-chat', modelLabel: 'DeepSeek Chat', modelIsKnown: true, availableModels: [], defaultModel: 'deepseek-chat', enabled: true, isDefault: true, supportsOCR: false, supportsWebGrounding: false }],
+      appChannels: { 'providers:test': { ok: false, code: 'auth', status: 401, providerMessage: 'Invalid API key (Authorization: Bearer [REDACTED])' } },
+    });
+    await page.locator('i.fa-cog').first().click();        // → settings
+    await page.locator('i.fa-microchip').first().click();   // → AI providers section
+    await page.getByRole('button', { name: loc.settings.ai.editKey }).click();
+    await page.getByRole('button', { name: loc.settings.ai.testConnection }).click();
+    // localized auth message (not a raw code / English)
+    await expect(page.getByText(loc.aiError.auth)).toBeVisible({ timeout: 10_000 });
+    // provider response surfaced (redacted) + no raw key anywhere on the page (J9)
+    await expect(page.getByText(loc.settings.ai.providerErrorDetail, { exact: false })).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('sk-');
+  });
+
+  // PR-6 §J (step 3 · J1): an unconfigured provider with an empty key must not allow a test request
+  // — the Test-connection button is disabled and no providers:test invoke is recorded.
+  test('PR-6 §J: unconfigured provider — empty key disables test, sends no request (J1)', async ({ page }) => {
+    const ui = 'zh-CN';
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    await bootComboIPC(page, ui, 'CN', {
+      hasProvider: true,
+      providers: [{ provider: 'deepseek', name: 'DeepSeek', hasKey: false, model: 'deepseek-chat', modelLabel: 'DeepSeek Chat', modelIsKnown: true, availableModels: [], defaultModel: 'deepseek-chat', enabled: false, isDefault: false, supportsOCR: false, supportsWebGrounding: false }],
+      appChannels: { 'providers:test': { ok: true } },
+      recordCalls: true,
+    });
+    await page.locator('i.fa-cog').first().click();
+    await page.locator('i.fa-microchip').first().click();
+    await page.getByRole('button', { name: loc.settings.ai.addKey }).click();
+    await expect(page.getByRole('button', { name: loc.settings.ai.testConnection })).toBeDisabled();
+    const calls = await page.evaluate(() => (window as any).__calls || []);
+    expect(calls.some((c: any) => c.channel === 'providers:test')).toBe(false);
+  });
+
   test('export-pdf → mock electronAPI success shows saved path', async ({ page }) => {
     const ui = 'zh-CN';
     await page.addInitScript(() => {
