@@ -1838,6 +1838,80 @@ test('analysis month labels follow UI language (en → Jan, not 1月)', async ({
   expect(mainText, 'no raw Chinese backend month label may leak in the analysis page under en UI').not.toContain('1月');
 });
 
+// ── PR-6 §K/§L page-breadth matrix ──────────────────────────────────────────────
+// The main 36-combo test scans only the dashboard. This extends the breadth across the
+// other key pages (transactions / finance / invoice-query) PLUS dashboard-KPI, sweeping
+// each page's body in all 6×6 = 36 combos for: raw i18n keys, zh-CN/zh-TW variant leakage,
+// and accounting-regime out-of-scope terms (FORBIDDEN_BY_LOCALE — e.g. US must not show VAT).
+// Reuses the module-level blacklists + bootComboIPC + REPORT_MOCK; pure display scan, no Key,
+// no business/i18n/report changes. Pages are entered by language-independent sidebar icons.
+//
+// Per-namespace raw-key sweep: a leaked i18n key looks like `finance.cashflowTitle` — a known
+// namespace prefix + dot + an identifier. Numbers/dates (e.g. "1.5") never match (requires a
+// leading letter after the dot AND a namespace prefix).
+const RAW_KEY_RE = /\b(finance|transactions|invoices|dashboard|nav|common)\.[a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z0-9_]+)*/;
+const BREADTH_PAGES = [
+  { name: 'dashboard', icon: 'i.fa-th-large' },
+  { name: 'transactions', icon: 'i.fa-exchange-alt' },
+  { name: 'finance', icon: 'i.fa-wallet' },
+  { name: 'invoice-query', icon: 'i.fa-search-dollar' },
+];
+
+test.describe('§K/§L page-breadth matrix', () => {
+  for (const acc of ACCOUNTING_LOCALES) {
+    for (const ui of UI_LANGUAGES) {
+      test(`breadth ui=${ui} acc=${acc}`, async ({ page }) => {
+        // Page payloads that must be a specific shape (the default mock returns [] for "list" paths
+        // and {} otherwise, which would crash these pages):
+        //  • finance P&L needs a valid /api/reports/generate (empty {} crashes the page)
+        //  • transactions reads summary.income.total → /api/transactions/summary must be an object
+        //    (the generic list rule would return [], and [].income.total throws → blanks the app)
+        await bootComboIPC(page, ui, acc, {
+          apiResponses: [
+            { match: '/api/transactions/summary', json: { income: { total: 1000, count: 2 }, expense: { total: 500, count: 1 }, net: 500 } },
+            { match: '/api/reports/generate', json: REPORT_MOCK(acc) },
+          ],
+        });
+        await page.waitForTimeout(300);
+        fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+        const local: Failure[] = [];
+
+        for (const pg of BREADTH_PAGES) {
+          await page.locator(pg.icon).first().click();
+          await page.waitForTimeout(300);
+          const text = await page.locator('body').innerText();
+          const shot = path.join(SCREENSHOT_DIR, `breadth-${ui}__${acc}__${pg.name}.png`);
+          const flag = (word: string, rule: string) =>
+            local.push({ ui, acc, page: pg.name, word, rule, snippet: snippetAround(text, word), screenshot: shot });
+
+          // (a) accounting-regime out-of-scope terms (L4 / US-no-VAT)
+          for (const w of FORBIDDEN_BY_LOCALE[acc]) if (text.includes(w)) flag(w, `${acc} regime must not show "${w}"`);
+          // (b) zh-CN must be Simplified / zh-TW must be Traditional
+          if (ui === 'zh-CN') {
+            for (const w of ZH_CN_FORBIDDEN_WORDS) if (text.includes(w)) flag(w, 'zh-CN UI must be Simplified (traditional word)');
+            for (const c of TRAD_ONLY) if (text.includes(c)) { flag(c, 'zh-CN UI must be Simplified (traditional char)'); break; }
+          }
+          if (ui === 'zh-TW') {
+            for (const w of ZH_TW_FORBIDDEN_WORDS) if (text.includes(w)) flag(w, 'zh-TW UI must be Traditional (simplified word)');
+            for (const c of SIMP_ONLY) if (text.includes(c)) { flag(c, 'zh-TW UI must be Traditional (simplified char)'); break; }
+          }
+          // (c) raw i18n key leak (namespace-scoped to avoid number/date false positives)
+          const m = text.match(RAW_KEY_RE);
+          if (m) flag(m[0], `raw i18n key leaked on ${pg.name}`);
+
+          if (local.some((f) => f.page === pg.name)) await page.screenshot({ path: shot, fullPage: true });
+        }
+
+        for (const f of local) {
+          failures.push(f);
+          console.error(`FAIL\n  uiLanguage: ${f.ui}\n  accountingLocale: ${f.acc}\n  page: ${f.page}\n  actual: "${f.snippet}"\n  forbidden: ${f.word}\n  expected: ${f.rule}\n  screenshot: ${f.screenshot}`);
+        }
+        expect(local, local.map((f) => `[ui=${ui} acc=${acc} page=${f.page}] "${f.word}" — ${f.rule}`).join('\n')).toEqual([]);
+      });
+    }
+  }
+});
+
 test.afterAll(async () => {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const summary = {
