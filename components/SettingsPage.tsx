@@ -9,6 +9,7 @@ import AccountingSection from './AccountingSection';
 import CategoriesSection from './CategoriesSection';
 import ProductsSection from './ProductsSection';
 import AccountsSection from './AccountsSection';
+import LiabilitiesSection from './LiabilitiesSection';
 import DataMigrationSection from './DataMigrationSection';
 import DataBackupSection from './DataBackupSection';
 
@@ -109,6 +110,7 @@ const SettingsPage: React.FC = () => {
           <SettingsNavLink active={activeSection === 'categories'} onClick={() => setActiveSection('categories')} icon="fa-tags" label={t('settings.nav.categories')} />
           <SettingsNavLink active={activeSection === 'products'} onClick={() => setActiveSection('products')} icon="fa-box" label={t('settings.nav.products')} />
           <SettingsNavLink active={activeSection === 'cashAccounts'} onClick={() => setActiveSection('cashAccounts')} icon="fa-wallet" label={t('settings.nav.cashAccounts')} />
+          <SettingsNavLink active={activeSection === 'liabilities'} onClick={() => setActiveSection('liabilities')} icon="fa-hand-holding-dollar" label={t('settings.nav.liabilities')} />
           <SettingsNavLink active={activeSection === 'dataMigration'} onClick={() => setActiveSection('dataMigration')} icon="fa-database" label={t('settings.nav.dataMigration')} />
           <SettingsNavLink active={activeSection === 'dataBackup'} onClick={() => setActiveSection('dataBackup')} icon="fa-box-archive" label={t('settings.nav.dataBackup')} />
           <SettingsNavLink active={activeSection === 'notifications'} onClick={() => setActiveSection('notifications')} icon="fa-bell" label={t('settings.nav.notifications')} />
@@ -235,6 +237,7 @@ const SettingsPage: React.FC = () => {
             {!isLoading && !loadError && activeSection === 'categories' && <CategoriesSection />}
             {!isLoading && !loadError && activeSection === 'products' && <ProductsSection />}
             {!isLoading && !loadError && activeSection === 'cashAccounts' && <AccountsSection />}
+            {!isLoading && !loadError && activeSection === 'liabilities' && <LiabilitiesSection />}
             {!isLoading && !loadError && activeSection === 'dataMigration' && <DataMigrationSection />}
             {!isLoading && !loadError && activeSection === 'dataBackup' && <DataBackupSection />}
 

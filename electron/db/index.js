@@ -493,6 +493,41 @@ const MIGRATIONS = [
     `);
     console.log('[db] v14: accounts table ready');
   },
+
+  // v15: liabilities / loans ledger (PR-7D-2, pipeline layer).
+  //   Manual ledger for borrowings & other liabilities (bank loans, shareholder
+  //   loans, equipment finance, other payables). This is NOT trade payables — those
+  //   stay derived from `purchases` via payables.js (/api/payables). POLICY-NEUTRAL:
+  //   every number is user-entered and user-maintained; the app computes NOTHING.
+  //   It does NOT roll up into a balance sheet, does NOT classify current/non-current,
+  //   does NOT build a repayment schedule, does NOT compute interest, and does NOT
+  //   touch P&L / cashflow / reports. interest_rate is recorded for reference only
+  //   (default NULL — no hardcoded rate). opening_balance is the outstanding amount on
+  //   opening_date; it may be negative (NaN→0, never clamped). liability_type is a
+  //   minimal cash/other-free enum (loan/other) — no chart-of-accounts codes, no
+  //   current/non-current presentation (that is PR-7B). Idempotent via IF NOT EXISTS.
+  (d) => {
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS liabilities (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        lender TEXT,
+        liability_type TEXT NOT NULL DEFAULT 'loan' CHECK (liability_type IN ('loan','other')),
+        currency TEXT,
+        principal REAL,
+        opening_balance REAL DEFAULT 0,
+        opening_date TEXT,
+        interest_rate REAL,
+        maturity_date TEXT,
+        note TEXT,
+        is_active INTEGER DEFAULT 1,
+        sort_order INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT
+      )
+    `);
+    console.log('[db] v15: liabilities table ready');
+  },
 ];
 
 function runMigrations(d) {

@@ -79,7 +79,8 @@
       "dataMigration": "Data Migration",
       "products": "Products",
       "dataBackup": "Data Backup",
-      "cashAccounts": "Accounts"
+      "cashAccounts": "Accounts",
+      "liabilities": "Liabilities"
     },
     "company": {
       "title": "Company Information",
@@ -1227,5 +1228,36 @@
     "addButton": "Add account",
     "addTitle": "New account",
     "editTitle": "Edit account"
+  },
+  "liabilities": {
+    "title": "Liabilities & Loans",
+    "subtitle": "A manual ledger of borrowings and other liabilities (bank loans, shareholder loans, equipment finance, etc.) for later management analysis.",
+    "notBalanceSheetNote": "This only records liabilities/loans (management basis). It is not a balance sheet and performs no balancing or repayment scheduling.",
+    "notTradePayableNote": "Do not record trade payables here — purchase payables are summarized automatically from your purchases.",
+    "name": "Name",
+    "namePlaceholder": "e.g. Bank operating loan",
+    "lender": "Lender / creditor",
+    "lenderPlaceholder": "e.g. ICBC",
+    "type": "Type",
+    "typeLoan": "Loan",
+    "typeOther": "Other liability",
+    "currency": "Currency",
+    "currencyPlaceholder": "e.g. USD / EUR",
+    "principal": "Principal",
+    "openingBalance": "Opening outstanding balance",
+    "openingDate": "Start date",
+    "interestRate": "Annual rate (%)",
+    "interestRateHint": "The annual rate is recorded for reference only; it does not feed any interest or repayment calculation.",
+    "maturityDate": "Maturity date",
+    "note": "Note",
+    "notePlaceholder": "Optional",
+    "openingHint": "The opening outstanding balance is the amount owed on the start date; it is recorded only and not reconciled with transactions. It is usually positive, but negatives are allowed (not enforced).",
+    "status": "Status",
+    "active": "Active",
+    "closed": "Closed",
+    "empty": "No liabilities/loans yet. Click below to add one.",
+    "addButton": "Add liability/loan",
+    "addTitle": "New liability/loan",
+    "editTitle": "Edit liability/loan"
   }
 }

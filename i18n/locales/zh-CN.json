@@ -79,7 +79,8 @@
       "dataMigration": "数据迁移",
       "products": "商品 / 服务",
       "dataBackup": "数据备份",
-      "cashAccounts": "账户与期初"
+      "cashAccounts": "账户与期初",
+      "liabilities": "负债/借款"
     },
     "company": {
       "title": "企业基础信息",
@@ -1227,5 +1228,36 @@
     "addButton": "添加账户",
     "addTitle": "新增账户",
     "editTitle": "编辑账户"
+  },
+  "liabilities": {
+    "title": "负债 / 借款台账",
+    "subtitle": "登记借款及其他负债（银行贷款、股东借款、设备分期等）的手工台账，用于后续管理分析。",
+    "notBalanceSheetNote": "这里仅登记负债/借款（管理口径），不是资产负债表，也不做平衡核算或还款计划。",
+    "notTradePayableNote": "此处不录采购应付账款——采购应付由「采购」数据自动汇总。",
+    "name": "名称",
+    "namePlaceholder": "如：工行经营贷",
+    "lender": "债权人 / 出借方",
+    "lenderPlaceholder": "如：工商银行",
+    "type": "类型",
+    "typeLoan": "借款",
+    "typeOther": "其他负债",
+    "currency": "币种",
+    "currencyPlaceholder": "如：CNY / USD",
+    "principal": "合同本金",
+    "openingBalance": "期初未偿余额",
+    "openingDate": "起始日期",
+    "interestRate": "年利率(%)",
+    "interestRateHint": "年利率仅作备查记录，不参与任何利息或还款计算。",
+    "maturityDate": "到期日",
+    "note": "备注",
+    "notePlaceholder": "可选",
+    "openingHint": "期初未偿余额为起始日的欠款余额，仅作记录，不与流水自动勾稽；通常应为正数，但不强制（允许负数）。",
+    "status": "状态",
+    "active": "在贷",
+    "closed": "已结清",
+    "empty": "暂无负债/借款记录，点击下方按钮添加。",
+    "addButton": "添加负债/借款",
+    "addTitle": "新增负债/借款",
+    "editTitle": "编辑负债/借款"
   }
 }

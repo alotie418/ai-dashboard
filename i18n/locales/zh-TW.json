@@ -79,7 +79,8 @@
       "dataMigration": "資料遷移",
       "products": "商品 / 服務",
       "dataBackup": "資料備份",
-      "cashAccounts": "帳戶與期初"
+      "cashAccounts": "帳戶與期初",
+      "liabilities": "負債/借款"
     },
     "company": {
       "title": "企業基礎資料",
@@ -1227,5 +1228,36 @@
     "addButton": "新增帳戶",
     "addTitle": "新增帳戶",
     "editTitle": "編輯帳戶"
+  },
+  "liabilities": {
+    "title": "負債 / 借款台帳",
+    "subtitle": "登記借款及其他負債（銀行貸款、股東借款、設備分期等）的手工台帳，供後續管理分析使用。",
+    "notBalanceSheetNote": "此處僅登記負債/借款（管理口徑），並非資產負債表，也不做平衡核算或還款計畫。",
+    "notTradePayableNote": "此處不錄採購應付帳款——採購應付由「採購」資料自動彙總。",
+    "name": "名稱",
+    "namePlaceholder": "如：工行經營貸",
+    "lender": "債權人 / 出借方",
+    "lenderPlaceholder": "如：工商銀行",
+    "type": "類型",
+    "typeLoan": "借款",
+    "typeOther": "其他負債",
+    "currency": "幣別",
+    "currencyPlaceholder": "如：TWD / USD",
+    "principal": "合約本金",
+    "openingBalance": "期初未償餘額",
+    "openingDate": "起始日期",
+    "interestRate": "年利率(%)",
+    "interestRateHint": "年利率僅作備查記錄，不參與任何利息或還款計算。",
+    "maturityDate": "到期日",
+    "note": "備註",
+    "notePlaceholder": "選填",
+    "openingHint": "期初未償餘額為起始日的欠款餘額，僅作記錄，不與流水自動勾稽；通常應為正數，但不強制（允許負數）。",
+    "status": "狀態",
+    "active": "在貸",
+    "closed": "已結清",
+    "empty": "尚無負債/借款記錄，點擊下方按鈕新增。",
+    "addButton": "新增負債/借款",
+    "addTitle": "新增負債/借款",
+    "editTitle": "編輯負債/借款"
   }
 }

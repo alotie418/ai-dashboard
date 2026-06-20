@@ -79,7 +79,8 @@
       "dataMigration": "Migration de données",
       "products": "Produits",
       "dataBackup": "Sauvegarde des données",
-      "cashAccounts": "Comptes"
+      "cashAccounts": "Comptes",
+      "liabilities": "Passifs"
     },
     "company": {
       "title": "Informations entreprise",
@@ -1227,5 +1228,36 @@
     "addButton": "Ajouter un compte",
     "addTitle": "Nouveau compte",
     "editTitle": "Modifier le compte"
+  },
+  "liabilities": {
+    "title": "Passifs et emprunts",
+    "subtitle": "Un registre manuel des emprunts et autres passifs (prêts bancaires, prêts d'associés, financement d'équipement, etc.) pour l'analyse de gestion.",
+    "notBalanceSheetNote": "Cette section enregistre uniquement les passifs/emprunts (base de gestion). Ce n'est pas un bilan et n'effectue ni équilibrage ni échéancier de remboursement.",
+    "notTradePayableNote": "N'enregistrez pas ici les dettes fournisseurs — elles sont récapitulées automatiquement à partir de vos achats.",
+    "name": "Nom",
+    "namePlaceholder": "ex. : Prêt bancaire d'exploitation",
+    "lender": "Prêteur / créancier",
+    "lenderPlaceholder": "ex. : Banque",
+    "type": "Type",
+    "typeLoan": "Emprunt",
+    "typeOther": "Autre passif",
+    "currency": "Devise",
+    "currencyPlaceholder": "ex. : EUR / USD",
+    "principal": "Principal",
+    "openingBalance": "Solde restant dû à l'ouverture",
+    "openingDate": "Date de début",
+    "interestRate": "Taux annuel (%)",
+    "interestRateHint": "Le taux annuel est enregistré à titre indicatif uniquement ; il n'alimente aucun calcul d'intérêts ni de remboursement.",
+    "maturityDate": "Date d'échéance",
+    "note": "Note",
+    "notePlaceholder": "Facultatif",
+    "openingHint": "Le solde restant dû à l'ouverture correspond au montant dû à la date de début ; il est seulement enregistré et n'est pas rapproché des opérations. Il est généralement positif, mais les valeurs négatives sont autorisées (non imposées).",
+    "status": "Statut",
+    "active": "En cours",
+    "closed": "Soldé",
+    "empty": "Aucun passif/emprunt pour l'instant. Cliquez ci-dessous pour en ajouter un.",
+    "addButton": "Ajouter un passif/emprunt",
+    "addTitle": "Nouveau passif/emprunt",
+    "editTitle": "Modifier le passif/emprunt"
   }
 }

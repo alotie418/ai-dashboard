@@ -79,7 +79,8 @@
       "dataMigration": "데이터 마이그레이션",
       "products": "상품 / 서비스",
       "dataBackup": "데이터 백업",
-      "cashAccounts": "계좌·기초잔액"
+      "cashAccounts": "계좌·기초잔액",
+      "liabilities": "부채·차입"
     },
     "company": {
       "title": "기업 기본 정보",
@@ -1227,5 +1228,36 @@
     "addButton": "계좌 추가",
     "addTitle": "새 계좌",
     "editTitle": "계좌 편집"
+  },
+  "liabilities": {
+    "title": "부채·차입 대장",
+    "subtitle": "차입 및 기타 부채(은행 대출, 주주 차입, 설비 할부 등)의 수기 대장으로, 이후 관리 분석에 사용합니다.",
+    "notBalanceSheetNote": "여기서는 부채·차입(관리 기준)만 기록하며, 재무상태표가 아니고 잔액 대사나 상환 계획도 하지 않습니다.",
+    "notTradePayableNote": "매입 외상매입금은 여기에 기록하지 않습니다——매입 외상매입금은 매입 데이터에서 자동 집계됩니다.",
+    "name": "명칭",
+    "namePlaceholder": "예: 은행 운전자금 대출",
+    "lender": "채권자·대여자",
+    "lenderPlaceholder": "예: ○○은행",
+    "type": "유형",
+    "typeLoan": "차입",
+    "typeOther": "기타 부채",
+    "currency": "통화",
+    "currencyPlaceholder": "예: KRW / USD",
+    "principal": "원금",
+    "openingBalance": "기초 미상환 잔액",
+    "openingDate": "개시일",
+    "interestRate": "연이율(%)",
+    "interestRateHint": "연이율은 참고 기록용이며, 이자나 상환 계산에 전혀 사용되지 않습니다.",
+    "maturityDate": "만기일",
+    "note": "비고",
+    "notePlaceholder": "선택",
+    "openingHint": "기초 미상환 잔액은 개시일의 채무 잔액으로, 기록용일 뿐 거래와 자동 대사되지 않습니다. 보통 양수이지만 음수도 허용됩니다(강제하지 않음).",
+    "status": "상태",
+    "active": "차입 중",
+    "closed": "상환 완료",
+    "empty": "부채·차입 기록이 없습니다. 아래 버튼으로 추가하세요.",
+    "addButton": "부채·차입 추가",
+    "addTitle": "새 부채·차입",
+    "editTitle": "부채·차입 편집"
   }
 }
