@@ -867,7 +867,15 @@
     "balanceCurrentLiabilities": "流动负债",
     "balancePaidInCapital": "实收资本",
     "balanceRetainedEarnings": "未分配利润",
-    "balanceLiabilitiesEquity": "负债与权益"
+    "balanceLiabilitiesEquity": "负债与权益",
+    "balanceOverviewTitle": "管理口径资产负债概览",
+    "balanceOverviewDisclaimer": "本概览为管理口径，未做法定严格平衡；下方「平衡差额／待调整」为待调整项，非真实差错可忽略。",
+    "balanceEstimateBadge": "估算 · 仅供经营管理参考",
+    "balanceBorrowings": "借款",
+    "balanceNonCurrentLiabilities": "非流动负债",
+    "balanceDifference": "平衡差额／待调整",
+    "balanceBorrowingsNullMaturity": "含未填到期日的借款，暂按流动列示",
+    "balanceCurrencyUnspecified": "未指定币种"
   },
   "usSchedule": {
     "line1": "Line 1 — 总收入或销售额",

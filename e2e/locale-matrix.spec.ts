@@ -344,6 +344,32 @@ const REPORT_MOCK = (acc: string) => ({
 // Phase 3 PR-3.7: the legacy Web-boot bootFinance() helper was removed; the finance
 // tests boot through bootComboIPC with REPORT_MOCK supplied via apiResponses.
 
+// PR-7B P1-4: the balance tab now fetches GET /api/balance-overview (management-basis
+// overview, NOT a statutory balance sheet). FinancePage.loadReport always calls it, so
+// every finance boot supplies a valid shape; an unmatched {} would just fall back to the
+// coming-soon empty state, but we provide real data so the overview + difference row render.
+const BALANCE_OVERVIEW_MOCK = (acc: string) => ({
+  estimate: true,
+  reportType: 'management_balance_overview',
+  period: { from: '2026-01-01', to: '2026-12-31' },
+  asOf: '2026-12-31',
+  baseCurrency: 'CNY',
+  byCurrency: [
+    {
+      currency: 'CNY',
+      assets: { current: [{ key: 'cash', amount: 1200 }, { key: 'receivables', amount: 800 }, { key: 'inventory', amount: 0 }], nonCurrent: [{ key: 'fixedAssets', amount: 8000 }] },
+      liabilities: { current: [{ key: 'payables', amount: 300 }, { key: 'borrowings', amount: 3500 }], nonCurrent: [{ key: 'borrowings', amount: 5000 }] },
+      equity: [{ key: 'equity', amount: 30000 }],
+      totals: { assets: 10000, liabilities: 8800, equity: 30000 },
+      balanceDifference: -28800,
+      warnings: ['borrowingsNullMaturityDefaultCurrent'],
+    },
+  ],
+  disclaimerKey: 'disclaimer.report',
+  limitations: [],
+  excludedNotes: [],
+});
+
 test.describe('finance → export PDF', () => {
   const FINANCE_COMBOS = [{ ui: 'zh-CN', acc: 'CN' }, { ui: 'en', acc: 'US' }, { ui: 'ja', acc: 'JP' }];
   for (const { ui, acc } of FINANCE_COMBOS) {
@@ -1838,6 +1864,39 @@ test('analysis month labels follow UI language (en → Jan, not 1月)', async ({
   expect(mainText, 'no raw Chinese backend month label may leak in the analysis page under en UI').not.toContain('1月');
 });
 
+// ── PR-7B P1-4: management balance overview tab (6 UI languages × CN locale) ──────
+// Boots with a mocked /api/balance-overview, clicks the balance sub-tab, and asserts the
+// management overview renders: title + balanceDifference row + borrowings label + estimate
+// badge, with NO statutory "balance sheet" wording and NO raw finance.* key leak.
+test.describe('balance overview (management basis)', () => {
+  for (const ui of UI_LANGUAGES) {
+    test(`balance overview ui=${ui} acc=CN`, async ({ page }) => {
+      await bootComboIPC(page, ui, 'CN', {
+        apiResponses: [
+          { match: '/api/reports/generate', json: REPORT_MOCK('CN') },
+          { match: '/api/balance-overview', json: BALANCE_OVERVIEW_MOCK('CN') },
+        ],
+      });
+      const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+      await page.locator('i.fa-wallet').first().click();                 // → finance page (P&L tab)
+      await page.locator('[data-testid="finance-tab-balance"]').click(); // → balance tab
+      // 管理口径标题渲染（等概览数据 + 重渲染）
+      await expect(page.getByText(loc.finance.balanceOverviewTitle, { exact: false })).toBeVisible({ timeout: 10_000 });
+      const body = await page.locator('body').innerText();
+      // 差额行 / 借款行 / 估算徽标 渲染
+      expect(body, `[${ui}] balanceDifference row`).toContain(loc.finance.balanceDifference);
+      expect(body, `[${ui}] borrowings label`).toContain(loc.finance.balanceBorrowings);
+      expect(body, `[${ui}] estimate badge`).toContain(loc.finance.balanceEstimateBadge);
+      // 不得出现裸法定报表名
+      for (const stmt of ['资产负债表', '資產負債表', 'Balance Sheet', '貸借対照表', '재무상태표']) {
+        expect(body, `[${ui}] must not show statutory statement name "${stmt}"`).not.toContain(stmt);
+      }
+      // 无 raw finance.* key 泄漏
+      expect(body, `[${ui}] raw finance.* i18n key leaked`).not.toMatch(/\bfinance\.[a-zA-Z]/);
+    });
+  }
+});
+
 // ── PR-6 §K/§L page-breadth matrix ──────────────────────────────────────────────
 // The main 36-combo test scans only the dashboard. This extends the breadth across the
 // other key pages (transactions / finance / invoice-query) PLUS dashboard-KPI, sweeping
@@ -1870,6 +1929,8 @@ test.describe('§K/§L page-breadth matrix', () => {
           apiResponses: [
             { match: '/api/transactions/summary', json: { income: { total: 1000, count: 2 }, expense: { total: 500, count: 1 }, net: 500 } },
             { match: '/api/reports/generate', json: REPORT_MOCK(acc) },
+            // PR-7B P1-4: finance page always fetches the balance overview on mount
+            { match: '/api/balance-overview', json: BALANCE_OVERVIEW_MOCK(acc) },
           ],
         });
         await page.waitForTimeout(300);

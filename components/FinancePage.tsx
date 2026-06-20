@@ -2,8 +2,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
-import { generateReport, fetchSettings, exportReportPdf, isDesktop, type ReportResult } from '../services/api';
+import { generateReport, fetchSettings, exportReportPdf, isDesktop, fetchBalanceOverview, type ReportResult, type BalanceOverview } from '../services/api';
 import { formatMoney, getTaxLabel, getCurrencySymbol, shouldShowTaxModule, shouldShowTaxInclusiveSummary } from './accountingHelpers';
+import { BALANCE_CLASSIFICATION } from './accountingClassification';
 
 interface Props {
   data: BusinessData;
@@ -18,6 +19,8 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
   const { t, i18n } = useTranslation();
   const [activeTab, setActiveTab] = useState<StatementType>('pl');
   const [report, setReport] = useState<ReportResult | null>(null);
+  // PR-7B P1-4: 管理口径资产负债概览（只读，来自 GET /api/balance-overview）。非法定 B/S。
+  const [balanceOverview, setBalanceOverview] = useState<BalanceOverview | null>(null);
   // Initialize locale from parent BusinessData if available, so first render
   // uses the correct currency symbol instead of defaulting to CN.
   const [locale, setLocale] = useState<string>((data as any)?.locale || 'CN');
@@ -55,6 +58,9 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
       setCompanyName((settings as any)?.company_info?.name || (settings as any)?.company_name || '');
       const r = await generateReport({ locale: loc, year: selectedYear });
       setReport(r);
+      // 管理口径资产负债概览（只读·非阻断：失败不影响 P&L）。年度口径，与 P&L 一致。
+      try { setBalanceOverview(await fetchBalanceOverview({ year: selectedYear })); }
+      catch { setBalanceOverview(null); }
     } catch (e: any) {
       setError(e?.message || 'Failed to generate report');
       // Fallback: use old data.financialStatement
@@ -266,7 +272,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
         <button onClick={() => setActiveTab('pl')} className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'pl' ? 'bg-primary text-white' : 'text-[#4a4a48] hover:text-[#191918]'}`} style={activeTab === 'pl' ? { boxShadow: '0 4px 16px rgba(39,76,146,0.15)' } : {}}>
           {plTabLabel}
         </button>
-        <button onClick={() => setActiveTab('balance')} className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'balance' ? 'bg-primary text-white' : 'text-[#4a4a48] hover:text-[#191918]'}`} style={activeTab === 'balance' ? { boxShadow: '0 4px 16px rgba(39,76,146,0.15)' } : {}}>
+        <button data-testid="finance-tab-balance" onClick={() => setActiveTab('balance')} className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'balance' ? 'bg-primary text-white' : 'text-[#4a4a48] hover:text-[#191918]'}`} style={activeTab === 'balance' ? { boxShadow: '0 4px 16px rgba(39,76,146,0.15)' } : {}}>
           {t('finance.tabBalance')}
         </button>
         <button onClick={() => setActiveTab('cashflow')} className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'cashflow' ? 'bg-primary text-white' : 'text-[#4a4a48] hover:text-[#191918]'}`} style={activeTab === 'cashflow' ? { boxShadow: '0 4px 16px rgba(39,76,146,0.15)' } : {}}>
@@ -326,16 +332,97 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
           </div>
         )}
 
-        {/* === Balance Sheet — full calculation not enabled yet (PR-T1) === */}
-        {activeTab === 'balance' && (
-          <div className="p-20 text-center text-[#5c5c5a] flex flex-col items-center">
-            <i className="fas fa-scale-balanced text-6xl mb-6 opacity-20"></i>
-            <h3 className="text-xl font-medium">{t('finance.balanceComingSoonTitle')}</h3>
-            <p className="mt-2 text-sm max-w-md">{t('finance.balanceComingSoonDesc')}</p>
-            <span className="mt-6 inline-flex items-center px-3 py-1 rounded-full text-[11px] bg-[#f0eeeb] text-[#5c5c5a] border border-[#e0ddd5]">
-              <i className="fas fa-clock mr-1.5"></i>{t('finance.comingSoonBadge')}
-            </span>
-          </div>
+        {/* === 管理口径资产负债概览（PR-7B P1-4）—— 非法定资产负债表 ===
+            按币种展示 资产/负债/权益 + 显式「平衡差额／待调整」(始终显示·不可隐藏) + 免责。
+            金额按「币种代码 + 千分位」展示，不折算、不用 locale 货币符号。数据来自只读 /api/balance-overview。
+            无数据时回退到原 coming-soon 空态。 */}
+        {activeTab === 'balance' && !loading && (
+          balanceOverview?.byCurrency?.length ? (
+            <div className="p-10">
+              <div className="max-w-3xl mx-auto space-y-6">
+                <div className="text-center mb-2">
+                  <h2 className="text-2xl font-bold text-[#191918]">{t('finance.balanceOverviewTitle')}</h2>
+                  <p className="text-[#5c5c5a] text-sm">{periodDisplay}</p>
+                  <span className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-[11px] bg-[#f0eeeb] text-[#5c5c5a] border border-[#e0ddd5]">
+                    <i className="fas fa-circle-info mr-1.5"></i>{t('finance.balanceEstimateBadge')}
+                  </span>
+                </div>
+                {/* 免责：管理口径估算 / 非法定 / 未做严格平衡 */}
+                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 space-y-1">
+                  <p><i className="fas fa-info-circle mr-1.5"></i>{t('finance.balanceOverviewDisclaimer')}</p>
+                  <p>{t('disclaimer.report')}</p>
+                </div>
+
+                {balanceOverview.byCurrency.map((blk) => {
+                  const ccyAmt = (v: number) => {
+                    const num = (Number(v) || 0).toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    return blk.currency ? `${blk.currency} ${num}` : num;
+                  };
+                  const lineLabel = (key: string) => {
+                    const e = (BALANCE_CLASSIFICATION as Record<string, { labelKey: string }>)[key];
+                    return e ? t(e.labelKey) : key;
+                  };
+                  const lineRow = (l: { key: string; amount: number }, pfx: string, i: number) => (
+                    <div key={`${pfx}${i}`} className="flex justify-between px-6 py-2.5 text-sm">
+                      <span className="text-[#4a4a48] pl-3">{lineLabel(l.key)}</span>
+                      <span className="font-mono text-[#191918]">{ccyAmt(l.amount)}</span>
+                    </div>
+                  );
+                  const subHdr = (label: string) => (
+                    <div className="px-6 py-1.5 text-[11px] uppercase tracking-wider text-[#8a8a88] bg-[#f9f9f8]/30">{label}</div>
+                  );
+                  const totalRow = (label: string, v: number, strong?: boolean) => (
+                    <div className={`flex justify-between px-6 py-2.5 text-sm bg-[#f9f9f8]/40 ${strong ? 'font-bold' : 'font-semibold'}`}>
+                      <span className="text-[#191918]">{label}</span><span className="font-mono text-[#191918]">{ccyAmt(v)}</span>
+                    </div>
+                  );
+                  return (
+                    <div key={blk.currency ?? 'null'} className="border border-[#e0ddd5] rounded-xl overflow-hidden">
+                      <div className="bg-[#f9f9f8]/60 px-6 py-3 text-sm font-bold text-[#191918]">
+                        {blk.currency ?? t('finance.balanceCurrencyUnspecified')}
+                      </div>
+                      <div className="divide-y divide-[#e0ddd5]/70">
+                        {/* 资产 */}
+                        <div className="px-6 py-2 text-xs font-bold text-[#191918] bg-[#f9f9f8]/50">{t('finance.balanceAssets')}</div>
+                        {blk.assets.current.length > 0 && subHdr(t('finance.balanceCurrentAssets'))}
+                        {blk.assets.current.map((l, i) => lineRow(l, 'ac', i))}
+                        {blk.assets.nonCurrent.length > 0 && subHdr(t('finance.balanceNonCurrentAssets'))}
+                        {blk.assets.nonCurrent.map((l, i) => lineRow(l, 'anc', i))}
+                        {totalRow(t('finance.balanceTotalAssets'), blk.totals.assets)}
+                        {/* 负债 */}
+                        <div className="px-6 py-2 text-xs font-bold text-[#191918] bg-[#f9f9f8]/50">{t('finance.balanceLiabilities')}</div>
+                        {blk.liabilities.current.length > 0 && subHdr(t('finance.balanceCurrentLiabilities'))}
+                        {blk.liabilities.current.map((l, i) => lineRow(l, 'lc', i))}
+                        {blk.liabilities.nonCurrent.length > 0 && subHdr(t('finance.balanceNonCurrentLiabilities'))}
+                        {blk.liabilities.nonCurrent.map((l, i) => lineRow(l, 'lnc', i))}
+                        {totalRow(t('finance.balanceTotalLiabilities'), blk.totals.liabilities)}
+                        {/* 权益 */}
+                        <div className="px-6 py-2 text-xs font-bold text-[#191918] bg-[#f9f9f8]/50">{t('finance.balanceEquity')}</div>
+                        {blk.equity.map((l, i) => lineRow(l, 'eq', i))}
+                        {totalRow(t('finance.balanceEquity'), blk.totals.equity)}
+                        {/* 平衡差额／待调整 —— 始终显示，不可隐藏 */}
+                        {totalRow(t('finance.balanceDifference'), blk.balanceDifference, true)}
+                      </div>
+                      {blk.warnings?.includes('borrowingsNullMaturityDefaultCurrent') && (
+                        <div className="px-6 py-2 text-[11px] text-amber-600 border-t border-[#e0ddd5]/70">
+                          <i className="fas fa-info-circle mr-1"></i>{t('finance.balanceBorrowingsNullMaturity')}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="p-20 text-center text-[#5c5c5a] flex flex-col items-center">
+              <i className="fas fa-scale-balanced text-6xl mb-6 opacity-20"></i>
+              <h3 className="text-xl font-medium">{t('finance.balanceComingSoonTitle')}</h3>
+              <p className="mt-2 text-sm max-w-md">{t('finance.balanceComingSoonDesc')}</p>
+              <span className="mt-6 inline-flex items-center px-3 py-1 rounded-full text-[11px] bg-[#f0eeeb] text-[#5c5c5a] border border-[#e0ddd5]">
+                <i className="fas fa-clock mr-1.5"></i>{t('finance.comingSoonBadge')}
+              </span>
+            </div>
+          )
         )}
 
         {/* === Cash Flow — operating activities MVP (management / cash basis, PR-7C) ===
