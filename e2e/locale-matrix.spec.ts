@@ -413,6 +413,57 @@ test.describe('finance → export PDF', () => {
     await expect(page.getByText(loc.finance.cashflowNotConfigured)).toHaveCount(4);
   });
 
+  // PR-7E acceptance (A — UI render): the cash-flow tab shows the legacy operating sample
+  // 1300/500/800 + 4 "not configured". Report is MOCKED here; the real aggregation that
+  // produces 1300/500/800 from seeded rows is covered by check:handlers (B).
+  test('PR-7E: cash flow tab renders legacy operating 1300/500/800 + 4 not-configured', async ({ page }) => {
+    const ui = 'zh-CN';
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    const report = {
+      ...REPORT_MOCK('CN'),
+      cashflowStatement: {
+        basis: 'cash', statutory: false, source: 'legacy',
+        operating: { inflow: 1300, outflow: 500, net: 800 },
+        investing: null, financing: null, beginningCash: null, endingCash: null,
+      },
+    };
+    await bootComboIPC(page, ui, 'CN', { apiResponses: [{ match: '/api/reports/generate', json: report }] });
+    await page.locator('i.fa-wallet').first().click(); // → finance page
+    await page.getByRole('button', { name: loc.finance.tabCashflow }).click();
+    await expect(page.getByRole('heading', { name: loc.finance.cashflowOperatingTitle })).toBeVisible({ timeout: 10_000 });
+    // value rows: scope by exact label, assert the formatted amount (regex tolerates currency symbol/thousands sep)
+    const row = (label: string) => page.locator('div.flex.justify-between', { has: page.getByText(label, { exact: true }) });
+    await expect(row(loc.finance.cashflowInflow)).toContainText(/1[,，]?300/);
+    await expect(row(loc.finance.cashflowOutflow)).toContainText(/500/);
+    await expect(row(loc.finance.cashflowNet)).toContainText(/800/);
+    await expect(page.getByText(loc.finance.cashflowNotConfigured)).toHaveCount(4);
+  });
+
+  // PR-7E acceptance (A — UI render): a transactions-source cash flow renders 50/0/50 and the
+  // legacy 1300 figure is absent. (The transactions-over-legacy PRIORITY logic itself is in B.)
+  test('PR-7E: cash flow tab renders transactions-source 50/0/50 (legacy figure absent)', async ({ page }) => {
+    const ui = 'zh-CN';
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    const report = {
+      ...REPORT_MOCK('CN'),
+      cashflowStatement: {
+        basis: 'cash', statutory: false, source: 'transactions',
+        operating: { inflow: 50, outflow: 0, net: 50 },
+        investing: null, financing: null, beginningCash: null, endingCash: null,
+      },
+    };
+    await bootComboIPC(page, ui, 'CN', { apiResponses: [{ match: '/api/reports/generate', json: report }] });
+    await page.locator('i.fa-wallet').first().click(); // → finance page
+    await page.getByRole('button', { name: loc.finance.tabCashflow }).click();
+    await expect(page.getByRole('heading', { name: loc.finance.cashflowOperatingTitle })).toBeVisible({ timeout: 10_000 });
+    const row = (label: string) => page.locator('div.flex.justify-between', { has: page.getByText(label, { exact: true }) });
+    await expect(row(loc.finance.cashflowInflow)).toContainText(/(^|\D)50(\D|$)/);
+    await expect(row(loc.finance.cashflowNet)).toContainText(/(^|\D)50(\D|$)/);
+    // legacy figure must not appear on the (cash-flow tab of the) page
+    await expect(page.getByText(/1[,，]?300/)).toHaveCount(0);
+    await expect(page.getByText(loc.finance.cashflowNotConfigured)).toHaveCount(4);
+  });
+
   test('export-pdf → mock electronAPI success shows saved path', async ({ page }) => {
     const ui = 'zh-CN';
     await page.addInitScript(() => {
