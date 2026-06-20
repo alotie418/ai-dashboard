@@ -49,7 +49,7 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   runMigrations(d);
   ok(MIGRATIONS.length === SCHEMA_VERSION, `[1] SCHEMA_VERSION(${SCHEMA_VERSION}) must equal MIGRATIONS.length(${MIGRATIONS.length})`);
   ok(ver(d) === MIGRATIONS.length, `[1] fresh→head should reach v${MIGRATIONS.length}, got v${ver(d)}`);
-  for (const t of ['purchases', 'sales', 'settings', 'categories', 'transactions', 'products', 'business_documents', 'assistant_conversations', 'accounts']) {
+  for (const t of ['purchases', 'sales', 'settings', 'categories', 'transactions', 'products', 'business_documents', 'assistant_conversations', 'accounts', 'liabilities']) {
     ok(tableExists(d, t), `[1] table '${t}' must exist at head`);
   }
   d.close();
@@ -116,6 +116,7 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   ok(colExists(d, 'purchases', 'product_id'), '[5] v10 purchases.product_id must be added');
   ok(colExists(d, 'categories', 'is_cogs'), '[5] v13 categories.is_cogs must be added');
   ok(tableExists(d, 'accounts'), '[5] v14 accounts table must be added');
+  ok(tableExists(d, 'liabilities'), '[5] v15 liabilities table must be added');
   d.close();
 }
 
@@ -140,9 +141,33 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   d.close();
 }
 
+// ---- 7. v15 liabilities schema：列齐 + liability_type CHECK + 期初余额可负 + interest_rate 默认 NULL ----
+{
+  const d = fresh();
+  runMigrations(d);
+  ok(tableExists(d, 'liabilities'), '[7] v15 liabilities table exists');
+  for (const c of ['id', 'name', 'lender', 'liability_type', 'currency', 'principal', 'opening_balance',
+                   'opening_date', 'interest_rate', 'maturity_date', 'note', 'is_active', 'sort_order',
+                   'created_at', 'updated_at']) {
+    ok(colExists(d, 'liabilities', c), `[7] liabilities.${c} column must exist`);
+  }
+  // liability_type CHECK：loan/other 放行，其它在 DB 层拒绝
+  let badType = null;
+  try { d.prepare("INSERT INTO liabilities (id, name, liability_type) VALUES ('l-bad', 'X', 'bond')").run(); }
+  catch (e) { badType = e?.message || String(e); }
+  ok(badType, '[7] liabilities.liability_type CHECK rejects values other than loan/other');
+  d.prepare("INSERT INTO liabilities (id, name, liability_type, opening_balance) VALUES ('l-ok', 'Loan', 'loan', -1000.25)").run();
+  const row = d.prepare("SELECT liability_type, opening_balance, interest_rate, is_active FROM liabilities WHERE id = 'l-ok'").get();
+  ok(row.liability_type === 'loan', '[7] loan type accepted');
+  ok(row.opening_balance === -1000.25, '[7] opening_balance accepts negative (NaN→0 / 不 clamp)');
+  ok(row.interest_rate === null, '[7] interest_rate defaults to NULL (no hardcoded rate)');
+  ok(row.is_active === 1, '[7] is_active defaults to 1');
+  d.close();
+}
+
 if (failures.length) {
   console.error(`✗ migrations: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema)`);
+console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema + v15 liabilities schema)`);

@@ -23,6 +23,7 @@ const mileageH = require('./mileage');
 const homeOfficeH = require('./homeOffice');
 const conversationsH = require('./conversations');
 const cashAccountsH = require('./cashAccounts');
+const liabilitiesH = require('./liabilities');
 
 const routes = [
   // ---- Dashboard ----
@@ -76,6 +77,12 @@ const routes = [
   ['POST', '/api/accounts', cashAccountsH.create],
   ['PUT', '/api/accounts/:id', cashAccountsH.update],
   ['DELETE', '/api/accounts/:id', cashAccountsH.remove],
+
+  // ---- Liabilities: 负债/借款手工台账（PR-7D-2 管道层；≠ 采购应付 payables；与 receivables/payables/accounts 不冲突）----
+  ['GET', '/api/liabilities', liabilitiesH.list],
+  ['POST', '/api/liabilities', liabilitiesH.create],
+  ['PUT', '/api/liabilities/:id', liabilitiesH.update],
+  ['DELETE', '/api/liabilities/:id', liabilitiesH.remove],
 
   // ---- Business Documents（业务单据 Phase A；next-number/tax-invoice 排在 :id 前）----
   ['GET', '/api/documents/next-number', documentsH.nextNumber],

@@ -79,7 +79,8 @@
       "dataMigration": "データ移行",
       "products": "商品・サービス",
       "dataBackup": "データバックアップ",
-      "cashAccounts": "口座・期首残高"
+      "cashAccounts": "口座・期首残高",
+      "liabilities": "負債・借入"
     },
     "company": {
       "title": "企業基本情報",
@@ -1227,5 +1228,36 @@
     "addButton": "口座を追加",
     "addTitle": "口座の新規作成",
     "editTitle": "口座の編集"
+  },
+  "liabilities": {
+    "title": "負債・借入台帳",
+    "subtitle": "借入およびその他の負債（銀行借入、株主借入、設備割賦など）の手動台帳で、以後の管理分析に利用します。",
+    "notBalanceSheetNote": "ここでは負債・借入（管理ベース）を記録するだけで、貸借対照表ではなく、残高照合や返済計画も行いません。",
+    "notTradePayableNote": "仕入の買掛金はここには記録しません——買掛金は仕入データから自動集計されます。",
+    "name": "名称",
+    "namePlaceholder": "例：銀行運転資金借入",
+    "lender": "債権者・貸主",
+    "lenderPlaceholder": "例：〇〇銀行",
+    "type": "種別",
+    "typeLoan": "借入",
+    "typeOther": "その他の負債",
+    "currency": "通貨",
+    "currencyPlaceholder": "例：JPY / USD",
+    "principal": "元本",
+    "openingBalance": "期首未返済残高",
+    "openingDate": "開始日",
+    "interestRate": "年利率(%)",
+    "interestRateHint": "年利率は参考記録用で、利息や返済の計算には一切使用しません。",
+    "maturityDate": "満期日",
+    "note": "備考",
+    "notePlaceholder": "任意",
+    "openingHint": "期首未返済残高は開始日の債務残高で、記録のみとなり、取引とは自動照合されません。通常はプラスですが、マイナスも許容されます（強制しません）。",
+    "status": "状態",
+    "active": "借入中",
+    "closed": "完済",
+    "empty": "負債・借入の記録がありません。下のボタンから追加してください。",
+    "addButton": "負債・借入を追加",
+    "addTitle": "負債・借入の新規作成",
+    "editTitle": "負債・借入の編集"
   }
 }

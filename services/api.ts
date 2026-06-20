@@ -374,6 +374,59 @@ export function deleteAccount(id: string): Promise<{ success: boolean }> {
   return apiFetch(`/api/accounts/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
+// ==================== Liabilities（负债/借款手工台账，PR-7D-2 管道层）====================
+// 政策中性主数据：仅录入/读取/编辑/删除·结清。≠ 采购应付（payables 仍由 purchases 聚合）。
+// 不接资产负债表、不 roll-up、不做还款计划、不算利息。opening_balance 用户手输（允许为负）；
+// interest_rate 仅备查、不参与计算。
+
+export type LiabilityType = 'loan' | 'other';
+
+export interface Liability {
+  id: string;
+  name: string;
+  lender: string | null;
+  liability_type: LiabilityType;
+  currency: string | null;
+  principal: number | null;
+  opening_balance: number;
+  opening_date: string | null;
+  interest_rate: number | null;
+  maturity_date: string | null;
+  note: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LiabilityUpsert {
+  name: string;
+  lender?: string | null;
+  liability_type?: LiabilityType;
+  currency?: string | null;
+  principal?: number | null;
+  opening_balance?: number;
+  opening_date?: string | null;
+  interest_rate?: number | null;
+  maturity_date?: string | null;
+  note?: string | null;
+  is_active?: boolean;
+  sort_order?: number;
+}
+
+export function listLiabilities(): Promise<Liability[]> {
+  return apiFetch<Liability[]>('/api/liabilities');
+}
+export function createLiability(payload: LiabilityUpsert): Promise<{ success: boolean; id: string }> {
+  return apiFetch('/api/liabilities', { method: 'POST', body: JSON.stringify(payload) });
+}
+export function updateLiability(id: string, payload: Partial<LiabilityUpsert>): Promise<{ success: boolean }> {
+  return apiFetch(`/api/liabilities/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+export function deleteLiability(id: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/liabilities/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
 // ==================== Transactions（国际化数据模型 v5，C 阶段）====================
 
 export type TransactionType = 'income' | 'expense';

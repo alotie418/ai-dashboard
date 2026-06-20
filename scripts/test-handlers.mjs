@@ -427,6 +427,68 @@ async function expectThrow(fn, label) {
   await expectThrow(() => call('DELETE', '/api/accounts/nope', null), '[acct] delete missing throws');
 }
 
+// ───────────────────────── liabilities (loans / other liabilities ledger, PR-7D-2 pipeline) ─────────────────────────
+// 管道层 round-trip：证明借款/其他负债能录入·保存·读取·编辑·删除·结清，且边界守得住——
+// ≠ 采购应付（payables 另算）、不接资产负债表、不算利息、不做还款计划。锁住：create 默认值（type=loan·
+// is_active=true·interest_rate=null）/ liability_type 白名单（loan·other）/ opening_balance 可负·NaN→0·缺省→0 /
+// principal·interest_rate 可空（缺省→null，仅备查）/ name·type 校验 / partial update 不清空 / 编辑 name·type·rate /
+// 结清(is_active=false)持久 / delete + delete-missing。
+{
+  freshDb();
+  const mkLiab = async (body) => call('POST', '/api/liabilities', body);
+
+  ok((await call('GET', '/api/liabilities', null)).length === 0, '[liab] list starts empty');
+
+  // create defaults: type→loan, is_active→true, principal/interest_rate→null; opening_balance kept
+  const l1 = await mkLiab({ name: '工行经营贷', lender: '工商银行', opening_balance: 50000, interest_rate: 4.85, currency: 'CNY', opening_date: '2026-01-01', maturity_date: '2027-01-01' });
+  ok(l1?.success && l1.id, `[liab] create → {success,id}, got ${JSON.stringify(l1)}`);
+  const r1 = (await call('GET', '/api/liabilities', null)).find((l) => l.id === l1.id);
+  ok(r1 && r1.liability_type === 'loan' && r1.opening_balance === 50000, '[liab] create defaults type=loan, opening_balance kept');
+  ok(r1.lender === '工商银行' && r1.interest_rate === 4.85 && r1.maturity_date === '2027-01-01', '[liab] lender/interest_rate(备查)/maturity persist');
+  ok(typeof r1.is_active === 'boolean' && r1.is_active === true, '[liab] is_active coerced to boolean, defaults true');
+
+  // type whitelist: invalid throws (handler guard before DB); other accepted
+  await expectThrow(() => call('POST', '/api/liabilities', { name: 'Bad', liability_type: 'bond' }), '[liab] invalid liability_type throws');
+  const l2 = await mkLiab({ name: '股东借款', liability_type: 'other' });
+  ok((await call('GET', '/api/liabilities', null)).find((l) => l.id === l2.id).liability_type === 'other', '[liab] other type accepted');
+
+  // opening_balance: negative allowed, NaN → 0, missing → 0; principal/interest_rate missing → null
+  const lNeg = await mkLiab({ name: '负余额', opening_balance: -300 });
+  const lNaN = await mkLiab({ name: 'NaN', opening_balance: 'xyz' });
+  const lMiss = await mkLiab({ name: 'Bare' });
+  const after = await call('GET', '/api/liabilities', null);
+  ok(after.find((l) => l.id === lNeg.id).opening_balance === -300, '[liab] negative opening_balance preserved (不 clamp)');
+  ok(after.find((l) => l.id === lNaN.id).opening_balance === 0, '[liab] NaN opening_balance coerced to 0');
+  const bare = after.find((l) => l.id === lMiss.id);
+  ok(bare.opening_balance === 0 && bare.principal === null && bare.interest_rate === null, '[liab] missing → opening_balance 0, principal/interest_rate null');
+
+  // name required (create + update); update validates type; missing id throws
+  await expectThrow(() => call('POST', '/api/liabilities', { name: '   ' }), '[liab] blank name throws');
+  await expectThrow(() => call('PUT', `/api/liabilities/${l1.id}`, { name: '' }), '[liab] update blank name throws');
+  await expectThrow(() => call('PUT', `/api/liabilities/${l1.id}`, { liability_type: 'mortgage' }), '[liab] update invalid type throws');
+  await expectThrow(() => call('PUT', '/api/liabilities/nope', { name: 'x' }), '[liab] update missing id throws');
+
+  // partial update: only provided field changes; untouched fields preserved (not cleared)
+  await call('PUT', `/api/liabilities/${l1.id}`, { opening_balance: 40000 });
+  const u1 = (await call('GET', '/api/liabilities', null)).find((l) => l.id === l1.id);
+  ok(u1.opening_balance === 40000 && u1.name === '工行经营贷' && u1.lender === '工商银行' && u1.interest_rate === 4.85,
+    '[liab] partial update changes only opening_balance, leaves name/lender/interest_rate intact');
+
+  // edit name + type + interest_rate (备查) together
+  await call('PUT', `/api/liabilities/${l1.id}`, { name: '工行经营贷(续)', liability_type: 'other', interest_rate: 5.1 });
+  const u2 = (await call('GET', '/api/liabilities', null)).find((l) => l.id === l1.id);
+  ok(u2.name === '工行经营贷(续)' && u2.liability_type === 'other' && u2.interest_rate === 5.1, '[liab] edit applies name/type/interest_rate');
+
+  // toggle active (结清) persists as boolean false
+  await call('PUT', `/api/liabilities/${l2.id}`, { is_active: false });
+  ok((await call('GET', '/api/liabilities', null)).find((l) => l.id === l2.id).is_active === false, '[liab] is_active=false (已结清) persists');
+
+  // delete removes; delete missing throws
+  await call('DELETE', `/api/liabilities/${l2.id}`, null);
+  ok(!(await call('GET', '/api/liabilities', null)).some((l) => l.id === l2.id), '[liab] delete removes row');
+  await expectThrow(() => call('DELETE', '/api/liabilities/nope', null), '[liab] delete missing throws');
+}
+
 // ───────────── products.create id hardening (prod-<ts>-<rand>) ─────────────
 // A tight loop with no spacing lands many creates on the SAME millisecond; the random suffix
 // must keep every id unique (no PRIMARY KEY collision). Pre-fix (pure Date.now) this collides.
@@ -1469,4 +1531,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');
