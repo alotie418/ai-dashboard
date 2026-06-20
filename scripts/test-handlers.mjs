@@ -1311,9 +1311,68 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   }
 }
 
+// ───────────── cash-flow acceptance via real reports.generate (PR-7E · B) ─────────────
+// End-to-end through the REAL report pipeline: seed via dispatch (real create + recordPayment
+// status computation), then POST /api/reports/generate (year → [from,to] window) and assert
+// report.cashflowStatement. Complements #231 (which unit-tests computeOperatingCashflow with
+// explicit windows): here the full-year 2026 window + report-level wiring + recordPayment are
+// exercised. All seed ids carry the PR7E_ACCEPTANCE_ marker. :memory: freshDb per scenario =
+// auto-isolated (no cleanup). Reads only — no production code/schema change.
+{
+  const seedSale = async (id, date, totalAmount, pay) => {
+    await call('POST', '/api/sales', { id, date, tons: 0, customer: 'PR7E', totalAmount });
+    if (pay) await call('PUT', `/api/sales/${id}/payment`, { paid_amount: pay.paid, payment_date: pay.date });
+  };
+  const seedPurchase = async (id, date, totalAmount, pay) => {
+    await call('POST', '/api/purchases', { id, date, tons: 0, supplier: 'PR7E', totalAmount });
+    if (pay) await call('PUT', `/api/purchases/${id}/payment`, { paid_amount: pay.paid, payment_date: pay.date });
+  };
+  const M = 'PR7E_ACCEPTANCE_';
+
+  // ── B1: legacy source, full-year 2026 → 1300 / 500 / 800 ──
+  // sA paid 1000 + sB partial 300 = 1300 ; sC unpaid & sD paid-but-2025 excluded.
+  // pE paid 400 + pF partial 100 = 500. No 2026 transactions → source 'legacy'.
+  {
+    freshDb();
+    await seedSale(`${M}sA`, '2026-03-10', 1000, { paid: 1000, date: '2026-03-10' });
+    await seedSale(`${M}sB`, '2026-04-20', 1000, { paid: 300,  date: '2026-04-20' });
+    await seedSale(`${M}sC`, '2026-05-01', 800,  null);                                   // unpaid → excluded
+    await seedSale(`${M}sD`, '2025-12-20', 500,  { paid: 500,  date: '2025-12-20' });     // prior-year payment → excluded
+    await seedPurchase(`${M}pE`, '2026-05-15', 400,  { paid: 400, date: '2026-05-15' });
+    await seedPurchase(`${M}pF`, '2026-06-25', 1000, { paid: 100, date: '2026-06-25' });  // partial → 100
+    const r = await call('POST', '/api/reports/generate', { locale: 'CN', year: '2026' });
+    const cf = r.cashflowStatement;
+    ok(cf && cf.source === 'legacy', '[cashflow-acc B1] source=legacy');
+    ok(approx(cf?.operating.inflow, 1300), `[cashflow-acc B1] inflow=1300 (got ${cf?.operating.inflow})`);
+    ok(approx(cf?.operating.outflow, 500), `[cashflow-acc B1] outflow=500 (got ${cf?.operating.outflow})`);
+    ok(approx(cf?.operating.net, 800), `[cashflow-acc B1] net=800 (got ${cf?.operating.net})`);
+    ok(cf?.investing === null && cf?.financing === null && cf?.beginningCash === null && cf?.endingCash === null,
+      '[cashflow-acc B1] investing/financing/beginning/ending = null');
+    ok(cf?.basis === 'cash' && cf?.statutory === false, '[cashflow-acc B1] basis=cash, statutory=false');
+  }
+
+  // ── B2: transactions take priority over legacy (same 2026 period) → 50 / 0 / 50 ──
+  // Same legacy set (would give 1300/500 under legacy) PLUS one 2026 income transaction (50)
+  // → periodTxnCount>0 → source 'transactions' → legacy IGNORED.
+  {
+    freshDb();
+    await seedSale(`${M}sA`, '2026-03-10', 1000, { paid: 1000, date: '2026-03-10' });
+    await seedSale(`${M}sB`, '2026-04-20', 1000, { paid: 300,  date: '2026-04-20' });
+    await seedPurchase(`${M}pE`, '2026-05-15', 400,  { paid: 400, date: '2026-05-15' });
+    await seedPurchase(`${M}pF`, '2026-06-25', 1000, { paid: 100, date: '2026-06-25' });
+    await call('POST', '/api/transactions', { id: `${M}tx1`, type: 'income', date: '2026-07-01', amount: 50, amount_net: 50, payment_status: 'paid' });
+    const r = await call('POST', '/api/reports/generate', { locale: 'CN', year: '2026' });
+    const cf = r.cashflowStatement;
+    ok(cf && cf.source === 'transactions', '[cashflow-acc B2] source=transactions (txn present → legacy ignored)');
+    ok(approx(cf?.operating.inflow, 50), `[cashflow-acc B2] inflow=50, legacy 1300 ignored (got ${cf?.operating.inflow})`);
+    ok(approx(cf?.operating.outflow, 0), `[cashflow-acc B2] outflow=0, legacy 500 ignored (got ${cf?.operating.outflow})`);
+    ok(approx(cf?.operating.net, 50), `[cashflow-acc B2] net=50 (got ${cf?.operating.net})`);
+  }
+}
+
 if (failures.length) {
   console.error(`✗ handlers: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E)) via real dispatch on :memory: DB');
