@@ -194,7 +194,7 @@
       "testOk": "Model callable, Key and ID both verified",
       "testFail": "Test failed",
       "providerErrorDetail": "Provider response",
-      "staleModelHint": "Currently using a custom or legacy model ID — reset recommended.",
+      "customModelHint": "Using a custom model ID — make sure it's available on your account.",
       "resetTo": "Reset to {{model}}",
       "configured": "Configured",
       "notConfigured": "Not configured",

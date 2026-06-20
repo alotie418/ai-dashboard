@@ -194,7 +194,7 @@
       "testOk": "モデル呼び出し成功、KeyとIDともに有効",
       "testFail": "テスト失敗",
       "providerErrorDetail": "プロバイダーの応答",
-      "staleModelHint": "現在カスタムまたは旧版model IDを使用中。リセットを推奨。",
+      "customModelHint": "カスタム model ID を使用中です。お使いのアカウントで利用可能か確認してください。",
       "resetTo": "{{model}}にリセット",
       "configured": "設定済み",
       "notConfigured": "未設定",

@@ -194,7 +194,7 @@
       "testOk": "Modèle accessible, clé et ID validés",
       "testFail": "Test échoué",
       "providerErrorDetail": "Réponse du fournisseur",
-      "staleModelHint": "Utilisation d'un model ID personnalisé ou obsolète — réinitialisation recommandée.",
+      "customModelHint": "Model ID personnalisé utilisé — vérifiez qu'il est disponible sur votre compte.",
       "resetTo": "Réinitialiser à {{model}}",
       "configured": "Configuré",
       "notConfigured": "Non configuré",

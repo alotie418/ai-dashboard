@@ -243,13 +243,13 @@ const ProvidersSection: React.FC = () => {
                               {p.supportsWebGrounding && <span className="ml-2 text-primary">{usLabel('setWebGrounding', 'settings.ai.supportsWebGrounding')}</span>}
                             </div>
                             {!isKnown && p.hasKey && (
-                              <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1.5">
-                                <i className="fas fa-info-circle mr-1"></i>
-                                {t('settings.ai.staleModelHint')}
+                              <div className="text-[10px] text-[#5c5c5a] bg-[#f9f9f8] border border-[#e0ddd5] rounded px-2 py-1 mt-1.5">
+                                <i className="fas fa-info-circle mr-1 text-[#8a8a88]"></i>
+                                {t('settings.ai.customModelHint')}
                                 <button
                                   onClick={() => handleSave(p.provider, 'modelOnly', fallbackDefault)}
                                   disabled={row.saving}
-                                  className="ml-1 underline hover:text-amber-900"
+                                  className="ml-1 underline hover:text-[#4a4a48]"
                                 >
                                   {t('settings.ai.resetTo', { model: fallbackDefault })}
                                 </button>

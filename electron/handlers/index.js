@@ -344,29 +344,21 @@ function registerHandlers({ ipcMain, dialog }) {
 
   console.log('[handlers] registered (api:request + providers:* + app:exportDb/importDb/relaunch/exportReportPdf + app:pickDocAttachment/openDocAttachment/discardDocAttachment)');
 
-  // 启动横幅：打印当前主进程加载的 provider META
-  // 调试时看到的 defaultModel 才是真正被使用的版本——前端再"新鲜"也得跟它对得上
+  // 启动横幅（仅开发/调试）：打印当前主进程加载的 provider META，便于确认实际使用的 defaultModel。
+  // 不再做 STALE 比对 / 「旧版 main 进程」告警——provider 默认值一致性由 check:providers 在 lint 期保证；
+  // 运行时比对既无法真正检出旧版 main（loaded metas 与常量同源），又会对国产 provider 误报。
   try {
-    const aiCore = require('../ai');
-    const list = aiCore.list();
-    const EXPECTED_DEFAULTS = {
-      anthropic: 'claude-sonnet-4-6',
-      openai: 'gpt-5.5',
-      gemini: 'gemini-3.5-flash',
-    };
-    console.log('[providers] loaded:');
-    let stale = false;
-    for (const p of list) {
-      const models = (p.availableModels || []).map(m =>
-        typeof m === 'string' ? `${m}(${m})` : `${m.label}(${m.value})`
-      ).join(', ');
-      const ok = EXPECTED_DEFAULTS[p.provider] === p.defaultModel;
-      const tag = ok ? '✓' : '⚠ STALE';
-      if (!ok) stale = true;
-      console.log(`  - ${tag} ${p.provider.padEnd(10)} default=${String(p.defaultModel).padEnd(24)} available=[${models}]`);
-    }
-    if (stale) {
-      console.warn('⚠ 检测到主进程加载的 default model 与预期不符 — 你可能在跑旧版 main 进程！请彻底重启：Ctrl+C 后再 npm run electron:dev');
+    const { app } = require('electron');
+    if (!app.isPackaged) {
+      const aiCore = require('../ai');
+      const list = aiCore.list();
+      console.log('[providers] loaded:');
+      for (const p of list) {
+        const models = (p.availableModels || []).map(m =>
+          typeof m === 'string' ? `${m}(${m})` : `${m.label}(${m.value})`
+        ).join(', ');
+        console.log(`  - ${p.provider.padEnd(10)} default=${String(p.defaultModel).padEnd(24)} available=[${models}]`);
+      }
     }
   } catch (e) {
     console.warn('[providers] preflight list failed:', e?.message || e);
