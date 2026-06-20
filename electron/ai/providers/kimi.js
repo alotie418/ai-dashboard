@@ -5,10 +5,11 @@
 // interchangeable (a .cn key against the .ai host returns 401); we default to the mainland (.cn)
 // endpoint since SoloLedger targets domestic users.
 //
-// Default model = kimi-k2.6 (current flagship general model, supports tool calling). The legacy
-// kimi-k2 snapshots (0711 / 0905 / turbo / thinking) and kimi-latest were retired 2026-05-25, so
-// the default is the current k2.6. Whitelist keeps k2.6 / k2.5 plus the moonshot-v1 long-context
-// line for compatibility; kimi-k2.7-code (coding, thinking forced-on) is excluded as out-of-scope.
+// Default model = moonshot-v1-128k — the Kimi models confirmed reachable in real-key QA were the
+// moonshot-v1 long-context line (kimi-k2.6 / k2.5 failed to connect on the tested account, 2026-06);
+// 128k is chosen over 32k for the larger context. The whitelist still keeps k2.6 / k2.5 (selectable
+// for accounts that have them) plus moonshot-v1-128k / 32k; kimi-k2.7-code is excluded as out-of-scope.
+// (The legacy kimi-k2 snapshots 0711 / 0905 / turbo / thinking and kimi-latest were retired 2026-05-25.)
 // (Model IDs verified against the official Moonshot / Kimi docs.)
 //
 // NOTE: Kimi does NOT support tool_choice:'required' (only 'none'/'auto'/null) — the factory uses
@@ -22,7 +23,7 @@ module.exports = createOpenAICompatibleAdapter({
   id: 'kimi',
   name: 'Kimi (月之暗面)',
   baseURL: 'https://api.moonshot.cn/v1',
-  defaultModel: 'kimi-k2.6',
+  defaultModel: 'moonshot-v1-128k',
   availableModels: [
     { label: 'Kimi K2.6', value: 'kimi-k2.6' },
     { label: 'Kimi K2.5', value: 'kimi-k2.5' },
