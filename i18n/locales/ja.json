@@ -193,6 +193,7 @@
       "testConnection": "接続テスト",
       "testOk": "モデル呼び出し成功、KeyとIDともに有効",
       "testFail": "テスト失敗",
+      "providerErrorDetail": "プロバイダーの応答",
       "staleModelHint": "現在カスタムまたは旧版model IDを使用中。リセットを推奨。",
       "resetTo": "{{model}}にリセット",
       "configured": "設定済み",

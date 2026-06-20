@@ -50,7 +50,7 @@ function normalizeCode(status, rawCode, message) {
   if (status === 401 || /invalid_api_key|unauthorized/.test(m)) return 'auth';
   if (status === 403 || /permission|forbidden/.test(m)) return 'permission';
   if (status === 429 || status === 402 || /rate_limit|quota|exceeded|insufficient_quota|insufficient.?balance|spending.?cap/.test(m)) return 'quota';
-  if (status === 404 || /model.*not.*found|invalid_model|unknown.*model|does.*not.*exist|not.*supported/.test(m)) return 'modelNotFound';
+  if (status === 404 || /model.*not.*(found|exist)|invalid[_ ]model|unknown.*model|unsupported.*model|does.*not.*exist|not.*supported|模型不存在|模型不可用|模型不支持/.test(m)) return 'modelNotFound';
   if (status === 400 || /invalid_request|bad_request/.test(m)) return 'badRequest';
   if (typeof status === 'number' && status >= 500) return 'serverError';
   return 'unknown';
@@ -86,6 +86,23 @@ async function buildHttpError(response, providerLabel) {
   return err;
 }
 
+// 用于「HTTP 2xx 但响应体其实是错误/无可用内容」的情况：不少 OpenAI 兼容服务商会把
+// 「模型不可用 / 余额不足」等塞进 200 响应体（而非 4xx）。据此从已解析的 body 归一化出
+// 带【稳定 code】的 Error，并对外/日志展示的 providerMessage 做密钥脱敏 + 截断。
+// status 设为 undefined（这并非真正的 HTTP 错误状态），分类完全依赖 body 里的 code/message。
+function buildBodyError(json, providerLabel) {
+  const rawCode = pickField(json, 'error.code', 'error.type', 'error.status', 'code', 'type', 'status');
+  const rawMessage = pickField(json, 'error.message', 'message', 'error.error.message')
+    || (json != null ? JSON.stringify(json).slice(0, 300) : 'empty response');
+  const code = normalizeCode(undefined, rawCode != null ? String(rawCode) : '', String(rawMessage));
+  const providerMessage = redactSecrets(String(rawMessage)).slice(0, 200);
+  const err = new Error(`${providerLabel} [${code}] (${providerMessage})`);
+  err.code = code;
+  err.providerMessage = providerMessage;
+  err.providerLabel = providerLabel;
+  return err;
+}
+
 // 用于网络错误（fetch 抛错、超时、连接失败等）。
 function wrapNetworkError(err, providerLabel) {
   const msg = redactSecrets(err?.message || String(err));
@@ -105,4 +122,4 @@ function parseError(providerLabel, detail) {
   return e;
 }
 
-module.exports = { buildHttpError, wrapNetworkError, parseError, normalizeCode, redactSecrets, AI_ERROR_CODES };
+module.exports = { buildHttpError, buildBodyError, wrapNetworkError, parseError, normalizeCode, redactSecrets, AI_ERROR_CODES };

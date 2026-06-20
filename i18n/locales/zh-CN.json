@@ -193,6 +193,7 @@
       "testConnection": "测试连接",
       "testOk": "模型可调用，Key 与 model ID 均通过",
       "testFail": "测试失败",
+      "providerErrorDetail": "服务商返回",
       "staleModelHint": "当前使用自定义或旧版 model ID，建议重置。",
       "resetTo": "重置为 {{model}}",
       "configured": "已配置",

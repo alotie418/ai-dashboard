@@ -19,6 +19,7 @@ const kimi = require('../electron/ai/providers/kimi.js'); // OpenAI Chat-Complet
 const glm = require('../electron/ai/providers/glm.js'); // OpenAI Chat-Completions compatible (fetch-only)
 const doubao = require('../electron/ai/providers/doubao.js'); // OpenAI Chat-Completions compatible (fetch-only)
 const { pickOcrProvider } = require('../electron/ai/ocrSelect.js'); // PR-3b OCR provider selection (pure)
+const { normalizeCode } = require('../electron/ai/providers/_error.js'); // error classification (pure)
 
 const failures = [];
 function check(name, cond, detail) {
@@ -438,6 +439,52 @@ async function testAgentBudget() {
     res.text === 'fallback final' && Array.isArray(res.toolTrace) && res.toolTrace.length === 0, JSON.stringify(res));
 }
 
+// Test-connection error surfacing (A): test() must NOT silently return {ok:false} on a 2xx body
+// error — it surfaces a coded + redacted error so the UI can classify and trigger the model-ID hint.
+// Also locks normalizeCode keyword coverage (Model Not Exist / 模型不存在 / invalid model …).
+async function testConnErrorSurfacing() {
+  console.log('Test-connection error surfacing (A):');
+
+  // success path unchanged: 2xx with text → {ok:true}
+  setFetch([{ choices: [{ message: { content: 'OK' } }] }]);
+  const okRes = await deepseek.test('k', 'deepseek-chat');
+  check('test() 2xx with text → {ok:true}', !!okRes && okRes.ok === true, JSON.stringify(okRes));
+
+  // 2xx but model-unavailable error in body → throws coded modelNotFound + providerMessage
+  setFetch([{ error: { message: 'Model Not Exist' } }]);
+  let e1 = null;
+  try { await deepseek.test('k', 'deepseek-v4-flash'); } catch (e) { e1 = e; }
+  check('test() 2xx "Model Not Exist" body → throws (not silent {ok:false})', !!e1, 'did not throw');
+  check('test() body error → code modelNotFound', !!e1 && e1.code === 'modelNotFound', e1 && e1.code);
+  check('test() body error → carries providerMessage', !!e1 && /Model Not Exist/.test(e1.providerMessage || ''), e1 && e1.providerMessage);
+
+  // 2xx empty/odd body (no error message) → throws code-bearing error with a body snippet
+  setFetch([{ choices: [] }]);
+  let e2 = null;
+  try { await deepseek.test('k', 'm'); } catch (e) { e2 = e; }
+  check('test() 2xx empty body → throws with code + providerMessage snippet',
+    !!e2 && !!e2.code && !!e2.providerMessage, e2 && JSON.stringify({ code: e2.code, msg: e2.providerMessage }));
+
+  // providerMessage must be redacted: a key-like substring is masked, not shown verbatim
+  setFetch([{ error: { message: 'auth failed for sk-abcdef1234567890XYZ' } }]);
+  let e3 = null;
+  try { await qwen.test('k', 'm'); } catch (e) { e3 = e; }
+  check('test() body error redacts sk- key in providerMessage',
+    !!e3 && !/sk-abcdef1234567890XYZ/.test(e3.providerMessage || '') && /REDACTED/.test(e3.providerMessage || ''), e3 && e3.providerMessage);
+
+  // normalizeCode keyword coverage (status undefined → message-only classification)
+  check('normalizeCode "Model Not Exist" → modelNotFound', normalizeCode(undefined, '', 'Model Not Exist') === 'modelNotFound');
+  check('normalizeCode "model does not exist" → modelNotFound', normalizeCode(undefined, '', 'The model does not exist') === 'modelNotFound');
+  check('normalizeCode "invalid model" → modelNotFound', normalizeCode(undefined, '', 'invalid model id') === 'modelNotFound');
+  check('normalizeCode "unsupported model" → modelNotFound', normalizeCode(undefined, '', 'unsupported model') === 'modelNotFound');
+  check('normalizeCode "模型不存在" → modelNotFound', normalizeCode(undefined, '', '该模型不存在') === 'modelNotFound');
+  check('normalizeCode "模型不可用" → modelNotFound', normalizeCode(undefined, '', '模型不可用') === 'modelNotFound');
+  // regression: keyword additions must not shadow the existing status-based classifications
+  check('normalizeCode 401 → auth (unchanged)', normalizeCode(401, '', 'unauthorized') === 'auth');
+  check('normalizeCode 400 invalid_request → badRequest (unchanged)', normalizeCode(400, 'invalid_request', 'bad') === 'badRequest');
+  check('normalizeCode 429 → quota (unchanged)', normalizeCode(429, '', 'rate limit') === 'quota');
+}
+
 async function main() {
   console.log('\n=== Agent Provider Round-Trip (offline) ===\n');
   await testAnthropic();
@@ -454,6 +501,7 @@ async function main() {
   testOcrProviderSelection();
   await testGemini();
   await testAgentBudget();
+  await testConnErrorSurfacing();
   console.log(`\n${failures.length === 0 ? '✓ all passed' : '✗ ' + failures.length + ' failed'}\n`);
   process.exit(failures.length === 0 ? 0 : 1);
 }

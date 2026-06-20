@@ -193,6 +193,7 @@
       "testConnection": "Test connection",
       "testOk": "Model callable, Key and ID both verified",
       "testFail": "Test failed",
+      "providerErrorDetail": "Provider response",
       "staleModelHint": "Currently using a custom or legacy model ID — reset recommended.",
       "resetTo": "Reset to {{model}}",
       "configured": "Configured",

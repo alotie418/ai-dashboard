@@ -193,6 +193,7 @@
       "testConnection": "Tester la connexion",
       "testOk": "Modèle accessible, clé et ID validés",
       "testFail": "Test échoué",
+      "providerErrorDetail": "Réponse du fournisseur",
       "staleModelHint": "Utilisation d'un model ID personnalisé ou obsolète — réinitialisation recommandée.",
       "resetTo": "Réinitialiser à {{model}}",
       "configured": "Configuré",
