@@ -7,6 +7,8 @@
 > 状态图例：`未测` = 尚未测试 · `通过` = 符合预期 · `失败` = 不符（须填 §F 失败记录）· `阻塞` = 前置条件缺失无法测 · `N/A` = 该项对此 provider 不适用。
 >
 > 🔄 **2026-06-20 收口更新**：§A–§I 为 2026-06-19 当轮原始记录（保留不改）。其后 #221–#229 已修复 provider/OCR-UX 阻断（Bug 1–4 + §B2 默认模型/错误提示 UX）。**最新发布判定与逐项收口见文末「§B2 收口更新」。**
+>
+> 🧪 **2026-06-20 自动化收口**：§C(§J 错误路径) / §E(§K/§L 多语言×会计制度) / §F(§N 安全) 的可自动化项已由 #233/#234/#235 落地为回归测试（原表不改写）。**逐项「通过（自动化覆盖）vs 需真实 Key 人工抽查」分类见文末「§J/§N/§K/§L 自动化收口」。**
 
 ---
 
@@ -273,6 +275,72 @@ DeepSeek `v4-pro`/`v4-flash` · Kimi `k2.6`/`k2.5` · GLM `5.1`/`4.5-Air`/`4.7-F
 - 截图 / 记录前确认无明文 Key。
 
 > 附注：本节仅更新「AI provider + OCR」维度；签名公证(PR-5)、会计口径(PR-7) 等其他发布闸门另行判定。
+
+---
+
+## §J/§N/§K/§L 自动化收口（2026-06-20 · #233 / #234 / #235 合并后）
+
+> 本节登记 §C(§J) / §E(§K/§L) / §F(§N) 的**可自动化项**已落地为回归测试。**§A–§I 原始表不改写**（与上「§B2 收口更新」同原则）。
+>
+> ⚠️ **「通过（自动化覆盖）」的含义边界**：自动化覆盖的是**逻辑层**——错误分类 / 文案本地化与脱敏 / 渲染掩码 / 导出白名单 / 凭据删除 / 6×6 页面展示。它**不等于**真实 provider 的运行时端到端验证；后者（真实 Key 下的 AI 输出、冷却、查账数字对账、OCR 语义）仍标「需真实 Key 人工抽查」。
+
+### 1. 自动化 PR → 覆盖映射
+| PR | 维度 | 自动化覆盖（守卫 / 测试） |
+|----|------|--------------------------|
+| #233 | §J 错误路径 | 后端 HTTP 401/403/404/429/402/500/400 → 稳定 code + 网络 + 跨 provider 错误结构 + J9 脱敏（`check:agent-providers`）；前端 `aiErrors.ts` 码映射 + 6 语言 `aiError.*` 齐全（`check:ai-errors`）；e2e 测试连接失败本地化展示·脱敏·无 key + J1 空 Key 禁用且不发请求（`test:locale-ui`） |
+| #234 | §N 安全 | N2 CSV 白名单不含凭据表（`check:csv-export`）；N5 `list()` 不泄露 key/密文 + N6 `remove()` 清除行（`check:handlers`）；N3 输入框掩码 + key 不渲染（`test:locale-ui`） |
+| #235 | §K/§L 多语言×会计制度 | 6×6=36 组合 × 4 页（dashboard/transactions/finance/invoice-query）裸 i18n key + 简繁错乱 + 会计制度越界词扫描（`test:locale-ui`） |
+| 既有守卫 | §K/§L/§N 辅助 | `check:locale-matrix`(379) · `check:provider-names` · `check:disclaimer` · `check:ai-tone` · `check:report-titles` · `check:tax-labels` |
+
+### 2. §C 错误路径（§J）逐项分类
+| 项 | 状态 | 依据 |
+|----|------|------|
+| J1 空 Key 不发请求 | ✅ 通过（自动化 #233） | e2e：空 Key 时测试按钮禁用、无 `providers:test` 调用 |
+| J2 / J5 Key 错误 401 → auth | ✅ 通过（自动化 #233） | `buildHttpError` 401→auth + e2e 本地化展示 |
+| J3 网络断开 → network | ✅ 通过（自动化 #233） | fetch 抛错 → `wrapNetworkError` code=network |
+| J6 403 → permission | ✅ 通过（自动化 #233） | `normalizeCode` 分类断言 |
+| J7 429 → quota（**仅分类**） | ✅ 通过（自动化 #233，分类层） | 429/402→quota；**冷却另见 J4** |
+| J8 500 → serverError | ✅ 通过（自动化 #233） | 分类断言 |
+| J9 文案本地化 + 不泄露 Key/堆栈 | ✅ 通过（自动化 #233） | `redactSecrets`（sk-/Bearer/JWT）+ 6 语言 i18n + e2e 页面无 `sk-` |
+| **J4 额度不足 5 分钟冷却 + 切换提示** | ⏳ **需真实 Key 人工抽查** | 429 分类已自动化，但**冷却 UX 未自动化**，且冷却目前仅数据分析页、对话/简报路径属功能缺口（另案） |
+
+### 3. §E 多语言 / 会计制度（§K / §L）逐项分类
+| 项 | 状态 | 依据 |
+|----|------|------|
+| K1 界面本地化·无裸 key·简繁正确（6 语言） | ✅ 通过（自动化 #235 + `check:locale-matrix` 379） | 36 组合 × 4 页扫描 |
+| K2 provider 展示名本地化（非中文 UI 无中文残留） | ✅ 通过（自动化 `check:provider-names` + e2e BYOK 名扫描） | |
+| K3 测试连接成功/失败提示随语言 | ✅ 通过（自动化 #233 e2e） | |
+| K5 错误提示随语言 | ✅ 通过（自动化 #233 `check:ai-errors` 6 语言齐全） | |
+| L4 无口径越界 + 免责声明在位 | ✅ 通过（自动化 #235 越界扫 + `check:disclaimer`/`check:report-titles`/`check:tax-labels`/`check:ai-tone`） | US 禁 VAT/进项/销项/增值税 |
+| US Schedule C vs 非 US 口径区分 | ✅ 通过（自动化 `check:locale-matrix` + #235） | |
+| **K4 对话/简报/预测输出语言跟随 UI 语言** | ⏳ **需真实 Key 人工抽查** | 运行时 AI 输出，代码层不可自动化 |
+| **L1 AI 上下文口径不冒充法定** | ⏳ **需真实 Key 人工抽查** | 文案层 `check:ai-tone` 已覆盖；运行时输出需真实 Key |
+| **L2 工具查账数字 == 报表页** | ⏳ **需真实 Key 人工抽查** | 端到端查账一致性需真实 Key |
+| **L3 OCR 各制度字段语义（进项/销项 vs receipt/document）** | ⏳ **需真实 Key + 真实票据人工抽查**（与 §M 交叉） | |
+
+### 4. §F 安全（§N）逐项分类
+| 项 | 状态 | 依据 |
+|----|------|------|
+| N1 Key 不入日志 | ✅ 通过（代码核查 + 脱敏自动化） | AI/handlers 层无明文 Key console 记录（代码核查）+ #233 `redactSecrets` 自动化；无静态守卫 |
+| N2 Key 不入导出文件 | ✅ 通过（自动化 #234） | CSV 白名单仅 transactions/purchases/sales/business_documents，`ai_providers`/`settings`→`INVALID_TABLE` |
+| N3 输入框掩码（不入截图明文） | ✅ 通过（自动化 #234 e2e） | key 输入框 `type=password`，typed/stored key 不渲染 |
+| N4 错误提示不泄露 Key/堆栈 | ✅ 通过（自动化 #233/#234） | `redactSecrets` 双断言（providerMessage + Error.message） |
+| N5 Key 经 safeStorage 加密存储 + 渲染端不拿明文 | ✅ 通过（渲染面自动化 + 代码核查），**真 safeStorage round-trip 未做** | #234：`list()` 仅 hasKey、不泄露密文（自动化）；加密落盘 = safeStorage（代码核查），真 round-trip 留 e2e-electron/人工 |
+| N6 删除 provider 后凭据清除 | ✅ 通过（自动化 #234） | `remove()` 后 hasKey=false 且 `ai_providers` 行物理删除 |
+
+### 5. 仍需真实 Key 人工抽查（非阻断，发布前/后补）
+- **§J**：J4 真实 429 冷却 5 分钟 + 切换提示（含对话/简报路径冷却功能缺口）。
+- **§K/§L 运行时**：K4 输出语言跟随、L1 AI 口径不冒充法定、L2 工具查账数字 == 报表、L3 OCR 各制度字段语义。
+- **§H / §I / §M 真实输出**：AI 简报、数据分析 AI、Vision OCR（M2 PDF / M3 识别失败 / M4 手动修正）。
+- OpenAI / Anthropic：无真实 Key，全项未测；Kimi 完整功能本轮仅测连接。
+
+### 6. 安全要求（持续生效）
+- API Key 不显示明文（仅掩码）、不进日志、不进文档 / commit / PR；providerMessage 已 `redactSecrets` 脱敏；截图/记录前确认无明文 Key。
+
+### 7. 对总判定的影响
+- **不改本文件总判定**（§B2 收口节已设「provider/OCR-UX 阻断已修 → 可进入发布前回归」）。本节仅登记 §J/§N/§K/§L 的**逻辑层自动化覆盖**已就位，**未把任何需真实 Key 的运行时项标为通过**。剩余真实 Key 抽查为发布前/后人工补测，非代码阻断。
+
+> 附注：本节仅登记「§J/§N/§K/§L 自动化覆盖现状」；签名公证(PR-5)、会计口径(PR-7) 等其他发布闸门另行判定。
 
 ---
 
