@@ -579,6 +579,35 @@ export function deleteTaxPayment(id: string): Promise<{ success: boolean }> {
   return apiFetch(`/api/tax-payments/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
+// ==================== Ledger Summary（各台账余额汇总快照，PR-7B-1 只读）====================
+// 管理口径只读快照：五张 7D 台账各自 SUM、按币种分组（仅启用行，不折算、不跨币种合计）。
+// 非资产负债表：不分类、不做合计、不做平衡、不折旧、不结转、不对冲、不碰 reports。
+// taxPaidMemo 仅为「已缴税款备查」，独立、不并入任何其它聚合。
+
+export interface LedgerCurrencyTotal {
+  currency: string | null;   // 原币（自由文本）；null = 未指定
+  total: number;             // 该币种小计（未折算）
+  count: number;
+}
+export interface LedgerGroup {
+  count: number;             // 启用行总笔数
+  byCurrency: LedgerCurrencyTotal[];
+}
+export interface LedgerSummary {
+  snapshot: boolean;         // 恒 true：管理口径数据快照
+  statutory: boolean;        // 恒 false：非法定报表
+  balanced: boolean;         // 恒 false：不做平衡校验
+  accounts: LedgerGroup;
+  liabilities: LedgerGroup;
+  fixedAssets: LedgerGroup;
+  equity: LedgerGroup;
+  taxPaidMemo: LedgerGroup;  // 已缴税款备查（独立，不参与任何合计）
+}
+
+export function fetchLedgerSummary(): Promise<LedgerSummary> {
+  return apiFetch<LedgerSummary>('/api/ledger-summary');
+}
+
 // ==================== Transactions（国际化数据模型 v5，C 阶段）====================
 
 export type TransactionType = 'income' | 'expense';

@@ -83,7 +83,8 @@
       "liabilities": "Passifs",
       "fixedAssets": "Immobilisations",
       "equity": "Capitaux propres",
-      "taxPayments": "Taxes payées"
+      "taxPayments": "Taxes payées",
+      "ledgerSummary": "Récap. registres"
     },
     "company": {
       "title": "Informations entreprise",
@@ -1356,5 +1357,20 @@
     "addButton": "Ajouter une taxe payée",
     "addTitle": "Nouvelle taxe payée",
     "editTitle": "Modifier la taxe payée"
+  },
+  "ledgerSummary": {
+    "title": "Aperçu récapitulatif des registres",
+    "subtitle": "Un total par registre (comptes / passifs / immobilisations / capitaux propres), regroupé par devise — à titre de gestion uniquement.",
+    "snapshotNote": "Il s'agit d'un aperçu de gestion des totaux de chaque registre, et non d'un bilan : aucune classification actif/passif/capitaux propres, aucun total général, aucun équilibrage, aucun amortissement, aucun report, aucune compensation.",
+    "mixedCurrencyNote": "Les devises sont listées séparément — aucune conversion de change ni total inter-devises.",
+    "accountsTotal": "Total des soldes d'ouverture des comptes",
+    "liabilitiesTotal": "Total des soldes restant dûs (passifs/emprunts)",
+    "fixedAssetsTotal": "Total des valeurs d'origine des immobilisations",
+    "equityTotal": "Total des montants enregistrés (capitaux propres)",
+    "taxMemoHeading": "Taxes payées (mémo — séparé, non inclus dans les totaux ci-dessus)",
+    "taxPaidMemo": "Total des taxes payées",
+    "count": "entrées",
+    "currencyUnspecified": "Devise non spécifiée",
+    "noData": "Aucune entrée active"
   }
 }

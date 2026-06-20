@@ -83,7 +83,8 @@
       "liabilities": "Liabilities",
       "fixedAssets": "Fixed Assets",
       "equity": "Equity & Capital",
-      "taxPayments": "Tax Payments"
+      "taxPayments": "Tax Payments",
+      "ledgerSummary": "Ledger Summary"
     },
     "company": {
       "title": "Company Information",
@@ -1356,5 +1357,20 @@
     "addButton": "Add tax payment",
     "addTitle": "New tax payment",
     "editTitle": "Edit tax payment"
+  },
+  "ledgerSummary": {
+    "title": "Ledger Summary Snapshot",
+    "subtitle": "A per-ledger total of each ledger (accounts / liabilities / fixed assets / equity), grouped by currency — for management reference only.",
+    "snapshotNote": "This is a management-basis snapshot of each ledger's totals, NOT a balance sheet: no asset/liability/equity classification, no grand totals, no balancing, no depreciation, no carry-forward, no offsetting.",
+    "mixedCurrencyNote": "Currencies are listed separately — no exchange-rate conversion and no cross-currency totals.",
+    "accountsTotal": "Accounts opening-balance total",
+    "liabilitiesTotal": "Liabilities/loans opening outstanding total",
+    "fixedAssetsTotal": "Fixed assets original-value total",
+    "equityTotal": "Equity/capital recorded-amount total",
+    "taxMemoHeading": "Tax paid (memo — separate, not included in any total above)",
+    "taxPaidMemo": "Tax paid total",
+    "count": "entries",
+    "currencyUnspecified": "Unspecified currency",
+    "noData": "No active entries"
   }
 }

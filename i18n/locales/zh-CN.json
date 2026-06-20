@@ -83,7 +83,8 @@
       "liabilities": "负债/借款",
       "fixedAssets": "固定资产",
       "equity": "权益/资本",
-      "taxPayments": "已缴税款"
+      "taxPayments": "已缴税款",
+      "ledgerSummary": "台账汇总"
     },
     "company": {
       "title": "企业基础信息",
@@ -1356,5 +1357,20 @@
     "addButton": "添加已缴税款",
     "addTitle": "新增已缴税款",
     "editTitle": "编辑已缴税款"
+  },
+  "ledgerSummary": {
+    "title": "台账汇总快照",
+    "subtitle": "各台账（账户/负债/固定资产/权益）余额各自汇总、按币种分组，仅作管理口径参考。",
+    "snapshotNote": "这是各台账余额的管理口径数据快照，不是资产负债表：不归类资产/负债/权益、不做合计、不做平衡、不折旧、不结转、不抵扣。",
+    "mixedCurrencyNote": "不同币种分别列示、不做汇率折算、不做跨币种合计。",
+    "accountsTotal": "账户期初余额合计",
+    "liabilitiesTotal": "负债/借款期初未偿余额合计",
+    "fixedAssetsTotal": "固定资产原值合计",
+    "equityTotal": "权益/资本登记金额合计",
+    "taxMemoHeading": "已缴税款备查（独立，不参与上方任何合计）",
+    "taxPaidMemo": "已缴税款合计",
+    "count": "笔",
+    "currencyUnspecified": "未指定币种",
+    "noData": "暂无启用记录"
   }
 }

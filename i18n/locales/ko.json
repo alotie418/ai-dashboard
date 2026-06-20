@@ -83,7 +83,8 @@
       "liabilities": "부채·차입",
       "fixedAssets": "고정자산",
       "equity": "자본·출자",
-      "taxPayments": "납부 세금"
+      "taxPayments": "납부 세금",
+      "ledgerSummary": "원장 요약"
     },
     "company": {
       "title": "기업 기본 정보",
@@ -1356,5 +1357,20 @@
     "addButton": "납부 세금 추가",
     "addTitle": "새 납부 세금",
     "editTitle": "납부 세금 편집"
+  },
+  "ledgerSummary": {
+    "title": "원장 요약 스냅샷",
+    "subtitle": "각 원장(계좌/부채/고정자산/자본)의 잔액을 각각 집계하고 통화별로 표시합니다. 관리 참고용입니다.",
+    "snapshotNote": "이것은 각 원장 잔액의 관리 기준 스냅샷이며 재무상태표가 아닙니다: 자산/부채/자본 분류·총합계·잔액 대사·감가상각·대체·상계를 하지 않습니다.",
+    "mixedCurrencyNote": "통화별로 개별 표시하며, 환율 환산이나 통화 간 합계를 하지 않습니다.",
+    "accountsTotal": "계좌 기초잔액 합계",
+    "liabilitiesTotal": "부채·차입 기초 미상환 잔액 합계",
+    "fixedAssetsTotal": "고정자산 취득원가 합계",
+    "equityTotal": "자본·출자 등록 금액 합계",
+    "taxMemoHeading": "납부 세금(참고 — 별도, 위 합계에 포함되지 않음)",
+    "taxPaidMemo": "납부 세금 합계",
+    "count": "건",
+    "currencyUnspecified": "통화 미지정",
+    "noData": "사용 중인 기록이 없습니다"
   }
 }

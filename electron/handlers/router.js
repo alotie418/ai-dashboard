@@ -27,6 +27,7 @@ const liabilitiesH = require('./liabilities');
 const fixedAssetsH = require('./fixedAssets');
 const equityH = require('./equity');
 const taxPaymentsH = require('./taxPayments');
+const ledgerSummaryH = require('./ledgerSummary');
 
 const routes = [
   // ---- Dashboard ----
@@ -104,6 +105,9 @@ const routes = [
   ['POST', '/api/tax-payments', taxPaymentsH.create],
   ['PUT', '/api/tax-payments/:id', taxPaymentsH.update],
   ['DELETE', '/api/tax-payments/:id', taxPaymentsH.remove],
+
+  // ---- Ledger Summary: 各台账余额汇总快照（PR-7B-1 只读聚合；管理口径·非资产负债表·不分类·不平衡；不走 reports）----
+  ['GET', '/api/ledger-summary', ledgerSummaryH.summary],
 
   // ---- Business Documents（业务单据 Phase A；next-number/tax-invoice 排在 :id 前）----
   ['GET', '/api/documents/next-number', documentsH.nextNumber],

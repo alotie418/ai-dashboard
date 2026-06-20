@@ -672,6 +672,56 @@ async function expectThrow(fn, label) {
   await expectThrow(() => call('DELETE', '/api/tax-payments/nope', null), '[tax] delete missing throws');
 }
 
+// ───────────────────────── ledger-summary (各台账余额汇总快照, PR-7B-1 只读聚合) ─────────────────────────
+// 只读管理口径快照：5 张 7D 台账各自 SUM、按币种分组、仅启用行；tax_payments 独立备查。
+// 锁住：空库全 0 / 各台账分币种小计正确 / **仅 is_active=1 计入**（停用排除）/ 不跨币种合计（CNY·USD 各自一行）/
+// taxPaidMemo 独立（不并入 accounts/liabilities/fixedAssets/equity）/ snapshot·statutory·balanced 标志 /
+// **响应不含任何跨台账合计或资产=负债+权益字段**（assets/liabilities total / balance / totalAssets 一律 undefined）。
+{
+  freshDb();
+
+  // 空库：结构齐、全 0
+  const empty = await call('GET', '/api/ledger-summary', null);
+  ok(empty.snapshot === true && empty.statutory === false && empty.balanced === false, '[ledger] flags: snapshot=true, statutory=false, balanced=false');
+  ok(empty.accounts.count === 0 && empty.accounts.byCurrency.length === 0, '[ledger] empty accounts → count 0, byCurrency []');
+  // 边界守卫：响应绝不含跨台账合计 / 平衡 / 资产负债权益总计字段
+  for (const k of ['assets', 'liabilities_total', 'totalAssets', 'totalLiabilities', 'totalEquity', 'balance', 'difference', 'grandTotal']) {
+    ok(empty[k] === undefined, `[ledger] response must NOT carry cross-ledger/balance field '${k}'`);
+  }
+
+  // seed accounts: 2×CNY active (100, 200) + 1×USD active (50) + 1×CNY inactive (999, 应排除)
+  await call('POST', '/api/accounts', { name: 'A1', opening_balance: 100, currency: 'CNY' });
+  await call('POST', '/api/accounts', { name: 'A2', opening_balance: 200, currency: 'CNY' });
+  await call('POST', '/api/accounts', { name: 'A3', opening_balance: 50, currency: 'USD' });
+  await call('POST', '/api/accounts', { name: 'A4', opening_balance: 999, currency: 'CNY', is_active: false });
+  // seed liabilities / fixed_assets / equity (各 1 CNY active)
+  await call('POST', '/api/liabilities', { name: 'L1', opening_balance: 5000, currency: 'CNY' });
+  await call('POST', '/api/fixed-assets', { name: 'F1', original_value: 8000, currency: 'CNY' });
+  await call('POST', '/api/equity', { name: 'E1', amount: 30000, currency: 'CNY' });
+  // seed tax_payments: 1 CNY active (memo only)
+  await call('POST', '/api/tax-payments', { name: 'T1', amount: 1200, currency: 'CNY' });
+
+  const s = await call('GET', '/api/ledger-summary', null);
+
+  // accounts：CNY 小计 300（仅 2 启用行；999 停用排除）、USD 小计 50；count=3（启用行）
+  const accCny = s.accounts.byCurrency.find((r) => r.currency === 'CNY');
+  const accUsd = s.accounts.byCurrency.find((r) => r.currency === 'USD');
+  ok(accCny && approx(accCny.total, 300) && accCny.count === 2, `[ledger] accounts CNY=300 count=2 (inactive 999 excluded), got ${JSON.stringify(accCny)}`);
+  ok(accUsd && approx(accUsd.total, 50) && accUsd.count === 1, '[ledger] accounts USD=50 count=1');
+  ok(s.accounts.count === 3, `[ledger] accounts active count=3 (停用排除), got ${s.accounts.count}`);
+  // 不跨币种合计：byCurrency 两行，不存在把 300+50 折成 350 的单一 total
+  ok(s.accounts.byCurrency.length === 2 && s.accounts.total === undefined, '[ledger] accounts grouped by currency, no cross-currency single total');
+
+  // liabilities / fixedAssets / equity 各自小计
+  ok(approx(s.liabilities.byCurrency.find((r) => r.currency === 'CNY')?.total, 5000), '[ledger] liabilities CNY=5000');
+  ok(approx(s.fixedAssets.byCurrency.find((r) => r.currency === 'CNY')?.total, 8000), '[ledger] fixedAssets CNY=8000');
+  ok(approx(s.equity.byCurrency.find((r) => r.currency === 'CNY')?.total, 30000), '[ledger] equity CNY=30000');
+
+  // taxPaidMemo 独立备查：自身正确，且 1200 绝不混入其它任何台账小计
+  ok(approx(s.taxPaidMemo.byCurrency.find((r) => r.currency === 'CNY')?.total, 1200), '[ledger] taxPaidMemo CNY=1200 (独立备查)');
+  ok(accCny.total === 300 && s.equity.byCurrency.find((r) => r.currency === 'CNY')?.total === 30000, '[ledger] tax 1200 not folded into accounts/equity totals');
+}
+
 // ───────────── products.create id hardening (prod-<ts>-<rand>) ─────────────
 // A tight loop with no spacing lands many creates on the SAME millisecond; the random suffix
 // must keep every id unique (no PRIMARY KEY collision). Pre-fix (pure Date.now) this collides.
@@ -1714,4 +1764,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');

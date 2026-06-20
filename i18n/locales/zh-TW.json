@@ -83,7 +83,8 @@
       "liabilities": "負債/借款",
       "fixedAssets": "固定資產",
       "equity": "權益/資本",
-      "taxPayments": "已繳稅款"
+      "taxPayments": "已繳稅款",
+      "ledgerSummary": "台帳彙總"
     },
     "company": {
       "title": "企業基礎資料",
@@ -1356,5 +1357,20 @@
     "addButton": "新增已繳稅款",
     "addTitle": "新增已繳稅款",
     "editTitle": "編輯已繳稅款"
+  },
+  "ledgerSummary": {
+    "title": "台帳彙總快照",
+    "subtitle": "各台帳（帳戶/負債/固定資產/權益）餘額各自彙總、按幣別分組，僅作管理口徑參考。",
+    "snapshotNote": "這是各台帳餘額的管理口徑數據快照，並非資產負債表：不歸類資產/負債/權益、不做合計、不做平衡、不折舊、不結轉、不抵扣。",
+    "mixedCurrencyNote": "不同幣別分別列示、不做匯率折算、不做跨幣別合計。",
+    "accountsTotal": "帳戶期初餘額合計",
+    "liabilitiesTotal": "負債/借款期初未償餘額合計",
+    "fixedAssetsTotal": "固定資產原值合計",
+    "equityTotal": "權益/資本登記金額合計",
+    "taxMemoHeading": "已繳稅款備查（獨立，不參與上方任何合計）",
+    "taxPaidMemo": "已繳稅款合計",
+    "count": "筆",
+    "currencyUnspecified": "未指定幣別",
+    "noData": "尚無啟用記錄"
   }
 }
