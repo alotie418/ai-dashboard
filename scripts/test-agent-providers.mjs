@@ -101,8 +101,8 @@ async function testOpenAI() {
 async function testDeepSeek() {
   console.log('DeepSeek (Chat Completions):');
   // META smoke (registry parity is covered by check:providers; here we lock the adapter shape)
-  check('deepseek meta id + default model', deepseek.meta.id === 'deepseek' && deepseek.meta.defaultModel === 'deepseek-v4-pro');
-  check('deepseek default model in availableModels', deepseek.meta.availableModels.some(m => m.value === 'deepseek-v4-pro'));
+  check('deepseek meta id + default model', deepseek.meta.id === 'deepseek' && deepseek.meta.defaultModel === 'deepseek-chat');
+  check('deepseek default model in availableModels', deepseek.meta.availableModels.some(m => m.value === 'deepseek-chat'));
   check('deepseek whitelist has v4-pro / v4-flash / chat(compat)',
     ['deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-chat'].every(v => deepseek.meta.availableModels.some(m => m.value === v)));
   check('deepseek capabilities text-only (no tts/ocr/webGrounding)',
@@ -178,8 +178,8 @@ async function testQwen() {
 async function testKimi() {
   console.log('Kimi (Chat Completions):');
   // META smoke (registry parity is covered by check:providers; here we lock the adapter shape)
-  check('kimi meta id + default model', kimi.meta.id === 'kimi' && kimi.meta.defaultModel === 'kimi-k2.6');
-  check('kimi default model in availableModels', kimi.meta.availableModels.some(m => m.value === 'kimi-k2.6'));
+  check('kimi meta id + default model', kimi.meta.id === 'kimi' && kimi.meta.defaultModel === 'moonshot-v1-128k');
+  check('kimi default model in availableModels', kimi.meta.availableModels.some(m => m.value === 'moonshot-v1-128k'));
   check('kimi whitelist has k2.6 / k2.5 / v1-128k / v1-32k(compat)',
     ['kimi-k2.6', 'kimi-k2.5', 'moonshot-v1-128k', 'moonshot-v1-32k'].every(v => kimi.meta.availableModels.some(m => m.value === v)));
   check('kimi capabilities: ocr=true (vision) + visionModel set, no tts/webGrounding',

@@ -56,9 +56,9 @@ export const DEFAULT_MODEL: Record<AIProviderId, string> = {
   anthropic: 'claude-sonnet-4-6',
   openai: 'gpt-5.5',
   gemini: 'gemini-3.5-flash',
-  deepseek: 'deepseek-v4-pro',
+  deepseek: 'deepseek-chat',
   qwen: 'qwen-plus',
-  kimi: 'kimi-k2.6',
+  kimi: 'moonshot-v1-128k',
   glm: 'glm-4.6',
   doubao: 'doubao-seed-2-0-pro-260215',
 };
