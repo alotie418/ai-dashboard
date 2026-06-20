@@ -911,6 +911,7 @@
     "permission": "Pas d'accès à ce modèle. Vous devrez peut-être l'activer ou être ajouté à la liste blanche dans la console du fournisseur.",
     "quota": "Limite de débit atteinte ou quota épuisé. Réessayez plus tard, ou changez de fournisseur d'IA.",
     "modelNotFound": "L'ID du modèle n'existe pas ou est indisponible. Définissez un ID de modèle valide dans Paramètres → Fournisseurs d'IA.",
+    "emptyResponse": "Le fournisseur a renvoyé une réponse réussie, mais le modèle n'a produit aucun contenu utilisable. Ce model ID ne prend peut-être pas en charge ce test, n'est pas entièrement activé, ou vous devez utiliser un autre model ID.",
     "badRequest": "Requête invalide. Causes fréquentes : ID de modèle mal orthographié ou fonctionnalité non prise en charge.",
     "serverError": "Le service du fournisseur d'IA rencontre des problèmes. Réessayez plus tard.",
     "parseFailed": "Échec de l'analyse de la réponse de l'IA. Réessayez ; si cela persiste, changez de modèle ou de fournisseur.",

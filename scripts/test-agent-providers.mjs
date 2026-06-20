@@ -458,12 +458,22 @@ async function testConnErrorSurfacing() {
   check('test() body error → code modelNotFound', !!e1 && e1.code === 'modelNotFound', e1 && e1.code);
   check('test() body error → carries providerMessage', !!e1 && /Model Not Exist/.test(e1.providerMessage || ''), e1 && e1.providerMessage);
 
-  // 2xx empty/odd body (no error message) → throws code-bearing error with a body snippet
-  setFetch([{ choices: [] }]);
+  // 2xx, well-formed chat.completion, but choices[0].message.content === '' (real DeepSeek v4-flash case)
+  setFetch([{ object: 'chat.completion', model: 'deepseek-v4-flash', choices: [{ index: 0, message: { role: 'assistant', content: '' }, finish_reason: 'stop' }] }]);
   let e2 = null;
-  try { await deepseek.test('k', 'm'); } catch (e) { e2 = e; }
-  check('test() 2xx empty body → throws with code + providerMessage snippet',
-    !!e2 && !!e2.code && !!e2.providerMessage, e2 && JSON.stringify({ code: e2.code, msg: e2.providerMessage }));
+  try { await deepseek.test('k', 'deepseek-v4-flash'); } catch (e) { e2 = e; }
+  check('test() 2xx empty content → code emptyResponse (not unknown)', !!e2 && e2.code === 'emptyResponse', e2 && e2.code);
+  check('test() emptyResponse → concise providerMessage (model/finish, no raw JSON)',
+    !!e2 && /model=deepseek-v4-flash/.test(e2.providerMessage || '') && /finish_reason=stop/.test(e2.providerMessage || '') && !/[{}]/.test(e2.providerMessage || ''),
+    e2 && e2.providerMessage);
+
+  // bare empty body (no model/finish) still → emptyResponse with a fallback summary, never raw JSON
+  setFetch([{ choices: [] }]);
+  let e2b = null;
+  try { await deepseek.test('k', 'm'); } catch (e) { e2b = e; }
+  check('test() bare empty body → emptyResponse + no raw JSON',
+    !!e2b && e2b.code === 'emptyResponse' && !/[{}]/.test(e2b.providerMessage || ''),
+    e2b && JSON.stringify({ code: e2b.code, msg: e2b.providerMessage }));
 
   // providerMessage must be redacted: a key-like substring is masked, not shown verbatim
   setFetch([{ error: { message: 'auth failed for sk-abcdef1234567890XYZ' } }]);
