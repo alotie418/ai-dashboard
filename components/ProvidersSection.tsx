@@ -339,6 +339,12 @@ const ProvidersSection: React.FC = () => {
                           {row.errorCode ? ` · ${row.errorCode}` : ''}
                         </div>
                         <div className="mt-1 break-all">{row.errorMsg}</div>
+                        {/* 服务商原始返回（主进程已 redactSecrets 脱敏，UI 再截断）——让 unknown 等泛化错误也有可读线索。 */}
+                        {row.errorProviderMessage && (
+                          <div className="mt-1 pt-1 border-t border-rose-200/60 break-all font-mono text-[10px] text-rose-500">
+                            {t('settings.ai.providerErrorDetail')}: {row.errorProviderMessage.slice(0, 240)}
+                          </div>
+                        )}
                       </div>
                     )}
                     {modelHintActive && (

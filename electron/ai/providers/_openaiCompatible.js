@@ -11,7 +11,7 @@
 //   meta + test/chat/analyze/ocr/dataAnalysis + chatWithTools/toToolResultsMsg/toNativeHistory
 // so it plugs into index.js (business face) and agent.js (read-only tool loop) unchanged.
 
-const { buildHttpError, wrapNetworkError, parseError } = require('./_error');
+const { buildHttpError, buildBodyError, wrapNetworkError, parseError } = require('./_error');
 
 function tryParseJson(text) {
   if (!text) return null;
@@ -75,12 +75,16 @@ function createOpenAICompatibleAdapter(cfg) {
   }
 
   async function test(apiKey, model) {
+    // callChat 已对 4xx/5xx 抛 buildHttpError、对 fetch 失败抛 wrapNetworkError（均带稳定 code）。
     const json = await callChat(apiKey, {
       model: model || defaultModel,
       messages: [{ role: 'user', content: 'reply OK' }],
       max_tokens: 16,
     });
-    return { ok: !!extractText(json) };
+    if (extractText(json)) return { ok: true };
+    // HTTP 2xx 但无可用文本：很多兼容服务商把「模型不可用/未开通/余额不足」等塞进 200 响应体而非 4xx。
+    // 不再静默 return {ok:false}（会丢失原因），改为抛出带 code + 脱敏 providerMessage 的错误，供 UI 分类与引导。
+    throw buildBodyError(json, LABEL);
   }
 
   async function chat(apiKey, model, { messages, systemInstruction }) {

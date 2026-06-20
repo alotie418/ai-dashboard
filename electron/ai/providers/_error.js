@@ -6,7 +6,7 @@
 // 稳定错误码枚举（与渲染端 services/aiErrors.ts + i18n aiError.* 对齐）。camelCase = i18n leaf。
 const AI_ERROR_CODES = [
   'noProvider', 'auth', 'permission', 'quota', 'modelNotFound',
-  'badRequest', 'serverError', 'parseFailed', 'network', 'timeout', 'unknown',
+  'badRequest', 'serverError', 'parseFailed', 'emptyResponse', 'network', 'timeout', 'unknown',
 ];
 
 async function readBody(response) {
@@ -50,7 +50,7 @@ function normalizeCode(status, rawCode, message) {
   if (status === 401 || /invalid_api_key|unauthorized/.test(m)) return 'auth';
   if (status === 403 || /permission|forbidden/.test(m)) return 'permission';
   if (status === 429 || status === 402 || /rate_limit|quota|exceeded|insufficient_quota|insufficient.?balance|spending.?cap/.test(m)) return 'quota';
-  if (status === 404 || /model.*not.*found|invalid_model|unknown.*model|does.*not.*exist|not.*supported/.test(m)) return 'modelNotFound';
+  if (status === 404 || /model.*not.*(found|exist)|invalid[_ ]model|unknown.*model|unsupported.*model|does.*not.*exist|not.*supported|模型不存在|模型不可用|模型不支持/.test(m)) return 'modelNotFound';
   if (status === 400 || /invalid_request|bad_request/.test(m)) return 'badRequest';
   if (typeof status === 'number' && status >= 500) return 'serverError';
   return 'unknown';
@@ -86,6 +86,37 @@ async function buildHttpError(response, providerLabel) {
   return err;
 }
 
+function makeCodedError(providerLabel, code, providerMessage) {
+  const err = new Error(`${providerLabel} [${code}] (${providerMessage})`);
+  err.code = code;
+  err.providerMessage = providerMessage;
+  err.providerLabel = providerLabel;
+  return err;
+}
+
+// 用于「HTTP 2xx 但响应体其实是错误 / 无可用内容」的情况，两条分支：
+//  1) body 带显式错误文案（error.message / message …）——不少兼容服务商把「模型不可用 / 余额不足」
+//     塞进 200 体而非 4xx——按其 code/message 归一化（modelNotFound / quota / …）。
+//  2) 结构正常但无可用 assistant 内容（如 choices[0].message.content 为空串）——归类 emptyResponse，
+//     **不回传整段 raw JSON**，只给精简且脱敏的线索（model / finish_reason）。
+// providerMessage 一律 redactSecrets 脱敏 + 截断；status 设 undefined（非真正 HTTP 错误状态）。
+function buildBodyError(json, providerLabel) {
+  const rawCode = pickField(json, 'error.code', 'error.type', 'error.status', 'code', 'type', 'status');
+  const explicitMsg = pickField(json, 'error.message', 'message', 'error.error.message');
+  if (explicitMsg != null && explicitMsg !== '') {
+    const code = normalizeCode(undefined, rawCode != null ? String(rawCode) : '', String(explicitMsg));
+    return makeCodedError(providerLabel, code, redactSecrets(String(explicitMsg)).slice(0, 200));
+  }
+  // 无显式错误文案 → 结构正常但空内容。给出精简摘要（绝不 dump 整段 JSON）。
+  const model = pickField(json, 'model');
+  const finish = pickField(json, 'choices.0.finish_reason');
+  const bits = [];
+  if (model) bits.push(`model=${model}`);
+  if (finish) bits.push(`finish_reason=${finish}`);
+  const summary = bits.length ? bits.join(' ') : 'no assistant content';
+  return makeCodedError(providerLabel, 'emptyResponse', redactSecrets(summary).slice(0, 200));
+}
+
 // 用于网络错误（fetch 抛错、超时、连接失败等）。
 function wrapNetworkError(err, providerLabel) {
   const msg = redactSecrets(err?.message || String(err));
@@ -105,4 +136,4 @@ function parseError(providerLabel, detail) {
   return e;
 }
 
-module.exports = { buildHttpError, wrapNetworkError, parseError, normalizeCode, redactSecrets, AI_ERROR_CODES };
+module.exports = { buildHttpError, buildBodyError, wrapNetworkError, parseError, normalizeCode, redactSecrets, AI_ERROR_CODES };

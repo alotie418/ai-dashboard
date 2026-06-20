@@ -6,7 +6,7 @@
 // 稳定错误码枚举（与主进程 electron/ai/providers/_error.js + i18n aiError.* 对齐）。camelCase = i18n leaf。
 export const AI_ERROR_CODES = [
   'noProvider', 'auth', 'permission', 'quota', 'modelNotFound',
-  'badRequest', 'serverError', 'parseFailed', 'network', 'timeout', 'unknown',
+  'badRequest', 'serverError', 'parseFailed', 'emptyResponse', 'network', 'timeout', 'unknown',
 ] as const;
 export type AiErrorCode = typeof AI_ERROR_CODES[number];
 
@@ -49,7 +49,10 @@ const MODEL_ERROR_PATTERN =
  * —— 后者覆盖了「badRequest 下 provider 原文提示模型问题」的情形。provider 中立、不显示原始错误串。
  */
 export function looksLikeModelError(code: string | undefined | null, providerMessage?: string | null): boolean {
-  if (safeAiErrorCode(code) === 'modelNotFound') return true;
+  // modelNotFound = 模型不存在/不可用；emptyResponse = 2xx 成功但模型无可用内容（该 model ID 可能
+  // 不支持此测试 / 未完整开通 / 需换 ID）——两者都引导用户检查 Model ID（不误判为 Key 错）。
+  const c = safeAiErrorCode(code);
+  if (c === 'modelNotFound' || c === 'emptyResponse') return true;
   return !!providerMessage && MODEL_ERROR_PATTERN.test(String(providerMessage));
 }
 
