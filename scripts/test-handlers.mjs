@@ -78,6 +78,7 @@ try {
 
 const { runMigrations, _setDbForTest } = require(join(ROOT, 'electron/db/index.js'));
 const { dispatch } = require(join(ROOT, 'electron/handlers/router.js'));
+const { computeOperatingCashflow } = require(join(ROOT, 'electron/reports/_cashflow.js'));
 
 const failures = [];
 const ok = (cond, msg) => { if (!cond) failures.push(msg); };
@@ -1227,9 +1228,92 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   await expectThrow(() => call('GET', `/api/documents/${dv.id}`, null), '[doc] deleted void doc gone');
 }
 
+// ───────────────────────── cash-flow operating aggregation (PR-7E) ─────────────────────────
+// DB-level test of computeOperatingCashflow — the layer NOT covered by check:cashflow's pure
+// txnCashAmount unit test nor the e2e cashflow mock: inflow / outflow / net, [from,to] window,
+// unpaid exclusion, partial → paid_amount only, transactions-over-legacy source selection, and
+// the null investing/financing/beginningCash/endingCash + basis='cash' + statutory=false invariants.
+// Seeds via direct INSERT (arrange) and calls computeOperatingCashflow(db,{from,to}) directly for
+// precise window control. Reads electron/reports/_cashflow.js only — no production code/schema change.
+{
+  const seedTxn = (db, r) => db.prepare(
+    `INSERT INTO transactions (id,type,date,amount,amount_net,payment_status,paid_amount,payment_date)
+     VALUES (?,?,?,?,?,?,?,?)`
+  ).run(r.id, r.type, r.date, r.amount, r.amount_net ?? r.amount, r.payment_status, r.paid_amount, r.payment_date ?? null);
+  const seedRow = (db, table, r) => db.prepare(
+    `INSERT INTO ${table} (id,date,payment_status,paid_amount,payment_date) VALUES (?,?,?,?,?)`
+  ).run(r.id, r.date, r.payment_status, r.paid_amount, r.payment_date ?? null);
+  const assertInvariants = (cf, tag) => {
+    ok(cf.investing === null, `${tag} investing=null`);
+    ok(cf.financing === null, `${tag} financing=null`);
+    ok(cf.beginningCash === null, `${tag} beginningCash=null`);
+    ok(cf.endingCash === null, `${tag} endingCash=null`);
+    ok(cf.basis === 'cash', `${tag} basis=cash`);
+    ok(cf.statutory === false, `${tag} statutory=false`);
+  };
+
+  // ── Scenario A: transactions source (period 2026-01) ──
+  // inflow = i1 1000 + i2 300(partial→paid_amount) + i5 200(paid+paid_amount0→full amount) + i6 700(payment_date null→date) = 2200
+  // outflow = e1 400 + e2 100(partial) + e3 0(partial no paid_amount) = 500 ; i3 unpaid & i4 02-05(out of window) excluded
+  {
+    const db = freshDb();
+    seedTxn(db, { id: 'cfA-i1', type: 'income',  date: '2026-01-10', amount: 1000, payment_status: 'paid',    paid_amount: 1000, payment_date: '2026-01-10' });
+    seedTxn(db, { id: 'cfA-i2', type: 'income',  date: '2026-01-20', amount: 1000, payment_status: 'partial', paid_amount: 300,  payment_date: '2026-01-20' });
+    seedTxn(db, { id: 'cfA-i3', type: 'income',  date: '2026-01-15', amount: 500,  payment_status: 'unpaid',  paid_amount: 0,    payment_date: '2026-01-15' });
+    seedTxn(db, { id: 'cfA-i4', type: 'income',  date: '2026-01-30', amount: 500,  payment_status: 'paid',    paid_amount: 500,  payment_date: '2026-02-05' });
+    seedTxn(db, { id: 'cfA-e1', type: 'expense', date: '2026-01-12', amount: 400,  payment_status: 'paid',    paid_amount: 400,  payment_date: '2026-01-12' });
+    seedTxn(db, { id: 'cfA-e2', type: 'expense', date: '2026-01-25', amount: 800,  payment_status: 'partial', paid_amount: 100,  payment_date: '2026-01-25' });
+    seedTxn(db, { id: 'cfA-e3', type: 'expense', date: '2026-01-18', amount: 800,  payment_status: 'partial', paid_amount: 0,    payment_date: '2026-01-18' });
+    seedTxn(db, { id: 'cfA-i5', type: 'income',  date: '2026-01-22', amount: 200,  payment_status: 'paid',    paid_amount: 0,    payment_date: '2026-01-22' });
+    seedTxn(db, { id: 'cfA-i6', type: 'income',  date: '2026-01-28', amount: 700,  payment_status: 'paid',    paid_amount: 700,  payment_date: null });
+    const cf = computeOperatingCashflow(db, { from: '2026-01-01', to: '2026-01-31' });
+    ok(cf.source === 'transactions', '[cashflow A] source=transactions');
+    ok(approx(cf.operating.inflow, 2200), `[cashflow A] inflow=2200 (got ${cf.operating.inflow})`);
+    ok(approx(cf.operating.outflow, 500), `[cashflow A] outflow=500 (got ${cf.operating.outflow})`);
+    ok(approx(cf.operating.net, 1700), `[cashflow A] net=1700 (got ${cf.operating.net})`);
+    assertInvariants(cf, '[cashflow A]');
+  }
+
+  // ── Scenario B: legacy source (period 2026-03, no transactions) ──
+  // inflow = s1 1000 + s2 400(partial) + s5 0(paid+paid_amount0; legacy does NOT fall back to full amount) = 1400
+  // outflow = p1 500 + p2 200(partial) = 700 ; s3 unpaid, s4 04-02(out), s6 payment_date NULL(legacy requires NOT NULL) excluded
+  {
+    const db = freshDb();
+    seedRow(db, 'sales', { id: 'cfB-s1', date: '2026-03-10', payment_status: 'paid',    paid_amount: 1000, payment_date: '2026-03-10' });
+    seedRow(db, 'sales', { id: 'cfB-s2', date: '2026-03-20', payment_status: 'partial', paid_amount: 400,  payment_date: '2026-03-20' });
+    seedRow(db, 'sales', { id: 'cfB-s3', date: '2026-03-15', payment_status: 'unpaid',  paid_amount: 0,    payment_date: '2026-03-15' });
+    seedRow(db, 'sales', { id: 'cfB-s4', date: '2026-04-02', payment_status: 'paid',    paid_amount: 600,  payment_date: '2026-04-02' });
+    seedRow(db, 'sales', { id: 'cfB-s5', date: '2026-03-22', payment_status: 'paid',    paid_amount: 0,    payment_date: '2026-03-22' });
+    seedRow(db, 'sales', { id: 'cfB-s6', date: '2026-03-08', payment_status: 'paid',    paid_amount: 900,  payment_date: null });
+    seedRow(db, 'purchases', { id: 'cfB-p1', date: '2026-03-12', payment_status: 'paid',    paid_amount: 500, payment_date: '2026-03-12' });
+    seedRow(db, 'purchases', { id: 'cfB-p2', date: '2026-03-25', payment_status: 'partial', paid_amount: 200, payment_date: '2026-03-25' });
+    const cf = computeOperatingCashflow(db, { from: '2026-03-01', to: '2026-03-31' });
+    ok(cf.source === 'legacy', '[cashflow B] source=legacy');
+    ok(approx(cf.operating.inflow, 1400), `[cashflow B] inflow=1400 (got ${cf.operating.inflow})`);
+    ok(approx(cf.operating.outflow, 700), `[cashflow B] outflow=700 (got ${cf.operating.outflow})`);
+    ok(approx(cf.operating.net, 700), `[cashflow B] net=700 (got ${cf.operating.net})`);
+    assertInvariants(cf, '[cashflow B]');
+  }
+
+  // ── Scenario C: transactions take priority over legacy in the same period (2026-05) ──
+  // one txn (income 1000) + legacy sale 9999 / purchase 8888 in the same period → legacy ignored.
+  {
+    const db = freshDb();
+    seedTxn(db, { id: 'cfC-i1', type: 'income', date: '2026-05-10', amount: 1000, payment_status: 'paid', paid_amount: 1000, payment_date: '2026-05-10' });
+    seedRow(db, 'sales',     { id: 'cfC-s1', date: '2026-05-12', payment_status: 'paid', paid_amount: 9999, payment_date: '2026-05-12' });
+    seedRow(db, 'purchases', { id: 'cfC-p1', date: '2026-05-14', payment_status: 'paid', paid_amount: 8888, payment_date: '2026-05-14' });
+    const cf = computeOperatingCashflow(db, { from: '2026-05-01', to: '2026-05-31' });
+    ok(cf.source === 'transactions', '[cashflow C] source=transactions (txn present → legacy ignored)');
+    ok(approx(cf.operating.inflow, 1000), `[cashflow C] inflow=1000, legacy sale 9999 ignored (got ${cf.operating.inflow})`);
+    ok(approx(cf.operating.outflow, 0), `[cashflow C] outflow=0, legacy purchase 8888 ignored (got ${cf.operating.outflow})`);
+    ok(approx(cf.operating.net, 1000), `[cashflow C] net=1000 (got ${cf.operating.net})`);
+    assertInvariants(cf, '[cashflow C]');
+  }
+}
+
 if (failures.length) {
   console.error(`✗ handlers: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation) via real dispatch on :memory: DB');
