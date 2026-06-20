@@ -49,7 +49,7 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   runMigrations(d);
   ok(MIGRATIONS.length === SCHEMA_VERSION, `[1] SCHEMA_VERSION(${SCHEMA_VERSION}) must equal MIGRATIONS.length(${MIGRATIONS.length})`);
   ok(ver(d) === MIGRATIONS.length, `[1] fresh→head should reach v${MIGRATIONS.length}, got v${ver(d)}`);
-  for (const t of ['purchases', 'sales', 'settings', 'categories', 'transactions', 'products', 'business_documents', 'assistant_conversations', 'accounts', 'liabilities']) {
+  for (const t of ['purchases', 'sales', 'settings', 'categories', 'transactions', 'products', 'business_documents', 'assistant_conversations', 'accounts', 'liabilities', 'fixed_assets']) {
     ok(tableExists(d, t), `[1] table '${t}' must exist at head`);
   }
   d.close();
@@ -117,6 +117,7 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   ok(colExists(d, 'categories', 'is_cogs'), '[5] v13 categories.is_cogs must be added');
   ok(tableExists(d, 'accounts'), '[5] v14 accounts table must be added');
   ok(tableExists(d, 'liabilities'), '[5] v15 liabilities table must be added');
+  ok(tableExists(d, 'fixed_assets'), '[5] v16 fixed_assets table must be added');
   d.close();
 }
 
@@ -165,9 +166,35 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   d.close();
 }
 
+// ---- 8. v16 fixed_assets schema：列齐 + status CHECK + original_value 默认 0（NaN→0/不 clamp）----
+{
+  const d = fresh();
+  runMigrations(d);
+  ok(tableExists(d, 'fixed_assets'), '[8] v16 fixed_assets table exists');
+  for (const c of ['id', 'name', 'category', 'acquisition_date', 'original_value', 'currency', 'supplier',
+                   'serial_no', 'note', 'status', 'is_active', 'sort_order', 'created_at', 'updated_at']) {
+    ok(colExists(d, 'fixed_assets', c), `[8] fixed_assets.${c} column must exist`);
+  }
+  // 故意不应存在折旧政策字段（留 PR-7B）
+  for (const c of ['depreciation_method', 'useful_life', 'salvage_value']) {
+    ok(!colExists(d, 'fixed_assets', c), `[8] fixed_assets must NOT carry depreciation-policy column '${c}' (deferred to PR-7B)`);
+  }
+  // status CHECK：in_use/idle/disposed 放行，其它在 DB 层拒绝
+  let badStatus = null;
+  try { d.prepare("INSERT INTO fixed_assets (id, name, status) VALUES ('a-bad', 'X', 'sold')").run(); }
+  catch (e) { badStatus = e?.message || String(e); }
+  ok(badStatus, '[8] fixed_assets.status CHECK rejects values other than in_use/idle/disposed');
+  d.prepare("INSERT INTO fixed_assets (id, name, status, original_value) VALUES ('a-ok', 'Laptop', 'disposed', -10.5)").run();
+  const row = d.prepare("SELECT status, original_value, is_active FROM fixed_assets WHERE id = 'a-ok'").get();
+  ok(row.status === 'disposed', '[8] disposed status accepted (登记标签，不触发处置损益)');
+  ok(row.original_value === -10.5, '[8] original_value not clamped (NaN→0 仅在 handler，DB 不强制 ≥0)');
+  ok(row.is_active === 1, '[8] is_active defaults to 1');
+  d.close();
+}
+
 if (failures.length) {
   console.error(`✗ migrations: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema + v15 liabilities schema)`);
+console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema + v15 liabilities schema + v16 fixed_assets schema)`);

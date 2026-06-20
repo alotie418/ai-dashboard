@@ -528,6 +528,39 @@ const MIGRATIONS = [
     `);
     console.log('[db] v15: liabilities table ready');
   },
+
+  // v16: fixed-assets register (PR-7D-3, pipeline layer).
+  //   Manual register of fixed assets (what asset, when bought, how much, status).
+  //   POLICY-NEUTRAL: every value is user-entered; the app computes NOTHING. It does
+  //   NOT depreciate, does NOT roll up net book value, does NOT post depreciation
+  //   expense, does NOT build a balance sheet, and does NOT touch P&L/cashflow/reports.
+  //   NO depreciation_method / useful_life / salvage_value columns — those are pure
+  //   depreciation-policy inputs and are deferred to PR-7B under accountant confirmation.
+  //   `category` is free text (no chart-of-accounts / depreciation-life mapping).
+  //   `status` (in_use/idle/disposed) is a recorded label only — 'disposed' does NOT
+  //   trigger any disposal gain/loss or removal from a report. original_value: NaN→0,
+  //   never clamped. Idempotent via CREATE TABLE IF NOT EXISTS.
+  (d) => {
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS fixed_assets (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        category TEXT,
+        acquisition_date TEXT,
+        original_value REAL DEFAULT 0,
+        currency TEXT,
+        supplier TEXT,
+        serial_no TEXT,
+        note TEXT,
+        status TEXT NOT NULL DEFAULT 'in_use' CHECK (status IN ('in_use','idle','disposed')),
+        is_active INTEGER DEFAULT 1,
+        sort_order INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT
+      )
+    `);
+    console.log('[db] v16: fixed_assets table ready');
+  },
 ];
 
 function runMigrations(d) {

@@ -80,7 +80,8 @@
       "products": "商品 / 服務",
       "dataBackup": "資料備份",
       "cashAccounts": "帳戶與期初",
-      "liabilities": "負債/借款"
+      "liabilities": "負債/借款",
+      "fixedAssets": "固定資產"
     },
     "company": {
       "title": "企業基礎資料",
@@ -1259,5 +1260,36 @@
     "addButton": "新增負債/借款",
     "addTitle": "新增負債/借款",
     "editTitle": "編輯負債/借款"
+  },
+  "fixedAssets": {
+    "title": "固定資產登記台帳",
+    "subtitle": "登記固定資產（設備、車輛、辦公家具等）的手工台帳，供後續管理分析使用。",
+    "notBalanceSheetNote": "此處僅登記固定資產（管理口徑），並非資產負債表，也不做平衡核算。",
+    "notDepreciationNote": "此處僅作登記，不計折舊、不出淨值、不產生折舊費用。",
+    "name": "資產名稱",
+    "namePlaceholder": "如：辦公電腦",
+    "category": "資產類別",
+    "categoryPlaceholder": "如：電子設備（自由填寫）",
+    "acquisitionDate": "購置日期",
+    "originalValue": "原值/購置金額",
+    "originalValueHint": "原值僅作記錄，不參與折舊或任何計算；通常應為非負數，但不強制。",
+    "currency": "幣別",
+    "currencyPlaceholder": "如：TWD / USD",
+    "supplier": "供應商/來源",
+    "supplierPlaceholder": "如：momo",
+    "serialNo": "序號",
+    "note": "備註",
+    "notePlaceholder": "選填",
+    "status": "使用狀態",
+    "statusInUse": "在用",
+    "statusIdle": "閒置",
+    "statusDisposed": "已處置",
+    "recordStatus": "台帳狀態",
+    "active": "啟用",
+    "inactive": "停用",
+    "empty": "尚無固定資產記錄，點擊下方按鈕新增。",
+    "addButton": "新增固定資產",
+    "addTitle": "新增固定資產",
+    "editTitle": "編輯固定資產"
   }
 }

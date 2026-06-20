@@ -80,7 +80,8 @@
       "products": "商品・サービス",
       "dataBackup": "データバックアップ",
       "cashAccounts": "口座・期首残高",
-      "liabilities": "負債・借入"
+      "liabilities": "負債・借入",
+      "fixedAssets": "固定資産"
     },
     "company": {
       "title": "企業基本情報",
@@ -1259,5 +1260,36 @@
     "addButton": "負債・借入を追加",
     "addTitle": "負債・借入の新規作成",
     "editTitle": "負債・借入の編集"
+  },
+  "fixedAssets": {
+    "title": "固定資産登録台帳",
+    "subtitle": "固定資産（設備、車両、オフィス家具など）の手動台帳で、以後の管理分析に利用します。",
+    "notBalanceSheetNote": "ここでは固定資産（管理ベース）を記録するだけで、貸借対照表ではなく、残高照合も行いません。",
+    "notDepreciationNote": "ここでは登録のみで、減価償却・帳簿価額・減価償却費は一切扱いません。",
+    "name": "資産名",
+    "namePlaceholder": "例：業務用ノートPC",
+    "category": "区分",
+    "categoryPlaceholder": "例：電子機器（自由入力）",
+    "acquisitionDate": "取得日",
+    "originalValue": "取得価額",
+    "originalValueHint": "取得価額は記録用で、減価償却やいかなる計算にも使用しません。通常はプラスですが、強制しません。",
+    "currency": "通貨",
+    "currencyPlaceholder": "例：JPY / USD",
+    "supplier": "仕入先・取得元",
+    "supplierPlaceholder": "例：〇〇商会",
+    "serialNo": "シリアル番号",
+    "note": "備考",
+    "notePlaceholder": "任意",
+    "status": "状態",
+    "statusInUse": "使用中",
+    "statusIdle": "遊休",
+    "statusDisposed": "処分済",
+    "recordStatus": "台帳",
+    "active": "有効",
+    "inactive": "無効",
+    "empty": "固定資産の記録がありません。下のボタンから追加してください。",
+    "addButton": "固定資産を追加",
+    "addTitle": "固定資産の新規作成",
+    "editTitle": "固定資産の編集"
   }
 }

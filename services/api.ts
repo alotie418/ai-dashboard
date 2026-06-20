@@ -427,6 +427,57 @@ export function deleteLiability(id: string): Promise<{ success: boolean }> {
   return apiFetch(`/api/liabilities/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
+// ==================== Fixed Assets（固定资产登记台账，PR-7D-3 管道层）====================
+// 政策中性主数据：仅录入/读取/编辑/删除·停用。不折旧、不出净值、不接资产负债表、不碰 reports。
+// 无 depreciation_method/useful_life/salvage_value（留 PR-7B）。category 自由文本无映射；
+// original_value 用户手输（NaN→0，不 clamp）；status='disposed' 仅登记标签不出表。
+
+export type AssetStatus = 'in_use' | 'idle' | 'disposed';
+
+export interface FixedAsset {
+  id: string;
+  name: string;
+  category: string | null;
+  acquisition_date: string | null;
+  original_value: number;
+  currency: string | null;
+  supplier: string | null;
+  serial_no: string | null;
+  note: string | null;
+  status: AssetStatus;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface FixedAssetUpsert {
+  name: string;
+  category?: string | null;
+  acquisition_date?: string | null;
+  original_value?: number;
+  currency?: string | null;
+  supplier?: string | null;
+  serial_no?: string | null;
+  note?: string | null;
+  status?: AssetStatus;
+  is_active?: boolean;
+  sort_order?: number;
+}
+
+export function listFixedAssets(): Promise<FixedAsset[]> {
+  return apiFetch<FixedAsset[]>('/api/fixed-assets');
+}
+export function createFixedAsset(payload: FixedAssetUpsert): Promise<{ success: boolean; id: string }> {
+  return apiFetch('/api/fixed-assets', { method: 'POST', body: JSON.stringify(payload) });
+}
+export function updateFixedAsset(id: string, payload: Partial<FixedAssetUpsert>): Promise<{ success: boolean }> {
+  return apiFetch(`/api/fixed-assets/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+export function deleteFixedAsset(id: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/fixed-assets/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
 // ==================== Transactions（国际化数据模型 v5，C 阶段）====================
 
 export type TransactionType = 'income' | 'expense';
