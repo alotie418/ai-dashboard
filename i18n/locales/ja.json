@@ -83,7 +83,8 @@
       "liabilities": "負債・借入",
       "fixedAssets": "固定資産",
       "equity": "資本・出資",
-      "taxPayments": "納付済み税金"
+      "taxPayments": "納付済み税金",
+      "ledgerSummary": "台帳サマリー"
     },
     "company": {
       "title": "企業基本情報",
@@ -1356,5 +1357,20 @@
     "addButton": "納付済み税金を追加",
     "addTitle": "納付済み税金の新規作成",
     "editTitle": "納付済み税金の編集"
+  },
+  "ledgerSummary": {
+    "title": "台帳サマリースナップショット",
+    "subtitle": "各台帳（口座/負債/固定資産/資本）の残高をそれぞれ集計し、通貨別に表示します。管理参考用です。",
+    "snapshotNote": "これは各台帳残高の管理ベースのスナップショットで、貸借対照表ではありません：資産/負債/純資産への分類・総合計・残高照合・減価償却・繰越・相殺は行いません。",
+    "mixedCurrencyNote": "通貨ごとに個別表示し、為替換算や通貨をまたいだ合計は行いません。",
+    "accountsTotal": "口座 期首残高合計",
+    "liabilitiesTotal": "負債・借入 期首未返済残高合計",
+    "fixedAssetsTotal": "固定資産 取得価額合計",
+    "equityTotal": "資本・出資 登録金額合計",
+    "taxMemoHeading": "納付済み税金（備考 — 独立、上記の合計には含めません）",
+    "taxPaidMemo": "納付済み税金 合計",
+    "count": "件",
+    "currencyUnspecified": "通貨未指定",
+    "noData": "有効な記録がありません"
   }
 }
