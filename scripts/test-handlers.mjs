@@ -550,6 +550,43 @@ async function expectThrow(fn, label) {
   await expectThrow(() => call('DELETE', '/api/fixed-assets/nope', null), '[asset] delete missing throws');
 }
 
+// ───────────── fixed_assets 折旧参数（PR-7B P2-1：仅登记，不计算）─────────────
+// 锁住：create 默认值（method=straight_line·start_policy=next_month）/ method·start_policy 白名单 /
+// useful_life_months·salvage_rate 空/NaN→null（非 0，null=用类别默认）/ disposal_date 往返 /
+// partial update 不清空 / list 返回 5 新字段。**不验证任何折旧计算（P2-1 不算）。**
+{
+  freshDb();
+  const mk = async (body) => call('POST', '/api/fixed-assets', body);
+
+  // create 默认值：未传折旧参数 → method/start_policy 默认、useful_life/salvage null
+  const a1 = await mk({ name: '电脑', original_value: 6000 });
+  const r1 = (await call('GET', '/api/fixed-assets', null)).find((a) => a.id === a1.id);
+  ok(r1.depreciation_method === 'straight_line' && r1.depreciation_start_policy === 'next_month', '[deprec] create defaults method=straight_line, start=next_month');
+  ok(r1.useful_life_months === null && r1.salvage_rate === null && r1.disposal_date === null, '[deprec] useful_life/salvage/disposal default null');
+
+  // 显式折旧参数往返
+  const a2 = await mk({ name: '车辆', original_value: 100000, useful_life_months: 48, salvage_rate: 0.05, depreciation_start_policy: 'same_month', status: 'disposed', disposal_date: '2026-06-30' });
+  const r2 = (await call('GET', '/api/fixed-assets', null)).find((a) => a.id === a2.id);
+  ok(r2.useful_life_months === 48 && r2.salvage_rate === 0.05, '[deprec] useful_life_months/salvage_rate persist');
+  ok(r2.depreciation_start_policy === 'same_month' && r2.disposal_date === '2026-06-30', '[deprec] start_policy/disposal_date persist');
+
+  // 白名单：非法 method / start_policy throw
+  await expectThrow(() => mk({ name: 'bad', depreciation_method: 'accelerated' }), '[deprec] invalid depreciation_method throws');
+  await expectThrow(() => mk({ name: 'bad', depreciation_start_policy: 'weekly' }), '[deprec] invalid depreciation_start_policy throws');
+
+  // 空/NaN → null（非 0）
+  const aNull = await mk({ name: '空参数', useful_life_months: '', salvage_rate: 'abc' });
+  const rNull = (await call('GET', '/api/fixed-assets', null)).find((a) => a.id === aNull.id);
+  ok(rNull.useful_life_months === null && rNull.salvage_rate === null, '[deprec] empty/NaN → null (NOT 0)');
+
+  // partial update：只改 salvage_rate，不清空 useful_life_months
+  await call('PUT', `/api/fixed-assets/${a2.id}`, { salvage_rate: 0.1 });
+  const u2 = (await call('GET', '/api/fixed-assets', null)).find((a) => a.id === a2.id);
+  ok(u2.salvage_rate === 0.1 && u2.useful_life_months === 48 && u2.depreciation_start_policy === 'same_month', '[deprec] partial update changes only salvage_rate');
+  // update 白名单
+  await expectThrow(() => call('PUT', `/api/fixed-assets/${a2.id}`, { depreciation_method: 'ddb' }), '[deprec] update invalid method throws');
+}
+
 // ───────────────────────── equity (equity / capital ledger, PR-7D-4 pipeline) ─────────────────────────
 // 管道层 round-trip：证明权益/资本事项能录入·保存·读取·编辑·删除·停用，且边界守得住——仅登记，
 // 不合计、不结转、不平衡、不映射科目、不联动。锁住：create 默认值（equity_type=capital_contribution·

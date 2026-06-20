@@ -1301,7 +1301,18 @@
     "empty": "Aucune immobilisation pour l'instant. Cliquez ci-dessous pour en ajouter une.",
     "addButton": "Ajouter une immobilisation",
     "addTitle": "Nouvelle immobilisation",
-    "editTitle": "Modifier l'immobilisation"
+    "editTitle": "Modifier l'immobilisation",
+    "depreciationParams": "Paramètres d'amortissement",
+    "depreciationMethod": "Méthode",
+    "methodStraightLine": "Linéaire",
+    "usefulLifeYears": "Durée d'utilité (années)",
+    "salvageRatePercent": "Taux de valeur résiduelle (%)",
+    "startPolicy": "Début d'amortissement",
+    "startNextMonth": "Mois suivant l'acquisition",
+    "startSameMonth": "Mois d'acquisition",
+    "startDaily": "Journalier",
+    "disposalDate": "Date de cession",
+    "depreciationParamsNote": "Ce sont uniquement des paramètres d'amortissement — aucune charge d'amortissement ni valeur nette comptable n'est générée ici (la valeur nette / l'amortissement cumulé sont estimés dans l'aperçu de gestion)."
   },
   "equity": {
     "title": "Registre des capitaux propres",

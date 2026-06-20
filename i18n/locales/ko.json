@@ -1301,7 +1301,18 @@
     "empty": "고정자산 기록이 없습니다. 아래 버튼으로 추가하세요.",
     "addButton": "고정자산 추가",
     "addTitle": "새 고정자산",
-    "editTitle": "고정자산 편집"
+    "editTitle": "고정자산 편집",
+    "depreciationParams": "감가상각 매개변수",
+    "depreciationMethod": "상각 방법",
+    "methodStraightLine": "정액법",
+    "usefulLifeYears": "내용연수(년)",
+    "salvageRatePercent": "잔존가치율(%)",
+    "startPolicy": "상각 개시",
+    "startNextMonth": "취득 다음 달부터",
+    "startSameMonth": "취득 월부터",
+    "startDaily": "일할",
+    "disposalDate": "처분일",
+    "depreciationParamsNote": "여기서는 감가상각 매개변수만 등록하며, 감가상각비나 장부가액을 생성하지 않습니다(장부가액·감가상각누계액은 관리 기준 개요에서 추정)."
   },
   "equity": {
     "title": "자본·출자 등록 대장",

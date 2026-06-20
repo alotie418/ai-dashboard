@@ -1301,7 +1301,18 @@
     "empty": "尚無固定資產記錄，點擊下方按鈕新增。",
     "addButton": "新增固定資產",
     "addTitle": "新增固定資產",
-    "editTitle": "編輯固定資產"
+    "editTitle": "編輯固定資產",
+    "depreciationParams": "折舊參數",
+    "depreciationMethod": "折舊方法",
+    "methodStraightLine": "直線法",
+    "usefulLifeYears": "預計使用年限（年）",
+    "salvageRatePercent": "殘值率（%）",
+    "startPolicy": "折舊起算",
+    "startNextMonth": "次月起",
+    "startSameMonth": "當月起",
+    "startDaily": "按天",
+    "disposalDate": "處置日期",
+    "depreciationParamsNote": "此處僅登記折舊參數，不代表已產生折舊費用或淨值（淨值/累計折舊在管理口徑概覽中估算）。"
   },
   "equity": {
     "title": "權益/資本登記台帳",
