@@ -78,7 +78,8 @@
       "security": "アカウントとセキュリティ",
       "dataMigration": "データ移行",
       "products": "商品・サービス",
-      "dataBackup": "データバックアップ"
+      "dataBackup": "データバックアップ",
+      "cashAccounts": "口座・期首残高"
     },
     "company": {
       "title": "企業基本情報",
@@ -1202,5 +1203,29 @@
     "ai": "AI の結論は入力データに基づく試算であり、誤りを含む場合があります。専門的な税務・会計助言ではありません。",
     "usTax": "試算値であり、申告には使用できません。税務の専門家にご相談ください。",
     "rates": "税率はプリセットの参考値であり変更される場合があります。最新の公式税率をご確認ください。"
+  },
+  "cashAccounts": {
+    "title": "口座と期首残高",
+    "subtitle": "現金・銀行口座とその期首残高を登録し、以後の管理分析に利用します。",
+    "notBalanceSheetNote": "ここでは口座と期首残高（管理ベース）を記録するだけで、貸借対照表ではなく、残高の照合も行いません。",
+    "name": "口座名",
+    "namePlaceholder": "例：当座 / 小口現金",
+    "type": "種別",
+    "typeCash": "現金",
+    "typeBank": "銀行",
+    "currency": "通貨",
+    "currencyPlaceholder": "例：JPY / USD",
+    "openingBalance": "期首残高",
+    "openingDate": "開始日",
+    "note": "備考",
+    "notePlaceholder": "任意",
+    "openingHint": "期首残高は開始日の口座残高で、記録のみとなり、取引とは自動照合されません。",
+    "status": "状態",
+    "active": "有効",
+    "inactive": "無効",
+    "empty": "口座がありません。下のボタンから追加してください。",
+    "addButton": "口座を追加",
+    "addTitle": "口座の新規作成",
+    "editTitle": "口座の編集"
   }
 }

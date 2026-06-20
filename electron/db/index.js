@@ -467,6 +467,32 @@ const MIGRATIONS = [
     d.exec("UPDATE categories SET is_cogs = 1 WHERE slug = 'cogs' OR (locale = 'EU' AND slug = 'purchases')");
     console.log('[db] v13: categories.is_cogs added + backfilled');
   },
+
+  // v14: cash / bank accounts + opening balance (PR-7D-1, pipeline layer).
+  //   Pure master-data table for user-entered cash/bank accounts and their opening
+  //   balance. POLICY-NEUTRAL by design: it does NOT roll up into a balance sheet,
+  //   does NOT assert any balance (资产=负债+权益 is PR-7B), does NOT auto-link to
+  //   sales/purchases/transactions, and carries NO accounting formula. opening_balance
+  //   is simply a number the user types; nothing reconciles it. type is restricted to
+  //   cash/bank (no chart-of-accounts codes). Idempotent via CREATE TABLE IF NOT EXISTS.
+  (d) => {
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS accounts (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL DEFAULT 'cash' CHECK (type IN ('cash','bank')),
+        currency TEXT,
+        opening_balance REAL DEFAULT 0,
+        opening_date TEXT,
+        note TEXT,
+        is_active INTEGER DEFAULT 1,
+        sort_order INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT
+      )
+    `);
+    console.log('[db] v14: accounts table ready');
+  },
 ];
 
 function runMigrations(d) {

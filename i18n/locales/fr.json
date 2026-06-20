@@ -78,7 +78,8 @@
       "security": "Compte & sécurité",
       "dataMigration": "Migration de données",
       "products": "Produits",
-      "dataBackup": "Sauvegarde des données"
+      "dataBackup": "Sauvegarde des données",
+      "cashAccounts": "Comptes"
     },
     "company": {
       "title": "Informations entreprise",
@@ -1202,5 +1203,29 @@
     "ai": "Les conclusions de l'IA sont des estimations issues de vos données, potentiellement inexactes, et ne constituent pas un conseil fiscal ou comptable professionnel.",
     "usTax": "Estimations uniquement — pas pour la déclaration fiscale. Consultez un fiscaliste.",
     "rates": "Les taux d'imposition sont des valeurs de référence préréglées et peuvent évoluer — vérifiez les taux officiels en vigueur."
+  },
+  "cashAccounts": {
+    "title": "Comptes et soldes d'ouverture",
+    "subtitle": "Enregistrez les comptes de caisse / bancaires et leurs soldes d'ouverture pour l'analyse de gestion.",
+    "notBalanceSheetNote": "Cette section enregistre uniquement les comptes et soldes d'ouverture (base de gestion). Ce n'est pas un bilan et aucun équilibrage n'est effectué.",
+    "name": "Nom du compte",
+    "namePlaceholder": "ex. : Compte courant / Petite caisse",
+    "type": "Type",
+    "typeCash": "Caisse",
+    "typeBank": "Banque",
+    "currency": "Devise",
+    "currencyPlaceholder": "ex. : EUR / USD",
+    "openingBalance": "Solde d'ouverture",
+    "openingDate": "Date d'ouverture",
+    "note": "Note",
+    "notePlaceholder": "Facultatif",
+    "openingHint": "Le solde d'ouverture correspond au solde du compte à la date d'ouverture ; il est seulement enregistré et n'est pas rapproché des opérations.",
+    "status": "Statut",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "empty": "Aucun compte pour l'instant. Cliquez ci-dessous pour en ajouter un.",
+    "addButton": "Ajouter un compte",
+    "addTitle": "Nouveau compte",
+    "editTitle": "Modifier le compte"
   }
 }

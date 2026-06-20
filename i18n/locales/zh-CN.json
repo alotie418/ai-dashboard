@@ -78,7 +78,8 @@
       "security": "账户与安全",
       "dataMigration": "数据迁移",
       "products": "商品 / 服务",
-      "dataBackup": "数据备份"
+      "dataBackup": "数据备份",
+      "cashAccounts": "账户与期初"
     },
     "company": {
       "title": "企业基础信息",
@@ -1202,5 +1203,29 @@
     "ai": "AI 结论基于你的数据估算，可能有误，非专业税务或会计意见。",
     "usTax": "估算，非报税依据，请咨询税务专业人士。",
     "rates": "税率为预设参考值，可能随政策调整，请核对最新官方税率。"
+  },
+  "cashAccounts": {
+    "title": "账户与期初余额",
+    "subtitle": "登记现金 / 银行账户及其建账期初余额，用于后续管理分析。",
+    "notBalanceSheetNote": "这里仅登记账户与期初余额（管理口径），不是资产负债表，也不做平衡核算。",
+    "name": "账户名称",
+    "namePlaceholder": "如：基本户 / 备用金",
+    "type": "类型",
+    "typeCash": "现金",
+    "typeBank": "银行",
+    "currency": "币种",
+    "currencyPlaceholder": "如：CNY / USD",
+    "openingBalance": "期初余额",
+    "openingDate": "建账日期",
+    "note": "备注",
+    "notePlaceholder": "可选",
+    "openingHint": "期初余额为建账日的账户余额，仅作记录，不与流水自动勾稽。",
+    "status": "状态",
+    "active": "启用",
+    "inactive": "停用",
+    "empty": "暂无账户，点击下方按钮添加。",
+    "addButton": "添加账户",
+    "addTitle": "新增账户",
+    "editTitle": "编辑账户"
   }
 }
