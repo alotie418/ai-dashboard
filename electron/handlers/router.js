@@ -25,6 +25,7 @@ const conversationsH = require('./conversations');
 const cashAccountsH = require('./cashAccounts');
 const liabilitiesH = require('./liabilities');
 const fixedAssetsH = require('./fixedAssets');
+const equityH = require('./equity');
 
 const routes = [
   // ---- Dashboard ----
@@ -90,6 +91,12 @@ const routes = [
   ['POST', '/api/fixed-assets', fixedAssetsH.create],
   ['PUT', '/api/fixed-assets/:id', fixedAssetsH.update],
   ['DELETE', '/api/fixed-assets/:id', fixedAssetsH.remove],
+
+  // ---- Equity: 权益/资本登记台账（PR-7D-4 管道层；仅登记不合计·不结转·不出表；路径不冲突）----
+  ['GET', '/api/equity', equityH.list],
+  ['POST', '/api/equity', equityH.create],
+  ['PUT', '/api/equity/:id', equityH.update],
+  ['DELETE', '/api/equity/:id', equityH.remove],
 
   // ---- Business Documents（业务单据 Phase A；next-number/tax-invoice 排在 :id 前）----
   ['GET', '/api/documents/next-number', documentsH.nextNumber],

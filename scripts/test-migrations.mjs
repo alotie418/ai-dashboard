@@ -49,7 +49,7 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   runMigrations(d);
   ok(MIGRATIONS.length === SCHEMA_VERSION, `[1] SCHEMA_VERSION(${SCHEMA_VERSION}) must equal MIGRATIONS.length(${MIGRATIONS.length})`);
   ok(ver(d) === MIGRATIONS.length, `[1] fresh→head should reach v${MIGRATIONS.length}, got v${ver(d)}`);
-  for (const t of ['purchases', 'sales', 'settings', 'categories', 'transactions', 'products', 'business_documents', 'assistant_conversations', 'accounts', 'liabilities', 'fixed_assets']) {
+  for (const t of ['purchases', 'sales', 'settings', 'categories', 'transactions', 'products', 'business_documents', 'assistant_conversations', 'accounts', 'liabilities', 'fixed_assets', 'equity']) {
     ok(tableExists(d, t), `[1] table '${t}' must exist at head`);
   }
   d.close();
@@ -118,6 +118,7 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   ok(tableExists(d, 'accounts'), '[5] v14 accounts table must be added');
   ok(tableExists(d, 'liabilities'), '[5] v15 liabilities table must be added');
   ok(tableExists(d, 'fixed_assets'), '[5] v16 fixed_assets table must be added');
+  ok(tableExists(d, 'equity'), '[5] v17 equity table must be added');
   d.close();
 }
 
@@ -192,9 +193,35 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   d.close();
 }
 
+// ---- 9. v17 equity schema：列齐 + equity_type CHECK + amount 可负 + 无结转/合计列 ----
+{
+  const d = fresh();
+  runMigrations(d);
+  ok(tableExists(d, 'equity'), '[9] v17 equity table exists');
+  for (const c of ['id', 'name', 'owner', 'equity_type', 'amount', 'currency', 'event_date',
+                   'note', 'is_active', 'sort_order', 'created_at', 'updated_at']) {
+    ok(colExists(d, 'equity', c), `[9] equity.${c} column must exist`);
+  }
+  // 故意不应存在合计/结转/科目列（留 PR-7B）
+  for (const c of ['total', 'retained_earnings', 'undistributed_profit', 'paid_in_capital', 'capital_reserve', 'surplus_reserve']) {
+    ok(!colExists(d, 'equity', c), `[9] equity must NOT carry rollup/carry-forward column '${c}' (deferred to PR-7B)`);
+  }
+  // equity_type CHECK：四个中性值放行，其它在 DB 层拒绝
+  let badType = null;
+  try { d.prepare("INSERT INTO equity (id, name, equity_type) VALUES ('e-bad', 'X', 'dividend')").run(); }
+  catch (e) { badType = e?.message || String(e); }
+  ok(badType, '[9] equity.equity_type CHECK rejects values other than the 4 neutral labels');
+  d.prepare("INSERT INTO equity (id, name, equity_type, amount) VALUES ('e-ok', 'Draw', 'owner_draw', -2000.5)").run();
+  const row = d.prepare("SELECT equity_type, amount, is_active FROM equity WHERE id = 'e-ok'").get();
+  ok(row.equity_type === 'owner_draw', '[9] owner_draw type accepted (中性标签，不触发计算)');
+  ok(row.amount === -2000.5, '[9] amount accepts negative (NaN→0 仅在 handler，DB 不强制方向)');
+  ok(row.is_active === 1, '[9] is_active defaults to 1');
+  d.close();
+}
+
 if (failures.length) {
   console.error(`✗ migrations: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema + v15 liabilities schema + v16 fixed_assets schema)`);
+console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema + v15 liabilities schema + v16 fixed_assets schema + v17 equity schema)`);

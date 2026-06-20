@@ -550,6 +550,66 @@ async function expectThrow(fn, label) {
   await expectThrow(() => call('DELETE', '/api/fixed-assets/nope', null), '[asset] delete missing throws');
 }
 
+// ───────────────────────── equity (equity / capital ledger, PR-7D-4 pipeline) ─────────────────────────
+// 管道层 round-trip：证明权益/资本事项能录入·保存·读取·编辑·删除·停用，且边界守得住——仅登记，
+// 不合计、不结转、不平衡、不映射科目、不联动。锁住：create 默认值（equity_type=capital_contribution·
+// is_active=true）/ equity_type 白名单（4 中性值）/ amount 可负·NaN→0·缺省→0（系统不解释方向）/
+// name·type 校验 / partial update 不清空 / 编辑 name·type·amount / owner_draw 仅存标签 /
+// 停用(is_active=false)持久 / delete + delete-missing。
+{
+  freshDb();
+  const mkEquity = async (body) => call('POST', '/api/equity', body);
+
+  ok((await call('GET', '/api/equity', null)).length === 0, '[equity] list starts empty');
+
+  // create defaults: equity_type→capital_contribution, is_active→true; amount/owner/etc kept
+  const e1 = await mkEquity({ name: '创始人增资', owner: '张三', amount: 100000, currency: 'CNY', event_date: '2026-01-01' });
+  ok(e1?.success && e1.id, `[equity] create → {success,id}, got ${JSON.stringify(e1)}`);
+  const r1 = (await call('GET', '/api/equity', null)).find((x) => x.id === e1.id);
+  ok(r1 && r1.equity_type === 'capital_contribution' && r1.amount === 100000, '[equity] create defaults type=capital_contribution, amount kept');
+  ok(r1.owner === '张三' && r1.currency === 'CNY' && r1.event_date === '2026-01-01', '[equity] owner/currency/event_date persist');
+  ok(typeof r1.is_active === 'boolean' && r1.is_active === true, '[equity] is_active coerced to boolean, defaults true');
+
+  // type whitelist: invalid throws (handler guard before DB); the 4 neutral labels accepted
+  await expectThrow(() => call('POST', '/api/equity', { name: 'Bad', equity_type: 'dividend' }), '[equity] invalid equity_type throws');
+  const e2 = await mkEquity({ name: '创始人支取', equity_type: 'owner_draw', amount: -3000 });
+  const r2 = (await call('GET', '/api/equity', null)).find((x) => x.id === e2.id);
+  ok(r2.equity_type === 'owner_draw' && r2.amount === -3000, '[equity] owner_draw accepted, negative amount preserved (sign not interpreted)');
+
+  // amount: NaN → 0, missing → 0
+  const eNaN = await mkEquity({ name: 'NaN', amount: 'nope' });
+  const eMiss = await mkEquity({ name: 'Bare' });
+  const after = await call('GET', '/api/equity', null);
+  ok(after.find((x) => x.id === eNaN.id).amount === 0, '[equity] NaN amount coerced to 0');
+  ok(after.find((x) => x.id === eMiss.id).amount === 0, '[equity] missing amount defaults to 0');
+
+  // name required (create + update); update validates type; missing id throws
+  await expectThrow(() => call('POST', '/api/equity', { name: '   ' }), '[equity] blank name throws');
+  await expectThrow(() => call('PUT', `/api/equity/${e1.id}`, { name: '' }), '[equity] update blank name throws');
+  await expectThrow(() => call('PUT', `/api/equity/${e1.id}`, { equity_type: 'bonus' }), '[equity] update invalid type throws');
+  await expectThrow(() => call('PUT', '/api/equity/nope', { name: 'x' }), '[equity] update missing id throws');
+
+  // partial update: only provided field changes; untouched fields preserved (not cleared)
+  await call('PUT', `/api/equity/${e1.id}`, { amount: 120000 });
+  const u1 = (await call('GET', '/api/equity', null)).find((x) => x.id === e1.id);
+  ok(u1.amount === 120000 && u1.name === '创始人增资' && u1.owner === '张三' && u1.currency === 'CNY',
+    '[equity] partial update changes only amount, leaves name/owner/currency intact');
+
+  // edit name + type + amount together
+  await call('PUT', `/api/equity/${e1.id}`, { name: '创始人增资(调整)', equity_type: 'adjustment', amount: 90000 });
+  const u2 = (await call('GET', '/api/equity', null)).find((x) => x.id === e1.id);
+  ok(u2.name === '创始人增资(调整)' && u2.equity_type === 'adjustment' && u2.amount === 90000, '[equity] edit applies name/type/amount');
+
+  // toggle active (停用) persists as boolean false
+  await call('PUT', `/api/equity/${e2.id}`, { is_active: false });
+  ok((await call('GET', '/api/equity', null)).find((x) => x.id === e2.id).is_active === false, '[equity] is_active=false (停用) persists');
+
+  // delete removes; delete missing throws
+  await call('DELETE', `/api/equity/${e2.id}`, null);
+  ok(!(await call('GET', '/api/equity', null)).some((x) => x.id === e2.id), '[equity] delete removes row');
+  await expectThrow(() => call('DELETE', '/api/equity/nope', null), '[equity] delete missing throws');
+}
+
 // ───────────── products.create id hardening (prod-<ts>-<rand>) ─────────────
 // A tight loop with no spacing lands many creates on the SAME millisecond; the random suffix
 // must keep every id unique (no PRIMARY KEY collision). Pre-fix (pure Date.now) this collides.
@@ -1592,4 +1652,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');

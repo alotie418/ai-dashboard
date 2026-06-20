@@ -478,6 +478,53 @@ export function deleteFixedAsset(id: string): Promise<{ success: boolean }> {
   return apiFetch(`/api/fixed-assets/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
+// ==================== Equity（权益/资本登记台账，PR-7D-4 管道层）====================
+// 政策中性主数据：仅录入/读取/编辑/删除·停用。不做权益合计、不做留存收益/利润结转、不做平衡、
+// 不接资产负债表、不碰 reports、不联动 accounts/transactions。equity_type 仅中性分类无科目映射；
+// amount 用户手输（NaN→0，不 clamp，允许负，系统不解释方向）。
+
+export type EquityType = 'capital_contribution' | 'owner_draw' | 'adjustment' | 'other';
+
+export interface EquityEntry {
+  id: string;
+  name: string;
+  owner: string | null;
+  equity_type: EquityType;
+  amount: number;
+  currency: string | null;
+  event_date: string | null;
+  note: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface EquityUpsert {
+  name: string;
+  owner?: string | null;
+  equity_type?: EquityType;
+  amount?: number;
+  currency?: string | null;
+  event_date?: string | null;
+  note?: string | null;
+  is_active?: boolean;
+  sort_order?: number;
+}
+
+export function listEquity(): Promise<EquityEntry[]> {
+  return apiFetch<EquityEntry[]>('/api/equity');
+}
+export function createEquity(payload: EquityUpsert): Promise<{ success: boolean; id: string }> {
+  return apiFetch('/api/equity', { method: 'POST', body: JSON.stringify(payload) });
+}
+export function updateEquity(id: string, payload: Partial<EquityUpsert>): Promise<{ success: boolean }> {
+  return apiFetch(`/api/equity/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+export function deleteEquity(id: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/equity/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
 // ==================== Transactions（国际化数据模型 v5，C 阶段）====================
 
 export type TransactionType = 'income' | 'expense';

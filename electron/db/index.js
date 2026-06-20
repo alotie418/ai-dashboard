@@ -561,6 +561,39 @@ const MIGRATIONS = [
     `);
     console.log('[db] v16: fixed_assets table ready');
   },
+
+  // v17: equity / capital ledger (PR-7D-4, pipeline layer).
+  //   Manual ledger of equity/capital events (capital contributions, owner draws,
+  //   adjustments, etc.). POLICY-NEUTRAL: every value is user-entered; the app
+  //   computes NOTHING. It does NOT total owner's equity, does NOT carry forward
+  //   retained earnings / undistributed profit / current-year profit, does NOT compute
+  //   capital reserve / surplus reserve, does NOT build a balance sheet or balance
+  //   check, and does NOT touch P&L/cashflow/reports or auto-link to accounts/
+  //   transactions. equity_type is a NEUTRAL label only — it maps to NO chart-of-
+  //   accounts code and does NOT auto-feed 实收资本/资本公积/盈余公积/未分配利润.
+  //   amount: NaN→0, never clamped, negatives allowed (sign is NOT interpreted).
+  //   All equity totals / carry-forwards are deferred to PR-7B under accountant
+  //   confirmation. Idempotent via CREATE TABLE IF NOT EXISTS.
+  (d) => {
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS equity (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        owner TEXT,
+        equity_type TEXT NOT NULL DEFAULT 'capital_contribution'
+          CHECK (equity_type IN ('capital_contribution','owner_draw','adjustment','other')),
+        amount REAL DEFAULT 0,
+        currency TEXT,
+        event_date TEXT,
+        note TEXT,
+        is_active INTEGER DEFAULT 1,
+        sort_order INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT
+      )
+    `);
+    console.log('[db] v17: equity table ready');
+  },
 ];
 
 function runMigrations(d) {

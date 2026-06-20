@@ -81,7 +81,8 @@
       "dataBackup": "資料備份",
       "cashAccounts": "帳戶與期初",
       "liabilities": "負債/借款",
-      "fixedAssets": "固定資產"
+      "fixedAssets": "固定資產",
+      "equity": "權益/資本"
     },
     "company": {
       "title": "企業基礎資料",
@@ -1291,5 +1292,34 @@
     "addButton": "新增固定資產",
     "addTitle": "新增固定資產",
     "editTitle": "編輯固定資產"
+  },
+  "equity": {
+    "title": "權益/資本登記台帳",
+    "subtitle": "登記權益/資本事項（增資、撤資、所有者支取、調整等）的手工台帳，供後續管理分析使用。",
+    "notBalanceSheetNote": "此處僅登記權益/資本事項（管理口徑），並非資產負債表，也不做平衡核算。",
+    "notRollupNote": "此處僅作登記，不做權益合計、不做留存收益/未分配利潤/本年利潤結轉、不做科目映射。",
+    "name": "事項名稱",
+    "namePlaceholder": "如：創辦人增資",
+    "owner": "出資人/股東",
+    "ownerPlaceholder": "如：張三",
+    "type": "類型",
+    "typeCapitalContribution": "出資/增資",
+    "typeOwnerDraw": "所有者支取",
+    "typeAdjustment": "調整",
+    "typeOther": "其他",
+    "amount": "金額",
+    "amountHint": "金額僅作登記，系統不解釋正負方向、不彙總、不結轉；可填負數。",
+    "currency": "幣別",
+    "currencyPlaceholder": "如：TWD / USD",
+    "eventDate": "發生日期",
+    "note": "備註",
+    "notePlaceholder": "選填",
+    "status": "狀態",
+    "active": "啟用",
+    "inactive": "停用",
+    "empty": "尚無權益/資本記錄，點擊下方按鈕新增。",
+    "addButton": "新增權益/資本事項",
+    "addTitle": "新增權益/資本事項",
+    "editTitle": "編輯權益/資本事項"
   }
 }
