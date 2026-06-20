@@ -722,6 +722,69 @@ async function expectThrow(fn, label) {
   ok(accCny.total === 300 && s.equity.byCurrency.find((r) => r.currency === 'CNY')?.total === 30000, '[ledger] tax 1200 not folded into accounts/equity totals');
 }
 
+// ───────────────────────── cash-position (现金/银行期末结转只读预览, PR-7B P1-2) ─────────────────────────
+// 只读 preview：endingEstimate = 期初 + 本期实收 − 本期实付，按币种。锁住：transactions 选源时按币种聚合·
+// 期末公式·缺 payment_date 回退 date·selectReportSource 防双计(本期有 txn → legacy sale 被忽略)·
+// **不写回 accounts**·estimate/limitations/excludedNotes·legacy 选源按本位币归集(缺 payment_date 行不计入)。
+const PD = '2026-06-15';        // 期间内
+const Q = '?from=2026-01-01&to=2026-12-31';
+{
+  const db = freshDb();
+  // 期初：CNY 1000(启用) + USD 500(启用) + CNY 999(停用→排除)
+  await call('POST', '/api/accounts', { name: 'A-CNY', opening_balance: 1000, currency: 'CNY' });
+  await call('POST', '/api/accounts', { name: 'A-USD', opening_balance: 500, currency: 'USD' });
+  await call('POST', '/api/accounts', { name: 'A-OFF', opening_balance: 999, currency: 'CNY', is_active: false });
+
+  // 本期 transactions（直插以精确控制 currency/payment_date/paid_amount）
+  const insTxn = db.prepare(`INSERT INTO transactions (id, type, date, amount, amount_net, currency, payment_status, paid_amount, payment_date) VALUES (?,?,?,?,?,?,?,?,?)`);
+  insTxn.run('cp-i1', 'income',  PD, 300, 300, 'CNY', 'paid', 300, PD);          // CNY 实收 300
+  insTxn.run('cp-e1', 'expense', PD, 100, 100, 'CNY', 'paid', 100, PD);          // CNY 实付 100
+  insTxn.run('cp-i2', 'income',  PD,  50,  50, 'USD', 'paid',  50, PD);          // USD 实收 50
+  insTxn.run('cp-i3', 'income',  PD,  70,  70, 'CNY', 'paid',  70, null);        // 缺 payment_date → 回退 date → 计入 CNY 实收 70
+  insTxn.run('cp-i4', 'income',  PD, 999, 999, 'CNY', 'unpaid', 0, PD);          // 未付 → 不计入
+  // legacy sale（同期）：因本期有 transactions → 选源 transactions → 此 sale 必须被忽略（防双计）
+  db.prepare(`INSERT INTO sales (id, date, customer, totalAmount, payment_status, paid_amount, payment_date) VALUES (?,?,?,?,?,?,?)`)
+    .run('cp-legacy-sale', PD, 'X', 8888, 'paid', 8888, PD);
+
+  const r = await call('GET', `/api/cash-position${Q}`, null);
+  ok(r.estimate === true && r.source === 'transactions', `[cash] estimate=true, source=transactions, got ${r.source}`);
+  const cny = r.byCurrency.find((x) => x.currency === 'CNY');
+  const usd = r.byCurrency.find((x) => x.currency === 'USD');
+  ok(cny && approx(cny.opening, 1000), `[cash] CNY opening=1000 (停用 999 排除), got ${cny?.opening}`);
+  ok(approx(cny.inflow, 370), `[cash] CNY inflow=370 (300+70, 缺 payment_date 的 70 经 date 回退计入), got ${cny.inflow}`);
+  ok(approx(cny.outflow, 100), `[cash] CNY outflow=100, got ${cny.outflow}`);
+  ok(approx(cny.endingEstimate, 1270), `[cash] CNY ending=期初+实收−实付=1270, got ${cny.endingEstimate}`);
+  ok(usd && approx(usd.opening, 500) && approx(usd.inflow, 50) && approx(usd.outflow, 0) && approx(usd.endingEstimate, 550), `[cash] USD opening500/in50/out0/end550, got ${JSON.stringify(usd)}`);
+  // 防双计：legacy sale 8888 未进 CNY 实收
+  ok(cny.inflow < 8888, '[cash] selectReportSource 防双计：本期有 txn → legacy sale 8888 被忽略');
+  // 按币种、不跨币种合计：恰两个币种，无单一总额字段
+  ok(r.byCurrency.length === 2 && r.total === undefined && r.endingTotal === undefined, '[cash] grouped by currency, no cross-currency total');
+  ok(Array.isArray(r.limitations) && r.limitations.length > 0 && Array.isArray(r.excludedNotes) && r.excludedNotes.length > 0, '[cash] limitations/excludedNotes present');
+
+  // **不写回 accounts**：调用后 accounts.opening_balance 不变
+  const accs = await call('GET', '/api/accounts', null);
+  ok(accs.find((a) => a.name === 'A-CNY').opening_balance === 1000 && accs.find((a) => a.name === 'A-USD').opening_balance === 500,
+    '[cash] read-only: accounts.opening_balance NOT written back');
+}
+
+// legacy 选源：本期无 transactions → source=legacy → sales/purchases 按本位币归集；缺 payment_date 行不计入
+{
+  const db = freshDb();
+  await call('POST', '/api/accounts', { name: 'A-CNY', opening_balance: 200, currency: 'CNY' });
+  db.prepare(`INSERT INTO sales (id, date, customer, totalAmount, payment_status, paid_amount, payment_date) VALUES (?,?,?,?,?,?,?)`)
+    .run('cp-s1', PD, 'X', 400, 'paid', 400, PD);        // 实收 400
+  db.prepare(`INSERT INTO sales (id, date, customer, totalAmount, payment_status, paid_amount, payment_date) VALUES (?,?,?,?,?,?,?)`)
+    .run('cp-s2', PD, 'Y', 60, 'paid', 60, null);        // 缺 payment_date → 不计入
+  db.prepare(`INSERT INTO purchases (id, date, supplier, totalAmount, payment_status, paid_amount, payment_date) VALUES (?,?,?,?,?,?,?)`)
+    .run('cp-p1', PD, 'Z', 150, 'paid', 150, PD);        // 实付 150
+
+  const r = await call('GET', `/api/cash-position${Q}`, null);
+  ok(r.source === 'legacy', `[cash-legacy] source=legacy (本期无 txn), got ${r.source}`);
+  const cny = r.byCurrency.find((x) => x.currency === r.baseCurrency);
+  ok(cny && approx(cny.opening, 200) && approx(cny.inflow, 400) && approx(cny.outflow, 150) && approx(cny.endingEstimate, 450),
+    `[cash-legacy] 本位币 opening200/in400(缺payment_date 60 排除)/out150/end450, got ${JSON.stringify(cny)}`);
+}
+
 // ───────────── products.create id hardening (prod-<ts>-<rand>) ─────────────
 // A tight loop with no spacing lands many creates on the SAME millisecond; the random suffix
 // must keep every id unique (no PRIMARY KEY collision). Pre-fix (pure Date.now) this collides.
@@ -1764,4 +1827,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');

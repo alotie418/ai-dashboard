@@ -608,6 +608,37 @@ export function fetchLedgerSummary(): Promise<LedgerSummary> {
   return apiFetch<LedgerSummary>('/api/ledger-summary');
 }
 
+// ==================== Cash Position（现金/银行期末结转只读预览，PR-7B P1-2）====================
+// 只读预览：endingEstimate = Σ accounts.opening_balance(启用) + 本期实收 − 本期实付，按币种。
+// 不写回 accounts、不改历史交易；仅经营活动实收付（未含投资/筹资）；多币种不折算、不跨币种合计。
+// 不做 balanceOverview / 资产负债概览 / 平衡差额 / 折旧 / 留存结转 / 税额对冲。
+
+export interface CashPositionCurrencyRow {
+  currency: string | null;   // 原币（自由文本）；null = 未指定
+  opening: number;           // 期初（启用账户）
+  inflow: number;            // 本期实收
+  outflow: number;           // 本期实付
+  endingEstimate: number;    // 期末估算 = opening + inflow − outflow
+}
+export interface CashPosition {
+  estimate: boolean;         // 恒 true
+  source: 'transactions' | 'legacy';
+  period: { from: string; to: string };
+  baseCurrency: string;
+  byCurrency: CashPositionCurrencyRow[];
+  limitations: string[];
+  excludedNotes: string[];
+}
+
+export function fetchCashPosition(opts: { from?: string; to?: string; year?: string } = {}): Promise<CashPosition> {
+  const qs = new URLSearchParams();
+  if (opts.from) qs.set('from', opts.from);
+  if (opts.to) qs.set('to', opts.to);
+  if (opts.year) qs.set('year', opts.year);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return apiFetch<CashPosition>(`/api/cash-position${suffix}`);
+}
+
 // ==================== Transactions（国际化数据模型 v5，C 阶段）====================
 
 export type TransactionType = 'income' | 'expense';
