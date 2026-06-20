@@ -639,6 +639,45 @@ export function fetchCashPosition(opts: { from?: string; to?: string; year?: str
   return apiFetch<CashPosition>(`/api/cash-position${suffix}`);
 }
 
+// ==================== Balance Overview（管理口径资产负债概览，PR-7B P1-3 只读聚合）====================
+// 非法定资产负债表：按币种归集 资产/负债/权益 + 各小计 + 显式 balanceDifference（= 资产−负债−权益）。
+// 现金来自 cash-position endingEstimate；固定资产按原值（不折旧）；借款按 maturity_date 一年线分；
+// 权益取 equity.amount 之和（不做结转）；税不进合计；多币种不折算、不跨币种合计；只读不写回。
+
+export interface BalanceLine {
+  key: string;       // = accountingClassification BALANCE_CLASSIFICATION 的 key（前端据此取标签）
+  amount: number;
+}
+export interface BalanceCurrencyBlock {
+  currency: string | null;
+  assets: { current: BalanceLine[]; nonCurrent: BalanceLine[] };
+  liabilities: { current: BalanceLine[]; nonCurrent: BalanceLine[] };
+  equity: BalanceLine[];
+  totals: { assets: number; liabilities: number; equity: number };
+  balanceDifference: number;   // 资产 − 负债 − 权益（按币种，非 0 为常态，不隐藏）
+  warnings: string[];
+}
+export interface BalanceOverview {
+  estimate: boolean;                                   // 恒 true
+  reportType: 'management_balance_overview';           // 非法定 balance sheet
+  period: { from: string; to: string };
+  asOf: string;
+  baseCurrency: string;
+  byCurrency: BalanceCurrencyBlock[];
+  disclaimerKey: string;
+  limitations: string[];
+  excludedNotes: string[];
+}
+
+export function fetchBalanceOverview(opts: { from?: string; to?: string; year?: string } = {}): Promise<BalanceOverview> {
+  const qs = new URLSearchParams();
+  if (opts.from) qs.set('from', opts.from);
+  if (opts.to) qs.set('to', opts.to);
+  if (opts.year) qs.set('year', opts.year);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return apiFetch<BalanceOverview>(`/api/balance-overview${suffix}`);
+}
+
 // ==================== Transactions（国际化数据模型 v5，C 阶段）====================
 
 export type TransactionType = 'income' | 'expense';
