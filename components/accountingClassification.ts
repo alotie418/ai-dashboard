@@ -4,7 +4,7 @@
 //   • 只声明每个数据源的 section（资产/负债/权益）与 liquidity（流动/非流动/按到期日/无）；
 //   • 只声明 accountingLocale → 四套标签集（ASBE / US_GAAP / JGAAP / IFRS）的归并（六制度收敛 4 套）；
 //   • 展示标签复用现有 i18n（finance.balance*，按 UI 语言）/ accountingLocaleConfig（bal*，按制度取制度名）；
-//   • 借款（borrowings）行专属标签 deferred 到 P1-4：此处仅留稳定 key 占位 '(deferred:P1-4)' + 说明。
+//   • 借款（borrowings）行标签 = finance.balanceBorrowings（P1-4 已接入 i18n + UI）。
 //
 // 明确不含（P1-1 红线）：金额、小计、合计（assets/liabilities/equityTotal）、平衡差额、折旧、
 //   留存收益结转、税额对冲、多币种折算，以及任何计算函数。本文件此刻**无运行时消费方**
@@ -25,7 +25,7 @@ export interface BalanceClassificationEntry {
   liquidity: BalanceLiquidity;
   /** liquidity === 'by_maturity' 时，空到期日的回退档（仅声明，不在此计算）。 */
   defaultLiquidity?: BalanceLiquidity;
-  /** 复用的展示标签键（finance.* 走 UI 语言）；'(deferred:P1-4)' 表示该行标签留 P1-4 再补 i18n。 */
+  /** 展示标签键（finance.* 走 UI 语言；P1-4 已为所有源接入，含 finance.balanceBorrowings）。 */
   labelKey: string;
   /** 制度名键（accountingLocaleConfig.taxConcepts 的 key，按 accountingLocale 取制度名）；无则省略。 */
   regimeLabelKey?: string;
@@ -43,7 +43,7 @@ export const BALANCE_CLASSIFICATION: Record<BalanceSourceKey, BalanceClassificat
   fixedAssets: { section: 'asset',     liquidity: 'non_current', labelKey: 'finance.balanceFixed',      includeInTotals: true, note: 'P1 用原值；折旧/净值属 P2' },
   payables:    { section: 'liability', liquidity: 'current',     labelKey: 'finance.balancePayable',    regimeLabelKey: 'balPayLabel', includeInTotals: true },
   taxPayable:  { section: 'liability', liquidity: 'current',     labelKey: 'finance.balanceTaxPayable', regimeLabelKey: 'balTaxPayLabel', includeInTotals: false, note: 'P1 仅估算占位，不参与任何合计；税额对冲属 P3' },
-  borrowings:  { section: 'liability', liquidity: 'by_maturity', defaultLiquidity: 'current', labelKey: '(deferred:P1-4)', includeInTotals: true, note: '按 liabilities.maturity_date 一年线分；空到期日默认流动；行标签 i18n 留 P1-4' },
+  borrowings:  { section: 'liability', liquidity: 'by_maturity', defaultLiquidity: 'current', labelKey: 'finance.balanceBorrowings', includeInTotals: true, note: '按 liabilities.maturity_date 一年线分；空到期日默认流动；行标签 finance.balanceBorrowings（P1-4 接入）' },
   equity:      { section: 'equity',    liquidity: 'none',        labelKey: 'finance.balanceEquity',     regimeLabelKey: 'balEquityHeader', includeInTotals: true },
 };
 

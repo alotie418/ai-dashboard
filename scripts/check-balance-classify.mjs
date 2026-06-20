@@ -44,8 +44,8 @@ ok(BALANCE_CLASSIFICATION.borrowings.section === 'liability' && BALANCE_CLASSIFI
   '[3] borrowings = liability/by_maturity');
 ok(BALANCE_CLASSIFICATION.borrowings.defaultLiquidity === 'current', '[3] borrowings.defaultLiquidity = current (空到期日按流动)');
 ok(typeof BALANCE_CLASSIFICATION.borrowings.note === 'string' && BALANCE_CLASSIFICATION.borrowings.note.length > 0, '[3] borrowings has a note');
-// 拍板3: 借款行标签 deferred 到 P1-4（占位）
-ok(BALANCE_CLASSIFICATION.borrowings.labelKey === '(deferred:P1-4)', '[3] borrowings.labelKey deferred to P1-4 (no new i18n in P1-1)');
+// P1-4: 借款行标签已接入 finance.balanceBorrowings（不再 deferred）
+ok(BALANCE_CLASSIFICATION.borrowings.labelKey === 'finance.balanceBorrowings', '[3] borrowings.labelKey wired to finance.balanceBorrowings (P1-4)');
 
 // ── 4. 六制度 → 四套标签集（EU/KR/TW 同归 IFRS）──
 for (const loc of ['CN', 'US', 'JP', 'EU', 'KR', 'TW']) ok(loc in LABEL_SET_BY_LOCALE, `[4] missing locale '${loc}'`);

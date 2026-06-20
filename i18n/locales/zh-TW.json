@@ -867,7 +867,15 @@
     "balanceCurrentLiabilities": "流動負債",
     "balancePaidInCapital": "實收資本",
     "balanceRetainedEarnings": "未分配利潤",
-    "balanceLiabilitiesEquity": "負債與權益"
+    "balanceLiabilitiesEquity": "負債與權益",
+    "balanceOverviewTitle": "管理口徑資產負債概覽",
+    "balanceOverviewDisclaimer": "本概覽為管理口徑，未做法定嚴格平衡；下方「平衡差額／待調整」為待調整項，非真實差錯可忽略。",
+    "balanceEstimateBadge": "估算 · 僅供經營管理參考",
+    "balanceBorrowings": "借款",
+    "balanceNonCurrentLiabilities": "非流動負債",
+    "balanceDifference": "平衡差額／待調整",
+    "balanceBorrowingsNullMaturity": "含未填到期日的借款，暫按流動列示",
+    "balanceCurrencyUnspecified": "未指定幣別"
   },
   "usSchedule": {
     "line1": "Line 1 — 總收入或銷售額",

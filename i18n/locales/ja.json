@@ -867,7 +867,15 @@
     "balanceCurrentLiabilities": "流動負債",
     "balancePaidInCapital": "資本金",
     "balanceRetainedEarnings": "利益剰余金",
-    "balanceLiabilitiesEquity": "負債及び純資産"
+    "balanceLiabilitiesEquity": "負債及び純資産",
+    "balanceOverviewTitle": "管理ベース 資産・負債概況",
+    "balanceOverviewDisclaimer": "本概況は管理ベースで、法定のような厳密な均衡は行っていません。下の「差額（調整待ち）」は調整待ち項目であり、必ずしも誤りではありません。",
+    "balanceEstimateBadge": "概算 · 経営管理の参考用",
+    "balanceBorrowings": "借入金",
+    "balanceNonCurrentLiabilities": "固定負債",
+    "balanceDifference": "差額（調整待ち）",
+    "balanceBorrowingsNullMaturity": "満期日未入力の借入を含み、暫定的に流動として表示",
+    "balanceCurrencyUnspecified": "通貨未指定"
   },
   "usSchedule": {
     "line1": "Line 1 — 総収入",

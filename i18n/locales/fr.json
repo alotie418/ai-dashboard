@@ -867,7 +867,15 @@
     "balanceCurrentLiabilities": "Dettes à court terme",
     "balancePaidInCapital": "Capital social",
     "balanceRetainedEarnings": "Résultat reporté",
-    "balanceLiabilitiesEquity": "Passif"
+    "balanceLiabilitiesEquity": "Passif",
+    "balanceOverviewTitle": "Aperçu de gestion actif-passif",
+    "balanceOverviewDisclaimer": "Cet aperçu est en base de gestion et n'est pas strictement équilibré comme un état réglementaire ; la ligne « écart / à ajuster » ci-dessous est un élément en attente d'ajustement, pas nécessairement une erreur.",
+    "balanceEstimateBadge": "Estimation · référence de gestion uniquement",
+    "balanceBorrowings": "Emprunts",
+    "balanceNonCurrentLiabilities": "Passifs non courants",
+    "balanceDifference": "Écart / à ajuster",
+    "balanceBorrowingsNullMaturity": "Inclut des emprunts sans date d'échéance, présentés comme courants pour l'instant",
+    "balanceCurrencyUnspecified": "Devise non spécifiée"
   },
   "usSchedule": {
     "line1": "Line 1 — Recettes brutes",

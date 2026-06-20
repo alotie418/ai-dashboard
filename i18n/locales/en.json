@@ -867,7 +867,15 @@
     "balanceCurrentLiabilities": "Current Liabilities",
     "balancePaidInCapital": "Paid-in Capital",
     "balanceRetainedEarnings": "Retained Earnings",
-    "balanceLiabilitiesEquity": "Liabilities & Equity"
+    "balanceLiabilitiesEquity": "Liabilities & Equity",
+    "balanceOverviewTitle": "Management Balance Overview",
+    "balanceOverviewDisclaimer": "This overview is on a management basis and is not strictly balanced like a statutory statement; the \"balance difference / to be adjusted\" line below is a pending-adjustment item, not necessarily an error.",
+    "balanceEstimateBadge": "Estimate · management reference only",
+    "balanceBorrowings": "Borrowings",
+    "balanceNonCurrentLiabilities": "Non-current liabilities",
+    "balanceDifference": "Balance difference / to be adjusted",
+    "balanceBorrowingsNullMaturity": "Includes borrowings without a maturity date, shown as current for now",
+    "balanceCurrencyUnspecified": "Unspecified currency"
   },
   "usSchedule": {
     "line1": "Line 1 — Gross Receipts",

@@ -867,7 +867,15 @@
     "balanceCurrentLiabilities": "유동부채",
     "balancePaidInCapital": "납입자본금",
     "balanceRetainedEarnings": "이익잉여금",
-    "balanceLiabilitiesEquity": "부채 및 자본"
+    "balanceLiabilitiesEquity": "부채 및 자본",
+    "balanceOverviewTitle": "관리 기준 자산·부채 개요",
+    "balanceOverviewDisclaimer": "본 개요는 관리 기준이며 법정처럼 엄격하게 평형을 맞추지 않습니다. 아래 \"차액(조정 필요)\"는 조정 대기 항목이며 반드시 오류는 아닙니다.",
+    "balanceEstimateBadge": "추정 · 경영 관리 참고용",
+    "balanceBorrowings": "차입금",
+    "balanceNonCurrentLiabilities": "비유동부채",
+    "balanceDifference": "차액(조정 필요)",
+    "balanceBorrowingsNullMaturity": "만기일 미입력 차입금 포함, 잠정적으로 유동으로 표시",
+    "balanceCurrencyUnspecified": "통화 미지정"
   },
   "usSchedule": {
     "line1": "Line 1 — 총수입",
