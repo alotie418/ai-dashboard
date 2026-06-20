@@ -367,6 +367,66 @@ async function expectThrow(fn, label) {
   await expectThrow(() => call('DELETE', '/api/products/nope', null), '[prod] delete missing throws');
 }
 
+// ───────────────────────── accounts (cash/bank master data + opening balance, PR-7D-1 pipeline) ─────────────────────────
+// 管道层 round-trip：证明账户/期初余额能录入·保存·读取·编辑·删除·停用，且边界守得住——
+// 不接资产负债表、不 roll-up、不勾稽。锁住：create 默认值 / type 白名单（cash·bank）/ opening_balance
+// 可负（透支）·NaN→0·缺省→0 / is_active 布尔强转回 list / name·type 校验 / partial update 不清空其它字段 /
+// 编辑 name·type·note / 停用持久 / delete + delete-missing。
+{
+  freshDb();
+  const mkAcct = async (body) => call('POST', '/api/accounts', body);
+
+  ok((await call('GET', '/api/accounts', null)).length === 0, '[acct] list starts empty');
+
+  // create defaults: type→cash, is_active→true; provided opening_balance/currency/date kept
+  const a1 = await mkAcct({ name: '基本户', opening_balance: 1000.5, currency: 'CNY', opening_date: '2026-01-01' });
+  ok(a1?.success && a1.id, `[acct] create → {success,id}, got ${JSON.stringify(a1)}`);
+  const r1 = (await call('GET', '/api/accounts', null)).find((a) => a.id === a1.id);
+  ok(r1 && r1.type === 'cash' && r1.opening_balance === 1000.5, '[acct] create defaults type=cash, opening_balance kept');
+  ok(r1.currency === 'CNY' && r1.opening_date === '2026-01-01', '[acct] currency/opening_date persist');
+  ok(typeof r1.is_active === 'boolean' && r1.is_active === true, '[acct] is_active coerced to boolean, defaults true');
+
+  // type whitelist: invalid throws (handler guard before DB); bank accepted
+  await expectThrow(() => call('POST', '/api/accounts', { name: 'Bad', type: 'crypto' }), '[acct] invalid type throws');
+  const a2 = await mkAcct({ name: '招行', type: 'bank' });
+  ok((await call('GET', '/api/accounts', null)).find((a) => a.id === a2.id).type === 'bank', '[acct] bank type accepted');
+
+  // opening_balance: negative allowed (overdraft), NaN → 0, missing → 0
+  const aNeg = await mkAcct({ name: '透支户', type: 'bank', opening_balance: -500 });
+  const aNaN = await mkAcct({ name: 'NaN', opening_balance: 'abc' });
+  const aMiss = await mkAcct({ name: 'NoBal' });
+  const after = await call('GET', '/api/accounts', null);
+  ok(after.find((a) => a.id === aNeg.id).opening_balance === -500, '[acct] negative opening_balance preserved (overdraft)');
+  ok(after.find((a) => a.id === aNaN.id).opening_balance === 0, '[acct] NaN opening_balance coerced to 0');
+  ok(after.find((a) => a.id === aMiss.id).opening_balance === 0, '[acct] missing opening_balance defaults to 0');
+
+  // name required (create + update); update validates type; missing id throws
+  await expectThrow(() => call('POST', '/api/accounts', { name: '   ' }), '[acct] blank name throws');
+  await expectThrow(() => call('PUT', `/api/accounts/${a1.id}`, { name: '' }), '[acct] update blank name throws');
+  await expectThrow(() => call('PUT', `/api/accounts/${a1.id}`, { type: 'gold' }), '[acct] update invalid type throws');
+  await expectThrow(() => call('PUT', '/api/accounts/nope', { name: 'x' }), '[acct] update missing id throws');
+
+  // partial update: only provided field changes; untouched fields preserved (not cleared)
+  await call('PUT', `/api/accounts/${a1.id}`, { opening_balance: 2000 });
+  const u1 = (await call('GET', '/api/accounts', null)).find((a) => a.id === a1.id);
+  ok(u1.opening_balance === 2000 && u1.name === '基本户' && u1.currency === 'CNY' && u1.opening_date === '2026-01-01',
+    '[acct] partial update changes only opening_balance, leaves name/currency/opening_date intact');
+
+  // edit name + type + note together
+  await call('PUT', `/api/accounts/${a1.id}`, { name: '基本户(改)', type: 'bank', note: '主账户' });
+  const u2 = (await call('GET', '/api/accounts', null)).find((a) => a.id === a1.id);
+  ok(u2.name === '基本户(改)' && u2.type === 'bank' && u2.note === '主账户', '[acct] edit applies name/type/note');
+
+  // toggle active (停用) persists as boolean false
+  await call('PUT', `/api/accounts/${a2.id}`, { is_active: false });
+  ok((await call('GET', '/api/accounts', null)).find((a) => a.id === a2.id).is_active === false, '[acct] is_active=false (停用) persists');
+
+  // delete removes; delete missing throws
+  await call('DELETE', `/api/accounts/${a2.id}`, null);
+  ok(!(await call('GET', '/api/accounts', null)).some((a) => a.id === a2.id), '[acct] delete removes row');
+  await expectThrow(() => call('DELETE', '/api/accounts/nope', null), '[acct] delete missing throws');
+}
+
 // ───────────── products.create id hardening (prod-<ts>-<rand>) ─────────────
 // A tight loop with no spacing lands many creates on the SAME millisecond; the random suffix
 // must keep every id unique (no PRIMARY KEY collision). Pre-fix (pure Date.now) this collides.
@@ -1409,4 +1469,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');

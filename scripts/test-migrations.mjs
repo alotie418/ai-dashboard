@@ -49,7 +49,7 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   runMigrations(d);
   ok(MIGRATIONS.length === SCHEMA_VERSION, `[1] SCHEMA_VERSION(${SCHEMA_VERSION}) must equal MIGRATIONS.length(${MIGRATIONS.length})`);
   ok(ver(d) === MIGRATIONS.length, `[1] fresh→head should reach v${MIGRATIONS.length}, got v${ver(d)}`);
-  for (const t of ['purchases', 'sales', 'settings', 'categories', 'transactions', 'products', 'business_documents', 'assistant_conversations']) {
+  for (const t of ['purchases', 'sales', 'settings', 'categories', 'transactions', 'products', 'business_documents', 'assistant_conversations', 'accounts']) {
     ok(tableExists(d, t), `[1] table '${t}' must exist at head`);
   }
   d.close();
@@ -115,6 +115,28 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   ok(tableExists(d, 'products'), '[5] v9 products table must be added');
   ok(colExists(d, 'purchases', 'product_id'), '[5] v10 purchases.product_id must be added');
   ok(colExists(d, 'categories', 'is_cogs'), '[5] v13 categories.is_cogs must be added');
+  ok(tableExists(d, 'accounts'), '[5] v14 accounts table must be added');
+  d.close();
+}
+
+// ---- 6. v14 accounts schema：列齐 + type CHECK + 期初余额可负 ----
+{
+  const d = fresh();
+  runMigrations(d);
+  ok(tableExists(d, 'accounts'), '[6] v14 accounts table exists');
+  for (const c of ['id', 'name', 'type', 'currency', 'opening_balance', 'opening_date', 'note', 'is_active', 'sort_order', 'created_at', 'updated_at']) {
+    ok(colExists(d, 'accounts', c), `[6] accounts.${c} column must exist`);
+  }
+  // type CHECK：cash/bank 放行，其它在 DB 层拒绝（handler 之外的最后一道防线）
+  let badType = null;
+  try { d.prepare("INSERT INTO accounts (id, name, type) VALUES ('a-bad', 'X', 'crypto')").run(); }
+  catch (e) { badType = e?.message || String(e); }
+  ok(badType, '[6] accounts.type CHECK rejects values other than cash/bank');
+  d.prepare("INSERT INTO accounts (id, name, type, opening_balance) VALUES ('a-ok', 'Cash', 'cash', -250.5)").run();
+  const row = d.prepare("SELECT type, opening_balance, is_active FROM accounts WHERE id = 'a-ok'").get();
+  ok(row.type === 'cash', '[6] cash type accepted');
+  ok(row.opening_balance === -250.5, '[6] opening_balance accepts negative (overdraft / 信用账户)');
+  ok(row.is_active === 1, '[6] is_active defaults to 1');
   d.close();
 }
 
@@ -123,4 +145,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation)`);
+console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema)`);

@@ -330,6 +330,50 @@ export function deleteProduct(id: string): Promise<{ success: boolean }> {
   return apiFetch(`/api/products/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
+// ==================== Accounts（现金/银行账户 + 期初余额，PR-7D-1 管道层）====================
+// 政策中性主数据：仅录入/读取/编辑/删除·停用。不接资产负债表、不 roll-up、不做平衡断言、
+// 不与 sales/purchases/transactions 联动。opening_balance 仅为用户手输数字（允许为负）。
+
+export type AccountType = 'cash' | 'bank';
+
+export interface Account {
+  id: string;
+  name: string;
+  type: AccountType;
+  currency: string | null;
+  opening_balance: number;
+  opening_date: string | null;
+  note: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AccountUpsert {
+  name: string;
+  type?: AccountType;
+  currency?: string | null;
+  opening_balance?: number;
+  opening_date?: string | null;
+  note?: string | null;
+  is_active?: boolean;
+  sort_order?: number;
+}
+
+export function listAccounts(): Promise<Account[]> {
+  return apiFetch<Account[]>('/api/accounts');
+}
+export function createAccount(payload: AccountUpsert): Promise<{ success: boolean; id: string }> {
+  return apiFetch('/api/accounts', { method: 'POST', body: JSON.stringify(payload) });
+}
+export function updateAccount(id: string, payload: Partial<AccountUpsert>): Promise<{ success: boolean }> {
+  return apiFetch(`/api/accounts/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) });
+}
+export function deleteAccount(id: string): Promise<{ success: boolean }> {
+  return apiFetch(`/api/accounts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
 // ==================== Transactions（国际化数据模型 v5，C 阶段）====================
 
 export type TransactionType = 'income' | 'expense';

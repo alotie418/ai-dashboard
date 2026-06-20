@@ -78,7 +78,8 @@
       "security": "Account & Security",
       "dataMigration": "Data Migration",
       "products": "Products",
-      "dataBackup": "Data Backup"
+      "dataBackup": "Data Backup",
+      "cashAccounts": "Accounts"
     },
     "company": {
       "title": "Company Information",
@@ -1202,5 +1203,29 @@
     "ai": "AI conclusions are estimates from your data, may be inaccurate, and are not professional tax or accounting advice.",
     "usTax": "Estimates only — not for tax filing. Consult a tax professional.",
     "rates": "Tax rates are preset reference values and may change — verify against current official rates."
+  },
+  "cashAccounts": {
+    "title": "Accounts & Opening Balances",
+    "subtitle": "Register cash / bank accounts and their opening balances for later management analysis.",
+    "notBalanceSheetNote": "This only records accounts and opening balances (management basis). It is not a balance sheet and performs no balancing.",
+    "name": "Account name",
+    "namePlaceholder": "e.g. Operating / Petty cash",
+    "type": "Type",
+    "typeCash": "Cash",
+    "typeBank": "Bank",
+    "currency": "Currency",
+    "currencyPlaceholder": "e.g. USD / EUR",
+    "openingBalance": "Opening balance",
+    "openingDate": "Opening date",
+    "note": "Note",
+    "notePlaceholder": "Optional",
+    "openingHint": "The opening balance is the account balance on the opening date; it is recorded only and is not reconciled with transactions.",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "empty": "No accounts yet. Click below to add one.",
+    "addButton": "Add account",
+    "addTitle": "New account",
+    "editTitle": "Edit account"
   }
 }

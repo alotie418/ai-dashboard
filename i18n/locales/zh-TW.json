@@ -78,7 +78,8 @@
       "security": "帳號與安全",
       "dataMigration": "資料遷移",
       "products": "商品 / 服務",
-      "dataBackup": "資料備份"
+      "dataBackup": "資料備份",
+      "cashAccounts": "帳戶與期初"
     },
     "company": {
       "title": "企業基礎資料",
@@ -1202,5 +1203,29 @@
     "ai": "AI 結論基於你的資料估算，可能有誤，非專業稅務或會計意見。",
     "usTax": "估算，非報稅依據，請諮詢稅務專業人士。",
     "rates": "稅率為預設參考值，可能隨政策調整，請核對最新官方稅率。"
+  },
+  "cashAccounts": {
+    "title": "帳戶與期初餘額",
+    "subtitle": "登記現金 / 銀行帳戶及其建帳期初餘額，供後續管理分析使用。",
+    "notBalanceSheetNote": "此處僅登記帳戶與期初餘額（管理口徑），並非資產負債表，也不做平衡核算。",
+    "name": "帳戶名稱",
+    "namePlaceholder": "如：基本戶 / 備用金",
+    "type": "類型",
+    "typeCash": "現金",
+    "typeBank": "銀行",
+    "currency": "幣別",
+    "currencyPlaceholder": "如：TWD / USD",
+    "openingBalance": "期初餘額",
+    "openingDate": "建帳日期",
+    "note": "備註",
+    "notePlaceholder": "選填",
+    "openingHint": "期初餘額為建帳日的帳戶餘額，僅作記錄，不與流水自動勾稽。",
+    "status": "狀態",
+    "active": "啟用",
+    "inactive": "停用",
+    "empty": "尚無帳戶，點擊下方按鈕新增。",
+    "addButton": "新增帳戶",
+    "addTitle": "新增帳戶",
+    "editTitle": "編輯帳戶"
   }
 }

@@ -22,6 +22,7 @@ const reportsH = require('./reports');
 const mileageH = require('./mileage');
 const homeOfficeH = require('./homeOffice');
 const conversationsH = require('./conversations');
+const cashAccountsH = require('./cashAccounts');
 
 const routes = [
   // ---- Dashboard ----
@@ -69,6 +70,12 @@ const routes = [
   ['POST', '/api/products', products.create],
   ['PUT', '/api/products/:id', products.update],
   ['DELETE', '/api/products/:id', products.remove],
+
+  // ---- Accounts: 现金/银行账户 + 期初余额（PR-7D-1 管道层；与 receivables 的 /api/receivables·/api/payables 不冲突）----
+  ['GET', '/api/accounts', cashAccountsH.list],
+  ['POST', '/api/accounts', cashAccountsH.create],
+  ['PUT', '/api/accounts/:id', cashAccountsH.update],
+  ['DELETE', '/api/accounts/:id', cashAccountsH.remove],
 
   // ---- Business Documents（业务单据 Phase A；next-number/tax-invoice 排在 :id 前）----
   ['GET', '/api/documents/next-number', documentsH.nextNumber],
