@@ -79,6 +79,7 @@ try {
 const { runMigrations, _setDbForTest } = require(join(ROOT, 'electron/db/index.js'));
 const { dispatch } = require(join(ROOT, 'electron/handlers/router.js'));
 const { computeOperatingCashflow } = require(join(ROOT, 'electron/reports/_cashflow.js'));
+const aiCore = require(join(ROOT, 'electron/ai/index.js'));
 
 const failures = [];
 const ok = (cond, msg) => { if (!cond) failures.push(msg); };
@@ -1370,9 +1371,42 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   }
 }
 
+// ───────────── PR-6 §N security: providers list/remove (N5 renderer never gets plaintext, N6 delete clears) ─────────────
+// Seed a row by DIRECT insert (a fake ciphertext) to bypass safeStorage (unavailable under node),
+// then exercise aiCore.list()/remove() — the real renderer-facing surface. list() must report
+// hasKey but expose NO key field; remove() must clear the row. aiCore.getDb() and the harness share
+// the same db module instance (_setDbForTest), so they hit the same :memory: DB. Reads only.
+{
+  const db = freshDb();
+  const FAKE_ENC = 'QkFTRTY0RFVNTVlDSVBIRVI='; // base64 dummy "ciphertext" — never a real key
+  db.prepare(`INSERT INTO ai_providers (provider, api_key_encrypted, model, enabled, is_default)
+              VALUES (?, ?, ?, 1, 1)`).run('deepseek', FAKE_ENC, 'deepseek-chat');
+
+  // N5: list() exposes hasKey but no key/ciphertext anywhere in the returned shape
+  const list = aiCore.list();
+  const ds = list.find((p) => p.provider === 'deepseek');
+  ok(!!ds && ds.hasKey === true, '[N5] list(): configured provider → hasKey=true');
+  const dsJson = JSON.stringify(ds || {});
+  ok(!/api_key|apiKey|api_key_encrypted/i.test(dsJson), '[N5] list() entry has no api_key/apiKey/encrypted field');
+  ok(!dsJson.includes(FAKE_ENC), '[N5] list() entry does not leak the stored ciphertext');
+  // whole-payload sweep: no provider entry carries a key field or the ciphertext
+  const allJson = JSON.stringify(list);
+  ok(!/api_key|apiKey/i.test(allJson) && !allJson.includes(FAKE_ENC), '[N5] full list() payload carries no key material');
+  // unconfigured providers report hasKey=false (no row)
+  const unconfigured = list.find((p) => p.provider === 'anthropic');
+  ok(!!unconfigured && unconfigured.hasKey === false, '[N5] unconfigured provider → hasKey=false');
+
+  // N6: remove() clears the row and the credential
+  aiCore.remove({ provider: 'deepseek' });
+  const after = aiCore.list().find((p) => p.provider === 'deepseek');
+  ok(!!after && after.hasKey === false, '[N6] after remove(): hasKey=false');
+  const cnt = db.prepare("SELECT COUNT(*) AS c FROM ai_providers WHERE provider = 'deepseek'").get().c;
+  ok(cnt === 0, '[N6] after remove(): ai_providers row physically deleted');
+}
+
 if (failures.length) {
   console.error(`✗ handlers: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');

@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const { csvCell, rowsToCsv, tableToCsv } = require(join(ROOT, 'electron/handlers/_csvExport.js'));
+const { csvCell, rowsToCsv, tableToCsv, EXPORTABLE_TABLES } = require(join(ROOT, 'electron/handlers/_csvExport.js'));
 
 const failures = [];
 const ok = (cond, msg) => { if (!cond) failures.push(msg); };
@@ -44,6 +44,30 @@ ok(csvCell(-300) === '-300', '[cell] negative NUMBER unaffected (number branch, 
 {
   const csv = rowsToCsv([], ['id', 'name']);
   ok(csv === 'id,name\r\n', '[rows] empty rows → header-only line');
+}
+
+// ───────────── PR-6 §N (N2): CSV export must NOT be able to dump credential/secret tables ─────────────
+// tableToCsv looks up EXPORTABLE_TABLES BEFORE touching the db, so a non-whitelisted key throws
+// INVALID_TABLE even with a null db — the ai_providers table (holds api_key_encrypted) is unreachable.
+{
+  let threwAi = null;
+  try { tableToCsv(null, 'ai_providers'); } catch (e) { threwAi = e?.message; }
+  ok(threwAi === 'INVALID_TABLE', `[N2] ai_providers (api_key_encrypted) not CSV-exportable → INVALID_TABLE, got ${threwAi}`);
+
+  let threwSettings = null;
+  try { tableToCsv(null, 'settings'); } catch (e) { threwSettings = e?.message; }
+  ok(threwSettings === 'INVALID_TABLE', `[N2] settings not CSV-exportable → INVALID_TABLE, got ${threwSettings}`);
+
+  const keys = Object.keys(EXPORTABLE_TABLES);
+  ok(!keys.includes('ai_providers'), '[N2] EXPORTABLE_TABLES excludes ai_providers');
+  ok(!keys.includes('settings'), '[N2] EXPORTABLE_TABLES excludes settings');
+  // The whitelist must only map to KNOWN non-credential business tables — guards against a future
+  // accidental addition of a secrets-bearing table (ai_providers / settings / any *key*) to the
+  // export surface. (documents → business_documents is a normal business-doc table, no secrets.)
+  const ALLOWED_REAL_TABLES = new Set(['transactions', 'purchases', 'sales', 'business_documents']);
+  const realTables = keys.map((k) => EXPORTABLE_TABLES[k].table);
+  ok(realTables.every((t) => ALLOWED_REAL_TABLES.has(t)), `[N2] every exportable table is a known non-credential business table, got [${realTables.join(',')}]`);
+  ok(!realTables.some((t) => /provider|key|secret|setting|credential|token/i.test(t)), `[N2] no exportable table name looks credential-bearing, got [${realTables.join(',')}]`);
 }
 
 // ───────────── Part 2: tableToCsv on a real :memory: DB（可用时）─────────────
