@@ -40,6 +40,21 @@ function setFetch(responses) {
   };
 }
 
+// Non-2xx stub (PR-6 §J): drives callChat → buildHttpError. readBody() uses response.text(),
+// so the stub must expose .text() (and .status/.ok=false). body is the parsed error JSON.
+function setHttpError(status, body) {
+  globalThis.fetch = async () => ({
+    ok: false,
+    status,
+    text: async () => JSON.stringify(body),
+    json: async () => body,
+  });
+}
+// Network failure stub (PR-6 §J): fetch() throws → callChat → wrapNetworkError (code 'network').
+function setNetworkThrow(msg = 'fetch failed') {
+  globalThis.fetch = async () => { throw new Error(msg); };
+}
+
 const TOOLDEFS = [{ name: 'get_sales', description: 'sales', input_schema: { type: 'object', properties: {} } }];
 const seed = (p) => p.toNativeHistory([{ role: 'user', parts: [{ text: '今年销售额?' }] }]);
 
@@ -495,6 +510,49 @@ async function testConnErrorSurfacing() {
   check('normalizeCode 429 → quota (unchanged)', normalizeCode(429, '', 'rate limit') === 'quota');
 }
 
+// PR-6 §J error paths: HTTP status → stable code (via buildHttpError/normalizeCode through the
+// real adapter), network failure → 'network', cross-provider error shapes, and J9 secret redaction.
+async function testErrorPaths() {
+  console.log('Error paths (PR-6 §J · HTTP status → code + redaction):');
+  const cases = [
+    { status: 401, body: { error: { message: 'Invalid API key' } }, code: 'auth' },
+    { status: 403, body: { error: { message: 'forbidden' } }, code: 'permission' },
+    { status: 404, body: { error: { message: 'model not found' } }, code: 'modelNotFound' },
+    { status: 429, body: { error: { message: 'rate limit' } }, code: 'quota' },
+    { status: 402, body: { error: { message: 'insufficient balance' } }, code: 'quota' },
+    { status: 500, body: { error: { message: 'internal error' } }, code: 'serverError' },
+    { status: 400, body: { error: { message: 'bad request' } }, code: 'badRequest' },
+  ];
+  for (const c of cases) {
+    setHttpError(c.status, c.body);
+    let e = null;
+    try { await deepseek.test('k', 'm'); } catch (err) { e = err; }
+    check(`HTTP ${c.status} → code ${c.code}`, !!e && e.code === c.code, e && `got ${e.code}`);
+    check(`HTTP ${c.status} → status passthrough`, !!e && e.status === c.status, e && `got ${e.status}`);
+  }
+  setNetworkThrow('ECONNREFUSED');
+  let en = null;
+  try { await deepseek.test('k', 'm'); } catch (err) { en = err; }
+  check('network throw → code network', !!en && en.code === 'network', en && en.code);
+  // cross-provider error shapes (pickField): Anthropic + Gemini
+  setHttpError(401, { type: 'error', error: { type: 'authentication_error', message: 'bad key' } });
+  let ea = null; try { await deepseek.test('k', 'm'); } catch (err) { ea = err; }
+  check('Anthropic-shape 401 → auth', !!ea && ea.code === 'auth', ea && ea.code);
+  setHttpError(429, { error: { code: 429, status: 'RESOURCE_EXHAUSTED', message: 'quota exceeded' } });
+  let eg = null; try { await deepseek.test('k', 'm'); } catch (err) { eg = err; }
+  check('Gemini-shape 429 → quota', !!eg && eg.code === 'quota', eg && eg.code);
+  // J9 redaction: secrets in the body message must be masked in providerMessage AND Error.message
+  setHttpError(401, { error: { message: 'auth failed Authorization: Bearer sk-ant-SECRETKEY123456 jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV' } });
+  let er = null; try { await deepseek.test('k', 'm'); } catch (err) { er = err; }
+  const pm = (er && er.providerMessage) || '';
+  const full = (er && er.message) || '';
+  check('J9 redact: providerMessage no raw key, has REDACTED', !/SECRETKEY123456/.test(pm) && /REDACTED/.test(pm), pm);
+  check('J9 redact: providerMessage JWT masked', !/eyJzdWIiOiIxMjM0NTY3ODkwIn0/.test(pm) && /REDACTED_JWT/.test(pm), pm);
+  check('J9 redact: Error.message carries no raw secret', !/SECRETKEY123456/.test(full) && !/eyJzdWIiOiIxMjM0NTY3ODkwIn0/.test(full), full);
+  // restore the default 200 stub for any later test
+  setFetch([]);
+}
+
 async function main() {
   console.log('\n=== Agent Provider Round-Trip (offline) ===\n');
   await testAnthropic();
@@ -512,6 +570,7 @@ async function main() {
   await testGemini();
   await testAgentBudget();
   await testConnErrorSurfacing();
+  await testErrorPaths();
   console.log(`\n${failures.length === 0 ? '✓ all passed' : '✗ ' + failures.length + ' failed'}\n`);
   process.exit(failures.length === 0 ? 0 : 1);
 }
