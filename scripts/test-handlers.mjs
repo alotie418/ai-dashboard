@@ -785,6 +785,96 @@ const Q = '?from=2026-01-01&to=2026-12-31';
     `[cash-legacy] 本位币 opening200/in400(缺payment_date 60 排除)/out150/end450, got ${JSON.stringify(cny)}`);
 }
 
+// ───────────────────────── balance-overview (管理口径资产负债概览, PR-7B P1-3 只读聚合) ─────────────────────────
+// 只读：按币种归集 资产/负债/权益 + 小计 + 显式 balanceDifference。锁住：按币种分组·cash 接 cash-position·
+// 固资按原值进非流动·借款 maturity 一年线分(空→流动+warning)·tax 不进合计·balanceDifference 显式·
+// 不跨币种合计·**不写回任何表**。基准日 asOf=period.to=2026-12-31 → cutoff=2027-12-31。
+{
+  const db = freshDb();
+  const find = (arr, key) => (arr.find((l) => l.key === key) || {}).amount;
+
+  // 期初账户：CNY 1000 + USD 500
+  await call('POST', '/api/accounts', { name: 'A-CNY', opening_balance: 1000, currency: 'CNY' });
+  await call('POST', '/api/accounts', { name: 'A-USD', opening_balance: 500, currency: 'USD' });
+  // 本期 transactions → 现金：CNY 1000+300−100=1200；USD 500+50=550（选源=transactions）
+  const insTxn = db.prepare(`INSERT INTO transactions (id, type, date, amount, amount_net, currency, payment_status, paid_amount, payment_date) VALUES (?,?,?,?,?,?,?,?,?)`);
+  insTxn.run('bo-i1', 'income',  PD, 300, 300, 'CNY', 'paid', 300, PD);
+  insTxn.run('bo-e1', 'expense', PD, 100, 100, 'CNY', 'paid', 100, PD);
+  insTxn.run('bo-i2', 'income',  PD,  50,  50, 'USD', 'paid',  50, PD);
+  // 固定资产（原值）：CNY 8000 + USD 2000
+  await call('POST', '/api/fixed-assets', { name: 'F-CNY', original_value: 8000, currency: 'CNY' });
+  await call('POST', '/api/fixed-assets', { name: 'F-USD', original_value: 2000, currency: 'USD' });
+  // 借款（CNY）：流动 2000(到期≤cutoff) + 非流动 5000(到期>cutoff) + 空到期日 1500(默认流动+warning)
+  await call('POST', '/api/liabilities', { name: 'L-cur', opening_balance: 2000, currency: 'CNY', maturity_date: '2026-09-01' });
+  await call('POST', '/api/liabilities', { name: 'L-non', opening_balance: 5000, currency: 'CNY', maturity_date: '2030-01-01' });
+  await call('POST', '/api/liabilities', { name: 'L-nul', opening_balance: 1500, currency: 'CNY' });
+  // 权益（CNY 30000）
+  await call('POST', '/api/equity', { name: 'E1', amount: 30000, currency: 'CNY' });
+  // 税：已缴税款（不得进任何合计）
+  await call('POST', '/api/tax-payments', { name: 'T1', amount: 1200, currency: 'CNY' });
+  // 应收/应付（本位币 CNY，无币种）：未收销售 800、未付采购 300
+  db.prepare(`INSERT INTO sales (id, date, customer, totalAmount, payment_status, paid_amount) VALUES (?,?,?,?,?,?)`).run('bo-s1', PD, 'X', 800, 'unpaid', 0);
+  db.prepare(`INSERT INTO purchases (id, date, supplier, totalAmount, payment_status, paid_amount) VALUES (?,?,?,?,?,?)`).run('bo-p1', PD, 'Y', 300, 'unpaid', 0);
+
+  const bo = await call('GET', `/api/balance-overview${Q}`, null);
+
+  // 元信息
+  ok(bo.estimate === true && bo.reportType === 'management_balance_overview', '[bo] estimate=true + reportType=management_balance_overview');
+  ok(bo.asOf === '2026-12-31' && bo.disclaimerKey === 'disclaimer.report', '[bo] asOf=period.to + disclaimerKey');
+  ok(Array.isArray(bo.limitations) && bo.limitations.length > 0 && Array.isArray(bo.excludedNotes) && bo.excludedNotes.length > 0, '[bo] limitations/excludedNotes present');
+  // 不跨币种合计：无顶层 totals/balanceDifference；按币种分组（CNY+USD）
+  ok(bo.totals === undefined && bo.balanceDifference === undefined, '[bo] no top-level total / cross-currency aggregate');
+  ok(bo.byCurrency.length === 2, `[bo] grouped by 2 currencies, got ${bo.byCurrency.length}`);
+  const cny = bo.byCurrency.find((b) => b.currency === 'CNY');
+  const usd = bo.byCurrency.find((b) => b.currency === 'USD');
+
+  // cash-position 接入：cash 行 = cash-position endingEstimate（同 from/to）
+  const cp = await call('GET', `/api/cash-position${Q}`, null);
+  const cpCny = cp.byCurrency.find((x) => x.currency === 'CNY').endingEstimate;
+  ok(approx(find(cny.assets.current, 'cash'), cpCny) && approx(cpCny, 1200), `[bo] cash 接 cash-position endingEstimate CNY=1200, got ${find(cny.assets.current, 'cash')}`);
+  ok(approx(find(usd.assets.current, 'cash'), 550), `[bo] cash USD=550, got ${find(usd.assets.current, 'cash')}`);
+
+  // AR/AP/存货：本位币 CNY 桶 = 各 summary
+  const recv = await call('GET', '/api/receivables/summary', null);
+  const pay = await call('GET', '/api/payables/summary', null);
+  const inv = await call('GET', '/api/inventory/summary', null);
+  ok(approx(find(cny.assets.current, 'receivables'), recv.totalReceivable) && approx(recv.totalReceivable, 800), '[bo] receivables 接 totalReceivable=800');
+  ok(approx(find(cny.liabilities.current, 'payables'), pay.totalPayable) && approx(pay.totalPayable, 300), '[bo] payables 接 totalPayable=300');
+  ok(approx(find(cny.assets.current, 'inventory'), inv.totalInventoryCost), '[bo] inventory 接 totalInventoryCost');
+  // USD 桶无 AR/AP/inventory（仅本位币桶）
+  ok(find(usd.assets.current, 'receivables') === undefined && find(usd.liabilities.current, 'payables') === undefined, '[bo] AR/AP only in base-currency bucket');
+
+  // 固定资产按原值进非流动资产
+  ok(approx(find(cny.assets.nonCurrent, 'fixedAssets'), 8000) && approx(find(usd.assets.nonCurrent, 'fixedAssets'), 2000), '[bo] fixedAssets(原值) → assets.nonCurrent (CNY 8000 / USD 2000)');
+
+  // 借款一年线分类 + 空到期日默认流动 + warning
+  ok(approx(find(cny.liabilities.current, 'borrowings'), 3500), `[bo] borrowings 流动=3500 (2000+空1500), got ${find(cny.liabilities.current, 'borrowings')}`);
+  ok(approx(find(cny.liabilities.nonCurrent, 'borrowings'), 5000), `[bo] borrowings 非流动=5000 (到期>cutoff), got ${find(cny.liabilities.nonCurrent, 'borrowings')}`);
+  ok(cny.warnings.includes('borrowingsNullMaturityDefaultCurrent'), '[bo] 空到期日 → warning');
+
+  // 权益 = Σ equity.amount（不结转）
+  ok(approx(find(cny.equity, 'equity'), 30000), '[bo] equity = Σ equity.amount = 30000');
+
+  // tax 不进任何 section/totals
+  const allCnyLines = [...cny.assets.current, ...cny.assets.nonCurrent, ...cny.liabilities.current, ...cny.liabilities.nonCurrent, ...cny.equity];
+  ok(!allCnyLines.some((l) => /tax/i.test(l.key)), '[bo] no tax line in any section');
+  ok(approx(cny.totals.liabilities, 300 + 3500 + 5000), `[bo] totals.liabilities=8800 (payables+borrowings, tax 1200 排除), got ${cny.totals.liabilities}`);
+  ok(bo.excludedNotes.some((n) => /tax|税/.test(n)), '[bo] excludedNotes 提及 tax 排除');
+
+  // balanceDifference 显式 = 资产 − 负债 − 权益（按币种）
+  ok(approx(cny.balanceDifference, cny.totals.assets - cny.totals.liabilities - cny.totals.equity), '[bo] balanceDifference = assets − liabilities − equity (CNY)');
+  ok(approx(usd.balanceDifference, usd.totals.assets - usd.totals.liabilities - usd.totals.equity), '[bo] balanceDifference per currency (USD)');
+  // totals.assets 自洽（cash1200+AR800+inv+fixed8000）
+  ok(approx(cny.totals.assets, 1200 + 800 + (inv.totalInventoryCost || 0) + 8000), `[bo] CNY totals.assets 自洽, got ${cny.totals.assets}`);
+
+  // **不写回任何表**：调用后各表行数/样本值不变
+  ok(db.prepare('SELECT opening_balance FROM accounts WHERE name=?').get('A-CNY').opening_balance === 1000, '[bo] read-only: accounts unchanged');
+  ok(db.prepare("SELECT COUNT(*) AS c FROM liabilities").get().c === 3, '[bo] read-only: liabilities row count unchanged');
+  ok(db.prepare('SELECT original_value FROM fixed_assets WHERE name=?').get('F-CNY').original_value === 8000, '[bo] read-only: fixed_assets unchanged');
+  ok(db.prepare('SELECT amount FROM equity WHERE name=?').get('E1').amount === 30000, '[bo] read-only: equity unchanged');
+  ok(db.prepare("SELECT COUNT(*) AS c FROM tax_payments").get().c === 1, '[bo] read-only: tax_payments unchanged');
+}
+
 // ───────────── products.create id hardening (prod-<ts>-<rand>) ─────────────
 // A tight loop with no spacing lands many creates on the SAME millisecond; the random suffix
 // must keep every id unique (no PRIMARY KEY collision). Pre-fix (pure Date.now) this collides.
@@ -1827,4 +1917,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');

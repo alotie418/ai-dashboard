@@ -29,6 +29,7 @@ const equityH = require('./equity');
 const taxPaymentsH = require('./taxPayments');
 const ledgerSummaryH = require('./ledgerSummary');
 const cashPositionH = require('./cashPosition');
+const balanceOverviewH = require('./balanceOverview');
 
 const routes = [
   // ---- Dashboard ----
@@ -112,6 +113,9 @@ const routes = [
 
   // ---- Cash Position: 现金/银行期末结转只读预览（PR-7B P1-2；期末=期初+实收−实付·按币种·只读不写回·不走 reports formula）----
   ['GET', '/api/cash-position', cashPositionH.summary],
+
+  // ---- Balance Overview: 管理口径资产负债概览（PR-7B P1-3 只读聚合；非法定 B/S·显式 balanceDifference·只读·不走 reports formula）----
+  ['GET', '/api/balance-overview', balanceOverviewH.overview],
 
   // ---- Business Documents（业务单据 Phase A；next-number/tax-invoice 排在 :id 前）----
   ['GET', '/api/documents/next-number', documentsH.nextNumber],
