@@ -631,6 +631,25 @@ const MIGRATIONS = [
     `);
     console.log('[db] v18: tax_payments table ready');
   },
+
+  // v19: fixed-assets depreciation PARAMETERS (PR-7B P2-1). Additive, nullable, no backfill.
+  //   Adds depreciation input fields to fixed_assets so users can record per-asset
+  //   depreciation parameters. This migration ONLY adds columns — it does NOT compute any
+  //   depreciation, accumulated depreciation or net book value, does NOT touch P&L/reports,
+  //   and does NOT modify original_value / status / acquisition_date or any existing column.
+  //   Enum validity (depreciation_method / depreciation_start_policy) is enforced in the
+  //   handler whitelist, NOT a DB CHECK (SQLite ALTER ADD COLUMN + CHECK is fragile; v10/v13
+  //   precedent adds columns with DEFAULT only). Idempotent via PRAGMA table_info guards.
+  (d) => {
+    const cols = d.prepare('PRAGMA table_info(fixed_assets)').all().map((c) => c.name);
+    const add = (name, def) => { if (!cols.includes(name)) d.exec(`ALTER TABLE fixed_assets ADD COLUMN ${name} ${def}`); };
+    add('depreciation_method', "TEXT DEFAULT 'straight_line'");
+    add('useful_life_months', 'INTEGER');                       // nullable → preview falls back to category default
+    add('salvage_rate', 'REAL');                                // nullable → preview falls back to category default
+    add('depreciation_start_policy', "TEXT DEFAULT 'next_month'");
+    add('disposal_date', 'TEXT');                               // recorded only; no disposal P&L in P2
+    console.log('[db] v19: fixed_assets depreciation params added (params only — no depreciation computed)');
+  },
 ];
 
 function runMigrations(d) {

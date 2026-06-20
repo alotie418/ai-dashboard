@@ -1301,7 +1301,18 @@
     "empty": "暂无固定资产记录，点击下方按钮添加。",
     "addButton": "添加固定资产",
     "addTitle": "新增固定资产",
-    "editTitle": "编辑固定资产"
+    "editTitle": "编辑固定资产",
+    "depreciationParams": "折旧参数",
+    "depreciationMethod": "折旧方法",
+    "methodStraightLine": "直线法",
+    "usefulLifeYears": "预计使用年限（年）",
+    "salvageRatePercent": "残值率（%）",
+    "startPolicy": "折旧起算",
+    "startNextMonth": "次月起",
+    "startSameMonth": "当月起",
+    "startDaily": "按天",
+    "disposalDate": "处置日期",
+    "depreciationParamsNote": "这里仅登记折旧参数，不代表已生成折旧费用或净值（净值/累计折旧在管理口径概览中估算）。"
   },
   "equity": {
     "title": "权益/资本登记台账",

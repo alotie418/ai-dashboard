@@ -20,12 +20,28 @@ function toNum0(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+// 折旧参数枚举（P2-1；DB 不加 CHECK，校验在此 handler 白名单）。
+const DEPRECIATION_METHODS = ['straight_line'];
+const DEPRECIATION_START_POLICIES = ['next_month', 'same_month', 'daily'];
+
+// 可空数字：未传/空/NaN → null（null = 「用类别默认」；区别于 original_value 的 NaN→0）。
+function toNumOrNull(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+function toIntOrNull(v) {
+  const n = toNumOrNull(v);
+  return n === null ? null : Math.trunc(n);
+}
+
 // GET /api/fixed-assets
 async function list() {
   const db = getDb();
   const rows = db.prepare(
     `SELECT id, name, category, acquisition_date, original_value, currency, supplier, serial_no,
-            note, status, is_active, sort_order, created_at, updated_at
+            note, status, depreciation_method, useful_life_months, salvage_rate,
+            depreciation_start_policy, disposal_date, is_active, sort_order, created_at, updated_at
        FROM fixed_assets ORDER BY is_active DESC, sort_order, created_at`
   ).all();
   return rows.map(r => ({ ...r, is_active: !!r.is_active }));
@@ -35,16 +51,24 @@ async function list() {
 async function create({ body }) {
   const db = getDb();
   const { name, category, acquisition_date, original_value, currency, supplier, serial_no,
-          note, status, is_active, sort_order } = body || {};
+          note, status, depreciation_method, useful_life_months, salvage_rate,
+          depreciation_start_policy, disposal_date, is_active, sort_order } = body || {};
   if (!name || !String(name).trim()) throw new Error('name required');
   const st = status || 'in_use';
   if (!ASSET_STATUSES.includes(st)) throw new Error(`status must be one of ${ASSET_STATUSES.join('/')}`);
+  // 折旧参数（P2-1：仅登记，不计算）。method/start_policy 走白名单；空缺省。
+  const dm = depreciation_method || 'straight_line';
+  if (!DEPRECIATION_METHODS.includes(dm)) throw new Error(`depreciation_method must be one of ${DEPRECIATION_METHODS.join('/')}`);
+  const dsp = depreciation_start_policy || 'next_month';
+  if (!DEPRECIATION_START_POLICIES.includes(dsp)) throw new Error(`depreciation_start_policy must be one of ${DEPRECIATION_START_POLICIES.join('/')}`);
   // 随机后缀防同毫秒撞 PRIMARY KEY（与 accounts/liabilities/products.create 同形）。
   const id = `asset-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   db.prepare(
     `INSERT INTO fixed_assets (id, name, category, acquisition_date, original_value, currency,
-                               supplier, serial_no, note, status, is_active, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                               supplier, serial_no, note, status, depreciation_method,
+                               useful_life_months, salvage_rate, depreciation_start_policy,
+                               disposal_date, is_active, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     String(name).trim(),
@@ -56,6 +80,11 @@ async function create({ body }) {
     serial_no != null && String(serial_no).trim() ? String(serial_no).trim() : null,
     note != null && String(note).trim() ? String(note).trim() : null,
     st,
+    dm,
+    toIntOrNull(useful_life_months),   // 空/NaN → null（用类别默认）
+    toNumOrNull(salvage_rate),         // 空/NaN → null（用类别默认）
+    dsp,
+    disposal_date || null,
     is_active === false ? 0 : 1,
     Number.isFinite(Number(sort_order)) ? Number(sort_order) : 999,
   );
@@ -88,6 +117,18 @@ async function update({ params, body }) {
     if (!ASSET_STATUSES.includes(b.status)) throw new Error(`status must be one of ${ASSET_STATUSES.join('/')}`);
     sets.push('status = ?'); vals.push(b.status);
   }
+  // 折旧参数 partial update（仅登记，不计算）。
+  if (b.depreciation_method !== undefined) {
+    if (!DEPRECIATION_METHODS.includes(b.depreciation_method)) throw new Error(`depreciation_method must be one of ${DEPRECIATION_METHODS.join('/')}`);
+    sets.push('depreciation_method = ?'); vals.push(b.depreciation_method);
+  }
+  if (b.useful_life_months !== undefined) { sets.push('useful_life_months = ?'); vals.push(toIntOrNull(b.useful_life_months)); }
+  if (b.salvage_rate !== undefined) { sets.push('salvage_rate = ?'); vals.push(toNumOrNull(b.salvage_rate)); }
+  if (b.depreciation_start_policy !== undefined) {
+    if (!DEPRECIATION_START_POLICIES.includes(b.depreciation_start_policy)) throw new Error(`depreciation_start_policy must be one of ${DEPRECIATION_START_POLICIES.join('/')}`);
+    sets.push('depreciation_start_policy = ?'); vals.push(b.depreciation_start_policy);
+  }
+  if (b.disposal_date !== undefined) { sets.push('disposal_date = ?'); vals.push(b.disposal_date || null); }
   if (b.is_active !== undefined) { sets.push('is_active = ?'); vals.push(b.is_active ? 1 : 0); }
   if (b.sort_order !== undefined) { sets.push('sort_order = ?'); vals.push(Number(b.sort_order) || 0); }
   if (sets.length === 0) return { success: true };

@@ -433,6 +433,8 @@ export function deleteLiability(id: string): Promise<{ success: boolean }> {
 // original_value 用户手输（NaN→0，不 clamp）；status='disposed' 仅登记标签不出表。
 
 export type AssetStatus = 'in_use' | 'idle' | 'disposed';
+export type DepreciationMethod = 'straight_line';
+export type DepreciationStartPolicy = 'next_month' | 'same_month' | 'daily';
 
 export interface FixedAsset {
   id: string;
@@ -445,6 +447,12 @@ export interface FixedAsset {
   serial_no: string | null;
   note: string | null;
   status: AssetStatus;
+  // PR-7B P2-1 折旧参数（仅登记，不计算；null = 用类别默认）。
+  depreciation_method: DepreciationMethod;
+  useful_life_months: number | null;
+  salvage_rate: number | null;
+  depreciation_start_policy: DepreciationStartPolicy;
+  disposal_date: string | null;
   is_active: boolean;
   sort_order: number;
   created_at?: string;
@@ -461,6 +469,11 @@ export interface FixedAssetUpsert {
   serial_no?: string | null;
   note?: string | null;
   status?: AssetStatus;
+  depreciation_method?: DepreciationMethod;
+  useful_life_months?: number | null;
+  salvage_rate?: number | null;
+  depreciation_start_policy?: DepreciationStartPolicy;
+  disposal_date?: string | null;
   is_active?: boolean;
   sort_order?: number;
 }

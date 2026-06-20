@@ -177,10 +177,8 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
                    'serial_no', 'note', 'status', 'is_active', 'sort_order', 'created_at', 'updated_at']) {
     ok(colExists(d, 'fixed_assets', c), `[8] fixed_assets.${c} column must exist`);
   }
-  // 故意不应存在折旧政策字段（留 PR-7B）
-  for (const c of ['depreciation_method', 'useful_life', 'salvage_value']) {
-    ok(!colExists(d, 'fixed_assets', c), `[8] fixed_assets must NOT carry depreciation-policy column '${c}' (deferred to PR-7B)`);
-  }
+  // 注：PR-7D-3 曾断言「折旧字段缺席（deferred PR-7B）」；PR-7B P2-1 已正式新增折旧参数字段，
+  // 故该负向断言移除，改由 block [11]（v19）正向断言折旧列存在。
   // status CHECK：in_use/idle/disposed 放行，其它在 DB 层拒绝
   let badStatus = null;
   try { d.prepare("INSERT INTO fixed_assets (id, name, status) VALUES ('a-bad', 'X', 'sold')").run(); }
@@ -247,9 +245,43 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   d.close();
 }
 
+// ---- 11. v19 fixed_assets 折旧参数：列齐 + 默认值 + nullable + 不动现有列 ----
+{
+  const d = fresh();
+  runMigrations(d);
+  for (const c of ['depreciation_method', 'useful_life_months', 'salvage_rate', 'depreciation_start_policy', 'disposal_date']) {
+    ok(colExists(d, 'fixed_assets', c), `[11] fixed_assets.${c} column must exist (v19)`);
+  }
+  // 插一行（仅必填 id/name）→ method/start_policy 得默认、其余 3 字段 NULL；现有列行为不变
+  d.prepare("INSERT INTO fixed_assets (id, name) VALUES ('fa-v19', 'X')").run();
+  const row = d.prepare("SELECT depreciation_method, useful_life_months, salvage_rate, depreciation_start_policy, disposal_date, original_value, status FROM fixed_assets WHERE id = 'fa-v19'").get();
+  ok(row.depreciation_method === 'straight_line', '[11] depreciation_method default = straight_line');
+  ok(row.depreciation_start_policy === 'next_month', '[11] depreciation_start_policy default = next_month');
+  ok(row.useful_life_months === null && row.salvage_rate === null && row.disposal_date === null, '[11] useful_life_months/salvage_rate/disposal_date are nullable (NULL)');
+  ok(row.original_value === 0 && row.status === 'in_use', '[11] existing columns (original_value/status) defaults unchanged');
+  d.close();
+}
+
+// ---- 12. 旧→head：v16 期 fixed_assets 行升级到 head(含 v19) 保值 + 新列得默认/NULL（不回填）----
+{
+  const d = fresh();
+  // 跑到 v16（建 fixed_assets），停在 v16
+  for (let v = 0; v < 16; v++) d.transaction(() => { MIGRATIONS[v](d); d.pragma(`user_version = ${v + 1}`); })();
+  ok(tableExists(d, 'fixed_assets'), '[12] fixed_assets created at v16');
+  ok(!colExists(d, 'fixed_assets', 'depreciation_method'), '[12] no depreciation columns yet at v16');
+  d.prepare("INSERT INTO fixed_assets (id, name, original_value, status) VALUES ('fa-old', 'OldAsset', 5000, 'in_use')").run();
+  runMigrations(d); // v17 → head（含 v19 加折旧列）
+  ok(ver(d) === MIGRATIONS.length, `[12] v16→head, got v${ver(d)}`);
+  const row = d.prepare("SELECT original_value, status, depreciation_method, useful_life_months, depreciation_start_policy FROM fixed_assets WHERE id = 'fa-old'").get();
+  ok(row.original_value === 5000 && row.status === 'in_use', '[12] old fixed_assets row VALUE preserved after v19');
+  ok(row.depreciation_method === 'straight_line' && row.depreciation_start_policy === 'next_month', '[12] new columns get schema defaults on old row');
+  ok(row.useful_life_months === null, '[12] new nullable column = NULL on old row (no data backfill)');
+  d.close();
+}
+
 if (failures.length) {
   console.error(`✗ migrations: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema + v15 liabilities schema + v16 fixed_assets schema + v17 equity schema + v18 tax_payments schema)`);
+console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema + v15 liabilities schema + v16 fixed_assets schema + v17 equity schema + v18 tax_payments schema + v19 fixed_assets depreciation params)`);

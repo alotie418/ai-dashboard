@@ -1,13 +1,13 @@
-// 设置页 → 固定资产登记台账（PR-7D-3，管道层）
-// 固定资产手工登记台账。POLICY-NEUTRAL：仅录入/保存/读取/编辑/删除·停用。
-// 不折旧、不出净值、不接资产负债表、不生成折旧费用，不碰 P&L/cashflow/reports。
-// 无折旧方法/年限/残值字段（留 PR-7B）；category 自由文本；status='disposed' 仅登记标签。
+// 设置页 → 固定资产登记台账（PR-7D-3 台账 + PR-7B P2-1 折旧参数录入）
+// 固定资产手工登记台账 + 折旧参数（method/年限/残值率/起算口径/处置日）。POLICY-NEUTRAL：
+// 仅录入/保存/读取/编辑/删除·停用。**P2-1 折旧参数仅登记，不计算折旧、不出净值、不接概览、
+// 不碰 P&L/reports**；category 自由文本；status='disposed' 仅登记标签 + 处置日（不触发处置损益）。
 // 纯 UI 语言驱动（i18n），不读 accountingLocale。
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   listFixedAssets, createFixedAsset, updateFixedAsset, deleteFixedAsset,
-  type FixedAsset, type AssetStatus,
+  type FixedAsset, type AssetStatus, type DepreciationStartPolicy,
 } from '../services/api';
 import { getSystemErrorText } from '../services/systemErrors';
 
@@ -32,6 +32,11 @@ const FixedAssetsSection: React.FC = () => {
   const [fSerial, setFSerial] = useState('');
   const [fStatus, setFStatus] = useState<AssetStatus>('in_use');
   const [fNote, setFNote] = useState('');
+  // P2-1 折旧参数（UI 按「年」「%」录入；method 固定 straight_line）。
+  const [fUsefulYears, setFUsefulYears] = useState<string>('');
+  const [fSalvagePct, setFSalvagePct] = useState<string>('');
+  const [fStartPolicy, setFStartPolicy] = useState<DepreciationStartPolicy>('next_month');
+  const [fDisposalDate, setFDisposalDate] = useState('');
 
   useEffect(() => { reload(); }, []);
 
@@ -51,6 +56,7 @@ const FixedAssetsSection: React.FC = () => {
   const resetForm = () => {
     setFName(''); setFCategory(''); setFAcqDate(''); setFOriginal('0'); setFCurrency('');
     setFSupplier(''); setFSerial(''); setFStatus('in_use'); setFNote('');
+    setFUsefulYears(''); setFSalvagePct(''); setFStartPolicy('next_month'); setFDisposalDate('');
   };
 
   const openAdd = () => { resetForm(); setEditingId(null); setShowForm(true); };
@@ -65,6 +71,11 @@ const FixedAssetsSection: React.FC = () => {
     setFSerial(a.serial_no || '');
     setFStatus(a.status);
     setFNote(a.note || '');
+    // 折旧参数回填：月→年（÷12）、小数→%（×100）。
+    setFUsefulYears(a.useful_life_months != null ? String(a.useful_life_months / 12) : '');
+    setFSalvagePct(a.salvage_rate != null ? String(a.salvage_rate * 100) : '');
+    setFStartPolicy(a.depreciation_start_policy || 'next_month');
+    setFDisposalDate(a.disposal_date || '');
     setEditingId(a.id);
     setShowForm(true);
   };
@@ -88,6 +99,12 @@ const FixedAssetsSection: React.FC = () => {
         serial_no: fSerial.trim() || null,
         status: fStatus,
         note: fNote.trim() || null,
+        // P2-1 折旧参数（仅登记）：年→月、%→小数；空→null（用类别默认）；method 固定 straight_line。
+        depreciation_method: 'straight_line' as const,
+        useful_life_months: fUsefulYears.trim() === '' ? null : Math.round(Number(fUsefulYears) * 12),
+        salvage_rate: fSalvagePct.trim() === '' ? null : Number(fSalvagePct) / 100,
+        depreciation_start_policy: fStartPolicy,
+        disposal_date: fStatus === 'disposed' ? (fDisposalDate || null) : null,
       };
       if (editingId) await updateFixedAsset(editingId, payload);
       else await createFixedAsset(payload);
@@ -250,6 +267,46 @@ const FixedAssetsSection: React.FC = () => {
                 className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white" />
             </div>
           </div>
+
+          {/* P2-1 折旧参数（仅登记，不计算折旧/不出净值）。method 固定直线法。 */}
+          <div className="border-t border-[#e0ddd5]/70 pt-3 space-y-2">
+            <div className="text-[11px] font-semibold text-[#4a4a48]">{t('fixedAssets.depreciationParams')}</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{t('fixedAssets.depreciationMethod')}</label>
+                <input value={t('fixedAssets.methodStraightLine')} disabled
+                  className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-[#f9f9f8]/60 text-[#5c5c5a]" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{t('fixedAssets.usefulLifeYears')}</label>
+                <input type="number" min="0" step="1" value={fUsefulYears} onChange={e => setFUsefulYears(e.target.value)} placeholder={t('common.optional')}
+                  className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{t('fixedAssets.salvageRatePercent')}</label>
+                <input type="number" min="0" step="0.01" value={fSalvagePct} onChange={e => setFSalvagePct(e.target.value)} placeholder={t('common.optional')}
+                  className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{t('fixedAssets.startPolicy')}</label>
+                <select value={fStartPolicy} onChange={e => setFStartPolicy(e.target.value as DepreciationStartPolicy)}
+                  className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white">
+                  <option value="next_month">{t('fixedAssets.startNextMonth')}</option>
+                  <option value="same_month">{t('fixedAssets.startSameMonth')}</option>
+                  <option value="daily">{t('fixedAssets.startDaily')}</option>
+                </select>
+              </div>
+              {fStatus === 'disposed' && (
+                <div>
+                  <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{t('fixedAssets.disposalDate')}</label>
+                  <input type="date" value={fDisposalDate} onChange={e => setFDisposalDate(e.target.value)}
+                    className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white" />
+                </div>
+              )}
+            </div>
+            <p className="text-[10px] text-[#8a8a88]"><i className="fas fa-circle-info mr-1"></i>{t('fixedAssets.depreciationParamsNote')}</p>
+          </div>
+
           <p className="text-[10px] text-[#8a8a88]"><i className="fas fa-circle-info mr-1"></i>{t('fixedAssets.originalValueHint')}</p>
           <div className="flex space-x-2">
             <button onClick={closeForm} className="text-xs px-4 py-1.5 border border-[#e0ddd5] text-[#4a4a48] rounded-lg hover:bg-[#f0eeeb]">

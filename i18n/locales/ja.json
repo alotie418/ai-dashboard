@@ -1301,7 +1301,18 @@
     "empty": "固定資産の記録がありません。下のボタンから追加してください。",
     "addButton": "固定資産を追加",
     "addTitle": "固定資産の新規作成",
-    "editTitle": "固定資産の編集"
+    "editTitle": "固定資産の編集",
+    "depreciationParams": "減価償却パラメータ",
+    "depreciationMethod": "償却方法",
+    "methodStraightLine": "定額法",
+    "usefulLifeYears": "耐用年数（年）",
+    "salvageRatePercent": "残存率（%）",
+    "startPolicy": "償却開始",
+    "startNextMonth": "取得の翌月から",
+    "startSameMonth": "取得月から",
+    "startDaily": "日割り",
+    "disposalDate": "処分日",
+    "depreciationParamsNote": "ここでは減価償却のパラメータを登録するだけで、減価償却費や帳簿価額は生成しません（帳簿価額・減価償却累計額は管理ベースの概況で概算します）。"
   },
   "equity": {
     "title": "資本・出資登録台帳",

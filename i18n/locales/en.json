@@ -1301,7 +1301,18 @@
     "empty": "No fixed assets yet. Click below to add one.",
     "addButton": "Add fixed asset",
     "addTitle": "New fixed asset",
-    "editTitle": "Edit fixed asset"
+    "editTitle": "Edit fixed asset",
+    "depreciationParams": "Depreciation parameters",
+    "depreciationMethod": "Method",
+    "methodStraightLine": "Straight-line",
+    "usefulLifeYears": "Useful life (years)",
+    "salvageRatePercent": "Salvage rate (%)",
+    "startPolicy": "Depreciation start",
+    "startNextMonth": "Month after acquisition",
+    "startSameMonth": "Acquisition month",
+    "startDaily": "Daily",
+    "disposalDate": "Disposal date",
+    "depreciationParamsNote": "These are depreciation parameters only — no depreciation expense or net book value is generated here (net value / accumulated depreciation are estimated in the management balance overview)."
   },
   "equity": {
     "title": "Equity & Capital Ledger",
