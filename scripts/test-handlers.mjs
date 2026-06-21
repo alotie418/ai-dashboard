@@ -830,6 +830,8 @@ const Q = '?from=2026-01-01&to=2026-12-31';
   const db = freshDb();
   const find = (arr, key) => (arr.find((l) => l.key === key) || {}).amount;
 
+  // P3-4 隔离：income_tax_rate=0 → 应计所得税=0 → 无 incomeTaxPayable 行（本 P1-3 用例只锁分类/现金/借款/权益/差额；所得税接入单测见 botax 块）。
+  await call('PUT', '/api/settings', { income_tax_rate: 0 });
   // 期初账户：CNY 1000 + USD 500
   await call('POST', '/api/accounts', { name: 'A-CNY', opening_balance: 1000, currency: 'CNY' });
   await call('POST', '/api/accounts', { name: 'A-USD', opening_balance: 500, currency: 'USD' });
@@ -1070,6 +1072,84 @@ const Q = '?from=2026-01-01&to=2026-12-31';
   // ── 不写回 equity ──
   ok(db.prepare("SELECT COUNT(*) AS c FROM equity").get().c === 6, '[bo-eq] read-only: equity 行数不变(6)');
   ok(db.prepare("SELECT amount FROM equity WHERE name='Draw'").get().amount === 8000, '[bo-eq] read-only: owner_draw amount 不变');
+}
+
+// ───────────── balance-overview 接所得税 position（PR-7B P3-4）─────────────
+// 锁住：netPosition>0→流动负债 incomeTaxPayable·<0→流动资产 incomeTaxPrepaid·=0→无行·仅本位币块·
+// 进 totals + balanceDifference 自洽·VAT 仍备查不进合计·US 亏损→prepaid+incomeTaxLossPeriodCaveat warning·不写回。
+{
+  const db = freshDb();
+  const TQ = '?from=2026-01-01&to=2026-12-31';
+  const insTxn = db.prepare(`INSERT INTO transactions (id, type, date, amount, amount_net, currency, payment_status, paid_amount, payment_date) VALUES (?,?,?,?,?,?,?,?,?)`);
+  const liab = (blk, key) => (blk.liabilities.current.find((l) => l.key === key) || {}).amount;
+  const asset = (blk, key) => (blk.assets.current.find((l) => l.key === key) || {}).amount;
+
+  // ── payable：利润 → 应计>已缴 → 流动负债 incomeTaxPayable（仅本位币）──
+  await call('PUT', '/api/settings', { accounting_locale: 'CN', currency: 'CNY', income_tax_rate: 25 });
+  await call('POST', '/api/accounts', { name: 'A-CNY', opening_balance: 1000, currency: 'CNY' });
+  await call('POST', '/api/accounts', { name: 'A-USD', opening_balance: 500, currency: 'USD' });
+  insTxn.run('btx-i1', 'income',  PD, 100000, 100000, 'CNY', 'paid', 100000, PD);
+  insTxn.run('btx-e1', 'expense', PD,  20000,  20000, 'CNY', 'paid',  20000, PD);
+  await call('POST', '/api/tax-payments', { tax_type: 'income_tax', currency: 'CNY', name: 'IT', amount: 5000, period_start: '2026-01-01', period_end: '2026-12-31' });
+  await call('POST', '/api/tax-payments', { tax_type: 'vat', currency: 'CNY', name: 'VAT', amount: 8888, period_start: '2026-01-01', period_end: '2026-12-31' });
+
+  const itp = await call('GET', `/api/income-tax-position${TQ}`, null);
+  const bo = await call('GET', `/api/balance-overview${TQ}`, null);
+  const cny = bo.byCurrency.find((b) => b.currency === 'CNY');
+  const usd = bo.byCurrency.find((b) => b.currency === 'USD');
+  ok(itp.netPosition > 0 && itp.positionType === 'payable', '[botax] 前置 netPosition>0 payable');
+  ok(approx(liab(cny, 'incomeTaxPayable'), itp.netPosition), `[botax] CNY incomeTaxPayable=netPosition=${itp.netPosition}, got ${liab(cny, 'incomeTaxPayable')}`);
+  ok(asset(cny, 'incomeTaxPrepaid') === undefined, '[botax] payable 时无 prepaid 行');
+  // 仅本位币：USD 块无所得税行
+  ok(liab(usd, 'incomeTaxPayable') === undefined && asset(usd, 'incomeTaxPrepaid') === undefined, '[botax] 非本位币块(USD)无所得税行');
+  // 进 totals.liabilities + balanceDifference 自洽
+  ok(approx(cny.totals.liabilities, (liab(cny, 'payables') || 0) + (liab(cny, 'incomeTaxPayable') || 0)), '[botax] totals.liabilities 含 incomeTaxPayable');
+  ok(approx(cny.balanceDifference, cny.totals.assets - cny.totals.liabilities - cny.totals.equity), '[botax] balanceDifference 含税款行后自洽');
+  // VAT 仍备查、不进任何 section；excludedNotes 说明
+  const cnyAll = [...cny.assets.current, ...cny.assets.nonCurrent, ...cny.liabilities.current, ...cny.liabilities.nonCurrent, ...cny.equity];
+  ok(!cnyAll.some((l) => /vat/i.test(l.key)), '[botax] VAT 不进任何 section');
+  ok(bo.excludedNotes.some((n) => /VAT|备查/.test(n)), '[botax] excludedNotes 说明 VAT 仅备查');
+  // 只读：tax_payments / accounts 不变
+  ok(db.prepare('SELECT COUNT(*) AS c FROM tax_payments').get().c === 2, '[botax] read-only: tax_payments 行数不变');
+  ok(db.prepare("SELECT opening_balance FROM accounts WHERE name='A-CNY'").get().opening_balance === 1000, '[botax] read-only: accounts 不变');
+}
+
+// ── balance-overview 所得税：prepaid（无利润+已缴 5000）+ zero（无行）──
+{
+  const TQ = '?from=2026-01-01&to=2026-12-31';
+  const asset = (blk, key) => (blk.assets.current.find((l) => l.key === key) || {}).amount;
+  const liab = (blk, key) => (blk.liabilities.current.find((l) => l.key === key) || {}).amount;
+  // prepaid
+  freshDb();
+  await call('PUT', '/api/settings', { accounting_locale: 'CN', currency: 'CNY', income_tax_rate: 25 });
+  await call('POST', '/api/accounts', { name: 'A', opening_balance: 1000, currency: 'CNY' });
+  await call('POST', '/api/tax-payments', { tax_type: 'income_tax', currency: 'CNY', name: 'IT', amount: 5000, period_start: '2026-01-01', period_end: '2026-12-31' });
+  const boP = await call('GET', `/api/balance-overview${TQ}`, null);
+  const cnyP = boP.byCurrency.find((b) => b.currency === 'CNY');
+  ok(approx(asset(cnyP, 'incomeTaxPrepaid'), 5000) && liab(cnyP, 'incomeTaxPayable') === undefined, '[botax] netPosition<0 → 流动资产 incomeTaxPrepaid=5000, 无 payable');
+  // zero：无利润无缴款 → 无税款行
+  freshDb();
+  await call('PUT', '/api/settings', { accounting_locale: 'CN', currency: 'CNY', income_tax_rate: 25 });
+  await call('POST', '/api/accounts', { name: 'A', opening_balance: 1000, currency: 'CNY' });
+  const boZ = await call('GET', `/api/balance-overview${TQ}`, null);
+  const cnyZ = boZ.byCurrency.find((b) => b.currency === 'CNY');
+  ok(liab(cnyZ, 'incomeTaxPayable') === undefined && asset(cnyZ, 'incomeTaxPrepaid') === undefined, '[botax] netPosition=0 → 无税款行(0 噪声)');
+}
+
+// ── balance-overview 所得税：US 亏损期 → prepaid + incomeTaxLossPeriodCaveat warning ──
+{
+  const db = freshDb();
+  const TQ = '?from=2026-01-01&to=2026-12-31';
+  const asset = (blk, key) => (blk.assets.current.find((l) => l.key === key) || {}).amount;
+  await call('PUT', '/api/settings', { accounting_locale: 'US', currency: 'USD', income_tax_rate: 20 });
+  await call('POST', '/api/accounts', { name: 'A', opening_balance: 1000, currency: 'USD' });
+  const insTxn = db.prepare(`INSERT INTO transactions (id, type, date, amount, amount_net, currency, payment_status, paid_amount, payment_date) VALUES (?,?,?,?,?,?,?,?,?)`);
+  insTxn.run('bul-i1', 'income',  PD, 3000, 3000, 'USD', 'paid', 3000, PD);
+  insTxn.run('bul-e1', 'expense', PD, 9000, 9000, 'USD', 'paid', 9000, PD);
+  const bo = await call('GET', `/api/balance-overview${TQ}`, null);
+  const usd = bo.byCurrency.find((b) => b.currency === 'USD');   // base=USD
+  ok(asset(usd, 'incomeTaxPrepaid') !== undefined, '[botax-us] 亏损期 accrued<0 → netPosition<0 → prepaid 行');
+  ok(usd.warnings.includes('incomeTaxLossPeriodCaveat'), '[botax-us] 亏损期 → incomeTaxLossPeriodCaveat warning');
 }
 
 // ───────────── products.create id hardening (prod-<ts>-<rand>) ─────────────

@@ -18,6 +18,7 @@ const { receivablesSummary, payablesSummary } = require('./receivables');
 const inventory = require('./inventory');
 const depreciationPreview = require('./depreciationPreview');   // PR-7B P2-3：固定资产用净值（只读复用）
 const retainedEarnings = require('./retainedEarnings');         // PR-7B P2-4b：权益未分配利润（只读复用）
+const incomeTaxPosition = require('./incomeTaxPosition');       // PR-7B P3-4：所得税应交/预缴（只读复用·仅本位币）
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -103,6 +104,14 @@ async function overview({ query } = {}) {
   const capitalMap = sumEquityByCurrency(db, ['capital_contribution', 'adjustment', 'other']);  // 出资基数（adj/other 折进出资行）
   const ownerDrawMap = sumEquityByCurrency(db, ['owner_draw']);                                  // 业主支取（individual 冲减出资行）
 
+  // 所得税净额（PR-7B P3-4）：仅 income_tax·同税种同期间·本位币（只读复用 income-tax-position·不改 reports）。
+  //   netPosition>0 → 流动负债「应交税费（所得税·估算）」；<0 → 流动资产「预缴税款（所得税·估算）」；=0 → 不显示行。
+  //   VAT/sales_tax/surcharge/payroll_tax/other 上游已过滤、根本不入 netPosition（仍仅备查）。
+  const itp = await incomeTaxPosition.position({ query: { from, to } });
+  const itpNet = round2(itp.netPosition);                         // 本位币·应计−已缴
+  const itpLossCaveat = (itp.warnings || []).includes('accruedNegativeLossPeriod');
+  const itpForeignExcluded = (itp.excludedPayments || []).some((e) => e.reason === 'non_base_currency');
+
   // ── 4) 借款：按币种 + 一年线分流动/非流动（空到期日→流动+warning）──
   const borrowCurrent = new Map();       // currency|null → sum
   const borrowNonCurrent = new Map();
@@ -141,6 +150,8 @@ async function overview({ query } = {}) {
     if (ccy === baseCurrency) {
       assetsCurrent.push({ key: 'receivables', amount: totalReceivable });
       assetsCurrent.push({ key: 'inventory', amount: totalInventory });
+      // P3-4：所得税净多缴 → 流动资产「预缴税款（所得税·估算）」（仅本位币·netPosition<0；=0 不显示）
+      if (itpNet < -0.005) assetsCurrent.push({ key: 'incomeTaxPrepaid', amount: round2(-itpNet) });
     }
     // 资产·非流动（固定资产净值，P2-3：来自 depreciation-preview；disposed 已排除）
     if (fixedNetMap.has(ccy)) {
@@ -153,7 +164,11 @@ async function overview({ query } = {}) {
       if (fnm.hasWarnings) warnings.push('fixedAssetsDepreciationWarnings');
     }
     // 负债·流动
-    if (ccy === baseCurrency) liabilitiesCurrent.push({ key: 'payables', amount: totalPayable });
+    if (ccy === baseCurrency) {
+      liabilitiesCurrent.push({ key: 'payables', amount: totalPayable });
+      // P3-4：所得税净欠缴 → 流动负债「应交税费（所得税·估算）」（仅本位币·netPosition>0；=0 不显示）
+      if (itpNet > 0.005) liabilitiesCurrent.push({ key: 'incomeTaxPayable', amount: round2(itpNet) });
+    }
     if (borrowCurrent.has(ccy)) liabilitiesCurrent.push({ key: 'borrowings', amount: borrowCurrent.get(ccy) });
     // 负债·非流动
     if (borrowNonCurrent.has(ccy)) liabilitiesNonCurrent.push({ key: 'borrowings', amount: borrowNonCurrent.get(ccy) });
@@ -169,6 +184,8 @@ async function overview({ query } = {}) {
     if (ccy === baseCurrency) equityLines.push({ key: 'retainedEarnings', amount: retainedBase });
 
     if (nullMaturityCcy.has(ccy)) warnings.push('borrowingsNullMaturityDefaultCurrent');
+    // P3-4：亏损期所得税估算 caveat（accrued<0 → 预缴行不代表真实预缴；仅本位币块·有税款行时）
+    if (ccy === baseCurrency && Math.abs(itpNet) > 0.005 && itpLossCaveat) warnings.push('incomeTaxLossPeriodCaveat');
 
     const sum = (arr) => round2(arr.reduce((s, l) => s + l.amount, 0));
     const totalAssets = round2(sum(assetsCurrent) + sum(assetsNonCurrent));
@@ -217,7 +234,8 @@ async function overview({ query } = {}) {
       '只读：不写回任何数据',
     ],
     excludedNotes: [
-      '已缴税款(tax_payments) 与 应交税费估算 不进入任何 section/totals（税费抵扣/对冲属 P3）',
+      '仅所得税(income_tax)同税种同期间净额作为「应交税费/预缴税款（估算）」进入概览（管理估算·本位币·来自 income-tax-position）；VAT/消费税/销售税/附加税/工资税/其它税种仍不进合计、仅备查（见已缴税款台账）',
+      ...(itpForeignExcluded ? ['非本位币所得税缴款未计入概览（不折算·见 income-tax-position excludedPayments）'] : []),
       '应收/应付/存货无币种字段，按本位币(' + baseCurrency + ')归集',
       `未分配利润为本位币(${baseCurrency})单一口径，仅列入本位币分组；非本位币分组只含出资类权益，不做折算（折算属 P3）`,
       ...foreignDrawNotes,

@@ -888,7 +888,11 @@
     "balanceAccumulatedDepreciation": "감가상각누계액",
     "balanceFixedNetHint": "정액법 추정",
     "balanceOwnerCapital": "사업주 자본",
-    "balanceRetainedHint": "기능통화 기준 · 관리용 추정(연말 마감 없음)"
+    "balanceRetainedHint": "기능통화 기준 · 관리용 추정(연말 마감 없음)",
+    "balanceIncomeTaxPayable": "미지급 법인세(추정)",
+    "balanceIncomeTaxPrepaid": "선급 법인세(추정)",
+    "balanceIncomeTaxHint": "기능통화 · 동일 세목·동일 기간 상계 · 관리용 추정",
+    "balanceIncomeTaxLossCaveat": "발생 법인세가 음수(손실기 추정)이며, 선급 항목은 실제 선급을 의미하지 않습니다"
   },
   "usSchedule": {
     "line1": "Line 1 — 총수입",
