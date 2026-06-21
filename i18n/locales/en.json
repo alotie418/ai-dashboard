@@ -149,7 +149,14 @@
       "scopeYes1": "Tax regime, tax rates, and tax concepts",
       "scopeYes2": "Default currency and report structure",
       "scopeYes3": "Dashboard metrics, categories, and AI finance context",
-      "scopeNo": "Does NOT change the display language. Menus and labels stay in your chosen UI Language."
+      "scopeNo": "Does NOT change the display language. Menus and labels stay in your chosen UI Language.",
+      "entitySectionTitle": "Business Entity & Opening Equity",
+      "entityTypeLabel": "Business Entity Type",
+      "entityTypeIndividual": "Individual / Sole Proprietor",
+      "entityTypeCompany": "Company / Incorporated",
+      "entityTypeHint": "Only affects equity row labels in the management overview (company = paid-in capital / individual = owner's capital). Not a legal entity determination.",
+      "openingRetainedLabel": "Opening Retained Earnings",
+      "openingRetainedHint": "Enter in functional currency; a negative value means accumulated losses. Management estimate only — no year-end close, no write-back to the equity ledger. Reopen the Finance overview to see changes."
     },
     "categories": {
       "title": "Categories",

@@ -149,7 +149,14 @@
       "scopeYes1": "稅制、稅率、稅種概念",
       "scopeYes2": "預設幣種與報表結構",
       "scopeYes3": "看板指標、分類、AI 財務分析上下文",
-      "scopeNo": "不會改變介面顯示語言。選單和標籤保持您選擇的 UI 語言。"
+      "scopeNo": "不會改變介面顯示語言。選單和標籤保持您選擇的 UI 語言。",
+      "entitySectionTitle": "經營主體與期初權益",
+      "entityTypeLabel": "經營主體類型",
+      "entityTypeIndividual": "個人 / 個體經營",
+      "entityTypeCompany": "公司 / 企業",
+      "entityTypeHint": "僅影響管理口徑概覽的權益列標籤（公司=實收資本 / 個體=業主資本），不構成法定主體認定。",
+      "openingRetainedLabel": "期初未分配利潤",
+      "openingRetainedHint": "按本位幣輸入；負數表示累計虧損。僅作管理估算參數，不自動年結、不寫回權益台帳。儲存後請重新進入財務概覽查看變化。"
     },
     "categories": {
       "title": "分類管理",

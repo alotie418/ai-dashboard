@@ -149,7 +149,14 @@
       "scopeYes1": "세제, 세율, 세금 개념",
       "scopeYes2": "기본 통화 및 보고서 구조",
       "scopeYes3": "대시보드 지표, 카테고리, AI 재무 분석 컨텍스트",
-      "scopeNo": "표시 언어는 변경되지 않습니다. 메뉴와 레이블은 선택한 UI 언어를 유지합니다."
+      "scopeNo": "표시 언어는 변경되지 않습니다. 메뉴와 레이블은 선택한 UI 언어를 유지합니다.",
+      "entitySectionTitle": "경영 주체 및 기초 자본",
+      "entityTypeLabel": "경영 주체 유형",
+      "entityTypeIndividual": "개인 / 개인사업자",
+      "entityTypeCompany": "회사 / 법인",
+      "entityTypeHint": "관리 기준 개요의 자본 항목 라벨(회사=납입자본금 / 개인=사업주 자본)에만 영향을 줍니다. 법적 주체 인정이 아닙니다.",
+      "openingRetainedLabel": "기초 이익잉여금",
+      "openingRetainedHint": "기능통화로 입력하세요. 음수는 누적 손실을 의미합니다. 관리용 추정 매개변수일 뿐이며 연말 마감이나 자본 원장 기입을 하지 않습니다. 저장 후 재무 개요를 다시 열어 확인하세요."
     },
     "categories": {
       "title": "카테고리 관리",

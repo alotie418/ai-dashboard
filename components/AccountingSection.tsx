@@ -12,6 +12,9 @@ const AccountingSection: React.FC = () => {
   const [surchargeRate, setSurchargeRate] = useState<number>(12);
   const [incomeTaxRate, setIncomeTaxRate] = useState<number>(25);
   const [currency, setCurrency] = useState<string>('CNY');
+  // PR-7B P2 收尾：经营主体类型 + 期初未分配利润（管理口径概览权益用；仅影响概览标签，非法定主体认定）。
+  const [entityType, setEntityType] = useState<'individual' | 'company'>('individual');
+  const [openingRetained, setOpeningRetained] = useState<number>(0);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -32,6 +35,12 @@ const AccountingSection: React.FC = () => {
       if (s.surcharge_rate !== undefined) setSurchargeRate(Number(s.surcharge_rate));
       if (s.income_tax_rate !== undefined) setIncomeTaxRate(Number(s.income_tax_rate));
       if (s.currency) setCurrency(s.currency);
+      // PR-7B P2 收尾：读取主体类型（缺/非法→individual）与期初未分配利润（NaN→0，允许负）。
+      if (s.entity_type === 'company' || s.entity_type === 'individual') setEntityType(s.entity_type);
+      if (s.opening_retained_earnings !== undefined) {
+        const n = Number(s.opening_retained_earnings);
+        setOpeningRetained(Number.isFinite(n) ? n : 0);
+      }
     }).catch(() => {});
   }, []);
 
@@ -180,6 +189,46 @@ const AccountingSection: React.FC = () => {
             {profile.notesByLang?.[lang] || profile.notes}
           </div>
         )}
+      </div>
+
+      {/* PR-7B P2 收尾：经营主体与期初权益（管理口径概览权益用；select 主体类型 + 期初未分配利润，允许负=累计亏损） */}
+      <div className="border border-[#e0ddd5] rounded-xl p-5 bg-[#f9f9f8]/30 space-y-3">
+        <div className="text-sm font-semibold text-[#191918]">{t('settings.accounting.entitySectionTitle')}</div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{t('settings.accounting.entityTypeLabel')}</label>
+            <select value={entityType} onChange={e => setEntityType(e.target.value as 'individual' | 'company')}
+              className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white">
+              <option value="individual">{t('settings.accounting.entityTypeIndividual')}</option>
+              <option value="company">{t('settings.accounting.entityTypeCompany')}</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{t('settings.accounting.openingRetainedLabel')} ({currency})</label>
+            <input type="number" step="0.01" value={openingRetained} onChange={e => setOpeningRetained(Number(e.target.value))}
+              className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white font-mono" />
+          </div>
+        </div>
+        <p className="text-[10px] text-[#5c5c5a] leading-snug"><i className="fas fa-circle-info mr-1.5"></i>{t('settings.accounting.entityTypeHint')}</p>
+        <p className="text-[10px] text-[#5c5c5a] leading-snug"><i className="fas fa-circle-info mr-1.5"></i>{t('settings.accounting.openingRetainedHint')}</p>
+        <button
+          onClick={async () => {
+            setSaving(true);
+            try {
+              await saveSettings({ entity_type: entityType, opening_retained_earnings: openingRetained } as any);
+              setToast({ type: 'success', text: t('settings.savedToast') });
+            } catch (e: any) {
+              setToast({ type: 'error', text: e?.message || 'Save failed' });
+            } finally {
+              setSaving(false);
+              setTimeout(() => setToast(null), 2500);
+            }
+          }}
+          disabled={saving}
+          className="text-xs px-3 py-1.5 border border-primary text-primary rounded-lg hover:bg-primary/5 disabled:opacity-50"
+        >
+          {saving ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('common.saving')}</> : t('common.save')}
+        </button>
       </div>
 
       <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">

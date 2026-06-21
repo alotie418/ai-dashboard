@@ -1096,6 +1096,8 @@ export interface AppSettings {
   admin_expense_annual?: number; // 年度管理费用 (元)
   vat_rate?: string;
   ai_model?: string;
+  entity_type?: 'individual' | 'company';   // PR-7B P2：经营主体类型（管理口径概览权益标签：company=实收资本 / individual=业主资本）
+  opening_retained_earnings?: number;        // PR-7B P2：期初未分配利润（本位币，允许负=累计亏损；仅管理估算参数）
 }
 
 // API record types
