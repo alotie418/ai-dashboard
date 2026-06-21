@@ -149,7 +149,14 @@
       "scopeYes1": "Régime fiscal, taux, concepts fiscaux",
       "scopeYes2": "Devise et structure des rapports",
       "scopeYes3": "Indicateurs tableau de bord, catégories, contexte IA financier",
-      "scopeNo": "Ne change PAS la langue d'affichage. Les menus et libellés restent dans votre langue UI."
+      "scopeNo": "Ne change PAS la langue d'affichage. Les menus et libellés restent dans votre langue UI.",
+      "entitySectionTitle": "Entité d'exploitation et capitaux d'ouverture",
+      "entityTypeLabel": "Type d'entité d'exploitation",
+      "entityTypeIndividual": "Particulier / Entrepreneur individuel",
+      "entityTypeCompany": "Société / Personne morale",
+      "entityTypeHint": "Affecte uniquement les libellés des capitaux propres dans l'aperçu de gestion (société = capital social / particulier = capital de l'exploitant). Ce n'est pas une qualification juridique de l'entité.",
+      "openingRetainedLabel": "Résultat reporté d'ouverture",
+      "openingRetainedHint": "Saisir en monnaie fonctionnelle ; une valeur négative correspond à des pertes cumulées. Paramètre d'estimation de gestion uniquement — pas de clôture annuelle, pas de réécriture du registre des capitaux propres. Rouvrez l'aperçu financier pour voir les changements."
     },
     "categories": {
       "title": "Catégories",

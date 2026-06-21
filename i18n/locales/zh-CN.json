@@ -149,7 +149,14 @@
       "scopeYes1": "税制、税率、税种概念",
       "scopeYes2": "默认币种与报表结构",
       "scopeYes3": "看板指标、分类、AI 财务分析上下文",
-      "scopeNo": "不会改变界面显示语言。菜单和标签保持你选择的 UI 语言。"
+      "scopeNo": "不会改变界面显示语言。菜单和标签保持你选择的 UI 语言。",
+      "entitySectionTitle": "经营主体与期初权益",
+      "entityTypeLabel": "经营主体类型",
+      "entityTypeIndividual": "个人 / 个体经营",
+      "entityTypeCompany": "公司 / 企业",
+      "entityTypeHint": "仅影响管理口径概览的权益行标签（公司=实收资本 / 个体=业主资本），不构成法定主体认定。",
+      "openingRetainedLabel": "期初未分配利润",
+      "openingRetainedHint": "按本位币录入；负数表示累计亏损。仅作管理估算参数，不自动年结、不写回权益台账。保存后请重新进入财务概览查看变化。"
     },
     "categories": {
       "title": "分类管理",

@@ -149,7 +149,14 @@
       "scopeYes1": "税制、税率、税概念",
       "scopeYes2": "デフォルト通貨と帳票構造",
       "scopeYes3": "ダッシュボード指標、カテゴリ、AI財務分析コンテキスト",
-      "scopeNo": "表示言語は変更されません。メニューとラベルは選択したUI言語のまま。"
+      "scopeNo": "表示言語は変更されません。メニューとラベルは選択したUI言語のまま。",
+      "entitySectionTitle": "経営主体と期首資本",
+      "entityTypeLabel": "経営主体の種類",
+      "entityTypeIndividual": "個人 / 個人事業",
+      "entityTypeCompany": "会社 / 法人",
+      "entityTypeHint": "管理ベース概況の純資産行ラベル（会社=資本金 / 個人=事業主資本）にのみ影響します。法的な主体認定ではありません。",
+      "openingRetainedLabel": "期首利益剰余金",
+      "openingRetainedHint": "機能通貨で入力。マイナスは累積損失を表します。管理用の概算パラメータのみで、期末締めや純資産台帳への書き戻しは行いません。保存後は財務概況を開き直して確認してください。"
     },
     "categories": {
       "title": "カテゴリ管理",
