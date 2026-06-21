@@ -879,7 +879,9 @@
     "balanceFixedNet": "Immobilisations (valeur nette)",
     "balanceOriginalValue": "Valeur d'origine",
     "balanceAccumulatedDepreciation": "Amortissement cumulé",
-    "balanceFixedNetHint": "estimation linéaire"
+    "balanceFixedNetHint": "estimation linéaire",
+    "balanceOwnerCapital": "Capital de l'exploitant",
+    "balanceRetainedHint": "Base en monnaie fonctionnelle · estimation de gestion (sans clôture annuelle)"
   },
   "usSchedule": {
     "line1": "Line 1 — Recettes brutes",

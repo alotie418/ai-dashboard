@@ -682,6 +682,7 @@ export interface BalanceCurrencyBlock {
 export interface BalanceOverview {
   estimate: boolean;                                   // 恒 true
   reportType: 'management_balance_overview';           // 非法定 balance sheet
+  entityType?: 'individual' | 'company';               // PR-7B P2-4b：出资行 entity-aware（company=实收资本 / individual=业主资本）
   period: { from: string; to: string };
   asOf: string;
   baseCurrency: string;

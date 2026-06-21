@@ -351,6 +351,7 @@ const REPORT_MOCK = (acc: string) => ({
 const BALANCE_OVERVIEW_MOCK = (acc: string) => ({
   estimate: true,
   reportType: 'management_balance_overview',
+  entityType: 'individual',   // PR-7B P2-4b：默认个体口径（出资行=业主资本 ownerCapital）
   period: { from: '2026-01-01', to: '2026-12-31' },
   asOf: '2026-12-31',
   baseCurrency: 'CNY',
@@ -359,7 +360,8 @@ const BALANCE_OVERVIEW_MOCK = (acc: string) => ({
       currency: 'CNY',
       assets: { current: [{ key: 'cash', amount: 1200 }, { key: 'receivables', amount: 800 }, { key: 'inventory', amount: 0 }], nonCurrent: [{ key: 'fixedAssets', amount: 7000, meta: { originalValue: 8000, accumulatedDepreciation: 1000, netBookValue: 7000, estimate: true } }] },
       liabilities: { current: [{ key: 'payables', amount: 300 }, { key: 'borrowings', amount: 3500 }], nonCurrent: [{ key: 'borrowings', amount: 5000 }] },
-      equity: [{ key: 'equity', amount: 30000 }],
+      // PR-7B P2-4b：权益两行 = 业主资本(ownerCapital) + 未分配利润(retainedEarnings)，合计仍 30000
+      equity: [{ key: 'ownerCapital', amount: 20000 }, { key: 'retainedEarnings', amount: 10000 }],
       totals: { assets: 10000, liabilities: 8800, equity: 30000 },
       balanceDifference: -28800,
       warnings: ['borrowingsNullMaturityDefaultCurrent'],
@@ -1890,6 +1892,10 @@ test.describe('balance overview (management basis)', () => {
       // PR-7B P2-3：固定资产（净值）标签 + 累计折旧辅助说明渲染
       expect(body, `[${ui}] fixed assets (net) label`).toContain(loc.finance.balanceFixedNet);
       expect(body, `[${ui}] accumulated depreciation note`).toContain(loc.finance.balanceAccumulatedDepreciation);
+      // PR-7B P2-4b：权益拆两行（业主资本 + 未分配利润）+ 留存本位币口径 hint
+      expect(body, `[${ui}] owner capital label`).toContain(loc.finance.balanceOwnerCapital);
+      expect(body, `[${ui}] retained earnings label`).toContain(loc.finance.balanceRetained);
+      expect(body, `[${ui}] retained hint`).toContain(loc.finance.balanceRetainedHint);
       // 不得出现裸法定报表名
       for (const stmt of ['资产负债表', '資產負債表', 'Balance Sheet', '貸借対照表', '재무상태표']) {
         expect(body, `[${ui}] must not show statutory statement name "${stmt}"`).not.toContain(stmt);

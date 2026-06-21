@@ -879,7 +879,9 @@
     "balanceFixedNet": "固定資産（帳簿価額）",
     "balanceOriginalValue": "取得価額",
     "balanceAccumulatedDepreciation": "減価償却累計額",
-    "balanceFixedNetHint": "定額法による概算"
+    "balanceFixedNetHint": "定額法による概算",
+    "balanceOwnerCapital": "事業主資本",
+    "balanceRetainedHint": "機能通貨ベース · 管理用概算（期末締めなし）"
   },
   "usSchedule": {
     "line1": "Line 1 — 総収入",
