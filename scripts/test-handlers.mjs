@@ -1450,6 +1450,72 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   ok(pos.limitations.some((l) => /SE tax|自雇/.test(l)), '[itp-us] limitations 注明仅所得税不含 SE tax');
 }
 
+// ───────────────── fx-reference-conversion (多币种参考折算只读预览, PR-7B P3-3) ─────────────────
+// 只读：balanceOverview 各币种 totals × 用户参考汇率 → 本位币参考合计。锁住：converted=amount×rate(rate=本位币/外币)·
+// 本位币 rate=1·缺汇率→missingRates(missing)·非法汇率→missingRates(invalid_rate)+warning·null 币种→no_currency_code·
+// 负值符号保留·query 覆盖 settings·**不改 balanceOverview byCurrency 原值·不写回任何表**。
+{
+  const db = freshDb();
+  const FXQ = '?from=2026-01-01&to=2026-12-31';
+  await call('PUT', '/api/settings', { currency: 'CNY' });
+  // 账户期初：CNY 1000 / USD 500 / EUR 200 / JPY 10000 / 无币种 999
+  await call('POST', '/api/accounts', { name: 'A-CNY', opening_balance: 1000, currency: 'CNY' });
+  await call('POST', '/api/accounts', { name: 'A-USD', opening_balance: 500, currency: 'USD' });
+  await call('POST', '/api/accounts', { name: 'A-EUR', opening_balance: 200, currency: 'EUR' });
+  await call('POST', '/api/accounts', { name: 'A-JPY', opening_balance: 10000, currency: 'JPY' });
+  await call('POST', '/api/accounts', { name: 'A-NULL', opening_balance: 999 });               // 无币种 → null 块
+  // USD 借款 3000（流动）→ USD balanceDifference 为负，验证负值折算
+  await call('POST', '/api/liabilities', { name: 'L-USD', opening_balance: 3000, currency: 'USD', maturity_date: '2026-09-01' });
+
+  // 折算前先取 balanceOverview 基准（用于「不改原值」对比）
+  const boBefore = await call('GET', `/api/balance-overview${FXQ}`, null);
+  const usdBefore = boBefore.byCurrency.find((b) => b.currency === 'USD');
+
+  // query rates：USD 7.2（有效）/ JPY -1（非法）/ EUR 缺失（不传）
+  const fx = await call('GET', `/api/fx-reference-conversion${FXQ}&rates=USD:7.2,JPY:-1`, null);
+  // 元信息
+  ok(fx.estimate === true && fx.reportType === 'fx_reference_conversion' && fx.baseCurrency === 'CNY', '[fx] estimate/reportType/baseCurrency=CNY');
+  ok(fx.source === 'user_reference_rates' && fx.rateSource === 'query' && fx.disclaimerKey === 'disclaimer.report', '[fx] source/rateSource=query(仅 query)/disclaimerKey');
+  // 生效汇率 + 本位币 rate=1
+  ok(fx.rates.CNY === 1 && fx.rates.USD === 7.2, '[fx] effective rates CNY=1 / USD=7.2');
+  const cny = fx.converted.find((c) => c.currency === 'CNY');
+  const usd = fx.converted.find((c) => c.currency === 'USD');
+  ok(cny && cny.rate === 1 && approx(cny.converted.assets, cny.original.assets), '[fx] baseCurrency rate=1 → 1:1 折算');
+  // USD：assets 500×7.2=3600；balanceDifference 负值符号保留
+  ok(usd && usd.rate === 7.2 && approx(usd.converted.assets, usd.original.assets * 7.2) && approx(usd.original.assets, 500) && approx(usd.converted.assets, 3600), `[fx] USD assets 500×7.2=3600, got ${usd?.converted.assets}`);
+  ok(usd.original.balanceDifference < 0 && approx(usd.converted.balanceDifference, usd.original.balanceDifference * 7.2), '[fx] 负值 balanceDifference × rate 符号保留');
+  // 缺汇率 EUR → missing；非法 JPY -1 → invalid_rate；null → no_currency_code
+  ok(fx.missingRates.find((m) => m.currency === 'EUR')?.reason === 'missing', '[fx] EUR 缺汇率 → missing');
+  ok(fx.missingRates.find((m) => m.currency === 'JPY')?.reason === 'invalid_rate', '[fx] JPY -1 → invalid_rate');
+  ok(fx.missingRates.find((m) => m.currency === null)?.reason === 'no_currency_code', '[fx] null 币种 → no_currency_code');
+  ok(fx.warnings.includes('invalidRatePresent') && fx.warnings.includes('missingRatesPresent'), '[fx] warnings invalidRatePresent + missingRatesPresent');
+  // totalsReference：仅 CNY+USD 计入；assets=1000+3600=4600
+  ok(approx(fx.totalsReference.assets, 4600), `[fx] totalsReference.assets=4600 (CNY1000+USD3600), got ${fx.totalsReference.assets}`);
+  ok(fx.totalsReference.includedCurrencies.includes('CNY') && fx.totalsReference.includedCurrencies.includes('USD'), '[fx] included CNY+USD');
+  ok(fx.totalsReference.excludedCurrencies.includes('EUR') && fx.totalsReference.excludedCurrencies.includes('JPY') && fx.totalsReference.excludedCurrencies.includes(null), '[fx] excluded EUR/JPY/null');
+  // **不改 balanceOverview byCurrency 原值**：再调一次，USD balanceDifference 仍为折算前原值
+  const boAfter = await call('GET', `/api/balance-overview${FXQ}`, null);
+  const usdAfter = boAfter.byCurrency.find((b) => b.currency === 'USD');
+  ok(approx(usdAfter.balanceDifference, usdBefore.balanceDifference) && approx(usdAfter.totals.assets, 500), '[fx] read-only: balanceOverview USD byCurrency 原值不变');
+  // **不写回任何表**：accounts / liabilities 行数/值不变
+  ok(db.prepare('SELECT COUNT(*) AS c FROM accounts').get().c === 5, '[fx] read-only: accounts 行数不变(5)');
+  ok(db.prepare("SELECT opening_balance FROM liabilities WHERE name='L-USD'").get().opening_balance === 3000, '[fx] read-only: liabilities 原值不变');
+}
+
+// ── fx-reference-conversion：settings 主源 + query 覆盖（query 优先·rateSource=merged）──
+{
+  const FXQ = '?from=2026-01-01&to=2026-12-31';
+  freshDb();
+  await call('PUT', '/api/settings', { currency: 'CNY', fx_reference_rates: { USD: 7.0, EUR: 7.85 } });
+  await call('POST', '/api/accounts', { name: 'A-USD', opening_balance: 100, currency: 'USD' });
+  await call('POST', '/api/accounts', { name: 'A-EUR', opening_balance: 100, currency: 'EUR' });
+  // query 覆盖 USD=7.2（settings 7.0 被覆盖），EUR 沿用 settings 7.85
+  const fx = await call('GET', `/api/fx-reference-conversion${FXQ}&rates=USD:7.2`, null);
+  ok(fx.rateSource === 'merged', '[fx] rateSource=merged (settings+query)');
+  ok(fx.rates.USD === 7.2 && fx.rates.EUR === 7.85, '[fx] query 覆盖 settings：USD=7.2(query) / EUR=7.85(settings)');
+  ok(fx.converted.find((c) => c.currency === 'USD').rate === 7.2 && fx.converted.find((c) => c.currency === 'EUR').rate === 7.85, '[fx] converted 用合并后汇率');
+}
+
 // ───────────────────────── §2B Batch 4: settings + reports + batch ─────────────────────────
 
 // ───────────────────────── settings (whitelist read+write filter, JSON round-trip) ─────────────────────────
@@ -2295,4 +2361,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + fx-reference-conversion(multi-currency reference conversion read-only, PR-7B P3-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');

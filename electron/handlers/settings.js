@@ -19,6 +19,8 @@ const SETTINGS_ALLOWED_KEYS = new Set([
   // PR-7B P2-4a：管理口径留存收益 preview 所需（仅白名单·无 UI；取值校验在 retainedEarnings handler 读取侧）
   'entity_type',                 // 'individual'（默认）| 'company'
   'opening_retained_earnings',   // 期初未分配利润（本位币单一数值，允许负=累计亏损）
+  // PR-7B P3-3：多币种参考折算 preview 所需（仅白名单·无 UI；JSON {币种:汇率}，rate=本位币/外币）
+  'fx_reference_rates',          // 参考汇率 { "USD": 7.2, ... }；仅 fx-reference-conversion 只读消费，不写回、不抓实时
 ]);
 
 async function get() {
