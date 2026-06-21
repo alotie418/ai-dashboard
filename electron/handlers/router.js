@@ -32,6 +32,7 @@ const cashPositionH = require('./cashPosition');
 const balanceOverviewH = require('./balanceOverview');
 const depreciationPreviewH = require('./depreciationPreview');
 const retainedEarningsH = require('./retainedEarnings');
+const incomeTaxPositionH = require('./incomeTaxPosition');
 
 const routes = [
   // ---- Dashboard ----
@@ -124,6 +125,9 @@ const routes = [
 
   // ---- Retained Earnings Preview: 留存/未分配利润只读预览（PR-7B P2-4a；期末=期初+本期净利−分红·单一本位币·只读不写回·只读复用 reports netProfit 不改 reports）----
   ['GET', '/api/retained-earnings-preview', retainedEarningsH.preview],
+
+  // ---- Income Tax Position: 所得税同税种同期间对冲只读预览（PR-7B P3-1；期末应交=本期应计−本期已缴·仅 income_tax·本位币·只读不写回·只读复用 reports 不改 reports·不接概览）----
+  ['GET', '/api/income-tax-position', incomeTaxPositionH.position],
 
   // ---- Business Documents（业务单据 Phase A；next-number/tax-invoice 排在 :id 前）----
   ['GET', '/api/documents/next-number', documentsH.nextNumber],

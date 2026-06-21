@@ -1356,6 +1356,100 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   ok(re.limitations.some((l) => /Schedule C/.test(l)), '[re-us] limitations 标注 Schedule C 口径');
 }
 
+// ───────────────── income-tax-position (所得税同税种同期间对冲只读预览, PR-7B P3-1) ─────────────────
+// 只读：期末应交所得税 = 本期应计(reports incomeStatement.incomeTax / US estimatedTax.annualIncomeTax) − 本期已缴(tax_payments)。
+// 锁住：仅 income_tax·is_active=1·本位币·period 重叠 / payment_date 回退·partialPeriodOverlap warning·
+// 非本位币/out_of_period/no_date 排除·负额冲正 warning·三态 payable/prepaid/zero·US accruedSource 特判·
+// 亏损期 accrued<0 warning·**不写回 tax_payments·不触碰 reports**·VAT/other 排除。
+{
+  const db = freshDb();
+  const ITQ = '?from=2026-01-01&to=2026-12-31';
+  const mkTax = (body) => call('POST', '/api/tax-payments', { tax_type: 'income_tax', currency: 'CNY', ...body });
+
+  await call('PUT', '/api/settings', { accounting_locale: 'CN', currency: 'CNY', income_tax_rate: 25 });
+  // 本期损益（利润 → 应计所得税 > 0）
+  const insTxn = db.prepare(`INSERT INTO transactions (id, type, date, amount, amount_net, currency, payment_status, paid_amount, payment_date) VALUES (?,?,?,?,?,?,?,?,?)`);
+  insTxn.run('it-i1', 'income',  PD, 100000, 100000, 'CNY', 'paid', 100000, PD);
+  insTxn.run('it-e1', 'expense', PD,  20000,  20000, 'CNY', 'paid',  20000, PD);
+
+  // 已缴 income_tax 缴款：
+  await mkTax({ name: 'T1-period', amount: 5000, period_start: '2026-01-01', period_end: '2026-12-31' });   // period 重叠(含)→matched basis=period
+  await mkTax({ name: 'T2-paydate', amount: 3000, payment_date: '2026-03-10' });                            // 无 period → payment_date 回退
+  await mkTax({ name: 'T3-partial', amount: 2000, period_start: '2026-10-01', period_end: '2027-03-31' });  // 越界→matched+partial warning
+  await mkTax({ name: 'T4-outside', amount: 1000, period_start: '2025-01-01', period_end: '2025-12-31' });  // 期间外→excluded out_of_period
+  await mkTax({ name: 'T5-nodate', amount: 9999 });                                                          // 无 period 无 payment_date→excluded no_date
+  await mkTax({ name: 'T6-usd', amount: 500, currency: 'USD', payment_date: PD });                           // 非本位币→excluded non_base_currency
+  await mkTax({ name: 'T7-neg', amount: -800, period_start: '2026-01-01', period_end: '2026-12-31' });       // 负额冲正→matched + negative warning
+  await mkTax({ name: 'T8-vat', tax_type: 'vat', amount: 7777, period_start: '2026-01-01', period_end: '2026-12-31' }); // VAT→SQL 过滤，不出现
+  await mkTax({ name: 'T9-inactive', amount: 6666, period_start: '2026-01-01', period_end: '2026-12-31', is_active: false }); // 停用→SQL 过滤
+
+  const pos = await call('GET', `/api/income-tax-position${ITQ}`, null);
+  // 元信息
+  ok(pos.estimate === true && pos.reportType === 'income_tax_position' && pos.taxType === 'income_tax', '[itp] estimate/reportType/taxType');
+  ok(pos.baseCurrency === 'CNY' && pos.locale === 'CN' && pos.accruedSource === 'incomeStatement.incomeTax', '[itp] CN accruedSource=incomeStatement.incomeTax');
+  ok(pos.disclaimerKey === 'disclaimer.tax', '[itp] disclaimerKey=disclaimer.tax');
+  // 应计交叉验证 reports
+  const rep = await call('POST', '/api/reports/generate', { locale: 'CN', from: '2026-01-01', to: '2026-12-31' });
+  ok(approx(pos.accruedIncomeTax, rep.incomeStatement.incomeTax) && pos.accruedIncomeTax > 0, `[itp] accrued 取自 incomeStatement.incomeTax=${rep.incomeStatement.incomeTax}, got ${pos.accruedIncomeTax}`);
+  // 匹配：T1+T2+T3+T7 = 4 笔；paid = 5000+3000+2000−800 = 9200
+  ok(pos.matchedPayments.length === 4, `[itp] matched 4 (T1/T2/T3/T7), got ${pos.matchedPayments.length}`);
+  ok(approx(pos.paidIncomeTax, 9200), `[itp] paid=9200 (5000+3000+2000−800), got ${pos.paidIncomeTax}`);
+  ok(pos.matchedPayments.find((m) => m.name === 'T1-period').matchBasis === 'period', '[itp] T1 matchBasis=period');
+  ok(pos.matchedPayments.find((m) => m.name === 'T2-paydate').matchBasis === 'payment_date', '[itp] T2 matchBasis=payment_date (period 缺→回退)');
+  // 排除：T4 out_of_period / T5 no_date / T6 non_base_currency = 3 笔；VAT/inactive 不出现
+  ok(pos.excludedPayments.length === 3, `[itp] excluded 3 (T4/T5/T6), got ${pos.excludedPayments.length}`);
+  ok(pos.excludedPayments.find((e) => e.name === 'T4-outside').reason === 'out_of_period', '[itp] T4 reason=out_of_period');
+  ok(pos.excludedPayments.find((e) => e.name === 'T5-nodate').reason === 'no_date', '[itp] T5 reason=no_date');
+  ok(pos.excludedPayments.find((e) => e.name === 'T6-usd').reason === 'non_base_currency', '[itp] T6 reason=non_base_currency');
+  const allNames = [...pos.matchedPayments, ...pos.excludedPayments].map((x) => x.name);
+  ok(!allNames.includes('T8-vat') && !allNames.includes('T9-inactive'), '[itp] VAT/inactive 经 SQL 过滤，不出现在 matched/excluded');
+  // warnings：partialPeriodOverlap(T3) + negativePaymentPresent(T7)
+  ok(pos.warnings.includes('partialPeriodOverlap'), '[itp] T3 越界 → partialPeriodOverlap warning');
+  ok(pos.warnings.includes('negativePaymentPresent'), '[itp] T7 负额 → negativePaymentPresent warning');
+  // netPosition = 应计 − 9200；应计>9200 → payable
+  ok(approx(pos.netPosition, pos.accruedIncomeTax - 9200) && pos.positionType === 'payable', `[itp] netPosition=应计−9200·payable, got ${pos.netPosition}/${pos.positionType}`);
+  // excludedNotes 提及非本位币 + 其它税种备查
+  ok(pos.excludedNotes.some((n) => /USD/.test(n)) && pos.excludedNotes.some((n) => /VAT|备查/.test(n)), '[itp] excludedNotes 非本位币 + 其它税种备查');
+  // **不写回 tax_payments**：9 行不变，T1 amount 不变
+  ok(db.prepare('SELECT COUNT(*) AS c FROM tax_payments').get().c === 9, '[itp] read-only: tax_payments 行数不变(9)');
+  ok(db.prepare("SELECT amount FROM tax_payments WHERE name='T1-period'").get().amount === 5000, '[itp] read-only: T1 amount 不变');
+}
+
+// ── income-tax-position：prepaid + zero 三态 ──
+{
+  const ITQ = '?from=2026-01-01&to=2026-12-31';
+  // prepaid：无损益(应计 0) + 已缴 5000 → netPosition -5000 → prepaid
+  freshDb();
+  await call('PUT', '/api/settings', { accounting_locale: 'CN', currency: 'CNY', income_tax_rate: 25 });
+  await call('POST', '/api/tax-payments', { tax_type: 'income_tax', currency: 'CNY', name: 'P1', amount: 5000, period_start: '2026-01-01', period_end: '2026-12-31' });
+  const prepaid = await call('GET', `/api/income-tax-position${ITQ}`, null);
+  ok(approx(prepaid.accruedIncomeTax, 0) && approx(prepaid.paidIncomeTax, 5000) && prepaid.positionType === 'prepaid', `[itp] prepaid: accrued 0 / paid 5000 / prepaid, got ${prepaid.positionType}`);
+  // zero：无损益 + 无缴款 → 0/0 → zero
+  freshDb();
+  await call('PUT', '/api/settings', { accounting_locale: 'CN', currency: 'CNY', income_tax_rate: 25 });
+  const zero = await call('GET', `/api/income-tax-position${ITQ}`, null);
+  ok(approx(zero.accruedIncomeTax, 0) && approx(zero.paidIncomeTax, 0) && zero.positionType === 'zero' && zero.matchedPayments.length === 0, '[itp] zero: accrued 0 / paid 0 / zero / no matched');
+}
+
+// ── income-tax-position US 特判：accruedSource=estimatedTax.annualIncomeTax + 亏损期 accrued<0 warning ──
+{
+  const db = freshDb();
+  const ITQ = '?from=2026-01-01&to=2026-12-31';
+  await call('PUT', '/api/settings', { accounting_locale: 'US', currency: 'USD', income_tax_rate: 20 });
+  // 亏损：expense > income → US annualIncomeTax = netProfit×率 < 0（不 clamp）
+  const insTxn = db.prepare(`INSERT INTO transactions (id, type, date, amount, amount_net, currency, payment_status, paid_amount, payment_date) VALUES (?,?,?,?,?,?,?,?,?)`);
+  insTxn.run('itu-i1', 'income',  PD, 3000, 3000, 'USD', 'paid', 3000, PD);
+  insTxn.run('itu-e1', 'expense', PD, 9000, 9000, 'USD', 'paid', 9000, PD);
+
+  const repUs = await call('POST', '/api/reports/generate', { locale: 'US', from: '2026-01-01', to: '2026-12-31' });
+  const usAccrued = repUs.estimatedTax.annualIncomeTax;
+  const pos = await call('GET', `/api/income-tax-position${ITQ}`, null);
+  ok(pos.locale === 'US' && pos.accruedSource === 'estimatedTax.annualIncomeTax', '[itp-us] US accruedSource=estimatedTax.annualIncomeTax (incomeStatement 缺席)');
+  ok(approx(pos.accruedIncomeTax, usAccrued) && pos.accruedIncomeTax < 0, `[itp-us] accrued 取自 estimatedTax.annualIncomeTax=${usAccrued} (亏损期为负), got ${pos.accruedIncomeTax}`);
+  ok(pos.warnings.includes('accruedNegativeLossPeriod'), '[itp-us] 亏损期 accrued<0 → accruedNegativeLossPeriod warning');
+  ok(pos.limitations.some((l) => /SE tax|自雇/.test(l)), '[itp-us] limitations 注明仅所得税不含 SE tax');
+}
+
 // ───────────────────────── §2B Batch 4: settings + reports + batch ─────────────────────────
 
 // ───────────────────────── settings (whitelist read+write filter, JSON round-trip) ─────────────────────────
@@ -2201,4 +2295,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');
