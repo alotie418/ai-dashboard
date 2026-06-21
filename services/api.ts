@@ -834,6 +834,59 @@ export function fetchIncomeTaxPosition(opts: { from?: string; to?: string; year?
   return apiFetch<IncomeTaxPosition>(`/api/income-tax-position${suffix}`);
 }
 
+// ==================== FX Reference Conversion（多币种参考折算只读预览，PR-7B P3-3）====================
+// 只读：把 balanceOverview 各币种 totals + balanceDifference 按用户参考汇率折成本位币「参考合计」。
+// converted = amount × rate（rate=本位币/外币，如 USD:7.2=1USD=7.2CNY）；本位币 rate=1。
+// 汇率来源 settings.fx_reference_rates(主) + query rates(覆盖·优先)；缺/非法/无币种代码 → missingRates，排除出 totalsReference。
+// **仅供参考**：不写回·不改 balanceOverview 原值/byCurrency·不生成汇兑损益·不入账·不接 UI(P3-3 handler-only)。
+
+export interface FxAmounts {
+  assets: number;
+  liabilities: number;
+  equity: number;
+  balanceDifference: number;
+}
+export interface FxConvertedBlock {
+  currency: string;
+  rate: number;                 // 本位币/外币
+  original: FxAmounts;
+  converted: FxAmounts;         // = original × rate
+}
+export interface FxMissingRate {
+  currency: string | null;
+  reason: 'missing' | 'invalid_rate' | 'no_currency_code';
+}
+export interface FxTotalsReference extends FxAmounts {
+  baseCurrency: string;
+  includedCurrencies: (string | null)[];
+  excludedCurrencies: (string | null)[];
+}
+export interface FxReferenceConversion {
+  estimate: boolean;                              // 恒 true
+  reportType: 'fx_reference_conversion';          // 非法定
+  period: { from: string; to: string };
+  baseCurrency: string;
+  source: 'user_reference_rates';
+  rateSource: 'settings' | 'query' | 'merged';
+  rates: Record<string, number>;                  // 生效汇率（含 base=1）
+  converted: FxConvertedBlock[];                  // 仅有有效汇率的币种
+  missingRates: FxMissingRate[];
+  totalsReference: FxTotalsReference;             // 跨币种参考合计（本位币）
+  warnings: string[];                             // invalidRatePresent / missingRatesPresent
+  limitations: string[];
+  disclaimerKey: string;
+}
+
+export function fetchFxReferenceConversion(opts: { from?: string; to?: string; year?: string; rates?: string } = {}): Promise<FxReferenceConversion> {
+  const qs = new URLSearchParams();
+  if (opts.from) qs.set('from', opts.from);
+  if (opts.to) qs.set('to', opts.to);
+  if (opts.year) qs.set('year', opts.year);
+  if (opts.rates) qs.set('rates', opts.rates);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return apiFetch<FxReferenceConversion>(`/api/fx-reference-conversion${suffix}`);
+}
+
 // ==================== Transactions（国际化数据模型 v5，C 阶段）====================
 
 export type TransactionType = 'income' | 'expense';

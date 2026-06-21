@@ -33,6 +33,7 @@ const balanceOverviewH = require('./balanceOverview');
 const depreciationPreviewH = require('./depreciationPreview');
 const retainedEarningsH = require('./retainedEarnings');
 const incomeTaxPositionH = require('./incomeTaxPosition');
+const fxReferenceH = require('./fxReference');
 
 const routes = [
   // ---- Dashboard ----
@@ -128,6 +129,9 @@ const routes = [
 
   // ---- Income Tax Position: 所得税同税种同期间对冲只读预览（PR-7B P3-1；期末应交=本期应计−本期已缴·仅 income_tax·本位币·只读不写回·只读复用 reports 不改 reports·不接概览）----
   ['GET', '/api/income-tax-position', incomeTaxPositionH.position],
+
+  // ---- FX Reference Conversion: 多币种参考折算只读预览（PR-7B P3-3；balanceOverview totals × 用户参考汇率·仅供参考·不写回·不改 byCurrency 原值·无汇兑损益·不接 UI）----
+  ['GET', '/api/fx-reference-conversion', fxReferenceH.convert],
 
   // ---- Business Documents（业务单据 Phase A；next-number/tax-invoice 排在 :id 前）----
   ['GET', '/api/documents/next-number', documentsH.nextNumber],
