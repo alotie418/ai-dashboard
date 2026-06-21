@@ -879,7 +879,9 @@
     "balanceFixedNet": "固定資產（淨值）",
     "balanceOriginalValue": "原值",
     "balanceAccumulatedDepreciation": "累計折舊",
-    "balanceFixedNetHint": "直線法估算淨值"
+    "balanceFixedNetHint": "直線法估算淨值",
+    "balanceOwnerCapital": "業主資本",
+    "balanceRetainedHint": "本位幣口徑 · 管理估算（未做年結）"
   },
   "usSchedule": {
     "line1": "Line 1 — 總收入或銷售額",

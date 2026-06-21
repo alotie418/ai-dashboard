@@ -5,7 +5,9 @@
 //   • balanceDifference = totals.assets − totals.liabilities − totals.equity（按币种·显式·非 0 为常态·不隐藏·不强制平衡）；
 //   • 现金 = 复用 cashPosition.summary 的 endingEstimate（按币种）；应收/应付/存货无币种 → 本位币桶；
 //   • 固定资产按 original_value（**不折旧·不算净值**）；借款按 maturity_date 一年线分流动/非流动（基准日=period.to；空→流动+warning）；
-//   • 权益 = Σ equity.amount（**不做留存/利润结转**，差额由 balanceDifference 承接）；
+//   • 权益（PR-7B P2-4b）= 两行：出资（实收资本/业主资本，entity-aware）+ 未分配利润（来自 retained-earnings-preview，本位币块）；
+//     出资基数 = capital_contribution + adjustment + other（adj/other 折进出资行，金额守恒）；
+//     individual：owner_draw 冲减出资行；company：owner_draw 已在 retained preview 作 distributions 扣减（出资行不重复扣）；
 //   • 税（应交估算/已缴税款）**不进入任何 section/totals**，仅 excludedNotes（避免税费对冲风险）；
 //   • 多币种**不折算、不跨币种合计**，每币种各自算 balanceDifference；
 //   • **只读**：不写回任何表、不改 electron/reports/*。复用各 handler 已导出的只读函数（require）。
@@ -15,6 +17,7 @@ const cashPosition = require('./cashPosition');
 const { receivablesSummary, payablesSummary } = require('./receivables');
 const inventory = require('./inventory');
 const depreciationPreview = require('./depreciationPreview');   // PR-7B P2-3：固定资产用净值（只读复用）
+const retainedEarnings = require('./retainedEarnings');         // PR-7B P2-4b：权益未分配利润（只读复用）
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -39,6 +42,19 @@ function sumByCurrency(db, table, amountCol) {
   const rows = db.prepare(
     `SELECT currency AS currency, COALESCE(SUM(${amountCol}), 0) AS total FROM ${table} WHERE is_active = 1 GROUP BY currency`
   ).all();
+  for (const r of rows) map.set(r.currency == null ? null : r.currency, round2(r.total));
+  return map;
+}
+
+// 按 currency 分组求和 equity.amount（启用行），限定 equity_type 集合（PR-7B P2-4b）。返回 Map<currency|null, number>。
+function sumEquityByCurrency(db, types) {
+  const map = new Map();
+  if (!tableExists(db, 'equity') || !types.length) return map;
+  const placeholders = types.map(() => '?').join(',');
+  const rows = db.prepare(
+    `SELECT currency AS currency, COALESCE(SUM(amount), 0) AS total FROM equity
+      WHERE is_active = 1 AND equity_type IN (${placeholders}) GROUP BY currency`
+  ).all(...types);
   for (const r of rows) map.set(r.currency == null ? null : r.currency, round2(r.total));
   return map;
 }
@@ -79,7 +95,13 @@ async function overview({ query } = {}) {
       hasWarnings,
     });
   }
-  const equityMap = sumByCurrency(db, 'equity', 'amount');
+  // 权益（PR-7B P2-4b）：拆「出资行 + 未分配利润行」。只读复用 retained-earnings-preview（同 period·不改 reports）。
+  const re = await retainedEarnings.preview({ query: { from, to } });
+  const entityType = re.entityType;                               // 'individual' | 'company'
+  const retainedBase = round2(re.endingRetainedEarnings);         // 本位币单一数值（仅本位币块）
+  const capitalKey = entityType === 'company' ? 'contributedCapital' : 'ownerCapital';
+  const capitalMap = sumEquityByCurrency(db, ['capital_contribution', 'adjustment', 'other']);  // 出资基数（adj/other 折进出资行）
+  const ownerDrawMap = sumEquityByCurrency(db, ['owner_draw']);                                  // 业主支取（individual 冲减出资行）
 
   // ── 4) 借款：按币种 + 一年线分流动/非流动（空到期日→流动+warning）──
   const borrowCurrent = new Map();       // currency|null → sum
@@ -101,7 +123,7 @@ async function overview({ query } = {}) {
 
   // ── 5) 组装：币种并集（含本位币，给 AR/AP/存货）──
   const currencies = new Set([
-    ...cashMap.keys(), ...fixedNetMap.keys(), ...equityMap.keys(),
+    ...cashMap.keys(), ...fixedNetMap.keys(), ...capitalMap.keys(), ...ownerDrawMap.keys(),
     ...borrowCurrent.keys(), ...borrowNonCurrent.keys(),
     baseCurrency,
   ]);
@@ -135,8 +157,16 @@ async function overview({ query } = {}) {
     if (borrowCurrent.has(ccy)) liabilitiesCurrent.push({ key: 'borrowings', amount: borrowCurrent.get(ccy) });
     // 负债·非流动
     if (borrowNonCurrent.has(ccy)) liabilitiesNonCurrent.push({ key: 'borrowings', amount: borrowNonCurrent.get(ccy) });
-    // 权益
-    if (equityMap.has(ccy)) equityLines.push({ key: 'equity', amount: equityMap.get(ccy) });
+    // 权益（P2-4b 两行）：出资行（entity-aware key）+ 未分配利润行（仅本位币块）
+    const capBase = capitalMap.get(ccy) || 0;
+    const draw = ownerDrawMap.get(ccy) || 0;
+    // individual：出资行 = 出资基数 − 同币种 owner_draw（拍板：owner_draw 冲减出资行）。
+    // company：出资行 = 出资基数（owner_draw 已在 retained preview 作 distributions 扣减，不重复扣）。
+    const capitalAmt = entityType === 'individual' ? round2(capBase - draw) : round2(capBase);
+    const hasCapital = capitalMap.has(ccy) || (entityType === 'individual' && ownerDrawMap.has(ccy));
+    if (hasCapital) equityLines.push({ key: capitalKey, amount: capitalAmt });
+    // 未分配利润：本位币单一口径 → 仅放入本位币块。
+    if (ccy === baseCurrency) equityLines.push({ key: 'retainedEarnings', amount: retainedBase });
 
     if (nullMaturityCcy.has(ccy)) warnings.push('borrowingsNullMaturityDefaultCurrent');
 
@@ -157,9 +187,20 @@ async function overview({ query } = {}) {
     };
   }).sort((a, b) => (a.currency === null ? 1 : b.currency === null ? -1 : String(a.currency).localeCompare(String(b.currency))));
 
+  // company：非本位币 owner_draw 既不进出资行也不进分红（不折算）→ excludedNotes 备查（与 P2-4a 一致）。
+  const foreignDrawNotes = [];
+  if (entityType === 'company') {
+    const foreign = [...ownerDrawMap.entries()].filter(([c]) => c !== baseCurrency);
+    if (foreign.length > 0) {
+      foreignDrawNotes.push('公司口径：非本位币 owner_draw（业主支取/分红）未计入分红或出资抵减，不折算：'
+        + foreign.map(([c, a]) => `${c == null ? '(未指定)' : c}=${a}`).join(', '));
+    }
+  }
+
   return {
     estimate: true,
     reportType: 'management_balance_overview',   // 非法定 balance sheet
+    entityType,                                  // 'individual' | 'company'（出资行 entity-aware；UI 按行 key 取标签）
     period: { from, to },
     asOf,
     baseCurrency,
@@ -167,7 +208,8 @@ async function overview({ query } = {}) {
     disclaimerKey: 'disclaimer.report',
     limitations: [
       '管理口径概览，非法定资产负债表，不做法定严格平衡；balanceDifference 为待调整项',
-      'balanceDifference = 资产 − 负债 − 权益（按币种）；非 0 为常态（权益取自台账，未做利润结转/配平）',
+      'balanceDifference = 资产 − 负债 − 权益（按币种）；非 0 为常态，差额为待调整项（不强制平衡、不隐藏）',
+      '权益拆「出资（实收资本/业主资本）+ 未分配利润」两行；未分配利润=期初+本期净利−分红的管理估算（来自 retained-earnings-preview，本位币口径，未做年结、不写回 equity）',
       '现金为期末估算（来自 cash-position：期初+实收−实付，仅经营活动，未含投资/筹资现金）',
       '固定资产按直线法估算净值（P2-3，来自 depreciation-preview，非法定/税务折旧；行 meta 含原值/累计折旧）；已处置资产不计入净值',
       '应收/应付/存货为 as-of 当前快照，与现金的期间口径不完全一致',
@@ -177,7 +219,8 @@ async function overview({ query } = {}) {
     excludedNotes: [
       '已缴税款(tax_payments) 与 应交税费估算 不进入任何 section/totals（税费抵扣/对冲属 P3）',
       '应收/应付/存货无币种字段，按本位币(' + baseCurrency + ')归集',
-      '留存收益/未分配利润/本年利润结转未实现（属 P2），差额由 balanceDifference 承接',
+      `未分配利润为本位币(${baseCurrency})单一口径，仅列入本位币分组；非本位币分组只含出资类权益，不做折算（折算属 P3）`,
+      ...foreignDrawNotes,
     ],
   };
 }

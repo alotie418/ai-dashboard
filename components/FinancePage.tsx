@@ -361,6 +361,10 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
                   const lineLabel = (key: string) => {
                     // P2-3：固定资产行显示「固定资产（净值）」。
                     if (key === 'fixedAssets') return t('finance.balanceFixedNet');
+                    // P2-4b：权益两行特判（不进 BALANCE_CLASSIFICATION，避开 check-balance-classify 红线）。
+                    if (key === 'contributedCapital') return t('finance.balanceCapital');      // 公司=实收资本
+                    if (key === 'ownerCapital') return t('finance.balanceOwnerCapital');        // 个体=业主资本
+                    if (key === 'retainedEarnings') return t('finance.balanceRetained');        // 未分配利润
                     const e = (BALANCE_CLASSIFICATION as Record<string, { labelKey: string }>)[key];
                     return e ? t(e.labelKey) : key;
                   };
@@ -377,6 +381,10 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
                           {t('finance.balanceOriginalValue')} {ccyAmt(l.meta.originalValue)} · {t('finance.balanceAccumulatedDepreciation')} {ccyAmt(l.meta.accumulatedDepreciation)}
                           <span className="ml-1">· {t('finance.balanceFixedNetHint')}</span>
                         </div>
+                      )}
+                      {/* P2-4b 未分配利润：本位币口径 · 管理估算（未做年结）。 */}
+                      {l.key === 'retainedEarnings' && (
+                        <div className="pl-3 mt-0.5 text-[10px] text-[#8a8a88]">{t('finance.balanceRetainedHint')}</div>
                       )}
                     </div>
                   );

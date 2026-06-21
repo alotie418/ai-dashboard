@@ -879,7 +879,9 @@
     "balanceFixedNet": "고정자산(장부가액)",
     "balanceOriginalValue": "취득원가",
     "balanceAccumulatedDepreciation": "감가상각누계액",
-    "balanceFixedNetHint": "정액법 추정"
+    "balanceFixedNetHint": "정액법 추정",
+    "balanceOwnerCapital": "사업주 자본",
+    "balanceRetainedHint": "기능통화 기준 · 관리용 추정(연말 마감 없음)"
   },
   "usSchedule": {
     "line1": "Line 1 — 총수입",

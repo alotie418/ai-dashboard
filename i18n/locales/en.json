@@ -879,7 +879,9 @@
     "balanceFixedNet": "Fixed assets (net)",
     "balanceOriginalValue": "Cost",
     "balanceAccumulatedDepreciation": "Accumulated depreciation",
-    "balanceFixedNetHint": "straight-line estimate"
+    "balanceFixedNetHint": "straight-line estimate",
+    "balanceOwnerCapital": "Owner's Capital",
+    "balanceRetainedHint": "Functional-currency basis · management estimate (no year-end close)"
   },
   "usSchedule": {
     "line1": "Line 1 — Gross Receipts",

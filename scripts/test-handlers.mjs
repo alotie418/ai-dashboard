@@ -889,8 +889,13 @@ const Q = '?from=2026-01-01&to=2026-12-31';
   ok(approx(find(cny.liabilities.nonCurrent, 'borrowings'), 5000), `[bo] borrowings 非流动=5000 (到期>cutoff), got ${find(cny.liabilities.nonCurrent, 'borrowings')}`);
   ok(cny.warnings.includes('borrowingsNullMaturityDefaultCurrent'), '[bo] 空到期日 → warning');
 
-  // 权益 = Σ equity.amount（不结转）
-  ok(approx(find(cny.equity, 'equity'), 30000), '[bo] equity = Σ equity.amount = 30000');
+  // 权益（PR-7B P2-4b 两行）：业主资本/出资（individual 默认）+ 未分配利润（本位币块）
+  ok(bo.entityType === 'individual', '[bo] entityType=individual (默认)');
+  ok(approx(find(cny.equity, 'ownerCapital'), 30000), `[bo] ownerCapital(individual) = Σcapital_contribution = 30000, got ${find(cny.equity, 'ownerCapital')}`);
+  ok(find(cny.equity, 'equity') === undefined, '[bo] 旧单行 key=equity 已移除');
+  const reBo = await call('GET', `/api/retained-earnings-preview${Q}`, null);
+  ok(approx(find(cny.equity, 'retainedEarnings'), reBo.endingRetainedEarnings), '[bo] retainedEarnings 行 = retained-earnings-preview.endingRetainedEarnings（本位币块）');
+  ok(usd.equity.every((l) => l.key !== 'retainedEarnings'), '[bo] 非本位币块(USD)无 retainedEarnings 行');
 
   // tax 不进任何 section/totals
   const allCnyLines = [...cny.assets.current, ...cny.assets.nonCurrent, ...cny.liabilities.current, ...cny.liabilities.nonCurrent, ...cny.equity];
@@ -1007,6 +1012,64 @@ const Q = '?from=2026-01-01&to=2026-12-31';
   ok(db.prepare("SELECT original_value FROM fixed_assets WHERE name='NetA'").get().original_value === 12000, '[bo-net] read-only: fixed_assets original_value unchanged');
   const cols = db.prepare("PRAGMA table_info(fixed_assets)").all().map((c) => c.name);
   ok(!cols.includes('net_book_value') && !cols.includes('accumulated_depreciation'), '[bo-net] read-only: no net/accumulated columns');
+}
+
+// ───────────── balance-overview 权益拆两行（PR-7B P2-4b）─────────────
+// 锁住：equity 单行→两行(出资+未分配利润)·entity-aware key·individual owner_draw 冲减出资行·
+// company owner_draw 不进出资行(已在 retained 作 distributions)·adjustment/other 折进出资行·
+// retained 仅本位币块·非本位币 company owner_draw 进 excludedNotes·totalEquity=出资+retained·
+// balanceDifference 随拆分·无重复扣减·不写回 equity。
+{
+  const db = freshDb();
+  const Q4 = '?from=2026-01-01&to=2026-12-31';
+  await call('PUT', '/api/settings', { opening_retained_earnings: 0, currency: 'CNY', accounting_locale: 'CN' });
+  // 权益台账（CNY）：capital 100000 + adjustment 5000 + other 2000 + owner_draw 8000（无交易→净利 0，retained 全由 distributions 决定）
+  await call('POST', '/api/equity', { name: 'Cap', equity_type: 'capital_contribution', amount: 100000, currency: 'CNY', event_date: PD });
+  await call('POST', '/api/equity', { name: 'Adj', equity_type: 'adjustment', amount: 5000, currency: 'CNY', event_date: PD });
+  await call('POST', '/api/equity', { name: 'Oth', equity_type: 'other', amount: 2000, currency: 'CNY', event_date: PD });
+  await call('POST', '/api/equity', { name: 'Draw', equity_type: 'owner_draw', amount: 8000, currency: 'CNY', event_date: PD });
+  // 非本位币（USD）：capital 3000 + owner_draw 1000
+  await call('POST', '/api/equity', { name: 'CapU', equity_type: 'capital_contribution', amount: 3000, currency: 'USD', event_date: PD });
+  await call('POST', '/api/equity', { name: 'DrawU', equity_type: 'owner_draw', amount: 1000, currency: 'USD', event_date: PD });
+  const eq = (blk, key) => (blk.equity.find((l) => l.key === key) || {}).amount;
+
+  // ── individual（默认）：ownerCapital = (100000+5000+2000) − owner_draw 8000 = 99000 ──
+  const reI = await call('GET', `/api/retained-earnings-preview${Q4}`, null);
+  const boI = await call('GET', `/api/balance-overview${Q4}`, null);
+  const cnyI = boI.byCurrency.find((b) => b.currency === 'CNY');
+  const usdI = boI.byCurrency.find((b) => b.currency === 'USD');
+  ok(boI.entityType === 'individual', '[bo-eq] default entityType=individual');
+  ok(approx(eq(cnyI, 'ownerCapital'), 99000), `[bo-eq] individual ownerCapital = (100000+5000+2000) − owner_draw 8000 = 99000, got ${eq(cnyI, 'ownerCapital')}`);
+  ok(eq(cnyI, 'contributedCapital') === undefined && eq(cnyI, 'equity') === undefined, '[bo-eq] individual 用 ownerCapital key（无 contributedCapital/旧 equity）');
+  ok(approx(reI.distributions, 0) && approx(eq(cnyI, 'retainedEarnings'), reI.endingRetainedEarnings), '[bo-eq] individual retained = preview.ending（distributions=0，未扣 owner_draw）');
+  // USD 块：ownerCapital = 3000 − 1000 = 2000（同币种 owner_draw 冲减）；无 retained
+  ok(approx(eq(usdI, 'ownerCapital'), 2000), `[bo-eq] individual USD ownerCapital = 3000 − 1000 = 2000, got ${eq(usdI, 'ownerCapital')}`);
+  ok(eq(usdI, 'retainedEarnings') === undefined, '[bo-eq] 非本位币块无 retainedEarnings');
+  // totalEquity = 出资 + retained（本位币块）；balanceDifference 自洽
+  ok(approx(cnyI.totals.equity, eq(cnyI, 'ownerCapital') + eq(cnyI, 'retainedEarnings')), '[bo-eq] individual totalEquity = ownerCapital + retained');
+  ok(approx(cnyI.balanceDifference, cnyI.totals.assets - cnyI.totals.liabilities - cnyI.totals.equity), '[bo-eq] individual balanceDifference = assets − liab − equity');
+
+  // ── company：contributedCapital = 100000+5000+2000 = 107000（不扣 owner_draw）；retained 扣 base owner_draw 8000 ──
+  await call('PUT', '/api/settings', { entity_type: 'company' });
+  const reC = await call('GET', `/api/retained-earnings-preview${Q4}`, null);
+  const boC = await call('GET', `/api/balance-overview${Q4}`, null);
+  const cnyC = boC.byCurrency.find((b) => b.currency === 'CNY');
+  const usdC = boC.byCurrency.find((b) => b.currency === 'USD');
+  ok(boC.entityType === 'company', '[bo-eq] entityType=company');
+  ok(approx(eq(cnyC, 'contributedCapital'), 107000), `[bo-eq] company contributedCapital = 100000+5000+2000 = 107000 (owner_draw 不扣), got ${eq(cnyC, 'contributedCapital')}`);
+  ok(eq(cnyC, 'ownerCapital') === undefined, '[bo-eq] company 用 contributedCapital key（无 ownerCapital）');
+  ok(approx(reC.distributions, 8000) && approx(eq(cnyC, 'retainedEarnings'), reC.endingRetainedEarnings), '[bo-eq] company retained = preview.ending（distributions=base owner_draw 8000）');
+  // 无重复扣减：8000 只在 retained 扣，不从 contributedCapital 再扣
+  ok(approx(eq(cnyC, 'contributedCapital'), 107000), '[bo-eq] no double-count: company owner_draw 未从出资行重复扣');
+  // company USD：contributedCapital = 3000（不扣 USD owner_draw）；USD owner_draw 1000 进 excludedNotes
+  ok(approx(eq(usdC, 'contributedCapital'), 3000), `[bo-eq] company USD contributedCapital = 3000 (USD owner_draw 不扣), got ${eq(usdC, 'contributedCapital')}`);
+  ok(boC.excludedNotes.some((n) => /USD/.test(n) && /owner_draw/i.test(n)), '[bo-eq] company 非本位币 owner_draw 进 excludedNotes');
+  // retained 仅本位币：excludedNotes 说明
+  ok(boC.excludedNotes.some((n) => /未分配利润/.test(n) && /本位币/.test(n)), '[bo-eq] excludedNotes 说明 retained 仅本位币口径');
+
+  // ── 不写回 equity ──
+  ok(db.prepare("SELECT COUNT(*) AS c FROM equity").get().c === 6, '[bo-eq] read-only: equity 行数不变(6)');
+  ok(db.prepare("SELECT amount FROM equity WHERE name='Draw'").get().amount === 8000, '[bo-eq] read-only: owner_draw amount 不变');
 }
 
 // ───────────── products.create id hardening (prod-<ts>-<rand>) ─────────────
