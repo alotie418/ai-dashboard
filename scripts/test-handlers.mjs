@@ -970,6 +970,45 @@ const Q = '?from=2026-01-01&to=2026-12-31';
   ok(!cols.includes('accumulated_depreciation') && !cols.includes('net_book_value'), '[dp] read-only: no accumulated/net columns written to schema');
 }
 
+// ───────────── balance-overview 固定资产接入净值（PR-7B P2-3）─────────────
+// 锁住：fixedAssets 行金额=净值(非原值)·meta 原值/累计折旧/净值/estimate·disposed 不计入·多币种·
+// balanceDifference 随净值变·不写回 fixed_assets。
+{
+  const db = freshDb();
+  const Q3 = '?from=2026-01-01&to=2026-12-31';   // asOf=2026-12-31
+  await call('POST', '/api/accounts', { name: 'A-CNY', opening_balance: 1000, currency: 'CNY' });
+  // 可折旧资产：original 12000·salvage 0.1·useful 12·acq 2026-01-15·next_month → net 2100（acc 9900）
+  await call('POST', '/api/fixed-assets', { name: 'NetA', original_value: 12000, salvage_rate: 0.1, useful_life_months: 12, acquisition_date: '2026-01-15', depreciation_start_policy: 'next_month', currency: 'CNY' });
+  // 已处置资产：不计入净值合计
+  await call('POST', '/api/fixed-assets', { name: 'DispA', original_value: 5000, useful_life_months: 12, acquisition_date: '2026-01-15', currency: 'CNY', status: 'disposed', disposal_date: '2026-06-30' });
+  // USD 可折旧资产：进 USD 块
+  await call('POST', '/api/fixed-assets', { name: 'NetU', original_value: 1000, salvage_rate: 0, useful_life_months: 12, acquisition_date: '2026-01-15', currency: 'USD' });
+
+  const bo = await call('GET', `/api/balance-overview${Q3}`, null);
+  const cny = bo.byCurrency.find((b) => b.currency === 'CNY');
+  const usd = bo.byCurrency.find((b) => b.currency === 'USD');
+  const fa = cny.assets.nonCurrent.find((l) => l.key === 'fixedAssets');
+
+  // 固定资产行金额 = 净值 2100（非原值 12000，且 disposed 的 5000 排除）
+  ok(fa && approx(fa.amount, 2100), `[bo-net] fixedAssets line = netBookValue 2100 (not original), got ${fa?.amount}`);
+  // meta：原值/累计折旧/净值/estimate（disposed 排除 → original 12000 非 17000）
+  ok(fa.meta && approx(fa.meta.originalValue, 12000) && approx(fa.meta.accumulatedDepreciation, 9900) && approx(fa.meta.netBookValue, 2100) && fa.meta.estimate === true,
+    `[bo-net] meta originalValue=12000(disposed excluded)/accumulated=9900/net=2100/estimate, got ${JSON.stringify(fa.meta)}`);
+  // 多币种：USD 块固定资产净值独立（< 1000）
+  const faU = usd.assets.nonCurrent.find((l) => l.key === 'fixedAssets');
+  ok(faU && faU.amount < 1000 && faU.amount > 0, `[bo-net] USD fixedAssets net in its own block, got ${faU?.amount}`);
+  // balanceDifference 体现净值（CNY totals.assets 含 2100 而非 12000）
+  ok(approx(cny.totals.assets, fa.amount + (cny.assets.current.reduce((s, l) => s + l.amount, 0))), '[bo-net] CNY totals.assets uses net value');
+  ok(approx(cny.balanceDifference, cny.totals.assets - cny.totals.liabilities - cny.totals.equity), '[bo-net] balanceDifference recomputed with net value');
+  // limitations 提及净值
+  ok(bo.limitations.some((n) => /净值|直线法/.test(n)), '[bo-net] limitations mention net value / straight-line');
+
+  // 不写回 fixed_assets：original_value 不变，无 accumulated/net 列
+  ok(db.prepare("SELECT original_value FROM fixed_assets WHERE name='NetA'").get().original_value === 12000, '[bo-net] read-only: fixed_assets original_value unchanged');
+  const cols = db.prepare("PRAGMA table_info(fixed_assets)").all().map((c) => c.name);
+  ok(!cols.includes('net_book_value') && !cols.includes('accumulated_depreciation'), '[bo-net] read-only: no net/accumulated columns');
+}
+
 // ───────────── products.create id hardening (prod-<ts>-<rand>) ─────────────
 // A tight loop with no spacing lands many creates on the SAME millisecond; the random suffix
 // must keep every id unique (no PRIMARY KEY collision). Pre-fix (pure Date.now) this collides.

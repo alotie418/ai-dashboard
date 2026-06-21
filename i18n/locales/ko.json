@@ -875,7 +875,11 @@
     "balanceNonCurrentLiabilities": "비유동부채",
     "balanceDifference": "차액(조정 필요)",
     "balanceBorrowingsNullMaturity": "만기일 미입력 차입금 포함, 잠정적으로 유동으로 표시",
-    "balanceCurrencyUnspecified": "통화 미지정"
+    "balanceCurrencyUnspecified": "통화 미지정",
+    "balanceFixedNet": "고정자산(장부가액)",
+    "balanceOriginalValue": "취득원가",
+    "balanceAccumulatedDepreciation": "감가상각누계액",
+    "balanceFixedNetHint": "정액법 추정"
   },
   "usSchedule": {
     "line1": "Line 1 — 총수입",

@@ -357,7 +357,7 @@ const BALANCE_OVERVIEW_MOCK = (acc: string) => ({
   byCurrency: [
     {
       currency: 'CNY',
-      assets: { current: [{ key: 'cash', amount: 1200 }, { key: 'receivables', amount: 800 }, { key: 'inventory', amount: 0 }], nonCurrent: [{ key: 'fixedAssets', amount: 8000 }] },
+      assets: { current: [{ key: 'cash', amount: 1200 }, { key: 'receivables', amount: 800 }, { key: 'inventory', amount: 0 }], nonCurrent: [{ key: 'fixedAssets', amount: 7000, meta: { originalValue: 8000, accumulatedDepreciation: 1000, netBookValue: 7000, estimate: true } }] },
       liabilities: { current: [{ key: 'payables', amount: 300 }, { key: 'borrowings', amount: 3500 }], nonCurrent: [{ key: 'borrowings', amount: 5000 }] },
       equity: [{ key: 'equity', amount: 30000 }],
       totals: { assets: 10000, liabilities: 8800, equity: 30000 },
@@ -1887,6 +1887,9 @@ test.describe('balance overview (management basis)', () => {
       expect(body, `[${ui}] balanceDifference row`).toContain(loc.finance.balanceDifference);
       expect(body, `[${ui}] borrowings label`).toContain(loc.finance.balanceBorrowings);
       expect(body, `[${ui}] estimate badge`).toContain(loc.finance.balanceEstimateBadge);
+      // PR-7B P2-3：固定资产（净值）标签 + 累计折旧辅助说明渲染
+      expect(body, `[${ui}] fixed assets (net) label`).toContain(loc.finance.balanceFixedNet);
+      expect(body, `[${ui}] accumulated depreciation note`).toContain(loc.finance.balanceAccumulatedDepreciation);
       // 不得出现裸法定报表名
       for (const stmt of ['资产负债表', '資產負債表', 'Balance Sheet', '貸借対照表', '재무상태표']) {
         expect(body, `[${ui}] must not show statutory statement name "${stmt}"`).not.toContain(stmt);

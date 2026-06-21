@@ -875,7 +875,11 @@
     "balanceNonCurrentLiabilities": "非流動負債",
     "balanceDifference": "平衡差額／待調整",
     "balanceBorrowingsNullMaturity": "含未填到期日的借款，暫按流動列示",
-    "balanceCurrencyUnspecified": "未指定幣別"
+    "balanceCurrencyUnspecified": "未指定幣別",
+    "balanceFixedNet": "固定資產（淨值）",
+    "balanceOriginalValue": "原值",
+    "balanceAccumulatedDepreciation": "累計折舊",
+    "balanceFixedNetHint": "直線法估算淨值"
   },
   "usSchedule": {
     "line1": "Line 1 — 總收入或銷售額",

@@ -875,7 +875,11 @@
     "balanceNonCurrentLiabilities": "Passifs non courants",
     "balanceDifference": "Écart / à ajuster",
     "balanceBorrowingsNullMaturity": "Inclut des emprunts sans date d'échéance, présentés comme courants pour l'instant",
-    "balanceCurrencyUnspecified": "Devise non spécifiée"
+    "balanceCurrencyUnspecified": "Devise non spécifiée",
+    "balanceFixedNet": "Immobilisations (valeur nette)",
+    "balanceOriginalValue": "Valeur d'origine",
+    "balanceAccumulatedDepreciation": "Amortissement cumulé",
+    "balanceFixedNetHint": "estimation linéaire"
   },
   "usSchedule": {
     "line1": "Line 1 — Recettes brutes",
