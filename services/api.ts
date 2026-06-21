@@ -783,6 +783,57 @@ export function fetchRetainedEarningsPreview(opts: { from?: string; to?: string;
   return apiFetch<RetainedEarningsPreview>(`/api/retained-earnings-preview${suffix}`);
 }
 
+// ==================== Income Tax Position（所得税同税种同期间对冲只读预览，PR-7B P3-1）====================
+// 只读：期末应交所得税 = 本期应计 − 本期已缴（同 tax_type=income_tax·同期间·本位币）。
+// 应计只读复用 reports incomeStatement.incomeTax（US 取 estimatedTax.annualIncomeTax）；不改 electron/reports/*。
+// 仅本位币·非本位币缴款进 excludedPayments；不折算·不接概览(P3-4 才接)·不写回 tax_payments。
+
+export interface IncomeTaxMatchedPayment {
+  id: string;
+  name: string;
+  amount: number;
+  currency: string | null;
+  payment_date: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  matchBasis: 'period' | 'payment_date';
+}
+export interface IncomeTaxExcludedPayment {
+  id: string;
+  name: string;
+  amount: number;
+  currency: string | null;
+  reason: 'non_base_currency' | 'out_of_period' | 'no_date';
+}
+export interface IncomeTaxPosition {
+  estimate: boolean;                                   // 恒 true
+  reportType: 'income_tax_position';                   // 非法定
+  taxType: 'income_tax';
+  locale: string;                                      // accounting_locale
+  accruedSource: 'incomeStatement.incomeTax' | 'estimatedTax.annualIncomeTax';
+  period: { from: string; to: string };
+  baseCurrency: string;
+  accruedIncomeTax: number;                            // 本期应计（本位币，来自 reports）
+  paidIncomeTax: number;                               // 本期已缴（本位币，Σ matched）
+  netPosition: number;                                 // = 应计 − 已缴
+  positionType: 'payable' | 'prepaid' | 'zero';        // >0 净欠缴 / <0 净多缴预缴 / 0
+  matchedPayments: IncomeTaxMatchedPayment[];
+  excludedPayments: IncomeTaxExcludedPayment[];
+  warnings: string[];                                  // negativePaymentPresent / partialPeriodOverlap / accruedNegativeLossPeriod
+  limitations: string[];
+  excludedNotes: string[];
+  disclaimerKey: string;
+}
+
+export function fetchIncomeTaxPosition(opts: { from?: string; to?: string; year?: string } = {}): Promise<IncomeTaxPosition> {
+  const qs = new URLSearchParams();
+  if (opts.from) qs.set('from', opts.from);
+  if (opts.to) qs.set('to', opts.to);
+  if (opts.year) qs.set('year', opts.year);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return apiFetch<IncomeTaxPosition>(`/api/income-tax-position${suffix}`);
+}
+
 // ==================== Transactions（国际化数据模型 v5，C 阶段）====================
 
 export type TransactionType = 'income' | 'expense';
