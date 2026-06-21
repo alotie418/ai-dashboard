@@ -1211,6 +1211,88 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
     '[pay] no purchases → paymentRate null, payable 0, no details');
 }
 
+// ───────────────── retained-earnings-preview (留存/未分配利润只读预览, PR-7B P2-4a) ─────────────────
+// 只读：期末未分配利润 = 期初(settings) + 本期净利(P&L incomeStatement.netProfit；US→scheduleC.line31_netProfit) − 分红。
+// 锁住：单一本位币(无 byCurrency)·entity_type 默认 individual·individual 下 owner_draw 不冲减·
+// company 下 owner_draw 冲减(仅本位币·期间内·有日期; USD/无日期/期间外/capital 排除)·entity_type 非法→fallback·
+// opening 允许负/NaN→0·netProfit 取自 reports·**不写回 equity/settings**·不自动年结。
+{
+  const db = freshDb();
+  const RE = '?from=2026-01-01&to=2026-12-31';
+  const mkDraw = (body) => call('POST', '/api/equity', { equity_type: 'owner_draw', ...body });
+
+  // settings：期初 10000、本位币 CNY、CN 制度
+  await call('PUT', '/api/settings', { opening_retained_earnings: 10000, currency: 'CNY', accounting_locale: 'CN' });
+  // 本期损益：income 5000 / expense 2000（净利由 reports 引擎计算，交叉验证）
+  const insTxn = db.prepare(`INSERT INTO transactions (id, type, date, amount, amount_net, currency, payment_status, paid_amount, payment_date) VALUES (?,?,?,?,?,?,?,?,?)`);
+  insTxn.run('re-i1', 'income',  PD, 5000, 5000, 'CNY', 'paid', 5000, PD);
+  insTxn.run('re-e1', 'expense', PD, 2000, 2000, 'CNY', 'paid', 2000, PD);
+  // owner_draw：本位币期间内 1000(计入 company) + USD 300(非本位币排除) + 无日期 500(排除) + 期间外 700(排除)
+  await mkDraw({ name: 'D-cny', amount: 1000, currency: 'CNY', event_date: PD });
+  await mkDraw({ name: 'D-usd', amount: 300, currency: 'USD', event_date: PD });
+  await mkDraw({ name: 'D-nodate', amount: 500, currency: 'CNY' });
+  await mkDraw({ name: 'D-outside', amount: 700, currency: 'CNY', event_date: '2025-06-15' });
+  // capital_contribution（非 owner_draw）不得计入分红
+  await call('POST', '/api/equity', { name: 'C1', equity_type: 'capital_contribution', amount: 50000, currency: 'CNY', event_date: PD });
+
+  // 交叉验证净利：reports 引擎 incomeStatement.netProfit
+  const rep = await call('POST', '/api/reports/generate', { locale: 'CN', from: '2026-01-01', to: '2026-12-31' });
+  const repNet = rep.incomeStatement.netProfit;
+
+  // ── default entity_type=individual（settings 未设 entity_type）──
+  const ind = await call('GET', `/api/retained-earnings-preview${RE}`, null);
+  ok(ind.estimate === true && ind.reportType === 'retained_earnings_preview', '[re] estimate=true + reportType=retained_earnings_preview');
+  ok(ind.entityType === 'individual', '[re] default entityType=individual (settings 未设 entity_type)');
+  ok(ind.baseCurrency === 'CNY' && ind.byCurrency === undefined && ind.disclaimerKey === 'disclaimer.report', '[re] 单一本位币口径(无 byCurrency) + disclaimerKey');
+  ok(approx(ind.openingRetainedEarnings, 10000), `[re] openingRetainedEarnings 取自 settings=10000, got ${ind.openingRetainedEarnings}`);
+  ok(approx(ind.netProfit, repNet) && ind.netProfitSource === 'incomeStatement', `[re] netProfit 取自 incomeStatement.netProfit=${repNet}, got ${ind.netProfit}`);
+  ok(approx(ind.distributions, 0), '[re] individual: distributions=0 (owner_draw 不冲减未分配利润)');
+  ok(approx(ind.endingRetainedEarnings, 10000 + repNet - 0), '[re] individual ending = 期初 + 净利 − 0');
+  ok(ind.excludedNotes.some((n) => /owner_draw|业主支取/.test(n)), '[re] individual excludedNotes 说明 owner_draw 留 P2-4b');
+
+  // ── entity_type=company：owner_draw 冲减（仅本位币·期间内·有日期 → 仅 D-cny 1000）──
+  await call('PUT', '/api/settings', { entity_type: 'company' });
+  const comp = await call('GET', `/api/retained-earnings-preview${RE}`, null);
+  ok(comp.entityType === 'company', '[re] entityType=company');
+  ok(approx(comp.distributions, 1000), `[re] company distributions=1000 (仅本位币·期间内·有日期; USD/无日期/期间外/capital 排除), got ${comp.distributions}`);
+  ok(approx(comp.endingRetainedEarnings, 10000 + comp.netProfit - 1000), '[re] company ending = 期初 + 净利 − 分红1000');
+  ok(comp.excludedNotes.some((n) => /USD/.test(n)), '[re] company excludedNotes 提及非本位币 owner_draw 排除');
+  ok(comp.excludedNotes.some((n) => /event_date|无法落入/.test(n)), '[re] company excludedNotes 提及无日期 owner_draw 排除');
+
+  // ── entity_type 非法值 → fallback individual ──
+  await call('PUT', '/api/settings', { entity_type: 'partnership' });
+  ok((await call('GET', `/api/retained-earnings-preview${RE}`, null)).entityType === 'individual', '[re] 非法 entity_type → fallback individual');
+
+  // ── opening 允许负 / NaN→0 ──
+  await call('PUT', '/api/settings', { entity_type: 'individual', opening_retained_earnings: -2500 });
+  ok(approx((await call('GET', `/api/retained-earnings-preview${RE}`, null)).openingRetainedEarnings, -2500), '[re] opening 允许负 (-2500)');
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('opening_retained_earnings', ?)").run(JSON.stringify('not-a-number'));
+  ok(approx((await call('GET', `/api/retained-earnings-preview${RE}`, null)).openingRetainedEarnings, 0), '[re] opening NaN → 0');
+
+  // ── 只读：调用后 equity / owner_draw 行不被写回 ──
+  ok(db.prepare("SELECT COUNT(*) AS c FROM equity WHERE equity_type='owner_draw'").get().c === 4, '[re] read-only: owner_draw 行数不变(4)');
+  ok(db.prepare("SELECT amount FROM equity WHERE name='D-cny'").get().amount === 1000, '[re] read-only: equity amount 不变');
+}
+
+// ── retained-earnings US 特判：netProfit 取 scheduleC.line31_netProfit ──
+{
+  const db = freshDb();
+  const RE = '?from=2026-01-01&to=2026-12-31';
+  await call('PUT', '/api/settings', { accounting_locale: 'US', currency: 'USD', opening_retained_earnings: 1000 });
+  const insTxn = db.prepare(`INSERT INTO transactions (id, type, date, amount, amount_net, currency, payment_status, paid_amount, payment_date) VALUES (?,?,?,?,?,?,?,?,?)`);
+  insTxn.run('us-i1', 'income',  PD, 9000, 9000, 'USD', 'paid', 9000, PD);
+  insTxn.run('us-e1', 'expense', PD, 4000, 4000, 'USD', 'paid', 4000, PD);
+
+  const rep = await call('POST', '/api/reports/generate', { locale: 'US', from: '2026-01-01', to: '2026-12-31' });
+  const usNet = rep.scheduleC.line31_netProfit;
+
+  const re = await call('GET', `/api/retained-earnings-preview${RE}`, null);
+  ok(re.locale === 'US' && re.netProfitSource === 'scheduleC', '[re-us] US → netProfitSource=scheduleC (incomeStatement 缺席)');
+  ok(approx(re.netProfit, usNet), `[re-us] netProfit 取自 scheduleC.line31_netProfit=${usNet}, got ${re.netProfit}`);
+  ok(re.baseCurrency === 'USD' && approx(re.endingRetainedEarnings, 1000 + usNet - 0), '[re-us] ending = 期初 + scheduleC净利 − 0 (US default individual)');
+  ok(re.limitations.some((l) => /Schedule C/.test(l)), '[re-us] limitations 标注 Schedule C 口径');
+}
+
 // ───────────────────────── §2B Batch 4: settings + reports + batch ─────────────────────────
 
 // ───────────────────────── settings (whitelist read+write filter, JSON round-trip) ─────────────────────────
@@ -1244,6 +1326,11 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
 
   // null body is a no-op per existing contract (body || {} → {})
   ok((await call('PUT', '/api/settings', null))?.success === true, '[set] null body → {success:true} no-op');
+
+  // PR-7B P2-4a 新增白名单键 entity_type / opening_retained_earnings 往返（无 UI，仅白名单可持久化）
+  await call('PUT', '/api/settings', { entity_type: 'company', opening_retained_earnings: 12345.67 });
+  const s4 = await call('GET', '/api/settings', null);
+  ok(s4.entity_type === 'company' && s4.opening_retained_earnings === 12345.67, '[set] entity_type/opening_retained_earnings round-trip (PR-7B P2-4a)');
 }
 
 // ───────────── reports (structural + non-tax invariants ONLY; never lock T11/T12 amounts) ─────────────
@@ -2051,4 +2138,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');

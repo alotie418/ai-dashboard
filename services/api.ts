@@ -750,6 +750,38 @@ export function fetchDepreciationPreview(opts: { asOf?: string; year?: string } 
   return apiFetch<DepreciationPreview>(`/api/depreciation-preview${suffix}`);
 }
 
+// ==================== Retained Earnings Preview（留存/未分配利润只读预览，PR-7B P2-4a）====================
+// 只读：期末未分配利润 = 期初(settings) + 本期净利 − 分红/利润分配。单一本位币口径（不做 byCurrency/折算）。
+// 本期净利只读复用 P&L incomeStatement.netProfit（US 无 → scheduleC.line31_netProfit）；不改 electron/reports/*。
+// entityType=individual：owner_draw 不冲减未分配利润（留 P2-4b 冲减出资行）→ distributions=0；
+// entityType=company：owner_draw 暂按分红冲减（仅本位币·期间内·非空日期）。不写回 equity、不自动年结、不接概览。
+
+export interface RetainedEarningsPreview {
+  estimate: boolean;                              // 恒 true
+  reportType: 'retained_earnings_preview';        // 非法定
+  entityType: 'individual' | 'company';
+  locale: string;                                 // 取净利用的 accounting_locale
+  period: { from: string; to: string };
+  baseCurrency: string;
+  openingRetainedEarnings: number;                // 期初未分配利润（本位币，允许负）
+  netProfit: number;                              // 本期净利（本位币）
+  netProfitSource: 'incomeStatement' | 'scheduleC';
+  distributions: number;                          // 本期分红/利润分配（company owner_draw；individual=0）
+  endingRetainedEarnings: number;                 // = 期初 + 本期净利 − 分红
+  disclaimerKey: string;
+  limitations: string[];
+  excludedNotes: string[];
+}
+
+export function fetchRetainedEarningsPreview(opts: { from?: string; to?: string; year?: string } = {}): Promise<RetainedEarningsPreview> {
+  const qs = new URLSearchParams();
+  if (opts.from) qs.set('from', opts.from);
+  if (opts.to) qs.set('to', opts.to);
+  if (opts.year) qs.set('year', opts.year);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return apiFetch<RetainedEarningsPreview>(`/api/retained-earnings-preview${suffix}`);
+}
+
 // ==================== Transactions（国际化数据模型 v5，C 阶段）====================
 
 export type TransactionType = 'income' | 'expense';

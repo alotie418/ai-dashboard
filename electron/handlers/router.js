@@ -31,6 +31,7 @@ const ledgerSummaryH = require('./ledgerSummary');
 const cashPositionH = require('./cashPosition');
 const balanceOverviewH = require('./balanceOverview');
 const depreciationPreviewH = require('./depreciationPreview');
+const retainedEarningsH = require('./retainedEarnings');
 
 const routes = [
   // ---- Dashboard ----
@@ -120,6 +121,9 @@ const routes = [
 
   // ---- Depreciation Preview: 固定资产直线法折旧只读预览（PR-7B P2-2；算净值/累计折旧·不写回·不走 reports formula）----
   ['GET', '/api/depreciation-preview', depreciationPreviewH.preview],
+
+  // ---- Retained Earnings Preview: 留存/未分配利润只读预览（PR-7B P2-4a；期末=期初+本期净利−分红·单一本位币·只读不写回·只读复用 reports netProfit 不改 reports）----
+  ['GET', '/api/retained-earnings-preview', retainedEarningsH.preview],
 
   // ---- Business Documents（业务单据 Phase A；next-number/tax-invoice 排在 :id 前）----
   ['GET', '/api/documents/next-number', documentsH.nextNumber],

@@ -16,6 +16,9 @@ const SETTINGS_ALLOWED_KEYS = new Set([
   'currency',              // 'CNY' / 'USD' / 'JPY' ...
   'ui_language',           // 'zh-CN' / 'en' / ...（备份用，主存储仍是 localStorage）
   'product_unit',          // 库存/数量单位：'unit'|'kg'|'ton'|'piece'|'box'|'bag'|'liter'（前端按此动态显示单位，未配置回退 'unit'→单位）
+  // PR-7B P2-4a：管理口径留存收益 preview 所需（仅白名单·无 UI；取值校验在 retainedEarnings handler 读取侧）
+  'entity_type',                 // 'individual'（默认）| 'company'
+  'opening_retained_earnings',   // 期初未分配利润（本位币单一数值，允许负=累计亏损）
 ]);
 
 async function get() {
