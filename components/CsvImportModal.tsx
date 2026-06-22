@@ -130,7 +130,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
           setStep(2);
         };
         reader.readAsArrayBuffer(file);
-      }).catch(() => alert('Excel 解析失败，请尝试 CSV 格式'));
+      }).catch(() => alert(t('csvImport.excelParseError')));
     } else {
       Papa.parse(file, {
         header: true,
@@ -143,7 +143,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
           setMapping(autoMapHeaders(hdrs, fields));
           setStep(2);
         },
-        error: () => alert('CSV 解析失败，请检查文件格式'),
+        error: () => alert(t('csvImport.csvParseError')),
       });
     }
   };
@@ -184,10 +184,10 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
 
   const validateRecord = (r: any) => {
     const errors: string[] = [];
-    if (!r.date || !/^\d{4}-\d{2}-\d{2}$/.test(r.date)) errors.push('日期格式错误(需要YYYY-MM-DD)');
-    if (type === 'sales' && !r.customer) errors.push('缺少客户名');
-    if (type === 'purchases' && !r.supplier) errors.push('缺少供应商');
-    if (!r.totalAmount || r.totalAmount <= 0) errors.push('总金额须大于0');
+    if (!r.date || !/^\d{4}-\d{2}-\d{2}$/.test(r.date)) errors.push(t('csvImport.errDateFormat'));
+    if (type === 'sales' && !r.customer) errors.push(t('csvImport.errMissingCustomer'));
+    if (type === 'purchases' && !r.supplier) errors.push(t('csvImport.errMissingSupplier'));
+    if (!r.totalAmount || r.totalAmount <= 0) errors.push(t('csvImport.errAmountPositive'));
     return errors;
   };
 
@@ -200,7 +200,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
       setStep(4);
       if (res.success > 0) onSuccess();
     } catch (err: any) {
-      setResult({ success: 0, failed: mappedRecords.length, errors: [{ row: 0, errors: [err.message || '导入失败'] }] });
+      setResult({ success: 0, failed: mappedRecords.length, errors: [{ row: 0, errors: [err.message || t('csvImport.importFailed')] }] });
       setStep(4);
     } finally {
       setImporting(false);
@@ -229,7 +229,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#e0ddd5]">
           <h3 className="text-lg font-bold text-[#191918]">
             <i className="fas fa-file-import mr-2 text-primary"></i>
-            批量导入{type === 'sales' ? '销售' : '采购'}记录
+            {type === 'sales' ? t('csvImport.titleSales') : t('csvImport.titlePurchases')}
           </h3>
           <button onClick={handleClose} className="text-[#5c5c5a] hover:text-[#191918]">
             <i className="fas fa-times text-lg"></i>
@@ -238,7 +238,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
 
         {/* Steps indicator */}
         <div className="flex items-center px-6 py-3 bg-[#f9f9f8] border-b border-[#e0ddd5]">
-          {['上传文件', '列映射', '预览验证', '导入结果'].map((label, i) => (
+          {[t('csvImport.step1Upload'), t('csvImport.step2Mapping'), t('csvImport.step3Preview'), t('csvImport.step4Result')].map((label, i) => (
             <div key={i} className="flex items-center">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                 step > i + 1 ? 'bg-green-500 text-white' : step === i + 1 ? 'bg-primary text-white' : 'bg-[#e0ddd5] text-[#5c5c5a]'
@@ -264,13 +264,13 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
                 }`}
               >
                 <i className="fas fa-cloud-upload-alt text-4xl text-primary mb-3"></i>
-                <p className="text-[#191918] font-medium mb-1">拖拽文件到这里，或点击选择</p>
-                <p className="text-xs text-[#5c5c5a]">支持 CSV、Excel(.xlsx) 文件，最多 500 条</p>
+                <p className="text-[#191918] font-medium mb-1">{t('csvImport.dropHint')}</p>
+                <p className="text-xs text-[#5c5c5a]">{t('csvImport.formatHint')}</p>
                 <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
                   onChange={(e) => { if (e.target.files?.[0]) processFile(e.target.files[0]); }} />
               </div>
               <button onClick={downloadTemplate} className="mt-4 text-sm text-primary hover:underline">
-                <i className="fas fa-download mr-1"></i> 下载导入模板
+                <i className="fas fa-download mr-1"></i> {t('csvImport.downloadTemplate')}
               </button>
             </div>
           )}
@@ -278,7 +278,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
           {/* Step 2: Field Mapping */}
           {step === 2 && (
             <div>
-              <p className="text-sm text-[#5c5c5a] mb-4">请确认 CSV 列与系统字段的对应关系：</p>
+              <p className="text-sm text-[#5c5c5a] mb-4">{t('csvImport.mappingInstruction')}</p>
               <div className="space-y-2">
                 {headers.map(h => (
                   <div key={h} className="flex items-center gap-3">
@@ -289,7 +289,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
                       onChange={(e) => setMapping({ ...mapping, [h]: e.target.value })}
                       className="flex-1 text-sm border border-[#e0ddd5] rounded-lg px-3 py-1.5 bg-white"
                     >
-                      <option value="">— 跳过 —</option>
+                      <option value="">{t('csvImport.skipColumn')}</option>
                       {fields.map(f => (
                         <option key={f.key} value={f.key}>{t((f as any).labelKey)}{f.required ? ' *' : ''}</option>
                       ))}
@@ -303,17 +303,17 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
           {/* Step 3: Preview & Validate */}
           {step === 3 && (
             <div>
-              <p className="text-sm text-[#5c5c5a] mb-3">预览前 10 条记录（共 {mappedRecords.length} 条）：</p>
+              <p className="text-sm text-[#5c5c5a] mb-3">{t('csvImport.previewHeading', { count: mappedRecords.length })}</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs border-collapse data-table">
                   <thead>
                     <tr className="bg-[#f0eeeb]">
                       <th className="px-2 py-1.5 text-left">#</th>
-                      <th className="px-2 py-1.5 text-left">日期</th>
-                      <th className="px-2 py-1.5 text-left">{type === 'sales' ? '客户' : '供应商'}</th>
-                      <th className="px-2 py-1.5 text-right">数量</th>
-                      <th className="px-2 py-1.5 text-right">总金额</th>
-                      <th className="px-2 py-1.5 text-center">状态</th>
+                      <th className="px-2 py-1.5 text-left">{t('csvImport.date')}</th>
+                      <th className="px-2 py-1.5 text-left">{type === 'sales' ? t('csvImport.customer') : t('csvImport.supplier')}</th>
+                      <th className="px-2 py-1.5 text-right">{t('csvImport.quantity')}</th>
+                      <th className="px-2 py-1.5 text-right">{t('csvImport.totalAmount')}</th>
+                      <th className="px-2 py-1.5 text-center">{t('csvImport.invoiceStatus')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -338,7 +338,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
                   </tbody>
                 </table>
               </div>
-              {mappedRecords.length > 10 && <p className="text-xs text-[#5c5c5a] mt-2">...还有 {mappedRecords.length - 10} 条未显示</p>}
+              {mappedRecords.length > 10 && <p className="text-xs text-[#5c5c5a] mt-2">{t('csvImport.moreRows', { count: mappedRecords.length - 10 })}</p>}
             </div>
           )}
 
@@ -348,22 +348,22 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
               {result.success > 0 ? (
                 <div>
                   <i className="fas fa-check-circle text-5xl text-green-500 mb-4"></i>
-                  <p className="text-lg font-bold text-[#191918]">导入完成</p>
+                  <p className="text-lg font-bold text-[#191918]">{t('csvImport.importComplete')}</p>
                   <p className="text-sm text-[#5c5c5a] mt-2">
-                    成功 <span className="text-green-600 font-bold">{result.success}</span> 条
-                    {result.failed > 0 && <>，失败 <span className="text-red-500 font-bold">{result.failed}</span> 条</>}
+                    <span className="text-green-600 font-bold">{t('csvImport.successCount', { count: result.success })}</span>
+                    {result.failed > 0 && <>{', '}<span className="text-red-500 font-bold">{t('csvImport.failedCount', { count: result.failed })}</span></>}
                   </p>
                 </div>
               ) : (
                 <div>
                   <i className="fas fa-exclamation-triangle text-5xl text-red-500 mb-4"></i>
-                  <p className="text-lg font-bold text-[#191918]">导入失败</p>
+                  <p className="text-lg font-bold text-[#191918]">{t('csvImport.importFailed')}</p>
                 </div>
               )}
               {result.errors.length > 0 && (
                 <div className="mt-4 text-left bg-red-50 rounded-lg p-3 max-h-40 overflow-y-auto">
                   {result.errors.slice(0, 10).map((e, i) => (
-                    <p key={i} className="text-xs text-red-600">第{e.row}行: {e.errors.join(', ')}</p>
+                    <p key={i} className="text-xs text-red-600">{t('csvImport.rowError', { row: e.row, errors: e.errors.join(', ') })}</p>
                   ))}
                 </div>
               )}
@@ -373,23 +373,23 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-[#e0ddd5] bg-[#f9f9f8]">
-          <span className="text-xs text-[#5c5c5a]">{fileName && `📄 ${fileName} (${csvData.length} 条)`}</span>
+          <span className="text-xs text-[#5c5c5a]">{fileName && t('csvImport.fileInfo', { name: fileName, count: csvData.length })}</span>
           <div className="flex gap-2">
             {step > 1 && step < 4 && (
-              <button onClick={() => setStep((step - 1) as any)} className="px-4 py-2 text-sm text-[#5c5c5a] hover:text-[#191918]">上一步</button>
+              <button onClick={() => setStep((step - 1) as any)} className="px-4 py-2 text-sm text-[#5c5c5a] hover:text-[#191918]">{t('csvImport.prev')}</button>
             )}
             {step === 2 && (
               <button onClick={() => setStep(3)} className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover">
-                下一步：预览
+                {t('csvImport.nextPreview')}
               </button>
             )}
             {step === 3 && (
               <button onClick={handleImport} disabled={importing} className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50">
-                {importing ? <><i className="fas fa-spinner fa-spin mr-1"></i>导入中...</> : `确认导入 ${mappedRecords.length} 条`}
+                {importing ? <><i className="fas fa-spinner fa-spin mr-1"></i>{t('csvImport.importing')}</> : t('csvImport.confirmImport', { count: mappedRecords.length })}
               </button>
             )}
             {step === 4 && (
-              <button onClick={handleClose} className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover">完成</button>
+              <button onClick={handleClose} className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover">{t('csvImport.done')}</button>
             )}
           </div>
         </div>
