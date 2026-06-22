@@ -456,7 +456,7 @@ const AppContent: React.FC = () => {
                     {MONTHS.map((m, i) => <option key={m} value={m} className="bg-white">{i === 0 ? t('header.monthAll') : t(`header.month${m.replace('月', '').padStart(2, '0')}`)}</option>)}
                   </select>
                 </div>
-                <button onClick={performAnalysis} className="p-2 text-primary hover:text-primary-hover transition-colors" title="立即刷新数据">
+                <button onClick={performAnalysis} className="p-2 text-primary hover:text-primary-hover transition-colors" title={t('header.refreshData')}>
                   <i className={`fas fa-sync-alt ${loadingAI ? 'animate-spin' : ''}`}></i>
                 </button>
               </div>
@@ -492,6 +492,7 @@ const AppContent: React.FC = () => {
 const isElectronEnv = typeof window !== 'undefined' && !!(window as any).electronAPI?.isElectron;
 
 const AuthWrapper: React.FC = () => {
+  const { t } = useTranslation();
   // 桌面版需要 BYOK：启动时检测是否已配置 API Key，未配置时显示 Onboarding
   const [onboardingState, setOnboardingState] = useState<'checking' | 'needed' | 'done'>(
     isElectronEnv ? 'checking' : 'done'
@@ -509,7 +510,7 @@ const AuthWrapper: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-[#f9f9f8]">
         <div className="flex items-center space-x-3 text-[#6b6b69]">
           <i className="fas fa-spinner fa-spin text-primary"></i>
-          <span className="text-sm">加载中...</span>
+          <span className="text-sm">{t('common.loading')}</span>
         </div>
       </div>
     );

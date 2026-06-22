@@ -47,12 +47,33 @@ const PINNED = [
   'sales.formInvoiceNo', 'sales.formQuantity', 'sales.formShipping', 'sales.formSubmitEdit',
   'sales.formSubmitNew', 'sales.formTaxAmount', 'sales.inventoryCurrent', 'sales.inventoryLow',
   'sales.inventorySufficient', 'sales.inventoryTotalPurchase', 'sales.inventoryTotalSales',
+  // UI-05B: remaining hardcoded-string cleanup (DataAnalysisPage / USDashboardCards / App.tsx).
+  'analysis.forecastBadge',
+  'usDashboard.scMeals', 'usDashboard.scCarTruck', 'usDashboard.scOffice', 'usDashboard.mileageTrips',
+  'header.refreshData',
+  // UI-05B (follow-up): DataAnalysisPage analysis.* labels (tabs / chart titles / series / metrics / table).
+  'analysis.panorama', 'analysis.trends', 'analysis.forecast', 'analysis.table',
+  'analysis.revenueStructure', 'analysis.growthTrend', 'analysis.logistics', 'analysis.efficiency',
+  'analysis.deflator', 'analysis.chartRevenue', 'analysis.chartProfit', 'analysis.chartPurchase',
+  'analysis.chartSales', 'analysis.chartMom', 'analysis.chartYoy', 'analysis.dimSwitch',
+  'analysis.dimAmount', 'analysis.dimVolume', 'analysis.dimEfficiency', 'analysis.trendFinancial',
+  'analysis.trendVolume', 'analysis.trendEfficiency', 'analysis.trendSubtitle', 'analysis.matrixTitle',
+  'analysis.matrixSubtitle', 'analysis.anomalyTitle', 'analysis.anomalyHigh', 'analysis.anomalyMid',
+  'analysis.anomalyLow', 'analysis.peakMonth', 'analysis.fastest', 'analysis.fastestSub',
+  'analysis.forecastTitle', 'analysis.forecastSubtitle', 'analysis.forecastActual', 'analysis.forecastConfidence',
+  'analysis.forecastSources', 'analysis.rerun', 'analysis.tableMonth', 'analysis.tableExport',
+  'analysis.tableExportFilename', 'analysis.tableHeaderMom', 'analysis.tableHeaderYoy',
 ];
 
 // fr keys that are legitimately identical to en (cognates) — allowed to equal en.
 const FR_ALLOW_EQ_EN = new Set([
   'purchases.formDate', 'sales.formDate',   // "Date"
   'purchases.summary', 'sales.summary',     // "Total"
+  // DataAnalysisPage cognates / international finance abbreviations kept in fr.
+  'analysis.chartMom', 'analysis.chartYoy',           // "MoM" / "YoY"
+  'analysis.tableHeaderMom', 'analysis.tableHeaderYoy', // "MoM" / "YoY"
+  'analysis.dimVolume',                                // "Volume"
+  'analysis.dimSwitch',                                // "Dimension"
 ]);
 
 const dicts = { ja, ko, fr };
@@ -72,14 +93,14 @@ for (const key of PINNED) {
   }
 }
 
-console.log('\n=== i18n English-placeholder Guard (UI-05A pinned keys) ===\n');
-console.log(`Pinned keys      : ${PINNED.length} (purchase/sales main page + common2)`);
+console.log('\n=== i18n English-placeholder Guard (pinned keys) ===\n');
+console.log(`Pinned keys      : ${PINNED.length} (UI-05A purchase/sales + common2; UI-05B analysis/usDashboard/header)`);
 console.log(`Checked locales  : ja, ko, fr (vs en)`);
 console.log(`fr cognate allows: ${[...FR_ALLOW_EQ_EN].join(', ')}`);
 console.log(`Violations       : ${violations.length}\n`);
 
 if (violations.length === 0) {
-  console.log('✓ No English placeholders among the UI-05A pinned keys.');
+  console.log('✓ No English placeholders among the pinned keys.');
   process.exit(0);
 }
 for (const v of violations) console.log('  ✗ ' + v);

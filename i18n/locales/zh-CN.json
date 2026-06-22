@@ -337,7 +337,8 @@
     "month11": "11月",
     "month12": "12月",
     "yearLabel": "{{year}} 年",
-    "quarterLabel": "第{{n}}季度"
+    "quarterLabel": "第{{n}}季度",
+    "refreshData": "立即刷新数据"
   },
   "chat": {
     "title": "AI 助手",
@@ -665,7 +666,7 @@
     "anomalyMid": "单位营收存在一定波动，建议关注价格变动。",
     "anomalyHigh": "单位营收波动较大，建议排查异常月份。",
     "forecastTitle": "智能业务增长预测",
-    "forecastBadge": "Next 90 Days",
+    "forecastBadge": "未来 90 天",
     "forecastSubtitle": "基于历史销量的趋势预测模型推演",
     "forecastAnalyzing": "正在整合全量业务指标进行回归分析...",
     "forecastConfidence": "置信范围",
@@ -1451,5 +1452,11 @@
     "count": "笔",
     "currencyUnspecified": "未指定币种",
     "noData": "暂无启用记录"
+  },
+  "usDashboard": {
+    "scMeals": "餐饮 (50%)",
+    "scCarTruck": "车辆与运输",
+    "scOffice": "办公费用",
+    "mileageTrips": "{{count}} 次行程"
   }
 }

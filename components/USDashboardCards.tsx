@@ -43,14 +43,14 @@ const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice,
         </div>
         <div className="flex flex-col flex-1 justify-around py-2">
           {mileageSummary && mileageSummary.totalDeduction > 0 && (
-            <Row label={`🚗 ${label('mileage')} (${mileageSummary.trips} trips)`} value={fmt(mileageSummary.totalDeduction)} />
+            <Row label={`🚗 ${label('mileage')} (${t('usDashboard.mileageTrips', { count: mileageSummary.trips })})`} value={fmt(mileageSummary.totalDeduction)} />
           )}
           {homeOffice && homeOffice.deduction > 0 && (
             <Row label={`🏠 ${label('homeOffice')}`} value={fmt(homeOffice.deduction)} />
           )}
-          {sc.line24b_meals > 0 && <Row label="🍽️ Meals (50%)" value={fmt(sc.line24b_meals)} />}
-          {sc.line9_car > 0 && <Row label="🚙 Car & Truck" value={fmt(sc.line9_car)} />}
-          {sc.line18_office > 0 && <Row label="📎 Office Expense" value={fmt(sc.line18_office)} />}
+          {sc.line24b_meals > 0 && <Row label={`🍽️ ${t('usDashboard.scMeals')}`} value={fmt(sc.line24b_meals)} />}
+          {sc.line9_car > 0 && <Row label={`🚙 ${t('usDashboard.scCarTruck')}`} value={fmt(sc.line9_car)} />}
+          {sc.line18_office > 0 && <Row label={`📎 ${t('usDashboard.scOffice')}`} value={fmt(sc.line18_office)} />}
         </div>
       </div>
 

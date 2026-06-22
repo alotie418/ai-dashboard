@@ -337,7 +337,8 @@
     "month11": "Nov",
     "month12": "Dec",
     "yearLabel": "{{year}}",
-    "quarterLabel": "Q{{n}}"
+    "quarterLabel": "Q{{n}}",
+    "refreshData": "Refresh data now"
   },
   "chat": {
     "title": "AI Assistant",
@@ -1451,5 +1452,11 @@
     "count": "entries",
     "currencyUnspecified": "Unspecified currency",
     "noData": "No active entries"
+  },
+  "usDashboard": {
+    "scMeals": "Meals (50%)",
+    "scCarTruck": "Car & Truck",
+    "scOffice": "Office Expense",
+    "mileageTrips": "{{count}} trips"
   }
 }
