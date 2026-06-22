@@ -494,8 +494,8 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
       {showAddModal && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAddModal(false)}></div>
-          <div className="relative w-full max-w-xl bg-white border border-[#e0ddd5] rounded-xl overflow-hidden animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
-            <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center gap-4">
+          <div className="relative w-full max-w-xl bg-white border border-[#e0ddd5] rounded-xl overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
+            <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center gap-4 shrink-0">
               <div className="flex-shrink-0">
                 <h2 className="text-xl font-bold text-[#191918] whitespace-nowrap">{(accLocale !== 'CN') ? taxLabel('modalTitlePurchase') : t('purchases.modalTitle')}</h2>
                 <p className="text-xs text-[#5c5c5a] mt-1">{(accLocale !== 'CN') ? taxLabel('modalSubtitlePurchase') : t('purchases.modalSubtitle')}</p>
@@ -505,7 +505,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
               </button>
             </div>
 
-            <form onSubmit={handleAddSubmit} className="p-8 space-y-5">
+            <form onSubmit={handleAddSubmit} className="p-8 space-y-5 flex-1 min-h-0 overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formDate')}</label>
