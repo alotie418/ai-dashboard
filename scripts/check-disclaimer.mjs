@@ -34,11 +34,11 @@ const KEYS = [
 const MOUNTS = [
   { key: 'disclaimer.report', files: ['components/FinancePage.tsx'] },
   { key: 'disclaimer.tax',    files: ['components/FinancePage.tsx', 'components/VATStatistics.tsx'] },
-  { key: 'disclaimer.ai',     files: ['components/AIInsights.tsx', 'components/assistant/ChatPanel.tsx', 'components/DataAnalysisPage.tsx'] },
+  { key: 'disclaimer.ai',     files: ['components/AIInsights.tsx', 'components/assistant/ChatPanel.tsx'] },
   { key: 'disclaimer.usTax',  files: ['components/USDashboardCards.tsx', 'components/USTaxToolsPage.tsx'] },
   { key: 'disclaimer.rates',  files: ['components/AccountingSection.tsx'] },
-  // AI prompt boundary-directive injection sites (chat / forecast / briefing).
-  { key: 'ai.boundaryDirective', files: ['components/assistant/useAssistant.ts', 'components/DataAnalysisPage.tsx', 'App.tsx'] },
+  // AI prompt boundary-directive injection sites (chat / briefing).
+  { key: 'ai.boundaryDirective', files: ['components/assistant/useAssistant.ts', 'App.tsx'] },
 ];
 
 const findings = [];
@@ -84,4 +84,4 @@ if (findings.length) {
   process.exit(1);
 }
 
-console.log('✓ All disclaimer keys present, translated, and mounted; AI boundary directive injected at all 3 prompt sites.');
+console.log('✓ All disclaimer keys present, translated, and mounted; AI boundary directive injected at all prompt sites.');

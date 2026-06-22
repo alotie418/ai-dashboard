@@ -7,49 +7,21 @@ import {
 import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { fetchSettings } from '../services/api';
-import { parseAiErrorCode, aiErrorMessage } from '../services/aiErrors';
 import { formatMoney, getCurrencySymbol, getInventoryUnitLabel } from './accountingHelpers';
 import { localizeMonthName } from './monthLabel';
 // AI calls moved to server-side proxy
-
-// Bug 1: forecast task state is owned by AppContent (survives sidebar navigation) and
-// passed in here. The page reads/writes it via these props instead of local useState,
-// so switching pages mid-run no longer drops the running state or the result.
-export interface ForecastState {
-  isAnalysing: boolean;
-  setIsAnalysing: React.Dispatch<React.SetStateAction<boolean>>;
-  salesForecast: string;
-  setSalesForecast: React.Dispatch<React.SetStateAction<string>>;
-  predictedData: any[];
-  setPredictedData: React.Dispatch<React.SetStateAction<any[]>>;
-  groundingSources: { title: string; uri: string }[];
-  setGroundingSources: React.Dispatch<React.SetStateAction<{ title: string; uri: string }[]>>;
-  isAnalysingRef: React.MutableRefObject<boolean>;
-  aiQuotaCooldownRef: React.MutableRefObject<number>;
-}
 
 interface Props {
   data: BusinessData;
   selectedYear: string;
   selectedQuarter: string;
   selectedMonth: string;
-  forecast: ForecastState;
 }
 
 type AnalysisDimension = 'financial' | 'volume' | 'efficiency';
 
-const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth, forecast }) => {
+const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
   const { t, i18n } = useTranslation();
-  // Forecast task state lives in AppContent (lifted) — read/write via props so it
-  // survives this page unmounting on sidebar navigation. Destructured with the same
-  // names the rest of this component already uses (no downstream changes needed).
-  const {
-    isAnalysing, setIsAnalysing,
-    salesForecast, setSalesForecast,
-    predictedData, setPredictedData,
-    groundingSources, setGroundingSources,
-    isAnalysingRef, aiQuotaCooldownRef,
-  } = forecast;
   const [accLocale, setAccLocale] = useState<string>('CN');
   const [productUnit, setProductUnit] = useState<string>('ton');
   useEffect(() => {
@@ -62,19 +34,7 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
   const unitLabel = getInventoryUnitLabel(productUnit, uiLang);
   const currSym = getCurrencySymbol(accLocale);
 
-  const LOADING_MESSAGES = useMemo(() => [
-    t('analysis.loading1'),
-    t('analysis.loading2'),
-    t('analysis.loading3'),
-    t('analysis.loading4'),
-    t('analysis.loading5'),
-  ], [t]);
-  const [activeTab, setActiveTab] = useState<'trends' | 'table' | 'forecast' | 'panorama'>('panorama');
-  // salesForecast / predictedData / isAnalysing / groundingSources are lifted to
-  // AppContent (see destructure above). loadingProgress/loadingMessage are the local
-  // progress animation only — fine to reset on remount.
-  const [loadingProgress, setLoadingProgress] = useState(0);
-  const [loadingMessage, setLoadingMessage] = useState('');
+  const [activeTab, setActiveTab] = useState<'trends' | 'table' | 'panorama'>('panorama');
 
   const stats = useMemo(() => {
     const perf = data.monthlyPerformance;
@@ -95,311 +55,6 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
 
   const [dimension, setDimension] = useState<AnalysisDimension>('financial');
 
-  useEffect(() => {
-    if (!isAnalysing) return;
-    let i = 0;
-    setLoadingProgress(0);
-    setLoadingMessage(LOADING_MESSAGES[0]);
-    const timer = setInterval(() => {
-      i++;
-      if (i < LOADING_MESSAGES.length) {
-        setLoadingMessage(LOADING_MESSAGES[i]);
-        setLoadingProgress(Math.min(95, (i / LOADING_MESSAGES.length) * 100));
-      } else {
-        clearInterval(timer);
-      }
-    }, 2500);
-    return () => clearInterval(timer);
-  }, [isAnalysing]);
-
-  // ========== LOCAL COMPUTE MODULES ==========
-
-  // Box-Muller transform for normal distribution sampling
-  const gaussianRandom = () => {
-    let u = 0, v = 0;
-    while (u === 0) u = Math.random();
-    while (v === 0) v = Math.random();
-    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-  };
-
-  // ── LOCAL FORECAST MODELS ──
-  // TODO [future-forecast]: Replace these 3 functions with a pluggable forecast engine.
-  //   Candidates: real VAR / ARIMA / exponential smoothing / ML regression.
-  //   Keep the same function signatures so the pipeline (STEP 1-3) doesn't change.
-  //   Add backtesting + accuracy metrics when the engine is swapped.
-
-  // ① Feature Vector Extraction
-  const extractFeatures = (perf: typeof data.monthlyPerformance) => {
-    const nonZero = perf.filter(p => p.revenue > 0);
-    if (nonZero.length < 3) return null;
-
-    const revenues = nonZero.map(p => p.revenue);
-    const costs = nonZero.map(p => p.cost);
-    const tons = nonZero.map(p => p.salesTons);
-    const n = revenues.length;
-
-    // Moving averages (3-month)
-    const ma3 = revenues.length >= 3
-      ? revenues.slice(-3).reduce((a, b) => a + b, 0) / 3
-      : revenues.reduce((a, b) => a + b, 0) / n;
-
-    // Trend slope via simple linear regression (revenue ~ time)
-    const xMean = (n - 1) / 2;
-    const yMean = revenues.reduce((a, b) => a + b, 0) / n;
-    let num = 0, den = 0;
-    for (let i = 0; i < n; i++) {
-      num += (i - xMean) * (revenues[i] - yMean);
-      den += (i - xMean) ** 2;
-    }
-    const trendSlope = den === 0 ? 0 : num / den;
-
-    // Revenue per ton
-    const totalTons = tons.reduce((a, b) => a + b, 0);
-    const revenuePerTon = totalTons > 0 ? revenues.reduce((a, b) => a + b, 0) / totalTons : 0;
-
-    // Cost-to-revenue ratio
-    const totalRevenue = revenues.reduce((a, b) => a + b, 0);
-    const totalCost = costs.reduce((a, b) => a + b, 0);
-    const costRatio = totalRevenue > 0 ? totalCost / totalRevenue : 0;
-
-    // Seasonal indices (each month's ratio to average)
-    const avgRevenue = totalRevenue / n;
-    const seasonalIndices = nonZero.map(p => ({
-      month: p.name,
-      index: avgRevenue > 0 ? +(p.revenue / avgRevenue).toFixed(3) : 1
-    }));
-
-    // Growth acceleration (2nd derivative of MoM) — skip null (no base period) MoM values.
-    const moms = nonZero.map(p => p.mom).filter((v): v is number => v != null);
-    const momDiffs = moms.slice(1).map((v, i) => v - moms[i]);
-    const avgAcceleration = momDiffs.length > 0 ? momDiffs.reduce((a, b) => a + b, 0) / momDiffs.length : 0;
-
-    return {
-      ma3: Math.round(ma3),
-      trendSlope: Math.round(trendSlope),
-      revenuePerTon: Math.round(revenuePerTon),
-      costRatio: +costRatio.toFixed(4),
-      seasonalIndices,
-      avgAcceleration: +avgAcceleration.toFixed(2),
-      dataPoints: n
-    };
-  };
-
-  // ② Trend Forecast: independent AR(1) per series [revenue, cost, salesTons]
-  // TODO [future-forecast]: Replace with real multivariate model (VAR/VECM) that captures cross-series correlation.
-  const varForecast = (perf: typeof data.monthlyPerformance) => {
-    const nonZero = perf.filter(p => p.revenue > 0);
-    if (nonZero.length < 4) return null;
-
-    const series = nonZero.map(p => [p.revenue, p.cost, p.salesTons]);
-    const k = 3;
-    const arCoefs: { a: number; b: number }[] = [];
-
-    for (let v = 0; v < k; v++) {
-      const vals = series.map(s => s[v]);
-      const y = vals.slice(1);
-      const x = vals.slice(0, -1);
-      const xMean = x.reduce((a, b) => a + b, 0) / x.length;
-      const yMean = y.reduce((a, b) => a + b, 0) / y.length;
-      let numerator = 0, denominator = 0;
-      for (let i = 0; i < x.length; i++) {
-        numerator += (x[i] - xMean) * (y[i] - yMean);
-        denominator += (x[i] - xMean) ** 2;
-      }
-      const b = denominator === 0 ? 0 : numerator / denominator;
-      const a = yMean - b * xMean;
-      arCoefs.push({ a, b });
-    }
-
-    const forecasts: { revenue: number; cost: number; salesTons: number }[] = [];
-    let lastVals = series[series.length - 1];
-    for (let m = 0; m < 3; m++) {
-      const nextVals = arCoefs.map((c, v) => Math.max(0, Math.round(c.a + c.b * lastVals[v])));
-      forecasts.push({ revenue: nextVals[0], cost: nextVals[1], salesTons: nextVals[2] });
-      lastVals = nextVals;
-    }
-    return forecasts;
-  };
-
-  // ③ Monte Carlo Simulation: P5/P95 confidence intervals
-  // TODO [future-forecast]: Use model-specific residual distribution instead of historical CV.
-  const monteCarloSimulation = (historicalRevenues: number[], pointEstimates: number[]) => {
-    const nonZero = historicalRevenues.filter(r => r > 0);
-    if (nonZero.length < 3) return null;
-
-    const mean = nonZero.reduce((a, b) => a + b, 0) / nonZero.length;
-    const variance = nonZero.reduce((a, b) => a + (b - mean) ** 2, 0) / (nonZero.length - 1);
-    const cv = mean === 0 ? 0 : Math.sqrt(variance) / mean;
-    const SIMULATIONS = 1000;
-
-    return pointEstimates.map((predicted, month) => {
-      const horizonFactor = Math.sqrt(1 + month);
-      const simValues: number[] = [];
-      for (let i = 0; i < SIMULATIONS; i++) {
-        simValues.push(predicted * (1 + gaussianRandom() * cv * horizonFactor));
-      }
-      simValues.sort((a, b) => a - b);
-      return {
-        upper: Math.round(simValues[Math.floor(SIMULATIONS * 0.95)]),
-        lower: Math.max(0, Math.round(simValues[Math.floor(SIMULATIONS * 0.05)]))
-      };
-    });
-  };
-
-  // ========== PREDICTION PIPELINE ==========
-
-  // isAnalysingRef (concurrency guard) + aiQuotaCooldownRef (429 cooldown) are lifted to
-  // AppContent too, so切页后再回来仍能防重复发起 / 维持冷却（见上方 forecast 解构）。
-  const runAnalysis = useCallback(async () => {
-    if (isAnalysingRef.current) return;
-    // 冷却中：直接显示友好提示，不再发请求。
-    if (Date.now() < aiQuotaCooldownRef.current) {
-      setSalesForecast(t('aiInsights.quotaExceeded'));
-      return;
-    }
-    isAnalysingRef.current = true;
-    setIsAnalysing(true);
-    setGroundingSources([]);
-
-    try {
-      const perf = data.monthlyPerformance;
-
-      // STEP 1: Local feature extraction
-      const features = extractFeatures(perf);
-
-      // STEP 2: Trend forecast (AR(1) per series)
-      const varPred = varForecast(perf);
-
-      // STEP 3: Monte Carlo on trend predictions (if available)
-      const historicalRevenues = perf.map(m => m.revenue);
-      const mcOnVar = varPred
-        ? monteCarloSimulation(historicalRevenues, varPred.map(v => v.revenue))
-        : null;
-
-      // STEP 4: Build comprehensive prompt with ALL local results
-      const historySummary = perf.map(m => ({
-        m: m.name, r: m.revenue, c: m.cost, p: m.profit, np: m.netProfit,
-        pt: m.purchaseTons, st: m.salesTons, yoy: m.yoy, mom: m.mom, d: m.deflator
-      }));
-      const fs = data.financialStatement;
-      const finSummary = {
-        rev: fs.salesRevenue, cos: fs.costOfSales, gp: fs.grossProfit,
-        gm: fs.grossMargin, np: fs.netProfit, nm: fs.netMargin,
-        tax: fs.taxSurcharge, ship: fs.shippingFee, admin: fs.adminExpense, op: fs.operatingExpenses ?? 0
-      };
-
-      // Prompt prose is i18n-driven (follows uiLanguage); the JSON payloads below
-      // are locale-neutral data and are injected verbatim. No industry hardcode.
-      let prompt = `${t('analysis.forecastPromptIntro')}
-
-${t('analysis.forecastPromptHistoryTitle')}
-${JSON.stringify(historySummary)}
-${t('analysis.forecastPromptHistoryLegend')}
-
-${t('analysis.forecastPromptFinTitle')}
-${JSON.stringify(finSummary)}`;
-
-      if (features) {
-        prompt += `
-
-${t('analysis.forecastPromptFeaturesTitle')}
-${JSON.stringify(features)}
-${t('analysis.forecastPromptFeaturesLegend')}`;
-      }
-
-      if (varPred) {
-        prompt += `
-
-${t('analysis.forecastPromptVarTitle')}
-${JSON.stringify(varPred)}
-${t('analysis.forecastPromptVarLegend')}`;
-      }
-
-      if (mcOnVar) {
-        prompt += `
-
-${t('analysis.forecastPromptMcTitle')}
-${JSON.stringify(mcOnVar)}
-${t('analysis.forecastPromptMcLegend')}`;
-      }
-
-      prompt += `
-
-${t('analysis.forecastPromptRequirements')}`;
-
-      // STEP 6: AI synthesis (走 IPC 统一通道，桌面版不走 HTTP)
-      const result: any = await (window as any).electronAPI.invoke('api:request', {
-        method: 'POST',
-        path: '/api/ai/data-analysis',
-        body: {
-          prompt,
-          systemInstruction: `${t('ai.forecastSystemPrompt')}\n\n${t('ai.boundaryDirective')}`,
-          responseSchema: {
-            type: 'OBJECT',
-            properties: {
-              insights: { type: 'STRING' },
-              predictions: {
-                type: 'ARRAY',
-                items: {
-                  type: 'OBJECT',
-                  properties: {
-                    name: { type: 'STRING' },
-                    revenue: { type: 'NUMBER' },
-                    profit: { type: 'NUMBER' },
-                    confidenceUpper: { type: 'NUMBER' },
-                    confidenceLower: { type: 'NUMBER' }
-                  }
-                }
-              }
-            }
-          }
-        },
-      });
-      setSalesForecast(result.insights || t('analysis.forecastDefault'));
-
-      // Extract Google Search grounding sources from server response
-      if (result.groundingSources && result.groundingSources.length > 0) {
-        setGroundingSources(result.groundingSources);
-      }
-
-      // STEP 7: Final Monte Carlo on AI's predictions for confidence intervals
-      const lastMonth = perf[perf.length - 1];
-      const aiPredictions = result.predictions || [];
-      const mcOnAI = monteCarloSimulation(historicalRevenues, aiPredictions.map((p: any) => p.revenue));
-
-      const forecasts = aiPredictions.map((p: any, i: number) => ({
-        ...p,
-        confidenceUpper: mcOnAI ? mcOnAI[i].upper : p.confidenceUpper,
-        confidenceLower: mcOnAI ? mcOnAI[i].lower : p.confidenceLower,
-        isForecast: true
-      }));
-
-      setPredictedData([
-        { ...lastMonth, confidenceUpper: lastMonth.revenue, confidenceLower: lastMonth.revenue, isForecast: false },
-        ...forecasts
-      ]);
-    } catch (err: any) {
-      // 区分「额度/限流(quota)」与一般错误：quota 进入 5 分钟冷却 + 友好提示，
-      // 避免连点或任何残留路径反复刷 429 刷屏控制台。
-      // R3c：错误分类改用稳定 code（parseAiErrorCode），其余按 code 映射 i18n（随 uiLanguage）。
-      const code = parseAiErrorCode(err);
-      if (code === 'quota') {
-        aiQuotaCooldownRef.current = Date.now() + 5 * 60 * 1000;
-        setSalesForecast(t('aiInsights.quotaExceeded'));
-        console.warn('[AI] data-analysis quota/429 — paused 5 min, no auto-retry');
-      } else {
-        console.error(err);
-        setSalesForecast(aiErrorMessage(err, t));
-      }
-    } finally {
-      isAnalysingRef.current = false;
-      setIsAnalysing(false);
-      setLoadingProgress(100);
-    }
-  }, [data.monthlyPerformance, data.financialStatement, t, i18n.language]);
-
-  // AI 经营预测不再在挂载 / 切页 / 热更新时自动调用 —— 改为用户点击横幅按钮
-  // (onClick={runAnalysis}) 时才触发，避免对默认 provider 反复请求刷 Gemini 429。
   const formatCurrency = (v: number) => formatMoney(v, accLocale, uiLang);
   // Defensive: a forecast point may carry an undefined/null numeric field (e.g. the AI
   // response omits profit/revenue/confidence), which previously crashed the page with
@@ -415,51 +70,10 @@ ${t('analysis.forecastPromptRequirements')}`;
       {/* AI Header Banner */}
       <div className="bg-gradient-to-br from-white via-white to-[#f9f9f8] border border-[#e0ddd5] rounded-xl p-10 relative overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
         <div className="absolute top-0 right-0 w-1/3 h-full bg-primary/5 blur-[120px] pointer-events-none"></div>
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-10">
-          <div className="flex-1">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="flex space-x-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary"></span>
-                <span className="h-1.5 w-1.5 rounded-full bg-primary/60"></span>
-                <span className="h-1.5 w-1.5 rounded-full bg-primary/30"></span>
-              </div>
-              <h3 className="text-primary text-xs font-bold uppercase">{t('analysis.aiDashboard')}</h3>
-            </div>
-            {isAnalysing ? (
-              <div className="space-y-6">
-                <div className="flex items-center space-x-6">
-                  <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 shadow-inner">
-                    <span className="text-3xl animate-bounce">🧠</span>
-                  </div>
-                  <div>
-                    <p className="text-[#191918] font-bold text-xl">{loadingMessage}</p>
-                    <p className="text-primary/60 text-[10px] font-mono mt-1">{t('analysis.realtimeProcessing')} | {t('analysis.progress')}: {Math.floor(loadingProgress)}%</p>
-                  </div>
-                </div>
-                <div className="w-full bg-[#f9f9f8] h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-gradient-to-r from-primary to-primary-light h-full transition-all duration-300 ease-out" style={{ width: `${loadingProgress}%`, boxShadow: '0 0 15px rgba(39,76,146,0.5)' }}></div>
-                </div>
-              </div>
-            ) : (
-              <div className="group">
-                <p className="text-[#191918] text-2xl font-light leading-snug max-w-2xl" style={{ whiteSpace: 'pre-wrap' }}>
-                  {salesForecast || t('analysis.forecastIdle')}
-                </p>
-                <div className="mt-8 flex items-center space-x-6">
-                  <button onClick={runAnalysis} className="px-6 py-2.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-full text-[10px] text-primary font-bold uppercase tracking-widest flex items-center transition-all active:scale-95">
-                    <i className="fas fa-sync-alt mr-2"></i> {salesForecast ? t('analysis.rerun') : t('analysis.runForecast')}
-                  </button>
-                </div>
-                {/* PR-E1: AI forecast is a management estimate, not professional advice. */}
-                <p className="mt-4 text-[10px] text-[#5c5c5a] leading-snug max-w-2xl">{t('disclaimer.ai')}</p>
-              </div>
-            )}
-          </div>
-          <div className="hidden lg:grid grid-cols-3 gap-8 border-l border-[#e0ddd5] pl-12 shrink-0">
-            <StatsIndicator label={t('analysis.avgYoy')} value={stats.yoy == null ? '—' : `${stats.yoy.toFixed(1)}%`} trend={stats.yoy == null ? 'neutral' : stats.yoy >= 0 ? 'up' : 'down'} />
-            <StatsIndicator label={t('analysis.avgMom')} value={stats.mom == null ? '—' : `${stats.mom.toFixed(1)}%`} trend={stats.mom == null ? 'neutral' : stats.mom >= 0 ? 'up' : 'down'} />
-            <StatsIndicator label={t('analysis.deflator')} value={stats.deflator == null ? '—' : stats.deflator.toFixed(1)} trend="neutral" color="text-amber-500" />
-          </div>
+        <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-8">
+          <StatsIndicator label={t('analysis.avgYoy')} value={stats.yoy == null ? '—' : `${stats.yoy.toFixed(1)}%`} trend={stats.yoy == null ? 'neutral' : stats.yoy >= 0 ? 'up' : 'down'} />
+          <StatsIndicator label={t('analysis.avgMom')} value={stats.mom == null ? '—' : `${stats.mom.toFixed(1)}%`} trend={stats.mom == null ? 'neutral' : stats.mom >= 0 ? 'up' : 'down'} />
+          <StatsIndicator label={t('analysis.deflator')} value={stats.deflator == null ? '—' : stats.deflator.toFixed(1)} trend="neutral" color="text-amber-500" />
         </div>
       </div>
 
@@ -468,7 +82,6 @@ ${t('analysis.forecastPromptRequirements')}`;
         <div className="flex flex-nowrap p-1 bg-[#f9f9f8]/80 rounded-xl w-fit max-w-full overflow-x-auto">
           <TabButton active={activeTab === 'panorama'} onClick={() => setActiveTab('panorama')} label={t('analysis.panorama')} icon="fa-globe-asia" />
           <TabButton active={activeTab === 'trends'} onClick={() => setActiveTab('trends')} label={t('analysis.trends')} icon="fa-chart-area" />
-          <TabButton active={activeTab === 'forecast'} onClick={() => setActiveTab('forecast')} label={t('analysis.forecast')} icon="fa-bolt-lightning" />
           <TabButton active={activeTab === 'table'} onClick={() => setActiveTab('table')} label={t('analysis.table')} icon="fa-table" />
         </div>
 
@@ -705,111 +318,6 @@ ${t('analysis.forecastPromptRequirements')}`;
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Rest of the Tabs (Forecast, Table) */}
-      {activeTab === 'forecast' && (
-        <div className="bg-white/80 border border-[#e0ddd5] rounded-xl p-10" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
-          <div className="flex items-center justify-between mb-12">
-            <div>
-              <h3 className="text-2xl font-bold text-[#191918] flex items-center">
-                {t('analysis.forecastTitle')}
-                <span className="ml-4 px-3 py-1 bg-primary/10 text-primary text-[10px] rounded-full border border-primary/20 font-bold uppercase tracking-wider">{t('analysis.forecastBadge')}</span>
-              </h3>
-              <p className="text-[#5c5c5a] text-sm mt-1 italic">{t('analysis.forecastSubtitle')}</p>
-            </div>
-          </div>
-
-          {isAnalysing ? (
-            <div className="h-[450px] flex flex-col items-center justify-center space-y-10">
-              <div className="relative">
-                <div className="w-24 h-24 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center animate-pulse">
-                  <span className="text-4xl">🔮</span>
-                </div>
-                <div className="absolute inset-0 border-2 border-dashed border-primary/40 rounded-full animate-[spin_10s_linear_infinite]"></div>
-              </div>
-              <div className="text-center space-y-3">
-                <p className="text-[#191918] text-xl font-medium tracking-tight">{loadingMessage}</p>
-                <p className="text-[#5c5c5a] text-sm">{t('analysis.forecastLoading')}</p>
-              </div>
-            </div>
-          ) : (
-            <div className="h-[450px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={predictedData}>
-                  <defs>
-                    <linearGradient id="colorForecast" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#274C92" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#274C92" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e0ddd5" vertical={false} />
-                  <XAxis dataKey="name" stroke="#6b6b69" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => localizeMonthName(v, t)} />
-                  <YAxis stroke="#6b6b69" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => formatCurrency(v)} />
-                  <Tooltip
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        const d = payload[0].payload;
-                        return (
-                          <div className="bg-white border border-[#e0ddd5] p-6 rounded-xl backdrop-blur-xl ring-1 ring-[#e0ddd5]" style={{ boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}>
-                            <p className="text-[#5c5c5a] text-[10px] font-bold uppercase mb-3 tracking-[0.2em]">{localizeMonthName(label, t)} {d.isForecast ? t('analysis.forecastValue') : t('analysis.forecastActual')}</p>
-                            <div className="space-y-3">
-                              <p className="text-[#191918] text-2xl font-bold">{currSym}{formatNum(d.revenue)}</p>
-                              {d.isForecast && (
-                                <p className="text-primary text-xs font-medium border-t border-[#e0ddd5] pt-2">
-                                  {t('analysis.forecastConfidence')}: {currSym}{formatNum(d.confidenceLower)} - {currSym}{formatNum(d.confidenceUpper)}
-                                </p>
-                              )}
-                              <p className="text-emerald-600 text-sm flex items-center">
-                                <i className="fas fa-chart-line mr-2"></i> {t('analysis.forecastEstProfit')}: {currSym}{formatNum(d.profit)}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Area type="monotone" dataKey="confidenceUpper" stroke="none" fill="#274C92" fillOpacity={0.12} name={t('analysis.forecastUpperBound')} />
-                  <Area type="monotone" dataKey="confidenceLower" stroke="none" fill="#274C92" fillOpacity={0.12} name={t('analysis.forecastLowerBound')} />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    name={t('analysis.chartRevenueLabel')}
-                    stroke="#274C92"
-                    strokeWidth={4}
-                    fill="url(#colorForecast)"
-                  />
-                  <Line type="monotone" dataKey="profit" name={t('analysis.chartProfitLabel')} stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 4" />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {/* Grounding Sources */}
-          {groundingSources.length > 0 && (
-            <div className="mt-6 bg-white/60 border border-[#e0ddd5] rounded-xl p-6" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
-              <h4 className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest mb-4 flex items-center">
-                <i className="fas fa-globe mr-2 text-primary"></i>
-                {t('analysis.forecastSources')}
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {groundingSources.map((src, idx) => (
-                  <a
-                    key={idx}
-                    href={src.uri}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center text-xs text-[#4a4a48] hover:text-primary transition-colors truncate p-2 rounded-lg hover:bg-[#f9f9f8]"
-                  >
-                    <i className="fas fa-link mr-2 text-primary/40 flex-shrink-0"></i>
-                    <span className="truncate">{src.title}</span>
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
