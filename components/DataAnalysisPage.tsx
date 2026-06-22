@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { fetchSettings } from '../services/api';
 import { parseAiErrorCode, aiErrorMessage } from '../services/aiErrors';
-import { formatMoney, getCurrencySymbol, getInventoryUnitLabel, formatCompactMoney } from './accountingHelpers';
+import { formatMoney, getCurrencySymbol, getInventoryUnitLabel } from './accountingHelpers';
 import { localizeMonthName } from './monthLabel';
 // AI calls moved to server-side proxy
 
@@ -400,7 +400,7 @@ ${t('analysis.forecastPromptRequirements')}`;
 
   // AI 经营预测不再在挂载 / 切页 / 热更新时自动调用 —— 改为用户点击横幅按钮
   // (onClick={runAnalysis}) 时才触发，避免对默认 provider 反复请求刷 Gemini 429。
-  const formatCurrency = (v: number) => formatCompactMoney(v, accLocale, uiLang, 1);
+  const formatCurrency = (v: number) => formatMoney(v, accLocale, uiLang);
   // Defensive: a forecast point may carry an undefined/null numeric field (e.g. the AI
   // response omits profit/revenue/confidence), which previously crashed the page with
   // `undefined.toLocaleString()`. Fall back to '0' for any non-finite value; format is
@@ -465,7 +465,7 @@ ${t('analysis.forecastPromptRequirements')}`;
 
       {/* Navigation Tabs */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white/60 p-3 rounded-xl border border-[#e0ddd5]/70 backdrop-blur-md">
-        <div className="flex p-1 bg-[#f9f9f8]/80 rounded-xl w-fit">
+        <div className="flex flex-nowrap p-1 bg-[#f9f9f8]/80 rounded-xl w-fit max-w-full overflow-x-auto">
           <TabButton active={activeTab === 'panorama'} onClick={() => setActiveTab('panorama')} label={t('analysis.panorama')} icon="fa-globe-asia" />
           <TabButton active={activeTab === 'trends'} onClick={() => setActiveTab('trends')} label={t('analysis.trends')} icon="fa-chart-area" />
           <TabButton active={activeTab === 'forecast'} onClick={() => setActiveTab('forecast')} label={t('analysis.forecast')} icon="fa-bolt-lightning" />
@@ -584,7 +584,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                     <div className="flex justify-between items-center gap-2 text-[11px] whitespace-nowrap">
                       <span className="text-[#5c5c5a]">{t('analysis.chartTons')}</span>
                       {/* Quantity only — no hardcoded商品单位 (units belong to product/SKU settings, not analytics) */}
-                      <span className="text-[#4a4a48] font-bold">{item.salesTons}</span>
+                      <span className="text-[#4a4a48] font-bold">{formatNum(item.salesTons)}</span>
                     </div>
                   </div>
                 </div>
@@ -616,7 +616,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                 <ComposedChart data={data.monthlyPerformance}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e0ddd5" vertical={false} />
                   <XAxis dataKey="name" stroke="#6b6b69" fontSize={11} tickLine={false} axisLine={false} dy={10} tickFormatter={(v) => localizeMonthName(v, t)} />
-                  <YAxis yAxisId="left" stroke="#6b6b69" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => dimension === 'volume' ? `${v} ${unitLabel}` : formatCurrency(v)} />
+                  <YAxis yAxisId="left" stroke="#6b6b69" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => dimension === 'volume' ? `${formatNum(v)} ${unitLabel}` : formatCurrency(v)} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0ddd5', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}
                     cursor={{ stroke: '#274C92', strokeWidth: 1 }}
@@ -857,8 +857,8 @@ ${t('analysis.forecastPromptRequirements')}`;
                 {data.monthlyPerformance.map((row, idx) => (
                   <tr key={idx} className="hover:bg-primary/5 transition-colors group">
                     <td className="px-10 py-6 text-sm font-bold text-[#333330] border-r border-[#e0ddd5]/70 sticky left-0 bg-white/90 group-hover:bg-[#f0eeeb] transition-colors">{localizeMonthName(row.name, t)}</td>
-                    <td className="px-10 py-6 text-sm text-center font-mono text-[#4a4a48] border-r border-[#e0ddd5]/70">{row.purchaseTons}</td>
-                    <td className="px-10 py-6 text-sm text-center font-mono text-[#4a4a48] border-r border-[#e0ddd5]/70">{row.salesTons}</td>
+                    <td className="px-10 py-6 text-sm text-center font-mono text-[#4a4a48] border-r border-[#e0ddd5]/70">{formatNum(row.purchaseTons)}</td>
+                    <td className="px-10 py-6 text-sm text-center font-mono text-[#4a4a48] border-r border-[#e0ddd5]/70">{formatNum(row.salesTons)}</td>
                     <td className="px-10 py-6 text-sm text-right font-bold text-[#191918] border-r border-[#e0ddd5]/70">{row.revenue.toLocaleString()}</td>
                     <td className="px-10 py-6 text-sm text-right font-bold text-emerald-600 border-r border-[#e0ddd5]/70">{row.netProfit.toLocaleString()}</td>
                     <td className="px-10 py-6 text-center border-r border-[#e0ddd5]/70">
@@ -907,13 +907,13 @@ const PanoramaCard: React.FC<{ title: string, subtitle: string, children: React.
 const TabButton: React.FC<{ active: boolean, onClick: () => void, label: string, icon: string }> = ({ active, onClick, label, icon }) => (
   <button
     onClick={onClick}
-    className={`flex items-center space-x-3 px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300
+    className={`flex items-center space-x-3 px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 shrink-0
       ${active ? 'bg-primary text-white' : 'text-[#4a4a48] hover:text-[#333330]'}
     `}
     style={active ? { boxShadow: '0 4px 16px rgba(39,76,146,0.15)' } : {}}
   >
     <i className={`fas ${icon} text-sm ${active ? 'scale-110' : ''}`}></i>
-    <span>{label}</span>
+    <span className="whitespace-nowrap">{label}</span>
   </button>
 );
 
