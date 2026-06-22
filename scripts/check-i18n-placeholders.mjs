@@ -47,6 +47,10 @@ const PINNED = [
   'sales.formInvoiceNo', 'sales.formQuantity', 'sales.formShipping', 'sales.formSubmitEdit',
   'sales.formSubmitNew', 'sales.formTaxAmount', 'sales.inventoryCurrent', 'sales.inventoryLow',
   'sales.inventorySufficient', 'sales.inventoryTotalPurchase', 'sales.inventoryTotalSales',
+  // UI-05B: remaining hardcoded-string cleanup (DataAnalysisPage / USDashboardCards / App.tsx).
+  'analysis.forecastBadge',
+  'usDashboard.scMeals', 'usDashboard.scCarTruck', 'usDashboard.scOffice', 'usDashboard.mileageTrips',
+  'header.refreshData',
 ];
 
 // fr keys that are legitimately identical to en (cognates) — allowed to equal en.
@@ -72,14 +76,14 @@ for (const key of PINNED) {
   }
 }
 
-console.log('\n=== i18n English-placeholder Guard (UI-05A pinned keys) ===\n');
-console.log(`Pinned keys      : ${PINNED.length} (purchase/sales main page + common2)`);
+console.log('\n=== i18n English-placeholder Guard (pinned keys) ===\n');
+console.log(`Pinned keys      : ${PINNED.length} (UI-05A purchase/sales + common2; UI-05B analysis/usDashboard/header)`);
 console.log(`Checked locales  : ja, ko, fr (vs en)`);
 console.log(`fr cognate allows: ${[...FR_ALLOW_EQ_EN].join(', ')}`);
 console.log(`Violations       : ${violations.length}\n`);
 
 if (violations.length === 0) {
-  console.log('✓ No English placeholders among the UI-05A pinned keys.');
+  console.log('✓ No English placeholders among the pinned keys.');
   process.exit(0);
 }
 for (const v of violations) console.log('  ✗ ' + v);

@@ -337,7 +337,8 @@
     "month11": "Nov",
     "month12": "Dec",
     "yearLabel": "{{year}}년도",
-    "quarterLabel": "{{n}}분기"
+    "quarterLabel": "{{n}}분기",
+    "refreshData": "지금 데이터 새로고침"
   },
   "chat": {
     "title": "AI 어시스턴트",
@@ -665,7 +666,7 @@
     "anomalyMid": "Moderate per-unit revenue volatility. Monitor price changes.",
     "anomalyHigh": "High per-unit revenue volatility. Investigate anomalous months.",
     "forecastTitle": "Business Growth Forecast",
-    "forecastBadge": "Next 90 Days",
+    "forecastBadge": "향후 90일",
     "forecastSubtitle": "Trend forecast model based on historical data",
     "forecastAnalyzing": "Integrating business metrics for regression analysis...",
     "forecastConfidence": "Confidence Range",
@@ -1451,5 +1452,11 @@
     "count": "건",
     "currencyUnspecified": "통화 미지정",
     "noData": "사용 중인 기록이 없습니다"
+  },
+  "usDashboard": {
+    "scMeals": "식비 (50%)",
+    "scCarTruck": "차량 및 운송",
+    "scOffice": "사무 비용",
+    "mileageTrips": "{{count}}회"
   }
 }

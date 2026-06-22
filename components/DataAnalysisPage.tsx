@@ -715,7 +715,7 @@ ${t('analysis.forecastPromptRequirements')}`;
             <div>
               <h3 className="text-2xl font-bold text-[#191918] flex items-center">
                 {t('analysis.forecastTitle')}
-                <span className="ml-4 px-3 py-1 bg-primary/10 text-primary text-[10px] rounded-full border border-primary/20 font-bold uppercase tracking-wider">Next 90 Days</span>
+                <span className="ml-4 px-3 py-1 bg-primary/10 text-primary text-[10px] rounded-full border border-primary/20 font-bold uppercase tracking-wider">{t('analysis.forecastBadge')}</span>
               </h3>
               <p className="text-[#5c5c5a] text-sm mt-1 italic">{t('analysis.forecastSubtitle')}</p>
             </div>
@@ -762,7 +762,7 @@ ${t('analysis.forecastPromptRequirements')}`;
                                 </p>
                               )}
                               <p className="text-emerald-600 text-sm flex items-center">
-                                <i className="fas fa-chart-line mr-2"></i> {t('analysis.forecastEstProfit')}: ¥{formatNum(d.profit)}
+                                <i className="fas fa-chart-line mr-2"></i> {t('analysis.forecastEstProfit')}: {currSym}{formatNum(d.profit)}
                               </p>
                             </div>
                           </div>

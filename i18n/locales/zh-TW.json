@@ -337,7 +337,8 @@
     "month11": "11月",
     "month12": "12月",
     "yearLabel": "{{year}} 年",
-    "quarterLabel": "第{{n}}季度"
+    "quarterLabel": "第{{n}}季度",
+    "refreshData": "立即重新整理資料"
   },
   "chat": {
     "title": "AI 助手",
@@ -665,7 +666,7 @@
     "anomalyMid": "單位營收存在一定波動，建議關注價格變動。",
     "anomalyHigh": "單位營收波動較大，建議排查異常月份。",
     "forecastTitle": "智能業務增長預測",
-    "forecastBadge": "Next 90 Days",
+    "forecastBadge": "未來 90 天",
     "forecastSubtitle": "基於歷史銷量的趨勢預測模型推演",
     "forecastAnalyzing": "正在整合全量業務指標進行回歸分析...",
     "forecastConfidence": "置信範圍",
@@ -1451,5 +1452,11 @@
     "count": "筆",
     "currencyUnspecified": "未指定幣別",
     "noData": "尚無啟用記錄"
+  },
+  "usDashboard": {
+    "scMeals": "餐飲 (50%)",
+    "scCarTruck": "車輛與運輸",
+    "scOffice": "辦公費用",
+    "mileageTrips": "{{count}} 次行程"
   }
 }

@@ -337,7 +337,8 @@
     "month11": "Nov",
     "month12": "Déc",
     "yearLabel": "{{year}}",
-    "quarterLabel": "T{{n}}"
+    "quarterLabel": "T{{n}}",
+    "refreshData": "Actualiser les données"
   },
   "chat": {
     "title": "Assistant IA",
@@ -665,7 +666,7 @@
     "anomalyMid": "Moderate per-unit revenue volatility. Monitor price changes.",
     "anomalyHigh": "High per-unit revenue volatility. Investigate anomalous months.",
     "forecastTitle": "Business Growth Forecast",
-    "forecastBadge": "Next 90 Days",
+    "forecastBadge": "90 prochains jours",
     "forecastSubtitle": "Trend forecast model based on historical data",
     "forecastAnalyzing": "Integrating business metrics for regression analysis...",
     "forecastConfidence": "Confidence Range",
@@ -1451,5 +1452,11 @@
     "count": "entrées",
     "currencyUnspecified": "Devise non spécifiée",
     "noData": "Aucune entrée active"
+  },
+  "usDashboard": {
+    "scMeals": "Repas (50 %)",
+    "scCarTruck": "Véhicule",
+    "scOffice": "Frais de bureau",
+    "mileageTrips": "{{count}} trajets"
   }
 }

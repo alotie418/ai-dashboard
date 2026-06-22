@@ -337,7 +337,8 @@
     "month11": "11月",
     "month12": "12月",
     "yearLabel": "{{year}} 年度",
-    "quarterLabel": "第{{n}}四半期"
+    "quarterLabel": "第{{n}}四半期",
+    "refreshData": "今すぐデータを更新"
   },
   "chat": {
     "title": "AIアシスタント",
@@ -665,7 +666,7 @@
     "anomalyMid": "Moderate per-unit revenue volatility. Monitor price changes.",
     "anomalyHigh": "High per-unit revenue volatility. Investigate anomalous months.",
     "forecastTitle": "Business Growth Forecast",
-    "forecastBadge": "Next 90 Days",
+    "forecastBadge": "今後 90 日間",
     "forecastSubtitle": "Trend forecast model based on historical data",
     "forecastAnalyzing": "Integrating business metrics for regression analysis...",
     "forecastConfidence": "Confidence Range",
@@ -1451,5 +1452,11 @@
     "count": "件",
     "currencyUnspecified": "通貨未指定",
     "noData": "有効な記録がありません"
+  },
+  "usDashboard": {
+    "scMeals": "食費（50%）",
+    "scCarTruck": "車両費",
+    "scOffice": "事務用品費",
+    "mileageTrips": "{{count}} 回"
   }
 }
