@@ -410,10 +410,10 @@ const AppContent: React.FC = () => {
             style={isElectronEnv ? ({ WebkitAppRegion: 'drag' } as React.CSSProperties) : undefined}
           >
             <div
-              className="flex items-center space-x-6"
+              className="flex items-center space-x-6 min-w-0"
               style={isElectronEnv ? ({ WebkitAppRegion: 'no-drag' } as React.CSSProperties) : undefined}
             >
-              <h2 className="text-xl font-semibold text-[#191918]">
+              <h2 className="text-xl font-semibold text-[#191918] truncate min-w-0">
                 {assistantAccLocale !== 'CN' && currentPage === 'inventory'
                   ? getTaxLabel(assistantAccLocale, i18n.language, 'invQueryTitle')
                   : assistantAccLocale !== 'CN' && currentPage === 'purchase'
@@ -422,7 +422,7 @@ const AppContent: React.FC = () => {
                   ? getTaxLabel(assistantAccLocale, i18n.language, 'navSales')
                   : t(`headerTitle.${currentPage}`)}
               </h2>
-              <div className="hidden lg:flex items-center space-x-4 pl-4 border-l border-[#e0ddd5]">
+              <div className="hidden lg:flex items-center space-x-4 pl-4 border-l border-[#e0ddd5] shrink-0">
                 <div className="flex items-center space-x-2 bg-white rounded-lg p-1 border border-[#e0ddd5]">
                   <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)} className="bg-transparent text-xs font-medium text-[#6b6b69] outline-none px-2 py-1.5 cursor-pointer hover:text-primary">
                     {YEARS.map(y => <option key={y} value={y} className="bg-white">{t('header.yearLabel', { year: y })}</option>)}
@@ -510,7 +510,7 @@ const AuthWrapper: React.FC = () => {
 const NavItem: React.FC<{ icon: string; label: string; active?: boolean; expanded?: boolean; onClick?: () => void; }> = ({ icon, label, active = false, expanded = true, onClick }) => (
   <div onClick={onClick} className={`flex items-center p-3 rounded-lg transition-all duration-200 cursor-pointer group ${active ? 'bg-primary text-white' : 'text-[#4a4a48] hover:bg-[#f0eeeb] hover:text-[#191918]'}`} style={active ? { boxShadow: '0 4px 24px rgba(39,76,146,0.15)' } : {}}>
     <i className={`fas ${icon} text-base ${expanded ? 'mr-4' : 'mx-auto'} w-5 text-center group-hover:scale-110 transition-transform`}></i>
-    {expanded && <span className="text-sm font-medium">{label}</span>}
+    {expanded && <span className="text-sm font-medium truncate min-w-0">{label}</span>}
   </div>
 );
 
