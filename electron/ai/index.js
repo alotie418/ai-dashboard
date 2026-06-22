@@ -1,6 +1,6 @@
 // AI Provider 统一接口
 // - 管理面：list / save / remove / setDefault / test
-// - 业务面：analyze / ocr / chat / tts / dataAnalysis
+// - 业务面：analyze / ocr / chat / tts
 //
 // API Key 全程加密：safeStorage encrypt → base64 → ai_providers.api_key_encrypted
 // 渲染端永远拿不到明文，主进程从 DB 解密后注入到 provider adapter
@@ -335,11 +335,6 @@ async function agentChat(body) {
   });
 }
 
-async function dataAnalysis(body) {
-  const rec = getDefaultRecord();
-  return PROVIDERS[rec.provider].dataAnalysis(rec.apiKey, rec.model, body);
-}
-
 // 语音功能（TTS / Live Audio）已于 AI 助手重设计 R1 移除——
 // 不再暴露 tts()/liveKey()（明文 key 出主进程的安全洞随之消除）。
 
@@ -347,5 +342,5 @@ module.exports = {
   // 管理面
   list, hasAny, save, remove, setDefault, test,
   // 业务面
-  analyze, ocr, chat, agentChat, dataAnalysis,
+  analyze, ocr, chat, agentChat,
 };

@@ -36,12 +36,6 @@ async function agentChat({ body }) {
   return aiCore.agentChat(body);
 }
 
-// /api/ai/data-analysis — 数据分析（含 Web grounding，仅 Gemini 有效）
-async function dataAnalysis({ body }) {
-  if (!body?.prompt) throw new Error('Missing prompt');
-  return aiCore.dataAnalysis(body);
-}
-
 // 语音（/api/ai/tts、/api/ai/live-key）已于 AI 助手重设计 R1 移除。
 
 // R3a: locale-robust「已开票/已收票」判定 —— context 聚合发票统计不再硬等单一中文值。
@@ -165,4 +159,4 @@ Tax surcharge: ${num(f.taxSurcharge)}, admin expense: ${num(f.adminExpense)}, sh
   return { context: sections.join('\n\n') };
 }
 
-module.exports = { analyze, ocr, context, chat, agentChat, dataAnalysis };
+module.exports = { analyze, ocr, context, chat, agentChat };
