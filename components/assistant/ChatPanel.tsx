@@ -69,7 +69,7 @@ const ChatPanel: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 p-6 space-y-6 overflow-y-auto custom-scrollbar bg-[#fafaf9]">
+      <div className="flex-1 min-h-0 p-6 space-y-6 overflow-y-auto custom-scrollbar bg-[#fafaf9]">
         {messages.length === 0 && (
           <div className="bg-white p-6 rounded-xl text-[#4a4a48] text-sm leading-relaxed border border-[#e0ddd5]">
             <p className="font-semibold text-primary mb-2 flex items-center"><i className="fas fa-hand-sparkles mr-2"></i> {t('chat.welcome')}</p>
@@ -78,7 +78,7 @@ const ChatPanel: React.FC = () => {
         )}
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`relative group max-w-[88%] p-4 rounded-xl text-sm leading-relaxed ${m.role === 'user' ? 'bg-primary text-white rounded-tr-sm' : 'bg-white text-[#4a4a48] border border-[#e0ddd5] rounded-tl-sm'}`}>
+            <div className={`relative group max-w-[88%] break-words p-4 rounded-xl text-sm leading-relaxed ${m.role === 'user' ? 'bg-primary text-white rounded-tr-sm' : 'bg-white text-[#4a4a48] border border-[#e0ddd5] rounded-tl-sm'}`}>
               {m.role === 'user' ? m.text : (
                 <div className="markdown-body">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>

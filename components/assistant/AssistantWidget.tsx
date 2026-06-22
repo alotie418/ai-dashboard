@@ -56,7 +56,7 @@ const AssistantWidget: React.FC = () => {
         <div
           ref={chatBoxRef}
           style={{ width: `${chatSize.width}px`, height: `${chatSize.height}px`, boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
-          className="glass-modal rounded-2xl overflow-hidden flex flex-col animate-in slide-in-from-right-8 duration-500 relative"
+          className="glass-modal rounded-2xl overflow-hidden flex flex-col animate-in slide-in-from-right-8 duration-500 relative max-w-[calc(100vw-4rem)] max-h-[calc(100vh-4rem)]"
         >
           <div onMouseDown={handleMouseDown} className="absolute top-0 left-0 w-8 h-8 cursor-nw-resize z-50 flex items-end justify-end pr-1 pb-1 group" title={t('chat.resize')}>
             <svg width="10" height="10" viewBox="0 0 10 10" className="text-[#d1cdc4] group-hover:text-primary transition-colors"><path d="M0 10L10 0M0 6L6 0M0 2L2 0" stroke="currentColor" strokeWidth="1.5" /></svg>
