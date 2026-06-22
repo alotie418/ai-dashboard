@@ -280,7 +280,7 @@ const AccountsPage: React.FC = () => {
                 <span className="font-medium">{formatCurrency(paymentModal.total)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-[#5c5c5a]">{t('accounts.modalPaidAmount')}</span>
+                <span className="text-[#5c5c5a]">{t('accounts.modalPaid')}</span>
                 <span className="font-medium text-green-600">{formatCurrency(paymentModal.paid)}</span>
               </div>
               <div className="flex justify-between text-sm">
@@ -301,7 +301,7 @@ const AccountsPage: React.FC = () => {
                 <button
                   onClick={() => setPaymentAmount(String(paymentModal.total - paymentModal.paid))}
                   className="text-xs px-3 py-1 bg-[#f0eeeb] text-[#5c5c5a] rounded-lg hover:bg-[#e0ddd5]"
-                >{t('accounts.modalFullPayment')}</button>
+                >{t('accounts.modalFullPayoff')}</button>
               </div>
             </div>
             <div className="flex gap-3">
