@@ -7,6 +7,7 @@ import { rasterizePdfFirstPage } from '../services/pdfRaster';
 import { fetchSales, createSale, updateSale, deleteSale, fetchSettings, listProducts, listProviders, isDesktop, type Product, type BusinessDocument, SalesRecord } from '../services/api';
 import { getSystemErrorText } from '../services/systemErrors';
 import { formatMoney, getCurrencySymbol, formatQuantity, formatLegacyQuantity, getTaxLabel, getProductUnitLabel } from './accountingHelpers';
+import { classifyInvoiceStatus, INVOICE_STATUS_BADGE_CLASS } from './invoiceStatusDisplay';
 import CsvImportModal from './CsvImportModal';
 import DocumentModal from './DocumentModal';
 import OcrPreviewModal from './OcrPreviewModal';
@@ -434,9 +435,19 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                   <td className="px-5 py-5 text-sm text-[#4a4a48]">{formatCurrency(row.shipping)}</td>
                   <td className="px-5 py-5 text-sm font-mono text-[#4a4a48] tracking-tight">{row.invoiceNo}</td>
                   <td className="px-5 py-5">
-                    <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-md text-[10px] font-bold">
-                      {row.status}
-                    </span>
+                    {(() => {
+                      const tone = classifyInvoiceStatus(row.status);
+                      const label = tone === 'unknown'
+                        ? (String(row.status ?? '').trim() || '—')
+                        : tone === 'done'
+                          ? (accLocale !== 'CN' ? taxLabel('invStatusIssued') : t('sales.invoiceStatusIssued'))
+                          : (accLocale !== 'CN' ? taxLabel('invStatusPendingIssue') : t('sales.invoiceStatusPending'));
+                      return (
+                        <span className={`px-2 py-0.5 border rounded-md text-[10px] font-bold ${INVOICE_STATUS_BADGE_CLASS[tone]}`}>
+                          {label}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-5 py-5 text-xs font-medium space-x-3">
                     <button
