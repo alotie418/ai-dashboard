@@ -182,7 +182,6 @@ const routes = [
   ['POST', '/api/ai/context', ai.context],
   ['POST', '/api/ai/chat', ai.chat],
   ['POST', '/api/ai/agent-chat', ai.agentChat],
-  ['POST', '/api/ai/data-analysis', ai.dataAnalysis],
 
   // ---- AI 助手会话持久化（R4a-1；具体路径 messages 排在 :id 之前）----
   ['GET', '/api/conversations', conversationsH.list],
