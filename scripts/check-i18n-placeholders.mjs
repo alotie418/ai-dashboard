@@ -48,11 +48,10 @@ const PINNED = [
   'sales.formSubmitNew', 'sales.formTaxAmount', 'sales.inventoryCurrent', 'sales.inventoryLow',
   'sales.inventorySufficient', 'sales.inventoryTotalPurchase', 'sales.inventoryTotalSales',
   // UI-05B: remaining hardcoded-string cleanup (DataAnalysisPage / USDashboardCards / App.tsx).
-  'analysis.forecastBadge',
   'usDashboard.scMeals', 'usDashboard.scCarTruck', 'usDashboard.scOffice', 'usDashboard.mileageTrips',
   'header.refreshData',
   // UI-05B (follow-up): DataAnalysisPage analysis.* labels (tabs / chart titles / series / metrics / table).
-  'analysis.panorama', 'analysis.trends', 'analysis.forecast', 'analysis.table',
+  'analysis.panorama', 'analysis.trends', 'analysis.table',
   'analysis.revenueStructure', 'analysis.growthTrend', 'analysis.logistics', 'analysis.efficiency',
   'analysis.deflator', 'analysis.chartRevenue', 'analysis.chartProfit', 'analysis.chartPurchase',
   'analysis.chartSales', 'analysis.chartMom', 'analysis.chartYoy', 'analysis.dimSwitch',
@@ -60,8 +59,7 @@ const PINNED = [
   'analysis.trendVolume', 'analysis.trendEfficiency', 'analysis.trendSubtitle', 'analysis.matrixTitle',
   'analysis.matrixSubtitle', 'analysis.anomalyTitle', 'analysis.anomalyHigh', 'analysis.anomalyMid',
   'analysis.anomalyLow', 'analysis.peakMonth', 'analysis.fastest', 'analysis.fastestSub',
-  'analysis.forecastTitle', 'analysis.forecastSubtitle', 'analysis.forecastActual', 'analysis.forecastConfidence',
-  'analysis.forecastSources', 'analysis.rerun', 'analysis.tableMonth', 'analysis.tableExport',
+  'analysis.tableMonth', 'analysis.tableExport',
   'analysis.tableExportFilename', 'analysis.tableHeaderMom', 'analysis.tableHeaderYoy',
 ];
 

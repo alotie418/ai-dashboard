@@ -137,23 +137,17 @@ const REQUIRED_I18N_KEYS = [
   // cashflow empty state
   'finance.cashflowTitle', 'finance.cashflowDesc', 'finance.cashflowSync',
   // Data Analysis page — formerly hardcoded English / missing keys
-  'analysis.aiDashboard', 'analysis.avgYoy', 'analysis.avgMom',
+  'analysis.avgYoy', 'analysis.avgMom',
   'analysis.subtitleRevenueCost', 'analysis.subtitleYoyMom',
   'analysis.subtitleLogistics', 'analysis.subtitleEfficiency',
   'analysis.matrixBadgeSteady', 'analysis.matrixBadgeBalance',
   'analysis.chartTons', 'analysis.chartAvgRevenue', 'analysis.chartMonthlyData',
-  'analysis.waitingData', 'analysis.dimSwitch', 'analysis.realtimeProcessing',
-  'analysis.progress', 'analysis.peakMonthSub',
+  'analysis.waitingData', 'analysis.dimSwitch',
+  'analysis.peakMonthSub',
   'analysis.severityLow', 'analysis.severityMid', 'analysis.severityHigh',
   'analysis.corrStrong', 'analysis.corrModerate', 'analysis.corrWeak',
   // PR-A: data-analysis metrics correctness — insufficient-history empty state (MoM/YoY)
   'analysis.insufficientHistory',
-  // R3b: data-analysis forecast — idle CTA + i18n-driven prompt prose (follows uiLanguage)
-  'analysis.forecastIdle', 'analysis.runForecast',
-  'analysis.forecastPromptIntro', 'analysis.forecastPromptHistoryTitle', 'analysis.forecastPromptHistoryLegend',
-  'analysis.forecastPromptFinTitle', 'analysis.forecastPromptFeaturesTitle', 'analysis.forecastPromptFeaturesLegend',
-  'analysis.forecastPromptVarTitle', 'analysis.forecastPromptVarLegend',
-  'analysis.forecastPromptMcTitle', 'analysis.forecastPromptMcLegend', 'analysis.forecastPromptRequirements',
   // R3c: AI error codes — stable code → i18n message (all surfaces, follows uiLanguage)
   'aiError.noProvider', 'aiError.auth', 'aiError.permission', 'aiError.quota',
   'aiError.modelNotFound', 'aiError.badRequest', 'aiError.serverError',
@@ -2674,12 +2668,6 @@ async function main() {
       if (lang === 'zh-CN' && /吨/.test(subtitleLog)) reasons.push(`analysis.subtitleLogistics hardcodes 吨: "${subtitleLog}"`);
       if (lang === 'zh-TW' && /噸/.test(subtitleLog)) reasons.push(`analysis.subtitleLogistics hardcodes 噸: "${subtitleLog}"`);
     }
-    // aiDashboard heading should not be uppercase English in CJK locales
-    const aiDash = get(data, 'analysis.aiDashboard');
-    if (typeof aiDash === 'string' && ['zh-CN', 'zh-TW', 'ja', 'ko'].includes(lang)) {
-      // The "AI" prefix is OK; the rest must contain native script
-      if (/^[A-Z\s]+$/.test(aiDash)) reasons.push(`analysis.aiDashboard is all-caps English in ${lang}: "${aiDash}"`);
-    }
     // severity / correlation labels: non-en locales must not be English literals
     if (lang !== 'en') {
       const englishLiterals = {
@@ -2694,28 +2682,6 @@ async function main() {
         const v = get(data, `analysis.${key}`);
         if (typeof v === 'string' && pattern.test(v.trim())) {
           reasons.push(`analysis.${key} is English literal in ${lang}: "${v}"`);
-        }
-      }
-    }
-    // R3b: data-analysis forecast prompt prose (moved to i18n, follows uiLanguage) —
-    //   (a) NO industry hardcode in any locale (软水盐 / soft water / brine);
-    //   (b) non-en locale must not be a byte-identical untranslated English fallback.
-    const FORECAST_PROMPT_KEYS = [
-      'forecastPromptIntro', 'forecastPromptHistoryTitle', 'forecastPromptHistoryLegend',
-      'forecastPromptFinTitle', 'forecastPromptFeaturesTitle', 'forecastPromptFeaturesLegend',
-      'forecastPromptVarTitle', 'forecastPromptVarLegend',
-      'forecastPromptMcTitle', 'forecastPromptMcLegend', 'forecastPromptRequirements',
-    ];
-    for (const key of FORECAST_PROMPT_KEYS) {
-      const v = get(data, `analysis.${key}`);
-      if (typeof v !== 'string') continue;
-      if (/软水盐|軟水鹽|soft[\s-]?water|brine/i.test(v)) {
-        reasons.push(`analysis.${key} hardcodes an industry (软水盐/soft water/brine) in ${lang}: "${v}"`);
-      }
-      if (lang !== 'en') {
-        const enV = get(locales['en'], `analysis.${key}`);
-        if (typeof enV === 'string' && v.trim() === enV.trim()) {
-          reasons.push(`analysis.${key} is an untranslated English fallback in ${lang}`);
         }
       }
     }
