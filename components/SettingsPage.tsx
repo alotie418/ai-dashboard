@@ -104,8 +104,8 @@ const SettingsPage: React.FC = () => {
   return (
     <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row gap-8">
-        {/* Sidebar Nav */}
-        <div className="w-full md:w-64 space-y-2">
+        {/* Sidebar Nav — shrink-0 锁死 256px，防宽表把导航挤窄（UI-01） */}
+        <div className="w-full md:w-64 md:shrink-0 space-y-2">
           <SettingsNavLink active={activeSection === 'company'} onClick={() => setActiveSection('company')} icon="fa-building" label={t('settings.nav.company')} />
           <SettingsNavLink active={activeSection === 'tax'} onClick={() => setActiveSection('tax')} icon="fa-percent" label={t('settings.nav.tax')} />
           <SettingsNavLink active={activeSection === 'ai'} onClick={() => setActiveSection('ai')} icon="fa-microchip" label={usLabel('setNavAi', 'settings.nav.ai')} />
@@ -125,8 +125,8 @@ const SettingsPage: React.FC = () => {
           <SettingsNavLink active={activeSection === 'security'} onClick={() => setActiveSection('security')} icon="fa-shield-halved" label={t('settings.nav.security')} />
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 space-y-6">
+        {/* Content Area — min-w-0 让宽表 overflow-x-auto 生效、不撑大整行挤压导航（UI-01） */}
+        <div className="flex-1 min-w-0 space-y-6">
           {/* Toast notification */}
           {saveMessage && (
             <div className={`px-5 py-3 rounded-xl text-sm font-medium flex items-center justify-between transition-all animate-in fade-in slide-in-from-top-2 duration-300 ${saveMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
@@ -302,8 +302,8 @@ const SettingsNavLink: React.FC<{ active: boolean, onClick: () => void, icon: st
     className={`w-full flex items-center px-6 py-4 rounded-xl transition-all border ${active ? 'bg-primary text-white border-primary' : 'bg-white/80 text-[#4a4a48] border-[#e0ddd5] hover:bg-[#f9f9f8] hover:text-[#191918]'}`}
     style={active ? {boxShadow: '0 4px 16px rgba(39,76,146,0.15)'} : {}}
   >
-    <i className={`fas ${icon} mr-4 w-5 text-center`}></i>
-    <span className="text-sm font-bold">{label}</span>
+    <i className={`fas ${icon} mr-4 w-5 text-center shrink-0`}></i>
+    <span className="text-sm font-bold whitespace-nowrap">{label}</span>
   </button>
 );
 
