@@ -365,6 +365,9 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
                     if (key === 'contributedCapital') return t('finance.balanceCapital');      // 公司=实收资本
                     if (key === 'ownerCapital') return t('finance.balanceOwnerCapital');        // 个体=业主资本
                     if (key === 'retainedEarnings') return t('finance.balanceRetained');        // 未分配利润
+                    // P3-4：所得税应交/预缴特判（仅所得税·估算·本位币；同 P2-4b 不进 BALANCE_CLASSIFICATION）。
+                    if (key === 'incomeTaxPayable') return t('finance.balanceIncomeTaxPayable');  // 应交税费（所得税·估算）
+                    if (key === 'incomeTaxPrepaid') return t('finance.balanceIncomeTaxPrepaid');  // 预缴税款（所得税·估算）
                     const e = (BALANCE_CLASSIFICATION as Record<string, { labelKey: string }>)[key];
                     return e ? t(e.labelKey) : key;
                   };
@@ -385,6 +388,10 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
                       {/* P2-4b 未分配利润：本位币口径 · 管理估算（未做年结）。 */}
                       {l.key === 'retainedEarnings' && (
                         <div className="pl-3 mt-0.5 text-[10px] text-[#8a8a88]">{t('finance.balanceRetainedHint')}</div>
+                      )}
+                      {/* P3-4 所得税应交/预缴：本位币 · 同税种同期间对冲 · 管理估算。 */}
+                      {(l.key === 'incomeTaxPayable' || l.key === 'incomeTaxPrepaid') && (
+                        <div className="pl-3 mt-0.5 text-[10px] text-[#8a8a88]">{t('finance.balanceIncomeTaxHint')}</div>
                       )}
                     </div>
                   );
@@ -426,6 +433,12 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
                       {blk.warnings?.includes('borrowingsNullMaturityDefaultCurrent') && (
                         <div className="px-6 py-2 text-[11px] text-amber-600 border-t border-[#e0ddd5]/70">
                           <i className="fas fa-info-circle mr-1"></i>{t('finance.balanceBorrowingsNullMaturity')}
+                        </div>
+                      )}
+                      {/* P3-4 亏损期所得税估算 caveat：预缴行不代表真实预缴 */}
+                      {blk.warnings?.includes('incomeTaxLossPeriodCaveat') && (
+                        <div className="px-6 py-2 text-[11px] text-amber-600 border-t border-[#e0ddd5]/70">
+                          <i className="fas fa-info-circle mr-1"></i>{t('finance.balanceIncomeTaxLossCaveat')}
                         </div>
                       )}
                     </div>

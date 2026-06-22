@@ -888,7 +888,11 @@
     "balanceAccumulatedDepreciation": "減価償却累計額",
     "balanceFixedNetHint": "定額法による概算",
     "balanceOwnerCapital": "事業主資本",
-    "balanceRetainedHint": "機能通貨ベース · 管理用概算（期末締めなし）"
+    "balanceRetainedHint": "機能通貨ベース · 管理用概算（期末締めなし）",
+    "balanceIncomeTaxPayable": "未払法人税等（概算）",
+    "balanceIncomeTaxPrepaid": "前払法人税等（概算）",
+    "balanceIncomeTaxHint": "機能通貨 · 同一税目・同一期間の相殺 · 管理用概算",
+    "balanceIncomeTaxLossCaveat": "計上法人税がマイナス（赤字期の概算）。前払行は実際の前払を表しません"
   },
   "usSchedule": {
     "line1": "Line 1 — 総収入",

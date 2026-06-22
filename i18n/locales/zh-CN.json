@@ -888,7 +888,11 @@
     "balanceAccumulatedDepreciation": "累计折旧",
     "balanceFixedNetHint": "直线法估算净值",
     "balanceOwnerCapital": "业主资本",
-    "balanceRetainedHint": "本位币口径 · 管理估算（未做年结）"
+    "balanceRetainedHint": "本位币口径 · 管理估算（未做年结）",
+    "balanceIncomeTaxPayable": "应交税费（所得税·估算）",
+    "balanceIncomeTaxPrepaid": "预缴税款（所得税·估算）",
+    "balanceIncomeTaxHint": "本位币 · 同税种同期间对冲 · 管理估算",
+    "balanceIncomeTaxLossCaveat": "应计所得税为负（亏损期估算），预缴行不代表真实预缴"
   },
   "usSchedule": {
     "line1": "Line 1 — 总收入或销售额",

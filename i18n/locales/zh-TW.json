@@ -888,7 +888,11 @@
     "balanceAccumulatedDepreciation": "累計折舊",
     "balanceFixedNetHint": "直線法估算淨值",
     "balanceOwnerCapital": "業主資本",
-    "balanceRetainedHint": "本位幣口徑 · 管理估算（未做年結）"
+    "balanceRetainedHint": "本位幣口徑 · 管理估算（未做年結）",
+    "balanceIncomeTaxPayable": "應交稅費（所得稅·估算）",
+    "balanceIncomeTaxPrepaid": "預繳稅款（所得稅·估算）",
+    "balanceIncomeTaxHint": "本位幣 · 同稅種同期間對沖 · 管理估算",
+    "balanceIncomeTaxLossCaveat": "應計所得稅為負（虧損期估算），預繳列不代表真實預繳"
   },
   "usSchedule": {
     "line1": "Line 1 — 總收入或銷售額",

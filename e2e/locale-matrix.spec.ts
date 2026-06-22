@@ -359,11 +359,12 @@ const BALANCE_OVERVIEW_MOCK = (acc: string) => ({
     {
       currency: 'CNY',
       assets: { current: [{ key: 'cash', amount: 1200 }, { key: 'receivables', amount: 800 }, { key: 'inventory', amount: 0 }], nonCurrent: [{ key: 'fixedAssets', amount: 7000, meta: { originalValue: 8000, accumulatedDepreciation: 1000, netBookValue: 7000, estimate: true } }] },
-      liabilities: { current: [{ key: 'payables', amount: 300 }, { key: 'borrowings', amount: 3500 }], nonCurrent: [{ key: 'borrowings', amount: 5000 }] },
+      // PR-7B P3-4：所得税净欠缴 → 流动负债 incomeTaxPayable（估算·本位币）；totals.liabilities/balanceDifference 随之变
+      liabilities: { current: [{ key: 'payables', amount: 300 }, { key: 'borrowings', amount: 3500 }, { key: 'incomeTaxPayable', amount: 1500 }], nonCurrent: [{ key: 'borrowings', amount: 5000 }] },
       // PR-7B P2-4b：权益两行 = 业主资本(ownerCapital) + 未分配利润(retainedEarnings)，合计仍 30000
       equity: [{ key: 'ownerCapital', amount: 20000 }, { key: 'retainedEarnings', amount: 10000 }],
-      totals: { assets: 10000, liabilities: 8800, equity: 30000 },
-      balanceDifference: -28800,
+      totals: { assets: 10000, liabilities: 10300, equity: 30000 },
+      balanceDifference: -30300,
       warnings: ['borrowingsNullMaturityDefaultCurrent'],
     },
   ],
@@ -1896,6 +1897,12 @@ test.describe('balance overview (management basis)', () => {
       expect(body, `[${ui}] owner capital label`).toContain(loc.finance.balanceOwnerCapital);
       expect(body, `[${ui}] retained earnings label`).toContain(loc.finance.balanceRetained);
       expect(body, `[${ui}] retained hint`).toContain(loc.finance.balanceRetainedHint);
+      // PR-7B P3-4：所得税应交行（估算）+ hint；不得出现「已申报/正式应交税费/税务确认」
+      expect(body, `[${ui}] income tax payable label`).toContain(loc.finance.balanceIncomeTaxPayable);
+      expect(body, `[${ui}] income tax hint`).toContain(loc.finance.balanceIncomeTaxHint);
+      for (const stmt of ['已申报', '正式应交税费', '税务确认']) {
+        expect(body, `[${ui}] must not show tax wording "${stmt}"`).not.toContain(stmt);
+      }
       // 不得出现裸法定报表名
       for (const stmt of ['资产负债表', '資產負債表', 'Balance Sheet', '貸借対照表', '재무상태표']) {
         expect(body, `[${ui}] must not show statutory statement name "${stmt}"`).not.toContain(stmt);

@@ -888,7 +888,11 @@
     "balanceAccumulatedDepreciation": "Accumulated depreciation",
     "balanceFixedNetHint": "straight-line estimate",
     "balanceOwnerCapital": "Owner's Capital",
-    "balanceRetainedHint": "Functional-currency basis · management estimate (no year-end close)"
+    "balanceRetainedHint": "Functional-currency basis · management estimate (no year-end close)",
+    "balanceIncomeTaxPayable": "Income tax payable (estimate)",
+    "balanceIncomeTaxPrepaid": "Prepaid income tax (estimate)",
+    "balanceIncomeTaxHint": "Functional currency · same-tax-same-period offset · management estimate",
+    "balanceIncomeTaxLossCaveat": "Accrued income tax is negative (loss-period estimate); the prepaid line does not represent an actual prepayment"
   },
   "usSchedule": {
     "line1": "Line 1 — Gross Receipts",

@@ -888,7 +888,11 @@
     "balanceAccumulatedDepreciation": "Amortissement cumulé",
     "balanceFixedNetHint": "estimation linéaire",
     "balanceOwnerCapital": "Capital de l'exploitant",
-    "balanceRetainedHint": "Base en monnaie fonctionnelle · estimation de gestion (sans clôture annuelle)"
+    "balanceRetainedHint": "Base en monnaie fonctionnelle · estimation de gestion (sans clôture annuelle)",
+    "balanceIncomeTaxPayable": "Impôt sur le revenu à payer (estimation)",
+    "balanceIncomeTaxPrepaid": "Impôt sur le revenu prépayé (estimation)",
+    "balanceIncomeTaxHint": "Monnaie fonctionnelle · compensation même impôt / même période · estimation de gestion",
+    "balanceIncomeTaxLossCaveat": "L'impôt sur le revenu calculé est négatif (estimation en période de perte) ; la ligne prépayé ne représente pas un paiement anticipé réel"
   },
   "usSchedule": {
     "line1": "Line 1 — Recettes brutes",
