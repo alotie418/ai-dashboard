@@ -99,6 +99,13 @@ const PINNED = [
   'finance.export', 'finance.print', 'finance.kpiNetAssets', 'finance.kpiNetProfit',
   'finance.kpiGrossMargin', 'finance.kpiNetMargin', 'finance.plRevenue', 'finance.plCost',
   'finance.plGrossProfit', 'finance.plNetProfit', 'finance.plNetMargin',
+  // PR-6 (i18n governance, final batch): alerts + settings + common2 + US sales-tax options.
+  // 14 live keys. dataBackup.csvTransactions/csvDocuments kept as fr cognates (NOT pinned);
+  // sales/purchases dead keys NOT pinned.
+  'alerts.unread', 'alerts.markAllRead', 'alerts.typeInventory', 'alerts.typeReceivable',
+  'alerts.typePayable', 'alerts.typePrice', 'common2.noData', 'settings.categories.slug',
+  'settings.ai.modelIdLabel', 'settings.ai.apiKeyLabel', 'settings.tax.rate9', 'settings.tax.rate6',
+  'purchases.taxSalesTax', 'purchases.taxSalesTax10',
 ];
 
 // fr keys that are legitimately identical to en (cognates) — allowed to equal en.
