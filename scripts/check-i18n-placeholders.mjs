@@ -61,6 +61,19 @@ const PINNED = [
   'analysis.anomalyLow', 'analysis.peakMonth', 'analysis.fastest', 'analysis.fastestSub',
   'analysis.tableMonth', 'analysis.tableExport',
   'analysis.tableExportFilename', 'analysis.tableHeaderMom', 'analysis.tableHeaderYoy',
+  // PR-1 (i18n governance): AccountsPage AR/AP labels — ja/ko/fr were English placeholders.
+  // 39 live keys (5 dead modal* keys and the "N/A" symbol are intentionally NOT pinned).
+  'accounts.receivable', 'accounts.payable', 'accounts.totalReceivable', 'accounts.totalPayable',
+  'accounts.overdueAmount', 'accounts.unpaidCount', 'accounts.unpaidCountReceivable',
+  'accounts.collectionRate', 'accounts.paymentRate', 'accounts.agingTitle',
+  'accounts.rankingReceivable', 'accounts.rankingPayable', 'accounts.details', 'accounts.unit',
+  'accounts.headerCustomer', 'accounts.headerSupplier', 'accounts.headerPaid', 'accounts.headerUnpaid',
+  'accounts.headerDueDate', 'accounts.headerStatus', 'accounts.statusUnpaid', 'accounts.statusPartial',
+  'accounts.statusOverdue', 'accounts.allCleared', 'accounts.recordPayment', 'accounts.recordPaymentPay',
+  'accounts.modalPaid', 'accounts.modalRemaining', 'accounts.modalFullPayoff', 'accounts.modalCancel',
+  'accounts.modalConfirm', 'accounts.alertExceeded', 'accounts.alertFailed', 'accounts.emptyAging',
+  'accounts.emptyRanking',
+  'accounts.count', 'accounts.headerTotal', 'accounts.headerDate', 'accounts.headerAction',
 ];
 
 // fr keys that are legitimately identical to en (cognates) — allowed to equal en.
@@ -72,6 +85,10 @@ const FR_ALLOW_EQ_EN = new Set([
   'analysis.tableHeaderMom', 'analysis.tableHeaderYoy', // "MoM" / "YoY"
   'analysis.dimVolume',                                // "Volume"
   'analysis.dimSwitch',                                // "Dimension"
+  // PR-1 AccountsPage cognates — correct French as-is.
+  'accounts.count', 'accounts.headerTotal',            // "Total"
+  'accounts.headerDate',                               // "Date"
+  'accounts.headerAction',                             // "Action"
 ]);
 
 const dicts = { ja, ko, fr };
