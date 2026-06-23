@@ -93,6 +93,12 @@ const PINNED = [
   'aiInsights.loading', 'aiInsights.summary', 'aiInsights.insights', 'aiInsights.anomalies',
   'aiInsights.recommendations', 'aiInsights.recommendation', 'aiInsights.retry',
   'aiInsights.empty', 'aiInsights.powered',
+  // PR-4 (i18n governance): FinancePage P&L line items + KPI labels + toolbar — ja/ko/fr
+  // were English placeholders. 11 live keys (8 dead finance keys NOT pinned; sensitive
+  // balance/cashflow/disclaimer keys were already translated). No fr cognates here.
+  'finance.export', 'finance.print', 'finance.kpiNetAssets', 'finance.kpiNetProfit',
+  'finance.kpiGrossMargin', 'finance.kpiNetMargin', 'finance.plRevenue', 'finance.plCost',
+  'finance.plGrossProfit', 'finance.plNetProfit', 'finance.plNetMargin',
 ];
 
 // fr keys that are legitimately identical to en (cognates) — allowed to equal en.
