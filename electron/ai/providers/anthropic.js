@@ -164,17 +164,4 @@ async function tts() {
   throw new Error('Claude 不支持 TTS，请切换到 Gemini 使用语音功能');
 }
 
-async function dataAnalysis(apiKey, model, { prompt, systemInstruction }) {
-  const json = await callMessages(apiKey, {
-    model: model || META.defaultModel,
-    max_tokens: 4096,
-    system: systemInstruction || '',
-    messages: [{ role: 'user', content: `${prompt}\n\n请严格按 JSON 格式输出，不要 markdown 代码块。` }],
-  });
-  const text = extractText(json);
-  const parsed = tryParseJson(text);
-  if (!parsed) throw parseError(LABEL, 'dataAnalysis');
-  return { ...parsed, groundingSources: [] }; // Claude 当前不接入 web grounding
-}
-
-module.exports = { meta: META, test, chat, chatWithTools, toToolResultsMsg, toNativeHistory, analyze, ocr, tts, dataAnalysis };
+module.exports = { meta: META, test, chat, chatWithTools, toToolResultsMsg, toNativeHistory, analyze, ocr, tts };

@@ -215,39 +215,4 @@ async function tts(apiKey, _model, { text, voiceName }) {
   }
 }
 
-async function dataAnalysis(apiKey, model, { prompt, systemInstruction, responseSchema }) {
-  try {
-    const { GoogleGenAI } = await loadSDK();
-    const ai = new GoogleGenAI({ apiKey });
-
-    const response = await ai.models.generateContent({
-      model: model || META.defaultModel,
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        systemInstruction: systemInstruction || '',
-        responseMimeType: 'application/json',
-        responseSchema: responseSchema || undefined,
-      },
-    });
-
-    const text = response.text || '{}';
-    const result = JSON.parse(text);
-
-    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-    const groundingSources = [];
-    if (chunks) {
-      for (const chunk of chunks) {
-        if (chunk.web) {
-          groundingSources.push({ title: chunk.web.title || 'Reference', uri: chunk.web.uri });
-        }
-      }
-    }
-
-    return { ...result, groundingSources };
-  } catch (e) {
-    throw normalizeSdkError(e);
-  }
-}
-
-module.exports = { meta: META, test, chat, chatWithTools, toToolResultsMsg, toNativeHistory, parseGeminiResponse, buildGeminiConfig, analyze, ocr, tts, dataAnalysis };
+module.exports = { meta: META, test, chat, chatWithTools, toToolResultsMsg, toNativeHistory, parseGeminiResponse, buildGeminiConfig, analyze, ocr, tts };
