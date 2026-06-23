@@ -74,6 +74,17 @@ const PINNED = [
   'accounts.modalConfirm', 'accounts.alertExceeded', 'accounts.alertFailed', 'accounts.emptyAging',
   'accounts.emptyRanking',
   'accounts.count', 'accounts.headerTotal', 'accounts.headerDate', 'accounts.headerAction',
+  // PR-2 (i18n governance): InventoryPage invoice-reconciliation labels — ja/ko/fr were
+  // English placeholders. 33 live keys (9 superseded dead keys are intentionally NOT pinned).
+  'invoices.currentStock', 'invoices.stockNormal', 'invoices.totalInput', 'invoices.totalOutput',
+  'invoices.pendingTax', 'invoices.deductible', 'invoices.noInput', 'invoices.noOutput',
+  'invoices.inputRecordCount', 'invoices.outputRecordCount', 'invoices.searchPlaceholder',
+  'invoices.filterAll', 'invoices.filterInput', 'invoices.filterOutput', 'invoices.advancedFilter',
+  'invoices.export', 'invoices.dateRange', 'invoices.amountRange', 'invoices.weightRange',
+  'invoices.statusFilter', 'invoices.allStatus', 'invoices.headerPartner', 'invoices.headerWeight',
+  'invoices.headerAmount', 'invoices.headerTax', 'invoices.headerInvoiceNo', 'invoices.headerStatus',
+  'invoices.empty', 'invoices.clearRetry',
+  'invoices.headerDate', 'invoices.headerType', 'invoices.min', 'invoices.max',
 ];
 
 // fr keys that are legitimately identical to en (cognates) — allowed to equal en.
@@ -89,6 +100,10 @@ const FR_ALLOW_EQ_EN = new Set([
   'accounts.count', 'accounts.headerTotal',            // "Total"
   'accounts.headerDate',                               // "Date"
   'accounts.headerAction',                             // "Action"
+  // PR-2 InventoryPage cognates — correct French as-is.
+  'invoices.headerDate',                               // "Date"
+  'invoices.headerType',                               // "Type"
+  'invoices.min', 'invoices.max',                      // "Min" / "Max"
 ]);
 
 const dicts = { ja, ko, fr };
