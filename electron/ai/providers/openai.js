@@ -182,17 +182,4 @@ async function tts() {
   throw new Error('OpenAI Provider 暂未启用 TTS，请切换到 Gemini 使用语音功能');
 }
 
-async function dataAnalysis(apiKey, model, { prompt, systemInstruction }) {
-  const json = await callResponses(apiKey, {
-    model: model || META.defaultModel,
-    instructions: systemInstruction || undefined,
-    input: `${prompt}\n\n请严格按 JSON 格式输出。`,
-    text: { format: { type: 'json_object' } },
-  });
-  const text = extractText(json);
-  const parsed = tryParseJson(text);
-  if (!parsed) throw parseError(LABEL, 'dataAnalysis');
-  return { ...parsed, groundingSources: [] };
-}
-
-module.exports = { meta: META, test, chat, chatWithTools, toToolResultsMsg, toNativeHistory, analyze, ocr, tts, dataAnalysis };
+module.exports = { meta: META, test, chat, chatWithTools, toToolResultsMsg, toNativeHistory, analyze, ocr, tts };

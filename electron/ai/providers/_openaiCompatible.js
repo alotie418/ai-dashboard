@@ -8,7 +8,7 @@
 //
 // Each provider = a thin config module that calls createOpenAICompatibleAdapter({...}).
 // The returned adapter satisfies the same contract as the other providers:
-//   meta + test/chat/analyze/ocr/dataAnalysis + chatWithTools/toToolResultsMsg/toNativeHistory
+//   meta + test/chat/analyze/ocr + chatWithTools/toToolResultsMsg/toNativeHistory
 // so it plugs into index.js (business face) and agent.js (read-only tool loop) unchanged.
 
 const { buildHttpError, buildBodyError, wrapNetworkError, parseError } = require('./_error');
@@ -191,21 +191,7 @@ function createOpenAICompatibleAdapter(cfg) {
     return parsed;
   }
 
-  async function dataAnalysis(apiKey, model, { prompt, systemInstruction }) {
-    const msgs = [];
-    if (systemInstruction) msgs.push({ role: 'system', content: systemInstruction });
-    msgs.push({ role: 'user', content: `${prompt}\n\n请严格按 JSON 格式输出。` });
-    const json = await callChat(apiKey, {
-      model: model || defaultModel,
-      messages: msgs,
-      response_format: { type: 'json_object' },
-    });
-    const parsed = tryParseJson(extractText(json));
-    if (!parsed) throw parseError(LABEL, 'dataAnalysis');
-    return { ...parsed, groundingSources: [] };
-  }
-
-  return { meta: META, test, chat, chatWithTools, toToolResultsMsg, toNativeHistory, analyze, ocr, dataAnalysis };
+  return { meta: META, test, chat, chatWithTools, toToolResultsMsg, toNativeHistory, analyze, ocr };
 }
 
 module.exports = { createOpenAICompatibleAdapter };
