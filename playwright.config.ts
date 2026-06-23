@@ -5,6 +5,9 @@ import { defineConfig } from '@playwright/test';
 // the real accounting-regime tax labels render client-side without a backend/DB.
 export default defineConfig({
   testDir: './e2e',
+  // The UI-audit smoke harness lives under e2e/audit and has its own config
+  // (playwright.audit.config.ts); never run it as part of `test:locale-ui`.
+  testIgnore: '**/audit/**',
   outputDir: 'test-results/locale-matrix/_artifacts',
   timeout: 60_000,
   fullyParallel: false,

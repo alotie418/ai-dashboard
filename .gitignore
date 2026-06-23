@@ -19,6 +19,9 @@ release
 test-results
 playwright-report
 .playwright
+
+# UI-audit run output (timestamped report.md + summary.json + screenshots)
+artifacts
 .env
 .env.production
 .env.local
