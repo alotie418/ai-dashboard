@@ -821,7 +821,10 @@ async function main() {
       // formTaxRate per-regime expected terms
       if (accId === 'US') {
         const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
-        if (!/Sales Tax|sales tax/i.test(rateLabel)) reasons.push(`US formTaxRate missing Sales Tax in ${uiLang}: "${rateLabel}"`);
+        // US sales-tax term may render as English "Sales Tax" (en/zh-CN/zh-TW keep the
+        // bilingual label) OR the native localized term (ja 売上税 / ko 판매세 / fr taxe de
+        // vente) — what must never appear is a VAT/consumption-tax term for another regime.
+        if (!/Sales Tax|sales tax|売上税|판매세|taxe de vente/i.test(rateLabel)) reasons.push(`US formTaxRate missing sales-tax term in ${uiLang}: "${rateLabel}"`);
       }
       if (accId === 'EU') {
         const rateLabel = helpers.getTaxLabel(accId, uiLang, 'formTaxRate');
