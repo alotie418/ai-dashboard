@@ -85,6 +85,14 @@ const PINNED = [
   'invoices.headerAmount', 'invoices.headerTax', 'invoices.headerInvoiceNo', 'invoices.headerStatus',
   'invoices.empty', 'invoices.clearRetry',
   'invoices.headerDate', 'invoices.headerType', 'invoices.min', 'invoices.max',
+  // PR-3 (i18n governance): Dashboard profit-margin cards + AI briefing — ja/ko/fr were
+  // English placeholders. 18 live keys (30 dead dashboard/aiInsights keys NOT pinned).
+  'dashboard.avgCost', 'dashboard.purchasesLabel', 'dashboard.profitMarginTitle',
+  'dashboard.grossMargin', 'dashboard.netMargin', 'dashboard.grossMarginFormula',
+  'dashboard.netMarginFormula', 'dashboard.grossMarginNote', 'dashboard.netMarginNote',
+  'aiInsights.loading', 'aiInsights.summary', 'aiInsights.insights', 'aiInsights.anomalies',
+  'aiInsights.recommendations', 'aiInsights.recommendation', 'aiInsights.retry',
+  'aiInsights.empty', 'aiInsights.powered',
 ];
 
 // fr keys that are legitimately identical to en (cognates) — allowed to equal en.
@@ -104,6 +112,8 @@ const FR_ALLOW_EQ_EN = new Set([
   'invoices.headerDate',                               // "Date"
   'invoices.headerType',                               // "Type"
   'invoices.min', 'invoices.max',                      // "Min" / "Max"
+  // PR-3 AI briefing cognate — correct French as-is.
+  'aiInsights.recommendation',                         // "Suggestion"
 ]);
 
 const dicts = { ja, ko, fr };
