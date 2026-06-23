@@ -57,6 +57,18 @@ i18n
     returnEmptyString: false,
   });
 
+// 让 <html lang> 跟随当前 UI 语言（默认 index.html 写死 lang="zh-CN"）。
+// 这控制 Chromium 原生 <input type="date"> 的空值占位格式（ko→년/월/일、fr→jj/mm/aaaa、
+// en→mm/dd/yyyy；zh/ja 保持 年/月/日），同时是语义正确 + a11y 正向。
+// 不影响日期 value（HTML 规范恒为 ISO YYYY-MM-DD），不影响 onChange / 保存格式。
+// 6 个语言码 zh-CN/zh-TW/en/ja/ko/fr 本身就是合法的 HTML lang，无需映射。
+if (typeof document !== 'undefined') {
+  document.documentElement.lang = i18n.language;
+  i18n.on('languageChanged', (lng) => {
+    document.documentElement.lang = lng;
+  });
+}
+
 // 切换语言并持久化
 export function setLanguage(code: LangCode) {
   i18n.changeLanguage(code);
