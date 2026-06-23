@@ -142,7 +142,7 @@ const REQUIRED_I18N_KEYS = [
   'analysis.subtitleLogistics', 'analysis.subtitleEfficiency',
   'analysis.matrixBadgeSteady', 'analysis.matrixBadgeBalance',
   'analysis.chartTons', 'analysis.chartAvgRevenue', 'analysis.chartMonthlyData',
-  'analysis.waitingData', 'analysis.dimSwitch',
+  'analysis.dimSwitch',
   'analysis.peakMonthSub',
   'analysis.severityLow', 'analysis.severityMid', 'analysis.severityHigh',
   'analysis.corrStrong', 'analysis.corrModerate', 'analysis.corrWeak',
