@@ -12,6 +12,11 @@ import {
   RAW_KEY_SUFFIX_WHITELIST,
   ZH_SIMP_ONLY,
   ZH_TRAD_ONLY,
+  GLOBAL_TOKEN_WHITELIST,
+  MOCK_FIXTURE_WHITELIST,
+  FR_COGNATE_WORDS,
+  ENGLISH_RESIDUE_DENYLIST,
+  JP_SHARED_SIMPLIFIED,
 } from './whitelist';
 
 const TOL = 2; // px tolerance for geometry comparisons
@@ -211,6 +216,10 @@ export function guessSource(type: string, page: string, modal?: string): string 
       return 'components/accountingLocaleConfig.ts (taxConcepts / getTaxLabel — e.g. US formTaxRate)';
     case 'number-abbreviation':
       return `components/accountingHelpers.ts (formatCompactMoney) or ${pageComponent(page, modal)}`;
+    case 'english-residue-candidate':
+      return `i18n/locales/<ui>.json (English placeholder — value === en) or ${pageComponent(page, modal)}`;
+    case 'chinese-leak-candidate':
+      return `i18n/locales/<ui>.json (untranslated Chinese) or ${pageComponent(page, modal)}`;
     default:
       return pageComponent(page, modal);
   }
@@ -231,4 +240,88 @@ export const SEVERITY: Record<string, Severity> = {
   'cross-regime-tax': 'P2',
   'date-value-format': 'P2',
   'chinese-variant-leak': 'P2',
+  // Phase-2 heuristic candidates — never hard fail (always possibleFalsePositive).
+  // Default P2 here; the spec downgrades fr english-residue and ja chinese-leak to P3.
+  'english-residue-candidate': 'P2',
+  'chinese-leak-candidate': 'P2',
 };
+
+/** Candidate (heuristic) finding types — rendered in a separate report section and
+ *  excluded from the hard-check severity profile + merge advice. */
+export const CANDIDATE_TYPES = new Set<string>(['english-residue-candidate', 'chinese-leak-candidate']);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase-2 heuristic candidates: English residue + Chinese leak (NEVER hard fail).
+//
+// These reduce manual page-by-page review cost. They are LOW-confidence by design,
+// so every candidate is reported with possibleFalsePositive=true and at most P2.
+// ─────────────────────────────────────────────────────────────────────────────
+export type Candidate = { kind: 'english-residue' | 'chinese-leak'; token: string; context: string };
+
+// CJK Han ideographs (Unified + Ext-A). Deliberately EXCLUDES Hiragana/Katakana
+// (぀-ヿ) and Hangul (가-힯) so normal ja/ko script never matches.
+const HAN_CHAR_RE = /[㐀-䶿一-鿿]/;
+// Latin word token (may carry internal & . ' - as in "P&L", "MoM", "Year-to-date").
+const LATIN_WORD_RE = /[A-Za-z][A-Za-z.&'-]*/g;
+
+function isTokenWhitelisted(low: string): boolean {
+  if (low.length < 3) return true; // 1–2 letter codes are noise (AI/ID/OK/NT…)
+  if (GLOBAL_TOKEN_WHITELIST.has(low)) return true;
+  if (MOCK_FIXTURE_WHITELIST.has(low)) return true;
+  // slug / model-id / code-like: letters mixed with digits or underscores → not prose
+  if (/[0-9_]/.test(low)) return true;
+  return false;
+}
+
+/** English residue in a non-English UI. ja/ko: any surviving Latin word. fr: only the
+ *  curated ENGLISH_RESIDUE_DENYLIST (minus cognates). en: skipped (English UI). */
+export function findEnglishResidueCandidates(text: string, ui: string): Candidate[] {
+  if (ui === 'en') return [];
+  const out: Candidate[] = [];
+  const seen = new Set<string>();
+  LATIN_WORD_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = LATIN_WORD_RE.exec(text)) !== null) {
+    const tok = m[0].replace(/[.&'-]+$/, ''); // strip trailing punctuation
+    const low = tok.toLowerCase();
+    if (isTokenWhitelisted(low)) continue;
+    if (ui === 'fr') {
+      if (FR_COGNATE_WORDS.has(low)) continue;
+      if (!ENGLISH_RESIDUE_DENYLIST.has(low)) continue; // fr: denylist only
+    }
+    if (seen.has(low)) continue;
+    seen.add(low);
+    out.push({ kind: 'english-residue', token: tok, context: contextAround(text, m.index, m[0].length) });
+  }
+  return out;
+}
+
+/** Chinese leak in a UI whose native script is not Han. en/ko/fr: any Han ideograph.
+ *  ja: ONLY simplified-Chinese-exclusive chars (ZH_SIMP_ONLY) — never normal kanji. */
+export function findChineseLeakCandidates(text: string, ui: string): Candidate[] {
+  const out: Candidate[] = [];
+  const seen = new Set<string>();
+  if (ui === 'ja') {
+    // Only simplified-Chinese-EXCLUSIVE chars; never normal kanji. Subtract the
+    // simplified forms that are also valid Japanese shinjitai (数/会/…) to avoid
+    // flagging legitimate Japanese (数量, 会計, …).
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (ZH_SIMP_ONLY.includes(ch) && !JP_SHARED_SIMPLIFIED.has(ch) && !seen.has(ch)) {
+        seen.add(ch);
+        out.push({ kind: 'chinese-leak', token: ch, context: contextAround(text, i, 1) });
+      }
+    }
+    return out;
+  }
+  if (ui === 'ko' || ui === 'fr' || ui === 'en') {
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (HAN_CHAR_RE.test(ch) && !seen.has(ch)) {
+        seen.add(ch);
+        out.push({ kind: 'chinese-leak', token: ch, context: contextAround(text, i, 1) });
+      }
+    }
+  }
+  return out;
+}
