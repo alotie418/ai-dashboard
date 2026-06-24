@@ -25,7 +25,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 
 const args = process.argv.slice(2);
-const mode = args.includes('--full') ? 'full' : 'smoke';
+const candidates = args.includes('--candidates');
+const mode = candidates ? 'candidates' : args.includes('--full') ? 'full' : 'smoke';
 const strict = args.includes('--strict');
 const noBuild = args.includes('--no-build');
 const forceBuild = args.includes('--build');
@@ -37,6 +38,10 @@ function run(cmd, cmdArgs, extraEnv = {}) {
 console.log(`\n=== UI Audit (${mode}) ===`);
 if (mode === 'full') {
   console.log('Note: --full is a phase-1 STUB — it runs the smoke scope. Full coverage is a later PR.');
+}
+if (candidates) {
+  console.log('Candidate pass ON: heuristic English-residue / Chinese-leak (acc=CN × en/ja/ko/fr).');
+  console.log('Candidates are P2/P3 possibleFalsePositive — they never block (merge advice = hard checks only).');
 }
 
 // 1. Ensure the SPA is built (vite preview serves dist/).
@@ -53,7 +58,7 @@ if (forceBuild || (!noBuild && !existsSync(distIndex))) {
 }
 
 // 2. Run the audit spec.
-const pw = run('npx', ['playwright', 'test', '--config', 'playwright.audit.config.ts'], { AUDIT_MODE: mode });
+const pw = run('npx', ['playwright', 'test', '--config', 'playwright.audit.config.ts'], { AUDIT_MODE: mode, AUDIT_CANDIDATES: candidates ? '1' : '' });
 // status is null when the command itself could not run (e.g. npx ENOENT); treat that
 // as a hard failure (2), never a silent success — mirrors the build step above.
 const pwStatus = pw.status ?? 2;
@@ -86,8 +91,9 @@ console.log(` Mode          : ${summary.mode}`);
 console.log(` Pages scanned : ${c.pagesScanned}`);
 console.log(` Combos        : ${c.combos}  (${summary.scope.uiLanguages.join('/')} × ${summary.scope.accountingLocales.join('/')})`);
 console.log(` Modals        : ${c.modals}`);
-console.log(` Findings      : ${c.findings}   (P0=${c.P0} P1=${c.P1} P2=${c.P2} P3=${c.P3})`);
+console.log(` Findings(hard): ${c.findings}   (P0=${c.P0} P1=${c.P1} P2=${c.P2} P3=${c.P3})`);
 console.log(` Hard fail     : ${c.hardFail}`);
+console.log(` Candidates    : ${c.candidates ?? 0}${candidates ? ' (heuristic · possibleFalsePositive)' : ' (pass off)'}`);
 console.log(` Merge advice  : ${summary.mergeAdvice}`);
 console.log(` Report        : ${join(dir, 'report.md')}`);
 console.log(` Summary JSON  : ${join(dir, 'summary.json')}`);

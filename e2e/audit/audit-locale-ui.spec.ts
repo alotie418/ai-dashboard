@@ -13,12 +13,14 @@
 
 import { test, type Page } from '@playwright/test';
 import * as path from 'node:path';
-import { bootComboIPC, type ApiResponse } from '../helpers/electronMock';
+import { bootComboIPC, gotoApp, type ApiResponse } from '../helpers/electronMock';
 import {
   findRawI18nKeys,
   findNumberAbbreviations,
   findCrossRegimeTax,
   findChineseVariantLeak,
+  findEnglishResidueCandidates,
+  findChineseLeakCandidates,
   classifyOverflow,
   classifyTabWrap,
   classifyButtonOffscreen,
@@ -39,7 +41,14 @@ import {
   type AuditScope,
 } from './report';
 
-const AUDIT_MODE = process.env.AUDIT_MODE === 'full' ? 'full' : 'smoke';
+// Candidate (heuristic English-residue / Chinese-leak) detection is OFF by default so
+// the smoke baseline stays clean PASS. AUDIT_CANDIDATES=1 (npm run audit:locale-ui:candidates)
+// turns it on; candidates are P2/P3 possibleFalsePositive and never affect merge advice.
+const CANDIDATES = process.env.AUDIT_CANDIDATES === '1';
+const AUDIT_MODE = CANDIDATES ? 'candidates' : process.env.AUDIT_MODE === 'full' ? 'full' : 'smoke';
+// Candidate scan runs only on the CN accounting locale: English residue lives in the
+// i18n JSON (t() path, default CN), while non-CN labels come from accountingLocaleConfig.
+const CANDIDATE_ACC = 'CN';
 
 const SMOKE_LANGS = ['en', 'ja', 'ko', 'fr'];
 const SMOKE_ACCS = ['US', 'CN'];
@@ -49,6 +58,17 @@ const PAGES: { name: string; icon: string }[] = [
   { name: 'sales', icon: 'fa-file-export' },
   { name: 'finance', icon: 'fa-wallet' },
   { name: 'settings', icon: 'fa-cog' },
+];
+
+// Candidate-only pages: scanned for English-residue / Chinese-leak (chrome text only,
+// NO hard checks), in addition to the 5 smoke pages. These are the not-yet-reviewed
+// pages where remaining visible residue is most likely. Only visited in candidate mode.
+const CANDIDATE_EXTRA_PAGES: { name: string; icon: string }[] = [
+  { name: 'accounts', icon: 'fa-handshake' },
+  { name: 'inventory', icon: 'fa-search-dollar' },
+  { name: 'transactions', icon: 'fa-exchange-alt' },
+  { name: 'analysis', icon: 'fa-chart-pie' },
+  { name: 'documents', icon: 'fa-file-contract' },
 ];
 
 const SCOPE: AuditScope = {
@@ -80,10 +100,18 @@ const BALANCE_OVERVIEW_MOCK = (acc: string) => ({
   disclaimerKey: 'disclaimer.report', limitations: [], excludedNotes: [],
 });
 
+// AccountsPage reads receivables/payables as objects (data.agingBuckets['0-30'], …); the
+// default lists mock returns [] (truthy) → [].agingBuckets crashes the page into the error
+// boundary. Provide zeroed object shapes so the candidate sweep can render Accounts.
+const RECEIVABLES_MOCK = { totalReceivable: 0, totalOverdue: 0, collectionRate: null, agingBuckets: { '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 }, topCustomers: [], details: [] };
+const PAYABLES_MOCK = { totalPayable: 0, totalOverdue: 0, paymentRate: null, agingBuckets: { '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 }, topSuppliers: [], details: [] };
+
 const AUDIT_API_RESPONSES = (acc: string): ApiResponse[] => [
   { match: '/api/transactions/summary', json: { income: { total: 0, count: 0 }, expense: { total: 0, count: 0 }, net: 0 } },
   { match: '/api/reports/generate', json: REPORT_MOCK(acc) },
   { match: '/api/balance-overview', json: BALANCE_OVERVIEW_MOCK(acc) },
+  { match: '/api/receivables', json: RECEIVABLES_MOCK },
+  { match: '/api/payables', json: PAYABLES_MOCK },
 ];
 
 // ── Module-level accumulators (workers:1 → single process aggregates the whole run). ──
@@ -116,13 +144,15 @@ function shotPaths(ui: string, name: string): { abs: string; rel: string } {
   return { abs: path.join(dir, `${name}.png`), rel: `${ui}/${name}.png` };
 }
 
-/** Visible page text, excluding inputs/code/kbd/links/scripts so shortcuts, model ids,
- *  URLs and API keys never reach the text rules. Optional CSS root scopes to a modal. */
-async function extractVisibleText(page: Page, rootSelector: string | null): Promise<string> {
-  return page.evaluate((sel: string | null) => {
+/** Visible text under a root, excluding inputs/code/kbd/links/scripts so shortcuts,
+ *  model ids, URLs and API keys never reach the text rules. `extraSkipTags` adds more
+ *  excluded tags — the candidate pass passes ['TD'] to skip table DATA cells (user data),
+ *  keeping only chrome (labels/buttons/headers/th/options/headings). */
+async function extractVisibleText(page: Page, rootSelector: string | null, extraSkipTags: string[] = []): Promise<string> {
+  return page.evaluate(({ sel, extra }: { sel: string | null; extra: string[] }) => {
     const root: Element | null = sel ? document.querySelector(sel) : document.body;
     if (!root) return '';
-    const SKIP = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'CODE', 'KBD', 'PRE', 'SCRIPT', 'STYLE', 'NOSCRIPT']);
+    const SKIP = new Set(['INPUT', 'TEXTAREA', 'SELECT', 'CODE', 'KBD', 'PRE', 'SCRIPT', 'STYLE', 'NOSCRIPT', ...extra]);
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
     const stop = root.parentElement;
     let out = '';
@@ -139,7 +169,55 @@ async function extractVisibleText(page: Page, rootSelector: string | null): Prom
       node = walker.nextNode();
     }
     return out.replace(/\s+/g, ' ').trim();
-  }, rootSelector);
+  }, { sel: rootSelector, extra: extraSkipTags });
+}
+
+/** Phase-2 heuristic candidate rules (English residue + Chinese leak). Runs on chrome
+ *  text only (table data cells excluded). All findings are possibleFalsePositive and
+ *  never affect merge advice; fr residue is P3, ja Chinese-leak (simplified-only) is P3. */
+function runCandidateRules(text: string, ctx: { ui: string; acc: string; page: string; modal?: string; screenshot?: string; selector?: string }): void {
+  const base = { ui: ctx.ui, acc: ctx.acc, page: ctx.page, modal: ctx.modal, screenshot: ctx.screenshot, selector: ctx.selector, possibleFalsePositive: true };
+  for (const c of findEnglishResidueCandidates(text, ctx.ui)) {
+    const severity: Severity = ctx.ui === 'fr' ? 'P3' : 'P2';
+    addFinding({ ...base, type: 'english-residue-candidate', severity, message: `possible English residue in ${ctx.ui} UI: "${c.token}"`, snippet: c.context });
+  }
+  for (const c of findChineseLeakCandidates(text, ctx.ui)) {
+    const severity: Severity = ctx.ui === 'ja' ? 'P3' : 'P2';
+    addFinding({ ...base, type: 'chinese-leak-candidate', severity, message: `possible Chinese leak in ${ctx.ui} UI: "${c.token}"`, snippet: c.context });
+  }
+}
+
+/** Run the candidate pass (chrome text only) for a page/modal, gated on CANDIDATES + CN. */
+async function scanCandidates(page: Page, ui: string, acc: string, pageName: string, rootSelector: string | null, modal: string | undefined, screenshot: string): Promise<void> {
+  if (!CANDIDATES || acc !== CANDIDATE_ACC) return;
+  const chrome = await extractVisibleText(page, rootSelector, ['TD']);
+  runCandidateRules(chrome, { ui, acc, page: pageName, modal, screenshot, selector: rootSelector ?? 'body' });
+}
+
+/** Navigate a candidate-only page and run the candidate pass. Resilient by design:
+ *  a short click timeout (no 120s hangs), and if a page crashes into the app error
+ *  boundary (which removes <nav>), it is skipped + logged (not recorded as residue)
+ *  and the app is rebooted so the remaining extra pages still get scanned. */
+async function scanCandidatePage(page: Page, ui: string, acc: string, pageName: string, icon: string): Promise<void> {
+  try {
+    await page.locator(`nav i.${icon}`).first().click({ timeout: 6000 });
+    await page.waitForTimeout(350);
+  } catch (e: any) {
+    console.warn(`[audit] candidate page ${pageName} (${ui}/${acc}) nav skipped: ${String(e?.message || e)}`);
+    try { await gotoApp(page, ui); } catch { /* ignore */ }
+    return;
+  }
+  // The app-level error boundary replaces the whole UI (including <nav>) on a render
+  // crash — usually a mock-shape gap, not real residue. Skip + reboot so it doesn't
+  // pollute candidates or break the next page.
+  if ((await page.locator('nav').count()) === 0) {
+    console.warn(`[audit] candidate page ${pageName} (${ui}/${acc}) crashed into error boundary — skipped + rebooting`);
+    try { await gotoApp(page, ui); } catch { /* ignore */ }
+    return;
+  }
+  const { abs, rel } = shotPaths(ui, pageName);
+  await page.screenshot({ path: abs, fullPage: true });
+  await scanCandidates(page, ui, acc, pageName, null, undefined, rel);
 }
 
 function runTextRules(text: string, ctx: { ui: string; acc: string; page: string; modal?: string; screenshot?: string; selector?: string }): void {
@@ -176,6 +254,7 @@ async function scanPage(page: Page, ui: string, acc: string, pageName: string, i
 
   const text = await extractVisibleText(page, null);
   runTextRules(text, { ui, acc, page: pageName, screenshot: rel, selector: 'body' });
+  await scanCandidates(page, ui, acc, pageName, null, undefined, rel);
 
   // Page-level horizontal overflow (documentElement only → ignores inner scrollers).
   const ov = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
@@ -224,6 +303,7 @@ async function scanModal(page: Page, ui: string, acc: string, pageName: string, 
 
   const text = await extractVisibleText(page, '.fixed.inset-0');
   runTextRules(text, { ui, acc, page: pageName, modal: modalName, screenshot: rel, selector: '.fixed.inset-0' });
+  await scanCandidates(page, ui, acc, pageName, '.fixed.inset-0', modalName, rel);
 
   const geo = await page.evaluate(() => {
     const overlay = document.querySelector('.fixed.inset-0');
@@ -342,6 +422,12 @@ for (const acc of SMOKE_ACCS) {
       await page.locator('nav i.fa-cog').first().click();
       await page.waitForTimeout(250);
       await scanAiWidget(page, ui, acc);
+      // Candidate-only: sweep the not-yet-reviewed pages for residue (CN × 4 langs).
+      if (CANDIDATES && acc === CANDIDATE_ACC) {
+        for (const pg of CANDIDATE_EXTRA_PAGES) {
+          await scanCandidatePage(page, ui, acc, pg.name, pg.icon);
+        }
+      }
     });
   }
 }
@@ -358,8 +444,9 @@ test.afterAll(async () => {
     ` Pages scanned : ${c.pagesScanned}`,
     ` Combos        : ${c.combos}  (${SCOPE.uiLanguages.join('/')} × ${SCOPE.accountingLocales.join('/')})`,
     ` Modals        : ${c.modals}`,
-    ` Findings      : ${c.findings}   P0=${c.P0} P1=${c.P1} P2=${c.P2} P3=${c.P3}`,
+    ` Findings(hard): ${c.findings}   P0=${c.P0} P1=${c.P1} P2=${c.P2} P3=${c.P3}`,
     ` Hard fail     : ${c.hardFail}`,
+    ` Candidates    : ${c.candidates}${CANDIDATES ? '' : ' (pass off — run audit:locale-ui:candidates)'}`,
     ` Merge advice  : ${summary.mergeAdvice}`,
     '──────────────────────────────────────────────',
     ` report.md   : ${reportPath}`,

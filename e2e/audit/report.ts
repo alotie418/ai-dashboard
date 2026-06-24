@@ -56,6 +56,7 @@ export type AuditSummary = {
     P2: number;
     P3: number;
     hardFail: number;
+    candidates: number;
   };
   mergeAdvice: MergeAdvice;
   knownLimitations: string[];
@@ -85,7 +86,7 @@ export function ensureAuditDir(sub?: string): string {
 export const KNOWN_LIMITATIONS: string[] = [
   'Native <input type="date"> placeholder text and the pop-up calendar render in the OS / Chromium process locale, not the renderer <html lang>. That language is NOT in the DOM, so it is a known limitation — the audit only validates input[type=date].value format (empty or YYYY-MM-DD), never the placeholder/calendar language.',
   'ja Chinese-leak cannot be reliably auto-detected because Japanese itself uses kanji. Phase 1 does not judge ja text for Chinese leakage.',
-  'English-residue and Chinese-leak heuristics (ja/ko/fr/en) are deferred to a phase-2 PR once the smoke framework is stable; only the specific US cross-regime tax-term check runs in phase 1.',
+  'English-residue / Chinese-leak detection runs ONLY in the candidates pass (audit:locale-ui:candidates) as low-confidence, possibleFalsePositive findings that never block. The smoke pass does not run them. fr English residue uses a curated denylist (low recall); ja Chinese leak flags only simplified-Chinese-exclusive characters, never normal kanji.',
   'Automated audit cannot replace human judgement of translation naturalness, accounting-term accuracy, or tax-wording correctness.',
 ];
 
@@ -101,9 +102,17 @@ export function isHardFail(f: Finding): boolean {
   return (f.severity === 'P0' || f.severity === 'P1') && !f.possibleFalsePositive;
 }
 
+/** Phase-2 heuristic candidate (English residue / Chinese leak). Reported separately,
+ *  excluded from the hard-check severity profile and from merge advice. */
+export function isCandidate(f: Finding): boolean {
+  return f.type.endsWith('-candidate');
+}
+
+/** Merge advice is computed from HARD findings only — candidates never affect it. */
 export function mergeAdvice(findings: Finding[]): MergeAdvice {
-  if (findings.some(isHardFail)) return 'BLOCK';
-  if (findings.length > 0) return 'REVIEW';
+  const hard = findings.filter((f) => !isCandidate(f));
+  if (hard.some(isHardFail)) return 'BLOCK';
+  if (hard.length > 0) return 'REVIEW';
   return 'PASS';
 }
 
@@ -113,7 +122,9 @@ export function buildSummary(
   mode: string,
   counters: AuditCounters,
 ): AuditSummary {
-  const c = severityCounts(findings);
+  const hard = findings.filter((f) => !isCandidate(f));
+  const candidates = findings.filter(isCandidate);
+  const c = severityCounts(hard); // P0–P3 profile reflects HARD checks only
   return {
     timestamp: AUDIT_TIMESTAMP,
     mode,
@@ -122,12 +133,13 @@ export function buildSummary(
       pagesScanned: counters.pagesScanned,
       combos: counters.combos,
       modals: counters.modals,
-      findings: findings.length,
+      findings: hard.length,
       P0: c.P0,
       P1: c.P1,
       P2: c.P2,
       P3: c.P3,
-      hardFail: findings.filter(isHardFail).length,
+      hardFail: hard.filter(isHardFail).length,
+      candidates: candidates.length,
     },
     mergeAdvice: mergeAdvice(findings),
     knownLimitations: KNOWN_LIMITATIONS,
@@ -175,21 +187,43 @@ function renderReportMd(summary: AuditSummary): string {
   out.push(`| P2 | ${counts.P2} |`);
   out.push(`| P3 | ${counts.P3} |`);
   out.push(`| Hard fail | ${counts.hardFail} |`);
+  out.push(`| Candidates (heuristic) | ${counts.candidates} |`);
   out.push(`| Merge advice | ${summary.mergeAdvice} |`);
   out.push('');
-  out.push('## Findings');
-  if (summary.findings.length === 0) {
+  out.push('## Findings (hard checks)');
+  const hard = summary.findings.filter((f) => !isCandidate(f));
+  if (hard.length === 0) {
     out.push('');
-    out.push('_No findings._');
+    out.push('_No hard-check findings._');
   } else {
     for (const sev of ['P0', 'P1', 'P2', 'P3'] as Severity[]) {
-      const group = summary.findings.filter((f) => f.severity === sev);
+      const group = hard.filter((f) => f.severity === sev);
       out.push('');
       out.push(`### ${sev} (${group.length})`);
       if (group.length === 0) {
         out.push('_none_');
         continue;
       }
+      for (const f of group) out.push(findingLine(f));
+    }
+  }
+  // Phase-2 heuristic candidates — separate section, NEVER affect merge advice.
+  const candidates = summary.findings.filter(isCandidate);
+  if (candidates.length > 0) {
+    out.push('');
+    out.push('## Candidates (heuristic · possibleFalsePositive · do NOT block)');
+    out.push('');
+    out.push('> Low-confidence English-residue / Chinese-leak heuristics for manual triage only.');
+    out.push('> Whitelisted: API/CSV/PDF/OCR/AI/ID/URL/SKU/currency codes/brands/AI providers, fr cognates');
+    out.push('> (Date/Total/Type/Action…), mock fixture data. ja kanji is NOT flagged (only simplified-only chars).');
+    const byLang = new Map<string, Finding[]>();
+    for (const f of candidates) {
+      const k = `${f.locale} · ${f.type}`;
+      (byLang.get(k) ?? byLang.set(k, []).get(k)!).push(f);
+    }
+    for (const [k, group] of byLang) {
+      out.push('');
+      out.push(`### ${k} (${group.length})`);
       for (const f of group) out.push(findingLine(f));
     }
   }
