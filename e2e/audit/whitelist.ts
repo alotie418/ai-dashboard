@@ -49,6 +49,10 @@ export const GLOBAL_TOKEN_WHITELIST = new Set<string>([
   'api', 'csv', 'pdf', 'ocr', 'sku', 'kpi', 'gst', 'ein', 'irs', 'url', 'upc', 'ean',
   'isbn', 'json', 'html', 'css', 'http', 'https', 'xml', 'b2b', 'b2c', 'faq', 'qr',
   'png', 'jpg', 'jpeg', 'svg', 'uuid', 'p&l', 'r&d', 'byok',
+  // finance metric acronyms kept across locales (analysis trends/table tabs)
+  'mom', 'yoy', 'qoq', 'ebitda', 'roi', 'cogs',
+  // tech / product names kept English in the AI-settings encryption description
+  'electron', 'sqlite', 'safestorage', 'key',
   // product / brand names (intentionally not localized)
   'sololedger',
   // tax-regime concept tokens that legitimately stay English/Latin across locales
