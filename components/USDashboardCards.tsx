@@ -84,8 +84,8 @@ const USDashboardCards: React.FC<Props> = ({ report, mileageSummary, homeOffice,
           <h3 className="text-lg font-bold text-[#191918]">{label('profitMargins')}</h3>
         </div>
         <div className="space-y-6 flex-1">
-          <MarginBar label={label('grossMargin')} value={sc.line7_grossIncome > 0 ? Math.round((sc.line7_grossIncome - sc.line28_totalExpenses) / sc.line7_grossIncome * 100) : 0} color="bg-primary" />
-          <MarginBar label={label('netMargin')} value={sc.line7_grossIncome > 0 ? Math.round(sc.line31_netProfit / sc.line7_grossIncome * 100) : 0} color="bg-emerald-500" />
+          <MarginBar label={label('grossMargin')} value={sc.line7_grossIncome > 0 ? Math.round((sc.line7_grossIncome - sc.line28_totalExpenses) / sc.line7_grossIncome * 100) : null} color="bg-primary" />
+          <MarginBar label={label('netMargin')} value={sc.line7_grossIncome > 0 ? Math.round(sc.line31_netProfit / sc.line7_grossIncome * 100) : null} color="bg-emerald-500" />
         </div>
       </div>
     </>
@@ -99,14 +99,14 @@ const Row: React.FC<{ label: string; value: string; bold?: boolean; indent?: boo
   </div>
 );
 
-const MarginBar: React.FC<{ label: string; value: number; color: string }> = ({ label, value, color }) => (
+const MarginBar: React.FC<{ label: string; value: number | null; color: string }> = ({ label, value, color }) => (
   <div className="space-y-2">
     <div className="flex justify-between items-end">
       <span className="text-sm text-[#4a4a48] font-medium">{label}</span>
-      <span className="font-bold text-xl">{value}%</span>
+      <span className="font-bold text-xl">{value === null ? '—' : `${value}%`}</span>
     </div>
     <div className="w-full bg-[#f0eeeb]/50 h-2.5 rounded-full overflow-hidden">
-      <div className={`${color} h-full rounded-full transition-all duration-1000`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }}></div>
+      <div className={`${color} h-full rounded-full transition-all duration-1000`} style={{ width: `${value === null ? 0 : Math.max(0, Math.min(100, value))}%` }}></div>
     </div>
   </div>
 );

@@ -26,9 +26,9 @@ const ProfitMarginIndicators: React.FC<Props> = ({ data, accountingLocale = 'CN'
     const netProfit = revenue - cost - operating - tax - shipping - admin - incomeTax;
     const grossMargin = revenue === 0 ? 0 : +(grossProfit / revenue * 100).toFixed(2);
     const netMargin = revenue === 0 ? 0 : +(netProfit / revenue * 100).toFixed(2);
-    return { grossMargin, netMargin };
+    return { grossMargin, netMargin, hasRevenue: revenue !== 0 };
   };
-  const { grossMargin, netMargin } = recompute();
+  const { grossMargin, netMargin, hasRevenue } = recompute();
 
   return (
     <div className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl p-6 h-full flex flex-col" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
@@ -41,7 +41,7 @@ const ProfitMarginIndicators: React.FC<Props> = ({ data, accountingLocale = 'CN'
         <div className="space-y-3">
           <div className="flex justify-between items-end">
             <span className="text-sm text-[#4a4a48] font-medium">{t('dashboard.grossMargin')}</span>
-            <span className="text-primary font-bold text-xl">{grossMargin}%</span>
+            <span className="text-primary font-bold text-xl">{hasRevenue ? `${grossMargin}%` : '—'}</span>
           </div>
           <div className="w-full bg-[#f0eeeb]/50 h-2.5 rounded-full overflow-hidden">
             <div className="bg-primary h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${Math.max(0, Math.min(100, grossMargin))}%`, boxShadow: '0 0 10px rgba(39,76,146,0.3)' }}></div>
@@ -52,7 +52,7 @@ const ProfitMarginIndicators: React.FC<Props> = ({ data, accountingLocale = 'CN'
         <div className="space-y-3">
           <div className="flex justify-between items-end">
             <span className="text-sm text-[#4a4a48] font-medium">{t('dashboard.netMargin')}</span>
-            <span className="text-emerald-500 font-bold text-xl">{netMargin}%</span>
+            <span className="text-emerald-500 font-bold text-xl">{hasRevenue ? `${netMargin}%` : '—'}</span>
           </div>
           <div className="w-full bg-[#f0eeeb]/50 h-2.5 rounded-full overflow-hidden">
             <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(16,185,129,0.3)]" style={{ width: `${Math.max(0, Math.min(100, netMargin))}%` }}></div>
