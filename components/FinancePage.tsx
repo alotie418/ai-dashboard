@@ -335,7 +335,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
         {/* === 管理口径资产负债概览（PR-7B P1-4）—— 非法定资产负债表 ===
             按币种展示 资产/负债/权益 + 显式「平衡差额／待调整」(始终显示·不可隐藏) + 免责。
             金额按「币种代码 + 千分位」展示，不折算、不用 locale 货币符号。数据来自只读 /api/balance-overview。
-            无数据时回退到原 coming-soon 空态。 */}
+            无数据时回退到「需先录入账户/交易数据」的空态（功能已就绪，非未实现）。 */}
         {activeTab === 'balance' && !loading && (
           balanceOverview?.byCurrency?.length ? (
             <div className="p-10">
@@ -452,7 +452,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
               <h3 className="text-xl font-medium">{t('finance.balanceComingSoonTitle')}</h3>
               <p className="mt-2 text-sm max-w-md">{t('finance.balanceComingSoonDesc')}</p>
               <span className="mt-6 inline-flex items-center px-3 py-1 rounded-full text-[11px] bg-[#f0eeeb] text-[#5c5c5a] border border-[#e0ddd5]">
-                <i className="fas fa-clock mr-1.5"></i>{t('finance.comingSoonBadge')}
+                <i className="fas fa-circle-info mr-1.5"></i>{t('finance.comingSoonBadge')}
               </span>
             </div>
           )
@@ -461,7 +461,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
         {/* === Cash Flow — operating activities MVP (management / cash basis, PR-7C) ===
             Real operating figures from recorded payments; investing / financing /
             beginning / ending cash render as "not configured" (never 0). Falls back to
-            the coming-soon state if the engine did not attach a cashflowStatement. */}
+            a "needs data" empty state (feature is ready, not unimplemented) if the engine did not attach a cashflowStatement. */}
         {activeTab === 'cashflow' && !loading && (
           report?.cashflowStatement ? (
             <div className="p-10">
@@ -498,7 +498,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
               <h3 className="text-xl font-medium">{t('finance.cashflowTitle')}</h3>
               <p className="mt-2 text-sm max-w-md">{t('finance.cashflowDesc')}</p>
               <span className="mt-6 inline-flex items-center px-3 py-1 rounded-full text-[11px] bg-[#f0eeeb] text-[#5c5c5a] border border-[#e0ddd5]">
-                <i className="fas fa-clock mr-1.5"></i>{t('finance.comingSoonBadge')}
+                <i className="fas fa-circle-info mr-1.5"></i>{t('finance.comingSoonBadge')}
               </span>
             </div>
           )
