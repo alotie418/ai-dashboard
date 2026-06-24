@@ -849,16 +849,21 @@ export const TW_TXN_CATEGORY_LABELS: Record<string, { label: Record<'zh-CN' | 'z
 // (not 营业税金及附加). Keyed by the stable slug (applied read-time in services/api.ts) so
 // it also fixes stale-DB rows; id/slug + backend report mapping (by slug) are unchanged —
 // display only. zh-CN/zh-TW only; en/ja/ko/fr keep the seed values.
-export const CN_TXN_CATEGORY_LABELS: Record<string, { label: Record<'zh-CN' | 'zh-TW', string>; scheduleLine: Record<'zh-CN' | 'zh-TW', string> }> = {
+// schedule_line is keyed by slug; the en/ja/ko/fr values use a conservative bilingual
+// style — the management-basis Chinese original (经营损益-…) is kept verbatim and a
+// bracketed translation is appended (consistent with the accounting-profile notes in
+// #286). DISPLAY ONLY: the stored value and the backend report mapping (by slug) are
+// unchanged; this only localizes what CategoriesSection / TransactionsPage render.
+export const CN_TXN_CATEGORY_LABELS: Record<string, { label: Record<'zh-CN' | 'zh-TW', string>; scheduleLine: Record<'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko' | 'fr', string> }> = {
   // income
-  sales:           { label: { 'zh-CN': '主营业务收入', 'zh-TW': '主營業務收入' }, scheduleLine: { 'zh-CN': '经营损益-营业收入',     'zh-TW': '經營損益-營業收入' } },
-  'other-revenue': { label: { 'zh-CN': '其他业务收入', 'zh-TW': '其他業務收入' }, scheduleLine: { 'zh-CN': '经营损益-其他业务收入', 'zh-TW': '經營損益-其他業務收入' } },
-  interest:        { label: { 'zh-CN': '利息收入',     'zh-TW': '利息收入' },     scheduleLine: { 'zh-CN': '经营损益-财务收入',     'zh-TW': '經營損益-財務收入' } },
+  sales:           { label: { 'zh-CN': '主营业务收入', 'zh-TW': '主營業務收入' }, scheduleLine: { 'zh-CN': '经营损益-营业收入',     'zh-TW': '經營損益-營業收入', en: '经营损益-营业收入 (P&L · Operating Revenue)', ja: '经营损益-营业收入（経営損益・営業収益）', ko: '经营损益-营业收入(경영손익·영업수익)', fr: '经营损益-营业收入 (Résultat · Produits d\'exploitation)' } },
+  'other-revenue': { label: { 'zh-CN': '其他业务收入', 'zh-TW': '其他業務收入' }, scheduleLine: { 'zh-CN': '经营损益-其他业务收入', 'zh-TW': '經營損益-其他業務收入', en: '经营损益-其他业务收入 (P&L · Other Operating Revenue)', ja: '经营损益-其他业务收入（経営損益・その他営業収益）', ko: '经营损益-其他业务收入(경영손익·기타영업수익)', fr: '经营损益-其他业务收入 (Résultat · Autres produits d\'exploitation)' } },
+  interest:        { label: { 'zh-CN': '利息收入',     'zh-TW': '利息收入' },     scheduleLine: { 'zh-CN': '经营损益-财务收入',     'zh-TW': '經營損益-財務收入', en: '经营损益-财务收入 (P&L · Financial Income)', ja: '经营损益-财务收入（経営損益・財務収益）', ko: '经营损益-财务收入(경영손익·재무수익)', fr: '经营损益-财务收入 (Résultat · Produits financiers)' } },
   // expense
-  cogs:            { label: { 'zh-CN': '营业成本',     'zh-TW': '營業成本' },     scheduleLine: { 'zh-CN': '经营损益-营业成本',     'zh-TW': '經營損益-營業成本' } },
-  selling:         { label: { 'zh-CN': '销售费用',     'zh-TW': '銷售費用' },     scheduleLine: { 'zh-CN': '经营损益-销售费用',     'zh-TW': '經營損益-銷售費用' } },
-  admin:           { label: { 'zh-CN': '管理费用',     'zh-TW': '管理費用' },     scheduleLine: { 'zh-CN': '经营损益-管理费用',     'zh-TW': '經營損益-管理費用' } },
-  financial:       { label: { 'zh-CN': '财务费用',     'zh-TW': '財務費用' },     scheduleLine: { 'zh-CN': '经营损益-财务费用',     'zh-TW': '經營損益-財務費用' } },
-  'tax-surcharge': { label: { 'zh-CN': '税金及附加',   'zh-TW': '稅金及附加' },   scheduleLine: { 'zh-CN': '经营损益-税金及附加',   'zh-TW': '經營損益-稅金及附加' } },
-  'income-tax':    { label: { 'zh-CN': '所得税',       'zh-TW': '所得稅' },       scheduleLine: { 'zh-CN': '经营损益-所得税',       'zh-TW': '經營損益-所得稅' } },
+  cogs:            { label: { 'zh-CN': '营业成本',     'zh-TW': '營業成本' },     scheduleLine: { 'zh-CN': '经营损益-营业成本',     'zh-TW': '經營損益-營業成本', en: '经营损益-营业成本 (P&L · Cost of Sales)', ja: '经营损益-营业成本（経営損益・売上原価）', ko: '经营损益-营业成本(경영손익·매출원가)', fr: '经营损益-营业成本 (Résultat · Coût des ventes)' } },
+  selling:         { label: { 'zh-CN': '销售费用',     'zh-TW': '銷售費用' },     scheduleLine: { 'zh-CN': '经营损益-销售费用',     'zh-TW': '經營損益-銷售費用', en: '经营损益-销售费用 (P&L · Selling Expenses)', ja: '经营损益-销售费用（経営損益・販売費）', ko: '经营损益-销售费用(경영손익·판매비)', fr: '经营损益-销售费用 (Résultat · Frais de vente)' } },
+  admin:           { label: { 'zh-CN': '管理费用',     'zh-TW': '管理費用' },     scheduleLine: { 'zh-CN': '经营损益-管理费用',     'zh-TW': '經營損益-管理費用', en: '经营损益-管理费用 (P&L · Administrative Expenses)', ja: '经营损益-管理费用（経営損益・一般管理費）', ko: '经营损益-管理费用(경영손익·관리비)', fr: '经营损益-管理费用 (Résultat · Frais administratifs)' } },
+  financial:       { label: { 'zh-CN': '财务费用',     'zh-TW': '財務費用' },     scheduleLine: { 'zh-CN': '经营损益-财务费用',     'zh-TW': '經營損益-財務費用', en: '经营损益-财务费用 (P&L · Financial Expenses)', ja: '经营损益-财务费用（経営損益・財務費用）', ko: '经营损益-财务费用(경영손익·재무비용)', fr: '经营损益-财务费用 (Résultat · Charges financières)' } },
+  'tax-surcharge': { label: { 'zh-CN': '税金及附加',   'zh-TW': '稅金及附加' },   scheduleLine: { 'zh-CN': '经营损益-税金及附加',   'zh-TW': '經營損益-稅金及附加', en: '经营损益-税金及附加 (P&L · Taxes & Surcharges)', ja: '经营损益-税金及附加（経営損益・租税公課）', ko: '经营损益-税金及附加(경영손익·세금과공과)', fr: '经营损益-税金及附加 (Résultat · Taxes et surtaxes)' } },
+  'income-tax':    { label: { 'zh-CN': '所得税',       'zh-TW': '所得稅' },       scheduleLine: { 'zh-CN': '经营损益-所得税',       'zh-TW': '經營損益-所得稅', en: '经营损益-所得税 (P&L · Corporate Income Tax)', ja: '经营损益-所得税（経営損益・法人税等）', ko: '经营损益-所得税(경영손익·법인세)', fr: '经营损益-所得税 (Résultat · Impôt sur les sociétés)' } },
 };
