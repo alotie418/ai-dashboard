@@ -30,12 +30,12 @@ export default defineConfig(({ mode }) => {
             },
           },
         },
-        // After the vendor split the only >600 kB chunk is `index` (~900 kB) — the app's own pages,
-        // which are eagerly imported in App.tsx. Splitting that further needs route-level React.lazy
-        // (a deferred follow-up). The limit is raised just above it because this is an Electron app
-        // that loads dist/ from the LOCAL disk — there is no network download, so the size warning
-        // (a web-download heuristic) is cosmetic here; the split still helps parse time + caching.
-        chunkSizeWarningLimit: 950,
+        // After vendor splitting AND route-level React.lazy (App.tsx loads each page as its own
+        // chunk), the largest chunk is `index` (~565 kB: app shell + the eager default dashboard).
+        // A 600 kB limit covers it with a small margin and still flags a real regression. (This is
+        // an Electron app loading dist/ from local disk, so the size warning — a web-download
+        // heuristic — is mild here anyway; the split mainly helps parse time + long-term caching.)
+        chunkSizeWarningLimit: 600,
       },
       server: {
         port: 3000,

@@ -200,6 +200,14 @@ async function extractVisibleText(page: Page, rootSelector: string | null, extra
   }, { sel: rootSelector, extra: extraSkipTags });
 }
 
+/** Wait for a route-level lazy page chunk's dynamic import() to finish after navigation
+ *  (App.tsx React.lazy). networkidle settles once the chunk fetch completes; capped at 3s
+ *  and swallowed so a page with a background fetch never hangs or fails the scan. Callers
+ *  still apply their fixed settle wait afterwards for render. */
+async function settle(page: Page): Promise<void> {
+  await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => { /* idle or capped */ });
+}
+
 /** Phase-2 heuristic candidate rules (English residue + Chinese leak). Runs on chrome
  *  text only (table data cells excluded). All findings are possibleFalsePositive and
  *  never affect merge advice; fr residue is P3, ja Chinese-leak (simplified-only) is P3. */
@@ -231,6 +239,7 @@ async function scanCandidates(page: Page, ui: string, acc: string, pageName: str
 async function scanCandidatePage(page: Page, ui: string, acc: string, pageName: string, icon: string): Promise<void> {
   try {
     await page.locator(`nav i.${icon}`).first().click({ timeout: 6000 });
+    await settle(page);
     await page.waitForTimeout(350);
   } catch (e: any) {
     console.warn(`[audit] candidate page ${pageName} (${ui}/${acc}) nav skipped: ${String(e?.message || e)}`);
@@ -257,6 +266,7 @@ async function scanCandidatePage(page: Page, ui: string, acc: string, pageName: 
 async function scanSubview(page: Page, ui: string, acc: string, pageName: string, navIcon: string, subviewName: string, openSelector: string): Promise<void> {
   try {
     await page.locator(`nav i.${navIcon}`).first().click({ timeout: 6000 });
+    await settle(page);
     await page.waitForTimeout(300);
     await page.locator(openSelector).first().click({ timeout: 6000 });
     await page.waitForTimeout(350);
@@ -298,6 +308,7 @@ function runTextRules(text: string, ctx: { ui: string; acc: string; page: string
 async function scanPage(page: Page, ui: string, acc: string, pageName: string, icon: string): Promise<void> {
   try {
     await page.locator(`nav i.${icon}`).first().click();
+    await settle(page);
     await page.waitForTimeout(350);
   } catch (e: any) {
     addFinding({ type: 'navigation-failed', ui, acc, page: pageName, message: `could not navigate to ${pageName}: ${String(e?.message || e)}` });
@@ -345,6 +356,7 @@ async function scanPage(page: Page, ui: string, acc: string, pageName: string, i
 async function scanModal(page: Page, ui: string, acc: string, pageName: string, navIcon: string, modalName: string): Promise<void> {
   try {
     await page.locator(`nav i.${navIcon}`).first().click();
+    await settle(page);
     await page.waitForTimeout(300);
     await page.locator('button:has(i.fa-plus)').first().click();
     await page.waitForTimeout(400);
@@ -478,6 +490,7 @@ for (const acc of SMOKE_ACCS) {
       await scanModal(page, ui, acc, 'sales', 'fa-file-export', 'add-sale');
       // Re-anchor on a non-assistant page, then exercise the floating AI widget.
       await page.locator('nav i.fa-cog').first().click();
+      await settle(page);
       await page.waitForTimeout(250);
       await scanAiWidget(page, ui, acc);
       // Candidate-only: sweep the not-yet-reviewed pages + sub-views for residue (CN × 4 langs).
