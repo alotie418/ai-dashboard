@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MOCK_BUSINESS_DATA } from './constants';
 import { fetchAIAnalysis } from './services/aiBriefingService';
@@ -11,23 +11,35 @@ import FinancialStatementTable from './components/FinancialStatementTable';
 import ProfitMarginIndicators from './components/ProfitMarginIndicators';
 import VATStatistics from './components/VATStatistics';
 import TaxInclusiveSummary from './components/TaxInclusiveSummary';
-import SalesAndOutputPage from './components/SalesAndOutputPage';
-import PurchaseAndInputPage from './components/PurchaseAndInputPage';
-import DataAnalysisPage from './components/DataAnalysisPage';
-import InventoryPage from './components/InventoryPage';
-import FinancePage from './components/FinancePage';
-import SettingsPage from './components/SettingsPage';
-import AccountsPage from './components/AccountsPage';
-import TransactionsPage from './components/TransactionsPage';
-import DocumentsPage from './components/DocumentsPage';
-import USTaxToolsPage from './components/USTaxToolsPage';
+// Route-level code splitting: each page is loaded on demand (its own chunk) so the main
+// index chunk only carries the app shell + the (eager) default dashboard. Pages render
+// behind the <Suspense> boundary below; chunks are local files under dist/assets — no
+// network, works fully offline (same mechanism as the existing xlsx / pdfjs lazy imports).
+const SalesAndOutputPage = lazy(() => import('./components/SalesAndOutputPage'));
+const PurchaseAndInputPage = lazy(() => import('./components/PurchaseAndInputPage'));
+const DataAnalysisPage = lazy(() => import('./components/DataAnalysisPage'));
+const InventoryPage = lazy(() => import('./components/InventoryPage'));
+const FinancePage = lazy(() => import('./components/FinancePage'));
+const SettingsPage = lazy(() => import('./components/SettingsPage'));
+const AccountsPage = lazy(() => import('./components/AccountsPage'));
+const TransactionsPage = lazy(() => import('./components/TransactionsPage'));
+const DocumentsPage = lazy(() => import('./components/DocumentsPage'));
+const USTaxToolsPage = lazy(() => import('./components/USTaxToolsPage'));
 import USDashboardCards from './components/USDashboardCards';
 import { formatMoney, getTaxLabel, getDashboardSections, getCurrencySymbol, buildAIFinanceContext, getInventoryUnitLabel, getProductUnitLabel } from './components/accountingHelpers';
 import AlertCenter from './components/AlertCenter';
 import OnboardingWizard from './components/OnboardingWizard';
 import { AssistantProvider } from './components/assistant/AssistantProvider';
 import AssistantWidget from './components/assistant/AssistantWidget';
-import AssistantPage from './components/assistant/AssistantPage';
+const AssistantPage = lazy(() => import('./components/assistant/AssistantPage'));
+
+// Suspense fallback while a lazy page chunk loads. Icon-only (no text) on purpose: chunks
+// load from local disk in ~tens of ms, and a textless flash never trips the locale audit.
+const PageFallback: React.FC = () => (
+  <div className="flex items-center justify-center py-24 text-[#5c5c5a]">
+    <i className="fas fa-spinner fa-spin text-2xl"></i>
+  </div>
+);
 
 type PageId = 'dashboard' | 'sales' | 'purchase' | 'analysis' | 'inventory' | 'documents' | 'finance' | 'accounts' | 'transactions' | 'assistant' | 'ustax' | 'settings';
 
@@ -454,7 +466,9 @@ const AppContent: React.FC = () => {
           </header>
         )}
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-          {renderPage()}
+          <Suspense fallback={<PageFallback />}>
+            {renderPage()}
+          </Suspense>
         </div>
       </main>
 
