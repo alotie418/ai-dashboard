@@ -71,6 +71,34 @@ const CANDIDATE_EXTRA_PAGES: { name: string; icon: string }[] = [
   { name: 'documents', icon: 'fa-file-contract' },
 ];
 
+// Candidate-only sub-views (tabs / settings sections) of already-covered pages — these
+// surface residue that the default view never shows. Batch 1 covers only sub-views that
+// render with the existing mocks (no new endpoints, no crash risk). The account-ledger
+// settings sections (cashAccounts/liabilities/fixedAssets/equity/taxPayments/ledgerSummary)
+// and the US-only usTax page are deferred to a later batch (need per-view mocks / acc=US).
+const CANDIDATE_SUBVIEWS: { page: string; navIcon: string; subviews: { name: string; open: string }[] }[] = [
+  { page: 'finance', navIcon: 'fa-wallet', subviews: [
+    { name: 'tab:balance', open: '[data-testid="finance-tab-balance"]' },
+    { name: 'tab:cashflow', open: '[data-testid="finance-tab-balance"] + button' },
+  ] },
+  { page: 'accounts', navIcon: 'fa-handshake', subviews: [
+    { name: 'tab:payable', open: 'button:has(i.fa-arrow-circle-up)' },
+  ] },
+  { page: 'analysis', navIcon: 'fa-chart-pie', subviews: [
+    { name: 'tab:trends', open: 'button:has(i.fa-chart-area)' },
+    { name: 'tab:table', open: 'button:has(i.fa-table)' },
+  ] },
+  // NOTE: section:accounting is intentionally NOT scanned — AccountingSection renders the
+  // CN accounting-profile seed data (China-GAAP schedule-line / category mappings, Chinese
+  // by design under acc=CN), which is sensitive accounting DATA, not translatable UI copy.
+  // Scanning it floods chinese-leak false positives that cannot (and must not) be "fixed".
+  { page: 'settings', navIcon: 'fa-cog', subviews: [
+    { name: 'section:ai', open: 'button:has(i.fa-microchip)' },
+    { name: 'section:categories', open: 'button:has(i.fa-tags)' },
+    { name: 'section:tax', open: 'button:has(i.fa-percent)' },
+  ] },
+];
+
 const SCOPE: AuditScope = {
   uiLanguages: SMOKE_LANGS,
   accountingLocales: SMOKE_ACCS,
@@ -187,10 +215,12 @@ function runCandidateRules(text: string, ctx: { ui: string; acc: string; page: s
   }
 }
 
-/** Run the candidate pass (chrome text only) for a page/modal, gated on CANDIDATES + CN. */
-async function scanCandidates(page: Page, ui: string, acc: string, pageName: string, rootSelector: string | null, modal: string | undefined, screenshot: string): Promise<void> {
+/** Run the candidate pass (chrome text only) for a page/modal/subview, gated on
+ *  CANDIDATES + CN. `skipTags` defaults to ['TD'] (drop table data cells = user data);
+ *  subview scans also pass 'NAV' so the global sidebar isn't re-reported per tab/section. */
+async function scanCandidates(page: Page, ui: string, acc: string, pageName: string, rootSelector: string | null, modal: string | undefined, screenshot: string, skipTags: string[] = ['TD']): Promise<void> {
   if (!CANDIDATES || acc !== CANDIDATE_ACC) return;
-  const chrome = await extractVisibleText(page, rootSelector, ['TD']);
+  const chrome = await extractVisibleText(page, rootSelector, skipTags);
   runCandidateRules(chrome, { ui, acc, page: pageName, modal, screenshot, selector: rootSelector ?? 'body' });
 }
 
@@ -218,6 +248,31 @@ async function scanCandidatePage(page: Page, ui: string, acc: string, pageName: 
   const { abs, rel } = shotPaths(ui, pageName);
   await page.screenshot({ path: abs, fullPage: true });
   await scanCandidates(page, ui, acc, pageName, null, undefined, rel);
+}
+
+/** Open a sub-view (tab / settings section) of an already-covered page and run the
+ *  candidate pass on it. Re-navigates the parent page fresh each time so a crash on one
+ *  sub-view can't break the next. `subviewName` (e.g. 'tab:balance', 'section:categories')
+ *  is carried in the finding's modal field. Skips NAV (already scanned on the default view). */
+async function scanSubview(page: Page, ui: string, acc: string, pageName: string, navIcon: string, subviewName: string, openSelector: string): Promise<void> {
+  try {
+    await page.locator(`nav i.${navIcon}`).first().click({ timeout: 6000 });
+    await page.waitForTimeout(300);
+    await page.locator(openSelector).first().click({ timeout: 6000 });
+    await page.waitForTimeout(350);
+  } catch (e: any) {
+    console.warn(`[audit] subview ${pageName}/${subviewName} (${ui}/${acc}) skipped: ${String(e?.message || e)}`);
+    try { await gotoApp(page, ui); } catch { /* ignore */ }
+    return;
+  }
+  if ((await page.locator('nav').count()) === 0) {
+    console.warn(`[audit] subview ${pageName}/${subviewName} (${ui}/${acc}) crashed — skipped + rebooting`);
+    try { await gotoApp(page, ui); } catch { /* ignore */ }
+    return;
+  }
+  const { abs, rel } = shotPaths(ui, `${pageName}__${subviewName.replace(':', '-')}`);
+  await page.screenshot({ path: abs, fullPage: true });
+  await scanCandidates(page, ui, acc, pageName, null, subviewName, rel, ['TD', 'NAV']);
 }
 
 function runTextRules(text: string, ctx: { ui: string; acc: string; page: string; modal?: string; screenshot?: string; selector?: string }): void {
@@ -376,6 +431,9 @@ async function scanAiWidget(page: Page, ui: string, acc: string): Promise<void> 
   const { abs, rel } = shotPaths(ui, `settings__ai-widget`);
   await page.screenshot({ path: abs, fullPage: true });
 
+  // Candidate scan of the ChatPanel chrome (welcome / placeholder / title / quick buttons).
+  await scanCandidates(page, ui, acc, 'settings', '.fixed.bottom-8.right-8', 'ai-widget', rel);
+
   const geo = await page.evaluate(() => {
     const root = document.querySelector('.fixed.bottom-8.right-8');
     if (!root) return null;
@@ -422,10 +480,15 @@ for (const acc of SMOKE_ACCS) {
       await page.locator('nav i.fa-cog').first().click();
       await page.waitForTimeout(250);
       await scanAiWidget(page, ui, acc);
-      // Candidate-only: sweep the not-yet-reviewed pages for residue (CN × 4 langs).
+      // Candidate-only: sweep the not-yet-reviewed pages + sub-views for residue (CN × 4 langs).
       if (CANDIDATES && acc === CANDIDATE_ACC) {
         for (const pg of CANDIDATE_EXTRA_PAGES) {
           await scanCandidatePage(page, ui, acc, pg.name, pg.icon);
+        }
+        for (const grp of CANDIDATE_SUBVIEWS) {
+          for (const sv of grp.subviews) {
+            await scanSubview(page, ui, acc, grp.page, grp.navIcon, sv.name, sv.open);
+          }
         }
       }
     });
