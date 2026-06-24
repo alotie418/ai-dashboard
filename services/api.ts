@@ -268,11 +268,20 @@ export function listCategories(opts: { locale?: AccountingLocale; type?: Categor
   const catMap = zhLang
     ? (opts.locale === 'JP' ? JP_TXN_CATEGORY_LABELS : opts.locale === 'EU' ? EU_TXN_CATEGORY_LABELS : opts.locale === 'KR' ? KR_TXN_CATEGORY_LABELS : opts.locale === 'TW' ? TW_TXN_CATEGORY_LABELS : opts.locale === 'CN' ? CN_TXN_CATEGORY_LABELS : null)
     : null;
+  // en/ja/ko/fr + CN: localize ONLY the report-line display (keep the handler's per-lang
+  // displayLabel), keyed by slug. Display only — stored value + by-slug backend report
+  // mapping unchanged; user/custom categories (no slug match) pass through their raw value.
+  const cnSchedLang = !zhLang && opts.locale === 'CN' && ['en', 'ja', 'ko', 'fr'].includes(opts.lang || '');
   return apiFetch<Category[]>(`/api/categories${qs.toString() ? '?' + qs.toString() : ''}`)
     .then(cats => cats.map(c => {
       if (catMap) {
         const m = catMap[c.slug];
         if (m) return { ...c, displayLabel: m.label[opts.lang as 'zh-CN' | 'zh-TW'], schedule_line: m.scheduleLine[opts.lang as 'zh-CN' | 'zh-TW'] };
+      }
+      if (cnSchedLang) {
+        const m = CN_TXN_CATEGORY_LABELS[c.slug];
+        const sl = m?.scheduleLine[opts.lang as 'en' | 'ja' | 'ko' | 'fr'];
+        if (sl) return { ...c, schedule_line: sl };
       }
       return c.schedule_line ? { ...c, schedule_line: normalizeScheduleLine(c.schedule_line) } : c;
     }));
