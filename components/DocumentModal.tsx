@@ -15,6 +15,7 @@ import {
   type BusinessDocument, type BusinessDocType, type Product, type SalesRecord,
 } from '../services/api';
 import { formatMoney, getTaxLabel, getProductUnitLabel, PRODUCT_UNIT_KEYS } from './accountingHelpers';
+import { useEscapeToClose } from '../hooks/useEscapeToClose';
 
 interface ItemRow {
   productId: string;
@@ -101,6 +102,8 @@ const DocumentModal: React.FC<Props> = ({ editing, initial, accLocale, products,
   const [rows, setRows] = useState<ItemRow[]>(seedItems ? seedItems.map(toRow) : [emptyRow()]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // C6-2: close on Escape (ignores IME composition; suppressed while saving).
+  useEscapeToClose(!saving, onClose);
   // Phase C：对账单期间 + 来源销售记录回链（信息性）
   const [periodStart, setPeriodStart] = useState(editing?.periodStart || '');
   const [periodEnd, setPeriodEnd] = useState(editing?.periodEnd || '');
