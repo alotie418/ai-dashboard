@@ -393,6 +393,10 @@
     }
   },
   "dashboard": {
+    "emptyTitle": "データがまだありません",
+    "emptyDesc": "最初の仕入または売上を入力すると、ここに経営概要が表示されます。すべての数値は経営管理上の概算であり、法定財務諸表ではありません。",
+    "emptyCtaPurchase": "仕入を入力",
+    "emptyCtaSales": "売上を入力",
     "inventory": "Inventory (Real-time)",
     "purchasesLabel": "仕入数量合計",
     "salesLabel": "Sales",

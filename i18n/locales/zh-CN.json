@@ -393,6 +393,10 @@
     }
   },
   "dashboard": {
+    "emptyTitle": "还没有数据",
+    "emptyDesc": "录入第一笔采购或销售后，这里会显示经营概览。所有数字均为经营管理估算，非法定财务报表。",
+    "emptyCtaPurchase": "录入采购",
+    "emptyCtaSales": "录入销售",
     "inventory": "库存余量 (实时)",
     "purchasesLabel": "采购总量",
     "salesLabel": "销售",
