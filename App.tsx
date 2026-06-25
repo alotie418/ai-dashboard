@@ -63,6 +63,23 @@ const splitTaxBasis = (full: string): { label: string; subtitle?: string } => {
   return m ? { label: m[1], subtitle: m[2] } : { label: full };
 };
 
+// C2-2 / C2-3: a genuinely empty ledger — no sales, purchases, inventory or
+// rawMetrics activity. Shared by the dashboard empty-state (replaces the zero-filled
+// cards) and the AI-brief guard (skips the briefing when there is nothing to analyse).
+const isEmptyLedger = (data: BusinessData): boolean => {
+  const fs = data.financialStatement;
+  const tis = data.taxInclusiveSummary;
+  const rm = (data as any).rawMetrics || {};
+  const inv = data.inventory;
+  return (
+    (fs?.salesRevenue ?? 0) === 0 && (fs?.costOfSales ?? 0) === 0 &&
+    ((fs as any)?.adminExpense ?? 0) === 0 && ((fs as any)?.operatingExpenses ?? 0) === 0 &&
+    (tis?.purchaseTotal ?? 0) === 0 && (tis?.salesTotal ?? 0) === 0 &&
+    (rm.purchaseTotalTons ?? 0) === 0 && (rm.salesTotalTons ?? 0) === 0 &&
+    (inv?.inStockCount ?? 0) === 0 && (inv?.details?.length ?? 0) === 0
+  );
+};
+
 const AppContent: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [data, setData] = useState<BusinessData>(MOCK_BUSINESS_DATA);
@@ -233,6 +250,13 @@ const AppContent: React.FC = () => {
     setAiError(null);
     try {
       const freshData = await loadDashboardData();
+      // C2-3: on a genuinely empty ledger, skip the AI brief — it would process
+      // all-zero data and (the empty-state hides AIInsights) yield no visible
+      // result. Data was still refreshed above; no AI call / quota is spent.
+      if (isEmptyLedger(freshData || dataRef.current)) {
+        setLoadingAI(false);
+        return;
+      }
       // Inject both accountingLocale (tax/currency/regime context) and
       // uiLanguage (response language) into the system prompt, so the AI
       // briefing follows the same separation rules as the chat assistant.
@@ -287,17 +311,7 @@ const AppContent: React.FC = () => {
         // AND the dashboard has loaded for real (not the initial MOCK), replace the
         // zero-filled cards with a guidance empty state. The default e2e / audit
         // fixture has inStockCount=1, so this never triggers in test / audit.
-        const fs = data.financialStatement;
-        const tis = data.taxInclusiveSummary;
-        const rm = (data as any).rawMetrics || {};
-        const inv = data.inventory;
-        const isEmptyLedger =
-          (fs?.salesRevenue ?? 0) === 0 && (fs?.costOfSales ?? 0) === 0 &&
-          ((fs as any)?.adminExpense ?? 0) === 0 && ((fs as any)?.operatingExpenses ?? 0) === 0 &&
-          (tis?.purchaseTotal ?? 0) === 0 && (tis?.salesTotal ?? 0) === 0 &&
-          (rm.purchaseTotalTons ?? 0) === 0 && (rm.salesTotalTons ?? 0) === 0 &&
-          (inv?.inStockCount ?? 0) === 0 && (inv?.details?.length ?? 0) === 0;
-        if (dashboardLoaded && isEmptyLedger) {
+        if (dashboardLoaded && isEmptyLedger(data)) {
           return (
             <div className="flex items-center justify-center min-h-[60vh]">
               <div className="max-w-lg text-center bg-white border border-[#e0ddd5] rounded-2xl p-10" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
