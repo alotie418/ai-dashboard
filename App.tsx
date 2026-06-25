@@ -506,7 +506,7 @@ const AppContent: React.FC = () => {
                     {MONTHS.map((m, i) => <option key={m} value={m} className="bg-white">{i === 0 ? t('header.monthAll') : t(`header.month${m.replace('月', '').padStart(2, '0')}`)}</option>)}
                   </select>
                 </div>
-                <button onClick={performAnalysis} className="p-2 text-primary hover:text-primary-hover transition-colors" title={t('header.refreshData')}>
+                <button onClick={performAnalysis} className="p-2 text-primary hover:text-primary-hover transition-colors" title={t('header.refreshData')} aria-label={t('header.refreshData')}>
                   <i className={`fas fa-sync-alt ${loadingAI ? 'animate-spin' : ''}`}></i>
                 </button>
               </div>
