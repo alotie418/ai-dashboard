@@ -231,7 +231,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
             <i className="fas fa-file-import mr-2 text-primary"></i>
             {type === 'sales' ? t('csvImport.titleSales') : t('csvImport.titlePurchases')}
           </h3>
-          <button onClick={handleClose} className="text-[#5c5c5a] hover:text-[#191918]">
+          <button onClick={handleClose} aria-label={t('common.close')} className="text-[#5c5c5a] hover:text-[#191918]">
             <i className="fas fa-times text-lg"></i>
           </button>
         </div>

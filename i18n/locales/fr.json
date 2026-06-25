@@ -5,6 +5,7 @@
     "readonly": "La base de données ou le dossier cible n'est pas accessible en écriture. Vérifiez les autorisations puis réessayez."
   },
   "common": {
+    "close": "Fermer",
     "dataSourceNote": "Source des données : cette page est générée à partir des enregistrements d'activité et des transactions. Si les deux sont utilisés sur la même période, veuillez les rapprocher pour éviter les doublons ou omissions.",
     "save": "Enregistrer",
     "cancel": "Annuler",

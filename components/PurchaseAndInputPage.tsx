@@ -500,7 +500,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                 <h2 className="text-xl font-bold text-[#191918] whitespace-nowrap">{(accLocale !== 'CN') ? taxLabel('modalTitlePurchase') : t('purchases.modalTitle')}</h2>
                 <p className="text-xs text-[#5c5c5a] mt-1">{(accLocale !== 'CN') ? taxLabel('modalSubtitlePurchase') : t('purchases.modalSubtitle')}</p>
               </div>
-              <button onClick={() => setShowAddModal(false)} className="flex-shrink-0 text-[#5c5c5a] hover:text-[#191918] transition-colors">
+              <button onClick={() => setShowAddModal(false)} aria-label={t('common.close')} className="flex-shrink-0 text-[#5c5c5a] hover:text-[#191918] transition-colors">
                 <i className="fas fa-times text-xl"></i>
               </button>
             </div>
