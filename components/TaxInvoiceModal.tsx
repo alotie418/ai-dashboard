@@ -128,7 +128,7 @@ const TaxInvoiceModal: React.FC<Props> = ({ doc, onClose, onSaved }) => {
             <h2 className="text-xl font-bold text-[#191918]">{t('documents.taxInvoiceTitle')}</h2>
             <p className="text-xs text-[#5c5c5a] mt-1 font-mono tracking-tight">{doc.docNumber}</p>
           </div>
-          <button type="button" onClick={handleCancel} className="flex-shrink-0 text-[#5c5c5a] hover:text-[#191918] transition-colors">
+          <button type="button" onClick={handleCancel} aria-label={t('common.close')} className="flex-shrink-0 text-[#5c5c5a] hover:text-[#191918] transition-colors">
             <i className="fas fa-times text-xl"></i>
           </button>
         </div>

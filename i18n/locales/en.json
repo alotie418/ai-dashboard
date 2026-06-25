@@ -5,6 +5,7 @@
     "readonly": "The database or target folder is not writable. Check file permissions and try again."
   },
   "common": {
+    "close": "Close",
     "dataSourceNote": "Data source: this page is built from business records and transaction records. If both are used in the same period, please reconcile to avoid duplicates or omissions.",
     "save": "Save",
     "cancel": "Cancel",

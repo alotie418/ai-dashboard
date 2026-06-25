@@ -46,6 +46,7 @@ const AssistantWidget: React.FC = () => {
     <div className="fixed bottom-8 right-8 z-[10000] flex flex-row-reverse items-end space-x-4 space-x-reverse">
       <button
         onClick={() => setShowChat(!showChat)}
+        aria-label={t('chat.title')}
         className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${showChat ? 'bg-[#f0eeeb] border border-[#d1cdc4] text-primary rotate-90 scale-110' : 'bg-primary text-white hover:scale-110'}`}
         style={{ boxShadow: showChat ? 'none' : '0 4px 24px rgba(39,76,146,0.3)' }}
       >

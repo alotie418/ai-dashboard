@@ -234,7 +234,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
       {pdfMsg && (
         <div className={`text-sm rounded-lg px-4 py-2 flex items-center justify-between ${pdfMsg.type === 'success' ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' : pdfMsg.type === 'error' ? 'text-rose-600 bg-rose-50 border border-rose-200' : 'text-amber-700 bg-amber-50 border border-amber-200'}`}>
           <span className="break-all"><i className={`fas ${pdfMsg.type === 'success' ? 'fa-check-circle' : pdfMsg.type === 'error' ? 'fa-exclamation-circle' : 'fa-circle-info'} mr-2`}></i>{pdfMsg.text}</span>
-          <button onClick={() => setPdfMsg(null)} className="ml-3 opacity-50 hover:opacity-100"><i className="fas fa-times"></i></button>
+          <button onClick={() => setPdfMsg(null)} aria-label={t('common.close')} className="ml-3 opacity-50 hover:opacity-100"><i className="fas fa-times"></i></button>
         </div>
       )}
 

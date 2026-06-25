@@ -259,7 +259,7 @@ const DocumentModal: React.FC<Props> = ({ editing, initial, accLocale, products,
       <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto glass-modal rounded-xl animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
         <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center gap-4 sticky top-0 bg-white z-10">
           <h2 className="text-xl font-bold text-[#191918] whitespace-nowrap">{editing ? t('documents.formEditTitle') : t('documents.formTitle')}</h2>
-          <button type="button" onClick={onClose} className="flex-shrink-0 text-[#5c5c5a] hover:text-[#191918] transition-colors">
+          <button type="button" onClick={onClose} aria-label={t('common.close')} className="flex-shrink-0 text-[#5c5c5a] hover:text-[#191918] transition-colors">
             <i className="fas fa-times text-xl"></i>
           </button>
         </div>
