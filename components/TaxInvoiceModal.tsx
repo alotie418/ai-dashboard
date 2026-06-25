@@ -12,6 +12,7 @@ import {
   type BusinessDocument,
 } from '../services/api';
 import { getSystemErrorText } from '../services/systemErrors';
+import { useEscapeToClose } from '../hooks/useEscapeToClose';
 
 interface Props {
   doc: BusinessDocument;
@@ -96,6 +97,10 @@ const TaxInvoiceModal: React.FC<Props> = ({ doc, onClose, onSaved }) => {
     if (pickedUnsaved) discardDocAttachment(pickedUnsaved.relPath).catch(() => {});
     onClose();
   };
+
+  // C6-2: close on Escape via the same cancel path (cleans up unsaved attachment);
+  // ignores IME composition; suppressed while saving.
+  useEscapeToClose(!saving, handleCancel);
 
   const handleSave = async () => {
     setMsg(null);

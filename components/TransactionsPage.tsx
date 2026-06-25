@@ -12,6 +12,7 @@ import {
 } from '../services/api';
 import { getTaxLabel, formatMoney } from './accountingHelpers';
 import { getSystemErrorText } from '../services/systemErrors';
+import { useEscapeToClose } from '../hooks/useEscapeToClose';
 
 const TransactionsPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -31,6 +32,9 @@ const TransactionsPage: React.FC = () => {
   const [form, setForm] = useState<Partial<TransactionUpsert>>({});
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  // C6-2: close the form modal on Escape (ignores IME composition; suppressed while saving).
+  useEscapeToClose(showForm && !saving, () => setShowForm(false));
 
   const reload = useCallback(async () => {
     setLoading(true);
