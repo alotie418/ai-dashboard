@@ -89,6 +89,7 @@ const ConversationSidebar: React.FC = () => {
                     <button
                       onClick={(e) => { e.stopPropagation(); startRename(c.id, c.title || ''); }}
                       title={t('chat.renameConversation')}
+                      aria-label={t('chat.renameConversation')}
                       className="text-[#5c5c5a] hover:text-primary text-[10px] w-5 h-5 flex items-center justify-center"
                     >
                       <i className="fas fa-pen"></i>
@@ -96,6 +97,7 @@ const ConversationSidebar: React.FC = () => {
                     <button
                       onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(c.id); }}
                       title={t('chat.deleteConversation')}
+                      aria-label={t('chat.deleteConversation')}
                       className="text-[#5c5c5a] hover:text-rose-500 text-[10px] w-5 h-5 flex items-center justify-center"
                     >
                       <i className="fas fa-trash"></i>

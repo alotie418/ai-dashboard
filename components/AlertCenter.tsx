@@ -119,6 +119,7 @@ const AlertCenter: React.FC = () => {
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 rounded-lg hover:bg-[#f0eeeb] transition-colors text-[#5c5c5a] hover:text-[#191918]"
         title={t('alerts.notifications')}
+        aria-label={t('alerts.notifications')}
       >
         <i className="fas fa-bell text-lg"></i>
         {unreadCount > 0 && (
@@ -184,6 +185,7 @@ const AlertCenter: React.FC = () => {
                         onClick={(e) => { e.stopPropagation(); handleDismiss(alert.id); }}
                         className="text-[#b0b0ae] hover:text-red-400 p-1 flex-shrink-0"
                         title={t('alerts.dismiss')}
+                        aria-label={t('alerts.dismiss')}
                       >
                         <i className="fas fa-times text-xs"></i>
                       </button>
