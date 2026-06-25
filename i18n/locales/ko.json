@@ -393,6 +393,10 @@
     }
   },
   "dashboard": {
+    "emptyTitle": "아직 데이터가 없습니다",
+    "emptyDesc": "첫 매입 또는 매출을 입력하면 여기에 경영 개요가 표시됩니다. 모든 수치는 경영 관리용 추정치이며 법정 재무제표가 아닙니다.",
+    "emptyCtaPurchase": "매입 입력",
+    "emptyCtaSales": "매출 입력",
     "inventory": "Inventory (Real-time)",
     "purchasesLabel": "매입 수량 합계",
     "salesLabel": "Sales",

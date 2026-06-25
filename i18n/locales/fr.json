@@ -393,6 +393,10 @@
     }
   },
   "dashboard": {
+    "emptyTitle": "Aucune donnée pour l'instant",
+    "emptyDesc": "Enregistrez votre premier achat ou vente pour afficher l'aperçu de votre activité ici. Tous les montants sont des estimations de gestion, pas des états financiers légaux.",
+    "emptyCtaPurchase": "Enregistrer un achat",
+    "emptyCtaSales": "Enregistrer une vente",
     "inventory": "Inventory (Real-time)",
     "purchasesLabel": "Quantité totale achetée",
     "salesLabel": "Sales",

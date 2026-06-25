@@ -66,6 +66,9 @@ const splitTaxBasis = (full: string): { label: string; subtitle?: string } => {
 const AppContent: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [data, setData] = useState<BusinessData>(MOCK_BUSINESS_DATA);
+  // Tracks whether the dashboard payload has been fetched at least once, so the
+  // empty-ledger guidance state only shows after a real load (not the initial MOCK).
+  const [dashboardLoaded, setDashboardLoaded] = useState(false);
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [loadingAI, setLoadingAI] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -194,6 +197,7 @@ const AppContent: React.FC = () => {
       };
       dataRef.current = next;
       setData(next);
+      setDashboardLoaded(true);
       return next;
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
@@ -278,6 +282,42 @@ const AppContent: React.FC = () => {
         const sections = getDashboardSections(accLocale);
         // sections determine which cards to show — driven by accountingLocale
         // labels on those cards are in uiLanguage via getTaxLabel()
+
+        // C2-2: when the ledger is genuinely empty (no sales / purchases / inventory)
+        // AND the dashboard has loaded for real (not the initial MOCK), replace the
+        // zero-filled cards with a guidance empty state. The default e2e / audit
+        // fixture has inStockCount=1, so this never triggers in test / audit.
+        const fs = data.financialStatement;
+        const tis = data.taxInclusiveSummary;
+        const rm = (data as any).rawMetrics || {};
+        const inv = data.inventory;
+        const isEmptyLedger =
+          (fs?.salesRevenue ?? 0) === 0 && (fs?.costOfSales ?? 0) === 0 &&
+          ((fs as any)?.adminExpense ?? 0) === 0 && ((fs as any)?.operatingExpenses ?? 0) === 0 &&
+          (tis?.purchaseTotal ?? 0) === 0 && (tis?.salesTotal ?? 0) === 0 &&
+          (rm.purchaseTotalTons ?? 0) === 0 && (rm.salesTotalTons ?? 0) === 0 &&
+          (inv?.inStockCount ?? 0) === 0 && (inv?.details?.length ?? 0) === 0;
+        if (dashboardLoaded && isEmptyLedger) {
+          return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+              <div className="max-w-lg text-center bg-white border border-[#e0ddd5] rounded-2xl p-10" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
+                <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <i className="fas fa-chart-line text-2xl text-primary"></i>
+                </div>
+                <h3 className="text-xl font-bold text-[#191918] mb-2">{t('dashboard.emptyTitle')}</h3>
+                <p className="text-sm text-[#5c5c5a] leading-relaxed mb-6">{t('dashboard.emptyDesc')}</p>
+                <div className="flex items-center justify-center gap-3">
+                  <button onClick={() => setCurrentPage('purchase')} className="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors">
+                    <i className="fas fa-file-import mr-2"></i>{t('dashboard.emptyCtaPurchase')}
+                  </button>
+                  <button onClick={() => setCurrentPage('sales')} className="px-5 py-2.5 rounded-xl bg-[#f0eeeb] text-[#191918] text-sm font-medium hover:bg-[#e0ddd5] transition-colors border border-[#e0ddd5]">
+                    <i className="fas fa-file-export mr-2"></i>{t('dashboard.emptyCtaSales')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        }
         return (
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
             <div className="xl:col-span-3 space-y-8">

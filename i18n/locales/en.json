@@ -393,6 +393,10 @@
     }
   },
   "dashboard": {
+    "emptyTitle": "No data yet",
+    "emptyDesc": "Record your first purchase or sale to see your business overview here. All figures are management estimates, not statutory financial statements.",
+    "emptyCtaPurchase": "Record a purchase",
+    "emptyCtaSales": "Record a sale",
     "inventory": "Inventory (Real-time)",
     "purchasesLabel": "Total Purchased",
     "salesLabel": "Sales",

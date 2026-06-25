@@ -393,6 +393,10 @@
     }
   },
   "dashboard": {
+    "emptyTitle": "尚無資料",
+    "emptyDesc": "錄入第一筆採購或銷售後，這裡會顯示經營概覽。所有數字均為經營管理估算，非法定財務報表。",
+    "emptyCtaPurchase": "錄入採購",
+    "emptyCtaSales": "錄入銷售",
     "inventory": "庫存餘量 (實時)",
     "purchasesLabel": "採購總量",
     "salesLabel": "銷售",
