@@ -1,6 +1,8 @@
 # 隐私说明 (Privacy Notice)
 
 > 草稿日期：2026-06-26（定稿时更新）｜适用版本：SoloLedger v0.1.x（本地桌面版）
+>
+> English: [PRIVACY.en.md](PRIVACY.en.md)
 
 本文件用通俗语言说明 SoloLedger 桌面应用如何处理你的数据，描述的是当前版本的实际行为，**不是法律意见，也不是任何合规认证**。SoloLedger 是一款经营记账与管理分析工具，不替代会计师、税务顾问或法定合规系统。
 
