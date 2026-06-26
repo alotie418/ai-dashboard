@@ -45,13 +45,37 @@ lines.forEach((line, idx) => {
   }
 });
 
-console.log('\n=== Hardcoded Tax-Rate Guard (PR-T2) ===\n');
-console.log(`Scanned: ${TARGET} (comments stripped)`);
+// F1: the entry-form pages must not hardcode a tax-rate literal as the default —
+// the default / OCR auto-fill rate must come from the locale-aware TAX_RATE_OPTIONS
+// (components/taxRateOptions.ts). Caught SalesAndOutputPage defaulting to CN's '13%'
+// regardless of accountingLocale. The legitimate rate *values* live in
+// taxRateOptions.ts (not scanned); only the entry pages are checked here.
+const COMPONENT_TARGETS = [
+  'components/SalesAndOutputPage.tsx',
+  'components/PurchaseAndInputPage.tsx',
+];
+const COMPONENT_PATTERNS = [
+  { re: /extractedTo\w+Form\s*\([^)]*['"]\d+(?:\.\d+)?%['"]/, why: 'OCR auto-fill passed a hardcoded tax-rate literal (use the locale-aware defaultTaxRate)' },
+  { re: /\btaxRate\s*\|\|\s*['"]\d+(?:\.\d+)?%['"]/, why: 'taxRate fallback hardcodes a rate literal (use the locale-aware defaultTaxRate)' },
+];
+for (const target of COMPONENT_TARGETS) {
+  const clines = stripComments(readFileSync(join(ROOT, target), 'utf8'));
+  clines.forEach((line, idx) => {
+    for (const { re, why } of COMPONENT_PATTERNS) {
+      const m = line.match(re);
+      if (m) { findings.push(`${target}:${idx + 1}: "${m[0].trim()}" — ${why}`); break; }
+    }
+  });
+}
+
+console.log('\n=== Hardcoded Tax-Rate Guard (PR-T2 + F1) ===\n');
+console.log(`Scanned: ${TARGET} + ${COMPONENT_TARGETS.join(', ')} (comments stripped)`);
 console.log(`Findings: ${findings.length}\n`);
 if (findings.length) {
   for (const f of findings) console.error('  ✗ ' + f);
   console.error('\nApp.tsx must trust the backend financial statement, not re-derive tax');
-  console.error('rates on the client. Move any rate to accountingProfiles.ts / settings.\n');
+  console.error('rates on the client; entry forms must use the locale-aware defaultTaxRate');
+  console.error('(TAX_RATE_OPTIONS), not a hardcoded percent. Rates live in accountingProfiles.ts.\n');
   process.exit(1);
 }
-console.log('✓ No client-side hardcoded tax-rate math in App.tsx.\n');
+console.log('✓ No client-side hardcoded tax-rate math / entry-form rate literals.\n');
