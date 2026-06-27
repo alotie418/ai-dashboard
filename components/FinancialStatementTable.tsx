@@ -26,11 +26,10 @@ const FinancialStatementTable: React.FC<Props> = ({ data, accountingLocale = 'CN
     const incomeTax = data.incomeTax;
     const grossProfit = revenue - cost; // revenue − COGS
     const netProfit = revenue - cost - operating - tax - shipping - admin - incomeTax;
-    const grossMargin = revenue === 0 ? 0 : +(grossProfit / revenue * 100).toFixed(2);
-    const netMargin = revenue === 0 ? 0 : +(netProfit / revenue * 100).toFixed(2);
-    return { grossProfit, netProfit, grossMargin, netMargin };
+    // grossMargin / netMargin are not rendered in this table (amounts only) — omitted.
+    return { grossProfit, netProfit };
   };
-  const { grossProfit, netProfit, grossMargin, netMargin } = recompute();
+  const { grossProfit, netProfit } = recompute();
 
   return (
     <div className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl overflow-hidden h-full flex flex-col" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
