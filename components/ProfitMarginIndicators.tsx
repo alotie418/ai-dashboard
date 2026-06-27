@@ -44,7 +44,7 @@ const ProfitMarginIndicators: React.FC<Props> = ({ data, accountingLocale = 'CN'
         <div className="space-y-3">
           <div className="flex justify-between items-end">
             <span className="text-sm text-[#4a4a48] font-medium">{t('dashboard.grossMargin')}</span>
-            <span className={`font-bold text-xl ${grossMargin < 0 ? 'text-rose-500' : 'text-primary'}`}>{hasRevenue ? `${grossMargin}%` : '—'}</span>
+            <span className={`font-bold text-xl ${grossMargin < 0 ? 'text-rose-500' : 'text-primary'}`}>{hasRevenue ? `${grossMargin.toFixed(2)}%` : '—'}</span>
           </div>
           <div className="w-full bg-[#f0eeeb]/50 h-2.5 rounded-full overflow-hidden">
             <div className="bg-primary h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${Math.max(0, Math.min(100, grossMargin))}%`, boxShadow: '0 0 10px rgba(39,76,146,0.3)' }}></div>
@@ -55,7 +55,7 @@ const ProfitMarginIndicators: React.FC<Props> = ({ data, accountingLocale = 'CN'
         <div className="space-y-3">
           <div className="flex justify-between items-end">
             <span className="text-sm text-[#4a4a48] font-medium">{t('dashboard.netMargin')}</span>
-            <span className={`font-bold text-xl ${netMargin < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{hasRevenue ? `${netMargin}%` : '—'}</span>
+            <span className={`font-bold text-xl ${netMargin < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{hasRevenue ? `${netMargin.toFixed(2)}%` : '—'}</span>
           </div>
           <div className="w-full bg-[#f0eeeb]/50 h-2.5 rounded-full overflow-hidden">
             <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(16,185,129,0.3)]" style={{ width: `${Math.max(0, Math.min(100, netMargin))}%` }}></div>

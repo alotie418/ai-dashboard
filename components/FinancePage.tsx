@@ -256,7 +256,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
         <div className="bg-white/80 border border-[#e0ddd5] p-6 rounded-xl">
           <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">{locale === 'US' ? getTaxLabel(locale, i18n.language, 'kpiGrossIncome') : t('finance.kpiGrossMargin')}</p>
           <h4 className="text-2xl font-bold text-[#191918] tracking-tight">
-            {locale === 'US' ? fmt(report?.scheduleC?.line7_grossIncome || 0) : `${(getIncomeStatement()?.grossMargin ?? fallbackPL.grossMargin) || 0}%`}
+            {locale === 'US' ? fmt(report?.scheduleC?.line7_grossIncome || 0) : `${((getIncomeStatement()?.grossMargin ?? fallbackPL.grossMargin) || 0).toFixed(2)}%`}
           </h4>
         </div>
         <div className="bg-white/80 border border-[#e0ddd5] p-6 rounded-xl">
@@ -264,7 +264,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
             {locale === 'US' ? getTaxLabel(locale, i18n.language, 'kpiQuarterlyTax') : t('finance.kpiNetMargin')}
           </p>
           <h4 className="text-2xl font-bold text-[#191918] tracking-tight">
-            {locale === 'US' ? fmt(report?.estimatedTax?.quarterlyPayment || 0) : `${(getIncomeStatement()?.netMargin ?? fallbackPL.netMargin) || 0}%`}
+            {locale === 'US' ? fmt(report?.estimatedTax?.quarterlyPayment || 0) : `${((getIncomeStatement()?.netMargin ?? fallbackPL.netMargin) || 0).toFixed(2)}%`}
           </h4>
         </div>
       </div>

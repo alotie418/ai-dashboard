@@ -1327,8 +1327,8 @@ test.describe('PR-T2 → App.tsx trusts backend financial statement (no client t
       adminExpense: 0, incomeTax: 2000, grossProfit: 40000, grossMargin: 40,
       netProfit: 38000, netMargin: 38,
     });
-    await expect(netMargin(page)).toHaveText('38%', { timeout: 10_000 });
-    await expect(page.getByText('30%')).toHaveCount(0); // not the 25%-override value
+    await expect(netMargin(page)).toHaveText('38.00%', { timeout: 10_000 });
+    await expect(page.getByText('30.00%')).toHaveCount(0); // not the 25%-override value
   });
 
   test('JP: income tax is not force-applied at 25% (zero-tax case flows through)', async ({ page }) => {
@@ -1340,8 +1340,8 @@ test.describe('PR-T2 → App.tsx trusts backend financial statement (no client t
       adminExpense: 0, incomeTax: 0, grossProfit: 40000, grossMargin: 40,
       netProfit: 40000, netMargin: 40,
     });
-    await expect(netMargin(page)).toHaveText('40%', { timeout: 10_000 });
-    await expect(page.getByText('30%')).toHaveCount(0); // not the 25%-override value
+    await expect(netMargin(page)).toHaveText('40.00%', { timeout: 10_000 });
+    await expect(page.getByText('30.00%')).toHaveCount(0); // not the 25%-override value
   });
 
   // PR-T5-2A: costOfSales is now COGS-only; the dashboard recompute must subtract
@@ -1353,8 +1353,8 @@ test.describe('PR-T2 → App.tsx trusts backend financial statement (no client t
       operatingProfit: 40000, taxSurcharge: 0, shippingFee: 0, adminExpense: 0, incomeTax: 0,
       grossProfit: 60000, grossMargin: 60, netProfit: 40000, netMargin: 40,
     });
-    await expect(netMargin(page)).toHaveText('40%', { timeout: 10_000 }); // net = revenue − COGS − operating
-    await expect(page.getByText('60%')).toBeVisible(); // gross margin = revenue − COGS
+    await expect(netMargin(page)).toHaveText('40.00%', { timeout: 10_000 }); // net = revenue − COGS − operating
+    await expect(page.getByText('60.00%')).toBeVisible(); // gross margin = revenue − COGS
   });
 });
 
