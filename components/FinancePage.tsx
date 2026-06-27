@@ -80,8 +80,10 @@ const FinancePage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, sel
     const operating = fs.operatingExpenses ?? 0; // 0 for US / pre-split payloads
     const grossProfit = revenue - cost;
     const netProfit = revenue - cost - operating - fs.taxSurcharge - fs.shippingFee - fs.adminExpense - fs.incomeTax;
-    const grossMargin = revenue === 0 ? 0 : +(grossProfit / revenue * 100).toFixed(2);
-    const netMargin = revenue === 0 ? 0 : +(netProfit / revenue * 100).toFixed(2);
+    // Match the report engine's rounding (Math.round(x*10000)/100, half-up) so the
+    // no-report fallback path agrees with the engine-sourced KPI cards / P&L table.
+    const grossMargin = revenue === 0 ? 0 : Math.round(grossProfit / revenue * 10000) / 100;
+    const netMargin = revenue === 0 ? 0 : Math.round(netProfit / revenue * 10000) / 100;
     return { grossProfit, netProfit, grossMargin, netMargin };
   })();
 
@@ -254,7 +256,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
         <div className="bg-white/80 border border-[#e0ddd5] p-6 rounded-xl">
           <p className="text-[#5c5c5a] text-[10px] uppercase font-bold tracking-widest mb-1">{locale === 'US' ? getTaxLabel(locale, i18n.language, 'kpiGrossIncome') : t('finance.kpiGrossMargin')}</p>
           <h4 className="text-2xl font-bold text-[#191918] tracking-tight">
-            {locale === 'US' ? fmt(report?.scheduleC?.line7_grossIncome || 0) : `${(getIncomeStatement()?.grossMargin ?? fallbackPL.grossMargin) || 0}%`}
+            {locale === 'US' ? fmt(report?.scheduleC?.line7_grossIncome || 0) : `${((getIncomeStatement()?.grossMargin ?? fallbackPL.grossMargin) || 0).toFixed(2)}%`}
           </h4>
         </div>
         <div className="bg-white/80 border border-[#e0ddd5] p-6 rounded-xl">
@@ -262,7 +264,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
             {locale === 'US' ? getTaxLabel(locale, i18n.language, 'kpiQuarterlyTax') : t('finance.kpiNetMargin')}
           </p>
           <h4 className="text-2xl font-bold text-[#191918] tracking-tight">
-            {locale === 'US' ? fmt(report?.estimatedTax?.quarterlyPayment || 0) : `${(getIncomeStatement()?.netMargin ?? fallbackPL.netMargin) || 0}%`}
+            {locale === 'US' ? fmt(report?.estimatedTax?.quarterlyPayment || 0) : `${((getIncomeStatement()?.netMargin ?? fallbackPL.netMargin) || 0).toFixed(2)}%`}
           </h4>
         </div>
       </div>
@@ -595,6 +597,7 @@ const GenericPL: React.FC<{
         <LineItem label={lbl('plRevenue')} value={fmt(pl.salesRevenue || pl.revenue || 0)} bold primary />
         <LineItem label={lbl('plCost')} value={fmt(pl.costOfSales || 0)} indent />
         <LineItem label={lbl('plGrossProfit')} value={fmt(pl.grossProfit || 0)} bold primary />
+        <LineItem label={t('finance.kpiGrossMargin')} value={`${(pl.grossMargin || 0).toFixed(2)}%`} indent />
         {(pl.operatingExpenses ?? 0) > 0 && <LineItem label={lbl('plOperatingExpenses')} value={fmt(pl.operatingExpenses)} indent />}
         {pl.taxSurcharge != null && <LineItem label={lbl('plTaxSurcharge')} value={fmt(pl.taxSurcharge)} indent />}
         {pl.shippingFee != null && <LineItem label={lbl('plShipping')} value={fmt(pl.shippingFee)} indent />}
