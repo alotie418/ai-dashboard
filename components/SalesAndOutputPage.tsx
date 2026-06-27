@@ -11,6 +11,7 @@ import { classifyInvoiceStatus, INVOICE_STATUS_BADGE_CLASS } from './invoiceStat
 import CsvImportModal from './CsvImportModal';
 import DocumentModal from './DocumentModal';
 import OcrPreviewModal from './OcrPreviewModal';
+import { TAX_RATE_OPTIONS } from './taxRateOptions';
 
 interface Props {
   data: BusinessData;
@@ -44,6 +45,10 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
   const fmtMoney = (val: number) => formatMoney(val, accLocale, uiLang);
   const fmtQty = (val: number, decimals = 2) => formatQuantity(val, productUnit, uiLang, decimals);
   const taxLabel = (key: string) => getTaxLabel(accLocale, uiLang, key);
+  // Locale-aware default tax rate (CN 13% / US 0% / JP 10% / EU 20% / KR 10% / TW 5%),
+  // shared with the purchase page. Used as the fallback for manual entry + OCR auto-fill
+  // so a non-CN sale no longer silently defaults to China's 13%.
+  const defaultTaxRate = (TAX_RATE_OPTIONS[accLocale] || TAX_RATE_OPTIONS.CN)[0]?.value || '13%';
   const [recognitionMode, setRecognitionMode] = useState<'ai' | 'ocr'>('ai');
   const [isScanning, setIsScanning] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -96,7 +101,9 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
     const { totalWithTax, quantity, taxRate } = newSale;
     if (!totalWithTax || totalWithTax <= 0) return;
 
-    const rateNum = parseFloat((taxRate || '13%').replace('%', '')) || 13;
+    // Locale-aware default; keep a legitimate 0% rate (`|| 13` would treat 0 as missing).
+    const parsedRate = parseFloat((taxRate || defaultTaxRate).replace('%', ''));
+    const rateNum = Number.isFinite(parsedRate) ? parsedRate : 0;
     const amountWithoutTax = Math.round((totalWithTax / (1 + rateNum / 100)) * 100) / 100;
     const taxAmount = Math.round((totalWithTax - amountWithoutTax) * 100) / 100;
 
@@ -218,7 +225,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
   // write — the user reviews the pre-filled form and clicks save (handleAddSubmit) to actually record.
   const confirmOcrFill = () => {
     if (!ocrPreview) return;
-    const filled = extractedToSalesForm(ocrPreview, '13%');
+    const filled = extractedToSalesForm(ocrPreview, defaultTaxRate);
     setNewSale(prev => ({ ...filled, date: filled.date || prev.date }));
     setSaleInvoiceStatus('待开');
     setOcrPreview(null);

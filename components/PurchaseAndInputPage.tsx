@@ -10,6 +10,7 @@ import { formatMoney, getCurrencySymbol, getTaxLabel, formatLegacyQuantity, getP
 import { classifyInvoiceStatus, INVOICE_STATUS_BADGE_CLASS } from './invoiceStatusDisplay';
 import CsvImportModal from './CsvImportModal';
 import OcrPreviewModal from './OcrPreviewModal';
+import { TAX_RATE_OPTIONS } from './taxRateOptions';
 
 interface Props {
   data: BusinessData;
@@ -20,35 +21,6 @@ interface Props {
 
 let purchaseIdCounter = 0;
 const nextPurchaseId = () => `purchase-${++purchaseIdCounter}-${Date.now()}`;
-
-const TAX_RATE_OPTIONS: Record<string, { value: string; labelKey: string }[]> = {
-  CN: [
-    { value: '13%', labelKey: 'purchases.taxStandard' },
-    { value: '9%', labelKey: 'purchases.taxTransport' },
-    { value: '6%', labelKey: 'purchases.taxService' },
-    { value: '3%', labelKey: 'purchases.taxSmall' },
-  ],
-  US: [
-    { value: '0%', labelKey: 'purchases.taxNone' },
-    { value: '7%', labelKey: 'purchases.taxSalesTax' },
-    { value: '10%', labelKey: 'purchases.taxSalesTax10' },
-  ],
-  JP: [
-    { value: '10%', labelKey: 'purchases.taxJpStandard' },
-    { value: '8%', labelKey: 'purchases.taxJpReduced' },
-  ],
-  EU: [
-    { value: '20%', labelKey: 'purchases.taxEuStandard' },
-    { value: '10%', labelKey: 'purchases.taxEuReduced' },
-    { value: '5%', labelKey: 'purchases.taxEuSuperReduced' },
-  ],
-  KR: [
-    { value: '10%', labelKey: 'purchases.taxKrStandard' },
-  ],
-  TW: [
-    { value: '5%', labelKey: 'purchases.taxTwStandard' },
-  ],
-};
 
 const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
   const { t, i18n } = useTranslation();
@@ -120,7 +92,9 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
     const { totalWithTax, quantity, taxRate } = newPurchase;
     if (!totalWithTax || totalWithTax <= 0) return;
 
-    const rateNum = parseFloat(taxRate.replace('%', '')) || 13;
+    // Keep a legitimate 0% rate (US sales tax) — `|| 13` would wrongly treat 0 as missing.
+    const parsedRate = parseFloat(taxRate.replace('%', ''));
+    const rateNum = Number.isFinite(parsedRate) ? parsedRate : 0;
     const amountWithoutTax = Math.round((totalWithTax / (1 + rateNum / 100)) * 100) / 100;
     const taxAmount = Math.round((totalWithTax - amountWithoutTax) * 100) / 100;
 
