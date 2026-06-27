@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { MOCK_BUSINESS_DATA } from './constants';
 import { fetchAIAnalysis } from './services/aiBriefingService';
 import { AIAnalysis, BusinessData } from './types';
-import { fetchDashboardData, fetchPurchases, fetchSettings, listProviders } from './services/api';
+import { fetchDashboardData, fetchPurchases, fetchSettings, listProviders, fetchReceivablesSummary, fetchPayablesSummary } from './services/api';
 import { parseAiErrorCode, aiErrorMessage } from './services/aiErrors';
 import MetricCard from './components/MetricCard';
 import AIInsights from './components/AIInsights';
@@ -147,6 +147,15 @@ const AppContent: React.FC = () => {
       // Phase 3: per-product inventory overview from the dashboard payload
       const inv = (dashboard as any).inventory || { inStockCount: 0, totalInventoryCost: 0, details: [] };
 
+      // Current outstanding AR/AP totals (tax-inclusive, base-currency) — reuse the
+      // existing summary handlers (same source as AccountsPage); not year-scoped.
+      let totalReceivable = 0, totalPayable = 0;
+      try {
+        const [rec, pay] = await Promise.all([fetchReceivablesSummary(), fetchPayablesSummary()]);
+        totalReceivable = rec?.totalReceivable ?? 0;
+        totalPayable = pay?.totalPayable ?? 0;
+      } catch { /* default: 0 */ }
+
       const next: BusinessData = {
         ...dataRef.current,
         locale: accLocale, // pass through for dashboard rendering
@@ -199,6 +208,22 @@ const AppContent: React.FC = () => {
             subValue: m.purchaseTotalTons > 0 ? `${t('dashboard.purchasesLabel')}: ${m.purchaseTotalTons}${qtySuffix}` : '—',
             icon: 'fa-tags',
             color: 'bg-orange-500',
+          },
+          {
+            // Current outstanding receivables (tax-inclusive, base-currency) — same
+            // figure as AccountsPage; reuses the receivables summary handler.
+            label: t('accounts.totalReceivable'),
+            value: formatMoney(totalReceivable, accLocale),
+            subValue: '—',
+            icon: 'fa-file-invoice-dollar',
+            color: 'bg-emerald-500',
+          },
+          {
+            label: t('accounts.totalPayable'),
+            value: formatMoney(totalPayable, accLocale),
+            subValue: '—',
+            icon: 'fa-file-invoice',
+            color: 'bg-rose-500',
           },
         ],
         rawMetrics: {
