@@ -24,8 +24,11 @@ const ProfitMarginIndicators: React.FC<Props> = ({ data, accountingLocale = 'CN'
     const incomeTax = data.incomeTax;
     const grossProfit = revenue - cost; // revenue − COGS
     const netProfit = revenue - cost - operating - tax - shipping - admin - incomeTax;
-    const grossMargin = revenue === 0 ? 0 : +(grossProfit / revenue * 100).toFixed(2);
-    const netMargin = revenue === 0 ? 0 : +(netProfit / revenue * 100).toFixed(2);
+    // Match the report engine's rounding (Math.round(x*10000)/100, half-up) instead of
+    // toFixed, so this dashboard card and the formal report show identical margin values.
+    // (US Schedule C exposes no margin fields, so margins are still derived here.)
+    const grossMargin = revenue === 0 ? 0 : Math.round(grossProfit / revenue * 10000) / 100;
+    const netMargin = revenue === 0 ? 0 : Math.round(netProfit / revenue * 10000) / 100;
     return { grossMargin, netMargin, hasRevenue: revenue !== 0 };
   };
   const { grossMargin, netMargin, hasRevenue } = recompute();
@@ -41,7 +44,7 @@ const ProfitMarginIndicators: React.FC<Props> = ({ data, accountingLocale = 'CN'
         <div className="space-y-3">
           <div className="flex justify-between items-end">
             <span className="text-sm text-[#4a4a48] font-medium">{t('dashboard.grossMargin')}</span>
-            <span className="text-primary font-bold text-xl">{hasRevenue ? `${grossMargin}%` : '—'}</span>
+            <span className={`font-bold text-xl ${grossMargin < 0 ? 'text-rose-500' : 'text-primary'}`}>{hasRevenue ? `${grossMargin}%` : '—'}</span>
           </div>
           <div className="w-full bg-[#f0eeeb]/50 h-2.5 rounded-full overflow-hidden">
             <div className="bg-primary h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${Math.max(0, Math.min(100, grossMargin))}%`, boxShadow: '0 0 10px rgba(39,76,146,0.3)' }}></div>
@@ -52,7 +55,7 @@ const ProfitMarginIndicators: React.FC<Props> = ({ data, accountingLocale = 'CN'
         <div className="space-y-3">
           <div className="flex justify-between items-end">
             <span className="text-sm text-[#4a4a48] font-medium">{t('dashboard.netMargin')}</span>
-            <span className="text-emerald-500 font-bold text-xl">{hasRevenue ? `${netMargin}%` : '—'}</span>
+            <span className={`font-bold text-xl ${netMargin < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{hasRevenue ? `${netMargin}%` : '—'}</span>
           </div>
           <div className="w-full bg-[#f0eeeb]/50 h-2.5 rounded-full overflow-hidden">
             <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(16,185,129,0.3)]" style={{ width: `${Math.max(0, Math.min(100, netMargin))}%` }}></div>
