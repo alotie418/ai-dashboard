@@ -6,7 +6,7 @@
 //   • next_month / same_month 起算；daily → fallback 到 next_month 口径 + warning；
 //   • disposed 有日期 → 处置次月停止；无日期 → 按 asOf 估算 + warning；**disposed 不计入 totals**；
 //   • 多币种分别列示、不折算、不跨币种合计；
-//   • **不做处置损益、不进 P&L、不接 balanceOverview、不改 reports、不改 schema、不改历史。**
+//   • **不做处置损益、不进 P&L、不改 reports、不改 schema、不改历史；自身只读不写回（balanceOverview 自 P2-3 起只读消费其净值）。**
 
 const { getDb } = require('../db');
 const { DEPRECIATION_DEFAULTS, resolveCategory } = require('./_depreciationDefaults');

@@ -4,7 +4,7 @@
 //   • 按币种把各来源归入 资产(流动/非流动) / 负债(流动/非流动) / 权益 + 各小计 + balanceDifference；
 //   • balanceDifference = totals.assets − totals.liabilities − totals.equity（按币种·显式·非 0 为常态·不隐藏·不强制平衡）；
 //   • 现金 = 复用 cashPosition.summary 的 endingEstimate（按币种）；应收/应付/存货无币种 → 本位币桶；
-//   • 固定资产按 original_value（**不折旧·不算净值**）；借款按 maturity_date 一年线分流动/非流动（基准日=period.to；空→流动+warning）；
+//   • 固定资产按账面净值（P2-3·复用 depreciation-preview·disposed 已排除·meta 含原值/累计折旧）；借款按 maturity_date 一年线分流动/非流动（基准日=period.to；空→流动+warning）；
 //   • 权益（PR-7B P2-4b）= 两行：出资（实收资本/业主资本，entity-aware）+ 未分配利润（来自 retained-earnings-preview，本位币块）；
 //     出资基数 = capital_contribution + adjustment + other（adj/other 折进出资行，金额守恒）；
 //     individual：owner_draw 冲减出资行；company：owner_draw 已在 retained preview 作 distributions 扣减（出资行不重复扣）；
