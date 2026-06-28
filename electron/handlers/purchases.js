@@ -83,6 +83,26 @@ async function list() {
   return db.prepare('SELECT * FROM purchases ORDER BY date DESC').all();
 }
 
+// Detail read (P4a): a purchase header + its line items. Legacy single-item records carry
+// no rows in purchase_items, so items is naturally []. Read-only — list() is unchanged.
+function loadItems(db, purchaseId) {
+  return db.prepare(
+    `SELECT id, product_id, description, unit_snapshot, quantity, unit_price,
+            amount_net, tax_rate, tax_amount, amount_gross, line_no
+       FROM purchase_items WHERE purchase_id = ? ORDER BY line_no, id`
+  ).all(purchaseId);
+}
+
+// GET /api/purchases/:id
+async function get({ params }) {
+  const db = getDb();
+  const id = params.id;
+  if (!id) throw new Error('Invalid ID');
+  const row = db.prepare('SELECT * FROM purchases WHERE id = ?').get(id);
+  if (!row) throw new Error('Purchase not found');
+  return { ...row, items: loadItems(db, id) };
+}
+
 async function create({ body }) {
   const db = getDb();
   const data = body || {};
@@ -181,4 +201,4 @@ async function remove({ params }) {
   return { success: true };
 }
 
-module.exports = { list, create, update, remove };
+module.exports = { list, get, create, update, remove };
