@@ -222,6 +222,108 @@ async function expectThrow(fn, label) {
   ok((await getSal('sd-0')).due_date === null, '[sal] create WITHOUT due_date → null');
 }
 
+// ───────────── P2: multi-line items write path (purchases + sales) ─────────────
+// items[] is the source of truth: header money = Σ items; legacy single-item columns are
+// neutralised (tons=0, product_id/snapshots=null). All multi-line writes run in a
+// db.transaction; an empty/bad items[] rolls the whole thing back. list() stays header-only.
+{
+  const db = freshDb();
+  // requirement 5: the test DB must actually enforce FKs, else the CASCADE checks are meaningless.
+  ok(db.pragma('foreign_keys', { simple: true }) === 1, '[items] test DB has foreign_keys = ON');
+
+  const itemsP = [
+    { product_id: 'prod-a', description: 'A', unit_snapshot: 'piece', quantity: 2, unit_price: 100, amount_net: 200, tax_rate: 13, tax_amount: 26, amount_gross: 226 },
+    { product_id: 'prod-b', description: 'B', unit_snapshot: 'box',   quantity: 1, unit_price: 50,  amount_net: 50,  tax_rate: 6,  tax_amount: 3,  amount_gross: 53 },
+  ];
+
+  // create + items → header summed, legacy cols neutralised, child rows written
+  ok((await call('POST', '/api/purchases', { id: 'pi-1', date: `${YEAR}-06-01`, supplier: 'Multi', items: itemsP }))?.success, '[items] purchase create+items → success');
+  const pHead = (await call('GET', '/api/purchases', null)).find((p) => p.id === 'pi-1');
+  ok(approx(pHead.amountWithoutTax, 250), `[items] pur header amountWithoutTax = Σ amount_net (250), got ${pHead.amountWithoutTax}`);
+  ok(approx(pHead.taxAmount, 29), `[items] pur header taxAmount = Σ tax_amount (29), got ${pHead.taxAmount}`);
+  ok(approx(pHead.totalAmount, 279), `[items] pur header totalAmount = Σ amount_gross (279), got ${pHead.totalAmount}`);
+  ok(approx(pHead.tons, 0) && pHead.product_id == null && pHead.product_name_snapshot == null && pHead.unit_snapshot == null, '[items] pur legacy cols neutralised (tons=0, product_id/snapshots=null)');
+  const pRows = db.prepare("SELECT * FROM purchase_items WHERE purchase_id = 'pi-1' ORDER BY line_no").all();
+  ok(pRows.length === 2 && pRows[0].line_no === 0 && pRows[1].line_no === 1, '[items] 2 purchase_items rows with line_no 0,1');
+  ok(pRows[0].product_id === 'prod-a' && approx(pRows[0].amount_net, 200) && approx(pRows[1].tax_amount, 3), '[items] line fields persisted');
+
+  // list() stays header-only (no items leakage in the read shape)
+  ok(pHead.items === undefined, '[items] list() returns header only (no items array)');
+
+  // update + items → replace all lines, header recomputed
+  await call('PUT', '/api/purchases/pi-1', { date: `${YEAR}-06-02`, supplier: 'Multi2', items: [{ description: 'C', quantity: 3, unit_price: 10, amount_net: 30, tax_amount: 3.9, amount_gross: 33.9 }] });
+  const pHead2 = (await call('GET', '/api/purchases', null)).find((p) => p.id === 'pi-1');
+  ok(approx(pHead2.amountWithoutTax, 30) && approx(pHead2.taxAmount, 3.9) && approx(pHead2.totalAmount, 33.9), '[items] pur update+items recomputes header');
+  const pRows2 = db.prepare("SELECT * FROM purchase_items WHERE purchase_id = 'pi-1'").all();
+  ok(pRows2.length === 1 && approx(pRows2[0].amount_net, 30), '[items] pur update replaced items (old deleted, new inserted)');
+
+  // update WITHOUT items key → existing items preserved (legacy header update only)
+  await call('PUT', '/api/purchases/pi-1', { date: `${YEAR}-06-03`, supplier: 'Multi3', tons: 5, totalAmount: 99 });
+  ok(db.prepare("SELECT COUNT(*) AS n FROM purchase_items WHERE purchase_id = 'pi-1'").get().n === 1, '[items] pur update WITHOUT items key preserves existing items');
+
+  // delete → FK CASCADE clears child rows
+  await call('DELETE', '/api/purchases/pi-1', null);
+  ok(db.prepare("SELECT COUNT(*) AS n FROM purchase_items WHERE purchase_id = 'pi-1'").get().n === 0, '[items] purchase delete → FK CASCADE clears purchase_items');
+}
+
+// empty / bad items[] → reject + rollback (requirements 1, 2, 4)
+{
+  const db = freshDb();
+
+  // create with empty items[] → illegal, nothing saved
+  await expectThrow(() => call('POST', '/api/purchases', { id: 'pe-1', date: `${YEAR}-06-01`, items: [] }), '[items] create with empty items[] throws');
+  ok((await call('GET', '/api/purchases', null)).length === 0, '[items] empty-items create saved nothing');
+
+  // seed a valid multi-line purchase
+  await call('POST', '/api/purchases', { id: 'pe-2', date: `${YEAR}-06-01`, supplier: 'Seed', items: [{ description: 'X', quantity: 1, amount_net: 100, tax_amount: 13, amount_gross: 113 }] });
+  ok(db.prepare("SELECT COUNT(*) AS n FROM purchase_items WHERE purchase_id = 'pe-2'").get().n === 1, '[items] seed has 1 item');
+
+  // update with empty items[] → must throw AND roll back (old item kept, header unchanged)
+  await expectThrow(() => call('PUT', '/api/purchases/pe-2', { date: `${YEAR}-06-02`, items: [] }), '[items] update with empty items[] throws');
+  ok(db.prepare("SELECT COUNT(*) AS n FROM purchase_items WHERE purchase_id = 'pe-2'").get().n === 1, '[items] empty-items update rolled back — old item preserved');
+
+  // update with a BAD row (non-finite amount) → throw + rollback (original intact)
+  await expectThrow(() => call('PUT', '/api/purchases/pe-2', { date: `${YEAR}-06-02`, items: [{ description: 'ok', amount_net: 10, amount_gross: 10 }, { description: 'bad', amount_net: 'NaNish' }] }), '[items] update with bad row throws');
+  const afterBad = db.prepare("SELECT * FROM purchase_items WHERE purchase_id = 'pe-2'").all();
+  ok(afterBad.length === 1 && approx(afterBad[0].amount_net, 100), '[items] bad-row update rolled back — original item intact');
+  ok(approx((await call('GET', '/api/purchases', null)).find((p) => p.id === 'pe-2').amountWithoutTax, 100), '[items] bad-row update rolled back — header unchanged');
+}
+
+// sales mirror: create+items / shippingCost header / update replace / delete CASCADE / empty reject
+{
+  const db = freshDb();
+  ok((await call('POST', '/api/sales', { id: 'si-1', date: `${YEAR}-06-01`, customer: 'MultiCust', shippingCost: 40, items: [
+    { description: 'S1', quantity: 2, amount_net: 200, tax_amount: 26, amount_gross: 226 },
+    { description: 'S2', quantity: 1, amount_net: 100, tax_amount: 13, amount_gross: 113 },
+  ] }))?.success, '[items] sale create+items → success');
+  const sHead = (await call('GET', '/api/sales', null)).find((s) => s.id === 'si-1');
+  ok(approx(sHead.amountWithoutTax, 300) && approx(sHead.taxAmount, 39) && approx(sHead.totalAmount, 339), '[items] sale header = Σ items');
+  ok(approx(sHead.shippingCost, 40), '[items] sale header shippingCost preserved (not part of items sum)');
+  ok(approx(sHead.tons, 0) && sHead.product_id == null, '[items] sale legacy cols neutralised');
+  ok(db.prepare("SELECT COUNT(*) AS n FROM sales_items WHERE sale_id = 'si-1'").get().n === 2, '[items] 2 sales_items rows');
+
+  // update replace
+  await call('PUT', '/api/sales/si-1', { date: `${YEAR}-06-02`, customer: 'MC2', shippingCost: 0, items: [{ description: 'S3', quantity: 5, amount_net: 500, tax_amount: 65, amount_gross: 565 }] });
+  ok(db.prepare("SELECT COUNT(*) AS n FROM sales_items WHERE sale_id = 'si-1'").get().n === 1, '[items] sale update replaced items');
+  const sHead2 = (await call('GET', '/api/sales', null)).find((s) => s.id === 'si-1');
+  ok(approx(sHead2.totalAmount, 565) && approx(sHead2.shippingCost, 0), '[items] sale update recomputes header + shippingCost from body');
+
+  // delete CASCADE
+  await call('DELETE', '/api/sales/si-1', null);
+  ok(db.prepare("SELECT COUNT(*) AS n FROM sales_items WHERE sale_id = 'si-1'").get().n === 0, '[items] sale delete → FK CASCADE clears sales_items');
+
+  // empty items on sale → throw
+  await expectThrow(() => call('POST', '/api/sales', { id: 'se-0', date: `${YEAR}-06-01`, items: [] }), '[items] sale create with empty items[] throws');
+}
+
+// legacy single-item path still byte-for-byte intact (no items key → unchanged behaviour)
+{
+  freshDb();
+  ok((await call('POST', '/api/purchases', { id: 'lg-1', date: `${YEAR}-06-01`, supplier: 'Legacy', tons: 10, totalAmount: 1130 }))?.success, '[items] legacy purchase create (no items) still works');
+  const lg = (await call('GET', '/api/purchases', null)).find((p) => p.id === 'lg-1');
+  ok(approx(lg.tons, 10) && approx(lg.totalAmount, 1130), '[items] legacy purchase header unchanged (tons/total preserved, not neutralised)');
+}
+
 // ───────────── dashboard end-to-end (settings → report engine → financialStatement) ─────────────
 {
   const db = freshDb();

@@ -1,5 +1,6 @@
 // Purchases CRUD
 const { getDb } = require('../db');
+const { normalizeItems, sumHeaderTotals, replaceItems } = require('./_lineItems');
 
 function safeString(v, maxLen = 255) {
   if (v == null) return '';
@@ -23,6 +24,60 @@ function validatePurchase(data) {
   return errors;
 }
 
+// Multi-line (P2): items[] is the source of truth. Header money = Σ items; the legacy
+// single-item columns are neutralised (tons=0, pricePerTon=0, product_id/snapshots=null
+// — decision B: a multi-line record does not masquerade as one product). The whole write
+// runs in one transaction; an empty/bad items[] throws before any row is written or
+// deleted, so a header is never left with no or half its items.
+function createWithItems(db, data) {
+  if (!data.id) throw new Error('id required');
+  if (!data.date) throw new Error('date required');
+  db.transaction(() => {
+    const rows = normalizeItems(data.items);
+    const totals = sumHeaderTotals(rows);
+    db.prepare(`
+      INSERT INTO purchases (id, date, supplier, tons, pricePerTon, totalAmount, amountWithoutTax, taxAmount, taxRate, invoiceNumber, invoiceStatus, product_id, product_name_snapshot, unit_snapshot, due_date)
+      VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?)
+    `).run(
+      data.id, data.date, safeString(data.supplier),
+      totals.totalAmount, totals.amountWithoutTax, totals.taxAmount,
+      Number(data.taxRate) || 13,
+      safeString(data.invoiceNumber, 100), safeString(data.invoiceStatus, 20),
+      data.due_date || null,
+    );
+    replaceItems(db, 'purchase_items', 'purchase_id', data.id, rows);
+  })();
+  return { success: true, id: data.id };
+}
+
+function updateWithItems(db, id, data) {
+  if (!data.date) throw new Error('date required');
+  const existing = db.prepare('SELECT id FROM purchases WHERE id = ?').get(id);
+  if (!existing) throw new Error('Purchase not found');
+  // due_date 仅在显式提供时纳入 SET（与 legacy update 同语义）。
+  const setDueDate = data.due_date !== undefined;
+  db.transaction(() => {
+    const rows = normalizeItems(data.items); // 空/坏行在此抛 → 事务回滚，旧 items 不被删
+    const totals = sumHeaderTotals(rows);
+    const args = [
+      data.date, safeString(data.supplier),
+      totals.totalAmount, totals.amountWithoutTax, totals.taxAmount,
+      Number(data.taxRate) || 13,
+      safeString(data.invoiceNumber, 100), safeString(data.invoiceStatus, 20),
+    ];
+    if (setDueDate) args.push(data.due_date || null);
+    args.push(id);
+    db.prepare(`
+      UPDATE purchases SET date=?, supplier=?, tons=0, pricePerTon=0, totalAmount=?,
+        amountWithoutTax=?, taxAmount=?, taxRate=?, invoiceNumber=?, invoiceStatus=?,
+        product_id=NULL, product_name_snapshot=NULL, unit_snapshot=NULL${setDueDate ? ', due_date=?' : ''}
+      WHERE id=?
+    `).run(...args);
+    replaceItems(db, 'purchase_items', 'purchase_id', id, rows);
+  })();
+  return { success: true };
+}
+
 async function list() {
   const db = getDb();
   return db.prepare('SELECT * FROM purchases ORDER BY date DESC').all();
@@ -31,6 +86,9 @@ async function list() {
 async function create({ body }) {
   const db = getDb();
   const data = body || {};
+
+  if (data.items !== undefined) return createWithItems(db, data);
+
   const errors = validatePurchase(data);
   if (errors.length > 0) throw new Error(errors.join('; '));
 
@@ -64,6 +122,9 @@ async function update({ params, body }) {
   if (!id) throw new Error('Invalid ID');
   const data = body || {};
   data.id = id;
+
+  if (data.items !== undefined) return updateWithItems(db, id, data);
+
   data.tons = Number(data.tons) || 0;
   data.pricePerTon = Number(data.pricePerTon) || 0;
   data.totalAmount = Number(data.totalAmount) || 0;
