@@ -1327,6 +1327,82 @@ const Q = '?from=2026-01-01&to=2026-12-31';
   ok(d1.unit !== d2.unit, '[inv] different-unit products stay separate rows (kg vs ton, never summed)');
 }
 
+// ───────────── P3: inventory reads multi-line items (purchase_items / sales_items) ─────────────
+// computeSummary now unions legacy single-item headers with the P2 line items; a header that
+// carries items is de-duped out of the legacy source (NOT EXISTS). The weighted-average cost
+// formula is unchanged — P3 only widened where qty/cost come from. The block above stays the
+// primary legacy-only regression guard (it runs against the new SQL).
+
+// (1) legacy-only echo: single-item data computes exactly as before.
+{
+  freshDb();
+  const mkProduct = async (body) => (await call('POST', '/api/products', body)).id;
+  const byId = (details, id) => details.find((d) => d.product_id === id);
+  const L = await mkProduct({ name: 'LegacyOnly', unit: 'kg', default_unit_cost: 0 });
+  await call('POST', '/api/purchases', { id: 'lo-1', date: `${YEAR}-02-01`, supplier: 'S', tons: 8, totalAmount: 904, amountWithoutTax: 800, product_id: L });
+  await call('POST', '/api/sales', { id: 'lo-out', date: `${YEAR}-03-01`, customer: 'C', tons: 2, totalAmount: 300, product_id: L });
+  const inv = await call('GET', '/api/inventory/summary', null);
+  const lo = byId(inv.details, L);
+  ok(lo && approx(lo.qtyOnHand, 6) && approx(lo.unitCost, 100) && approx(lo.lineCost, 600), '[inv-p3] (1) legacy-only unchanged: 8 in − 2 out = 6 @ 800/8=100 → 600');
+}
+
+// (2..8) items source, legacy+items merge, NOT EXISTS de-dup, null/service/inactive exclusions.
+{
+  const db = freshDb();
+  const mkProduct = async (body) => (await call('POST', '/api/products', body)).id;
+  const byId = (details, id) => details.find((d) => d.product_id === id);
+
+  const A = await mkProduct({ name: 'Alpha', unit: 'piece', default_unit_cost: 0 });
+  const B = await mkProduct({ name: 'Beta', unit: 'box', default_unit_cost: 0 });
+  const SVC = await mkProduct({ name: 'Service', unit: 'hour', is_service: true });
+  const OFF = await mkProduct({ name: 'Off', unit: 'box', is_active: false });
+
+  // (2) multi-line purchase: A×10 @ net1000, B×5 @ net250, plus null-product / service / inactive lines
+  await call('POST', '/api/purchases', { id: 'mp-1', date: `${YEAR}-02-01`, supplier: 'S', items: [
+    { product_id: A, quantity: 10, amount_net: 1000, tax_amount: 130, amount_gross: 1130 },
+    { product_id: B, quantity: 5, amount_net: 250, tax_amount: 32.5, amount_gross: 282.5 },
+    { product_id: null, quantity: 7, amount_net: 700, amount_gross: 700 },
+    { product_id: SVC, quantity: 3, amount_net: 300, amount_gross: 300 },
+    { product_id: OFF, quantity: 4, amount_net: 400, amount_gross: 400 },
+  ] });
+  const mpHead = (await call('GET', '/api/purchases', null)).find((p) => p.id === 'mp-1');
+  ok(approx(mpHead.tons, 0) && mpHead.product_id == null, '[inv-p3] multi-line header neutralised (legacy source ignores it)');
+
+  // (3) multi-line sale: A×4 out
+  await call('POST', '/api/sales', { id: 'ms-1', date: `${YEAR}-03-01`, customer: 'C', items: [
+    { product_id: A, quantity: 4, amount_net: 800, amount_gross: 904 },
+  ] });
+
+  let inv = await call('GET', '/api/inventory/summary', null);
+  // (5)(6)(7): only A + B in stock — null-product / service / inactive item lines excluded
+  ok(inv.inStockCount === 2, `[inv-p3] (5)(6)(7) inStockCount=2 — null/service/inactive item lines excluded, got ${inv.inStockCount}`);
+  ok(!byId(inv.details, SVC) && !byId(inv.details, OFF), '[inv-p3] service + inactive product item lines excluded');
+  ok(approx(inv.totalInventoryCost, 850), `[inv-p3] totalInventoryCost = A600 + B250 = 850 (null-product line 700 NOT counted), got ${inv.totalInventoryCost}`);
+
+  const a = byId(inv.details, A), b = byId(inv.details, B);
+  ok(a && approx(a.qtyOnHand, 6), `[inv-p3] (2)(3) A onHand = 10(item in) − 4(item out) = 6, got ${a?.qtyOnHand}`);
+  ok(a && approx(a.unitCost, 100), '[inv-p3] (2) A avg = 1000/10 = 100 (tax-exclusive amount_net)');
+  ok(a && approx(a.lineCost, 600), '[inv-p3] A lineCost = 6×100 = 600');
+  ok(b && approx(b.qtyOnHand, 5) && approx(b.unitCost, 50) && approx(b.lineCost, 250), '[inv-p3] B onHand 5 @ 250/5=50 → 250');
+
+  // (4) legacy + items merge for the SAME product A: legacy single-item purchase A×5 @ net600
+  await call('POST', '/api/purchases', { id: 'lp-A', date: `${YEAR}-02-02`, supplier: 'S', tons: 5, totalAmount: 678, amountWithoutTax: 600, product_id: A });
+  inv = await call('GET', '/api/inventory/summary', null);
+  const a2 = byId(inv.details, A);
+  ok(a2 && approx(a2.qtyOnHand, 11), `[inv-p3] (4) A merged onHand = (10 items + 5 legacy) − 4 out = 11, got ${a2?.qtyOnHand}`);
+  ok(a2 && approx(a2.unitCost, 106.67), `[inv-p3] (4) A merged avg = (1000+600)/(10+5) = 106.67, got ${a2?.unitCost}`);
+
+  // (8) NOT EXISTS de-dup: a header that ALSO carries items must count ONLY the items. P2 never
+  // produces this, so arrange it directly (header w/ product_id+tons + a child item, same product).
+  const C = await mkProduct({ name: 'Gamma', unit: 'kg', default_unit_cost: 0 });
+  db.prepare("INSERT INTO purchases (id, date, supplier, tons, amountWithoutTax, totalAmount, product_id) VALUES ('dup-1', ?, 'S', 99, 9900, 9900, ?)").run(`${YEAR}-02-03`, C);
+  db.prepare("INSERT INTO purchase_items (purchase_id, line_no, product_id, quantity, amount_net, amount_gross) VALUES ('dup-1', 0, ?, 2, 200, 200)").run(C);
+  inv = await call('GET', '/api/inventory/summary', null);
+  const c = byId(inv.details, C);
+  ok(c && approx(c.qtyOnHand, 2), `[inv-p3] (8) NOT EXISTS de-dup: header+items counts items only → onHand 2 (not 101), got ${c?.qtyOnHand}`);
+  ok(c && approx(c.unitCost, 100), `[inv-p3] (8) NOT EXISTS de-dup: avg = 200/2 = 100 (header tons 99 / cost 9900 excluded), got ${c?.unitCost}`);
+}
+
 // §2B Batch 3 — relative-date helper so aging tests never go stale. Use mid-bucket offsets
 // (15/45/75/120), NEVER boundary values (30/60/90): the handler's daysDiff is a floor, so a
 // boundary row could flip buckets on a sub-day/UTC edge. Both test and handler derive dates
