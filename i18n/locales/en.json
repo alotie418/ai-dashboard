@@ -441,6 +441,8 @@
     "taxSummaryNote2": "Core financial decisions should be based on tax-exclusive amounts"
   },
   "purchases": {
+    "modalTitleEdit": "Edit Purchase",
+    "formSubmitEdit": "Save Changes",
     "title": "Purchases & Input Tax",
     "pageSubtitle": "Purchase business ledger — record each purchase as it happens; profit & loss is based on business records.",
     "formInvoiceStatus": "Invoice Status",

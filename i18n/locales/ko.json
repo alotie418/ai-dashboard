@@ -441,6 +441,8 @@
     "taxSummaryNote2": "Core financial decisions should be based on tax-exclusive amounts"
   },
   "purchases": {
+    "modalTitleEdit": "매입 기록 편집",
+    "formSubmitEdit": "변경 저장",
     "title": "매입 및 매입세액",
     "pageSubtitle": "매입 업무 원장: 매입 발생을 건별로 기록하며, 손익은 업무 기록을 기준으로 합니다.",
     "formInvoiceStatus": "송장 상태",

@@ -441,6 +441,8 @@
     "taxSummaryNote2": "Core financial decisions should be based on tax-exclusive amounts"
   },
   "purchases": {
+    "modalTitleEdit": "仕入記録の編集",
+    "formSubmitEdit": "変更を保存",
     "title": "仕入・仕入税額",
     "pageSubtitle": "仕入業務台帳：仕入の発生をその都度記録します。損益は業務記録を基準とします。",
     "formInvoiceStatus": "請求書ステータス",
