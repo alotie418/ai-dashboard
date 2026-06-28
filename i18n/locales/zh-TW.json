@@ -441,6 +441,8 @@
     "taxSummaryNote2": "核心財務決策應基於不含稅金額進行分析"
   },
   "purchases": {
+    "modalTitleEdit": "編輯採購記錄",
+    "formSubmitEdit": "確認修改",
     "title": "採購",
     "pageSubtitle": "採購業務台帳：逐筆記錄採購發生，經營損益以業務記錄為準。",
     "formInvoiceStatus": "發票狀態",

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { analyzeInvoice, extractedToPurchaseForm, type ExtractedInvoice } from '../services/ocrService';
 import { rasterizePdfFirstPage } from '../services/pdfRaster';
-import { fetchPurchases, createPurchase, deletePurchase, fetchSettings, listProducts, listProviders, type Product, PurchaseRecord } from '../services/api';
+import { fetchPurchases, createPurchase, updatePurchase, deletePurchase, fetchSettings, listProducts, listProviders, type Product, PurchaseRecord } from '../services/api';
 import { getSystemErrorText } from '../services/systemErrors';
 import { formatMoney, getCurrencySymbol, getTaxLabel, formatLegacyQuantity, getProductUnitLabel } from './accountingHelpers';
 import { classifyInvoiceStatus, INVOICE_STATUS_BADGE_CLASS } from './invoiceStatusDisplay';
@@ -49,6 +49,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
   const [recognitionMode, setRecognitionMode] = useState<'ai' | 'ocr'>('ai');
   const [isScanning, setIsScanning] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [records, setRecords] = useState<PurchaseRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCsvImport, setShowCsvImport] = useState(false);
@@ -203,11 +204,19 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
       alert(t('purchases.errorRequiredFields'));
       return;
     }
-    const recordToAdd: PurchaseRecord = { id: nextPurchaseId(), ...newPurchase, status: purchaseInvoiceStatus };
     try {
-      await createPurchase(recordToAdd);
-      setRecords(prev => [recordToAdd, ...prev]);
+      if (editingId) {
+        // Update the existing purchase in place — never insert a duplicate row.
+        const recordToUpdate: PurchaseRecord = { id: editingId, ...newPurchase, status: purchaseInvoiceStatus };
+        await updatePurchase(editingId, recordToUpdate);
+        setRecords(prev => prev.map(r => r.id === editingId ? recordToUpdate : r));
+      } else {
+        const recordToAdd: PurchaseRecord = { id: nextPurchaseId(), ...newPurchase, status: purchaseInvoiceStatus };
+        await createPurchase(recordToAdd);
+        setRecords(prev => [recordToAdd, ...prev]);
+      }
       setShowAddModal(false);
+      setEditingId(null);
       setNewPurchase({
         date: new Date().toISOString().split('T')[0],
         supplier: '',
@@ -263,7 +272,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
             {isScanning ? t('purchases.scanning') : (accLocale === 'KR' ? taxLabel('scanDocButton') : t('purchases.scanInvoice'))}
           </button>
           <button
-            onClick={() => { setPurchaseInvoiceStatus('未收'); setShowAddModal(true); }}
+            onClick={() => { setEditingId(null); setPurchaseInvoiceStatus('未收'); setShowAddModal(true); }}
             className="flex items-center px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors text-sm font-medium" style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}
           >
             <i className="fas fa-plus mr-2"></i> {accLocale !== 'CN' ? taxLabel('newPurchaseButton') : t('purchases.newPurchase')}
@@ -378,6 +387,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                   <td className="px-5 py-5 text-xs font-medium space-x-3">
                     <button
                       onClick={() => {
+                        setEditingId(row.id);
                         setNewPurchase({ date: row.date, supplier: row.supplier, productId: row.productId || '', quantity: row.quantity, price: row.price, taxRate: row.taxRate, invoiceNo: row.invoiceNo, dueDate: row.dueDate || '', totalWithTax: row.totalWithTax || 0, unitPriceWithoutTax: row.unitPriceWithoutTax || 0, taxAmount: row.taxAmount || 0 });
                         setPurchaseInvoiceStatus(row.status || '未收');
                         setShowAddModal(true);
@@ -467,14 +477,14 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
       {/* Add Purchase Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAddModal(false)}></div>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setShowAddModal(false); setEditingId(null); }}></div>
           <div className="relative w-full max-w-xl bg-white border border-[#e0ddd5] rounded-xl overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
             <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center gap-4 shrink-0">
               <div className="flex-shrink-0">
-                <h2 className="text-xl font-bold text-[#191918] whitespace-nowrap">{(accLocale !== 'CN') ? taxLabel('modalTitlePurchase') : t('purchases.modalTitle')}</h2>
+                <h2 className="text-xl font-bold text-[#191918] whitespace-nowrap">{editingId ? t('purchases.modalTitleEdit') : ((accLocale !== 'CN') ? taxLabel('modalTitlePurchase') : t('purchases.modalTitle'))}</h2>
                 <p className="text-xs text-[#5c5c5a] mt-1">{(accLocale !== 'CN') ? taxLabel('modalSubtitlePurchase') : t('purchases.modalSubtitle')}</p>
               </div>
-              <button onClick={() => setShowAddModal(false)} aria-label={t('common.close')} className="flex-shrink-0 text-[#5c5c5a] hover:text-[#191918] transition-colors">
+              <button onClick={() => { setShowAddModal(false); setEditingId(null); }} aria-label={t('common.close')} className="flex-shrink-0 text-[#5c5c5a] hover:text-[#191918] transition-colors">
                 <i className="fas fa-times text-xl"></i>
               </button>
             </div>
@@ -652,7 +662,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                   type="submit"
                   className="flex-2 px-10 py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl transition-all active:scale-95" style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}
                 >
-                  {t('purchases.formSubmit')}
+                  {editingId ? t('purchases.formSubmitEdit') : t('purchases.formSubmit')}
                 </button>
               </div>
             </form>

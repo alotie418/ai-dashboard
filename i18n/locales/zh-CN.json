@@ -441,6 +441,8 @@
     "taxSummaryNote2": "核心财务决策应基于不含税金额进行分析"
   },
   "purchases": {
+    "modalTitleEdit": "编辑采购记录",
+    "formSubmitEdit": "确认修改",
     "title": "采购",
     "pageSubtitle": "采购业务台账：逐笔记录采购发生，经营损益以业务记录为准。",
     "formInvoiceStatus": "发票状态",
