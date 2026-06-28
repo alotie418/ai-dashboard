@@ -705,6 +705,13 @@
     "corrWeak": "약함"
   },
   "accounts": {
+    "headerCreditPeriod": "기한",
+    "headerAging": "경과일수",
+    "dueRemaining": "{{days}}일 남음",
+    "dueOverdue": "{{days}}일 연체",
+    "dueToday": "오늘 마감",
+    "dueNotSet": "미설정",
+    "agingDays": "{{days}}일",
     "receivable": "매출채권",
     "pageSubtitle": "매입·매출의 결제 상태에 따라 채권/채무와 연령 분석을 추적합니다.",
     "payable": "매입채무",

@@ -204,6 +204,8 @@ const AccountsPage: React.FC = () => {
                       <th className="px-4 py-2 text-right">{t('accounts.headerPaid')}</th>
                       <th className="px-4 py-2 text-right">{t('accounts.headerUnpaid')}</th>
                       <th className="px-4 py-2 text-center">{t('accounts.headerDueDate')}</th>
+                      <th className="px-4 py-2 text-center">{t('accounts.headerCreditPeriod')}</th>
+                      <th className="px-4 py-2 text-center">{t('accounts.headerAging')}</th>
                       <th className="px-4 py-2 text-center">{t('accounts.headerStatus')}</th>
                       <th className="px-4 py-2 text-center">{t('accounts.headerAction')}</th>
                     </tr>
@@ -211,7 +213,16 @@ const AccountsPage: React.FC = () => {
                   <tbody>
                     {details.map((item: any) => {
                       const unpaid = (item.totalAmount || 0) - (item.paid_amount || 0);
-                      const isOverdue = item.due_date && item.due_date < new Date().toISOString().split('T')[0];
+                      const today = new Date().toISOString().split('T')[0];
+                      const isOverdue = item.due_date && item.due_date < today;
+                      const daysBetween = (a: string, b: string) => Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
+                      // 账期 (credit period): due-date countdown derived from due_date.
+                      const creditPeriod = !item.due_date ? t('accounts.dueNotSet')
+                        : item.due_date > today ? t('accounts.dueRemaining', { days: daysBetween(today, item.due_date) })
+                        : item.due_date === today ? t('accounts.dueToday')
+                        : t('accounts.dueOverdue', { days: daysBetween(item.due_date, today) });
+                      // 账龄 (aging): days outstanding from the document date.
+                      const aging = item.date ? t('accounts.agingDays', { days: daysBetween(item.date, today) }) : t('accounts.dueNotSet');
                       return (
                         <tr key={item.id} className="border-t border-[#f0eeeb] hover:bg-[#f9f9f8]">
                           <td className="px-4 py-2.5">{item.date}</td>
@@ -220,6 +231,8 @@ const AccountsPage: React.FC = () => {
                           <td className="px-4 py-2.5 text-right text-green-600">{formatCurrency(item.paid_amount || 0)}</td>
                           <td className="px-4 py-2.5 text-right font-medium text-red-500">{formatCurrency(unpaid)}</td>
                           <td className="px-4 py-2.5 text-center">{item.due_date || '-'}</td>
+                          <td className={`px-4 py-2.5 text-center ${isOverdue ? 'text-red-500' : 'text-[#5c5c5a]'}`}>{creditPeriod}</td>
+                          <td className="px-4 py-2.5 text-center text-[#5c5c5a]">{aging}</td>
                           <td className="px-4 py-2.5 text-center">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
                               isOverdue ? 'bg-red-100 text-red-600' :

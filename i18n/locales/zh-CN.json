@@ -705,6 +705,13 @@
     "corrWeak": "弱"
   },
   "accounts": {
+    "headerCreditPeriod": "账期",
+    "headerAging": "账龄",
+    "dueRemaining": "剩余 {{days}} 天",
+    "dueOverdue": "逾期 {{days}} 天",
+    "dueToday": "今日到期",
+    "dueNotSet": "未设置",
+    "agingDays": "{{days}} 天",
     "receivable": "应收账款",
     "pageSubtitle": "按采购/销售的付款状态跟踪应收应付与账龄。",
     "payable": "应付账款",

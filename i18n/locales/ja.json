@@ -705,6 +705,13 @@
     "corrWeak": "弱"
   },
   "accounts": {
+    "headerCreditPeriod": "支払期日",
+    "headerAging": "経過日数",
+    "dueRemaining": "残り{{days}}日",
+    "dueOverdue": "{{days}}日超過",
+    "dueToday": "本日期限",
+    "dueNotSet": "未設定",
+    "agingDays": "{{days}}日",
     "receivable": "売掛金",
     "pageSubtitle": "仕入・売上の支払ステータスに基づき、売掛金・買掛金と年齢分析を管理します。",
     "payable": "買掛金",

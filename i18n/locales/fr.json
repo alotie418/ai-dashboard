@@ -705,6 +705,13 @@
     "corrWeak": "Faible"
   },
   "accounts": {
+    "headerCreditPeriod": "Échéance",
+    "headerAging": "Ancienneté",
+    "dueRemaining": "{{days}} j restants",
+    "dueOverdue": "{{days}} j de retard",
+    "dueToday": "Échéance aujourd'hui",
+    "dueNotSet": "Non défini",
+    "agingDays": "{{days}} j",
     "receivable": "Créances clients",
     "pageSubtitle": "Suivez les créances/dettes et l'ancienneté selon le statut de paiement des achats / ventes.",
     "payable": "Dettes fournisseurs",
