@@ -937,6 +937,7 @@
     "dismiss": "忽略"
   },
   "tableHeaders": {
+    "product": "商品",
     "date": "日期",
     "supplier": "供应商",
     "customer": "客户",

@@ -937,6 +937,7 @@
     "dismiss": "無視"
   },
   "tableHeaders": {
+    "product": "商品",
     "date": "日付",
     "supplier": "仕入先",
     "customer": "得意先",
