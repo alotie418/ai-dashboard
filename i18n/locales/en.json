@@ -705,6 +705,13 @@
     "corrWeak": "Weak"
   },
   "accounts": {
+    "headerCreditPeriod": "Term",
+    "headerAging": "Aging",
+    "dueRemaining": "{{days}}d left",
+    "dueOverdue": "{{days}}d overdue",
+    "dueToday": "Due today",
+    "dueNotSet": "Not set",
+    "agingDays": "{{days}}d",
     "receivable": "Receivables",
     "pageSubtitle": "Track receivables/payables and aging by the payment status of purchases / sales.",
     "payable": "Payables",

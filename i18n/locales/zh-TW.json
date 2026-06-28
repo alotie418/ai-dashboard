@@ -705,6 +705,13 @@
     "corrWeak": "弱"
   },
   "accounts": {
+    "headerCreditPeriod": "帳期",
+    "headerAging": "帳齡",
+    "dueRemaining": "剩餘 {{days}} 天",
+    "dueOverdue": "逾期 {{days}} 天",
+    "dueToday": "今日到期",
+    "dueNotSet": "未設定",
+    "agingDays": "{{days}} 天",
     "receivable": "應收帳款",
     "pageSubtitle": "依採購/銷售的付款狀態追蹤應收應付與帳齡。",
     "payable": "應付帳款",
