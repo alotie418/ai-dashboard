@@ -1144,6 +1144,23 @@ export function saveHomeOffice(body: Partial<HomeOfficeData>): Promise<HomeOffic
 // ==================== Types ====================
 
 // Frontend interfaces (match component definitions)
+// Detail line item (P4a) — camelCase mirror of purchase_items / sales_items columns.
+// Read side only: populated by getPurchase/getSale detail reads. The write mapping
+// (toApi* sending items) is deferred to P4b/c.
+export interface LineItem {
+  id?: number;
+  productId: string | null;
+  description: string | null;
+  unitSnapshot: string | null;
+  quantity: number | null;
+  unitPrice: number | null;
+  amountNet: number;
+  taxRate: number | null;
+  taxAmount: number;
+  amountGross: number;
+  lineNo: number;
+}
+
 export interface SalesRecord {
   id: string;
   date: string;
@@ -1166,6 +1183,7 @@ export interface SalesRecord {
   productId?: string;       // Phase 2: linked product/service
   productName?: string;     // snapshot at record time
   unit?: string;            // snapshot at record time
+  items?: LineItem[];       // P4a: present on getSale detail; undefined from list()
 }
 
 export interface PurchaseRecord {
@@ -1189,6 +1207,7 @@ export interface PurchaseRecord {
   productId?: string;       // Phase 2: linked product/service
   productName?: string;     // snapshot at record time
   unit?: string;            // snapshot at record time
+  items?: LineItem[];       // P4a: present on getPurchase detail; undefined from list()
 }
 
 export interface AppSettings {
@@ -1235,6 +1254,7 @@ interface ApiSalesRecord {
   product_id?: string | null;
   product_name_snapshot?: string | null;
   unit_snapshot?: string | null;
+  items?: any[];            // P4a: present on the /:id detail read; absent from the list
 }
 
 interface ApiPurchaseRecord {
@@ -1257,6 +1277,7 @@ interface ApiPurchaseRecord {
   product_id?: string | null;
   product_name_snapshot?: string | null;
   unit_snapshot?: string | null;
+  items?: any[];            // P4a: present on the /:id detail read; absent from the list
 }
 
 // ==================== Helpers ====================
@@ -1272,6 +1293,23 @@ function parseTaxRatePercent(taxRate: string): number {
 }
 
 // ==================== Field Mapping ====================
+
+// P4a: map one detail item row (snake_case from purchase_items/sales_items) → LineItem.
+function fromApiLineItem(r: any): LineItem {
+  return {
+    id: r.id,
+    productId: r.product_id ?? null,
+    description: r.description ?? null,
+    unitSnapshot: r.unit_snapshot ?? null,
+    quantity: r.quantity ?? null,
+    unitPrice: r.unit_price ?? null,
+    amountNet: r.amount_net ?? 0,
+    taxRate: r.tax_rate ?? null,
+    taxAmount: r.tax_amount ?? 0,
+    amountGross: r.amount_gross ?? 0,
+    lineNo: r.line_no ?? 0,
+  };
+}
 
 function toApiSales(r: SalesRecord): ApiSalesRecord {
   const tons = parseTons(r.quantity);
@@ -1326,6 +1364,7 @@ function fromApiSales(a: ApiSalesRecord): SalesRecord {
     productId: a.product_id || '',
     productName: a.product_name_snapshot || '',
     unit: a.unit_snapshot || '',
+    items: Array.isArray(a.items) ? a.items.map(fromApiLineItem) : undefined,
   };
 }
 
@@ -1380,6 +1419,7 @@ function fromApiPurchase(a: ApiPurchaseRecord): PurchaseRecord {
     productId: a.product_id || '',
     productName: a.product_name_snapshot || '',
     unit: a.unit_snapshot || '',
+    items: Array.isArray(a.items) ? a.items.map(fromApiLineItem) : undefined,
   };
 }
 
@@ -1414,6 +1454,11 @@ export async function fetchSales(): Promise<SalesRecord[]> {
   return results.map(fromApiSales);
 }
 
+// P4a: detail read — sale header + its line items (items: [] for legacy single-item records).
+export async function getSale(id: string): Promise<SalesRecord> {
+  return fromApiSales(await apiFetch<ApiSalesRecord>(`/api/sales/${encodeURIComponent(id)}`));
+}
+
 export async function createSale(record: SalesRecord): Promise<void> {
   await apiFetch('/api/sales', {
     method: 'POST',
@@ -1439,6 +1484,11 @@ export async function deleteSale(id: string): Promise<void> {
 export async function fetchPurchases(): Promise<PurchaseRecord[]> {
   const results = await apiFetch<ApiPurchaseRecord[]>('/api/purchases');
   return results.map(fromApiPurchase);
+}
+
+// P4a: detail read — purchase header + its line items (items: [] for legacy single-item records).
+export async function getPurchase(id: string): Promise<PurchaseRecord> {
+  return fromApiPurchase(await apiFetch<ApiPurchaseRecord>(`/api/purchases/${encodeURIComponent(id)}`));
 }
 
 export async function createPurchase(record: PurchaseRecord): Promise<void> {

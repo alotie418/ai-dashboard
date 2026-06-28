@@ -44,6 +44,7 @@ const routes = [
   ['PUT', '/api/sales/:id/payment', payment.recordSalePayment],
   ['GET', '/api/sales', sales.list],
   ['POST', '/api/sales', sales.create],
+  ['GET', '/api/sales/:id', sales.get],
   ['PUT', '/api/sales/:id', sales.update],
   ['DELETE', '/api/sales/:id', sales.remove],
 
@@ -52,6 +53,7 @@ const routes = [
   ['PUT', '/api/purchases/:id/payment', payment.recordPurchasePayment],
   ['GET', '/api/purchases', purchases.list],
   ['POST', '/api/purchases', purchases.create],
+  ['GET', '/api/purchases/:id', purchases.get],
   ['PUT', '/api/purchases/:id', purchases.update],
   ['DELETE', '/api/purchases/:id', purchases.remove],
 

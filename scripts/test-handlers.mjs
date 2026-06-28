@@ -324,6 +324,71 @@ async function expectThrow(fn, label) {
   ok(approx(lg.tons, 10) && approx(lg.totalAmount, 1130), '[items] legacy purchase header unchanged (tons/total preserved, not neutralised)');
 }
 
+// ───────────── P4a: detail read GET /api/purchases/:id + /api/sales/:id (header + items[]) ─────────────
+// Detail returns the header plus its line items (ordered by line_no, id). Legacy single-item
+// records have no child rows → items: []. list() shape is unchanged (still an array of headers).
+{
+  const db = freshDb();
+
+  // (a) legacy purchase → items: []
+  await call('POST', '/api/purchases', { id: 'd-lg', date: `${YEAR}-06-01`, supplier: 'Legacy', tons: 10, totalAmount: 1130, amountWithoutTax: 1000 });
+  const dlg = await call('GET', '/api/purchases/d-lg', null);
+  ok(dlg && dlg.id === 'd-lg' && dlg.supplier === 'Legacy', '[p4a] getPurchase returns the header');
+  ok(Array.isArray(dlg.items) && dlg.items.length === 0, '[p4a] legacy purchase detail → items: []');
+
+  // (b) multi-line purchase → real items[] ordered by line_no; header neutralised (P2)
+  await call('POST', '/api/purchases', { id: 'd-ml', date: `${YEAR}-06-02`, supplier: 'Multi', items: [
+    { product_id: 'pa', description: 'A', unit_snapshot: 'piece', quantity: 2, unit_price: 100, amount_net: 200, tax_rate: 13, tax_amount: 26, amount_gross: 226 },
+    { product_id: 'pb', description: 'B', unit_snapshot: 'box', quantity: 1, unit_price: 50, amount_net: 50, tax_rate: 6, tax_amount: 3, amount_gross: 53 },
+  ] });
+  const dml = await call('GET', '/api/purchases/d-ml', null);
+  ok(approx(dml.tons, 0) && dml.product_id == null, '[p4a] multi-line purchase header still neutralised in detail');
+  ok(Array.isArray(dml.items) && dml.items.length === 2, '[p4a] multi-line purchase detail → 2 items');
+  ok(dml.items[0].line_no === 0 && dml.items[0].product_id === 'pa' && approx(dml.items[0].amount_net, 200), '[p4a] item fields returned (line_no/product_id/amount_net)');
+  ok(approx(dml.items[0].tax_amount, 26) && approx(dml.items[1].amount_gross, 53), '[p4a] item tax_amount/amount_gross returned');
+
+  // (c) items ordered by line_no even when inserted out of order
+  db.prepare("INSERT INTO purchases (id, date, supplier, tons, product_id) VALUES ('d-ord', ?, 'S', 0, NULL)").run(`${YEAR}-06-03`);
+  for (const ln of [2, 0, 1]) {
+    db.prepare("INSERT INTO purchase_items (purchase_id, line_no, product_id, quantity, amount_net) VALUES ('d-ord', ?, ?, 1, 10)").run(ln, `p${ln}`);
+  }
+  const dord = await call('GET', '/api/purchases/d-ord', null);
+  ok(dord.items.map((i) => i.line_no).join(',') === '0,1,2', `[p4a] items ordered by line_no, got ${dord.items.map((i) => i.line_no).join(',')}`);
+
+  // (d) not found
+  await expectThrow(() => call('GET', '/api/purchases/nope', null), '[p4a] getPurchase missing → Purchase not found');
+
+  // (e) list() still returns an array (the :id route did not shadow the collection GET)
+  const plist = await call('GET', '/api/purchases', null);
+  ok(Array.isArray(plist) && plist.length === 3, `[p4a] GET /api/purchases list still returns an array, got ${Array.isArray(plist) ? plist.length : typeof plist}`);
+}
+
+// sales mirror — incl shippingCost staying on the header
+{
+  freshDb();
+
+  // legacy sale → items: [] (shippingCost on header)
+  await call('POST', '/api/sales', { id: 's-lg', date: `${YEAR}-06-01`, customer: 'C', tons: 5, totalAmount: 565, shippingCost: 40 });
+  const slg = await call('GET', '/api/sales/s-lg', null);
+  ok(slg.id === 's-lg' && approx(slg.shippingCost, 40), '[p4a] getSale returns header incl shippingCost');
+  ok(Array.isArray(slg.items) && slg.items.length === 0, '[p4a] legacy sale detail → items: []');
+
+  // multi-line sale → items[]; shippingCost still header-level, tons neutralised
+  await call('POST', '/api/sales', { id: 's-ml', date: `${YEAR}-06-02`, customer: 'C', shippingCost: 25, items: [
+    { product_id: 'sa', quantity: 3, amount_net: 300, tax_amount: 39, amount_gross: 339 },
+  ] });
+  const sml = await call('GET', '/api/sales/s-ml', null);
+  ok(approx(sml.shippingCost, 25) && approx(sml.tons, 0), '[p4a] multi-line sale: shippingCost on header, tons neutralised');
+  ok(Array.isArray(sml.items) && sml.items.length === 1 && approx(sml.items[0].amount_gross, 339), '[p4a] multi-line sale detail → 1 item');
+
+  // not found
+  await expectThrow(() => call('GET', '/api/sales/nope', null), '[p4a] getSale missing → Sale not found');
+
+  // list() still an array
+  const slist = await call('GET', '/api/sales', null);
+  ok(Array.isArray(slist) && slist.length === 2, `[p4a] GET /api/sales list still returns an array, got ${Array.isArray(slist) ? slist.length : typeof slist}`);
+}
+
 // ───────────── dashboard end-to-end (settings → report engine → financialStatement) ─────────────
 {
   const db = freshDb();
