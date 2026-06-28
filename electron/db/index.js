@@ -650,6 +650,60 @@ const MIGRATIONS = [
     add('disposal_date', 'TEXT');                               // recorded only; no disposal P&L in P2
     console.log('[db] v19: fixed_assets depreciation params added (params only — no depreciation computed)');
   },
+
+  // v20: per-record line items for purchases / sales (multi-product P1 — schema only).
+  //   Two child tables mirroring the two header tables (purchase_items / sales_items).
+  //   STRICTLY ADDITIVE: this migration ONLY creates tables + indexes. It does NOT
+  //   touch purchases / sales columns, does NOT backfill any row, and changes NO
+  //   behaviour — no handler, inventory, reports, dashboard, AR/AP, cashflow, CSV, AI
+  //   or UI reads these tables yet (wired up in later phases P2–P4). Existing rows stay
+  //   "header-only" (an implicit single line) until then.
+  //   FK: purchase_id / sale_id → header(id) ON DELETE CASCADE so deleting a header
+  //   removes its lines (foreign_keys is ON). product_id is a PLAIN column on purpose —
+  //   an enforced FK to products(id) would make the bare DELETE in products.remove fail
+  //   (same precedent as v11 business_document_items). Lines are self-contained snapshots
+  //   (description / unit_snapshot frozen at save time). Idempotent via IF NOT EXISTS.
+  (d) => {
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS purchase_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        purchase_id TEXT NOT NULL REFERENCES purchases(id) ON DELETE CASCADE,
+        line_no INTEGER DEFAULT 0,
+        product_id TEXT,
+        description TEXT,
+        unit_snapshot TEXT,
+        quantity REAL,
+        unit_price REAL,
+        amount_net REAL DEFAULT 0,
+        tax_rate REAL,
+        tax_amount REAL DEFAULT 0,
+        amount_gross REAL DEFAULT 0
+      )
+    `);
+    d.exec('CREATE INDEX IF NOT EXISTS idx_purchase_items_purchase ON purchase_items(purchase_id)');
+    d.exec('CREATE INDEX IF NOT EXISTS idx_purchase_items_product ON purchase_items(product_id)');
+
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS sales_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sale_id TEXT NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+        line_no INTEGER DEFAULT 0,
+        product_id TEXT,
+        description TEXT,
+        unit_snapshot TEXT,
+        quantity REAL,
+        unit_price REAL,
+        amount_net REAL DEFAULT 0,
+        tax_rate REAL,
+        tax_amount REAL DEFAULT 0,
+        amount_gross REAL DEFAULT 0
+      )
+    `);
+    d.exec('CREATE INDEX IF NOT EXISTS idx_sales_items_sale ON sales_items(sale_id)');
+    d.exec('CREATE INDEX IF NOT EXISTS idx_sales_items_product ON sales_items(product_id)');
+
+    console.log('[db] v20: purchase_items + sales_items tables ready (schema only — no backfill, no behaviour change)');
+  },
 ];
 
 function runMigrations(d) {
