@@ -965,6 +965,7 @@
   "common2": {
     "lineNetAmount": "Line amount (excl. tax)",
     "taxAmount": "Tax",
+    "multiLineQtyHint": "Multiple products — see quantities per product",
     "dueDate": "Due date",
     "edit": "Edit",
     "delete": "Delete",

@@ -965,6 +965,7 @@
   "common2": {
     "lineNetAmount": "本行未稅金額",
     "taxAmount": "稅額",
+    "multiLineQtyHint": "多商品明細，請依商品查看數量",
     "dueDate": "到期日",
     "edit": "編輯",
     "delete": "刪除",

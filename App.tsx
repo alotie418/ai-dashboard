@@ -239,7 +239,11 @@ const AppContent: React.FC = () => {
           inventoryTons: m.inventoryTons,
           purchaseTotalTons: m.purchaseTotalTons,
           salesTotalTons: m.salesTotalTons,
-        },
+          // P5b-2a: surface the multi-line flag so the sales inventory banner can degrade its
+          // header-tons quantity display. Cast: rawMetrics' type lives in types.ts and is left
+          // unwidened on purpose — the read side uses (rawMetrics as any).hasMultiLine.
+          hasMultiLine,
+        } as any,
         monthlyPerformance: dashboard.monthlyPerformance,
         financialStatement: enrichedFS,
         vatStatistics: dashboard.vatStatistics,
