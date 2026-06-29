@@ -261,7 +261,9 @@
       "csvTransactions": "Transactions",
       "csvPurchases": "Purchases",
       "csvSales": "Sales",
-      "csvDocuments": "Documents"
+      "csvDocuments": "Documents",
+      "csvPurchaseItems": "Purchase items",
+      "csvSalesItems": "Sales items"
     },
     "dataMigration": {
       "title": "Data Migration",

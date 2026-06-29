@@ -12,6 +12,10 @@ const EXPORTABLE_TABLES = {
   purchases: { table: 'purchases', order: 'date DESC' },
   sales: { table: 'sales', order: 'date DESC' },
   documents: { table: 'business_documents', order: 'doc_date DESC' },
+  // 多商品明细子表（schema v20）。无 date 列，按「父 id + 行号」排序，使同一单的明细聚在一起；
+  // 导出含 purchase_id/sale_id，可按 id 关联回 purchases/sales 主表 CSV。无任何凭证/密钥列。
+  purchase_items: { table: 'purchase_items', order: 'purchase_id, line_no' },
+  sales_items: { table: 'sales_items', order: 'sale_id, line_no' },
 };
 
 function csvCell(v) {

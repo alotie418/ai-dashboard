@@ -261,7 +261,9 @@
       "csvTransactions": "取引",
       "csvPurchases": "仕入",
       "csvSales": "売上",
-      "csvDocuments": "書類"
+      "csvDocuments": "書類",
+      "csvPurchaseItems": "仕入明細",
+      "csvSalesItems": "売上明細"
     },
     "dataMigration": {
       "title": "データ移行",

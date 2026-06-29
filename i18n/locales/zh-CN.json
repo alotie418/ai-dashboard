@@ -261,7 +261,9 @@
       "csvTransactions": "交易",
       "csvPurchases": "采购",
       "csvSales": "销售",
-      "csvDocuments": "单据"
+      "csvDocuments": "单据",
+      "csvPurchaseItems": "采购明细",
+      "csvSalesItems": "销售明细"
     },
     "dataMigration": {
       "title": "数据迁移",
