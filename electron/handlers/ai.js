@@ -78,6 +78,17 @@ async function context({ body }) {
   // its response in the user's uiLanguage.
   const num = (v) => Number(v || 0).toLocaleString();
 
+  // P5b-2c: when the period contains multi-line item records, the quantity/volume figures below
+  // read header-level tons (0 for a multi-line record — the real, mixed-unit quantities live in
+  // the line items), so they are incomplete. Prepend a caveat (before [Dashboard]) so the AI never
+  // treats them as reliable totals or aggregates them across products. Amount metrics are
+  // unaffected. Locale-neutral English like the rest of the context; the model answers in the
+  // user's UI language. Per-record qty lines are left as-is — this note covers them globally.
+  if (dash?.metrics?.hasMultiLine) {
+    sections.push(`[Note]
+This period includes multi-line item records. Quantity/volume fields such as inventoryTons, purchaseTotalTons, salesTotalTons, monthly volume, and per-record qty may be incomplete. Do not treat quantity/volume metrics as reliable totals or compare them across products. Use amount-based metrics and per-product inventory details instead. Amount metrics such as revenue, COGS, profit, receivables, payables, and tax are not affected.`);
+  }
+
   if (dash) {
     const fs = dash.financialStatement || {};
     const metrics = dash.metrics || {};
