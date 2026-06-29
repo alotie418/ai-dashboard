@@ -666,6 +666,25 @@ test.describe('accounting display clarity', () => {
       .not.toContain(`${loc.dashboard.purchasesLabel}: 269.6`);
   });
 
+  // (3c) P5b-2a: the sales page inventory banner degrades to a neutral notice under multi-line
+  // records — no distorted header-tons totals, no false low-stock alarm.
+  test('sales: inventory banner degrades under multi-line records', async ({ page }) => {
+    const ui = 'zh-CN';
+    const base = DASHBOARD('CN');
+    // salesTotalTons > purchaseTotalTons would normally raise a false "库存不足" alarm
+    const dashboard = { ...base, metrics: { ...base.metrics, purchaseTotalTons: 5, salesTotalTons: 9, hasMultiLine: true } };
+    await bootComboIPC(page, ui, 'CN', { dashboard });
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    // navigate to the sales page (sidebar icon fa-file-export)
+    await page.locator('i.fa-file-export').first().click();
+    // the neutral multi-line quantity notice shows
+    await expect(page.getByText(loc.common2.multiLineQtyHint).first()).toBeVisible({ timeout: 10_000 });
+    // and the low/sufficient stock alarm wording is gone
+    const body = await page.locator('body').innerText();
+    expect(body, 'no low-stock alarm under multi-line').not.toContain(loc.sales.inventoryLow);
+    expect(body, 'no sufficient-stock alarm under multi-line').not.toContain(loc.sales.inventorySufficient);
+  });
+
   // (4) accounts: empty data → N/A rate, never a fabricated 100%
   test('accounts: empty receivables show N/A rate, not 100%', async ({ page }) => {
     const ui = 'zh-CN';
@@ -1800,6 +1819,31 @@ test.describe('PR-2 → invoice query reconciliation ledger filter', () => {
     const outputBadge = page.locator('table tbody').getByText('销项', { exact: true }).first();
     await expect(outputBadge).toHaveClass(/text-primary/);
     await expect(outputBadge).not.toHaveClass(/text-rose-600/);
+  });
+
+  // P5b-2a: a multi-line record (multi-product, possibly mixed-unit) makes the header-quantity
+  // stats misleading, so the quantity stat cards degrade to '—' + a notice. Money cards (待处理
+  // 进项税额) are unaffected — list() attaches items[] only to such records, flagging them locally.
+  test('multi-line records degrade the quantity stat cards', async ({ page }) => {
+    await bootComboIPC(page, ui, 'CN', {
+      apiResponses: [
+        { match: '/api/purchases', method: 'GET', json: [
+          { id: 'p-ml', date: '2026-06-15', supplier: '多商品采购', tons: 0, pricePerTon: 0, totalAmount: 279, amountWithoutTax: 250, taxAmount: 29, taxRate: 13, invoiceNumber: 'PM-1', invoiceStatus: '已收', product_id: null,
+            items: [
+              { line_no: 0, product_id: 'a', description: 'A', unit_snapshot: 'piece', quantity: 2, unit_price: 100, amount_net: 200, tax_rate: 13, tax_amount: 26, amount_gross: 226 },
+              { line_no: 1, product_id: 'b', description: 'B', unit_snapshot: 'box', quantity: 1, unit_price: 50, amount_net: 50, tax_rate: 6, tax_amount: 3, amount_gross: 53 },
+            ] },
+        ] },
+        { match: '/api/sales', method: 'GET', json: [] },
+      ],
+    });
+    await page.locator('i.fa-search-dollar').first().click();
+    await expect(page.getByText('发票核对台账')).toBeVisible({ timeout: 10_000 });
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+    // the 当前库存 quantity card degrades to '—'
+    await expect(page.locator('[data-testid="inventory-quantity"]')).toHaveText('—');
+    // the multi-line quantity notice shows on the degraded card(s)
+    await expect(page.getByText(loc.common2.multiLineQtyHint).first()).toBeVisible();
   });
 });
 

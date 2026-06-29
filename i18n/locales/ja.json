@@ -965,6 +965,7 @@
   "common2": {
     "lineNetAmount": "明細金額（税抜）",
     "taxAmount": "税額",
+    "multiLineQtyHint": "複数商品の明細 — 数量は商品別にご確認ください",
     "dueDate": "支払期日",
     "edit": "編集",
     "delete": "削除",

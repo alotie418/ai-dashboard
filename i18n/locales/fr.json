@@ -965,6 +965,7 @@
   "common2": {
     "lineNetAmount": "Montant HT de la ligne",
     "taxAmount": "Taxe",
+    "multiLineQtyHint": "Plusieurs produits — voir les quantités par produit",
     "dueDate": "Date d'échéance",
     "edit": "Modifier",
     "delete": "Supprimer",

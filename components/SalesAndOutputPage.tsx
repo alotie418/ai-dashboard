@@ -460,6 +460,20 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
 
       {/* Inventory Banner */}
       {(() => {
+        // P5b-2a: with multi-line (multi-product, possibly mixed-unit) records in the period the
+        // header-tons totals are undercounted and the purchase−sales "inventory" would even raise a
+        // false low-stock alarm. Degrade to a neutral notice (no alarm, no distorted numbers) and
+        // steer to per-product inventory. Money figures elsewhere are unaffected.
+        if ((data.rawMetrics as any)?.hasMultiLine === true) {
+          return (
+            <div className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl p-4 flex items-center space-x-3">
+              <div className="text-[#5c5c5a] bg-[#f0eeeb] w-8 h-8 rounded-full flex items-center justify-center">
+                <i className="fas fa-boxes"></i>
+              </div>
+              <p className="text-[#5c5c5a] text-sm">{t('common2.multiLineQtyHint')}</p>
+            </div>
+          );
+        }
         const purchaseQty = data.rawMetrics?.purchaseTotalTons ?? 0;
         const salesQty = data.rawMetrics?.salesTotalTons ?? 0;
         const inventoryQty = purchaseQty - salesQty;

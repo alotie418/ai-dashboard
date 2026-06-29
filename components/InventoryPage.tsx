@@ -174,14 +174,23 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
     };
   }, [salesRecords, purchaseRecords, accLocale, uiLang]);
 
+  // P5b-2a: detect multi-line (multi-product, possibly mixed-unit) records locally — list()
+  // attaches items[] only to such records, so their presence flags the period. When present, the
+  // header-quantity stat cards below (parseTons over the header quantity, which is 0 for a
+  // multi-line record) would undercount, so they degrade to '—' + a notice. Money cards unaffected.
+  const hasMultiLine = useMemo(
+    () => [...purchaseRecords, ...salesRecords].some(r => Array.isArray(r.items) && r.items.length > 0),
+    [purchaseRecords, salesRecords],
+  );
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Header Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title={t('invoices.currentStock')}
-          value={stats.currentStock}
-          sub={stats.currentStockSub}
+          value={hasMultiLine ? '—' : stats.currentStock}
+          sub={hasMultiLine ? t('common2.multiLineQtyHint') : stats.currentStockSub}
           icon="fa-warehouse"
           color="text-amber-500"
           bg="bg-amber-500/10"
@@ -195,8 +204,8 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
         {filterType !== 'output' && (
         <StatCard
           title={genLabel('invTotalInput', 'invoices.totalInput')}
-          value={stats.totalInputWeight}
-          sub={stats.totalInputSub}
+          value={hasMultiLine ? '—' : stats.totalInputWeight}
+          sub={hasMultiLine ? t('common2.multiLineQtyHint') : stats.totalInputSub}
           icon="fa-file-import"
           color="text-primary"
           bg="bg-primary/10"
@@ -205,8 +214,8 @@ const InventoryPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, s
         {filterType !== 'input' && (
         <StatCard
           title={genLabel('invTotalOutput', 'invoices.totalOutput')}
-          value={stats.totalOutputWeight}
-          sub={stats.totalOutputSub}
+          value={hasMultiLine ? '—' : stats.totalOutputWeight}
+          sub={hasMultiLine ? t('common2.multiLineQtyHint') : stats.totalOutputSub}
           icon="fa-file-export"
           color="text-emerald-600"
           bg="bg-emerald-500/10"
