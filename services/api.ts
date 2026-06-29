@@ -49,7 +49,7 @@ export function relaunchApp(): Promise<{ ok: boolean; devMode?: boolean }> {
 
 // ==================== 结构化 CSV 导出（§2A · 仅桌面版 · 供会计师对接/迁出）====================
 
-export type CsvExportTable = 'transactions' | 'purchases' | 'sales' | 'documents';
+export type CsvExportTable = 'transactions' | 'purchases' | 'sales' | 'documents' | 'purchase_items' | 'sales_items';
 
 export interface CsvExportResult {
   ok: boolean;

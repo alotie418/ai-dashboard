@@ -261,7 +261,9 @@
       "csvTransactions": "交易",
       "csvPurchases": "採購",
       "csvSales": "銷售",
-      "csvDocuments": "單據"
+      "csvDocuments": "單據",
+      "csvPurchaseItems": "採購明細",
+      "csvSalesItems": "銷售明細"
     },
     "dataMigration": {
       "title": "資料遷移",

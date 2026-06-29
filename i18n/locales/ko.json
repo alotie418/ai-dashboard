@@ -261,7 +261,9 @@
       "csvTransactions": "거래",
       "csvPurchases": "매입",
       "csvSales": "매출",
-      "csvDocuments": "문서"
+      "csvDocuments": "문서",
+      "csvPurchaseItems": "매입 명세",
+      "csvSalesItems": "매출 명세"
     },
     "dataMigration": {
       "title": "데이터 마이그레이션",

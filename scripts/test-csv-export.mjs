@@ -61,10 +61,15 @@ ok(csvCell(-300) === '-300', '[cell] negative NUMBER unaffected (number branch, 
   const keys = Object.keys(EXPORTABLE_TABLES);
   ok(!keys.includes('ai_providers'), '[N2] EXPORTABLE_TABLES excludes ai_providers');
   ok(!keys.includes('settings'), '[N2] EXPORTABLE_TABLES excludes settings');
+  // P5a: the two line-item child tables (purchase_items / sales_items, schema v20) are exportable
+  // so multi-product detail is never lost in a CSV migrate-out.
+  ok(keys.includes('purchase_items'), '[P5a] EXPORTABLE_TABLES includes purchase_items');
+  ok(keys.includes('sales_items'), '[P5a] EXPORTABLE_TABLES includes sales_items');
   // The whitelist must only map to KNOWN non-credential business tables — guards against a future
   // accidental addition of a secrets-bearing table (ai_providers / settings / any *key*) to the
-  // export surface. (documents → business_documents is a normal business-doc table, no secrets.)
-  const ALLOWED_REAL_TABLES = new Set(['transactions', 'purchases', 'sales', 'business_documents']);
+  // export surface. (documents → business_documents is a normal business-doc table, no secrets;
+  // purchase_items / sales_items hold only line-item business data, no credentials.)
+  const ALLOWED_REAL_TABLES = new Set(['transactions', 'purchases', 'sales', 'business_documents', 'purchase_items', 'sales_items']);
   const realTables = keys.map((k) => EXPORTABLE_TABLES[k].table);
   ok(realTables.every((t) => ALLOWED_REAL_TABLES.has(t)), `[N2] every exportable table is a known non-credential business table, got [${realTables.join(',')}]`);
   ok(!realTables.some((t) => /provider|key|secret|setting|credential|token/i.test(t)), `[N2] no exportable table name looks credential-bearing, got [${realTables.join(',')}]`);
@@ -106,6 +111,51 @@ const { runMigrations } = require(join(ROOT, 'electron/db/index.js'));
   ok(out.rows === 1, `[table] transactions → 1 row, got ${out.rows}`);
   ok(out.csv.split('\r\n')[0].startsWith('id,type,date,amount'), '[table] header from schema columns');
   ok(out.csv.includes("'=HYPERLINK"), `[table] injection counterparty prefixed with ' end-to-end, got ${out.csv.includes("'=HYPERLINK")}`);
+
+  // ───────────── P5a: line-item child tables export (purchase_items / sales_items) ─────────────
+  // The two child tables (schema v20) must export every column — including the FK back to the
+  // header (purchase_id/sale_id) so the CSV joins to the purchases/sales CSV — and nothing
+  // credential-bearing. Empty → header-only; populated → one CSV row per line item.
+  const ITEM_COLS = ['id', 'purchase_id', 'line_no', 'product_id', 'description', 'unit_snapshot',
+    'quantity', 'unit_price', 'amount_net', 'tax_rate', 'tax_amount', 'amount_gross'];
+
+  const emptyPi = tableToCsv(db, 'purchase_items');
+  ok(emptyPi.rows === 0, '[P5a] empty purchase_items → 0 rows');
+  ok(emptyPi.csv.trim().split('\r\n').length === 1, '[P5a] empty purchase_items → header line only');
+  const piHeader = emptyPi.csv.split('\r\n')[0].split(',');
+  ok(ITEM_COLS.every((c) => piHeader.includes(c)),
+    `[P5a] purchase_items header carries every expected column incl. purchase_id, got [${piHeader.join(',')}]`);
+  ok(!piHeader.some((c) => /key|secret|credential|token|password/i.test(c)),
+    `[P5a] purchase_items has no credential-bearing column, got [${piHeader.join(',')}]`);
+
+  // FK = ON (set above), so a parent purchase row must exist before inserting its items.
+  db.prepare('INSERT INTO purchases (id, date, supplier, tons, totalAmount) VALUES (?, ?, ?, ?, ?)')
+    .run('p-ml', '2026-06-01', 'Acme', 0, 1130);
+  const insItem = db.prepare(`INSERT INTO purchase_items
+    (purchase_id, line_no, product_id, description, unit_snapshot, quantity, unit_price, amount_net, tax_rate, tax_amount, amount_gross)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  insItem.run('p-ml', 1, 'prod-1', 'Widget A', 'pcs', 10, 50, 500, 13, 65, 565);
+  insItem.run('p-ml', 2, null, 'Service B', null, 1, 500, 500, 13, 65, 565);
+  const pi = tableToCsv(db, 'purchase_items');
+  ok(pi.rows === 2, `[P5a] purchase_items → 2 rows, got ${pi.rows}`);
+  ok(pi.csv.trim().split('\r\n').length === 3, '[P5a] purchase_items CSV = header + 2 data lines');
+  ok(pi.csv.includes('p-ml'), '[P5a] purchase_items row carries its purchase_id (joinable to header)');
+
+  // sales_items: same shape (sale_id instead of purchase_id).
+  const salesHeader = tableToCsv(db, 'sales_items').csv.split('\r\n')[0].split(',');
+  ok(salesHeader.includes('sale_id') && salesHeader.includes('line_no') && salesHeader.includes('amount_gross'),
+    `[P5a] sales_items header carries sale_id/line_no/amount_gross, got [${salesHeader.join(',')}]`);
+  ok(!salesHeader.some((c) => /key|secret|credential|token|password/i.test(c)),
+    `[P5a] sales_items has no credential-bearing column, got [${salesHeader.join(',')}]`);
+  db.prepare('INSERT INTO sales (id, date, customer, tons, totalAmount) VALUES (?, ?, ?, ?, ?)')
+    .run('s-ml', '2026-06-02', 'Beta', 0, 226);
+  db.prepare(`INSERT INTO sales_items
+    (sale_id, line_no, product_id, description, unit_snapshot, quantity, unit_price, amount_net, tax_rate, tax_amount, amount_gross)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run('s-ml', 1, 'prod-1', 'Widget A', 'pcs', 2, 100, 200, 13, 26, 226);
+  const si = tableToCsv(db, 'sales_items');
+  ok(si.rows === 1, `[P5a] sales_items → 1 row, got ${si.rows}`);
+  ok(si.csv.includes('s-ml'), '[P5a] sales_items row carries its sale_id (joinable to header)');
+
   db.close();
 }
 

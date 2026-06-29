@@ -13,6 +13,8 @@ const CSV_TABLES: { key: CsvExportTable; labelKey: string }[] = [
   { key: 'purchases', labelKey: 'settings.dataBackup.csvPurchases' },
   { key: 'sales', labelKey: 'settings.dataBackup.csvSales' },
   { key: 'documents', labelKey: 'settings.dataBackup.csvDocuments' },
+  { key: 'purchase_items', labelKey: 'settings.dataBackup.csvPurchaseItems' },
+  { key: 'sales_items', labelKey: 'settings.dataBackup.csvSalesItems' },
 ];
 
 const DataBackupSection: React.FC = () => {
