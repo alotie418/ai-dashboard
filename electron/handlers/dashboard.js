@@ -52,7 +52,7 @@ async function summary({ query }) {
   const hasSales = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sales'").get();
   const hasPurchases = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='purchases'").get();
 
-  let metrics = { inventoryTons: 0, purchaseTotalTons: 0, purchaseTotalAmount: 0, salesTotalTons: 0, salesTotalAmount: 0, avgCostPerTon: 0 };
+  let metrics = { inventoryTons: 0, purchaseTotalTons: 0, purchaseTotalAmount: 0, salesTotalTons: 0, salesTotalAmount: 0, avgCostPerTon: 0, hasMultiLine: false };
   let monthlyPerformance = [];
 
   if (hasSales || hasPurchases) {
@@ -73,6 +73,25 @@ async function summary({ query }) {
       SELECT COALESCE((SELECT SUM(tons) FROM purchases), 0) - COALESCE((SELECT SUM(tons) FROM sales), 0) as inventoryTons
     `).get();
 
+    // P5b-1: read-only flag — does the current period contain ANY multi-line record
+    // (purchase_items/sales_items)? The child tables have no date of their own, so we scope by
+    // the parent header's date. DISPLAY LAYER ONLY: the legacy tons/avgCostPerTon figures above
+    // are NOT recomputed — the dashboard merely degrades the quantity KPIs that would mislead
+    // when a record's real quantity lives in mixed-unit line items (header tons=0). No formula change.
+    let hasMultiLine = false;
+    try {
+      const ml = db.prepare(`
+        SELECT (
+          EXISTS (SELECT 1 FROM purchase_items pi JOIN purchases p ON pi.purchase_id = p.id
+                  WHERE p.date >= ? AND p.date <= ?)
+          OR
+          EXISTS (SELECT 1 FROM sales_items si JOIN sales s ON si.sale_id = s.id
+                  WHERE s.date >= ? AND s.date <= ?)
+        ) AS hasML
+      `).get(dateStart, dateEnd, dateStart, dateEnd);
+      hasMultiLine = !!(ml && ml.hasML);
+    } catch { /* purchase_items/sales_items may be absent on a pre-v20 DB → keep false */ }
+
     metrics = {
       inventoryTons: Math.round((invAll.inventoryTons || 0) * 100) / 100,
       purchaseTotalTons: Math.round((purchaseAgg.totalTons || 0) * 100) / 100,
@@ -80,6 +99,7 @@ async function summary({ query }) {
       salesTotalTons: Math.round((salesAgg.totalTons || 0) * 100) / 100,
       salesTotalAmount: Math.round((salesAgg.totalAmount || 0) * 100) / 100,
       avgCostPerTon,
+      hasMultiLine,
     };
 
     // Monthly breakdown from legacy tables

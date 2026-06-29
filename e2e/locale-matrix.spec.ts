@@ -649,6 +649,23 @@ test.describe('accounting display clarity', () => {
     expect(body, 'purchase sub-label must not be a bare "<num> 采购"').not.toMatch(/\d\s*采购(?!总量)/);
   });
 
+  // (3b) P5b-1: when the period holds multi-line records the avgCost card degrades to a hint
+  // (header-tons avgCost would be distorted, 采购总量 undercounted) — never a misleading figure.
+  test('dashboard: multi-line records degrade the avgCost card', async ({ page }) => {
+    const ui = 'zh-CN';
+    const base = DASHBOARD('CN');
+    const dashboard = { ...base, metrics: { ...base.metrics, purchaseTotalTons: 269.6, avgCostPerTon: 500, hasMultiLine: true } };
+    await bootComboIPC(page, ui, 'CN', { dashboard });
+    const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+
+    // the avgCost card shows the multi-line hint as its sub-value
+    await expect(page.getByText(loc.dashboard.avgCostMultiLineHint).first()).toBeVisible({ timeout: 10_000 });
+    // and must NOT show the degraded header-tons "采购总量: 269.6" sub-label
+    const body = await page.locator('body').innerText();
+    expect(body, 'multi-line avgCost card must not show the header-tons 采购总量 figure')
+      .not.toContain(`${loc.dashboard.purchasesLabel}: 269.6`);
+  });
+
   // (4) accounts: empty data → N/A rate, never a fabricated 100%
   test('accounts: empty receivables show N/A rate, not 100%', async ({ page }) => {
     const ui = 'zh-CN';

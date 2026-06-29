@@ -18,7 +18,7 @@ export const SETTINGS = (acc: string) => ({
 
 export const DASHBOARD = (acc: string) => ({
   locale: acc,
-  metrics: { inventoryTons: 0, purchaseTotalTons: 0, purchaseTotalAmount: 0, salesTotalTons: 0, salesTotalAmount: 0, avgCostPerTon: 0 },
+  metrics: { inventoryTons: 0, purchaseTotalTons: 0, purchaseTotalAmount: 0, salesTotalTons: 0, salesTotalAmount: 0, avgCostPerTon: 0, hasMultiLine: false },
   monthlyPerformance: [],
   financialStatement: { salesRevenue: 0, costOfSales: 0, costOfGoodsSold: 0, operatingExpenses: 0, operatingProfit: 0, taxSurcharge: 0, adminExpense: 0, incomeTax: 0, shippingFee: 0, grossProfit: 0, grossMargin: 0, netProfit: 0, netMargin: 0 },
   vatStatistics: { cumulativeInput: 0, cumulativeOutput: 0, certifiedInput: 0, invoicedOutput: 0, estimatedPayable: 0 },

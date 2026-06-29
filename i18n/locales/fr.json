@@ -407,6 +407,7 @@
     "cogsNoTax": "Coût des ventes (HT)",
     "totalExpenses": "Total des charges",
     "avgCost": "Coût moyen",
+    "avgCostMultiLineHint": "Plusieurs produits — voir le coût de stock par produit",
     "plTitle": "P&L Statement (Excl. Tax)",
     "plRevenue": "Sales Revenue (Excl. Tax)",
     "plCost": "Less: COGS (Weighted Avg)",

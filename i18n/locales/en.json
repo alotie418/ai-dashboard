@@ -407,6 +407,7 @@
     "cogsNoTax": "Cost of Sales (excl. tax)",
     "totalExpenses": "Total Expenses",
     "avgCost": "Avg Cost",
+    "avgCostMultiLineHint": "Multiple products — see per-product inventory cost",
     "plTitle": "P&L Statement (Excl. Tax)",
     "plRevenue": "Sales Revenue (Excl. Tax)",
     "plCost": "Less: COGS (Weighted Avg)",

@@ -407,6 +407,7 @@
     "cogsNoTax": "매출원가(부가세 제외)",
     "totalExpenses": "총비용",
     "avgCost": "평균 원가",
+    "avgCostMultiLineHint": "여러 품목 명세 — 품목별 재고 원가를 확인하세요",
     "plTitle": "P&L Statement (Excl. Tax)",
     "plRevenue": "Sales Revenue (Excl. Tax)",
     "plCost": "Less: COGS (Weighted Avg)",
