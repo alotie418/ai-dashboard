@@ -1311,9 +1311,9 @@ function fromApiLineItem(r: any): LineItem {
   };
 }
 
-// P4b: map an editor LineItem (camel) → the snake-case row the backend items[] expects
-// (purchase_items columns; tax_rate is numeric here, unlike business_document_items' string).
-// Purchases only — the sales write mapping is deferred to P4c.
+// Map an editor LineItem (camel) → the snake-case row the backend items[] expects
+// (purchase_items/sales_items columns; tax_rate is numeric here, unlike business_document_items'
+// string). Used by both toApiPurchase (P4b) and toApiSales (P4c).
 function toApiLineItem(it: LineItem, idx: number): any {
   return {
     product_id: it.productId ?? null,
@@ -1338,7 +1338,7 @@ function toApiSales(r: SalesRecord): ApiSalesRecord {
   const totalAmount = r.totalWithTax || Math.round((amountWithoutTax + taxAmount) * 100) / 100;
   const pricePerTon = r.unitPriceWithoutTax || (tons > 0 ? Math.round((amountWithoutTax / tons) * 100) / 100 : 0);
 
-  return {
+  const api: ApiSalesRecord = {
     id: r.id,
     date: r.date,
     customer: r.customer,
@@ -1357,6 +1357,12 @@ function toApiSales(r: SalesRecord): ApiSalesRecord {
     due_date: r.dueDate || undefined,
     product_id: r.productId || null,
   };
+  // P4c: when the editor produced multiple lines, send items[] — the backend (P2) treats the
+  // lines as the source of truth (header money = Σ items, legacy cols neutralised). shippingCost
+  // stays a header field above (never part of the items sum). A single-line sale carries no
+  // items and stays on the legacy header path.
+  if (Array.isArray(r.items)) api.items = r.items.map(toApiLineItem);
+  return api;
 }
 
 function fromApiSales(a: ApiSalesRecord): SalesRecord {

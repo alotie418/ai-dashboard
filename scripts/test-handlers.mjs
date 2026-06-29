@@ -389,9 +389,14 @@ async function expectThrow(fn, label) {
   // not found
   await expectThrow(() => call('GET', '/api/sales/nope', null), '[p4a] getSale missing → Sale not found');
 
-  // list() still an array
+  // list() still an array; P4c: it now attaches items[] per multi-line sale (s-ml carries items,
+  // legacy s-lg carries none) so the UI can render one row per item.
   const slist = await call('GET', '/api/sales', null);
   ok(Array.isArray(slist) && slist.length === 2, `[p4a] GET /api/sales list still returns an array, got ${Array.isArray(slist) ? slist.length : typeof slist}`);
+  const slistMl = slist.find((s) => s.id === 's-ml');
+  const slistLg = slist.find((s) => s.id === 's-lg');
+  ok(Array.isArray(slistMl.items) && slistMl.items.length === 1 && slistMl.items[0].line_no === 0, '[p4c] list() attaches items[] for a multi-line sale, ordered by line_no');
+  ok(slistLg.items === undefined, '[p4c] list() attaches no items[] for a legacy single-item sale');
 }
 
 // ───────────── dashboard end-to-end (settings → report engine → financialStatement) ─────────────
