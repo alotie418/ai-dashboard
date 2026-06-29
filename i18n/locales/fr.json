@@ -960,6 +960,8 @@
     "taxAmount": "Taxe totale"
   },
   "common2": {
+    "lineNetAmount": "Montant HT de la ligne",
+    "taxAmount": "Taxe",
     "dueDate": "Date d'échéance",
     "edit": "Modifier",
     "delete": "Supprimer",

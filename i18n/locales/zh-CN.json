@@ -960,6 +960,8 @@
     "taxAmount": "合计税额"
   },
   "common2": {
+    "lineNetAmount": "该行不含税金额",
+    "taxAmount": "税额",
     "dueDate": "到期日",
     "edit": "编辑",
     "delete": "删除",

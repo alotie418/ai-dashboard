@@ -960,6 +960,8 @@
     "taxAmount": "Total Tax"
   },
   "common2": {
+    "lineNetAmount": "Line amount (excl. tax)",
+    "taxAmount": "Tax",
     "dueDate": "Due date",
     "edit": "Edit",
     "delete": "Delete",

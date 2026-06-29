@@ -869,7 +869,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                         className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
                       />
                     </div>
-                    <div className="grid grid-cols-4 gap-3">
+                    <div className="grid grid-cols-5 gap-3">
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{usZh ? taxLabel('setFormQtyLabel') : t('sales.formQuantity')}</label>
                         <input
@@ -896,7 +896,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-[#5c5c5a] tracking-widest">{taxLabel('formTaxRate')} %</label>
+                        <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('tableHeaders.taxRate')} %</label>
                         <input
                           type="number"
                           step="0.01"
@@ -906,6 +906,12 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                           onChange={(e) => setLine(i, { taxRatePct: e.target.value })}
                           className="w-full bg-white border border-[#e0ddd5] rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
                         />
+                      </div>
+                      <div className="space-y-2">
+                        {/* Per-line tax amount — read-only display, shown inline in the row so the user
+                            sees THIS item's tax beside its rate and gross total (not just a footer). */}
+                        <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('common2.taxAmount')}</label>
+                        <div className="w-full px-3 py-3 text-sm font-bold text-rose-600 whitespace-nowrap overflow-hidden text-ellipsis" title={fmtMoney(amt.taxAmount)}>{fmtMoney(amt.taxAmount)}</div>
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale !== 'CN' ? taxLabel('headerTotalWithTax') : t('sales.formTotalWithTax')}</label>
@@ -921,9 +927,10 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
                         />
                       </div>
                     </div>
-                    <div className="flex justify-end gap-5 text-xs text-[#4a4a48]">
-                      <span>{accLocale !== 'CN' ? taxLabel('headerAmount') : t('tableHeaders.amountWithoutTax')}: <span className="font-medium text-[#191918]">{fmtMoney(amt.amountNet)}</span></span>
-                      <span>{t('sales.formTaxAmount')}: <span className="font-medium text-rose-600">{fmtMoney(amt.taxAmount)}</span></span>
+                    {/* THIS line's own net amount (该行不含税金额) — the line's tax now sits inline in the
+                        grid above; this keeps the net (the COGS basis) visible, never the order total. */}
+                    <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 border-t border-[#e0ddd5]/70 mt-1 pt-2 text-sm">
+                      <span className="font-semibold text-[#3c3c3a]">{t('common2.lineNetAmount')}: <span className="font-bold text-[#191918]">{fmtMoney(amt.amountNet)}</span></span>
                     </div>
                   </div>
                   );
