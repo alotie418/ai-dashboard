@@ -434,6 +434,32 @@ async function expectThrow(fn, label) {
   ok(dashPrior.metrics.hasMultiLine === false, `[dash] hasMultiLine period-scoped (prior year false), got ${dashPrior.metrics.hasMultiLine}`);
 }
 
+// ───────────── P5b-2c: AI brief caveat under multi-line records ─────────────
+// ai.context() assembles the locale-neutral brief fed to the model. When the period has multi-line
+// records its quantity/volume figures (header tons) are incomplete, so a [Note] caveat must be
+// prepended (before [Dashboard]); a single-commodity period must NOT carry it. Real assembly path
+// (require + call ai.context on the :memory: DB), not a snapshot.
+{
+  freshDb();
+  const ai = require(join(ROOT, 'electron/handlers/ai.js'));
+  const CAVEAT = 'multi-line item records';
+
+  // legacy single-item purchase only → brief carries no caveat
+  await call('POST', '/api/purchases', { id: 'ai-lg', date: `${YEAR}-05-01`, supplier: 'LegacyAI',
+    tons: 10, pricePerTon: 100, totalAmount: 1130, amountWithoutTax: 1000, taxAmount: 130, taxRate: 13 });
+  const ctx1 = await ai.context({ body: { year: YEAR } });
+  ok(ctx1 && typeof ctx1.context === 'string', '[ai] context() returns a context string');
+  ok(!ctx1.context.includes(CAVEAT), '[ai] no multi-line caveat when the period has no line items');
+
+  // add a multi-line purchase in the same period → caveat appears, before [Dashboard]
+  await call('POST', '/api/purchases', { id: 'ai-ml', date: `${YEAR}-05-02`, supplier: 'MultiAI',
+    items: [{ description: 'X', quantity: 2, unit_price: 100, amount_net: 200, tax_rate: 13, tax_amount: 26, amount_gross: 226 }] });
+  const ctx2 = await ai.context({ body: { year: YEAR } });
+  ok(ctx2.context.includes(CAVEAT), '[ai] multi-line caveat present when a line-item record exists in period');
+  ok(ctx2.context.indexOf('[Note]') >= 0 && ctx2.context.indexOf('[Note]') < ctx2.context.indexOf('[Dashboard]'),
+    '[ai] caveat [Note] precedes the [Dashboard] section');
+}
+
 // ───────────────────────── router ─────────────────────────
 {
   freshDb();
