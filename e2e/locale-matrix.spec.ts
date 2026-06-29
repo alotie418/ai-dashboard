@@ -1950,6 +1950,21 @@ test('analysis month labels follow UI language (en → Jan, not 1月)', async ({
   expect(mainText, 'no raw Chinese backend month label may leak in the analysis page under en UI').not.toContain('1月');
 });
 
+// P5b-2b: with multi-line records in the period the analysis page shows a top caveat that the
+// quantity charts/columns/CSV may be incomplete. The default (hasMultiLine absent/false) path is
+// unaffected — the existing analysis tests above never set the flag, so they keep passing.
+test('analysis: multi-line records show the quantity caveat notice', async ({ page }) => {
+  const ui = 'zh-CN';
+  const base = DASHBOARD('CN');
+  const dashboard = { ...base, metrics: { ...base.metrics, hasMultiLine: true } };
+  await bootComboIPC(page, ui, 'CN', { dashboard });
+  const loc = JSON.parse(fs.readFileSync(path.join('i18n', 'locales', `${ui}.json`), 'utf8'));
+  // sidebar → data analysis (stable icon fa-chart-pie)
+  await page.locator('i.fa-chart-pie').first().click();
+  // the multi-line quantity caveat is visible at the top of the analysis page
+  await expect(page.getByText(loc.analysis.multiLineNotice).first()).toBeVisible({ timeout: 10_000 });
+});
+
 // ── PR-7B P1-4: management balance overview tab (6 UI languages × CN locale) ──────
 // Boots with a mocked /api/balance-overview, clicks the balance sub-tab, and asserts the
 // management overview renders: title + balanceDifference row + borrowings label + estimate
