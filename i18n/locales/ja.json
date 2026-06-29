@@ -407,6 +407,7 @@
     "cogsNoTax": "売上原価（税抜）",
     "totalExpenses": "経費合計",
     "avgCost": "平均原価",
+    "avgCostMultiLineHint": "複数商品の明細あり — 商品別の在庫原価をご確認ください",
     "plTitle": "P&L Statement (Excl. Tax)",
     "plRevenue": "Sales Revenue (Excl. Tax)",
     "plCost": "Less: COGS (Weighted Avg)",

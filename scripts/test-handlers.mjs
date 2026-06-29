@@ -419,6 +419,19 @@ async function expectThrow(fn, label) {
   }
   ok(fs.salesRevenue > 0, `[dash] income reflected in salesRevenue, got ${fs.salesRevenue}`);
   ok(dash.inventory && typeof dash.inventory === 'object', '[dash] inventory overview present');
+
+  // P5b-1: read-only hasMultiLine flag — false when the period has no line items (only txns here)
+  ok(dash.metrics && dash.metrics.hasMultiLine === false, `[dash] hasMultiLine=false with no line items, got ${dash.metrics?.hasMultiLine}`);
+
+  // a multi-line purchase IN the period flips the flag to true (period-scoped via the header date)
+  await call('POST', '/api/purchases', { id: 'd-ml', date: `${YEAR}-04-01`, supplier: 'MultiDash',
+    items: [{ description: 'X', quantity: 2, unit_price: 100, amount_net: 200, tax_rate: 13, tax_amount: 26, amount_gross: 226 }] });
+  const dash2 = await call('GET', `/api/dashboard?year=${YEAR}`, null);
+  ok(dash2.metrics.hasMultiLine === true, `[dash] hasMultiLine=true after a multi-line purchase in period, got ${dash2.metrics.hasMultiLine}`);
+
+  // period scoping: a different year sees none of this year's line items → flag stays false
+  const dashPrior = await call('GET', `/api/dashboard?year=${Number(YEAR) - 1}`, null);
+  ok(dashPrior.metrics.hasMultiLine === false, `[dash] hasMultiLine period-scoped (prior year false), got ${dashPrior.metrics.hasMultiLine}`);
 }
 
 // ───────────────────────── router ─────────────────────────

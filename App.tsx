@@ -146,6 +146,9 @@ const AppContent: React.FC = () => {
       const perUnit = qtyUnit ? `/${qtyUnit}` : '';
       // Phase 3: per-product inventory overview from the dashboard payload
       const inv = (dashboard as any).inventory || { inStockCount: 0, totalInventoryCost: 0, details: [] };
+      // P5b-1: backend read-only flag — the period holds multi-line (multi-product, possibly
+      // mixed-unit) records, so the header-tons avgCost/总量 figures would mislead → degrade them.
+      const hasMultiLine = (m as any).hasMultiLine === true;
 
       // Current outstanding AR/AP totals (tax-inclusive, base-currency) — reuse the
       // existing summary handlers (same source as AccountsPage); not year-scoped.
@@ -202,10 +205,16 @@ const AppContent: React.FC = () => {
           },
           {
             label: t('dashboard.avgCost'),
-            value: m.avgCostPerTon > 0 ? `${sym}${m.avgCostPerTon.toLocaleString()}${perUnit}` : '—',
+            // P5b-1: with multi-line records in the period the header-tons avgCost is distorted
+            // (amount counted, header tons=0) and the total is undercounted, so degrade to '—' +
+            // a hint rather than show a misleading figure. The per-product inventory cost card
+            // above (P3) stays the correct source. No avgCost recomputation here (formula untouched).
+            value: hasMultiLine ? '—' : (m.avgCostPerTon > 0 ? `${sym}${m.avgCostPerTon.toLocaleString()}${perUnit}` : '—'),
             // Label-first so the number reads as a labeled quantity ("采购总量: 269.6 吨")
             // instead of a bare "269.6 采购", whose meaning was unclear.
-            subValue: m.purchaseTotalTons > 0 ? `${t('dashboard.purchasesLabel')}: ${m.purchaseTotalTons}${qtySuffix}` : '—',
+            subValue: hasMultiLine
+              ? t('dashboard.avgCostMultiLineHint')
+              : (m.purchaseTotalTons > 0 ? `${t('dashboard.purchasesLabel')}: ${m.purchaseTotalTons}${qtySuffix}` : '—'),
             icon: 'fa-tags',
             color: 'bg-orange-500',
           },
