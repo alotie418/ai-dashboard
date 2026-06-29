@@ -636,6 +636,7 @@
     "clearRetry": "Effacer les filtres et réessayer"
   },
   "analysis": {
+    "multiLineNotice": "Avec des lignes multi-produits, les graphiques/colonnes de quantité peuvent être incomplets — référez-vous aux enregistrements mono-produit ou au détail des stocks (les montants ne sont pas affectés).",
     "panorama": "Panorama annuel",
     "trends": "Analyse des tendances",
     "table": "Tableau détaillé",

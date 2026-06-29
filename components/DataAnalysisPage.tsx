@@ -33,6 +33,10 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
   const uiLang = i18n.language;
   const unitLabel = getInventoryUnitLabel(productUnit, uiLang);
   const currSym = getCurrencySymbol(accLocale);
+  // P5b-2b: the period holds multi-line (multi-product, possibly mixed-unit) records — the
+  // tons/volume charts, columns and CSV below read header tons, which is 0 for such records, so
+  // they may be incomplete. Show a page-level caveat (display only; money metrics are unaffected).
+  const hasMultiLine = (data.rawMetrics as any)?.hasMultiLine === true;
 
   const [activeTab, setActiveTab] = useState<'trends' | 'table' | 'panorama'>('panorama');
 
@@ -76,6 +80,16 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
           <StatsIndicator label={t('analysis.deflator')} value={stats.deflator == null ? '—' : stats.deflator.toFixed(1)} trend="neutral" color="text-amber-500" />
         </div>
       </div>
+
+      {/* P5b-2b: multi-line caveat — the quantity charts/columns/CSV below may be incomplete
+          when the period mixes legacy single-commodity records with multi-product line items
+          (header tons=0). Money metrics on this page are unaffected. */}
+      {hasMultiLine && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start space-x-3">
+          <i className="fas fa-circle-info text-amber-500 mt-0.5"></i>
+          <p className="text-sm text-amber-800">{t('analysis.multiLineNotice')}</p>
+        </div>
+      )}
 
       {/* Navigation Tabs */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white/60 p-3 rounded-xl border border-[#e0ddd5]/70 backdrop-blur-md">
@@ -332,7 +346,10 @@ const DataAnalysisPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter
               onClick={() => {
                 const rows = data.monthlyPerformance;
                 const csvHeader = [t('analysis.tableMonth'),t('analysis.tableHeaderPurchase'),t('analysis.tableHeaderSales'),t('analysis.tableHeaderRevenue'),t('analysis.tableHeaderCost'),t('analysis.tableHeaderGross'),t('analysis.tableHeaderNet'),t('analysis.tableHeaderYoy'),t('analysis.tableHeaderMom'),t('analysis.tableHeaderPrice')].join(',');
-                let csv = '﻿' + csvHeader + '\n';
+                // P5b-2b: under multi-line records the quantity columns may be incomplete — prepend
+                // the same caveat (BOM, then one quoted note line, then the header) so it travels
+                // with the exported file. Quoted → safe even if the localized text has a comma.
+                let csv = '﻿' + (hasMultiLine ? `"${t('analysis.multiLineNotice')}"\n` : '') + csvHeader + '\n';
                 rows.forEach(r => {
                   csv += `${r.name},${r.purchaseTons},${r.salesTons},${r.revenue},${r.cost},${r.profit},${r.netProfit},${r.yoy ?? ''},${r.mom ?? ''},${r.deflator ?? ''}\n`;
                 });

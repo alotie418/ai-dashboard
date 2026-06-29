@@ -636,6 +636,7 @@
     "clearRetry": "清除過濾條件重試"
   },
   "analysis": {
+    "multiLineNotice": "多商品明細期間：數量類圖表/列可能不完整，請以單一商品路徑或庫存明細為準（金額指標不受影響）。",
     "panorama": "年度總覽",
     "trends": "趨勢分析",
     "table": "明細資料",

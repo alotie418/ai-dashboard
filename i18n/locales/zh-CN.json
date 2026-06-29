@@ -636,6 +636,7 @@
     "clearRetry": "清除过滤条件重试"
   },
   "analysis": {
+    "multiLineNotice": "多商品明细期间：数量类图表/列可能不完整，请以单商品路径或库存明细为准（金额指标不受影响）。",
     "panorama": "年度总览",
     "trends": "趋势分析",
     "table": "明细数据",

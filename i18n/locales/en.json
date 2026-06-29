@@ -636,6 +636,7 @@
     "clearRetry": "Clear filters and retry"
   },
   "analysis": {
+    "multiLineNotice": "With multi-product line items, the quantity charts/columns may be incomplete — rely on single-product records or the inventory detail (amount metrics are unaffected).",
     "panorama": "Annual Panorama",
     "trends": "Trend Analysis",
     "table": "Detail Table",
