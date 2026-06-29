@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { BusinessData } from '../types';
 import { analyzeInvoice, extractedToPurchaseForm, type ExtractedInvoice } from '../services/ocrService';
 import { rasterizePdfFirstPage } from '../services/pdfRaster';
-import { fetchPurchases, createPurchase, updatePurchase, deletePurchase, fetchSettings, listProducts, listProviders, type Product, PurchaseRecord } from '../services/api';
+import { fetchPurchases, getPurchase, createPurchase, updatePurchase, deletePurchase, fetchSettings, listProducts, listProviders, type Product, type LineItem, PurchaseRecord } from '../services/api';
 import { getSystemErrorText } from '../services/systemErrors';
 import { formatMoney, getCurrencySymbol, getTaxLabel, formatLegacyQuantity, getProductUnitLabel } from './accountingHelpers';
 import { classifyInvoiceStatus, INVOICE_STATUS_BADGE_CLASS } from './invoiceStatusDisplay';
@@ -21,6 +21,25 @@ interface Props {
 
 let purchaseIdCounter = 0;
 const nextPurchaseId = () => `purchase-${++purchaseIdCounter}-${Date.now()}`;
+
+// P4b: one product/service line in the multi-line editor (all inputs are strings).
+interface ItemRow {
+  productId: string;
+  description: string;
+  unit: string;
+  quantity: string;
+  unitPrice: string;
+  taxRatePct: string;
+  // Tax-inclusive amount typed directly (P4b problem-2 fix): a non-empty grossInput drives the
+  // line in reverse (net = gross/(1+rate), tax = gross−net, unitPrice = net/qty); typing the
+  // net unit price clears it and the line goes back to forward (net = qty × unitPrice).
+  grossInput: string;
+  // Locked original amount (from an edited record's stored values); cleared when the user
+  // changes quantity/unitPrice/taxRate/gross so the line switches back to recompute. Prevents a
+  // no-op edit from drifting a stored amount by a rounding cent (mirrors DocumentModal).
+  locked: { net: number; tax: number } | null;
+}
+const round2 = (v: number) => Math.round((v || 0) * 100) / 100;
 
 const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQuarter, selectedMonth }) => {
   const { t, i18n } = useTranslation();
@@ -86,37 +105,85 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
   // invoice once the user explicitly marks 已收 (PR-1; no schema change).
   const [purchaseInvoiceStatus, setPurchaseInvoiceStatus] = useState('未收');
 
+  // ── P4b: multi-line items editor ──────────────────────────────────────────
+  // The header (date/supplier/invoiceNo/dueDate/status) stays in newPurchase; the product
+  // lines live here. Save rule: exactly 1 valid line → legacy single-item payload (header
+  // tons/product_id preserved, no regression); >1 valid line → items[] (backend P2 sums the
+  // header from the lines and neutralises the legacy columns).
+  const defaultRatePct = String(parseFloat(defaultTaxRate.replace('%', '')) || 0);
+  const emptyRow = (): ItemRow => ({ productId: '', description: '', unit: '', quantity: '', unitPrice: '', taxRatePct: defaultRatePct, grossInput: '', locked: null });
+  const initialHeader = () => ({ date: new Date().toISOString().split('T')[0], supplier: '', quantity: '', price: 0, taxRate: defaultTaxRate, invoiceNo: '', dueDate: '', totalWithTax: 0, unitPriceWithoutTax: 0, taxAmount: 0 });
+  const [lines, setLines] = useState<ItemRow[]>([emptyRow()]);
+
+  // Per-line amounts, by driver precedence: gross-typed (reverse) > stored/locked > unit-price
+  // (forward). Reverse: net = gross/(1+rate), tax = gross−net. Forward: net = qty × unitPrice,
+  // tax = net × rate, gross = net + tax. All round2.
+  const lineAmounts = (r: ItemRow) => {
+    const pct = parseFloat(r.taxRatePct) || 0;
+    if (r.grossInput !== '') {
+      const amountGross = round2(parseFloat(r.grossInput) || 0);
+      const amountNet = round2(amountGross / (1 + pct / 100));
+      return { amountNet, taxAmount: round2(amountGross - amountNet), amountGross, pct };
+    }
+    if (r.locked) return { amountNet: round2(r.locked.net), taxAmount: round2(r.locked.tax), amountGross: round2(r.locked.net + r.locked.tax), pct };
+    const amountNet = round2((parseFloat(r.quantity) || 0) * (parseFloat(r.unitPrice) || 0));
+    const taxAmount = round2(amountNet * pct / 100);
+    return { amountNet, taxAmount, amountGross: round2(amountNet + taxAmount), pct };
+  };
+  // Effective net unit price (derived when the line is gross-driven; raw otherwise).
+  const lineUnitPrice = (r: ItemRow) => {
+    const qty = parseFloat(r.quantity) || 0;
+    if (r.grossInput !== '' || r.locked) return qty > 0 ? round2(lineAmounts(r).amountNet / qty) : (parseFloat(r.unitPrice) || 0);
+    return parseFloat(r.unitPrice) || 0;
+  };
+  const computed = lines.map(lineAmounts);
+  const totalNet = round2(computed.reduce((s, l) => s + l.amountNet, 0));
+  const totalTax = round2(computed.reduce((s, l) => s + l.taxAmount, 0));
+  const totalGross = round2(computed.reduce((s, l) => s + l.amountGross, 0));
+
+  // Editing any driver (qty/unitPrice/taxRate/gross) unlocks a stored amount. Typing the net
+  // unit price additionally clears the gross driver (switches the line back to forward mode).
+  const setLine = (i: number, patch: Partial<ItemRow>) => {
+    setLines((prev) => prev.map((r, idx) => {
+      if (idx !== i) return r;
+      const next: ItemRow = { ...r, ...patch };
+      if (patch.quantity !== undefined || patch.unitPrice !== undefined || patch.taxRatePct !== undefined || patch.grossInput !== undefined) next.locked = null;
+      if (patch.unitPrice !== undefined) next.grossInput = '';
+      return next;
+    }));
+  };
+  const addLine = () => setLines((prev) => [...prev, emptyRow()]);
+  const removeLine = (i: number) => setLines((prev) => prev.filter((_, idx) => idx !== i));
+  const onPickProduct = (i: number, productId: string) => {
+    const p = products.find((x) => x.id === productId);
+    if (!p) { setLine(i, { productId: '' }); return; }
+    setLine(i, {
+      productId,
+      description: lines[i].description || p.name,
+      unit: p.unit || '',
+      unitPrice: p.default_unit_cost && p.default_unit_cost > 0 ? String(p.default_unit_cost) : lines[i].unitPrice,
+      quantity: lines[i].quantity || '1',
+    });
+  };
+  const itemToRow = (it: LineItem): ItemRow => ({
+    productId: it.productId || '',
+    description: it.description || '',
+    unit: it.unitSnapshot || '',
+    quantity: it.quantity == null ? '' : String(it.quantity),
+    unitPrice: it.unitPrice == null ? '' : String(it.unitPrice),
+    taxRatePct: it.taxRate == null ? '' : String(it.taxRate),
+    grossInput: '',
+    locked: { net: it.amountNet || 0, tax: it.taxAmount || 0 },
+  });
+  const resetLines = () => setLines([emptyRow()]);
+  const openNewPurchase = () => { setEditingId(null); setNewPurchase(initialHeader()); setPurchaseInvoiceStatus('未收'); resetLines(); setShowAddModal(true); };
+  const closeAddModal = () => { setShowAddModal(false); setEditingId(null); setNewPurchase(initialHeader()); setPurchaseInvoiceStatus('未收'); resetLines(); };
+  // ──────────────────────────────────────────────────────────────────────────
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-calculate: when totalWithTax + quantity + taxRate change, compute price/unitPrice/taxAmount
-  useEffect(() => {
-    const { totalWithTax, quantity, taxRate } = newPurchase;
-    if (!totalWithTax || totalWithTax <= 0) return;
-
-    // Keep a legitimate 0% rate (US sales tax) — `|| 13` would wrongly treat 0 as missing.
-    const parsedRate = parseFloat(taxRate.replace('%', ''));
-    const rateNum = Number.isFinite(parsedRate) ? parsedRate : 0;
-    const amountWithoutTax = Math.round((totalWithTax / (1 + rateNum / 100)) * 100) / 100;
-    const taxAmount = Math.round((totalWithTax - amountWithoutTax) * 100) / 100;
-
-    const tonsMatch = quantity.match(/[\d.]+/);
-    const tons = tonsMatch ? parseFloat(tonsMatch[0]) : 0;
-    const unitPrice = tons > 0 ? Math.round((amountWithoutTax / tons) * 100) / 100 : 0;
-
-    // Only update if calculated values differ (avoid infinite loop)
-    if (
-      newPurchase.price !== amountWithoutTax ||
-      newPurchase.unitPriceWithoutTax !== unitPrice ||
-      newPurchase.taxAmount !== taxAmount
-    ) {
-      setNewPurchase(prev => ({
-        ...prev,
-        price: amountWithoutTax,
-        unitPriceWithoutTax: unitPrice,
-        taxAmount
-      }));
-    }
-  }, [newPurchase.totalWithTax, newPurchase.quantity, newPurchase.taxRate]);
+  // P4b: per-line amounts are computed by lineAmounts() above; the old single-field
+  // total→amount auto-calc effect is removed (each line now carries its own qty/price/rate).
 
   const formatCurrency = (val: number) => fmtMoney(val);
 
@@ -194,42 +261,96 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
     const filled = extractedToPurchaseForm(ocrPreview, defaultTaxRate);
     setNewPurchase(prev => ({ ...filled, date: filled.date || prev.date }));
     setPurchaseInvoiceStatus('未收');
+    // OCR is single-invoice → land the recognised values in line 1 (P4b keeps OCR single-line;
+    // multi-line OCR is a later task). Amount is locked to the recognised value.
+    const pct = String(parseFloat((filled.taxRate || defaultTaxRate).replace('%', '')) || 0);
+    const net = filled.amountWithoutTax || filled.price || 0;
+    setLines([{
+      productId: filled.productId || '',
+      description: '',
+      unit: '',
+      quantity: filled.quantity || '',
+      unitPrice: String(filled.unitPriceWithoutTax || ''),
+      taxRatePct: pct,
+      grossInput: '',
+      locked: net ? { net, tax: filled.taxAmount || 0 } : null,
+    }]);
     setOcrPreview(null);
     setShowAddModal(true);
   };
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPurchase.supplier || !newPurchase.quantity) {
+    if (!newPurchase.supplier) {
       alert(t('purchases.errorRequiredFields'));
       return;
     }
+    // Auto-ignore fully blank rows; a row is valid if it has a product OR a description.
+    const valid = lines.filter((r) => r.productId || r.description.trim());
+    if (valid.length === 0) {
+      alert(t('purchases.errorRequiredFields'));
+      return;
+    }
+    const header = {
+      date: newPurchase.date,
+      supplier: newPurchase.supplier,
+      invoiceNo: newPurchase.invoiceNo,
+      dueDate: newPurchase.dueDate,
+      status: purchaseInvoiceStatus,
+    };
     try {
-      if (editingId) {
-        // Update the existing purchase in place — never insert a duplicate row.
-        const recordToUpdate: PurchaseRecord = { id: editingId, ...newPurchase, status: purchaseInvoiceStatus };
-        await updatePurchase(editingId, recordToUpdate);
-        setRecords(prev => prev.map(r => r.id === editingId ? recordToUpdate : r));
+      if (valid.length === 1) {
+        // Single line → legacy single-item payload (header tons/product_id preserved, no items).
+        const r = valid[0];
+        const a = lineAmounts(r);
+        const legacy: PurchaseRecord = {
+          id: editingId || nextPurchaseId(),
+          ...header,
+          productId: r.productId || '',
+          quantity: r.quantity || '',
+          price: a.amountNet,
+          taxRate: `${a.pct}%`,
+          amountWithoutTax: a.amountNet,
+          taxAmount: a.taxAmount,
+          totalWithTax: a.amountGross,
+          unitPriceWithoutTax: lineUnitPrice(r),
+        };
+        if (editingId) await updatePurchase(editingId, legacy);
+        else await createPurchase(legacy);
       } else {
-        const recordToAdd: PurchaseRecord = { id: nextPurchaseId(), ...newPurchase, status: purchaseInvoiceStatus };
-        await createPurchase(recordToAdd);
-        setRecords(prev => [recordToAdd, ...prev]);
+        // Multiple lines → items[] payload (backend P2 sums the header + neutralises legacy cols).
+        const items: LineItem[] = valid.map((r, idx) => {
+          const a = lineAmounts(r);
+          const up = lineUnitPrice(r);
+          return {
+            productId: r.productId || null,
+            description: r.description.trim() || null,
+            unitSnapshot: r.unit || null,
+            quantity: r.quantity === '' ? null : (parseFloat(r.quantity) || 0),
+            unitPrice: (r.unitPrice !== '' || r.grossInput !== '' || r.locked) ? up : null,
+            amountNet: a.amountNet,
+            taxRate: r.taxRatePct === '' ? null : (parseFloat(r.taxRatePct) || 0),
+            taxAmount: a.taxAmount,
+            amountGross: a.amountGross,
+            lineNo: idx,
+          };
+        });
+        const record: PurchaseRecord = {
+          id: editingId || nextPurchaseId(),
+          ...header,
+          productId: '',
+          quantity: '',
+          price: 0,
+          taxRate: defaultTaxRate,
+          items,
+        };
+        if (editingId) await updatePurchase(editingId, record);
+        else await createPurchase(record);
       }
-      setShowAddModal(false);
-      setEditingId(null);
-      setNewPurchase({
-        date: new Date().toISOString().split('T')[0],
-        supplier: '',
-        quantity: '',
-        price: 0,
-        taxRate: defaultTaxRate,
-        invoiceNo: '',
-        dueDate: '',
-        totalWithTax: 0,
-        unitPriceWithoutTax: 0,
-        taxAmount: 0
-      });
-      setPurchaseInvoiceStatus('未收');
+      // Refresh from the backend instead of optimistic patching: a multi-line save neutralises
+      // the header (tons=0, total=Σ items) so the stored row differs from the form values.
+      setRecords(await fetchPurchases());
+      closeAddModal();
     } catch (err) {
       console.error(err);
       alert(getSystemErrorText(err, t) || t('purchases.errorSaveFailed'));
@@ -272,7 +393,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
             {isScanning ? t('purchases.scanning') : (accLocale === 'KR' ? taxLabel('scanDocButton') : t('purchases.scanInvoice'))}
           </button>
           <button
-            onClick={() => { setEditingId(null); setPurchaseInvoiceStatus('未收'); setShowAddModal(true); }}
+            onClick={openNewPurchase}
             className="flex items-center px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors text-sm font-medium" style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}
           >
             <i className="fas fa-plus mr-2"></i> {accLocale !== 'CN' ? taxLabel('newPurchaseButton') : t('purchases.newPurchase')}
@@ -341,6 +462,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
               <tr className="border-b border-[#e0ddd5] text-[#5c5c5a] text-xs">
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.date')}</th>
                 <th className="px-5 py-4 font-medium">{usZh ? taxLabel('setHeaderPayee') : t('tableHeaders.supplier')}</th>
+                <th className="px-5 py-4 font-medium">{t('tableHeaders.product')}</th>
                 <th className="px-5 py-4 font-medium">{t('tableHeaders.quantity')}</th>
                 <th className="px-5 py-4 font-medium whitespace-nowrap">{(accLocale !== 'CN') ? taxLabel('headerUnitPrice') : t('tableHeaders.unitPriceWithoutTax')}</th>
                 <th className="px-5 py-4 font-medium whitespace-nowrap">{(accLocale !== 'CN') ? taxLabel('headerAmount') : t('tableHeaders.totalAmountWithoutTax')}</th>
@@ -353,75 +475,116 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e0ddd5]/50">
-              {records.map((row) => {
-                const unitPrice = row.unitPriceWithoutTax || (row.pricePerTon || 0);
-                const amtWithoutTax = row.amountWithoutTax || row.price;
-                const taxAmt = row.taxAmount || 0;
-                const totalWT = row.totalWithTax || (amtWithoutTax + taxAmt);
-                return (
-                <tr key={row.id} className="hover:bg-[#f9f9f8]/30 transition-colors">
-                  <td className="px-5 py-5 text-sm text-[#4a4a48] whitespace-nowrap">{row.date}</td>
-                  <td className="px-5 py-5 text-sm text-[#191918] font-medium col-name">{row.supplier}</td>
-                  <td className="px-5 py-5 text-sm text-[#4a4a48]">{row.unit ? `${row.quantity} ${getProductUnitLabel(row.unit, uiLang)}` : formatLegacyQuantity(row.quantity, productUnit, uiLang)}</td>
-                  <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{formatCurrency(unitPrice)}</td>
-                  <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{formatCurrency(amtWithoutTax)}</td>
-                  <td className="px-5 py-5 text-sm text-rose-600 font-medium whitespace-nowrap">{formatCurrency(taxAmt)}</td>
-                  <td className="px-5 py-5 text-sm text-[#191918] font-bold whitespace-nowrap">{formatCurrency(totalWT)}</td>
-                  <td className="px-5 py-5 text-sm text-[#4a4a48]">{row.taxRate}</td>
-                  <td className="px-5 py-5 text-sm font-mono text-[#4a4a48] tracking-tight">{row.invoiceNo}</td>
-                  <td className="px-5 py-5">
-                    {(() => {
-                      const tone = classifyInvoiceStatus(row.status);
-                      const label = tone === 'unknown'
-                        ? (String(row.status ?? '').trim() || '—')
-                        : tone === 'done'
-                          ? (accLocale !== 'CN' ? taxLabel('invStatusCertified') : t('purchases.invoiceStatusReceived'))
-                          : (accLocale !== 'CN' ? taxLabel('invStatusPendingCert') : t('purchases.invoiceStatusPending'));
-                      return (
-                        <span className={`px-2 py-0.5 border rounded-md text-[10px] font-bold ${INVOICE_STATUS_BADGE_CLASS[tone]}`}>
-                          {label}
-                        </span>
-                      );
-                    })()}
-                  </td>
-                  <td className="px-5 py-5 text-xs font-medium space-x-3">
-                    <button
-                      onClick={() => {
-                        setEditingId(row.id);
-                        setNewPurchase({ date: row.date, supplier: row.supplier, productId: row.productId || '', quantity: row.quantity, price: row.price, taxRate: row.taxRate, invoiceNo: row.invoiceNo, dueDate: row.dueDate || '', totalWithTax: row.totalWithTax || 0, unitPriceWithoutTax: row.unitPriceWithoutTax || 0, taxAmount: row.taxAmount || 0 });
-                        setPurchaseInvoiceStatus(row.status || '未收');
-                        setShowAddModal(true);
-                      }}
-                      className="text-primary hover:text-primary-hover transition-colors"
-                    >{t('common2.edit')}</button>
-                    <button
-                      onClick={async () => {
-                        try {
-                          await deletePurchase(row.id);
-                          setRecords(prev => prev.filter(r => r.id !== row.id));
-                        } catch (err) {
-                          console.error(err);
-                          alert(getSystemErrorText(err, t) || t('purchases.errorDeleteFailed'));
-                        }
-                      }}
-                      className="text-rose-500 hover:text-rose-400 transition-colors"
-                    >
-                      {t('common2.delete')}
-                    </button>
-                  </td>
-                </tr>
-                );
+              {records.flatMap((rec) => {
+                // P4b-2: expand a multi-line record into one display row per line item; a legacy
+                // single-item record stays one row. All rows of a record share rec.id, so editing
+                // any row opens the same multi-line modal and deleting any row removes the whole
+                // purchase. Per-row amounts are the LINE's net/tax/gross (not the order total).
+                const lineRows = (rec.items && rec.items.length > 0)
+                  ? rec.items.map((it, idx) => ({ item: it as LineItem | null, key: `${rec.id}::${it.lineNo ?? idx}::${idx}` }))
+                  : [{ item: null as LineItem | null, key: rec.id }];
+                return lineRows.map(({ item, key }) => {
+                  const productName = item
+                    ? ((item.productId && products.find(p => p.id === item.productId)?.name) || (item.description || '').trim() || (item.unitSnapshot ? getProductUnitLabel(item.unitSnapshot, uiLang) : '—'))
+                    : (rec.productName || (rec.productId && products.find(p => p.id === rec.productId)?.name) || '—');
+                  const qtyCell = item
+                    ? (item.quantity != null ? `${item.quantity}${item.unitSnapshot ? ' ' + getProductUnitLabel(item.unitSnapshot, uiLang) : ''}` : '—')
+                    : (rec.unit ? `${rec.quantity} ${getProductUnitLabel(rec.unit, uiLang)}` : formatLegacyQuantity(rec.quantity, productUnit, uiLang));
+                  const unitPriceCell = item ? (item.unitPrice != null ? formatCurrency(item.unitPrice) : '—') : formatCurrency(rec.unitPriceWithoutTax || rec.pricePerTon || 0);
+                  const net = item ? item.amountNet : (rec.amountWithoutTax || rec.price);
+                  const tax = item ? item.taxAmount : (rec.taxAmount || 0);
+                  const gross = item ? item.amountGross : (rec.totalWithTax || (net + tax));
+                  const rateCell = item ? (item.taxRate != null ? `${item.taxRate}%` : '—') : rec.taxRate;
+                  return (
+                  <tr key={key} className="hover:bg-[#f9f9f8]/30 transition-colors">
+                    <td className="px-5 py-5 text-sm text-[#4a4a48] whitespace-nowrap">{rec.date}</td>
+                    <td className="px-5 py-5 text-sm text-[#191918] font-medium col-name">{rec.supplier}</td>
+                    <td className="px-5 py-5 text-sm text-[#4a4a48] col-name">{productName}</td>
+                    <td className="px-5 py-5 text-sm text-[#4a4a48]">{qtyCell}</td>
+                    <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{unitPriceCell}</td>
+                    <td className="px-5 py-5 text-sm text-[#191918] font-medium whitespace-nowrap">{formatCurrency(net)}</td>
+                    <td className="px-5 py-5 text-sm text-rose-600 font-medium whitespace-nowrap">{formatCurrency(tax)}</td>
+                    <td className="px-5 py-5 text-sm text-[#191918] font-bold whitespace-nowrap">{formatCurrency(gross)}</td>
+                    <td className="px-5 py-5 text-sm text-[#4a4a48]">{rateCell}</td>
+                    <td className="px-5 py-5 text-sm font-mono text-[#4a4a48] tracking-tight">{rec.invoiceNo}</td>
+                    <td className="px-5 py-5">
+                      {(() => {
+                        const tone = classifyInvoiceStatus(rec.status);
+                        const label = tone === 'unknown'
+                          ? (String(rec.status ?? '').trim() || '—')
+                          : tone === 'done'
+                            ? (accLocale !== 'CN' ? taxLabel('invStatusCertified') : t('purchases.invoiceStatusReceived'))
+                            : (accLocale !== 'CN' ? taxLabel('invStatusPendingCert') : t('purchases.invoiceStatusPending'));
+                        return (
+                          <span className={`px-2 py-0.5 border rounded-md text-[10px] font-bold ${INVOICE_STATUS_BADGE_CLASS[tone]}`}>
+                            {label}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-5 py-5 text-xs font-medium space-x-3">
+                      <button
+                        onClick={async () => {
+                          try {
+                            // Always fetch the detail so a multi-line record's items are never lost.
+                            const detail = await getPurchase(rec.id);
+                            setEditingId(rec.id);
+                            setNewPurchase({ date: detail.date, supplier: detail.supplier, productId: detail.productId || '', quantity: '', price: 0, taxRate: detail.taxRate || defaultTaxRate, invoiceNo: detail.invoiceNo, dueDate: detail.dueDate || '', totalWithTax: 0, unitPriceWithoutTax: 0, taxAmount: 0 });
+                            setPurchaseInvoiceStatus(rec.status || '未收');
+                            if (detail.items && detail.items.length > 0) {
+                              setLines(detail.items.map(itemToRow));
+                            } else {
+                              // Legacy single-item record → one row rehydrated from the header
+                              // (amount locked to the stored value so a no-op edit never drifts it).
+                              const pct = String(parseFloat((detail.taxRate || '').replace('%', '')) || parseFloat(defaultRatePct) || 0);
+                              setLines([{
+                                productId: detail.productId || '',
+                                description: detail.productName || '',
+                                unit: detail.unit || '',
+                                quantity: detail.quantity || '',
+                                unitPrice: String(detail.unitPriceWithoutTax || detail.pricePerTon || ''),
+                                taxRatePct: pct,
+                                grossInput: '',
+                                locked: { net: detail.amountWithoutTax || detail.price || 0, tax: detail.taxAmount || 0 },
+                              }]);
+                            }
+                            setShowAddModal(true);
+                          } catch (err) {
+                            console.error(err);
+                            alert(getSystemErrorText(err, t) || t('purchases.errorSaveFailed'));
+                          }
+                        }}
+                        className="text-primary hover:text-primary-hover transition-colors"
+                      >{t('common2.edit')}</button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await deletePurchase(rec.id);
+                            setRecords(prev => prev.filter(r => r.id !== rec.id));
+                          } catch (err) {
+                            console.error(err);
+                            alert(getSystemErrorText(err, t) || t('purchases.errorDeleteFailed'));
+                          }
+                        }}
+                        className="text-rose-500 hover:text-rose-400 transition-colors"
+                      >
+                        {t('common2.delete')}
+                      </button>
+                    </td>
+                  </tr>
+                  );
+                });
               })}
               {isLoading && (
                 <tr>
-                  <td colSpan={11} className="px-6 py-12 text-center text-[#5c5c5a] text-sm">
+                  <td colSpan={12} className="px-6 py-12 text-center text-[#5c5c5a] text-sm">
                     <i className="fas fa-spinner animate-spin mr-2"></i>{t('purchases.loading')}
                   </td>
                 </tr>
               )}
               {!isLoading && records.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-6 py-12 text-center text-[#5c5c5a] text-sm italic">
+                  <td colSpan={12} className="px-6 py-12 text-center text-[#5c5c5a] text-sm italic">
                     {accLocale !== 'CN' ? taxLabel('emptyPurchase') : t('purchases.empty')}
                   </td>
                 </tr>
@@ -430,6 +593,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
               {!isLoading && records.length > 0 && (
                 <tr className="bg-[#f9f9f8] border-t-2 border-[#e0ddd5] font-semibold">
                   <td className="px-5 py-4 text-sm text-[#191918]" colSpan={2}>{t('purchases.summary')}</td>
+                  <td className="px-5 py-4 text-sm text-[#4a4a48]">—</td>
                   <td className="px-5 py-4 text-sm text-[#191918]">
                     {(() => {
                       const total = records.reduce((sum, r) => {
@@ -477,14 +641,14 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
       {/* Add Purchase Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setShowAddModal(false); setEditingId(null); }}></div>
-          <div className="relative w-full max-w-xl bg-white border border-[#e0ddd5] rounded-xl overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeAddModal}></div>
+          <div className="relative w-full max-w-2xl bg-white border border-[#e0ddd5] rounded-xl overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>
             <div className="p-8 border-b border-[#e0ddd5] flex justify-between items-center gap-4 shrink-0">
               <div className="flex-shrink-0">
                 <h2 className="text-xl font-bold text-[#191918] whitespace-nowrap">{editingId ? t('purchases.modalTitleEdit') : ((accLocale !== 'CN') ? taxLabel('modalTitlePurchase') : t('purchases.modalTitle'))}</h2>
                 <p className="text-xs text-[#5c5c5a] mt-1">{(accLocale !== 'CN') ? taxLabel('modalSubtitlePurchase') : t('purchases.modalSubtitle')}</p>
               </div>
-              <button onClick={() => { setShowAddModal(false); setEditingId(null); }} aria-label={t('common.close')} className="flex-shrink-0 text-[#5c5c5a] hover:text-[#191918] transition-colors">
+              <button onClick={closeAddModal} aria-label={t('common.close')} className="flex-shrink-0 text-[#5c5c5a] hover:text-[#191918] transition-colors">
                 <i className="fas fa-times text-xl"></i>
               </button>
             </div>
@@ -549,111 +713,130 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('products.selectLabel')}</label>
-                <select
-                  value={newPurchase.productId || ''}
-                  onChange={(e) => setNewPurchase({ ...newPurchase, productId: e.target.value })}
-                  className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
-                >
-                  <option value="">{t('products.unassigned')}</option>
-                  {products.filter(p => p.is_active).map(p => (
-                    <option key={p.id} value={p.id}>{p.name}（{getProductUnitLabel(p.unit, uiLang)}）</option>
-                  ))}
-                </select>
+              {/* P4b: multi-line items editor. One product/service per row; the header above
+                  keeps date/supplier/invoice/due/status. A row is valid (saved) when it has a
+                  product OR a description; fully blank rows are ignored. */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('documents.itemsTitle')}</label>
+                {lines.map((row, i) => {
+                  const amt = computed[i];
+                  return (
+                  <div key={i} className="border border-[#e0ddd5] rounded-xl p-4 space-y-3 bg-[#f9f9f8]/50">
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('products.selectLabel')}</label>
+                      {lines.length > 1 && (
+                        <button type="button" onClick={() => removeLine(i)} className="flex-shrink-0 text-rose-500 hover:text-rose-400 text-xs font-medium">
+                          {t('documents.removeItem')}
+                        </button>
+                      )}
+                    </div>
+                    <select
+                      value={row.productId}
+                      onChange={(e) => onPickProduct(i, e.target.value)}
+                      className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
+                    >
+                      <option value="">{t('products.unassigned')}</option>
+                      {products.filter(p => p.is_active).map(p => (
+                        <option key={p.id} value={p.id}>{p.name}（{getProductUnitLabel(p.unit, uiLang)}）</option>
+                      ))}
+                    </select>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('documents.itemDescription')}</label>
+                      <input
+                        type="text"
+                        data-testid={`purchase-line-desc-${i}`}
+                        placeholder={t('common2.optional')}
+                        value={row.description}
+                        onChange={(e) => setLine(i, { description: e.target.value })}
+                        className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 gap-3">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{usZh ? taxLabel('setFormQtyLabel') : t('purchases.formQuantity')}</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          data-testid={`purchase-line-qty-${i}`}
+                          placeholder={usZh ? taxLabel('setFormQtyPh') : t('purchases.formQuantityPlaceholder')}
+                          value={row.quantity}
+                          onChange={(e) => setLine(i, { quantity: e.target.value })}
+                          className="w-full bg-white border border-[#e0ddd5] rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale !== 'CN' ? taxLabel('headerUnitPrice') : t('purchases.formUnitPrice')}</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          data-testid={`purchase-line-price-${i}`}
+                          value={row.grossInput !== '' ? String(lineUnitPrice(row) || '') : row.unitPrice}
+                          onChange={(e) => setLine(i, { unitPrice: e.target.value })}
+                          className="w-full bg-white border border-[#e0ddd5] rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-[#5c5c5a] tracking-widest">{taxLabel('formTaxRate')} %</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          value={row.taxRatePct}
+                          onChange={(e) => setLine(i, { taxRatePct: e.target.value })}
+                          className="w-full bg-white border border-[#e0ddd5] rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        {/* P4b problem-2 fix: type the tax-inclusive total here → net/tax/unit-price
+                            are back-calculated; typing the unit price instead drives it forward. */}
+                        <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale !== 'CN' ? taxLabel('headerTotalWithTax') : t('purchases.formTotalWithTax')}</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          data-testid={`purchase-line-gross-${i}`}
+                          placeholder={t('common2.optional')}
+                          value={row.grossInput !== '' ? row.grossInput : (amt.amountGross ? String(amt.amountGross) : '')}
+                          onChange={(e) => setLine(i, { grossInput: e.target.value })}
+                          className="w-full bg-white border border-[#e0ddd5] rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-5 text-xs text-[#4a4a48]">
+                      <span>{accLocale !== 'CN' ? taxLabel('headerAmount') : t('tableHeaders.totalAmountWithoutTax')}: <span className="font-medium text-[#191918]">{fmtMoney(amt.amountNet)}</span></span>
+                      <span>{t('purchases.formTaxAmount')}: <span className="font-medium text-rose-600">{fmtMoney(amt.taxAmount)}</span></span>
+                    </div>
+                  </div>
+                  );
+                })}
+                <button type="button" onClick={addLine} className="w-full border-2 border-dashed border-[#e0ddd5] hover:border-primary/50 hover:bg-primary/5 rounded-xl py-2.5 text-xs text-[#5c5c5a] hover:text-primary transition-all">
+                  <i className="fas fa-plus mr-2"></i>{t('documents.addItem')}
+                </button>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{usZh ? taxLabel('setFormQtyLabel') : t('purchases.formQuantity')}</label>
-                <input
-                  type="text"
-                  required
-                  placeholder={usZh ? taxLabel('setFormQtyPh') : t('purchases.formQuantityPlaceholder')}
-                  value={newPurchase.quantity}
-                  onChange={(e) => setNewPurchase({ ...newPurchase, quantity: e.target.value })}
-                  className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale !== 'CN' ? taxLabel('headerAmount') : t('purchases.formPrice')}</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
-                    <input
-                      type="number"
-                      required
-                      step="0.01"
-                      value={newPurchase.price || ''}
-                      onChange={(e) => setNewPurchase({ ...newPurchase, price: parseFloat(e.target.value) || 0 })}
-                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all`}
-                    />
-                  </div>
+              {/* 表头合计（明细求和；只读展示，后端 P2 再权威重算） */}
+              <div className="border-t border-[#e0ddd5] pt-4 space-y-1.5 text-sm">
+                <div className="flex justify-between text-[#4a4a48]">
+                  <span>{accLocale !== 'CN' ? taxLabel('headerAmount') : t('tableHeaders.totalAmountWithoutTax')}</span>
+                  <span className="font-medium text-[#191918]">{fmtMoney(totalNet)}</span>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] tracking-widest">{taxLabel('formTaxRate')}</label>
-                  <select
-                    value={newPurchase.taxRate}
-                    onChange={(e) => setNewPurchase({ ...newPurchase, taxRate: e.target.value })}
-                    className="w-full bg-white border border-[#e0ddd5] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all appearance-none"
-                  >
-                    {taxRateOptions.map(opt => (
-                      <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
-                    ))}
-                  </select>
+                <div className="flex justify-between text-[#4a4a48]">
+                  <span>{accLocale !== 'CN' ? taxLabel('headerTaxAmount') : t('tableHeaders.totalTax')}</span>
+                  <span className="font-medium text-rose-600">{fmtMoney(totalTax)}</span>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{accLocale !== 'CN' ? taxLabel('headerUnitPrice') : t('purchases.formUnitPrice')}</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={newPurchase.unitPriceWithoutTax || ''}
-                      onChange={(e) => setNewPurchase({ ...newPurchase, unitPriceWithoutTax: parseFloat(e.target.value) || 0 })}
-                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all`}
-                      placeholder={t('common2.optional')}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formTaxAmount')}</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={newPurchase.taxAmount || ''}
-                      onChange={(e) => setNewPurchase({ ...newPurchase, taxAmount: parseFloat(e.target.value) || 0 })}
-                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all`}
-                      placeholder={t('common2.optional')}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-[#5c5c5a] uppercase tracking-widest">{t('purchases.formTotalWithTax')}</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5c5c5a] text-sm">{currSym}</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      data-testid="ocr-fill-total"
-                      value={newPurchase.totalWithTax || ''}
-                      onChange={(e) => setNewPurchase({ ...newPurchase, totalWithTax: parseFloat(e.target.value) || 0 })}
-                      className={`w-full bg-white border border-[#e0ddd5] rounded-xl ${moneyPad} pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary text-[#191918] transition-all`}
-                      placeholder={t('common2.optional')}
-                    />
-                  </div>
+                <div className="flex justify-between text-base font-bold text-[#191918]">
+                  <span>{accLocale !== 'CN' ? taxLabel('headerTotalWithTax') : t('tableHeaders.totalWithTax')}</span>
+                  <span data-testid="purchase-total-gross">{fmtMoney(totalGross)}</span>
                 </div>
               </div>
 
               <div className="pt-4 flex space-x-3">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={closeAddModal}
                   className="flex-1 py-4 bg-[#f0eeeb] hover:bg-[#e0ddd5] text-[#4a4a48] font-bold rounded-xl transition-all"
                 >
                   {t('purchases.formCancel')}

@@ -937,6 +937,7 @@
     "dismiss": "Dismiss"
   },
   "tableHeaders": {
+    "product": "Product",
     "date": "Date",
     "supplier": "Supplier",
     "customer": "Customer",

@@ -288,7 +288,16 @@ for (const { navIcon, label, expectedCounterparty } of [
     await page.getByRole('button', { name: loc.ocr.useResult }).click();
     // add-form pre-filled with the recognized values (counterparty text + total number)
     await expect(page.getByTestId('ocr-fill-counterparty')).toHaveValue(expectedCounterparty, { timeout: 10_000 });
-    await expect(page.getByTestId('ocr-fill-total')).toHaveValue('1130');
+    if (label === 'purchase') {
+      // P4b: the purchase form is now a multi-line editor — the recognised invoice lands in
+      // line 1 (quantity is a raw input; the total shows in the computed line/header readout,
+      // net 1000 + tax 130 = 1130 → "¥1,130.00").
+      await expect(page.getByTestId('purchase-line-qty-0')).toHaveValue('10');
+      await expect(page.getByTestId('purchase-total-gross')).toContainText('1,130.00');
+    } else {
+      // sales is still the single-field form in P4b (its multi-line editor is P4c)
+      await expect(page.getByTestId('ocr-fill-total')).toHaveValue('1130');
+    }
   });
 }
 
@@ -1506,8 +1515,12 @@ test.describe('§2A disk-full surfaced in CRUD pages (PR-2b)', () => {
     await page.locator('button:has(i.fa-plus)').first().click();
     // fill all HTML5-required fields (date is pre-filled with today): supplier + quantity + amount
     await page.locator('[data-testid="ocr-fill-counterparty"]').fill('Acme');
+    // P4b multi-line editor: a row needs a product OR description to count; quantity is the
+    // line-1 placeholder input, the amount is the line-1 unit-price input (no longer a single
+    // required header price field).
+    await page.getByTestId('purchase-line-desc-0').fill('Item');
     await page.getByPlaceholder(loc.purchases.formQuantityPlaceholder).fill('10');
-    await page.locator('input[type="number"][required]').fill('100');
+    await page.getByTestId('purchase-line-price-0').fill('100');
     await page.getByRole('button', { name: loc.purchases.formSubmit }).click();
     // the rejected save alerts the actionable disk-full message
     await expect.poll(() => dialogMsg, { timeout: 10_000 }).toBe(loc.systemError.diskFull);
@@ -1599,8 +1612,11 @@ test.describe('PR-1 → invoice status selectors (purchase / sales add modal)', 
     await expect(page.locator('[data-testid="purchase-invoice-status"]')).toHaveValue('未收');
     // fill required fields, explicitly mark 已收, save
     await page.locator('[data-testid="ocr-fill-counterparty"]').fill('Acme');
+    // P4b multi-line editor: fill line-1 (description makes the row valid) then submit. The
+    // single-line save still goes through the legacy payload, so invoiceStatus flows unchanged.
+    await page.getByTestId('purchase-line-desc-0').fill('Item');
     await page.getByPlaceholder(loc.purchases.formQuantityPlaceholder).fill('10');
-    await page.locator('input[type="number"][required]').fill('113');
+    await page.getByTestId('purchase-line-price-0').fill('113');
     await page.locator('[data-testid="purchase-invoice-status"]').selectOption('已收');
     await page.getByRole('button', { name: loc.purchases.formSubmit }).click();
     // the create call carries the explicitly chosen invoiceStatus, not a hardcoded value

@@ -247,8 +247,10 @@ async function expectThrow(fn, label) {
   ok(pRows.length === 2 && pRows[0].line_no === 0 && pRows[1].line_no === 1, '[items] 2 purchase_items rows with line_no 0,1');
   ok(pRows[0].product_id === 'prod-a' && approx(pRows[0].amount_net, 200) && approx(pRows[1].tax_amount, 3), '[items] line fields persisted');
 
-  // list() stays header-only (no items leakage in the read shape)
-  ok(pHead.items === undefined, '[items] list() returns header only (no items array)');
+  // P4b-2: list() now attaches items[] for a multi-line record (so the UI renders one row per
+  // line item), ordered by line_no with the line fields intact.
+  ok(Array.isArray(pHead.items) && pHead.items.length === 2, `[items] list() attaches items[] for a multi-line record, got ${Array.isArray(pHead.items) ? pHead.items.length : typeof pHead.items}`);
+  ok(pHead.items[0].line_no === 0 && pHead.items[0].product_id === 'prod-a' && approx(pHead.items[0].amount_net, 200), '[items] list() items carry line fields, ordered by line_no');
 
   // update + items → replace all lines, header recomputed
   await call('PUT', '/api/purchases/pi-1', { date: `${YEAR}-06-02`, supplier: 'Multi2', items: [{ description: 'C', quantity: 3, unit_price: 10, amount_net: 30, tax_amount: 3.9, amount_gross: 33.9 }] });
@@ -322,6 +324,9 @@ async function expectThrow(fn, label) {
   ok((await call('POST', '/api/purchases', { id: 'lg-1', date: `${YEAR}-06-01`, supplier: 'Legacy', tons: 10, totalAmount: 1130 }))?.success, '[items] legacy purchase create (no items) still works');
   const lg = (await call('GET', '/api/purchases', null)).find((p) => p.id === 'lg-1');
   ok(approx(lg.tons, 10) && approx(lg.totalAmount, 1130), '[items] legacy purchase header unchanged (tons/total preserved, not neutralised)');
+  // P4b-2: a legacy single-item record carries no purchase_items → list() attaches no items
+  // field (the UI renders it as a single row).
+  ok(lg.items === undefined, '[items] list() attaches no items[] for a legacy single-item record');
 }
 
 // ───────────── P4a: detail read GET /api/purchases/:id + /api/sales/:id (header + items[]) ─────────────

@@ -1311,6 +1311,24 @@ function fromApiLineItem(r: any): LineItem {
   };
 }
 
+// P4b: map an editor LineItem (camel) → the snake-case row the backend items[] expects
+// (purchase_items columns; tax_rate is numeric here, unlike business_document_items' string).
+// Purchases only — the sales write mapping is deferred to P4c.
+function toApiLineItem(it: LineItem, idx: number): any {
+  return {
+    product_id: it.productId ?? null,
+    description: it.description ?? null,
+    unit_snapshot: it.unitSnapshot ?? null,
+    quantity: it.quantity ?? null,
+    unit_price: it.unitPrice ?? null,
+    amount_net: it.amountNet ?? 0,
+    tax_rate: it.taxRate ?? null,
+    tax_amount: it.taxAmount ?? 0,
+    amount_gross: it.amountGross ?? 0,
+    line_no: it.lineNo ?? idx,
+  };
+}
+
 function toApiSales(r: SalesRecord): ApiSalesRecord {
   const tons = parseTons(r.quantity);
   const taxRate = parseTaxRatePercent((r as any).taxRate || '13%');
@@ -1377,7 +1395,7 @@ function toApiPurchase(r: PurchaseRecord): ApiPurchaseRecord {
   const totalAmount = r.totalWithTax || Math.round((amountWithoutTax + taxAmount) * 100) / 100;
   const pricePerTon = r.unitPriceWithoutTax || (tons > 0 ? Math.round((amountWithoutTax / tons) * 100) / 100 : 0);
 
-  return {
+  const api: ApiPurchaseRecord = {
     id: r.id,
     date: r.date,
     supplier: r.supplier,
@@ -1395,6 +1413,11 @@ function toApiPurchase(r: PurchaseRecord): ApiPurchaseRecord {
     due_date: r.dueDate || undefined,
     product_id: r.productId || null,
   };
+  // P4b: when the editor produced multiple lines, send items[] — the backend (P2) then
+  // treats the lines as the source of truth (header money = Σ items, legacy cols neutralised).
+  // A single-line purchase carries no items and stays on the legacy header path.
+  if (Array.isArray(r.items)) api.items = r.items.map(toApiLineItem);
+  return api;
 }
 
 function fromApiPurchase(a: ApiPurchaseRecord): PurchaseRecord {

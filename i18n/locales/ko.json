@@ -937,6 +937,7 @@
     "dismiss": "무시"
   },
   "tableHeaders": {
+    "product": "상품",
     "date": "날짜",
     "supplier": "공급업체",
     "customer": "고객",
