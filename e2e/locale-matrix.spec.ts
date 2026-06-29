@@ -289,14 +289,15 @@ for (const { navIcon, label, expectedCounterparty } of [
     // add-form pre-filled with the recognized values (counterparty text + total number)
     await expect(page.getByTestId('ocr-fill-counterparty')).toHaveValue(expectedCounterparty, { timeout: 10_000 });
     if (label === 'purchase') {
-      // P4b: the purchase form is now a multi-line editor — the recognised invoice lands in
-      // line 1 (quantity is a raw input; the total shows in the computed line/header readout,
-      // net 1000 + tax 130 = 1130 → "¥1,130.00").
+      // P4b: the purchase form is a multi-line editor — the recognised invoice lands in line 1
+      // (quantity is a raw input; the total shows in the computed line/header readout, net 1000
+      // + tax 130 = 1130 → "¥1,130.00").
       await expect(page.getByTestId('purchase-line-qty-0')).toHaveValue('10');
       await expect(page.getByTestId('purchase-total-gross')).toContainText('1,130.00');
     } else {
-      // sales is still the single-field form in P4b (its multi-line editor is P4c)
-      await expect(page.getByTestId('ocr-fill-total')).toHaveValue('1130');
+      // P4c: the sales form is now a multi-line editor too — same shape as purchase.
+      await expect(page.getByTestId('sale-line-qty-0')).toHaveValue('10');
+      await expect(page.getByTestId('sale-total-gross')).toContainText('1,130.00');
     }
   });
 }
@@ -1635,9 +1636,14 @@ test.describe('PR-1 → invoice status selectors (purchase / sales add modal)', 
     // default is the pending state — proves the old hardcoded 已开 default is gone
     await expect(page.locator('[data-testid="sale-invoice-status"]')).toHaveValue('待开');
     // fill required fields, leave the status at its default, save
+    // P4c multi-line editor: fill line-1 (a description makes the row valid; quantity is the
+    // line placeholder input, the amount is the line unit-price input — no single required header
+    // price anymore). The single-line save still goes through the legacy payload, so invoiceStatus
+    // flows unchanged.
     await page.locator('[data-testid="ocr-fill-counterparty"]').fill('Buyer');
+    await page.getByTestId('sale-line-desc-0').fill('Item');
     await page.getByPlaceholder(loc.sales.formQuantityPlaceholder).fill('5');
-    await page.locator('input[type="number"][required]').fill('565');
+    await page.getByTestId('sale-line-price-0').fill('565');
     await page.getByRole('button', { name: loc.sales.formSubmitNew }).click();
     // the create call carries 待开 (the default), NOT the old hardcoded 已开
     await expect.poll(async () => {

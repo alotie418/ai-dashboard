@@ -960,6 +960,8 @@
     "taxAmount": "세액 합계"
   },
   "common2": {
+    "lineNetAmount": "행 공급가액",
+    "taxAmount": "세액",
     "dueDate": "만기일",
     "edit": "편집",
     "delete": "삭제",

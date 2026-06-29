@@ -960,6 +960,8 @@
     "taxAmount": "税額合計"
   },
   "common2": {
+    "lineNetAmount": "明細金額（税抜）",
+    "taxAmount": "税額",
     "dueDate": "支払期日",
     "edit": "編集",
     "delete": "削除",

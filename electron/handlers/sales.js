@@ -81,7 +81,20 @@ function updateWithItems(db, id, data) {
 
 async function list() {
   const db = getDb();
-  return db.prepare('SELECT * FROM sales ORDER BY date DESC').all();
+  const rows = db.prepare('SELECT * FROM sales ORDER BY date DESC').all();
+  // P4c list expand: attach line items so the UI can render one row per item. One extra query,
+  // grouped in JS by sale_id. Legacy single-item records have no sales_items and get no items
+  // field (so they render as a single row). Read-only — additive field, no calc touched
+  // (inventory/AR/reports run their own queries; tons stays 0 per P2/P3).
+  const items = db.prepare(
+    `SELECT id, sale_id, product_id, description, unit_snapshot, quantity, unit_price,
+            amount_net, tax_rate, tax_amount, amount_gross, line_no
+       FROM sales_items ORDER BY line_no, id`
+  ).all();
+  if (items.length === 0) return rows;
+  const byParent = {};
+  for (const it of items) (byParent[it.sale_id] ||= []).push(it);
+  return rows.map((r) => (byParent[r.id] ? { ...r, items: byParent[r.id] } : r));
 }
 
 // Detail read (P4a): a sale header + its line items. Legacy single-item records carry no
