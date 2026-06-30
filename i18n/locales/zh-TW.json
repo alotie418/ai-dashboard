@@ -407,7 +407,7 @@
     "cogsNoTax": "銷售成本（未稅）",
     "totalExpenses": "總費用",
     "avgCost": "平均成本",
-    "avgCostMultiLineHint": "多商品明細下請依商品查看庫存成本",
+    "avgCostMultiLineHint": "多商品明細下，請依商品查看庫存成本",
     "plTitle": "損益表 (不含稅口徑)",
     "plRevenue": "銷售收入 (不含稅)",
     "plCost": "減：銷售成本 (加權平均法)",
