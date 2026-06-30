@@ -1108,7 +1108,21 @@
     "errGroupConflict": "Document {{docNo}} : date / tiers incohérents entre ses lignes",
     "errGroupNoLines": "Le document {{docNo}} n'a aucune ligne de détail valide",
     "errAmountConflict": "Le montant TTC est incohérent avec le prix unitaire HT",
-    "errLineNeedsProductOrDesc": "Une ligne de détail nécessite un produit ou une désignation"
+    "errLineNeedsProductOrDesc": "Une ligne de détail nécessite un produit ou une désignation",
+    "errorSummary": "{{count}} erreur(s) — tout le fichier ne sera pas importé ; corrigez d'abord",
+    "legacyRow": "Unique",
+    "previewLineCount": "{{count}} lignes",
+    "previewNetTotal": "HT",
+    "previewTaxTotal": "Taxe",
+    "matchStatus": "Corresp.",
+    "matchedBadge": "Associé",
+    "unmatchedShort": "Desc. seule",
+    "unmatchedBadge": "Aucune correspondance produit — importé en description seule (hors stock)",
+    "previewMoreDocs": "{{count}} autres documents non affichés dans l'aperçu",
+    "productsLoading": "Chargement des produits…",
+    "rowErrorCtx": "Ligne {{row}} (doc {{docNo}} · ligne {{lineNo}}) : {{errors}}",
+    "errProductAmbiguous": "Le nom de produit « {{name}} » correspond à plusieurs produits — utilisez un product_id",
+    "errDupLineNo": "Document {{docNo}} : numéros de ligne en double — triés par ordre du fichier"
   },
   "transactions": {
     "title": "Transactions",

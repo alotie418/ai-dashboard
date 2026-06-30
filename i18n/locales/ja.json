@@ -1108,7 +1108,21 @@
     "errGroupConflict": "伝票番号 {{docNo}} の行間で日付・取引先が一致しません",
     "errGroupNoLines": "伝票番号 {{docNo}} に有効な明細行がありません",
     "errAmountConflict": "税込合計と税抜単価が一致しません",
-    "errLineNeedsProductOrDesc": "明細行には商品または品名が必要です"
+    "errLineNeedsProductOrDesc": "明細行には商品または品名が必要です",
+    "errorSummary": "{{count}} 件のエラー — ファイル全体がインポートされません。先に修正してください",
+    "legacyRow": "単票",
+    "previewLineCount": "{{count}} 行",
+    "previewNetTotal": "税抜",
+    "previewTaxTotal": "税額",
+    "matchStatus": "照合",
+    "matchedBadge": "照合済",
+    "unmatchedShort": "説明のみ",
+    "unmatchedBadge": "商品未照合 — 説明としてのみインポート（在庫に計上しません）",
+    "previewMoreDocs": "他 {{count}} 件の伝票はプレビュー未表示です",
+    "productsLoading": "商品マスタを読み込み中…",
+    "rowErrorCtx": "{{row}} 行目（伝票 {{docNo}} · 行 {{lineNo}}）：{{errors}}",
+    "errProductAmbiguous": "商品名「{{name}}」が複数の商品に一致します。product_id をご利用ください",
+    "errDupLineNo": "伝票 {{docNo}} の行番号が重複しています。ファイル順に並べ替えました"
   },
   "transactions": {
     "title": "取引記録",

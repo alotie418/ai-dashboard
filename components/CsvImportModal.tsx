@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import Papa from 'papaparse';
-import { batchCreateSales, batchCreatePurchases, fetchSettings } from '../services/api';
+import { batchCreateSales, batchCreatePurchases, fetchSettings, listProducts, type Product } from '../services/api';
 import { getCurrencySymbol } from './accountingHelpers';
 
 interface Props {
@@ -166,8 +166,27 @@ function buildLegacyRecord(r: any, type: string): any {
 //   unitPriceNet + quantity (+ taxRate) given → forward (net = qty×price, tax = net×rate);
 //   description-only with no amount → a zero-amount line (allowed).
 // Returns { skip } for a fully-blank row, { error } for an invalid one, else { item }.
-function buildItem(r: any, idx: number, t: any): { skip?: boolean; error?: string; item?: any } {
-  const hasProduct = has(r.product);
+type MatchStatus = 'none' | 'byId' | 'byName' | 'unmatched' | 'ambiguous';
+
+// P5d-4 conservative product resolution: an explicit product_id wins (active or not, the user typed
+// the id on purpose); otherwise an EXACT name match against ACTIVE products only — a single hit
+// resolves, multiple hits are ambiguous (error, never silently pick), zero hits stay unmatched
+// (imported as a description-only line, not counted in inventory). No fuzzy matching.
+function resolveProduct(value: string, products: Product[]): { product_id: string | null; status: MatchStatus; name: string | null; unit: string | null } {
+  const v = String(value ?? '').trim();
+  if (!v) return { product_id: null, status: 'none', name: null, unit: null };
+  const byId = products.find(p => p.id === v);
+  if (byId) return { product_id: byId.id, status: 'byId', name: byId.name, unit: byId.unit };
+  const lc = v.toLowerCase();
+  const byName = products.filter(p => p.is_active && String(p.name).trim().toLowerCase() === lc);
+  if (byName.length === 1) return { product_id: byName[0].id, status: 'byName', name: byName[0].name, unit: byName[0].unit };
+  if (byName.length > 1) return { product_id: null, status: 'ambiguous', name: v, unit: null };
+  return { product_id: null, status: 'unmatched', name: v, unit: null };
+}
+
+function buildItem(r: any, idx: number, t: any, products: Product[]): { skip?: boolean; error?: string; item?: any; match?: MatchStatus } {
+  const productVal = has(r.product) ? String(r.product).trim() : '';
+  const hasProduct = !!productVal;
   const hasDesc = has(r.description);
   // P5d-3 fix: the line quantity and net unit price come from the dedicated multi-line columns
   // when mapped, else fall back to the legacy 数量(tons) / 单价(pricePerTon) columns — those are
@@ -177,6 +196,9 @@ function buildItem(r: any, idx: number, t: any): { skip?: boolean; error?: strin
   const hasAnyAmount = has(qtyRaw) || has(unitRaw) || has(r.totalWithTax);
   if (!hasProduct && !hasDesc && !hasAnyAmount) return { skip: true }; // blank line
   if (!hasProduct && !hasDesc) return { error: tr(t, 'csvImport.errLineNeedsProductOrDesc') };
+
+  const resolved = resolveProduct(productVal, products);
+  if (resolved.status === 'ambiguous') return { error: tr(t, 'csvImport.errProductAmbiguous', { name: productVal }) };
 
   const qty = cleanNum(qtyRaw);
   const rate = has(r.taxRate) ? cleanNum(r.taxRate) : 0;
@@ -200,12 +222,18 @@ function buildItem(r: any, idx: number, t: any): { skip?: boolean; error?: strin
     tax = has(r.taxAmount) ? round2(cleanNum(r.taxAmount)) : round2(net * rate / 100);
     gross = round2(net + tax);
   }
+  // description = CSV description, else the matched product name or the raw product cell (so an
+  // unmatched product still imports as a labelled description-only line). unit_snapshot = CSV unit,
+  // else the matched product's unit. The persisted item shape is unchanged from P5d-3.
+  const description = hasDesc ? String(r.description) : (resolved.name || (productVal || null));
+  const unit_snapshot = has(r.unit) ? String(r.unit).slice(0, 50) : (resolved.unit || null);
   return {
+    match: resolved.status,
     item: {
       line_no: has(r.lineNo) ? cleanNum(r.lineNo) : idx,
-      product_id: hasProduct ? String(r.product).trim() : null,
-      description: hasDesc ? String(r.description) : null,
-      unit_snapshot: has(r.unit) ? String(r.unit).slice(0, 50) : null,
+      product_id: resolved.product_id,
+      description,
+      unit_snapshot,
       quantity: qty,
       unit_price: unit,
       amount_net: net,
@@ -216,35 +244,42 @@ function buildItem(r: any, idx: number, t: any): { skip?: boolean; error?: strin
   };
 }
 
-function buildPayload(rows: any[], type: string, t: any): { records: any[]; errors: { row: number; errors: string[] }[]; summary: { docs: number; lines: number } } {
+type PreviewItem = { lineNo: number; name: string | null; unit: string | null; qty: number; unitNet: number; rate: number | null; net: number; tax: number; gross: number; match: MatchStatus };
+type PreviewGroup = { kind: 'doc' | 'legacy'; docNo: string; row: number; date: string; party: string; invoiceNumber: string; lineCount: number; totals: { net: number; tax: number; gross: number }; items: PreviewItem[]; errors: string[]; warning: string | null };
+type Payload = { records: any[]; errors: { row: number; errors: string[] }[]; summary: { docs: number; lines: number }; groups: PreviewGroup[] };
+
+function buildPayload(rows: any[], type: string, t: any, products: Product[]): Payload {
   const party = type === 'sales' ? 'customer' : 'supplier';
   const records: any[] = [];
   const errors: { row: number; errors: string[] }[] = [];
+  const groups: PreviewGroup[] = [];
   let docs = 0;
   let lines = 0;
 
-  const groups = new Map<string, any[]>();
+  const groupsMap = new Map<string, any[]>();
   const legacy: any[] = [];
   for (const r of rows) {
     if (has(r.docNo)) {
       const key = String(r.docNo).trim();
-      if (!groups.has(key)) groups.set(key, []);
-      (groups.get(key) as any[]).push(r);
+      if (!groupsMap.has(key)) groupsMap.set(key, []);
+      (groupsMap.get(key) as any[]).push(r);
     } else if (Object.keys(r).some(k => k !== '_row' && has(r[k]))) {
       legacy.push(r); // skip fully-blank rows
     }
   }
 
-  // legacy rows → one record each
+  // legacy rows → one record + one compact display group
   for (const r of legacy) {
+    docs++;
     const rec = buildLegacyRecord(r, type);
     const e = validateLegacy(rec, type, t);
+    groups.push({ kind: 'legacy', docNo: '', row: r._row, date: rec.date, party: rec[party], invoiceNumber: rec.invoiceNumber || '', lineCount: 1, totals: { net: rec.amountWithoutTax, tax: rec.taxAmount, gross: rec.totalAmount }, items: [], errors: e, warning: null });
     if (e.length) errors.push({ row: r._row, errors: e });
-    else { records.push(rec); docs++; }
+    else records.push(rec);
   }
 
-  // doc groups → one items[] record each
-  for (const [docNo, grp] of groups) {
+  // doc groups → one items[] record + one per-document display group
+  for (const [docNo, grp] of groupsMap) {
     docs++;
     const head = grp[0];
     const e: string[] = [];
@@ -260,15 +295,29 @@ function buildPayload(rows: any[], type: string, t: any): { records: any[]; erro
       .map((r, i) => ({ r, i }))
       .sort((a, b) => (has(a.r.lineNo) ? cleanNum(a.r.lineNo) : a.i) - (has(b.r.lineNo) ? cleanNum(b.r.lineNo) : b.i));
     const items: any[] = [];
+    const previewItems: PreviewItem[] = [];
+    const seenLineNos = new Set<number>();
+    let dupLine = false;
     sorted.forEach(({ r }, i) => {
-      const res = buildItem(r, i, t);
+      const ln = has(r.lineNo) ? cleanNum(r.lineNo) : null;
+      if (ln != null) { if (seenLineNos.has(ln)) dupLine = true; else seenLineNos.add(ln); }
+      const res = buildItem(r, i, t, products);
       if (res.skip) return;
-      if (res.error) { e.push(tr(t, 'csvImport.rowError', { row: r._row, errors: res.error })); return; }
+      const lineNo = has(r.lineNo) ? cleanNum(r.lineNo) : i;
+      if (res.error) { e.push(tr(t, 'csvImport.rowErrorCtx', { row: r._row, docNo, lineNo, errors: res.error })); return; }
       items.push(res.item);
+      previewItems.push({ lineNo: res.item.line_no, name: res.item.description, unit: res.item.unit_snapshot, qty: res.item.quantity, unitNet: res.item.unit_price, rate: res.item.tax_rate, net: res.item.amount_net, tax: res.item.tax_amount, gross: res.item.amount_gross, match: res.match || 'none' });
     });
     if (items.length === 0) e.push(tr(t, 'csvImport.errGroupNoLines', { docNo }));
 
-    if (e.length) { errors.push({ row: head._row, errors: [...new Set(e)] }); continue; }
+    const totals = {
+      net: round2(items.reduce((s, it) => s + it.amount_net, 0)),
+      tax: round2(items.reduce((s, it) => s + it.tax_amount, 0)),
+      gross: round2(items.reduce((s, it) => s + it.amount_gross, 0)),
+    };
+    const dedup = [...new Set(e)];
+    groups.push({ kind: 'doc', docNo, row: head._row, date: head.date, party: head[party], invoiceNumber: has(head.invoiceNumber) ? String(head.invoiceNumber) : '', lineCount: previewItems.length, totals, items: previewItems, errors: dedup, warning: dupLine ? tr(t, 'csvImport.errDupLineNo', { docNo }) : null });
+    if (dedup.length) { errors.push({ row: head._row, errors: dedup }); continue; }
     lines += items.length;
     const rec: any = {
       id: has(head.id) ? String(head.id) : `${type === 'sales' ? 'sale' : 'purchase'}-import-${Date.now()}-${String(docNo).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40)}`,
@@ -283,7 +332,7 @@ function buildPayload(rows: any[], type: string, t: any): { records: any[]; erro
     records.push(rec);
   }
 
-  return { records, errors, summary: { docs, lines } };
+  return { records, errors, summary: { docs, lines }, groups };
 }
 
 const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
@@ -304,6 +353,13 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
   const [result, setResult] = useState<{ success: number; failed: number; errors: { row: number; errors: string[] }[] } | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // P5d-4: products for name→id resolution, pre-loaded on open. productsReady gates the preview so
+  // a slow load never makes every product look "unmatched".
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productsReady, setProductsReady] = useState(false);
+  useEffect(() => {
+    listProducts().then((p) => { setProducts(p); setProductsReady(true); }).catch(() => setProductsReady(true));
+  }, []);
 
   const fields = type === 'sales' ? SALES_FIELDS : PURCHASE_FIELDS;
 
@@ -382,11 +438,10 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
     return r;
   }), [csvData, mapping]);
 
-  const payload = useMemo(() => buildPayload(mappedRows, type, t), [mappedRows, type, t]);
-  const errorRows = useMemo(() => new Set(payload.errors.map(e => e.row)), [payload]);
+  const payload = useMemo(() => buildPayload(mappedRows, type, t, products), [mappedRows, type, t, products]);
 
   const handleImport = async () => {
-    if (payload.errors.length > 0) return; // all-or-nothing: never submit a file with known errors
+    if (!productsReady || payload.errors.length > 0) return; // all-or-nothing: never submit a file with known errors
     setImporting(true);
     try {
       const batchFn = type === 'sales' ? batchCreateSales : batchCreatePurchases;
@@ -499,58 +554,87 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
 
           {/* Step 3: Preview & Validate */}
           {step === 3 && (
+            !productsReady ? (
+              <div className="text-sm text-[#5c5c5a] py-10 text-center"><i className="fas fa-spinner fa-spin mr-2"></i>{t('csvImport.productsLoading')}</div>
+            ) : (
             <div>
               <p className="text-sm text-[#191918] font-medium mb-2">{t('csvImport.groupSummary', { docs: payload.summary.docs, lines: payload.summary.lines })}</p>
-              <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
-                <i className="fas fa-circle-info mr-1.5"></i>{t('csvImport.allOrNothingNotice')}
+              <div className={`text-xs border rounded-lg px-3 py-2 mb-3 ${payload.errors.length > 0 ? 'text-red-700 bg-red-50 border-red-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
+                <i className="fas fa-circle-info mr-1.5"></i>
+                {payload.errors.length > 0 ? t('csvImport.errorSummary', { count: payload.errors.length }) : t('csvImport.allOrNothingNotice')}
               </div>
-              {payload.errors.length > 0 && (
-                <div className="text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3 max-h-32 overflow-y-auto">
-                  {payload.errors.slice(0, 10).map((e, i) => (
-                    <p key={i} className="text-red-600">{t('csvImport.rowError', { row: e.row, errors: e.errors.join(', ') })}</p>
-                  ))}
-                  {payload.errors.length > 10 && <p className="text-red-500">{t('csvImport.moreRows', { count: payload.errors.length - 10 })}</p>}
-                </div>
-              )}
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs border-collapse data-table">
-                  <thead>
-                    <tr className="bg-[#f0eeeb]">
-                      <th className="px-2 py-1.5 text-left">#</th>
-                      <th className="px-2 py-1.5 text-left">{t('csvImport.docNo')}</th>
-                      <th className="px-2 py-1.5 text-left">{t('csvImport.date')}</th>
-                      <th className="px-2 py-1.5 text-left">{type === 'sales' ? t('csvImport.customer') : t('csvImport.supplier')}</th>
-                      <th className="px-2 py-1.5 text-right">{t('csvImport.quantity')}</th>
-                      <th className="px-2 py-1.5 text-right">{t('csvImport.totalAmount')}</th>
-                      <th className="px-2 py-1.5 text-center">{t('csvImport.invoiceStatus')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mappedRows.slice(0, 10).map((r, i) => {
-                      const isErr = errorRows.has(r._row);
-                      const amount = cleanNum(has(r.totalWithTax) ? r.totalWithTax : r.totalAmount);
-                      return (
-                        <tr key={i} className={`border-t border-[#f0eeeb] ${isErr ? 'bg-red-50' : ''}`}>
-                          <td className="px-2 py-1.5">{r._row}</td>
-                          <td className="px-2 py-1.5">{has(r.docNo) ? String(r.docNo) : '—'}</td>
-                          <td className="px-2 py-1.5">{r.date}</td>
-                          <td className="px-2 py-1.5">{type === 'sales' ? r.customer : r.supplier}</td>
-                          <td className="px-2 py-1.5 text-right">{has(r.quantity) ? r.quantity : (r.tons ?? '')}</td>
-                          <td className="px-2 py-1.5 text-right">{currSym}{amount.toLocaleString()}</td>
-                          <td className="px-2 py-1.5 text-center">
-                            {isErr
-                              ? <span className="text-red-500"><i className="fas fa-exclamation-circle"></i></span>
-                              : <span className="text-green-600"><i className="fas fa-check-circle"></i></span>
-                            }
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="space-y-2">
+                {payload.groups.slice(0, 30).map((g, gi) => {
+                  const hasErr = g.errors.length > 0;
+                  const cardHead = (
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-3 py-2">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs min-w-0">
+                        <i className={`fas ${hasErr ? 'fa-exclamation-circle text-red-500' : 'fa-check-circle text-green-600'}`}></i>
+                        <span className="font-bold text-[#191918] truncate">{g.kind === 'doc' ? g.docNo : t('csvImport.legacyRow')}</span>
+                        <span className="text-[#5c5c5a]">{g.date}</span>
+                        <span className="text-[#5c5c5a] truncate">{g.party}</span>
+                        {g.invoiceNumber && <span className="text-[#5c5c5a]">{g.invoiceNumber}</span>}
+                        <span className="text-[#5c5c5a]">{t('csvImport.previewLineCount', { count: g.lineCount })}</span>
+                      </div>
+                      <div className="flex items-center gap-x-3 text-xs whitespace-nowrap">
+                        <span className="text-[#5c5c5a]">{t('csvImport.previewNetTotal')} <span className="font-bold text-[#191918]">{currSym}{g.totals.net.toLocaleString()}</span></span>
+                        <span className="text-[#5c5c5a]">{t('csvImport.previewTaxTotal')} <span className="font-bold text-[#191918]">{currSym}{g.totals.tax.toLocaleString()}</span></span>
+                        <span className="text-[#5c5c5a]">{t('csvImport.totalWithTax')} <span className="font-bold text-rose-600">{currSym}{g.totals.gross.toLocaleString()}</span></span>
+                      </div>
+                    </div>
+                  );
+                  return (
+                    <div key={gi} className={`border rounded-lg ${hasErr ? 'border-red-200 bg-red-50/40' : 'border-[#e0ddd5] bg-white'}`}>
+                      {g.kind === 'doc' && g.items.length > 0 ? (
+                        <details>
+                          <summary className="cursor-pointer list-none hover:bg-[#f9f9f8]/60 rounded-lg">{cardHead}</summary>
+                          <div className="overflow-x-auto border-t border-[#e0ddd5]/70">
+                            <table className="w-full text-[11px] border-collapse">
+                              <thead><tr className="bg-[#f9f9f8] text-[#5c5c5a]">
+                                <th className="px-2 py-1 text-left">{t('csvImport.lineNo')}</th>
+                                <th className="px-2 py-1 text-left">{t('csvImport.description')}</th>
+                                <th className="px-2 py-1 text-left">{t('csvImport.unit')}</th>
+                                <th className="px-2 py-1 text-right">{t('csvImport.quantity')}</th>
+                                <th className="px-2 py-1 text-right">{t('csvImport.unitPriceNet')}</th>
+                                <th className="px-2 py-1 text-right">{t('csvImport.taxRate')}</th>
+                                <th className="px-2 py-1 text-right">{t('csvImport.taxAmount')}</th>
+                                <th className="px-2 py-1 text-right">{t('csvImport.totalWithTax')}</th>
+                                <th className="px-2 py-1 text-center">{t('csvImport.matchStatus')}</th>
+                              </tr></thead>
+                              <tbody>
+                                {g.items.map((it, ii) => (
+                                  <tr key={ii} className="border-t border-[#f0eeeb]">
+                                    <td className="px-2 py-1">{it.lineNo}</td>
+                                    <td className="px-2 py-1">{it.name || '—'}</td>
+                                    <td className="px-2 py-1">{it.unit || '—'}</td>
+                                    <td className="px-2 py-1 text-right">{it.qty}</td>
+                                    <td className="px-2 py-1 text-right">{currSym}{it.unitNet.toLocaleString()}</td>
+                                    <td className="px-2 py-1 text-right">{it.rate != null ? `${it.rate}%` : '—'}</td>
+                                    <td className="px-2 py-1 text-right">{currSym}{it.tax.toLocaleString()}</td>
+                                    <td className="px-2 py-1 text-right font-medium">{currSym}{it.gross.toLocaleString()}</td>
+                                    <td className="px-2 py-1 text-center whitespace-nowrap">
+                                      {it.match === 'byId' || it.match === 'byName'
+                                        ? <span className="text-green-600">{t('csvImport.matchedBadge')}</span>
+                                        : it.match === 'unmatched'
+                                          ? <span className="text-amber-600" title={t('csvImport.unmatchedBadge')}>{t('csvImport.unmatchedShort')}</span>
+                                          : <span className="text-[#5c5c5a]">—</span>}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            {g.warning && <p className="text-[10px] text-amber-600 px-2 py-1">{g.warning}</p>}
+                          </div>
+                        </details>
+                      ) : cardHead}
+                      {hasErr && <div className="border-t border-red-200 px-3 py-1.5 text-[11px] text-red-600">{g.errors.join('；')}</div>}
+                    </div>
+                  );
+                })}
               </div>
-              {mappedRows.length > 10 && <p className="text-xs text-[#5c5c5a] mt-2">{t('csvImport.moreRows', { count: mappedRows.length - 10 })}</p>}
+              {payload.groups.length > 30 && <p className="text-xs text-[#5c5c5a] mt-2">{t('csvImport.previewMoreDocs', { count: payload.groups.length - 30 })}</p>}
             </div>
+            )
           )}
 
           {/* Step 4: Result */}
@@ -595,7 +679,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
               </button>
             )}
             {step === 3 && (
-              <button onClick={handleImport} disabled={importing || payload.errors.length > 0} className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed">
+              <button onClick={handleImport} disabled={importing || !productsReady || payload.errors.length > 0} className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed">
                 {importing ? <><i className="fas fa-spinner fa-spin mr-1"></i>{t('csvImport.importing')}</> : t('csvImport.confirmImport', { count: payload.records.length })}
               </button>
             )}
