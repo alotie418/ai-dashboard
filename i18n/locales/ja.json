@@ -1093,7 +1093,22 @@
     "exampleIssued": "発行済",
     "exampleReceived": "受領済",
     "templateSales": "売上インポートテンプレート",
-    "templatePurchases": "仕入インポートテンプレート"
+    "templatePurchases": "仕入インポートテンプレート",
+    "docNo": "伝票番号",
+    "lineNo": "行番号",
+    "product": "商品ID",
+    "description": "品名・摘要",
+    "unit": "単位",
+    "unitPriceNet": "税抜単価",
+    "taxAmount": "税額",
+    "totalWithTax": "税込合計",
+    "multiLineHint": "「伝票番号」を入力すると、同じ番号の複数行を明細付きの 1 伝票にまとめます。空欄なら 1 行 1 件です。",
+    "groupSummary": "{{docs}} 件の伝票 / {{lines}} 行の明細をインポートします",
+    "allOrNothingNotice": "いずれかの行・伝票の検証に失敗するとファイル全体がインポートされません。修正してから再試行してください。",
+    "errGroupConflict": "伝票番号 {{docNo}} の行間で日付・取引先が一致しません",
+    "errGroupNoLines": "伝票番号 {{docNo}} に有効な明細行がありません",
+    "errAmountConflict": "税込合計と税抜単価が一致しません",
+    "errLineNeedsProductOrDesc": "明細行には商品または品名が必要です"
   },
   "transactions": {
     "title": "取引記録",

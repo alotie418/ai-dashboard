@@ -1093,7 +1093,22 @@
     "exampleIssued": "발행",
     "exampleReceived": "수령",
     "templateSales": "매출 가져오기 템플릿",
-    "templatePurchases": "매입 가져오기 템플릿"
+    "templatePurchases": "매입 가져오기 템플릿",
+    "docNo": "전표 번호",
+    "lineNo": "행 번호",
+    "product": "상품 ID",
+    "description": "품명/설명",
+    "unit": "단위",
+    "unitPriceNet": "공급가 단가",
+    "taxAmount": "세액",
+    "totalWithTax": "세금 포함 합계",
+    "multiLineHint": "「전표 번호」를 입력하면 같은 번호의 여러 행이 명세가 있는 하나의 전표로 합쳐집니다. 비워 두면 한 행당 한 건입니다.",
+    "groupSummary": "{{docs}}건의 전표 / {{lines}}행의 명세를 가져옵니다",
+    "allOrNothingNotice": "행 또는 전표 중 하나라도 검증에 실패하면 파일 전체가 가져오기되지 않습니다. 수정 후 다시 시도하세요.",
+    "errGroupConflict": "전표 번호 {{docNo}}의 행 간 날짜/거래처가 일치하지 않습니다",
+    "errGroupNoLines": "전표 번호 {{docNo}}에 유효한 명세 행이 없습니다",
+    "errAmountConflict": "세금 포함 합계와 공급가 단가가 일치하지 않습니다",
+    "errLineNeedsProductOrDesc": "명세 행에는 상품 또는 품명이 필요합니다"
   },
   "transactions": {
     "title": "거래 기록",

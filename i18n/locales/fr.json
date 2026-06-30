@@ -1093,7 +1093,22 @@
     "exampleIssued": "Émise",
     "exampleReceived": "Reçue",
     "templateSales": "Modèle d'import ventes",
-    "templatePurchases": "Modèle d'import achats"
+    "templatePurchases": "Modèle d'import achats",
+    "docNo": "N° de document",
+    "lineNo": "N° de ligne",
+    "product": "ID produit",
+    "description": "Désignation",
+    "unit": "Unité",
+    "unitPriceNet": "Prix unitaire HT",
+    "taxAmount": "Montant de taxe",
+    "totalWithTax": "Montant TTC",
+    "multiLineHint": "Renseignez un « N° de document » pour fusionner les lignes partageant ce numéro en un seul document avec ses lignes ; laissez vide pour une ligne par enregistrement.",
+    "groupSummary": "Importera {{docs}} documents / {{lines}} lignes de détail",
+    "allOrNothingNotice": "Si une ligne ou un document échoue à la validation, tout le fichier n'est pas importé — corrigez puis réessayez.",
+    "errGroupConflict": "Document {{docNo}} : date / tiers incohérents entre ses lignes",
+    "errGroupNoLines": "Le document {{docNo}} n'a aucune ligne de détail valide",
+    "errAmountConflict": "Le montant TTC est incohérent avec le prix unitaire HT",
+    "errLineNeedsProductOrDesc": "Une ligne de détail nécessite un produit ou une désignation"
   },
   "transactions": {
     "title": "Transactions",
