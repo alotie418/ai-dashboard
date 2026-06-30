@@ -1108,7 +1108,21 @@
     "errGroupConflict": "单据号 {{docNo}} 内日期/往来单位不一致",
     "errGroupNoLines": "单据号 {{docNo}} 没有有效明细行",
     "errAmountConflict": "价税合计与不含税单价不一致",
-    "errLineNeedsProductOrDesc": "明细行需填写商品或品名"
+    "errLineNeedsProductOrDesc": "明细行需填写商品或品名",
+    "errorSummary": "{{count}} 处错误，整批将不导入，请先修正",
+    "legacyRow": "单条",
+    "previewLineCount": "{{count}} 行",
+    "previewNetTotal": "不含税",
+    "previewTaxTotal": "税额",
+    "matchStatus": "匹配",
+    "matchedBadge": "已匹配",
+    "unmatchedShort": "仅描述",
+    "unmatchedBadge": "未匹配商品，仅作描述导入，不计库存",
+    "previewMoreDocs": "另有 {{count}} 张单据未在预览中显示",
+    "productsLoading": "商品库加载中…",
+    "rowErrorCtx": "第 {{row}} 行（单据 {{docNo}} · 行 {{lineNo}}）：{{errors}}",
+    "errProductAmbiguous": "商品名「{{name}}」匹配到多个商品，请改用 product_id",
+    "errDupLineNo": "单据 {{docNo}} 行号重复，已按文件顺序排序"
   },
   "transactions": {
     "title": "收支记录",

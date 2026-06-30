@@ -1108,7 +1108,21 @@
     "errGroupConflict": "Document {{docNo}}: inconsistent date / counterparty across its rows",
     "errGroupNoLines": "Document {{docNo}} has no valid line items",
     "errAmountConflict": "Tax-inclusive total conflicts with the unit price",
-    "errLineNeedsProductOrDesc": "A line item needs a product or a description"
+    "errLineNeedsProductOrDesc": "A line item needs a product or a description",
+    "errorSummary": "{{count}} error(s) — the whole file will not be imported; fix them first",
+    "legacyRow": "Single",
+    "previewLineCount": "{{count}} lines",
+    "previewNetTotal": "Net",
+    "previewTaxTotal": "Tax",
+    "matchStatus": "Match",
+    "matchedBadge": "Matched",
+    "unmatchedShort": "Desc only",
+    "unmatchedBadge": "No product match — imported as description only (not counted in inventory)",
+    "previewMoreDocs": "{{count}} more documents not shown in the preview",
+    "productsLoading": "Loading products…",
+    "rowErrorCtx": "Row {{row}} (doc {{docNo}} · line {{lineNo}}): {{errors}}",
+    "errProductAmbiguous": "Product name \"{{name}}\" matches multiple products — use a product_id instead",
+    "errDupLineNo": "Document {{docNo}}: duplicate line numbers — sorted by file order"
   },
   "transactions": {
     "title": "Transactions",

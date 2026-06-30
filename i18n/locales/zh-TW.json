@@ -1108,7 +1108,21 @@
     "errGroupConflict": "單據號 {{docNo}} 內日期/往來單位不一致",
     "errGroupNoLines": "單據號 {{docNo}} 沒有有效明細行",
     "errAmountConflict": "含稅合計與未稅單價不一致",
-    "errLineNeedsProductOrDesc": "明細行需填寫商品或品名"
+    "errLineNeedsProductOrDesc": "明細行需填寫商品或品名",
+    "errorSummary": "{{count}} 處錯誤，整批將不匯入，請先修正",
+    "legacyRow": "單筆",
+    "previewLineCount": "{{count}} 行",
+    "previewNetTotal": "未稅",
+    "previewTaxTotal": "稅額",
+    "matchStatus": "比對",
+    "matchedBadge": "已比對",
+    "unmatchedShort": "僅描述",
+    "unmatchedBadge": "未比對到商品，僅作描述匯入，不計庫存",
+    "previewMoreDocs": "另有 {{count}} 張單據未在預覽中顯示",
+    "productsLoading": "商品庫載入中…",
+    "rowErrorCtx": "第 {{row}} 行（單據 {{docNo}} · 行 {{lineNo}}）：{{errors}}",
+    "errProductAmbiguous": "商品名「{{name}}」比對到多個商品，請改用 product_id",
+    "errDupLineNo": "單據 {{docNo}} 行號重複，已依檔案順序排序"
   },
   "transactions": {
     "title": "收支記錄",
