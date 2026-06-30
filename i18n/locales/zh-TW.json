@@ -1093,7 +1093,22 @@
     "exampleIssued": "已開",
     "exampleReceived": "已收",
     "templateSales": "銷售匯入範本",
-    "templatePurchases": "採購匯入範本"
+    "templatePurchases": "採購匯入範本",
+    "docNo": "單據號",
+    "lineNo": "行號",
+    "product": "商品ID",
+    "description": "品名/說明",
+    "unit": "單位",
+    "unitPriceNet": "未稅單價",
+    "taxAmount": "稅額",
+    "totalWithTax": "含稅合計",
+    "multiLineHint": "填寫「單據號」即可把同一單號的多行合併為一張單據（含商品明細）；不填則一行一單。",
+    "groupSummary": "將匯入 {{docs}} 張單據 / {{lines}} 行明細",
+    "allOrNothingNotice": "任一行/單據驗證失敗將導致整個檔案不匯入，請先修正後重試。",
+    "errGroupConflict": "單據號 {{docNo}} 內日期/往來單位不一致",
+    "errGroupNoLines": "單據號 {{docNo}} 沒有有效明細行",
+    "errAmountConflict": "含稅合計與未稅單價不一致",
+    "errLineNeedsProductOrDesc": "明細行需填寫商品或品名"
   },
   "transactions": {
     "title": "收支記錄",

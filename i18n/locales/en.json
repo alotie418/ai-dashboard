@@ -1093,7 +1093,22 @@
     "exampleIssued": "Issued",
     "exampleReceived": "Received",
     "templateSales": "Sales Import Template",
-    "templatePurchases": "Purchases Import Template"
+    "templatePurchases": "Purchases Import Template",
+    "docNo": "Document No.",
+    "lineNo": "Line No.",
+    "product": "Product ID",
+    "description": "Description",
+    "unit": "Unit",
+    "unitPriceNet": "Unit price (excl. tax)",
+    "taxAmount": "Tax amount",
+    "totalWithTax": "Total (incl. tax)",
+    "multiLineHint": "Add a \"Document No.\" to merge rows sharing it into one document with line items; leave it blank for one row per record.",
+    "groupSummary": "Will import {{docs}} documents / {{lines}} line items",
+    "allOrNothingNotice": "If any row or document fails validation, the whole file is not imported — please fix and retry.",
+    "errGroupConflict": "Document {{docNo}}: inconsistent date / counterparty across its rows",
+    "errGroupNoLines": "Document {{docNo}} has no valid line items",
+    "errAmountConflict": "Tax-inclusive total conflicts with the unit price",
+    "errLineNeedsProductOrDesc": "A line item needs a product or a description"
   },
   "transactions": {
     "title": "Transactions",

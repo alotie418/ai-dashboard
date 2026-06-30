@@ -1093,7 +1093,22 @@
     "exampleIssued": "已开",
     "exampleReceived": "已收",
     "templateSales": "销售导入模板",
-    "templatePurchases": "采购导入模板"
+    "templatePurchases": "采购导入模板",
+    "docNo": "单据号",
+    "lineNo": "行号",
+    "product": "商品ID",
+    "description": "品名/说明",
+    "unit": "单位",
+    "unitPriceNet": "不含税单价",
+    "taxAmount": "税额",
+    "totalWithTax": "价税合计",
+    "multiLineHint": "填写「单据号」即可把同一单号的多行合并为一张单据（含商品明细）；不填则一行一单。",
+    "groupSummary": "将导入 {{docs}} 张单据 / {{lines}} 行明细",
+    "allOrNothingNotice": "任一行/单据校验失败将导致整个文件不导入，请先修正后重试。",
+    "errGroupConflict": "单据号 {{docNo}} 内日期/往来单位不一致",
+    "errGroupNoLines": "单据号 {{docNo}} 没有有效明细行",
+    "errAmountConflict": "价税合计与不含税单价不一致",
+    "errLineNeedsProductOrDesc": "明细行需填写商品或品名"
   },
   "transactions": {
     "title": "收支记录",
