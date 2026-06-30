@@ -1233,6 +1233,25 @@ export interface AppSettings {
 }
 
 // API record types
+
+// snake_case line-item row on the wire (purchase_items / sales_items columns). Produced by
+// toApiLineItem (write) and consumed by fromApiLineItem (read); also the shape of
+// ApiPurchaseRecord/ApiSalesRecord.items. Fields are optional/nullable to tolerate the read
+// boundary (a detail row may carry extra FK columns; a missing field falls back in fromApiLineItem).
+interface ApiLineItem {
+  id?: number;
+  product_id?: string | null;
+  description?: string | null;
+  unit_snapshot?: string | null;
+  quantity?: number | null;
+  unit_price?: number | null;
+  amount_net?: number;
+  tax_rate?: number | null;
+  tax_amount?: number;
+  amount_gross?: number;
+  line_no?: number;
+}
+
 interface ApiSalesRecord {
   id: string;
   date: string;
@@ -1254,7 +1273,7 @@ interface ApiSalesRecord {
   product_id?: string | null;
   product_name_snapshot?: string | null;
   unit_snapshot?: string | null;
-  items?: any[];            // P4a: present on the /:id detail read; absent from the list
+  items?: ApiLineItem[];    // P4a: present on the /:id detail read; absent from the list
 }
 
 interface ApiPurchaseRecord {
@@ -1277,7 +1296,7 @@ interface ApiPurchaseRecord {
   product_id?: string | null;
   product_name_snapshot?: string | null;
   unit_snapshot?: string | null;
-  items?: any[];            // P4a: present on the /:id detail read; absent from the list
+  items?: ApiLineItem[];    // P4a: present on the /:id detail read; absent from the list
 }
 
 // ==================== Helpers ====================
@@ -1295,7 +1314,7 @@ function parseTaxRatePercent(taxRate: string): number {
 // ==================== Field Mapping ====================
 
 // P4a: map one detail item row (snake_case from purchase_items/sales_items) → LineItem.
-function fromApiLineItem(r: any): LineItem {
+function fromApiLineItem(r: ApiLineItem): LineItem {
   return {
     id: r.id,
     productId: r.product_id ?? null,
@@ -1314,7 +1333,7 @@ function fromApiLineItem(r: any): LineItem {
 // Map an editor LineItem (camel) → the snake-case row the backend items[] expects
 // (purchase_items/sales_items columns; tax_rate is numeric here, unlike business_document_items'
 // string). Used by both toApiPurchase (P4b) and toApiSales (P4c).
-function toApiLineItem(it: LineItem, idx: number): any {
+function toApiLineItem(it: LineItem, idx: number): ApiLineItem {
   return {
     product_id: it.productId ?? null,
     description: it.description ?? null,
@@ -1786,14 +1805,45 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
 
 // --- Batch Import (Feature 2) ---
 
-export async function batchCreateSales(records: any[]): Promise<import('../types').BatchImportResult> {
+// One CSV-import record handed to the batch handlers — shared by purchases and sales, so every
+// header field is optional (a sale carries customer/shippingCost, a purchase carries supplier). A
+// record carrying items[] is a multi-line document; otherwise it is a legacy single row. Built
+// loosely by CsvImportModal; kept permissive on purpose (no field is required at this layer — the
+// backend validates and rejects the whole file all-or-nothing).
+export interface BatchImportRecord {
+  id?: string;
+  date?: string;
+  supplier?: string;
+  customer?: string;
+  quantity?: string | number;
+  tons?: number;
+  price?: number;
+  pricePerTon?: number;
+  totalAmount?: number;
+  amountWithoutTax?: number;
+  taxAmount?: number;
+  taxRate?: number;
+  invoiceNumber?: string;
+  invoiceStatus?: string;
+  payment_status?: string;
+  paid_amount?: number;
+  due_date?: string | null;
+  shippingCost?: number;
+  productId?: string;
+  product_id?: string | null;
+  product_name_snapshot?: string | null;
+  unit_snapshot?: string | null;
+  items?: ApiLineItem[];
+}
+
+export async function batchCreateSales(records: BatchImportRecord[]): Promise<import('../types').BatchImportResult> {
   return apiFetch('/api/sales/batch', {
     method: 'POST',
     body: JSON.stringify({ records }),
   });
 }
 
-export async function batchCreatePurchases(records: any[]): Promise<import('../types').BatchImportResult> {
+export async function batchCreatePurchases(records: BatchImportRecord[]): Promise<import('../types').BatchImportResult> {
   return apiFetch('/api/purchases/batch', {
     method: 'POST',
     body: JSON.stringify({ records }),
