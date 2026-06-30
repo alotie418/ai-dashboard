@@ -1989,7 +1989,9 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   ok(bs1.invoiceStatus === '待开', '[batch] sales default invoiceStatus=待开');
   ok(bs1.due_date === due, '[batch] sales due_date persisted');
 
-  // partial: valid + missing-date + negative-tons
+  // P5d-2: all-or-nothing — 1 valid + 2 invalid (missing date, negative tons) → the WHOLE file is
+  // a no-op (success 0, failed = records.length, errors[] for the bad rows); the valid row is NOT
+  // written. This replaces the former partial-success behaviour (deliberate change, P5d-2).
   freshDb();
   const part = await call('POST', '/api/sales/batch', {
     records: [
@@ -1998,9 +2000,9 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
       { id: 'bad-tons', date: '2023-02-02', customer: 'Neg', tons: -5, totalAmount: 100 }, // negative tons
     ],
   });
-  ok(part.success === 1 && part.failed === 2, `[batch] partial → success 1 failed 2, got ${JSON.stringify(part)}`);
-  ok(Array.isArray(part.errors) && part.errors.length === 2 && part.errors.every((e) => e.row && Array.isArray(e.errors)), '[batch] errors carry {row, errors[]}');
-  ok((await call('GET', '/api/sales', null)).length === 1, '[batch] only the valid row inserted');
+  ok(part.success === 0 && part.failed === 3, `[batch] all-or-nothing: any invalid → success 0 failed 3, got ${JSON.stringify(part)}`);
+  ok(Array.isArray(part.errors) && part.errors.length === 2 && part.errors.every((e) => e.row && Array.isArray(e.errors)), '[batch] errors carry {row, errors[]} for the 2 bad rows');
+  ok((await call('GET', '/api/sales', null)).length === 0, '[batch] all-or-nothing → nothing inserted (the 1 valid row is NOT written)');
 
   // empty + over-cap throw
   await expectThrow(() => call('POST', '/api/sales/batch', { records: [] }), '[batch] empty records throws');
@@ -2017,6 +2019,94 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   const bp1 = purch.find((p) => p.id === 'bp1');
   ok(purch.length === 1 && bp1 && bp1.due_date === due, '[batch] GET /api/purchases reflects insert + due_date persisted');
   ok(bp1.invoiceStatus === '已收', '[batch] purchases default invoiceStatus=已收');
+}
+
+// ───────────── P5d-2: batch import with multi-line items[] (all-or-nothing) ─────────────
+// A record carrying items[] is persisted as a neutralised header (tons/pricePerTon=0, product_id
+// NULL) + child rows, header money = Σ items; a record without items[] stays legacy. Any invalid
+// record/item rolls the WHOLE file back. Mirrors the editor write path via _lineItems.
+{
+  // (1) legacy purchase (no items) → unchanged: header written, no purchase_items
+  const db1 = freshDb();
+  const lg = await call('POST', '/api/purchases/batch', {
+    records: [{ id: 'bli-lg', date: '2026-01-01', supplier: 'LegacyB', tons: 5, totalAmount: 1000 }],
+  });
+  ok(lg.success === 1 && lg.failed === 0, `[batch-items] legacy purchase no items → success 1, got ${JSON.stringify(lg)}`);
+  ok(db1.prepare("SELECT COUNT(*) n FROM purchase_items WHERE purchase_id='bli-lg'").get().n === 0, '[batch-items] legacy purchase writes no purchase_items');
+
+  // (2) purchase with items[] → header neutralised + money = Σ items + purchase_items rows
+  freshDb();
+  const pi = await call('POST', '/api/purchases/batch', {
+    records: [{ id: 'bli-p', date: '2026-01-02', supplier: 'MultiB', items: [
+      { product_id: 'pa', description: 'A', unit_snapshot: 'piece', quantity: 2, unit_price: 100, amount_net: 200, tax_rate: 13, tax_amount: 26, amount_gross: 226 },
+      { product_id: 'pb', description: 'B', unit_snapshot: 'box', quantity: 1, unit_price: 50, amount_net: 50, tax_rate: 6, tax_amount: 3, amount_gross: 53 },
+    ] }],
+  });
+  ok(pi.success === 1 && pi.failed === 0, `[batch-items] purchase items → success 1, got ${JSON.stringify(pi)}`);
+  const ph = (await call('GET', '/api/purchases', null)).find((p) => p.id === 'bli-p');
+  ok(approx(ph.tons, 0) && ph.product_id == null, '[batch-items] purchase header neutralised (tons=0, product_id null)');
+  ok(approx(ph.amountWithoutTax, 250) && approx(ph.taxAmount, 29) && approx(ph.totalAmount, 279), '[batch-items] purchase header money = Σ items (net 250 / tax 29 / gross 279)');
+  ok(Array.isArray(ph.items) && ph.items.length === 2, '[batch-items] purchase list attaches its 2 items');
+
+  // (3) sale with items[] → neutralised header + sales_items; shippingCost stays header-level
+  freshDb();
+  const si = await call('POST', '/api/sales/batch', {
+    records: [{ id: 'bli-s', date: '2026-01-03', customer: 'MultiC', shippingCost: 25, items: [
+      { product_id: 'pa', description: 'A', quantity: 2, unit_price: 100, amount_net: 200, tax_rate: 13, tax_amount: 26, amount_gross: 226 },
+    ] }],
+  });
+  ok(si.success === 1 && si.failed === 0, `[batch-items] sale items → success 1, got ${JSON.stringify(si)}`);
+  const sh = (await call('GET', '/api/sales', null)).find((s) => s.id === 'bli-s');
+  ok(approx(sh.tons, 0) && sh.product_id == null, '[batch-items] sale header neutralised');
+  ok(approx(sh.amountWithoutTax, 200) && approx(sh.taxAmount, 26) && approx(sh.totalAmount, 226), '[batch-items] sale header money = Σ items (shipping excluded)');
+  ok(approx(sh.shippingCost, 25), '[batch-items] sale shippingCost stays header-level, not in the items sum');
+  ok(Array.isArray(sh.items) && sh.items.length === 1, '[batch-items] sale list attaches its 1 item');
+
+  // (4) items=[] → whole batch rolls back (success 0, nothing written)
+  const db4 = freshDb();
+  const empty = await call('POST', '/api/purchases/batch', {
+    records: [{ id: 'bli-empty', date: '2026-01-04', supplier: 'X', items: [] }],
+  });
+  ok(empty.success === 0 && empty.failed === 1 && empty.errors.length >= 1, `[batch-items] items=[] → success 0 + errors, got ${JSON.stringify(empty)}`);
+  ok(db4.prepare("SELECT COUNT(*) n FROM purchases").get().n === 0 && db4.prepare("SELECT COUNT(*) n FROM purchase_items").get().n === 0, '[batch-items] items=[] → nothing written');
+
+  // (5) bad item (non-finite quantity) → whole batch rolls back
+  const db5 = freshDb();
+  const bad = await call('POST', '/api/purchases/batch', {
+    records: [{ id: 'bli-bad', date: '2026-01-05', supplier: 'X', items: [
+      { description: 'A', quantity: 'abc', unit_price: 1, amount_net: 1, tax_amount: 0, amount_gross: 1 },
+    ] }],
+  });
+  ok(bad.success === 0 && bad.failed === 1, `[batch-items] bad item → success 0, got ${JSON.stringify(bad)}`);
+  ok(db5.prepare("SELECT COUNT(*) n FROM purchases").get().n === 0 && db5.prepare("SELECT COUNT(*) n FROM purchase_items").get().n === 0, '[batch-items] bad item → nothing written');
+
+  // (6) mixed legacy + items in ONE batch, all valid → both written correctly
+  const db6 = freshDb();
+  const mix = await call('POST', '/api/purchases/batch', {
+    records: [
+      { id: 'bli-mx-lg', date: '2026-01-06', supplier: 'Lg', tons: 3, totalAmount: 300 },
+      { id: 'bli-mx-ml', date: '2026-01-06', supplier: 'Ml', items: [
+        { description: 'A', quantity: 1, unit_price: 10, amount_net: 10, tax_rate: 13, tax_amount: 1.3, amount_gross: 11.3 },
+      ] },
+    ],
+  });
+  ok(mix.success === 2 && mix.failed === 0, `[batch-items] mixed legacy+items → success 2, got ${JSON.stringify(mix)}`);
+  ok(db6.prepare("SELECT COUNT(*) n FROM purchases").get().n === 2, '[batch-items] mixed → 2 headers written');
+  ok(db6.prepare("SELECT COUNT(*) n FROM purchase_items").get().n === 1, '[batch-items] mixed → only the multi-line record wrote items');
+  ok(approx(db6.prepare("SELECT tons FROM purchases WHERE id='bli-mx-lg'").get().tons, 3), '[batch-items] mixed legacy record keeps its tons (not neutralised)');
+
+  // (7) any failure in a mixed batch → 0 written (all-or-nothing across legacy + items)
+  const db7 = freshDb();
+  const fail = await call('POST', '/api/purchases/batch', {
+    records: [
+      { id: 'bli-ok', date: '2026-01-07', supplier: 'Ok', items: [
+        { description: 'A', quantity: 1, unit_price: 10, amount_net: 10, tax_amount: 0, amount_gross: 10 },
+      ] },
+      { id: 'bli-bad2', supplier: 'NoDate', tons: 1, totalAmount: 100 }, // legacy missing date
+    ],
+  });
+  ok(fail.success === 0 && fail.failed === 2, `[batch-items] any failure → success 0 failed 2, got ${JSON.stringify(fail)}`);
+  ok(db7.prepare("SELECT COUNT(*) n FROM purchases").get().n === 0 && db7.prepare("SELECT COUNT(*) n FROM purchase_items").get().n === 0, '[batch-items] any failure → 0 written (the valid items record is rolled back too)');
 }
 
 // ───────────────────────── §2B Batch 5: conversations (chat history persistence) ─────────────────────────
