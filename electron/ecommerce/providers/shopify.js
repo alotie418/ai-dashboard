@@ -8,17 +8,19 @@
 // below — verify against the current Shopify GraphQL Admin API docs:
 //   - endpoint path:  https://{shop}.myshopify.com/admin/api/{version}/graphql.json
 //   - auth header:    X-Shopify-Access-Token: <admin api access token>
-//   - API version:    Shopify versions the Admin API quarterly (YYYY-MM); the value
-//                     below is a PLACEHOLDER and must be kept current per Shopify's
-//                     version calendar.
+//   - API version:    Shopify versions the Admin API quarterly (YYYY-MM). SHOPIFY_API_VERSION
+//                     below is the single source of truth — bump it each quarter per Shopify's
+//                     version calendar and confirm against official docs (versions are supported
+//                     for ~12 months, so keep it recent).
 //   - query fields:   `shop { name myshopifyDomain currencyCode }` are stable, but
 //                     confirm field availability for the pinned version.
 // Auth model for MVP: single-store CUSTOM APP admin token (no OAuth redirect flow).
 
 const { publicMeta } = require('./_providerInterface');
 
-// PLACEHOLDER — confirm the current stable Admin API version per official docs.
-const SHOPIFY_API_VERSION = '2025-01';
+// Single source of truth for the Admin API version. Shopify versions quarterly (YYYY-MM);
+// bump this each quarter and confirm the current stable version against official docs.
+const SHOPIFY_API_VERSION = '2026-07';
 const TEST_TIMEOUT_MS = 15000;
 
 const META = {
