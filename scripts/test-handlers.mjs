@@ -2908,9 +2908,117 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   ok(!!wooAdapter._normalizeSiteUrl('not a url').error, '[EC9] invalid URL → error');
 }
 
+// ───────────── PR-EC3: order pull → STAGING (mock adapters, no network) ─────────────
+// Proves the staging/idempotency/sync-log/watermark logic + that NOTHING hits the ledger.
+{
+  // EC10: normalizeOrder is PURE and carries NO buyer PII (name/email/address/phone)
+  const shopRaw = {
+    id: 'gid://shopify/Order/555', name: '#1005', createdAt: '2026-06-01T00:00:00Z', updatedAt: '2026-06-02T00:00:00Z',
+    displayFinancialStatus: 'PAID', currentTotalPriceSet: { shopMoney: { amount: '120.00', currencyCode: 'USD' } },
+    subtotalPriceSet: { shopMoney: { amount: '100.00' } }, totalTaxSet: { shopMoney: { amount: '10.00' } },
+    totalShippingPriceSet: { shopMoney: { amount: '10.00' } }, customer: { id: 'gid://shopify/Customer/9' },
+    lineItems: { edges: [ { node: { sku: 'SKU1', title: 'Widget', quantity: 2, originalUnitPriceSet: { shopMoney: { amount: '50.00' } }, taxLines: [ { title: 'VAT', ratePercentage: 10, priceSet: { shopMoney: { amount: '10.00' } } } ] } } ] },
+    shippingLines: { edges: [ { node: { title: 'Standard', originalPriceSet: { shopMoney: { amount: '10.00' } } } } ] },
+    taxLines: [ { title: 'VAT', ratePercentage: 10, priceSet: { shopMoney: { amount: '10.00' } } } ],
+    refunds: [], billingAddress: { name: 'Jane Buyer', email: 'jane@example.com', phone: '555-1234', address1: '1 Main St' },
+  };
+  const sn = ecommerceCore._PROVIDERS.shopify.normalizeOrder(shopRaw);
+  ok(sn.platform === 'shopify' && sn.externalOrderId === 'gid://shopify/Order/555' && sn.orderNumber === '#1005', '[EC10] shopify normalizeOrder maps id/number');
+  ok(sn.items.length === 1 && sn.items[0].sku === 'SKU1' && sn.items[0].quantity === 2 && sn.items[0].lineNet === 100, '[EC10] shopify item net = unit*qty');
+  ok(sn.totals.grandTotalGross === 120 && sn.taxes.total === 10 && sn.shipping.total === 10, '[EC10] shopify totals mapped');
+  ok(!/jane@example\.com|Jane Buyer|555-1234|Main St/.test(JSON.stringify(sn)), '[EC10] shopify normalized carries NO buyer PII (name/email/phone/address)');
+
+  const wooRaw = {
+    id: 777, number: '777', status: 'processing', date_created_gmt: '2026-06-01T00:00:00', date_modified_gmt: '2026-06-03T00:00:00',
+    currency: 'EUR', total: '55.00', total_tax: '5.00', shipping_total: '5.00', customer_id: 42,
+    line_items: [ { name: 'Gadget', sku: 'G1', quantity: 1, subtotal: '45.00', total: '45.00', total_tax: '5.00' } ],
+    shipping_lines: [ { method_title: 'Flat', total: '5.00' } ], tax_lines: [ { rate_code: 'VAT', rate_percent: 10, tax_total: '5.00' } ],
+    fee_lines: [ { name: 'Handling', total: '2.00' } ], refunds: [ { id: 1, total: '-3.00' } ],
+    billing: { first_name: 'Bob', email: 'bob@example.com', phone: '999', address_1: '2 Side St' },
+  };
+  const wn = ecommerceCore._PROVIDERS.woocommerce.normalizeOrder(wooRaw);
+  ok(wn.platform === 'woocommerce' && wn.externalOrderId === '777' && wn.currency === 'EUR', '[EC10] woo normalizeOrder maps id/currency');
+  ok(wn.fees.length === 1 && wn.fees[0].amount === 2 && wn.refunds.length === 1, '[EC10] woo maps fee_lines + refunds');
+  ok(wn.header.customerRef === 'wc-42' && !/bob@example\.com|Bob|Side St|"999"/.test(JSON.stringify(wn)), '[EC10] woo normalized keeps only opaque customerRef, NO PII');
+
+  // Mock provider: 2 pages of orders, no network. normalizeOrder passes raw through (already normalized-shaped).
+  function mockProvider(pagesData) {
+    let call = 0;
+    return {
+      meta: { id: 'shopify', name: 'M', transport: 'graphql', authMode: 'manual_token' },
+      testConnection: async () => ({ ok: true }),
+      async pullOrdersPage() { const p = pagesData[call] || { rawOrders: [], hasNextPage: false, nextCursor: null }; call++; return p; },
+      normalizeOrder: (raw) => raw,   // raw is already a NormalizedOrder in these fixtures
+    };
+  }
+  const nord = (ext, upd) => ({ platform: 'shopify', externalOrderId: ext, orderNumber: '#' + ext, orderStatus: 'PAID', createdAt: '2026-06-01T00:00:00Z', updatedAt: upd, currency: 'USD', header: { customerRef: null }, items: [], shipping: { total: 0, lines: [] }, taxes: { total: 0, lines: [] }, fees: [], refunds: [], totals: { grandTotalGross: 10 } });
+
+  const FAKE_ENC = 'QkFTRTY0RFVNTVlDSVBIRVI=';
+  const seedConn = (db, id) => db.prepare(`INSERT INTO ecommerce_connections (id, platform, label, shop_identifier, credentials_encrypted, enabled) VALUES (?, 'shopify', 'M', 'demo.myshopify.com', ?, 1)`).run(id, FAKE_ENC);
+
+  // EC11: happy path — 2 pages → 3 staged rows; sync_log ok; watermark advanced; NO ledger write
+  {
+    const db = freshDb();
+    seedConn(db, 'ec-p1');
+    const providers = { shopify: mockProvider([
+      { rawOrders: [nord('A', '2026-06-02T00:00:00Z'), nord('B', '2026-06-03T00:00:00Z')], hasNextPage: true, nextCursor: 'cur1' },
+      { rawOrders: [nord('C', '2026-06-04T00:00:00Z')], hasNextPage: false, nextCursor: null },
+    ]) };
+    const r = await ecommerceCore.pull('ec-p1', { providers, creds: { token: 'x' } });
+    ok(r.status === 'ok' && r.pulled === 3 && r.stagedNew === 3 && r.pages === 2, `[EC11] pull ok: 3 pulled/3 new/2 pages, got ${JSON.stringify(r)}`);
+    ok(db.prepare("SELECT COUNT(*) AS c FROM ecommerce_staged_orders WHERE connection_id='ec-p1'").get().c === 3, '[EC11] 3 staged rows written');
+    ok(db.prepare("SELECT COUNT(*) AS c FROM ecommerce_sync_log WHERE connection_id='ec-p1' AND status='ok'").get().c === 1, '[EC11] one sync_log row status=ok');
+    const wm = db.prepare("SELECT last_order_updated_at FROM ecommerce_connections WHERE id='ec-p1'").get().last_order_updated_at;
+    ok(wm === '2026-06-04T00:00:00Z', '[EC11] watermark advanced to max order_updated_at');
+    // RED LINE: nothing written to the ledger
+    ok(db.prepare('SELECT COUNT(*) AS c FROM sales').get().c === 0 && db.prepare('SELECT COUNT(*) AS c FROM sales_items').get().c === 0, '[EC11] pull wrote NOTHING to sales/sales_items');
+    // staged row exposes no credentials + raw_excerpt_json NULL
+    const staged = ecommerceCore.listStaged({ connectionId: 'ec-p1' });
+    ok(staged.length === 3 && !/credential|token|"secret"/i.test(JSON.stringify(staged)), '[EC11] listStaged carries no credential material');
+    ok(db.prepare("SELECT COUNT(*) AS c FROM ecommerce_staged_orders WHERE raw_excerpt_json IS NOT NULL").get().c === 0, '[EC11] raw_excerpt_json stays NULL for every staged row');
+  }
+
+  // EC12: idempotent re-pull — same orders again → 0 new, 2 updated, still 2 rows
+  {
+    const db = freshDb();
+    seedConn(db, 'ec-p2');
+    const pages = () => ({ shopify: mockProvider([ { rawOrders: [nord('A', '2026-06-02T00:00:00Z'), nord('B', '2026-06-03T00:00:00Z')], hasNextPage: false, nextCursor: null } ]) });
+    const r1 = await ecommerceCore.pull('ec-p2', { providers: pages(), creds: { token: 'x' } });
+    const r2 = await ecommerceCore.pull('ec-p2', { providers: pages(), creds: { token: 'x' } });
+    ok(r1.stagedNew === 2 && r2.stagedNew === 0 && r2.stagedUpdated === 2, `[EC12] re-pull idempotent: new then updated, got ${JSON.stringify(r2)}`);
+    ok(db.prepare("SELECT COUNT(*) AS c FROM ecommerce_staged_orders WHERE connection_id='ec-p2'").get().c === 2, '[EC12] still exactly 2 staged rows (no duplicates)');
+  }
+
+  // EC13: page cap → status 'partial' (never silently truncated), cursor saved for resume
+  {
+    const db = freshDb();
+    seedConn(db, 'ec-p3');
+    const alwaysMore = { shopify: { meta: { id: 'shopify', name: 'M', transport: 'graphql', authMode: 'manual_token' }, testConnection: async () => ({ ok: true }),
+      async pullOrdersPage() { return { rawOrders: [nord('X' + Math.random(), '2026-06-05T00:00:00Z')], hasNextPage: true, nextCursor: 'c' }; }, normalizeOrder: (r) => r } };
+    const r = await ecommerceCore.pull('ec-p3', { providers: alwaysMore, creds: { token: 'x' }, maxPages: 20 });
+    ok(r.status === 'partial' && r.pages === 20, `[EC13] hit 20-page cap → status=partial (not silent truncation), got ${JSON.stringify(r)}`);
+    ok(db.prepare("SELECT cursor_after FROM ecommerce_sync_log WHERE connection_id='ec-p3' ORDER BY id DESC LIMIT 1").get().cursor_after === 'c', '[EC13] cursor_after saved for resume');
+  }
+
+  // EC14: error path — adapter throws → sync_log status=error, watermark NOT advanced, error_json has NO creds
+  {
+    const db = freshDb();
+    seedConn(db, 'ec-p4');
+    const boom = { shopify: { meta: { id: 'shopify', name: 'M', transport: 'graphql', authMode: 'manual_token' }, testConnection: async () => ({ ok: true }),
+      async pullOrdersPage() { const e = new Error('Authorization: Bearer shpat_supersecrettoken rejected'); e.code = 'auth'; throw e; }, normalizeOrder: (r) => r } };
+    const r = await ecommerceCore.pull('ec-p4', { providers: boom, creds: { token: 'x' } });
+    ok(r.status === 'error', `[EC14] adapter throw → status=error, got ${JSON.stringify(r)}`);
+    const logRow = db.prepare("SELECT status, error_json FROM ecommerce_sync_log WHERE connection_id='ec-p4' ORDER BY id DESC LIMIT 1").get();
+    ok(logRow.status === 'error' && logRow.error_json && /"code":"auth"/.test(logRow.error_json), '[EC14] sync_log status=error + code=auth');
+    ok(!/shpat_supersecrettoken|Bearer/i.test(logRow.error_json), '[EC14] error_json redacts token/authorization (no credential leak)');
+    ok(db.prepare("SELECT last_order_updated_at FROM ecommerce_connections WHERE id='ec-p4'").get().last_order_updated_at === null, '[EC14] watermark NOT advanced on error');
+    ok(db.prepare('SELECT COUNT(*) AS c FROM sales').get().c === 0, '[EC14] error path still wrote nothing to sales');
+  }
+}
+
 if (failures.length) {
   console.error(`✗ handlers: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + fx-reference-conversion(multi-currency reference conversion read-only, PR-7B P3-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears) + ecommerce connections(EC1 no-credential-leak/EC2 shopify catalog/EC3 setEnabled/EC4 remove/EC5 shopify-domain normalise/EC6 woocommerce key_secret catalog/EC7 11-platform catalog display-only/EC8 non-connectable save-test whitelist reject/EC9 woocommerce https-only URL normalise)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + fx-reference-conversion(multi-currency reference conversion read-only, PR-7B P3-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears) + ecommerce connections(EC1 no-credential-leak/EC2 shopify catalog/EC3 setEnabled/EC4 remove/EC5 shopify-domain normalise/EC6 woocommerce key_secret catalog/EC7 11-platform catalog display-only/EC8 non-connectable save-test whitelist reject/EC9 woocommerce https-only URL normalise) + ecommerce pull→staging(EC10 normalizeOrder pure/no-PII/EC11 pull ok staged+watermark+no-ledger-write/EC12 idempotent re-pull/EC13 20-page cap→partial/EC14 error→sync_log+redacted+watermark-frozen)) via real dispatch on :memory: DB');

@@ -96,6 +96,25 @@ function registerHandlers({ ipcMain, dialog }) {
     }
   });
 
+  // PR-EC3: pull orders → staging (NO ledger write). ecommerce:pull triggers a run;
+  // ecommerce:staged / ecommerce:syncLog are read-only lists (never carry credentials).
+  ipcMain.handle('ecommerce:pull', async (_evt, payload) => {
+    try {
+      const summary = await ecommerceCore.pull((payload && payload.connectionId), payload || {});
+      return { ok: true, ...summary };
+    } catch (err) {
+      return { ok: false, code: err?.code || 'unknown', message: err?.message };
+    }
+  });
+
+  ipcMain.handle('ecommerce:staged', async (_evt, payload) => {
+    return ecommerceCore.listStaged(payload || {});
+  });
+
+  ipcMain.handle('ecommerce:syncLog', async (_evt, payload) => {
+    return ecommerceCore.listSyncLog(payload || {});
+  });
+
   // ====== 数据库备份 / 导出（文件夹 bundle：DB + 附件，§2A#3）======
   // 导出为一个文件夹（sololedger.db + attachments/docs/*），而非单 .db——否则换机导入后
   // tax_invoice_attachment_path 全部悬空。与 #152 启动自动备份同形，可互相恢复。

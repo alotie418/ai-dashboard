@@ -739,6 +739,78 @@ const MIGRATIONS = [
     d.exec('CREATE INDEX IF NOT EXISTS idx_ecommerce_conn_platform ON ecommerce_connections(platform)');
     console.log('[db] v21: ecommerce_connections table ready (connection settings only — no order pull / staging / sync / ledger linkage)');
   },
+
+  // v22: e-commerce order PULL → STAGING (PR-EC3). Additive only.
+  //   Adds the staging + sync-log layer so pulled orders can land in a PREVIEW area
+  //   WITHOUT touching the ledger. This migration:
+  //     - adds 3 nullable sync columns to ecommerce_connections (cursor / watermark);
+  //     - creates ecommerce_staged_orders (one row per pulled order, idempotent on
+  //       (connection_id, external_order_id)) — normalized preview data only;
+  //     - creates ecommerce_sync_log (one row per pull run).
+  //   STRICTLY does NOT touch sales / sales_items / purchases (no external_order_id /
+  //   platform_source column here — that is deferred to the commit phase, PR-EC5), does
+  //   NOT touch inventory / reports / categories, and carries NO accounting meaning:
+  //   staged amounts are the platform's raw values for PREVIEW, never posted.
+  //   raw_excerpt_json defaults NULL — the full raw payload is NOT persisted; buyer PII
+  //   (name / email / address / phone) is never stored (see electron/ecommerce/pull.js).
+  //   Idempotent via PRAGMA table_info guards + IF NOT EXISTS.
+  (d) => {
+    const cols = d.prepare('PRAGMA table_info(ecommerce_connections)').all().map((c) => c.name);
+    const add = (name, def) => { if (!cols.includes(name)) d.exec(`ALTER TABLE ecommerce_connections ADD COLUMN ${name} ${def}`); };
+    add('last_cursor', 'TEXT');              // opaque per-platform pagination cursor (Shopify endCursor; null for page-based)
+    add('last_synced_at', 'TEXT');           // when the last pull run finished
+    add('last_order_updated_at', 'TEXT');    // incremental watermark (max order updated/modified time seen)
+
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS ecommerce_staged_orders (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        connection_id     TEXT NOT NULL,
+        platform          TEXT NOT NULL,
+        external_order_id TEXT NOT NULL,
+        order_number      TEXT,
+        order_status      TEXT,
+        order_created_at  TEXT,
+        order_updated_at  TEXT,
+        currency          TEXT,
+        total_gross       REAL,
+        normalized_json   TEXT,
+        raw_excerpt_json  TEXT,
+        match_status      TEXT DEFAULT 'unresolved',
+        stage_status      TEXT DEFAULT 'staged',
+        committed_sale_id TEXT,
+        first_seen_at     TEXT DEFAULT (datetime('now')),
+        last_pulled_at    TEXT DEFAULT (datetime('now')),
+        error             TEXT,
+        updated_at        TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    d.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_staged_conn_ext ON ecommerce_staged_orders(connection_id, external_order_id)');
+    d.exec('CREATE INDEX IF NOT EXISTS idx_staged_status ON ecommerce_staged_orders(stage_status)');
+    d.exec('CREATE INDEX IF NOT EXISTS idx_staged_platform ON ecommerce_staged_orders(platform, external_order_id)');
+
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS ecommerce_sync_log (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        connection_id  TEXT,
+        platform       TEXT,
+        run_at         TEXT DEFAULT (datetime('now')),
+        status         TEXT,
+        pulled         INTEGER DEFAULT 0,
+        staged_new     INTEGER DEFAULT 0,
+        staged_updated INTEGER DEFAULT 0,
+        errors         INTEGER DEFAULT 0,
+        pages          INTEGER DEFAULT 0,
+        since_used     TEXT,
+        cursor_before  TEXT,
+        cursor_after   TEXT,
+        duration_ms    INTEGER,
+        error_json     TEXT,
+        created_at     TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    d.exec('CREATE INDEX IF NOT EXISTS idx_sync_log_conn ON ecommerce_sync_log(connection_id, run_at)');
+    console.log('[db] v22: ecommerce_staged_orders + ecommerce_sync_log + connection sync columns ready (pull→staging; NO ledger write)');
+  },
 ];
 
 function runMigrations(d) {
