@@ -323,7 +323,26 @@
         "item1": "ストアの認証情報は OS のセキュアストレージ（safeStorage）で暗号化され、この端末から外に出ることはありません。",
         "item2": "暗号化はこの端末に紐づいています。別の端末でバックアップを復元した後は、トークンを再入力してください。",
         "item3": "現在のバージョンは接続テストのみを行います。注文は取得されず、帳簿には何も書き込まれません。"
-      }
+      },
+      "tier1Label": "セルフ接続（すぐ接続可）",
+      "tier2Label": "アプリ / OAuth / 審査が必要",
+      "tier3Label": "計画中（後日）",
+      "statusAvailable": "接続可能",
+      "statusNeedsAuth": "要認可",
+      "statusPlanned": "計画中",
+      "connect": "接続を追加",
+      "comingSoonHint": "プラットフォームのアプリ / OAuth / 審査が必要です——近日対応。",
+      "plannedHint": "今後のバージョンで対応予定です。",
+      "catalogTitle": "プラットフォーム一覧",
+      "storeUrlLabel": "ストアURL",
+      "storeUrlPlaceholder": "https://your-store.com",
+      "storeUrlDesc": "WooCommerce ストアの URL を入力してください（HTTPS のみ）。",
+      "consumerKeyLabel": "Consumer key",
+      "consumerKeyPlaceholder": "ck_...",
+      "consumerSecretLabel": "Consumer secret",
+      "consumerSecretPlaceholder": "cs_...",
+      "getKeysLink": "REST API キーの生成方法",
+      "credsOverrideHint": "（空欄のままにすると保存済みの認証情報を使用）"
     }
   },
   "onboarding": {

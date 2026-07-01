@@ -323,7 +323,26 @@
         "item1": "商店憑證由作業系統安全儲存（safeStorage）加密，絕不離開本裝置。",
         "item2": "加密與本機綁定——在另一台裝置還原備份後，需重新輸入權杖。",
         "item3": "目前版本僅測試連線，不擷取訂單、不寫入任何帳本資料。"
-      }
+      },
+      "tier1Label": "可自助接入（即可連接）",
+      "tier2Label": "需應用 / OAuth / 授權審核",
+      "tier3Label": "規劃中（後置）",
+      "statusAvailable": "可連接",
+      "statusNeedsAuth": "需授權",
+      "statusPlanned": "規劃中",
+      "connect": "新增連線",
+      "comingSoonHint": "需平台應用 / OAuth / 授權審核——即將支援。",
+      "plannedHint": "計劃在後續版本支援。",
+      "catalogTitle": "平台目錄",
+      "storeUrlLabel": "商店 URL",
+      "storeUrlPlaceholder": "https://your-store.com",
+      "storeUrlDesc": "填寫你的 WooCommerce 商店 URL（僅支援 HTTPS）。",
+      "consumerKeyLabel": "Consumer key",
+      "consumerKeyPlaceholder": "ck_...",
+      "consumerSecretLabel": "Consumer secret",
+      "consumerSecretPlaceholder": "cs_...",
+      "getKeysLink": "如何產生 REST API 金鑰",
+      "credsOverrideHint": "（留空則沿用已儲存的憑證）"
     }
   },
   "onboarding": {

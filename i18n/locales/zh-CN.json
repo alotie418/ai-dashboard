@@ -323,7 +323,26 @@
         "item1": "店铺凭证由操作系统安全存储（safeStorage）加密，绝不离开本设备。",
         "item2": "加密与本机绑定——在另一台设备恢复备份后，需重新录入令牌。",
         "item3": "当前版本仅测试连接，不拉取订单、不写入任何账本数据。"
-      }
+      },
+      "tier1Label": "可自助接入（即可连接）",
+      "tier2Label": "需应用 / OAuth / 授权审核",
+      "tier3Label": "规划中（后置）",
+      "statusAvailable": "可连接",
+      "statusNeedsAuth": "需授权",
+      "statusPlanned": "规划中",
+      "connect": "添加连接",
+      "comingSoonHint": "需平台应用 / OAuth / 授权审核——即将支持。",
+      "plannedHint": "计划在后续版本支持。",
+      "catalogTitle": "平台目录",
+      "storeUrlLabel": "店铺 URL",
+      "storeUrlPlaceholder": "https://your-store.com",
+      "storeUrlDesc": "填写你的 WooCommerce 店铺 URL（仅支持 HTTPS）。",
+      "consumerKeyLabel": "Consumer key",
+      "consumerKeyPlaceholder": "ck_...",
+      "consumerSecretLabel": "Consumer secret",
+      "consumerSecretPlaceholder": "cs_...",
+      "getKeysLink": "如何生成 REST API 密钥",
+      "credsOverrideHint": "（留空则沿用已保存的凭证）"
     }
   },
   "onboarding": {

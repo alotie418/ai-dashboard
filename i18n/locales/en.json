@@ -323,7 +323,26 @@
         "item1": "Store credentials are encrypted by the OS secure storage (safeStorage) and never leave this device.",
         "item2": "Encryption is bound to this machine — after restoring a backup on another device, re-enter the token.",
         "item3": "This version only tests the connection. No orders are pulled and nothing is written to your ledger."
-      }
+      },
+      "tier1Label": "Self-serve (connect now)",
+      "tier2Label": "Needs app / OAuth / review",
+      "tier3Label": "Planned (later)",
+      "statusAvailable": "Available",
+      "statusNeedsAuth": "Needs authorization",
+      "statusPlanned": "Planned",
+      "connect": "Add connection",
+      "comingSoonHint": "Requires a platform app / OAuth / review — coming soon.",
+      "plannedHint": "Planned for a future version.",
+      "catalogTitle": "Platform directory",
+      "storeUrlLabel": "Store URL",
+      "storeUrlPlaceholder": "https://your-store.com",
+      "storeUrlDesc": "Enter your WooCommerce store URL (HTTPS only).",
+      "consumerKeyLabel": "Consumer key",
+      "consumerKeyPlaceholder": "ck_...",
+      "consumerSecretLabel": "Consumer secret",
+      "consumerSecretPlaceholder": "cs_...",
+      "getKeysLink": "How to generate REST API keys",
+      "credsOverrideHint": "(leave blank to keep the saved credentials)"
     }
   },
   "onboarding": {

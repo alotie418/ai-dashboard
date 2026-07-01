@@ -119,12 +119,18 @@ export function testProvider(payload: TestProviderRequest): Promise<TestProvider
 // 凭证在主进程用 safeStorage 加密存储，渲染端永远拿不到明文/密文。
 // 本层只做「连接 + 测试 + 增删禁用」，不拉单、不写账本。
 
-/** 电商 provider 目录项（供「添加连接」表单渲染字段） */
+export type EcommerceAuthMode = 'manual_token' | 'key_secret' | 'oauth2' | 'signed_openapi' | 'partner_authorization';
+export type EcommercePlatformStatus = 'available' | 'needs_authorization' | 'planned';
+
+/** 电商平台目录项（全部目标平台；connectable=false 为仅展示，无凭证输入） */
 export interface EcommerceProviderMeta {
-  id: string;                       // 'shopify'
-  name: string;                     // 'Shopify'
-  transport: 'graphql' | 'rest';
-  authKind: 'token' | 'keySecret' | 'oauth';
+  id: string;                       // 'shopify' | 'woocommerce' | 'amazon' | ...
+  name: string;                     // 'Shopify' / 'WooCommerce' / '拼多多' ...
+  transport: 'graphql' | 'rest' | null;
+  authMode: EcommerceAuthMode;
+  status: EcommercePlatformStatus;
+  tier: number;                     // 1 自助 / 2 需授权 / 3 后置
+  connectable: boolean;             // 有真实 adapter 才可连接（其余仅目录展示）
   shopField: { key: string; label: string; placeholder: string } | null;
   credentialFields: { key: string; label: string; placeholder: string; secret: boolean }[];
   docsUrl: string;
