@@ -704,6 +704,41 @@ const MIGRATIONS = [
 
     console.log('[db] v20: purchase_items + sales_items tables ready (schema only — no backfill, no behaviour change)');
   },
+
+  // v21: e-commerce platform CONNECTION settings (ecommerce connector MVP — settings-only slice).
+  //   Stores a saved platform connection (which store, which platform) + its ENCRYPTED
+  //   credentials (safeStorage ciphertext, base64), mirroring the ai_providers precedent.
+  //   STRICTLY SCOPED to "connect + store credentials + test connection". This migration:
+  //     - creates ONE table (ecommerce_connections) and its index; nothing else.
+  //     - does NOT add order-pull / staging / sync-cursor columns (ecommerce_staged_orders /
+  //       ecommerce_sync_log are a LATER phase, deliberately not created here).
+  //     - does NOT touch sales / sales_items (no external_order_id / platform_source column) —
+  //       order import is a separate, later PR.
+  //     - carries NO accounting meaning: it is pure integration config, never read by
+  //       reports / inventory / dashboard / AR-AP / cashflow.
+  //   credentials_encrypted holds safeStorage-encrypted JSON (e.g. { token } for Shopify);
+  //   shop_identifier (the non-secret store domain) is stored in plaintext for display.
+  //   last_test_at / last_test_ok record the most recent connection test outcome (UI display).
+  //   Idempotent via CREATE TABLE IF NOT EXISTS.
+  (d) => {
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS ecommerce_connections (
+        id                    TEXT PRIMARY KEY,
+        platform              TEXT NOT NULL,
+        label                 TEXT,
+        shop_identifier       TEXT,
+        credentials_encrypted TEXT NOT NULL,
+        store_currency        TEXT,
+        enabled               INTEGER DEFAULT 1,
+        last_test_at          TEXT,
+        last_test_ok          INTEGER,
+        created_at            TEXT DEFAULT (datetime('now')),
+        updated_at            TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    d.exec('CREATE INDEX IF NOT EXISTS idx_ecommerce_conn_platform ON ecommerce_connections(platform)');
+    console.log('[db] v21: ecommerce_connections table ready (connection settings only — no order pull / staging / sync / ledger linkage)');
+  },
 ];
 
 function runMigrations(d) {

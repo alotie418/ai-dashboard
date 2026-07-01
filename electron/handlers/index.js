@@ -5,6 +5,7 @@
 
 const { dispatch } = require('./router');
 const aiCore = require('../ai');
+const ecommerceCore = require('../ecommerce');
 // §2A PR-1：把 SQLite/fs 写失败（磁盘满/IO/只读）归一化为稳定码，供备份·附件 catch 贴码。
 // 仅用于 app:* 备份/附件路径；不触碰 api:request CRUD 保存路径（那是 PR-2 范围）。
 const { diskErrorCode } = require('./_dbError');
@@ -60,6 +61,38 @@ function registerHandlers({ ipcMain, dialog }) {
         providerMessage: err?.providerMessage,
         rawMessage: err?.message,
       };
+    }
+  });
+
+  // ====== 电商平台连接管理（MVP：仅连接设置 + 凭证 safeStorage 加密 + 测试连接）======
+  // 明文凭证绝不回传渲染端；解密只在主进程 test 时发生。此处不做拉单/暂存/同步/写账本。
+  ipcMain.handle('ecommerce:providers', async () => {
+    return ecommerceCore.listProviders();
+  });
+
+  ipcMain.handle('ecommerce:list', async () => {
+    return ecommerceCore.list();
+  });
+
+  ipcMain.handle('ecommerce:save', async (_evt, payload) => {
+    return ecommerceCore.save(payload || {});
+  });
+
+  ipcMain.handle('ecommerce:setEnabled', async (_evt, payload) => {
+    return ecommerceCore.setEnabled(payload || {});
+  });
+
+  ipcMain.handle('ecommerce:remove', async (_evt, payload) => {
+    return ecommerceCore.remove(payload || {});
+  });
+
+  ipcMain.handle('ecommerce:test', async (_evt, payload) => {
+    try {
+      // ecommerceCore.test already returns { ok, ... } (never throws for expected
+      // auth/network failures); wrap only genuine exceptions (bad id / db).
+      return await ecommerceCore.test(payload || {});
+    } catch (err) {
+      return { ok: false, code: err?.code || 'unknown', providerMessage: err?.message };
     }
   });
 
@@ -342,7 +375,7 @@ function registerHandlers({ ipcMain, dialog }) {
     }
   });
 
-  console.log('[handlers] registered (api:request + providers:* + app:exportDb/importDb/relaunch/exportReportPdf + app:pickDocAttachment/openDocAttachment/discardDocAttachment)');
+  console.log('[handlers] registered (api:request + providers:* + ecommerce:* + app:exportDb/importDb/relaunch/exportReportPdf + app:pickDocAttachment/openDocAttachment/discardDocAttachment)');
 
   // 启动横幅（仅开发/调试）：打印当前主进程加载的 provider META，便于确认实际使用的 defaultModel。
   // 不再做 STALE 比对 / 「旧版 main 进程」告警——provider 默认值一致性由 check:providers 在 lint 期保证；

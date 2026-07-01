@@ -85,7 +85,8 @@
       "fixedAssets": "고정자산",
       "equity": "자본·출자",
       "taxPayments": "납부 세금",
-      "ledgerSummary": "원장 요약"
+      "ledgerSummary": "원장 요약",
+      "ecommerce": "이커머스"
     },
     "company": {
       "title": "기업 기본 정보",
@@ -283,6 +284,46 @@
       "note2": "이전 테이블 데이터는 삭제되지 않습니다 — 언제든지 롤백 가능",
       "note3": "마이그레이션 기록은 legacy_migrations 테이블에 저장되어 중복 마이그레이션 방지",
       "note4": "이전 필드(수량 / 단가 / 운송비)는 source_meta JSON에 저장되어 손실되지 않음"
+    },
+    "ecommerce": {
+      "title": "이커머스 플랫폼 연동",
+      "subtitle": "온라인 상점을 연결하여 이후 주문을 가져올 준비를 합니다. 현재 버전은 연결 저장 및 테스트만 지원합니다.",
+      "mvpNotice": "미리보기 기능: 상점 자격 증명을 저장하고 연결을 테스트하기만 합니다. 주문 가져오기는 아직 활성화되지 않았으며 장부에 아무것도 기록되지 않습니다.",
+      "desktopOnly": "이커머스 연결은 데스크톱 앱에서만 사용할 수 있습니다.",
+      "addStore": "Shopify 상점 추가",
+      "noConnections": "아직 연결된 상점이 없습니다.",
+      "shopDomainLabel": "상점 도메인",
+      "shopDomainPlaceholder": "your-store.myshopify.com",
+      "shopDomainDesc": ".myshopify.com 상점 도메인을 입력하세요.",
+      "tokenLabel": "Admin API 액세스 토큰",
+      "tokenPlaceholder": "shpat_...",
+      "tokenOverrideHint": "(비워 두면 저장된 토큰을 사용)",
+      "labelLabel": "표시 이름 (선택)",
+      "labelPlaceholder": "내 Shopify 상점",
+      "getTokenLink": "Admin API 토큰 만드는 방법",
+      "testConnection": "연결 테스트",
+      "testOk": "연결됨: {name}",
+      "testFail": "연결 실패",
+      "removeConfirm": "삭제하시겠습니까?",
+      "enable": "사용",
+      "disable": "사용 안 함",
+      "statusEnabled": "사용 중",
+      "statusDisabled": "사용 안 함",
+      "neverTested": "테스트 안 함",
+      "lastTest": "마지막 테스트: {time}",
+      "lastTestOk": "성공",
+      "lastTestFail": "실패",
+      "savedToast": "연결이 저장되었습니다",
+      "removedToast": "연결이 삭제되었습니다",
+      "loadError": "연결을 불러오지 못했습니다: {msg}",
+      "saveError": "저장하지 못했습니다: {msg}",
+      "deleteError": "삭제하지 못했습니다: {msg}",
+      "security": {
+        "title": "자격 증명 보안",
+        "item1": "상점 자격 증명은 운영체제 보안 저장소(safeStorage)로 암호화되며 이 기기를 벗어나지 않습니다.",
+        "item2": "암호화는 이 기기에 종속됩니다. 다른 기기에서 백업을 복원한 후에는 토큰을 다시 입력하세요.",
+        "item3": "현재 버전은 연결 테스트만 수행합니다. 주문을 가져오지 않으며 장부에 아무것도 기록하지 않습니다."
+      }
     }
   },
   "onboarding": {

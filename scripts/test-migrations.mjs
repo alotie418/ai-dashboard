@@ -49,7 +49,7 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   runMigrations(d);
   ok(MIGRATIONS.length === SCHEMA_VERSION, `[1] SCHEMA_VERSION(${SCHEMA_VERSION}) must equal MIGRATIONS.length(${MIGRATIONS.length})`);
   ok(ver(d) === MIGRATIONS.length, `[1] fresh→head should reach v${MIGRATIONS.length}, got v${ver(d)}`);
-  for (const t of ['purchases', 'sales', 'settings', 'categories', 'transactions', 'products', 'business_documents', 'assistant_conversations', 'accounts', 'liabilities', 'fixed_assets', 'equity', 'tax_payments']) {
+  for (const t of ['purchases', 'sales', 'settings', 'categories', 'transactions', 'products', 'business_documents', 'assistant_conversations', 'accounts', 'liabilities', 'fixed_assets', 'equity', 'tax_payments', 'ecommerce_connections']) {
     ok(tableExists(d, t), `[1] table '${t}' must exist at head`);
   }
   d.close();
@@ -279,9 +279,35 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   d.close();
 }
 
+// ---- 13. v21 ecommerce_connections：列齐 + credentials_encrypted NOT NULL + enabled 默认 1 + 无订单拉取列 ----
+{
+  const d = fresh();
+  runMigrations(d);
+  ok(tableExists(d, 'ecommerce_connections'), '[13] v21 ecommerce_connections table exists');
+  for (const c of ['id', 'platform', 'label', 'shop_identifier', 'credentials_encrypted', 'store_currency',
+                   'enabled', 'last_test_at', 'last_test_ok', 'created_at', 'updated_at']) {
+    ok(colExists(d, 'ecommerce_connections', c), `[13] ecommerce_connections.${c} column must exist`);
+  }
+  // credentials_encrypted NOT NULL：缺失应被 DB 拒绝（最后一道防线，凭证不可为空）
+  let missingCred = null;
+  try { d.prepare("INSERT INTO ecommerce_connections (id, platform) VALUES ('ec-bad', 'shopify')").run(); }
+  catch (e) { missingCred = e?.message || String(e); }
+  ok(missingCred, '[13] credentials_encrypted is NOT NULL (row without it rejected)');
+  // 正常插入：enabled 默认 1；last_test_ok 首次测试前为 NULL
+  d.prepare("INSERT INTO ecommerce_connections (id, platform, shop_identifier, credentials_encrypted) VALUES ('ec-ok', 'shopify', 'x.myshopify.com', 'QkFTRTY0')").run();
+  const row = d.prepare("SELECT enabled, last_test_ok FROM ecommerce_connections WHERE id = 'ec-ok'").get();
+  ok(row.enabled === 1, '[13] enabled defaults to 1');
+  ok(row.last_test_ok === null, '[13] last_test_ok nullable (NULL before first test)');
+  // 严格边界：本 PR 仅连接设置，绝不携带订单拉取/暂存/游标列（留后续 phase）
+  for (const c of ['last_cursor', 'external_order_id', 'order_json', 'sync_state', 'staged_at']) {
+    ok(!colExists(d, 'ecommerce_connections', c), `[13] ecommerce_connections must NOT carry order-pull column '${c}' (deferred to a later phase)`);
+  }
+  d.close();
+}
+
 if (failures.length) {
   console.error(`✗ migrations: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema + v15 liabilities schema + v16 fixed_assets schema + v17 equity schema + v18 tax_payments schema + v19 fixed_assets depreciation params)`);
+console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema + v15 liabilities schema + v16 fixed_assets schema + v17 equity schema + v18 tax_payments schema + v19 fixed_assets depreciation params + v21 ecommerce_connections schema)`);

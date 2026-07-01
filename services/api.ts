@@ -115,6 +115,85 @@ export function testProvider(payload: TestProviderRequest): Promise<TestProvider
   return electronInvoke<TestProviderResult>('providers:test', payload);
 }
 
+// ==================== 电商平台连接（仅桌面版 · MVP：连接设置）====================
+// 凭证在主进程用 safeStorage 加密存储，渲染端永远拿不到明文/密文。
+// 本层只做「连接 + 测试 + 增删禁用」，不拉单、不写账本。
+
+/** 电商 provider 目录项（供「添加连接」表单渲染字段） */
+export interface EcommerceProviderMeta {
+  id: string;                       // 'shopify'
+  name: string;                     // 'Shopify'
+  transport: 'graphql' | 'rest';
+  authKind: 'token' | 'keySecret' | 'oauth';
+  shopField: { key: string; label: string; placeholder: string } | null;
+  credentialFields: { key: string; label: string; placeholder: string; secret: boolean }[];
+  docsUrl: string;
+}
+
+/** 已保存的电商连接（绝不含凭证明文/密文） */
+export interface EcommerceConnection {
+  id: string;
+  platform: string;
+  platformName: string;
+  label: string;
+  shopIdentifier: string;
+  storeCurrency: string | null;
+  enabled: boolean;
+  lastTestAt: string | null;
+  lastTestOk: boolean | null;
+  hasCredentials: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SaveEcommerceConnectionRequest {
+  id?: string;
+  platform: string;
+  label?: string;
+  shopIdentifier?: string;
+  credentials?: Record<string, string>; // e.g. { token }; 留空=沿用已存凭证
+  storeCurrency?: string;
+  enabled?: boolean;
+}
+
+export interface TestEcommerceConnectionResult {
+  ok: boolean;
+  storeInfo?: { name: string; domain: string; currency: string | null } | null;
+  status?: number | null;
+  code?: string | null;        // config / auth / notFound / network / timeout / graphql / ...
+  providerMessage?: string | null; // 英文，仅调试展示；绝不含凭证
+}
+
+/** 电商 provider 目录（可连接的平台 + 表单字段） */
+export function listEcommerceProviders(): Promise<EcommerceProviderMeta[]> {
+  return electronInvoke<EcommerceProviderMeta[]>('ecommerce:providers');
+}
+
+/** 已保存的电商连接列表 */
+export function listEcommerceConnections(): Promise<EcommerceConnection[]> {
+  return electronInvoke<EcommerceConnection[]>('ecommerce:list');
+}
+
+/** 新建 / 更新一个电商连接 */
+export function saveEcommerceConnection(payload: SaveEcommerceConnectionRequest): Promise<{ success: boolean; id: string }> {
+  return electronInvoke('ecommerce:save', payload);
+}
+
+/** 启用 / 禁用一个电商连接 */
+export function setEcommerceConnectionEnabled(id: string, enabled: boolean): Promise<{ success: boolean }> {
+  return electronInvoke('ecommerce:setEnabled', { id, enabled });
+}
+
+/** 删除一个电商连接 */
+export function removeEcommerceConnection(id: string): Promise<{ success: boolean }> {
+  return electronInvoke('ecommerce:remove', { id });
+}
+
+/** 测试连接（表单内联凭证优先；带 id 则回退已存凭证），结果绝不含凭证 */
+export function testEcommerceConnection(payload: { id?: string; platform: string; shopIdentifier?: string; credentials?: Record<string, string> }): Promise<TestEcommerceConnectionResult> {
+  return electronInvoke<TestEcommerceConnectionResult>('ecommerce:test', payload);
+}
+
 // ==================== AI 助手聊天（走统一 apiFetch：桌面 IPC / Web fetch）====================
 // 业务上下文由 /api/ai/context 现查（本地聚合 DB，不调外部 AI）；对话走 /api/ai/chat。
 // 系统提示词由调用方（useAssistant）按 accountingLocale×uiLanguage 组装后传入。

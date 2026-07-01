@@ -85,7 +85,8 @@
       "fixedAssets": "Fixed Assets",
       "equity": "Equity & Capital",
       "taxPayments": "Tax Payments",
-      "ledgerSummary": "Ledger Summary"
+      "ledgerSummary": "Ledger Summary",
+      "ecommerce": "E-commerce"
     },
     "company": {
       "title": "Company Information",
@@ -283,6 +284,46 @@
       "note2": "Legacy tables are NOT deleted — rollback anytime",
       "note3": "Migration records stored in legacy_migrations table to prevent duplicate runs",
       "note4": "Legacy fields (quantity / unit price / shipping) saved to source_meta JSON — no data loss"
+    },
+    "ecommerce": {
+      "title": "E-commerce Platforms",
+      "subtitle": "Connect an online store to import orders later. This version only saves and tests the connection.",
+      "mvpNotice": "Preview: this saves store credentials and tests the connection only. Order import is not enabled yet — nothing is written to your ledger.",
+      "desktopOnly": "E-commerce connections are available in the desktop app only.",
+      "addStore": "Add Shopify store",
+      "noConnections": "No store connected yet.",
+      "shopDomainLabel": "Store domain",
+      "shopDomainPlaceholder": "your-store.myshopify.com",
+      "shopDomainDesc": "Enter your .myshopify.com store domain.",
+      "tokenLabel": "Admin API access token",
+      "tokenPlaceholder": "shpat_...",
+      "tokenOverrideHint": "(leave blank to keep the saved token)",
+      "labelLabel": "Display name (optional)",
+      "labelPlaceholder": "My Shopify store",
+      "getTokenLink": "How to create an Admin API token",
+      "testConnection": "Test connection",
+      "testOk": "Connected: {name}",
+      "testFail": "Connection failed",
+      "removeConfirm": "Remove?",
+      "enable": "Enable",
+      "disable": "Disable",
+      "statusEnabled": "Enabled",
+      "statusDisabled": "Disabled",
+      "neverTested": "Never tested",
+      "lastTest": "Last test: {time}",
+      "lastTestOk": "OK",
+      "lastTestFail": "Failed",
+      "savedToast": "Connection saved",
+      "removedToast": "Connection removed",
+      "loadError": "Failed to load connections: {msg}",
+      "saveError": "Failed to save: {msg}",
+      "deleteError": "Failed to delete: {msg}",
+      "security": {
+        "title": "Credential security",
+        "item1": "Store credentials are encrypted by the OS secure storage (safeStorage) and never leave this device.",
+        "item2": "Encryption is bound to this machine — after restoring a backup on another device, re-enter the token.",
+        "item3": "This version only tests the connection. No orders are pulled and nothing is written to your ledger."
+      }
     }
   },
   "onboarding": {

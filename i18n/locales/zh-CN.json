@@ -85,7 +85,8 @@
       "fixedAssets": "固定资产",
       "equity": "权益/资本",
       "taxPayments": "已缴税款",
-      "ledgerSummary": "台账汇总"
+      "ledgerSummary": "台账汇总",
+      "ecommerce": "电商平台"
     },
     "company": {
       "title": "企业基础信息",
@@ -283,6 +284,46 @@
       "note2": "旧表数据不会删除，可随时回滚",
       "note3": "迁移记录写入 legacy_migrations 表，避免重复迁移",
       "note4": "旧字段（数量 / 单价 / 运费）会保存到 source_meta JSON，不丢失"
+    },
+    "ecommerce": {
+      "title": "电商平台接入",
+      "subtitle": "连接线上店铺，为后续导入订单做准备。当前版本仅保存并测试连接。",
+      "mvpNotice": "预览功能：仅保存店铺凭证并测试连接，暂不导入订单——不会写入任何账本数据。",
+      "desktopOnly": "电商连接仅在桌面版可用。",
+      "addStore": "添加 Shopify 店铺",
+      "noConnections": "尚未连接任何店铺。",
+      "shopDomainLabel": "店铺域名",
+      "shopDomainPlaceholder": "your-store.myshopify.com",
+      "shopDomainDesc": "填写你的 .myshopify.com 店铺域名。",
+      "tokenLabel": "Admin API 访问令牌",
+      "tokenPlaceholder": "shpat_...",
+      "tokenOverrideHint": "（留空则沿用已保存的令牌）",
+      "labelLabel": "显示名称（可选）",
+      "labelPlaceholder": "我的 Shopify 店铺",
+      "getTokenLink": "如何创建 Admin API 令牌",
+      "testConnection": "测试连接",
+      "testOk": "已连接：{name}",
+      "testFail": "连接失败",
+      "removeConfirm": "确认删除？",
+      "enable": "启用",
+      "disable": "禁用",
+      "statusEnabled": "已启用",
+      "statusDisabled": "已禁用",
+      "neverTested": "尚未测试",
+      "lastTest": "上次测试：{time}",
+      "lastTestOk": "成功",
+      "lastTestFail": "失败",
+      "savedToast": "连接已保存",
+      "removedToast": "连接已删除",
+      "loadError": "加载连接失败：{msg}",
+      "saveError": "保存失败：{msg}",
+      "deleteError": "删除失败：{msg}",
+      "security": {
+        "title": "凭证安全",
+        "item1": "店铺凭证由操作系统安全存储（safeStorage）加密，绝不离开本设备。",
+        "item2": "加密与本机绑定——在另一台设备恢复备份后，需重新录入令牌。",
+        "item3": "当前版本仅测试连接，不拉取订单、不写入任何账本数据。"
+      }
     }
   },
   "onboarding": {
