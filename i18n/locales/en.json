@@ -1116,12 +1116,14 @@
     "previewTaxTotal": "Tax",
     "matchStatus": "Match",
     "matchedBadge": "Matched",
+    "manualMatchBadge": "Manually matched",
+    "selectProduct": "— Select product —",
     "unmatchedShort": "Desc only",
     "unmatchedBadge": "No product match — imported as description only (not counted in inventory)",
     "previewMoreDocs": "{{count}} more documents not shown in the preview",
     "productsLoading": "Loading products…",
     "rowErrorCtx": "Row {{row}} (doc {{docNo}} · line {{lineNo}}): {{errors}}",
-    "errProductAmbiguous": "Product name \"{{name}}\" matches multiple products — use a product_id instead",
+    "errProductAmbiguous": "Product name \"{{name}}\" matches multiple products — pick one in the preview",
     "errDupLineNo": "Document {{docNo}}: duplicate line numbers — sorted by file order"
   },
   "transactions": {

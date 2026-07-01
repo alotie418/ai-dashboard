@@ -1116,12 +1116,14 @@
     "previewTaxTotal": "税额",
     "matchStatus": "匹配",
     "matchedBadge": "已匹配",
+    "manualMatchBadge": "已手动匹配",
+    "selectProduct": "— 选择商品 —",
     "unmatchedShort": "仅描述",
     "unmatchedBadge": "未匹配商品，仅作描述导入，不计库存",
     "previewMoreDocs": "另有 {{count}} 张单据未在预览中显示",
     "productsLoading": "商品库加载中…",
     "rowErrorCtx": "第 {{row}} 行（单据 {{docNo}} · 行 {{lineNo}}）：{{errors}}",
-    "errProductAmbiguous": "商品名「{{name}}」匹配到多个商品，请改用 product_id",
+    "errProductAmbiguous": "商品名「{{name}}」匹配到多个商品，请在预览中手动选择",
     "errDupLineNo": "单据 {{docNo}} 行号重复，已按文件顺序排序"
   },
   "transactions": {

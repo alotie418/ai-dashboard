@@ -1116,12 +1116,14 @@
     "previewTaxTotal": "稅額",
     "matchStatus": "比對",
     "matchedBadge": "已比對",
+    "manualMatchBadge": "已手動比對",
+    "selectProduct": "— 選擇商品 —",
     "unmatchedShort": "僅描述",
     "unmatchedBadge": "未比對到商品，僅作描述匯入，不計庫存",
     "previewMoreDocs": "另有 {{count}} 張單據未在預覽中顯示",
     "productsLoading": "商品庫載入中…",
     "rowErrorCtx": "第 {{row}} 行（單據 {{docNo}} · 行 {{lineNo}}）：{{errors}}",
-    "errProductAmbiguous": "商品名「{{name}}」比對到多個商品，請改用 product_id",
+    "errProductAmbiguous": "商品名「{{name}}」比對到多個商品，請在預覽中手動選擇",
     "errDupLineNo": "單據 {{docNo}} 行號重複，已依檔案順序排序"
   },
   "transactions": {

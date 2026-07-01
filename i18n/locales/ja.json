@@ -1116,12 +1116,14 @@
     "previewTaxTotal": "税額",
     "matchStatus": "照合",
     "matchedBadge": "照合済",
+    "manualMatchBadge": "手動で照合済",
+    "selectProduct": "— 商品を選択 —",
     "unmatchedShort": "説明のみ",
     "unmatchedBadge": "商品未照合 — 説明としてのみインポート（在庫に計上しません）",
     "previewMoreDocs": "他 {{count}} 件の伝票はプレビュー未表示です",
     "productsLoading": "商品マスタを読み込み中…",
     "rowErrorCtx": "{{row}} 行目（伝票 {{docNo}} · 行 {{lineNo}}）：{{errors}}",
-    "errProductAmbiguous": "商品名「{{name}}」が複数の商品に一致します。product_id をご利用ください",
+    "errProductAmbiguous": "商品名「{{name}}」が複数の商品に一致します。プレビューで手動選択してください",
     "errDupLineNo": "伝票 {{docNo}} の行番号が重複しています。ファイル順に並べ替えました"
   },
   "transactions": {

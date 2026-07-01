@@ -1116,12 +1116,14 @@
     "previewTaxTotal": "Taxe",
     "matchStatus": "Corresp.",
     "matchedBadge": "Associé",
+    "manualMatchBadge": "Associé manuellement",
+    "selectProduct": "— Choisir un produit —",
     "unmatchedShort": "Desc. seule",
     "unmatchedBadge": "Aucune correspondance produit — importé en description seule (hors stock)",
     "previewMoreDocs": "{{count}} autres documents non affichés dans l'aperçu",
     "productsLoading": "Chargement des produits…",
     "rowErrorCtx": "Ligne {{row}} (doc {{docNo}} · ligne {{lineNo}}) : {{errors}}",
-    "errProductAmbiguous": "Le nom de produit « {{name}} » correspond à plusieurs produits — utilisez un product_id",
+    "errProductAmbiguous": "Le nom de produit « {{name}} » correspond à plusieurs produits — choisissez-en un dans l'aperçu",
     "errDupLineNo": "Document {{docNo}} : numéros de ligne en double — triés par ordre du fichier"
   },
   "transactions": {

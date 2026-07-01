@@ -166,7 +166,7 @@ function buildLegacyRecord(r: any, type: string): any {
 //   unitPriceNet + quantity (+ taxRate) given → forward (net = qty×price, tax = net×rate);
 //   description-only with no amount → a zero-amount line (allowed).
 // Returns { skip } for a fully-blank row, { error } for an invalid one, else { item }.
-type MatchStatus = 'none' | 'byId' | 'byName' | 'unmatched' | 'ambiguous';
+type MatchStatus = 'none' | 'byId' | 'byName' | 'unmatched' | 'ambiguous' | 'manual';
 
 // P5d-4 conservative product resolution: an explicit product_id wins (active or not, the user typed
 // the id on purpose); otherwise an EXACT name match against ACTIVE products only — a single hit
@@ -184,7 +184,7 @@ function resolveProduct(value: string, products: Product[]): { product_id: strin
   return { product_id: null, status: 'unmatched', name: v, unit: null };
 }
 
-function buildItem(r: any, idx: number, t: any, products: Product[]): { skip?: boolean; error?: string; item?: any; match?: MatchStatus } {
+function buildItem(r: any, idx: number, t: any, products: Product[], override?: string): { skip?: boolean; error?: string; item?: any; match?: MatchStatus } {
   const productVal = has(r.product) ? String(r.product).trim() : '';
   const hasProduct = !!productVal;
   const hasDesc = has(r.description);
@@ -197,8 +197,22 @@ function buildItem(r: any, idx: number, t: any, products: Product[]): { skip?: b
   if (!hasProduct && !hasDesc && !hasAnyAmount) return { skip: true }; // blank line
   if (!hasProduct && !hasDesc) return { error: tr(t, 'csvImport.errLineNeedsProductOrDesc') };
 
-  const resolved = resolveProduct(productVal, products);
-  if (resolved.status === 'ambiguous') return { error: tr(t, 'csvImport.errProductAmbiguous', { name: productVal }) };
+  // P6: a manual override (an active product the user picked in the preview) wins over name
+  // resolution. A stale override (product since removed) falls back to normal resolution.
+  const ov = override != null && String(override).trim() !== '' ? String(override).trim() : '';
+  let resolved: { product_id: string | null; status: MatchStatus; name: string | null; unit: string | null };
+  if (ov) {
+    const picked = products.find(p => p.id === ov);
+    resolved = picked
+      ? { product_id: picked.id, status: 'manual', name: picked.name, unit: picked.unit }
+      : resolveProduct(productVal, products);
+  } else {
+    resolved = resolveProduct(productVal, products);
+  }
+  // P6 (method B): an ambiguous name no longer short-circuits to an error here — the line is still
+  // built (product_id=null, match='ambiguous') so the preview can offer a product selector.
+  // buildPayload turns an un-resolved ambiguous line into a blocking group error, so all-or-nothing
+  // holds: the record is never submitted while any line stays ambiguous.
 
   const qty = cleanNum(qtyRaw);
   const rate = has(r.taxRate) ? cleanNum(r.taxRate) : 0;
@@ -244,11 +258,11 @@ function buildItem(r: any, idx: number, t: any, products: Product[]): { skip?: b
   };
 }
 
-type PreviewItem = { lineNo: number; name: string | null; unit: string | null; qty: number; unitNet: number; rate: number | null; net: number; tax: number; gross: number; match: MatchStatus };
+type PreviewItem = { row: number; lineNo: number; name: string | null; unit: string | null; qty: number; unitNet: number; rate: number | null; net: number; tax: number; gross: number; match: MatchStatus };
 type PreviewGroup = { kind: 'doc' | 'legacy'; docNo: string; row: number; date: string; party: string; invoiceNumber: string; lineCount: number; totals: { net: number; tax: number; gross: number }; items: PreviewItem[]; errors: string[]; warning: string | null };
 type Payload = { records: any[]; errors: { row: number; errors: string[] }[]; summary: { docs: number; lines: number }; groups: PreviewGroup[] };
 
-function buildPayload(rows: any[], type: string, t: any, products: Product[]): Payload {
+function buildPayload(rows: any[], type: string, t: any, products: Product[], overrides: Record<number, string>): Payload {
   const party = type === 'sales' ? 'customer' : 'supplier';
   const records: any[] = [];
   const errors: { row: number; errors: string[] }[] = [];
@@ -301,12 +315,17 @@ function buildPayload(rows: any[], type: string, t: any, products: Product[]): P
     sorted.forEach(({ r }, i) => {
       const ln = has(r.lineNo) ? cleanNum(r.lineNo) : null;
       if (ln != null) { if (seenLineNos.has(ln)) dupLine = true; else seenLineNos.add(ln); }
-      const res = buildItem(r, i, t, products);
+      const res = buildItem(r, i, t, products, overrides[r._row]);
       if (res.skip) return;
       const lineNo = has(r.lineNo) ? cleanNum(r.lineNo) : i;
       if (res.error) { e.push(tr(t, 'csvImport.rowErrorCtx', { row: r._row, docNo, lineNo, errors: res.error })); return; }
+      // P6 (method B): a still-ambiguous line (no valid manual pick) blocks the whole file — the row
+      // is shown with a selector, but the import stays disabled until the user resolves it.
+      if (res.match === 'ambiguous') {
+        e.push(tr(t, 'csvImport.rowErrorCtx', { row: r._row, docNo, lineNo, errors: tr(t, 'csvImport.errProductAmbiguous', { name: res.item.description }) }));
+      }
       items.push(res.item);
-      previewItems.push({ lineNo: res.item.line_no, name: res.item.description, unit: res.item.unit_snapshot, qty: res.item.quantity, unitNet: res.item.unit_price, rate: res.item.tax_rate, net: res.item.amount_net, tax: res.item.tax_amount, gross: res.item.amount_gross, match: res.match || 'none' });
+      previewItems.push({ row: r._row, lineNo: res.item.line_no, name: res.item.description, unit: res.item.unit_snapshot, qty: res.item.quantity, unitNet: res.item.unit_price, rate: res.item.tax_rate, net: res.item.amount_net, tax: res.item.tax_amount, gross: res.item.amount_gross, match: res.match || 'none' });
     });
     if (items.length === 0) e.push(tr(t, 'csvImport.errGroupNoLines', { docNo }));
 
@@ -360,6 +379,18 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
   useEffect(() => {
     listProducts().then((p) => { setProducts(p); setProductsReady(true); }).catch(() => setProductsReady(true));
   }, []);
+  // P6: manual product picks keyed by source row (_row → product_id). Only active products are
+  // offered — this does not narrow resolveProduct's existing semantics (an explicit id still wins,
+  // active-service names still match); it just mirrors the same active-only rule for manual picks.
+  const [overrides, setOverrides] = useState<Record<number, string>>({});
+  const activeProducts = useMemo(() => products.filter(p => p.is_active), [products]);
+  const setOverride = useCallback((row: number, productId: string) => {
+    setOverrides(prev => {
+      const next = { ...prev };
+      if (productId) next[row] = productId; else delete next[row]; // clearing reverts to auto-resolution
+      return next;
+    });
+  }, []);
 
   const fields = type === 'sales' ? SALES_FIELDS : PURCHASE_FIELDS;
 
@@ -371,6 +402,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
     setFileName('');
     setImporting(false);
     setResult(null);
+    setOverrides({});
   }, []);
 
   const handleClose = () => {
@@ -379,6 +411,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
   };
 
   const processFile = (file: File) => {
+    setOverrides({}); // a new file re-numbers rows — old _row→product picks no longer apply
     setFileName(file.name);
     const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
 
@@ -438,7 +471,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
     return r;
   }), [csvData, mapping]);
 
-  const payload = useMemo(() => buildPayload(mappedRows, type, t, products), [mappedRows, type, t, products]);
+  const payload = useMemo(() => buildPayload(mappedRows, type, t, products, overrides), [mappedRows, type, t, products, overrides]);
 
   const handleImport = async () => {
     if (!productsReady || payload.errors.length > 0) return; // all-or-nothing: never submit a file with known errors
@@ -538,7 +571,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
                     <i className="fas fa-arrow-right text-[#5c5c5a] text-xs"></i>
                     <select
                       value={mapping[h] || ''}
-                      onChange={(e) => setMapping({ ...mapping, [h]: e.target.value })}
+                      onChange={(e) => { setMapping({ ...mapping, [h]: e.target.value }); setOverrides({}); }}
                       className="flex-1 text-sm border border-[#e0ddd5] rounded-lg px-3 py-1.5 bg-white"
                     >
                       <option value="">{t('csvImport.skipColumn')}</option>
@@ -586,7 +619,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
                   return (
                     <div key={gi} className={`border rounded-lg ${hasErr ? 'border-red-200 bg-red-50/40' : 'border-[#e0ddd5] bg-white'}`}>
                       {g.kind === 'doc' && g.items.length > 0 ? (
-                        <details>
+                        <details open={hasErr || undefined}>
                           <summary className="cursor-pointer list-none hover:bg-[#f9f9f8]/60 rounded-lg">{cardHead}</summary>
                           <div className="overflow-x-auto border-t border-[#e0ddd5]/70">
                             <table className="w-full text-[11px] border-collapse">
@@ -613,11 +646,32 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
                                     <td className="px-2 py-1 text-right">{currSym}{it.tax.toLocaleString()}</td>
                                     <td className="px-2 py-1 text-right font-medium">{currSym}{it.gross.toLocaleString()}</td>
                                     <td className="px-2 py-1 text-center whitespace-nowrap">
-                                      {it.match === 'byId' || it.match === 'byName'
-                                        ? <span className="text-green-600">{t('csvImport.matchedBadge')}</span>
-                                        : it.match === 'unmatched'
-                                          ? <span className="text-amber-600" title={t('csvImport.unmatchedBadge')}>{t('csvImport.unmatchedShort')}</span>
-                                          : <span className="text-[#5c5c5a]">—</span>}
+                                      {it.match === 'byId' || it.match === 'byName' ? (
+                                        <span className="text-green-600">{t('csvImport.matchedBadge')}</span>
+                                      ) : it.match === 'unmatched' || it.match === 'ambiguous' || it.match === 'manual' ? (
+                                        // P6: let the user assign an active product to an unmatched / same-name-ambiguous
+                                        // line; an empty pick keeps it description-only (unmatched) or blocking (ambiguous).
+                                        <div className="flex items-center justify-center gap-1">
+                                          <select
+                                            aria-label={t('csvImport.matchStatus')}
+                                            value={overrides[it.row] ?? ''}
+                                            onChange={(e) => setOverride(it.row, e.target.value)}
+                                            className="text-[11px] border border-[#e0ddd5] rounded px-1 py-0.5 bg-white max-w-[130px]"
+                                          >
+                                            <option value="">{t('csvImport.selectProduct')}</option>
+                                            {activeProducts.map(p => (
+                                              <option key={p.id} value={p.id}>{p.name}</option>
+                                            ))}
+                                          </select>
+                                          {it.match === 'manual'
+                                            ? <span className="text-green-600" title={t('csvImport.manualMatchBadge')}><i className="fas fa-check"></i></span>
+                                            : it.match === 'ambiguous'
+                                              ? <span className="text-red-500" title={t('csvImport.errProductAmbiguous', { name: it.name || '' })}><i className="fas fa-exclamation"></i></span>
+                                              : <span className="text-amber-600" title={t('csvImport.unmatchedBadge')}>{t('csvImport.unmatchedShort')}</span>}
+                                        </div>
+                                      ) : (
+                                        <span className="text-[#5c5c5a]">—</span>
+                                      )}
                                     </td>
                                   </tr>
                                 ))}
