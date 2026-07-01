@@ -145,10 +145,164 @@ async function testConnection(creds) {
   };
 }
 
+// ============================================================
+// PR-EC3: order pull → staging (NO ledger write)
+// ============================================================
+//
+// ⚠️ OFFICIAL-DOCS CONFIRMATION REQUIRED (Shopify GraphQL Admin API):
+//   - `orders(first, after, query, sortKey, reverse)` connection shape, `pageInfo { hasNextPage endCursor }`;
+//   - incremental filter via `query: "updated_at:>=<ISO>"` + `sortKey: UPDATED_AT` ascending;
+//   - money is exposed as *Set { shopMoney { amount currencyCode } } — confirm exact field names;
+//   - rate limiting is COST-BASED (`extensions.cost.throttleStatus`); on THROTTLED / 429 back off
+//     using the restore rate. Confirm cost fields + limits.
+// The field selection below is a MINIMAL, representative shape; confirm every field name against
+// the pinned SHOPIFY_API_VERSION before real use. Idempotency (staging upsert) makes an imperfect
+// incremental filter safe (re-fetched orders are de-duplicated, never double-inserted).
+
+const ORDERS_PAGE_SIZE = 50;      // per-page order count (confirm max page size per docs)
+const LINE_ITEMS_PER_ORDER = 100; // nested line-items page (confirm)
+
+function buildOrdersQuery(pageSize, cursor, since) {
+  const filter = since ? `updated_at:>='${since}'` : '';
+  const afterArg = cursor ? `, after: ${JSON.stringify(cursor)}` : '';
+  // sortKey UPDATED_AT ascending so the watermark advances monotonically.
+  return `{
+    orders(first: ${pageSize}${afterArg}, sortKey: UPDATED_AT, query: ${JSON.stringify(filter)}) {
+      pageInfo { hasNextPage endCursor }
+      edges { node {
+        id name createdAt updatedAt displayFinancialStatus
+        currentTotalPriceSet { shopMoney { amount currencyCode } }
+        subtotalPriceSet { shopMoney { amount } }
+        totalTaxSet { shopMoney { amount } }
+        totalShippingPriceSet { shopMoney { amount } }
+        customer { id }
+        lineItems(first: ${LINE_ITEMS_PER_ORDER}) { edges { node {
+          sku title quantity
+          originalUnitPriceSet { shopMoney { amount } }
+          discountedUnitPriceSet { shopMoney { amount } }
+          taxLines { title ratePercentage priceSet { shopMoney { amount } } }
+        } } }
+        shippingLines { edges { node { title originalPriceSet { shopMoney { amount } } } } }
+        taxLines { title ratePercentage priceSet { shopMoney { amount } } }
+        refunds { id createdAt totalRefundedSet { shopMoney { amount } } }
+      } }
+    }
+  }`;
+}
+
+// Fetch ONE page of orders. Returns { rawOrders, nextCursor, hasNextPage }. Throws a coded
+// Error on hard failure (pull.js records it in the sync log). Does a small internal backoff
+// on throttling. NEVER logs credentials.
+async function pullOrdersPage(creds, { since, cursor, pageSize } = {}) {
+  const { shop, token } = creds || {};
+  const host = normalizeShopHost(shop);
+  if (!host) { const e = new Error('invalid store domain'); e.code = 'config'; throw e; }
+  if (!token) { const e = new Error('missing token'); e.code = 'config'; throw e; }
+  const doFetch = getFetch();
+  if (!doFetch) { const e = new Error('fetch unavailable'); e.code = 'unavailable'; throw e; }
+
+  const url = `https://${host}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`;
+  const query = buildOrdersQuery(pageSize || ORDERS_PAGE_SIZE, cursor, since);
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TEST_TIMEOUT_MS);
+    let resp;
+    try {
+      resp = await doFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token.trim(), 'Accept': 'application/json' },
+        body: JSON.stringify({ query }),
+        signal: controller.signal,
+      });
+    } catch (e) {
+      clearTimeout(timer);
+      const err = new Error(e?.name === 'AbortError' ? 'timeout' : (e?.message || 'network error'));
+      err.code = e?.name === 'AbortError' ? 'timeout' : 'network';
+      throw err;  // never carries creds
+    }
+    clearTimeout(timer);
+
+    if (resp.status === 429) { await backoff(attempt); continue; }  // throttled → retry
+    if (resp.status === 401 || resp.status === 403) { const e = new Error(`HTTP ${resp.status}`); e.code = 'auth'; e.status = resp.status; throw e; }
+    if (!resp.ok) { const e = new Error(`HTTP ${resp.status}`); e.code = 'http'; e.status = resp.status; throw e; }
+
+    let json;
+    try { json = await resp.json(); } catch { const e = new Error('invalid JSON'); e.code = 'parse'; throw e; }
+
+    // Cost-based throttling can also surface as a top-level error with THROTTLED code.
+    const throttled = Array.isArray(json?.errors) && json.errors.some((x) => /throttl/i.test(x?.extensions?.code || x?.message || ''));
+    if (throttled) { await backoff(attempt); continue; }
+    if (Array.isArray(json?.errors) && json.errors.length) {
+      const e = new Error(String(json.errors[0]?.message || 'graphql error').slice(0, 200)); e.code = 'graphql'; throw e;
+    }
+
+    const conn = json?.data?.orders;
+    const edges = conn?.edges || [];
+    return {
+      rawOrders: edges.map((x) => x.node).filter(Boolean),
+      nextCursor: conn?.pageInfo?.endCursor || null,
+      hasNextPage: !!conn?.pageInfo?.hasNextPage,
+    };
+  }
+  const e = new Error('throttled — retries exhausted'); e.code = 'throttled'; throw e;
+}
+
+function backoff(attempt) {
+  const ms = Math.min(4000, 500 * Math.pow(2, attempt));
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+const money = (set) => { const a = parseFloat(set?.shopMoney?.amount); return Number.isFinite(a) ? a : null; };
+
+// PURE: Shopify order node → neutral NormalizedOrder. No buyer PII (only an opaque customer id ref).
+function normalizeOrder(o) {
+  const currency = o?.currentTotalPriceSet?.shopMoney?.currencyCode || null;
+  const items = (o?.lineItems?.edges || []).map((x) => x.node).filter(Boolean).map((li) => {
+    const unitNet = money(li.discountedUnitPriceSet) ?? money(li.originalUnitPriceSet);
+    const qty = Number.isFinite(li.quantity) ? li.quantity : null;
+    const lineTax = (li.taxLines || []).reduce((s, t) => s + (money(t.priceSet) || 0), 0);
+    const lineNet = unitNet != null && qty != null ? unitNet * qty : null;
+    const rate = li.taxLines && li.taxLines[0] && li.taxLines[0].ratePercentage != null ? Number(li.taxLines[0].ratePercentage) : null;
+    return {
+      sku: li.sku || null, name: li.title || null, quantity: qty,
+      unitPriceNet: unitNet, lineNet, lineTax: lineTax || null,
+      lineGross: lineNet != null ? lineNet + (lineTax || 0) : null, taxRate: rate,
+    };
+  });
+  const shipLines = (o?.shippingLines?.edges || []).map((x) => x.node).filter(Boolean).map((s) => ({ title: s.title || null, amount: money(s.originalPriceSet) }));
+  const taxLines = (o?.taxLines || []).map((t) => ({ title: t.title || null, rate: t.ratePercentage != null ? Number(t.ratePercentage) : null, amount: money(t.priceSet) }));
+  const refunds = (o?.refunds || []).map((r) => ({ id: r.id || null, createdAt: r.createdAt || null, amount: money(r.totalRefundedSet) }));
+  return {
+    platform: 'shopify',
+    externalOrderId: String(o?.id || ''),
+    orderNumber: o?.name || null,
+    orderStatus: o?.displayFinancialStatus || null,
+    createdAt: o?.createdAt || null,
+    updatedAt: o?.updatedAt || null,
+    currency,
+    header: { customerRef: o?.customer?.id ? String(o.customer.id) : null },   // opaque id only — NO name/email/address/phone
+    items,
+    shipping: { total: money(o?.totalShippingPriceSet), lines: shipLines },
+    taxes: { total: money(o?.totalTaxSet), lines: taxLines },
+    fees: [],   // Shopify Payments fees live in a separate balance API, not the order object (later phase)
+    refunds,
+    totals: {
+      subtotalNet: money(o?.subtotalPriceSet),
+      taxTotal: money(o?.totalTaxSet),
+      shippingTotal: money(o?.totalShippingPriceSet),
+      grandTotalGross: money(o?.currentTotalPriceSet),
+    },
+  };
+}
+
 module.exports = {
   meta: META,
   testConnection,
+  pullOrdersPage,
+  normalizeOrder,
   publicMeta: () => publicMeta(module.exports),
-  // exported for unit testing the domain normaliser without a network call
+  // exported for unit testing without a network call
   _normalizeShopHost: normalizeShopHost,
+  _buildOrdersQuery: buildOrdersQuery,
 };

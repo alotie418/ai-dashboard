@@ -23,8 +23,15 @@
 //     (mirrors the AI provider test() contract). The decrypted secret is injected
 //     here in the main process and never returned to the renderer.
 //
-// NOTE: pullOrders / normalizeOrder are FUTURE-phase methods and are intentionally
-// NOT part of this MVP interface — this slice is connection settings only.
+// OPTIONAL (PR-EC3, order pull → staging):
+//   async pullOrdersPage(creds, { since, cursor, pageSize }): { rawOrders, nextCursor, hasNextPage }
+//     — fetches ONE page of orders (does its own transient retry/backoff). The multi-page
+//       loop, page cap and sync-log live in electron/ecommerce/pull.js.
+//   normalizeOrder(rawOrder): NormalizedOrder   — PURE; converges platform differences into
+//     the neutral { header, items, shipping, taxes, fees, refunds, totals } shape. Buyer PII
+//     (name/email/address/phone) MUST NOT be included.
+// Both are OPTIONAL (only testConnection is required by assertValidProvider); pull.js checks
+// for them at call time. They NEVER write to sales/sales_items — staging only.
 
 const REQUIRED_META_FIELDS = ['id', 'name', 'transport', 'authMode'];
 const VALID_TRANSPORTS = ['graphql', 'rest'];

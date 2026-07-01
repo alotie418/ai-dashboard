@@ -298,9 +298,53 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
   const row = d.prepare("SELECT enabled, last_test_ok FROM ecommerce_connections WHERE id = 'ec-ok'").get();
   ok(row.enabled === 1, '[13] enabled defaults to 1');
   ok(row.last_test_ok === null, '[13] last_test_ok nullable (NULL before first test)');
-  // 严格边界：本 PR 仅连接设置，绝不携带订单拉取/暂存/游标列（留后续 phase）
-  for (const c of ['last_cursor', 'external_order_id', 'order_json', 'sync_state', 'staged_at']) {
-    ok(!colExists(d, 'ecommerce_connections', c), `[13] ecommerce_connections must NOT carry order-pull column '${c}' (deferred to a later phase)`);
+  // 边界：连接表不承载订单/暂存字段（last_cursor 由 v21→改为 v22 的同步列，见 block 14；此处只守订单/暂存列）
+  for (const c of ['external_order_id', 'order_json', 'sync_state', 'staged_at', 'normalized_json']) {
+    ok(!colExists(d, 'ecommerce_connections', c), `[13] ecommerce_connections must NOT carry order/staging column '${c}'`);
+  }
+  d.close();
+}
+
+// ---- 14. v22 拉单→暂存：连接同步列 + staged_orders + sync_log；且 sales/sales_items 未被改动 ----
+{
+  const d = fresh();
+  runMigrations(d);
+  // 14a. ecommerce_connections 新增 3 个同步列（nullable，additive）
+  for (const c of ['last_cursor', 'last_synced_at', 'last_order_updated_at']) {
+    ok(colExists(d, 'ecommerce_connections', c), `[14] ecommerce_connections.${c} sync column must exist (v22)`);
+  }
+  // 14b. ecommerce_staged_orders 列齐
+  ok(tableExists(d, 'ecommerce_staged_orders'), '[14] v22 ecommerce_staged_orders table exists');
+  for (const c of ['id', 'connection_id', 'platform', 'external_order_id', 'order_number', 'order_status',
+                   'order_created_at', 'order_updated_at', 'currency', 'total_gross', 'normalized_json',
+                   'raw_excerpt_json', 'match_status', 'stage_status', 'committed_sale_id',
+                   'first_seen_at', 'last_pulled_at', 'error', 'updated_at']) {
+    ok(colExists(d, 'ecommerce_staged_orders', c), `[14] ecommerce_staged_orders.${c} column must exist`);
+  }
+  // 14c. 唯一约束 (connection_id, external_order_id) 幂等：同键第二次插入被拒
+  d.prepare("INSERT INTO ecommerce_staged_orders (connection_id, platform, external_order_id) VALUES ('c1','shopify','o1')").run();
+  let dupErr = null;
+  try { d.prepare("INSERT INTO ecommerce_staged_orders (connection_id, platform, external_order_id) VALUES ('c1','shopify','o1')").run(); }
+  catch (e) { dupErr = e?.message || String(e); }
+  ok(dupErr, '[14] UNIQUE(connection_id, external_order_id) rejects a duplicate staged row (idempotency)');
+  // 不同 connection 同 external_order_id 允许
+  d.prepare("INSERT INTO ecommerce_staged_orders (connection_id, platform, external_order_id) VALUES ('c2','shopify','o1')").run();
+  ok(count(d, 'ecommerce_staged_orders') === 2, '[14] same external id under a different connection is allowed');
+  // 默认值
+  const srow = d.prepare("SELECT stage_status, match_status, raw_excerpt_json FROM ecommerce_staged_orders WHERE connection_id='c1'").get();
+  ok(srow.stage_status === 'staged' && srow.match_status === 'unresolved', '[14] staged defaults: stage_status=staged / match_status=unresolved');
+  ok(srow.raw_excerpt_json === null, '[14] raw_excerpt_json defaults NULL (full raw not persisted)');
+  // 14d. ecommerce_sync_log 列齐
+  ok(tableExists(d, 'ecommerce_sync_log'), '[14] v22 ecommerce_sync_log table exists');
+  for (const c of ['id', 'connection_id', 'platform', 'run_at', 'status', 'pulled', 'staged_new',
+                   'staged_updated', 'errors', 'pages', 'since_used', 'cursor_before', 'cursor_after',
+                   'duration_ms', 'error_json']) {
+    ok(colExists(d, 'ecommerce_sync_log', c), `[14] ecommerce_sync_log.${c} column must exist`);
+  }
+  // 14e. 红线：v22 未给 sales / sales_items 加任何订单列（去重列留 PR-EC5）
+  for (const c of ['external_order_id', 'platform_source']) {
+    ok(!colExists(d, 'sales', c), `[14] sales must NOT carry '${c}' yet (deferred to commit phase PR-EC5)`);
+    ok(!colExists(d, 'sales_items', c), `[14] sales_items must NOT carry '${c}'`);
   }
   d.close();
 }
@@ -310,4 +354,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema + v15 liabilities schema + v16 fixed_assets schema + v17 equity schema + v18 tax_payments schema + v19 fixed_assets depreciation params + v21 ecommerce_connections schema)`);
+console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema + v15 liabilities schema + v16 fixed_assets schema + v17 equity schema + v18 tax_payments schema + v19 fixed_assets depreciation params + v21 ecommerce_connections schema + v22 staged_orders/sync_log + sales untouched)`);

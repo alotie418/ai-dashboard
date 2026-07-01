@@ -6,11 +6,13 @@
 // NEVER receives the plaintext (or the ciphertext); decryption happens only in
 // the main process, right before a testConnection call, and is never logged.
 //
-// SCOPE GUARD: this module ONLY connects + stores credentials + tests. It does
-// NOT pull orders, stage orders, sync, or write anything into sales/sales_items.
+// SCOPE (through PR-EC3): connect + store credentials + test + PULL orders into a
+// STAGING preview area (ecommerce_staged_orders) + a sync log. It STILL does NOT write
+// anything into sales / sales_items / purchases / inventory — staging only, no posting.
 
 const { getDb } = require('../db');
 const { assertValidProvider, publicMeta } = require('./providers/_providerInterface');
+const { pull } = require('./pull');
 
 const shopify = require('./providers/shopify');
 const woocommerce = require('./providers/woocommerce');
@@ -257,8 +259,65 @@ function remove({ id } = {}) {
   return { success: true };
 }
 
+// ============================================================
+// 拉单 → 暂存（PR-EC3）—— 只读账本，只写 staged / sync_log
+// ============================================================
+
+// List staged orders (preview data). NEVER contains credentials. normalized_json is
+// parsed into `normalized` for the renderer. Read-only.
+function listStaged({ connectionId, status, limit = 200 } = {}) {
+  const db = getDb();
+  const where = [];
+  const args = [];
+  if (connectionId) { where.push('connection_id = ?'); args.push(connectionId); }
+  if (status) { where.push('stage_status = ?'); args.push(status); }
+  const sql = `SELECT id, connection_id, platform, external_order_id, order_number, order_status,
+      order_created_at, order_updated_at, currency, total_gross, normalized_json, match_status,
+      stage_status, committed_sale_id, first_seen_at, last_pulled_at, error
+    FROM ecommerce_staged_orders
+    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+    ORDER BY order_updated_at DESC, id DESC LIMIT ?`;
+  const rows = db.prepare(sql).all(...args, Math.max(1, Math.min(1000, limit)));
+  return rows.map((r) => {
+    let normalized = null;
+    try { normalized = r.normalized_json ? JSON.parse(r.normalized_json) : null; } catch { normalized = null; }
+    return {
+      id: r.id, connectionId: r.connection_id, platform: r.platform, externalOrderId: r.external_order_id,
+      orderNumber: r.order_number, orderStatus: r.order_status,
+      orderCreatedAt: r.order_created_at, orderUpdatedAt: r.order_updated_at,
+      currency: r.currency, totalGross: r.total_gross, normalized,
+      matchStatus: r.match_status, stageStatus: r.stage_status, committedSaleId: r.committed_sale_id,
+      firstSeenAt: r.first_seen_at, lastPulledAt: r.last_pulled_at, error: r.error,
+    };
+  });
+}
+
+// List sync-log runs. error_json is parsed; never contains credentials (pull.js redacts). Read-only.
+function listSyncLog({ connectionId, limit = 50 } = {}) {
+  const db = getDb();
+  const sql = `SELECT id, connection_id, platform, run_at, status, pulled, staged_new, staged_updated,
+      errors, pages, since_used, cursor_before, cursor_after, duration_ms, error_json
+    FROM ecommerce_sync_log
+    ${connectionId ? 'WHERE connection_id = ?' : ''}
+    ORDER BY id DESC LIMIT ?`;
+  const args = connectionId ? [connectionId, Math.max(1, Math.min(500, limit))] : [Math.max(1, Math.min(500, limit))];
+  const rows = db.prepare(sql).all(...args);
+  return rows.map((r) => {
+    let error = null;
+    try { error = r.error_json ? JSON.parse(r.error_json) : null; } catch { error = null; }
+    return {
+      id: r.id, connectionId: r.connection_id, platform: r.platform, runAt: r.run_at, status: r.status,
+      pulled: r.pulled, stagedNew: r.staged_new, stagedUpdated: r.staged_updated, errors: r.errors,
+      pages: r.pages, sinceUsed: r.since_used, cursorBefore: r.cursor_before, cursorAfter: r.cursor_after,
+      durationMs: r.duration_ms, error,
+    };
+  });
+}
+
 module.exports = {
   listProviders, list, save, test, setEnabled, remove,
+  // PR-EC3: pull → staging (no ledger write)
+  pull, listStaged, listSyncLog,
   // exported for tests
   _PROVIDERS: PROVIDERS, _VALID_IDS: VALID_IDS,
 };

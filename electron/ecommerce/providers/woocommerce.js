@@ -141,10 +141,132 @@ async function testConnection(creds) {
   return { ok: true, storeInfo: { name: host, domain: host, currency: null } };
 }
 
+// ============================================================
+// PR-EC3: order pull → staging (NO ledger write)
+// ============================================================
+//
+// ⚠️ OFFICIAL-DOCS CONFIRMATION REQUIRED (WooCommerce / WordPress REST API):
+//   - endpoint:   GET {siteRoot}/wp-json/wc/v3/orders?per_page=&page=
+//   - pagination: page/per_page; total pages from response header `X-WP-TotalPages`
+//                 (fallback: a page returning < per_page rows is the last page).
+//   - INCREMENTAL: `modified_after` (based on date_modified_gmt) IS the intended filter, BUT
+//                  per the EC3 constraint we do NOT hard-depend on `orderby=modified` (its
+//                  availability for the orders endpoint is not reliably confirmable). Strategy:
+//                    * pass `modified_after=<watermark>` ONLY as a volume-reduction hint
+//                      (confirm it is honoured; if not, it is simply ignored by the server);
+//                    * rely on page-based pagination with the DEFAULT ordering (no orderby=modified);
+//                    * CORRECTNESS comes from the staging UPSERT idempotency (re-fetched orders
+//                      are de-duplicated), NOT from a perfect incremental filter.
+//                  The watermark is advanced to the max date_modified_gmt actually seen.
+//   - auth:       HTTPS Basic Auth base64(ck:cs), same as testConnection. HTTPS-only.
+// Confirm every field/param name against the official docs before real use.
+
+const WC_ORDERS_PATH = '/wp-json/wc/v3/orders';
+const WC_PAGE_SIZE = 50;
+
+// Fetch ONE page of orders → { rawOrders, nextCursor, hasNextPage }. nextCursor is the next
+// PAGE NUMBER (page-based); pull.js passes it back as `cursor`. Throws a coded Error on hard
+// failure. Small internal backoff on 429/503. NEVER logs credentials.
+async function pullOrdersPage(creds, { since, cursor, pageSize } = {}) {
+  const { shop, consumerKey, consumerSecret } = creds || {};
+  const norm = normalizeSiteUrl(shop);
+  if (norm.error === 'http') { const e = new Error('http not supported'); e.code = 'config'; throw e; }
+  if (norm.error) { const e = new Error('invalid store URL'); e.code = 'config'; throw e; }
+  if (!consumerKey || !consumerSecret) { const e = new Error('missing key/secret'); e.code = 'config'; throw e; }
+  const doFetch = getFetch();
+  if (!doFetch) { const e = new Error('fetch unavailable'); e.code = 'unavailable'; throw e; }
+
+  const page = Number.isFinite(cursor) && cursor > 0 ? cursor : 1;
+  const per = pageSize || WC_PAGE_SIZE;
+  const params = new URLSearchParams({ per_page: String(per), page: String(page) });
+  if (since) params.set('modified_after', since);   // volume-reduction hint only (see header note)
+  const url = `${norm.url}${WC_ORDERS_PATH}?${params.toString()}`;
+  const auth = 'Basic ' + Buffer.from(`${consumerKey.trim()}:${consumerSecret.trim()}`).toString('base64');
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TEST_TIMEOUT_MS);
+    let resp;
+    try {
+      resp = await doFetch(url, { method: 'GET', headers: { 'Authorization': auth, 'Accept': 'application/json' }, signal: controller.signal });
+    } catch (e) {
+      clearTimeout(timer);
+      const err = new Error(e?.name === 'AbortError' ? 'timeout' : (e?.message || 'network error'));
+      err.code = e?.name === 'AbortError' ? 'timeout' : 'network';
+      throw err;
+    }
+    clearTimeout(timer);
+
+    if (resp.status === 429 || resp.status === 503) { await backoff(attempt); continue; }
+    if (resp.status === 401 || resp.status === 403) { const e = new Error(`HTTP ${resp.status}`); e.code = 'auth'; e.status = resp.status; throw e; }
+    if (resp.status === 404) { const e = new Error('HTTP 404 — WooCommerce REST API not found'); e.code = 'notFound'; e.status = 404; throw e; }
+    if (!resp.ok) { const e = new Error(`HTTP ${resp.status}`); e.code = 'http'; e.status = resp.status; throw e; }
+
+    let arr;
+    try { arr = await resp.json(); } catch { const e = new Error('invalid JSON'); e.code = 'parse'; throw e; }
+    if (!Array.isArray(arr)) { const e = new Error('unexpected orders payload'); e.code = 'unexpected'; throw e; }
+
+    const totalPages = parseInt(resp.headers.get('X-WP-TotalPages') || '', 10);
+    const hasNextPage = Number.isFinite(totalPages) ? page < totalPages : arr.length >= per;
+    return { rawOrders: arr, nextCursor: hasNextPage ? page + 1 : null, hasNextPage };
+  }
+  const e = new Error('rate limited — retries exhausted'); e.code = 'throttled'; throw e;
+}
+
+function backoff(attempt) {
+  const ms = Math.min(4000, 500 * Math.pow(2, attempt));
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+
+// PURE: WooCommerce order → neutral NormalizedOrder. Buyer PII (billing/shipping name/email/
+// address/phone) is DELIBERATELY IGNORED — only an opaque customer_id ref is kept.
+function normalizeOrder(o) {
+  const items = (o?.line_items || []).map((li) => {
+    const qty = Number.isFinite(li.quantity) ? li.quantity : num(li.quantity);
+    const lineNet = num(li.subtotal);              // WooCommerce: subtotal = net line before tax (confirm)
+    const lineTax = num(li.total_tax);
+    const lineGross = num(li.total) != null && lineTax != null ? num(li.total) + lineTax : num(li.total);
+    return {
+      sku: li.sku || null, name: li.name || null, quantity: qty,
+      unitPriceNet: lineNet != null && qty ? lineNet / qty : null,
+      lineNet, lineTax, lineGross, taxRate: null,
+    };
+  });
+  const shipLines = (o?.shipping_lines || []).map((s) => ({ title: s.method_title || null, amount: num(s.total) }));
+  const taxLines = (o?.tax_lines || []).map((t) => ({ title: t.rate_code || t.label || null, rate: num(t.rate_percent), amount: num(t.tax_total) }));
+  const fees = (o?.fee_lines || []).map((f) => ({ title: f.name || null, amount: num(f.total) }));
+  const refunds = (o?.refunds || []).map((r) => ({ id: r.id != null ? String(r.id) : null, createdAt: null, amount: num(r.total) }));
+  return {
+    platform: 'woocommerce',
+    externalOrderId: String(o?.id ?? ''),
+    orderNumber: o?.number != null ? String(o.number) : null,
+    orderStatus: o?.status || null,
+    createdAt: o?.date_created_gmt || o?.date_created || null,
+    updatedAt: o?.date_modified_gmt || o?.date_modified || null,
+    currency: o?.currency || null,
+    header: { customerRef: o?.customer_id ? `wc-${o.customer_id}` : null },   // opaque id only — NO PII
+    items,
+    shipping: { total: num(o?.shipping_total), lines: shipLines },
+    taxes: { total: num(o?.total_tax), lines: taxLines },
+    fees,
+    refunds,
+    totals: {
+      subtotalNet: items.reduce((s, i) => s + (i.lineNet || 0), 0) || null,
+      taxTotal: num(o?.total_tax),
+      shippingTotal: num(o?.shipping_total),
+      grandTotalGross: num(o?.total),
+    },
+  };
+}
+
 module.exports = {
   meta: META,
   testConnection,
+  pullOrdersPage,
+  normalizeOrder,
   publicMeta: () => publicMeta(module.exports),
-  // exported for unit testing the URL normaliser without a network call
+  // exported for unit testing without a network call
   _normalizeSiteUrl: normalizeSiteUrl,
 };
