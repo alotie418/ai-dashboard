@@ -377,8 +377,8 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
                   type Meta = { originalValue: number; accumulatedDepreciation: number };
                   // 明细行（栏内）：左 label 可换行，右金额 monospace 右对齐、不换行，避免重叠 / 横向滚动。
                   const lineRow = (l: { key: string; amount: number; meta?: Meta }, pfx: string, i: number) => (
-                    <div key={`${pfx}${i}`} className="px-5 py-2">
-                      <div className="flex items-start justify-between gap-3">
+                    <div key={`${pfx}${i}`} className="px-1 py-1.5">
+                      <div className="flex items-baseline justify-between gap-3">
                         <span className="text-sm text-[#4a4a48] min-w-0 break-words">{lineLabel(l.key)}</span>
                         <span className="text-sm font-mono text-[#191918] shrink-0 whitespace-nowrap tabular-nums">{ccyAmt(l.amount)}</span>
                       </div>
@@ -399,90 +399,78 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
                       )}
                     </div>
                   );
-                  // 栏内小标题（流动 / 非流动）
+                  // 分区内小标题（流动 / 非流动）
                   const subHdr = (label: string) => (
-                    <div className="px-5 pt-3 pb-1 text-[10px] uppercase tracking-wider text-[#8a8a88]">{label}</div>
+                    <div className="px-1 pt-2 pb-0.5 text-[10px] uppercase tracking-wider text-[#8a8a88]">{label}</div>
                   );
-                  // 栏底小计（浅背景突出）
-                  const colSubtotal = (label: string, v: number) => (
-                    <div className="mt-2 flex items-center justify-between gap-3 px-5 py-2.5 bg-[#f4f4f2] border-t border-[#e0ddd5]/70">
-                      <span className="text-sm font-semibold text-[#191918] min-w-0 break-words">{label}</span>
-                      <span className="text-sm font-mono font-semibold text-[#191918] shrink-0 whitespace-nowrap tabular-nums">{ccyAmt(v)}</span>
+                  // 顶部 KPI 小卡（每个数字只出现一次；差额=主题色卡·始终显示·不可隐藏）。
+                  // 标签不 truncate（保留完整文案：长标签换行·flex 底对齐使各卡数字对齐）。
+                  const kpi = (label: string, v: number, accent?: boolean) => (
+                    <div className={`flex flex-col justify-between rounded-lg border px-3.5 py-3 overflow-hidden ${accent ? 'bg-primary/5 border-primary/25' : 'bg-[#f6f6f4] border-[#eceae6]'}`}>
+                      <p className="text-[11px] font-medium tracking-wide text-[#8a8a88] leading-tight">{label}</p>
+                      <p className={`mt-1.5 font-mono text-base md:text-lg font-bold whitespace-nowrap tabular-nums ${accent ? 'text-primary' : 'text-[#191918]'}`}>{ccyAmt(v)}</p>
                     </div>
                   );
-                  // 顶部关键数（4 个）：资产总计 / 负债合计 / 所有者权益 / 平衡差额（差额醒目色）
-                  const stat = (label: string, v: number, emphasize?: boolean) => (
-                    <div className="px-3 py-2.5">
-                      <p className="text-[10px] uppercase tracking-wider text-[#8a8a88] mb-1 leading-tight">{label}</p>
-                      <p className={`font-mono text-base md:text-lg font-bold whitespace-nowrap tabular-nums ${emphasize ? 'text-primary' : 'text-[#191918]'}`}>{ccyAmt(v)}</p>
+                  // 分区卡（资产 / 负债 / 所有者权益）：独立卡片·高度自适应·空分区显示占位「—」
+                  const section = (title: string, empty: boolean, body: React.ReactNode) => (
+                    <div className="rounded-lg border border-[#e0ddd5] bg-white/70 overflow-hidden">
+                      <div className="px-4 py-2 text-xs font-bold text-[#191918] bg-[#f9f9f8]/70 border-b border-[#e0ddd5]/70">{title}</div>
+                      <div className="px-3 py-2">
+                        {empty ? <div className="py-4 text-center text-sm text-[#c4c4c2]">—</div> : body}
+                      </div>
                     </div>
                   );
-                  // 栏头（资产 / 负债 / 所有者权益）
-                  const colHead = (label: string) => (
-                    <div className="px-5 py-2.5 text-xs font-bold text-[#191918] bg-[#f9f9f8]/70 border-b border-[#e0ddd5]/70">{label}</div>
-                  );
+                  const assetsEmpty = blk.assets.current.length + blk.assets.nonCurrent.length === 0;
+                  const liabEmpty = blk.liabilities.current.length + blk.liabilities.nonCurrent.length === 0;
+                  const equityEmpty = blk.equity.length === 0;
                   return (
-                    <div key={blk.currency ?? 'null'} className="border border-[#e0ddd5] rounded-xl overflow-hidden bg-white/60">
+                    <div key={blk.currency ?? 'null'} className="rounded-xl border border-[#e8e6e1] bg-white/40 overflow-hidden">
                       {/* 卡头：币种 */}
-                      <div className="flex items-center bg-[#f9f9f8]/60 px-6 py-3 border-b border-[#e0ddd5]">
+                      <div className="flex items-center px-5 py-3 border-b border-[#e8e6e1] bg-[#f9f9f8]/60">
                         <span className="text-sm font-bold text-[#191918]"><i className="fas fa-coins mr-2 text-[#8a8a88]"></i>{blk.currency ?? t('finance.balanceCurrencyUnspecified')}</span>
                       </div>
-                      {/* 4 个关键数：资产总计 / 负债合计 / 所有者权益 / 平衡差额 */}
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-2 gap-y-1 px-4 py-3 border-b border-[#e0ddd5] bg-[#fbfbfa]">
-                        {stat(t('finance.balanceTotalAssets'), blk.totals.assets)}
-                        {stat(t('finance.balanceTotalLiabilities'), blk.totals.liabilities)}
-                        {stat(t('finance.balanceEquity'), blk.totals.equity)}
-                        {stat(t('finance.balanceDifference'), blk.balanceDifference, true)}
-                      </div>
-                      {/* 详情区：桌面 3 栏（资产 / 负债 / 所有者权益），移动端自动堆叠 */}
-                      <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-[#e0ddd5]/70">
-                        {/* 资产 */}
-                        <div className="flex flex-col">
-                          {colHead(t('finance.balanceAssets'))}
-                          <div className="flex-1">
-                            {blk.assets.current.length > 0 && subHdr(t('finance.balanceCurrentAssets'))}
-                            {blk.assets.current.map((l, i) => lineRow(l, 'ac', i))}
-                            {blk.assets.nonCurrent.length > 0 && subHdr(t('finance.balanceNonCurrentAssets'))}
-                            {blk.assets.nonCurrent.map((l, i) => lineRow(l, 'anc', i))}
-                          </div>
-                          {colSubtotal(t('finance.balanceTotalAssets'), blk.totals.assets)}
+                      <div className="p-4 md:p-5 space-y-4">
+                        {/* 顶部 4 个 KPI 小卡：资产总计 / 负债合计 / 所有者权益 / 平衡差额（差额=主题色卡·始终显示） */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                          {kpi(t('finance.balanceTotalAssets'), blk.totals.assets)}
+                          {kpi(t('finance.balanceTotalLiabilities'), blk.totals.liabilities)}
+                          {kpi(t('finance.balanceEquity'), blk.totals.equity)}
+                          {kpi(t('finance.balanceDifference'), blk.balanceDifference, true)}
                         </div>
-                        {/* 负债 */}
-                        <div className="flex flex-col">
-                          {colHead(t('finance.balanceLiabilities'))}
-                          <div className="flex-1">
-                            {blk.liabilities.current.length > 0 && subHdr(t('finance.balanceCurrentLiabilities'))}
-                            {blk.liabilities.current.map((l, i) => lineRow(l, 'lc', i))}
-                            {blk.liabilities.nonCurrent.length > 0 && subHdr(t('finance.balanceNonCurrentLiabilities'))}
-                            {blk.liabilities.nonCurrent.map((l, i) => lineRow(l, 'lnc', i))}
-                          </div>
-                          {colSubtotal(t('finance.balanceTotalLiabilities'), blk.totals.liabilities)}
+                        {/* 明细：桌面 3 张独立分区卡·高度自适应（消除空栏留白），移动端堆叠 */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-start">
+                          {section(t('finance.balanceAssets'), assetsEmpty, (
+                            <>
+                              {blk.assets.current.length > 0 && subHdr(t('finance.balanceCurrentAssets'))}
+                              {blk.assets.current.map((l, i) => lineRow(l, 'ac', i))}
+                              {blk.assets.nonCurrent.length > 0 && subHdr(t('finance.balanceNonCurrentAssets'))}
+                              {blk.assets.nonCurrent.map((l, i) => lineRow(l, 'anc', i))}
+                            </>
+                          ))}
+                          {section(t('finance.balanceLiabilities'), liabEmpty, (
+                            <>
+                              {blk.liabilities.current.length > 0 && subHdr(t('finance.balanceCurrentLiabilities'))}
+                              {blk.liabilities.current.map((l, i) => lineRow(l, 'lc', i))}
+                              {blk.liabilities.nonCurrent.length > 0 && subHdr(t('finance.balanceNonCurrentLiabilities'))}
+                              {blk.liabilities.nonCurrent.map((l, i) => lineRow(l, 'lnc', i))}
+                            </>
+                          ))}
+                          {section(t('finance.balanceEquity'), equityEmpty, (
+                            <>
+                              {blk.equity.map((l, i) => lineRow(l, 'eq', i))}
+                            </>
+                          ))}
                         </div>
-                        {/* 所有者权益 */}
-                        <div className="flex flex-col">
-                          {colHead(t('finance.balanceEquity'))}
-                          <div className="flex-1">
-                            {blk.equity.map((l, i) => lineRow(l, 'eq', i))}
-                          </div>
-                          {colSubtotal(t('finance.balanceEquity'), blk.totals.equity)}
-                        </div>
-                      </div>
-                      {/* 平衡差额／待调整 —— 始终显示（醒目差额条·不可隐藏·不强制平衡） */}
-                      <div className="flex items-center justify-between gap-3 px-6 py-3 border-t-2 border-primary/20 bg-primary/5">
-                        <span className="text-sm font-bold text-[#191918]">
-                          <i className="fas fa-scale-balanced mr-2 text-primary/70"></i>{t('finance.balanceDifference')}
-                        </span>
-                        <span className="text-base font-mono font-bold text-primary shrink-0 whitespace-nowrap tabular-nums">{ccyAmt(blk.balanceDifference)}</span>
                       </div>
                       {/* warnings（保留在卡底） */}
                       {blk.warnings?.includes('borrowingsNullMaturityDefaultCurrent') && (
-                        <div className="px-6 py-2 text-[11px] text-amber-600 border-t border-[#e0ddd5]/70">
+                        <div className="px-5 py-2 text-[11px] text-amber-600 border-t border-[#e8e6e1]">
                           <i className="fas fa-info-circle mr-1"></i>{t('finance.balanceBorrowingsNullMaturity')}
                         </div>
                       )}
                       {/* P3-4 亏损期所得税估算 caveat：预缴行不代表真实预缴 */}
                       {blk.warnings?.includes('incomeTaxLossPeriodCaveat') && (
-                        <div className="px-6 py-2 text-[11px] text-amber-600 border-t border-[#e0ddd5]/70">
+                        <div className="px-5 py-2 text-[11px] text-amber-600 border-t border-[#e8e6e1]">
                           <i className="fas fa-info-circle mr-1"></i>{t('finance.balanceIncomeTaxLossCaveat')}
                         </div>
                       )}
