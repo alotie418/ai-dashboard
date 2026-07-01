@@ -15,6 +15,7 @@ import {
   type EcommerceProviderMeta,
   type EcommerceConnection,
 } from '../services/api';
+import EcommerceOrdersModal from './ecommerce/EcommerceOrdersModal';
 
 interface FormState {
   open: boolean;
@@ -52,6 +53,7 @@ const EcommerceConnectionsSection: React.FC = () => {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [rowTest, setRowTest] = useState<Record<string, { testing: boolean; result: 'ok' | 'fail' | null; msg: string }>>({});
   const [globalMessage, setGlobalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [ordersFor, setOrdersFor] = useState<EcommerceConnection | null>(null);
 
   const activeProvider = providers.find((p) => p.id === form.platform) || null;
   const activeCredKeys = activeProvider ? (CRED_KEYS[activeProvider.authMode] || []) : [];
@@ -253,6 +255,11 @@ const EcommerceConnectionsSection: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap shrink-0">
+                        {c.enabled && (
+                          <button onClick={() => setOrdersFor(c)} className="text-xs px-3 py-1.5 border border-primary/40 text-primary rounded-lg hover:bg-primary/5 whitespace-nowrap">
+                            <i className="fas fa-cloud-arrow-down mr-1.5"></i>{t('settings.ecommerce.orders.viewOrders')}
+                          </button>
+                        )}
                         <button onClick={() => doRowTest(c)} disabled={rt?.testing} className="text-xs px-3 py-1.5 border border-[#e0ddd5] text-[#4a4a48] rounded-lg hover:bg-[#f0eeeb] disabled:opacity-50 whitespace-nowrap">
                           {rt?.testing ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('common.testing')}</> : <><i className="fas fa-plug mr-1.5"></i>{t('settings.ecommerce.testConnection')}</>}
                         </button>
@@ -400,6 +407,8 @@ const EcommerceConnectionsSection: React.FC = () => {
           </div>
         </>
       )}
+
+      {ordersFor && <EcommerceOrdersModal connection={ordersFor} onClose={() => setOrdersFor(null)} />}
     </section>
   );
 };
