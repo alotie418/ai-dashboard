@@ -85,7 +85,8 @@
       "fixedAssets": "Immobilisations",
       "equity": "Capitaux propres",
       "taxPayments": "Taxes payées",
-      "ledgerSummary": "Récap. registres"
+      "ledgerSummary": "Récap. registres",
+      "ecommerce": "E-commerce"
     },
     "company": {
       "title": "Informations entreprise",
@@ -283,6 +284,46 @@
       "note2": "Les tables anciennes ne sont PAS supprimées — rollback à tout moment",
       "note3": "Enregistrements de migration stockés dans legacy_migrations pour éviter les doublons",
       "note4": "Champs existants (quantité / prix unitaire / fret) sauvegardés dans source_meta JSON — pas de perte"
+    },
+    "ecommerce": {
+      "title": "Plateformes e-commerce",
+      "subtitle": "Connectez une boutique en ligne pour importer des commandes ultérieurement. Cette version enregistre et teste uniquement la connexion.",
+      "mvpNotice": "Aperçu : cette version enregistre les identifiants de la boutique et teste la connexion uniquement. L'import des commandes n'est pas encore activé — rien n'est écrit dans votre comptabilité.",
+      "desktopOnly": "Les connexions e-commerce sont disponibles uniquement dans l'application de bureau.",
+      "addStore": "Ajouter une boutique Shopify",
+      "noConnections": "Aucune boutique connectée pour le moment.",
+      "shopDomainLabel": "Domaine de la boutique",
+      "shopDomainPlaceholder": "your-store.myshopify.com",
+      "shopDomainDesc": "Saisissez le domaine .myshopify.com de votre boutique.",
+      "tokenLabel": "Jeton d'accès Admin API",
+      "tokenPlaceholder": "shpat_...",
+      "tokenOverrideHint": "(laisser vide pour conserver le jeton enregistré)",
+      "labelLabel": "Nom affiché (facultatif)",
+      "labelPlaceholder": "Ma boutique Shopify",
+      "getTokenLink": "Comment créer un jeton Admin API",
+      "testConnection": "Tester la connexion",
+      "testOk": "Connecté : {name}",
+      "testFail": "Échec de la connexion",
+      "removeConfirm": "Supprimer ?",
+      "enable": "Activer",
+      "disable": "Désactiver",
+      "statusEnabled": "Activé",
+      "statusDisabled": "Désactivé",
+      "neverTested": "Jamais testé",
+      "lastTest": "Dernier test : {time}",
+      "lastTestOk": "OK",
+      "lastTestFail": "Échec",
+      "savedToast": "Connexion enregistrée",
+      "removedToast": "Connexion supprimée",
+      "loadError": "Échec du chargement des connexions : {msg}",
+      "saveError": "Échec de l'enregistrement : {msg}",
+      "deleteError": "Échec de la suppression : {msg}",
+      "security": {
+        "title": "Sécurité des identifiants",
+        "item1": "Les identifiants de la boutique sont chiffrés par le stockage sécurisé du système (safeStorage) et ne quittent jamais cet appareil.",
+        "item2": "Le chiffrement est lié à cette machine — après avoir restauré une sauvegarde sur un autre appareil, saisissez à nouveau le jeton.",
+        "item3": "Cette version teste uniquement la connexion. Aucune commande n'est récupérée et rien n'est écrit dans votre comptabilité."
+      }
     }
   },
   "onboarding": {

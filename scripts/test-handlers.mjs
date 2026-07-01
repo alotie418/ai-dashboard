@@ -80,6 +80,7 @@ const { runMigrations, _setDbForTest } = require(join(ROOT, 'electron/db/index.j
 const { dispatch } = require(join(ROOT, 'electron/handlers/router.js'));
 const { computeOperatingCashflow } = require(join(ROOT, 'electron/reports/_cashflow.js'));
 const aiCore = require(join(ROOT, 'electron/ai/index.js'));
+const ecommerceCore = require(join(ROOT, 'electron/ecommerce/index.js'));
 
 const failures = [];
 const ok = (cond, msg) => { if (!cond) failures.push(msg); };
@@ -2818,9 +2819,58 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   ok(cnt === 0, '[N6] after remove(): ai_providers row physically deleted');
 }
 
+// ───────────── ecommerce connections: list/setEnabled/remove security (no credential leak) ─────────────
+// Direct-insert a fake ciphertext row (bypass safeStorage, unavailable under node), then exercise the
+// renderer-facing surface (ecommerceCore.list/listProviders/setEnabled/remove). list() must report
+// hasCredentials but expose NO token/ciphertext; the provider catalog is metas-only. Reads/writes the
+// same :memory: DB via _setDbForTest (shared db module instance). No network (testConnection not called).
+{
+  const db = freshDb();
+  const FAKE_ENC = 'QkFTRTY0RFVNTVlDSVBIRVI='; // base64 dummy "ciphertext" — never a real credential
+  db.prepare(`INSERT INTO ecommerce_connections (id, platform, label, shop_identifier, credentials_encrypted, enabled)
+              VALUES (?, ?, ?, ?, ?, 1)`).run('ec-t1', 'shopify', 'My Store', 'demo.myshopify.com', FAKE_ENC);
+
+  // EC1: list() exposes hasCredentials + non-secret fields, but NO token/ciphertext anywhere
+  const list = ecommerceCore.list();
+  const conn = list.find((c) => c.id === 'ec-t1');
+  ok(!!conn && conn.hasCredentials === true, '[EC1] list(): saved connection → hasCredentials=true');
+  ok(conn && conn.platform === 'shopify' && conn.shopIdentifier === 'demo.myshopify.com', '[EC1] list(): platform/shopIdentifier exposed');
+  const connJson = JSON.stringify(conn || {});
+  // The safe boolean flag is `hasCredentials`; assert no RAW secret field/value leaks
+  // (credentials_encrypted / a "token" field / api_key / the stored ciphertext itself).
+  ok(!/credentials_encrypted|"token"|api_key/i.test(connJson), '[EC1] list() entry exposes no raw credential field');
+  ok(!connJson.includes(FAKE_ENC), '[EC1] list() entry does not leak the stored ciphertext');
+  const allJson = JSON.stringify(list);
+  ok(!allJson.includes(FAKE_ENC) && !/credentials_encrypted|"token"|api_key/i.test(allJson), '[EC1] full list() payload carries no credential material');
+
+  // EC2: provider catalog is renderer-safe metas (transport/authKind + a secret token field)
+  const provs = ecommerceCore.listProviders();
+  const shop = provs.find((p) => p.id === 'shopify');
+  ok(!!shop && shop.transport === 'graphql' && shop.authKind === 'token', '[EC2] listProviders(): shopify = graphql/token');
+  ok(Array.isArray(shop.credentialFields) && shop.credentialFields.some((f) => f.key === 'token' && f.secret === true), '[EC2] shopify exposes a secret token field');
+
+  // EC3: setEnabled toggles enabled flag
+  ecommerceCore.setEnabled({ id: 'ec-t1', enabled: false });
+  ok(ecommerceCore.list().find((c) => c.id === 'ec-t1')?.enabled === false, '[EC3] setEnabled(false) disables the connection');
+  ecommerceCore.setEnabled({ id: 'ec-t1', enabled: true });
+  ok(ecommerceCore.list().find((c) => c.id === 'ec-t1')?.enabled === true, '[EC3] setEnabled(true) re-enables');
+
+  // EC4: remove() physically clears the row
+  ecommerceCore.remove({ id: 'ec-t1' });
+  ok(!ecommerceCore.list().some((c) => c.id === 'ec-t1'), '[EC4] remove() deletes the connection from list()');
+  const cnt = db.prepare("SELECT COUNT(*) AS c FROM ecommerce_connections WHERE id = 'ec-t1'").get().c;
+  ok(cnt === 0, '[EC4] ecommerce_connections row physically deleted');
+
+  // EC5: shopify domain normaliser (pure, no network) — canonical myshopify.com host or null
+  const shopifyAdapter = ecommerceCore._PROVIDERS.shopify;
+  ok(shopifyAdapter._normalizeShopHost('My-Store') === 'my-store.myshopify.com', '[EC5] normalize bare handle → myshopify.com host');
+  ok(shopifyAdapter._normalizeShopHost('https://demo.myshopify.com/admin') === 'demo.myshopify.com', '[EC5] normalize full URL → host');
+  ok(shopifyAdapter._normalizeShopHost('not a domain!!') === null, '[EC5] reject invalid domain → null');
+}
+
 if (failures.length) {
   console.error(`✗ handlers: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + fx-reference-conversion(multi-currency reference conversion read-only, PR-7B P3-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + fx-reference-conversion(multi-currency reference conversion read-only, PR-7B P3-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears) + ecommerce connections(EC1 no-credential-leak/EC2 provider catalog/EC3 setEnabled/EC4 remove/EC5 domain normalise)) via real dispatch on :memory: DB');

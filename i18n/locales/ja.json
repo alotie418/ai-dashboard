@@ -85,7 +85,8 @@
       "fixedAssets": "固定資産",
       "equity": "資本・出資",
       "taxPayments": "納付済み税金",
-      "ledgerSummary": "台帳サマリー"
+      "ledgerSummary": "台帳サマリー",
+      "ecommerce": "EC連携"
     },
     "company": {
       "title": "企業基本情報",
@@ -283,6 +284,46 @@
       "note2": "旧テーブルのデータは削除されません — いつでもロールバック可能",
       "note3": "移行記録は legacy_migrations テーブルに保存され、重複移行を防止",
       "note4": "旧フィールド（数量 / 単価 / 運送費）は source_meta JSON に保存され、失われません"
+    },
+    "ecommerce": {
+      "title": "ECプラットフォーム連携",
+      "subtitle": "オンラインストアを接続し、後で注文を取り込む準備をします。現在のバージョンは接続の保存とテストのみ行います。",
+      "mvpNotice": "プレビュー機能：ストアの認証情報を保存し接続をテストするだけです。注文の取り込みはまだ有効ではなく、帳簿には何も書き込まれません。",
+      "desktopOnly": "EC連携はデスクトップ版でのみ利用できます。",
+      "addStore": "Shopifyストアを追加",
+      "noConnections": "まだストアが接続されていません。",
+      "shopDomainLabel": "ストアドメイン",
+      "shopDomainPlaceholder": "your-store.myshopify.com",
+      "shopDomainDesc": ".myshopify.com のストアドメインを入力してください。",
+      "tokenLabel": "Admin API アクセストークン",
+      "tokenPlaceholder": "shpat_...",
+      "tokenOverrideHint": "（空欄のままにすると保存済みトークンを使用）",
+      "labelLabel": "表示名（任意）",
+      "labelPlaceholder": "私の Shopify ストア",
+      "getTokenLink": "Admin API トークンの作成方法",
+      "testConnection": "接続をテスト",
+      "testOk": "接続しました：{name}",
+      "testFail": "接続に失敗しました",
+      "removeConfirm": "削除しますか？",
+      "enable": "有効化",
+      "disable": "無効化",
+      "statusEnabled": "有効",
+      "statusDisabled": "無効",
+      "neverTested": "未テスト",
+      "lastTest": "前回のテスト：{time}",
+      "lastTestOk": "成功",
+      "lastTestFail": "失敗",
+      "savedToast": "接続を保存しました",
+      "removedToast": "接続を削除しました",
+      "loadError": "接続の読み込みに失敗しました：{msg}",
+      "saveError": "保存に失敗しました：{msg}",
+      "deleteError": "削除に失敗しました：{msg}",
+      "security": {
+        "title": "認証情報のセキュリティ",
+        "item1": "ストアの認証情報は OS のセキュアストレージ（safeStorage）で暗号化され、この端末から外に出ることはありません。",
+        "item2": "暗号化はこの端末に紐づいています。別の端末でバックアップを復元した後は、トークンを再入力してください。",
+        "item3": "現在のバージョンは接続テストのみを行います。注文は取得されず、帳簿には何も書き込まれません。"
+      }
     }
   },
   "onboarding": {

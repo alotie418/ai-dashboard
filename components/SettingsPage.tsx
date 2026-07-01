@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { fetchSettings, saveSettings } from '../services/api';
 import { getTaxLabel, getCurrencySymbol } from './accountingHelpers';
 import ProvidersSection from './ProvidersSection';
+import EcommerceConnectionsSection from './EcommerceConnectionsSection';
 import LanguageSection from './LanguageSection';
 import AccountingSection from './AccountingSection';
 import CategoriesSection from './CategoriesSection';
@@ -109,6 +110,7 @@ const SettingsPage: React.FC = () => {
           <SettingsNavLink active={activeSection === 'company'} onClick={() => setActiveSection('company')} icon="fa-building" label={t('settings.nav.company')} />
           <SettingsNavLink active={activeSection === 'tax'} onClick={() => setActiveSection('tax')} icon="fa-percent" label={t('settings.nav.tax')} />
           <SettingsNavLink active={activeSection === 'ai'} onClick={() => setActiveSection('ai')} icon="fa-microchip" label={usLabel('setNavAi', 'settings.nav.ai')} />
+          <SettingsNavLink active={activeSection === 'ecommerce'} onClick={() => setActiveSection('ecommerce')} icon="fa-store" label={t('settings.nav.ecommerce')} />
           <SettingsNavLink active={activeSection === 'language'} onClick={() => setActiveSection('language')} icon="fa-language" label={t('settings.nav.language')} />
           <SettingsNavLink active={activeSection === 'accounting'} onClick={() => setActiveSection('accounting')} icon="fa-balance-scale" label={t('settings.nav.accounting')} />
           <SettingsNavLink active={activeSection === 'categories'} onClick={() => setActiveSection('categories')} icon="fa-tags" label={t('settings.nav.categories')} />
@@ -239,6 +241,8 @@ const SettingsPage: React.FC = () => {
                 <ProvidersSection />
               </div>
             )}
+
+            {!isLoading && !loadError && activeSection === 'ecommerce' && <EcommerceConnectionsSection />}
 
             {!isLoading && !loadError && activeSection === 'language' && <LanguageSection />}
             {!isLoading && !loadError && activeSection === 'accounting' && <AccountingSection />}

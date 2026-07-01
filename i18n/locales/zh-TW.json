@@ -85,7 +85,8 @@
       "fixedAssets": "固定資產",
       "equity": "權益/資本",
       "taxPayments": "已繳稅款",
-      "ledgerSummary": "台帳彙總"
+      "ledgerSummary": "台帳彙總",
+      "ecommerce": "電商平台"
     },
     "company": {
       "title": "企業基礎資料",
@@ -283,6 +284,46 @@
       "note2": "舊表資料不會刪除，可隨時回滾",
       "note3": "遷移記錄寫入 legacy_migrations 表，避免重複遷移",
       "note4": "舊欄位（數量 / 單價 / 運費）會保存到 source_meta JSON，不丟失"
+    },
+    "ecommerce": {
+      "title": "電商平台接入",
+      "subtitle": "連接線上商店，為後續匯入訂單做準備。目前版本僅儲存並測試連線。",
+      "mvpNotice": "預覽功能：僅儲存商店憑證並測試連線，暫不匯入訂單——不會寫入任何帳本資料。",
+      "desktopOnly": "電商連線僅在桌面版可用。",
+      "addStore": "新增 Shopify 商店",
+      "noConnections": "尚未連接任何商店。",
+      "shopDomainLabel": "商店網域",
+      "shopDomainPlaceholder": "your-store.myshopify.com",
+      "shopDomainDesc": "填寫你的 .myshopify.com 商店網域。",
+      "tokenLabel": "Admin API 存取權杖",
+      "tokenPlaceholder": "shpat_...",
+      "tokenOverrideHint": "（留空則沿用已儲存的權杖）",
+      "labelLabel": "顯示名稱（可選）",
+      "labelPlaceholder": "我的 Shopify 商店",
+      "getTokenLink": "如何建立 Admin API 權杖",
+      "testConnection": "測試連線",
+      "testOk": "已連線：{name}",
+      "testFail": "連線失敗",
+      "removeConfirm": "確認刪除？",
+      "enable": "啟用",
+      "disable": "停用",
+      "statusEnabled": "已啟用",
+      "statusDisabled": "已停用",
+      "neverTested": "尚未測試",
+      "lastTest": "上次測試：{time}",
+      "lastTestOk": "成功",
+      "lastTestFail": "失敗",
+      "savedToast": "連線已儲存",
+      "removedToast": "連線已刪除",
+      "loadError": "載入連線失敗：{msg}",
+      "saveError": "儲存失敗：{msg}",
+      "deleteError": "刪除失敗：{msg}",
+      "security": {
+        "title": "憑證安全",
+        "item1": "商店憑證由作業系統安全儲存（safeStorage）加密，絕不離開本裝置。",
+        "item2": "加密與本機綁定——在另一台裝置還原備份後，需重新輸入權杖。",
+        "item3": "目前版本僅測試連線，不擷取訂單、不寫入任何帳本資料。"
+      }
     }
   },
   "onboarding": {
