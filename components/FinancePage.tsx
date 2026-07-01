@@ -403,18 +403,26 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
                   const subHdr = (label: string) => (
                     <div className="px-1 pt-2 pb-0.5 text-[11px] font-bold tracking-wide text-[#191918]">{label}</div>
                   );
-                  // 顶部 KPI 小卡（每个数字只出现一次；差额=主题色卡·始终显示·不可隐藏）。
+                  // 每类一种浅色填充（浅色系）：KPI 小卡与下方对应分区卡「同色」——
+                  //   资产=emerald · 负债=amber · 所有者权益=violet · 平衡差额=blue（数字仍主题蓝）。
+                  const TINT = {
+                    assets: { kpi: 'bg-emerald-50 border-emerald-100', card: 'bg-emerald-50/40 border-emerald-100', head: 'bg-emerald-50 border-emerald-100' },
+                    liab:   { kpi: 'bg-amber-50 border-amber-100',     card: 'bg-amber-50/40 border-amber-100',     head: 'bg-amber-50 border-amber-100' },
+                    equity: { kpi: 'bg-violet-50 border-violet-100',   card: 'bg-violet-50/40 border-violet-100',   head: 'bg-violet-50 border-violet-100' },
+                    diff:   { kpi: 'bg-blue-50 border-blue-200' },
+                  };
+                  // 顶部 KPI 小卡（每个数字只出现一次；差额=蓝色卡+主题色数字·始终显示·不可隐藏）。
                   // 标签不 truncate（保留完整文案：长标签换行·flex 底对齐使各卡数字对齐）。
-                  const kpi = (label: string, v: number, accent?: boolean) => (
-                    <div className={`flex flex-col justify-between rounded-lg border px-3.5 py-3 overflow-hidden ${accent ? 'bg-primary/5 border-primary/25' : 'bg-[#f6f6f4] border-[#eceae6]'}`}>
+                  const kpi = (label: string, v: number, tint: string, accent?: boolean) => (
+                    <div className={`flex flex-col justify-between rounded-lg border px-3.5 py-3 overflow-hidden ${tint}`}>
                       <p className="text-xs font-bold tracking-wide text-[#191918] leading-tight">{label}</p>
                       <p className={`mt-1.5 font-mono text-base md:text-lg font-bold whitespace-nowrap tabular-nums ${accent ? 'text-primary' : 'text-[#191918]'}`}>{ccyAmt(v)}</p>
                     </div>
                   );
-                  // 分区卡（资产 / 负债 / 所有者权益）：独立卡片·高度自适应·空分区显示占位「—」
-                  const section = (title: string, empty: boolean, body: React.ReactNode) => (
-                    <div className="rounded-lg border border-[#e0ddd5] bg-white/70 overflow-hidden">
-                      <div className="px-4 py-2 text-xs font-bold text-[#191918] bg-[#f9f9f8]/70 border-b border-[#e0ddd5]/70">{title}</div>
+                  // 分区卡（资产 / 负债 / 所有者权益）：独立卡片·浅色填充与对应 KPI 同色·高度自适应·空分区显示占位「—」
+                  const section = (title: string, empty: boolean, tint: { card: string; head: string }, body: React.ReactNode) => (
+                    <div className={`rounded-lg border overflow-hidden ${tint.card}`}>
+                      <div className={`px-4 py-2 text-xs font-bold text-[#191918] border-b ${tint.head}`}>{title}</div>
                       <div className="px-3 py-2">
                         {empty ? <div className="py-4 text-center text-sm text-[#c4c4c2]">—</div> : body}
                       </div>
@@ -432,14 +440,14 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
                       <div className="p-4 md:p-5 space-y-4">
                         {/* 顶部 4 个 KPI 小卡：资产总计 / 负债合计 / 所有者权益 / 平衡差额（差额=主题色卡·始终显示） */}
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-                          {kpi(t('finance.balanceTotalAssets'), blk.totals.assets)}
-                          {kpi(t('finance.balanceTotalLiabilities'), blk.totals.liabilities)}
-                          {kpi(t('finance.balanceEquity'), blk.totals.equity)}
-                          {kpi(t('finance.balanceDifference'), blk.balanceDifference, true)}
+                          {kpi(t('finance.balanceTotalAssets'), blk.totals.assets, TINT.assets.kpi)}
+                          {kpi(t('finance.balanceTotalLiabilities'), blk.totals.liabilities, TINT.liab.kpi)}
+                          {kpi(t('finance.balanceEquity'), blk.totals.equity, TINT.equity.kpi)}
+                          {kpi(t('finance.balanceDifference'), blk.balanceDifference, TINT.diff.kpi, true)}
                         </div>
                         {/* 明细：桌面 3 张独立分区卡·高度自适应（消除空栏留白），移动端堆叠 */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-start">
-                          {section(t('finance.balanceAssets'), assetsEmpty, (
+                          {section(t('finance.balanceAssets'), assetsEmpty, TINT.assets, (
                             <>
                               {blk.assets.current.length > 0 && subHdr(t('finance.balanceCurrentAssets'))}
                               {blk.assets.current.map((l, i) => lineRow(l, 'ac', i))}
@@ -447,7 +455,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
                               {blk.assets.nonCurrent.map((l, i) => lineRow(l, 'anc', i))}
                             </>
                           ))}
-                          {section(t('finance.balanceLiabilities'), liabEmpty, (
+                          {section(t('finance.balanceLiabilities'), liabEmpty, TINT.liab, (
                             <>
                               {blk.liabilities.current.length > 0 && subHdr(t('finance.balanceCurrentLiabilities'))}
                               {blk.liabilities.current.map((l, i) => lineRow(l, 'lc', i))}
@@ -455,7 +463,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
                               {blk.liabilities.nonCurrent.map((l, i) => lineRow(l, 'lnc', i))}
                             </>
                           ))}
-                          {section(t('finance.balanceEquity'), equityEmpty, (
+                          {section(t('finance.balanceEquity'), equityEmpty, TINT.equity, (
                             <>
                               {blk.equity.map((l, i) => lineRow(l, 'eq', i))}
                             </>
