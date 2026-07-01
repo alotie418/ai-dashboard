@@ -399,15 +399,15 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
                       )}
                     </div>
                   );
-                  // 分区内小标题（流动 / 非流动）：结构性标签，加深加粗保证清晰（不用最浅灰）。
+                  // 分区内小标题（流动 / 非流动）：结构性标签，加黑加粗保证清晰。
                   const subHdr = (label: string) => (
-                    <div className="px-1 pt-2 pb-0.5 text-[11px] font-semibold tracking-wide text-[#6b6b69]">{label}</div>
+                    <div className="px-1 pt-2 pb-0.5 text-[11px] font-bold tracking-wide text-[#191918]">{label}</div>
                   );
                   // 顶部 KPI 小卡（每个数字只出现一次；差额=主题色卡·始终显示·不可隐藏）。
                   // 标签不 truncate（保留完整文案：长标签换行·flex 底对齐使各卡数字对齐）。
                   const kpi = (label: string, v: number, accent?: boolean) => (
                     <div className={`flex flex-col justify-between rounded-lg border px-3.5 py-3 overflow-hidden ${accent ? 'bg-primary/5 border-primary/25' : 'bg-[#f6f6f4] border-[#eceae6]'}`}>
-                      <p className="text-xs font-semibold tracking-wide text-[#5c5c5a] leading-tight">{label}</p>
+                      <p className="text-xs font-bold tracking-wide text-[#191918] leading-tight">{label}</p>
                       <p className={`mt-1.5 font-mono text-base md:text-lg font-bold whitespace-nowrap tabular-nums ${accent ? 'text-primary' : 'text-[#191918]'}`}>{ccyAmt(v)}</p>
                     </div>
                   );
