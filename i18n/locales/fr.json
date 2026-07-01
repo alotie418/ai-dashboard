@@ -323,7 +323,26 @@
         "item1": "Les identifiants de la boutique sont chiffrés par le stockage sécurisé du système (safeStorage) et ne quittent jamais cet appareil.",
         "item2": "Le chiffrement est lié à cette machine — après avoir restauré une sauvegarde sur un autre appareil, saisissez à nouveau le jeton.",
         "item3": "Cette version teste uniquement la connexion. Aucune commande n'est récupérée et rien n'est écrit dans votre comptabilité."
-      }
+      },
+      "tier1Label": "Libre-service (connexion immédiate)",
+      "tier2Label": "Nécessite app / OAuth / validation",
+      "tier3Label": "Prévu (ultérieurement)",
+      "statusAvailable": "Disponible",
+      "statusNeedsAuth": "Autorisation requise",
+      "statusPlanned": "Prévu",
+      "connect": "Ajouter une connexion",
+      "comingSoonHint": "Nécessite une application plateforme / OAuth / validation — bientôt disponible.",
+      "plannedHint": "Prévu pour une version ultérieure.",
+      "catalogTitle": "Répertoire des plateformes",
+      "storeUrlLabel": "URL de la boutique",
+      "storeUrlPlaceholder": "https://your-store.com",
+      "storeUrlDesc": "Saisissez l'URL de votre boutique WooCommerce (HTTPS uniquement).",
+      "consumerKeyLabel": "Consumer key",
+      "consumerKeyPlaceholder": "ck_...",
+      "consumerSecretLabel": "Consumer secret",
+      "consumerSecretPlaceholder": "cs_...",
+      "getKeysLink": "Comment générer des clés REST API",
+      "credsOverrideHint": "(laisser vide pour conserver les identifiants enregistrés)"
     }
   },
   "onboarding": {

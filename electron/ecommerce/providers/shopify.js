@@ -27,7 +27,8 @@ const META = {
   id: 'shopify',
   name: 'Shopify',
   transport: 'graphql',
-  authKind: 'token',
+  authMode: 'manual_token',
+  status: 'available',
   shopField: {
     key: 'shop',
     label: 'Store domain',

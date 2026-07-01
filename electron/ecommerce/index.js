@@ -13,15 +13,65 @@ const { getDb } = require('../db');
 const { assertValidProvider, publicMeta } = require('./providers/_providerInterface');
 
 const shopify = require('./providers/shopify');
+const woocommerce = require('./providers/woocommerce');
 
+// Functional registry: ONLY platforms with a real adapter live here. This is the
+// allowlist for save()/test() — anything not in PROVIDERS is rejected. The 9
+// display-only platforms below (CATALOG) deliberately have NO adapter, so the
+// backend refuses to store credentials or test them.
 const PROVIDERS = {
   shopify,
+  woocommerce,
 };
 
 // Fail fast at load: every registered provider must satisfy the interface.
 for (const id of Object.keys(PROVIDERS)) assertValidProvider(PROVIDERS[id]);
 
 const VALID_IDS = Object.keys(PROVIDERS);
+
+// Platform catalog (display metadata for ALL target platforms). Connectable
+// platforms (those in PROVIDERS) are merged from their adapter meta; the rest are
+// DISPLAY-ONLY: no adapter, no credential fields, no testConnection — the settings
+// UI shows their status and blocks any credential input, and save()/test() reject
+// them via the VALID_IDS allowlist. authMode values here are architectural
+// predictions and must be confirmed per each platform's official docs.
+const CATALOG = [
+  { id: 'shopify',      tier: 1 },  // available — from adapter
+  { id: 'woocommerce',  tier: 1 },  // available — from adapter
+  { id: 'amazon',       name: 'Amazon',       tier: 2, status: 'needs_authorization', authMode: 'oauth2',                docsUrl: 'https://developer-docs.amazon.com/sp-api/' },
+  { id: 'tiktok_shop',  name: 'TikTok Shop',  tier: 2, status: 'needs_authorization', authMode: 'oauth2',                docsUrl: 'https://partner.tiktokshop.com/' },
+  { id: 'temu',         name: 'TEMU',         tier: 2, status: 'needs_authorization', authMode: 'oauth2',                docsUrl: '' },
+  { id: 'shein',        name: 'SHEIN',        tier: 2, status: 'needs_authorization', authMode: 'oauth2',                docsUrl: '' },
+  { id: 'pinduoduo',    name: '拼多多',        tier: 3, status: 'planned',             authMode: 'signed_openapi',        docsUrl: '' },
+  { id: 'taobao_tmall', name: '淘宝 / 天猫',   tier: 3, status: 'planned',             authMode: 'signed_openapi',        docsUrl: '' },
+  { id: 'jd',           name: '京东',          tier: 3, status: 'planned',             authMode: 'signed_openapi',        docsUrl: '' },
+  { id: 'douyin',       name: '抖店',          tier: 3, status: 'planned',             authMode: 'signed_openapi',        docsUrl: '' },
+  { id: 'xiaohongshu',  name: '小红书',        tier: 3, status: 'planned',             authMode: 'partner_authorization', docsUrl: '' },
+];
+
+// Build the renderer-safe catalog: connectable entries carry the adapter's
+// publicMeta (fields/docs) + connectable:true; display-only entries carry static
+// metadata + connectable:false + empty credentialFields (so the UI renders NO input).
+function buildCatalog() {
+  return CATALOG.map((entry) => {
+    const adapter = PROVIDERS[entry.id];
+    if (adapter) {
+      return { ...publicMeta(adapter), tier: entry.tier, connectable: true };
+    }
+    return {
+      id: entry.id,
+      name: entry.name,
+      transport: null,
+      authMode: entry.authMode,
+      status: entry.status,
+      tier: entry.tier,
+      shopField: null,
+      credentialFields: [],
+      docsUrl: entry.docsUrl || '',
+      connectable: false,
+    };
+  });
+}
 
 // ── safeStorage helpers (same pattern as electron/ai/index.js) ──
 function getSafeStorage() {
@@ -68,10 +118,10 @@ function genId(platform) {
 // 管理面
 // ============================================================
 
-// The provider catalog (renderer-safe metas) — what platforms can be connected
-// and which fields the "add connection" form should collect.
+// The platform catalog (renderer-safe metas) — ALL target platforms with their
+// status; connectable ones also carry the fields the "add connection" form needs.
 function listProviders() {
-  return VALID_IDS.map((id) => publicMeta(PROVIDERS[id]));
+  return buildCatalog();
 }
 
 // Saved connections — NEVER exposes credentials. hasCredentials is a boolean flag only.
@@ -126,7 +176,7 @@ function save({ id, platform, label, shopIdentifier, credentials, storeCurrency,
   } else if (existing) {
     encrypted = existing.credentials_encrypted;
   } else {
-    throw new Error('新建连接需要填写凭证（如 Admin API token）');
+    throw new Error('新建连接需要填写凭证');
   }
 
   const finalId = existing ? existing.id : (id || genId(platform));

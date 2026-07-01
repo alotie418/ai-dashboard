@@ -2843,10 +2843,11 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   const allJson = JSON.stringify(list);
   ok(!allJson.includes(FAKE_ENC) && !/credentials_encrypted|"token"|api_key/i.test(allJson), '[EC1] full list() payload carries no credential material');
 
-  // EC2: provider catalog is renderer-safe metas (transport/authKind + a secret token field)
+  // EC2: platform catalog — Shopify connectable (graphql / manual_token / available) with a secret token field
   const provs = ecommerceCore.listProviders();
   const shop = provs.find((p) => p.id === 'shopify');
-  ok(!!shop && shop.transport === 'graphql' && shop.authKind === 'token', '[EC2] listProviders(): shopify = graphql/token');
+  ok(!!shop && shop.transport === 'graphql' && shop.authMode === 'manual_token' && shop.status === 'available' && shop.connectable === true,
+    '[EC2] catalog: shopify = graphql/manual_token/available/connectable');
   ok(Array.isArray(shop.credentialFields) && shop.credentialFields.some((f) => f.key === 'token' && f.secret === true), '[EC2] shopify exposes a secret token field');
 
   // EC3: setEnabled toggles enabled flag
@@ -2866,6 +2867,45 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   ok(shopifyAdapter._normalizeShopHost('My-Store') === 'my-store.myshopify.com', '[EC5] normalize bare handle → myshopify.com host');
   ok(shopifyAdapter._normalizeShopHost('https://demo.myshopify.com/admin') === 'demo.myshopify.com', '[EC5] normalize full URL → host');
   ok(shopifyAdapter._normalizeShopHost('not a domain!!') === null, '[EC5] reject invalid domain → null');
+
+  // EC6: WooCommerce is connectable via REST / key_secret with TWO secret fields (key + secret)
+  const woo = provs.find((p) => p.id === 'woocommerce');
+  ok(!!woo && woo.transport === 'rest' && woo.authMode === 'key_secret' && woo.status === 'available' && woo.connectable === true,
+    '[EC6] catalog: woocommerce = rest/key_secret/available/connectable');
+  ok(Array.isArray(woo.credentialFields)
+    && woo.credentialFields.some((f) => f.key === 'consumerKey' && f.secret === true)
+    && woo.credentialFields.some((f) => f.key === 'consumerSecret' && f.secret === true),
+    '[EC6] woocommerce exposes secret consumerKey + consumerSecret fields');
+
+  // EC7: the 9 non-connectable platforms are DISPLAY-ONLY (in catalog, but no adapter, no inputs)
+  ok(provs.length === 11, `[EC7] catalog lists all 11 platforms, got ${provs.length}`);
+  const amazon = provs.find((p) => p.id === 'amazon');
+  ok(!!amazon && amazon.status === 'needs_authorization' && amazon.connectable === false && amazon.credentialFields.length === 0,
+    '[EC7] amazon = needs_authorization / not connectable / no credential fields');
+  const pdd = provs.find((p) => p.id === 'pinduoduo');
+  ok(!!pdd && pdd.status === 'planned' && pdd.connectable === false && pdd.credentialFields.length === 0,
+    '[EC7] pinduoduo = planned / not connectable / no credential fields');
+  // whole catalog: exactly 2 connectable (shopify + woocommerce)
+  ok(provs.filter((p) => p.connectable).length === 2, '[EC7] exactly 2 connectable platforms (shopify + woocommerce)');
+
+  // EC8: backend WHITELIST — save/test of a non-connectable platform is rejected (no adapter)
+  let savedBad = null;
+  try { ecommerceCore.save({ platform: 'amazon', shopIdentifier: 'x', credentials: { token: 'y' } }); }
+  catch (e) { savedBad = e?.message || String(e); }
+  ok(savedBad && /unknown/i.test(savedBad), '[EC8] save({platform:amazon}) rejected (not in allowlist)');
+  let testedBad = null;
+  try { await ecommerceCore.test({ platform: 'amazon', shopIdentifier: 'x', credentials: { token: 'y' } }); }
+  catch (e) { testedBad = e?.message || String(e); }
+  ok(testedBad && /unknown/i.test(testedBad), '[EC8] test({platform:amazon}) rejected (not in allowlist)');
+  ok(db.prepare("SELECT COUNT(*) AS c FROM ecommerce_connections WHERE platform = 'amazon'").get().c === 0,
+    '[EC8] no amazon row was ever written');
+
+  // EC9: WooCommerce store-URL normaliser (pure, no network) — HTTPS-only, no http fallback
+  const wooAdapter = ecommerceCore._PROVIDERS.woocommerce;
+  ok(wooAdapter._normalizeSiteUrl('http://x.com').error === 'http', '[EC9] http:// URL rejected (https-only, no fallback)');
+  ok(wooAdapter._normalizeSiteUrl('https://x.com/').url === 'https://x.com', '[EC9] https URL → trailing slash stripped');
+  ok(wooAdapter._normalizeSiteUrl('shop.example.com').url === 'https://shop.example.com', '[EC9] bare domain → assume https');
+  ok(!!wooAdapter._normalizeSiteUrl('not a url').error, '[EC9] invalid URL → error');
 }
 
 if (failures.length) {
@@ -2873,4 +2913,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + fx-reference-conversion(multi-currency reference conversion read-only, PR-7B P3-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears) + ecommerce connections(EC1 no-credential-leak/EC2 provider catalog/EC3 setEnabled/EC4 remove/EC5 domain normalise)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + fx-reference-conversion(multi-currency reference conversion read-only, PR-7B P3-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears) + ecommerce connections(EC1 no-credential-leak/EC2 shopify catalog/EC3 setEnabled/EC4 remove/EC5 shopify-domain normalise/EC6 woocommerce key_secret catalog/EC7 11-platform catalog display-only/EC8 non-connectable save-test whitelist reject/EC9 woocommerce https-only URL normalise)) via real dispatch on :memory: DB');

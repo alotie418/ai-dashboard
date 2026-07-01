@@ -10,7 +10,8 @@
 //     id: string,                    // stable id, e.g. 'shopify'
 //     name: string,                  // display name, e.g. 'Shopify'
 //     transport: 'graphql' | 'rest', // how this provider talks to the platform
-//     authKind: 'token' | 'keySecret' | 'oauth',
+//     authMode: 'manual_token' | 'key_secret' | 'oauth2' | 'signed_openapi' | 'partner_authorization',
+//     status: 'available' | 'needs_authorization' | 'planned',  // catalog status (default 'available')
 //     shopField: { key, label, placeholder } | null,   // the non-secret store identifier the UI collects
 //     credentialFields: [{ key, label, placeholder, secret }],  // secret inputs the UI collects
 //     docsUrl: string,               // official API docs (UI "how to get a token" link)
@@ -25,12 +26,18 @@
 // NOTE: pullOrders / normalizeOrder are FUTURE-phase methods and are intentionally
 // NOT part of this MVP interface — this slice is connection settings only.
 
-const REQUIRED_META_FIELDS = ['id', 'name', 'transport', 'authKind'];
+const REQUIRED_META_FIELDS = ['id', 'name', 'transport', 'authMode'];
 const VALID_TRANSPORTS = ['graphql', 'rest'];
-const VALID_AUTH_KINDS = ['token', 'keySecret', 'oauth'];
+// The 5 generalised auth modes. A *registered* provider (one with a real adapter
+// in ECOMMERCE_PROVIDERS) must declare one of these; catalog-only display entries
+// may also carry oauth2 / signed_openapi / partner_authorization for information.
+const VALID_AUTH_MODES = ['manual_token', 'key_secret', 'oauth2', 'signed_openapi', 'partner_authorization'];
+const VALID_STATUSES = ['available', 'needs_authorization', 'planned'];
 
 // Runtime validator so every registered provider is guaranteed to satisfy the
-// contract (fail fast at module load, not at first user action).
+// contract (fail fast at module load, not at first user action). Only providers
+// with a real adapter go through this — they must be connectable (status
+// 'available') and expose testConnection().
 function assertValidProvider(adapter) {
   if (!adapter || typeof adapter !== 'object') {
     throw new Error('[ecommerce] provider must be an object');
@@ -45,8 +52,11 @@ function assertValidProvider(adapter) {
   if (!VALID_TRANSPORTS.includes(meta.transport)) {
     throw new Error(`[ecommerce] provider '${meta.id}' has invalid transport: ${meta.transport}`);
   }
-  if (!VALID_AUTH_KINDS.includes(meta.authKind)) {
-    throw new Error(`[ecommerce] provider '${meta.id}' has invalid authKind: ${meta.authKind}`);
+  if (!VALID_AUTH_MODES.includes(meta.authMode)) {
+    throw new Error(`[ecommerce] provider '${meta.id}' has invalid authMode: ${meta.authMode}`);
+  }
+  if (meta.status && !VALID_STATUSES.includes(meta.status)) {
+    throw new Error(`[ecommerce] provider '${meta.id}' has invalid status: ${meta.status}`);
   }
   if (typeof adapter.testConnection !== 'function') {
     throw new Error(`[ecommerce] provider '${meta.id}' must implement testConnection()`);
@@ -62,7 +72,8 @@ function publicMeta(adapter) {
     id: m.id,
     name: m.name,
     transport: m.transport,
-    authKind: m.authKind,
+    authMode: m.authMode,
+    status: m.status || 'available',
     shopField: m.shopField || null,
     credentialFields: (m.credentialFields || []).map((f) => ({
       key: f.key, label: f.label, placeholder: f.placeholder || '', secret: !!f.secret,
@@ -74,7 +85,8 @@ function publicMeta(adapter) {
 module.exports = {
   REQUIRED_META_FIELDS,
   VALID_TRANSPORTS,
-  VALID_AUTH_KINDS,
+  VALID_AUTH_MODES,
+  VALID_STATUSES,
   assertValidProvider,
   publicMeta,
 };
