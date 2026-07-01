@@ -445,8 +445,8 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
                           {kpi(t('finance.balanceEquity'), blk.totals.equity, TINT.equity.kpi)}
                           {kpi(t('finance.balanceDifference'), blk.balanceDifference, TINT.diff.kpi, true)}
                         </div>
-                        {/* 明细：桌面 3 张独立分区卡·高度自适应（消除空栏留白），移动端堆叠 */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-start">
+                        {/* 明细：桌面 3 张独立分区卡·等宽等高（items-stretch·统一尺寸·负债/权益与资产一致），移动端堆叠 */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-stretch">
                           {section(t('finance.balanceAssets'), assetsEmpty, TINT.assets, (
                             <>
                               {blk.assets.current.length > 0 && subHdr(t('finance.balanceCurrentAssets'))}
