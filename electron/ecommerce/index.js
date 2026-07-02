@@ -314,10 +314,16 @@ function listSyncLog({ connectionId, limit = 50 } = {}) {
   });
 }
 
+// PR-EC5a: staged → sales/sales_items commit (the ONLY ledger-writing path in this
+// module tree; two-pass all-or-nothing, see ./commit.js)
+const { commit } = require('./commit');
+
 module.exports = {
   listProviders, list, save, test, setEnabled, remove,
   // PR-EC3: pull → staging (no ledger write)
   pull, listStaged, listSyncLog,
+  // PR-EC5a: commit staged orders into the ledger
+  commit,
   // exported for tests
   _PROVIDERS: PROVIDERS, _VALID_IDS: VALID_IDS,
 };

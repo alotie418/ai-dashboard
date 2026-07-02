@@ -3016,9 +3016,362 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   }
 }
 
+// ───────────── PR-EC5a: staged-order COMMIT → sales/sales_items (mock data, no network) ─────────────
+// Proves the two-pass all-or-nothing commit, the idempotency layers (staged status →
+// deterministic PK → partial unique index), the D1–D8 decisions (shipping not posted /
+// status→payment matrix / refund block / connection-level dedup / no invented tax rate /
+// description-only keeps product_id NULL) and that NOTHING ELSE in the ledger moves.
+{
+  const FAKE_ENC = 'QkFTRTY0RFVNTVlDSVBIRVI=';
+  const seedConn = (db, id, { platform = 'shopify', label = 'My Store', currency = 'USD' } = {}) =>
+    db.prepare(`INSERT INTO ecommerce_connections (id, platform, label, shop_identifier, credentials_encrypted, store_currency, enabled)
+                VALUES (?, ?, ?, 'demo', ?, ?, 1)`).run(id, platform, label, FAKE_ENC, currency);
+
+  // normalized-order fixture (Shopify-shaped): Widget (matchable) + Mystery Thing
+  // (description-only), uniform 10% tax, shipping 5 (never posted, D1-A)
+  const mkOrder = (over = {}) => ({
+    platform: 'shopify', externalOrderId: 'ext-1', orderNumber: '#1001', orderStatus: 'PAID',
+    createdAt: '2026-06-01T10:00:00Z', updatedAt: '2026-06-02T00:00:00Z', currency: 'USD',
+    header: { customerRef: null },
+    items: [
+      { sku: 'SKU1', name: 'Widget', quantity: 2, unitPriceNet: 50, lineNet: 100, lineTax: 10, lineGross: 110, taxRate: 10 },
+      { sku: null, name: 'Mystery Thing', quantity: 1, unitPriceNet: 20, lineNet: 20, lineTax: 2, lineGross: 22, taxRate: 10 },
+    ],
+    shipping: { total: 5, lines: [] }, taxes: { total: 12, lines: [] }, fees: [], refunds: [],
+    totals: { subtotalNet: 120, taxTotal: 12, shippingTotal: 5, grandTotalGross: 137 },
+    ...over,
+  });
+
+  const seedStaged = (db, connId, n) => db.prepare(`INSERT INTO ecommerce_staged_orders
+      (connection_id, platform, external_order_id, order_number, order_status, order_created_at,
+       order_updated_at, currency, total_gross, normalized_json, match_status, stage_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unresolved', 'staged')`)
+    .run(connId, n.platform, n.externalOrderId, n.orderNumber, n.orderStatus, n.createdAt,
+      n.updatedAt, n.currency, n.totals?.grandTotalGross ?? null, JSON.stringify(n)).lastInsertRowid;
+
+  const addProduct = (db, id, name, active = 1) =>
+    db.prepare("INSERT INTO products (id, name, unit, is_active) VALUES (?, ?, 'piece', ?)").run(id, name, active);
+
+  // EC15: happy path — header=Σ items, provenance columns, staged backfill, report breakdown,
+  //        matched line visible to the EXISTING derived-inventory read path (no new logic)
+  {
+    const db = freshDb();
+    seedConn(db, 'ec-c1');
+    addProduct(db, 'prod-w', 'Widget');
+    // opening stock so the derived inventory read is observable: legacy header purchase, qty 10
+    db.prepare("INSERT INTO purchases (id, date, supplier, tons, product_id, amountWithoutTax, totalAmount) VALUES ('pu-w', '2026-01-01', 'S', 10, 'prod-w', 500, 565)").run();
+    const sid = seedStaged(db, 'ec-c1', mkOrder());
+    const r = ecommerceCore.commit({ connectionId: 'ec-c1', stagedIds: [sid] });
+    ok(r.success === 1 && r.failed === 0 && r.errors.length === 0, `[EC15] commit happy path succeeds, got ${JSON.stringify(r)}`);
+
+    const sale = db.prepare('SELECT * FROM sales WHERE id = ?').get(`sale-ec-${sid}`);
+    ok(!!sale, '[EC15] deterministic sale id sale-ec-<stagedId> written');
+    ok(sale.date === '2026-06-01' && sale.customer === 'My Store #1001', '[EC15] date = order date part; customer = connection label + order number (no PII)');
+    ok(approx(sale.totalAmount, 132) && approx(sale.amountWithoutTax, 120) && approx(sale.taxAmount, 12),
+      `[EC15] header money = Σ items (132/120/12), got ${sale.totalAmount}/${sale.amountWithoutTax}/${sale.taxAmount}`);
+    ok(sale.tons === 0 && sale.pricePerTon === 0 && sale.product_id === null, '[EC15] header neutralised (multi-line convention)');
+    ok(sale.shippingCost === 0, '[EC15] D1-A: platform shipping NOT posted (shippingCost=0)');
+    ok(sale.taxRate === 10, '[EC15] uniform line tax rate → header taxRate 10');
+    ok(sale.payment_status === 'paid' && approx(sale.paid_amount, 132), '[EC15] PAID → payment_status=paid, paid_amount=total');
+    ok(sale.invoiceStatus === '待开', '[EC15] invoiceStatus defaults 待开');
+    ok(sale.external_order_id === 'ext-1' && sale.platform_source === 'shopify' && sale.ecommerce_connection_id === 'ec-c1',
+      '[EC15] provenance columns written');
+
+    const items = db.prepare('SELECT * FROM sales_items WHERE sale_id = ? ORDER BY line_no').all(`sale-ec-${sid}`);
+    ok(items.length === 2, `[EC15] 2 line items written, got ${items.length}`);
+    ok(items[0]?.product_id === 'prod-w' && items[0]?.description === 'Widget' && items[0]?.quantity === 2, '[EC15] matched line carries product_id');
+    ok(items[1]?.product_id === null && items[1]?.description === 'Mystery Thing', '[EC15] description-only line carries NO product_id');
+    ok(approx((items[0]?.amount_net || 0) + (items[1]?.amount_net || 0), sale.amountWithoutTax)
+      && approx((items[0]?.amount_gross || 0) + (items[1]?.amount_gross || 0), sale.totalAmount),
+      '[EC15] header = Σ items invariant holds');
+
+    const staged = db.prepare('SELECT stage_status, committed_sale_id, error FROM ecommerce_staged_orders WHERE id = ?').get(sid);
+    ok(staged.stage_status === 'committed' && staged.committed_sale_id === `sale-ec-${sid}` && staged.error === null,
+      '[EC15] staged row backfilled committed + sale id (same transaction)');
+
+    const rep = r.committed[0];
+    ok(rep && approx(rep.grandTotalGross, 137) && approx(rep.committedTotalAmount, 132) && approx(rep.difference, 5),
+      `[EC15] report: platform 137 vs committed 132, diff 5, got ${JSON.stringify(rep)}`);
+    ok(rep && approx(rep.breakdown.shippingNotPosted, 5) && approx(rep.breakdown.otherDifference, 0),
+      '[EC15] diff breakdown = shipping 5 (not posted) + other 0');
+    ok(rep && rep.lines.total === 2 && rep.lines.matched === 1 && rep.lines.descriptionOnly === 1, '[EC15] line match summary in report');
+
+    // derived inventory (EXISTING read path — D4): matched line consumes stock 10−2=8
+    const inv = await call('GET', '/api/inventory/summary', null);
+    const wid = inv.details.find((x) => x.product_id === 'prod-w');
+    ok(wid && approx(wid.qtyOnHand, 8), `[EC15] matched line visible to derived inventory (10−2=8), got ${wid?.qtyOnHand}`);
+  }
+
+  // EC16: a fully description-only order commits with product_id NULL everywhere and moves NO inventory
+  {
+    const db = freshDb();
+    seedConn(db, 'ec-c2');
+    addProduct(db, 'prod-x', 'Xylo');
+    db.prepare("INSERT INTO purchases (id, date, supplier, tons, product_id) VALUES ('pu-x', '2026-01-01', 'S', 7, 'prod-x')").run();
+    const n = mkOrder({ externalOrderId: 'ext-2', orderNumber: '#1002',
+      items: [{ sku: null, name: 'Nobody Knows', quantity: 3, unitPriceNet: 10, lineNet: 30, lineTax: 3, lineGross: 33, taxRate: 10 }],
+      totals: { subtotalNet: 30, taxTotal: 3, shippingTotal: 0, grandTotalGross: 33 } });
+    const sid = seedStaged(db, 'ec-c2', n);
+    const r = ecommerceCore.commit({ connectionId: 'ec-c2', stagedIds: [sid] });
+    ok(r.success === 1, `[EC16] description-only order commits, got ${JSON.stringify(r.errors)}`);
+    const item = db.prepare('SELECT product_id, description FROM sales_items WHERE sale_id = ?').get(`sale-ec-${sid}`);
+    ok(item.product_id === null && item.description === 'Nobody Knows', '[EC16] description-only line: product_id stays NULL');
+    const inv = await call('GET', '/api/inventory/summary', null);
+    ok(approx(inv.details.find((x) => x.product_id === 'prod-x')?.qtyOnHand, 7),
+      '[EC16] description-only commit does NOT move derived inventory');
+  }
+
+  // EC17: ambiguous product blocks the order; the WHOLE selection is all-or-nothing
+  {
+    const db = freshDb();
+    seedConn(db, 'ec-c3');
+    addProduct(db, 'p-d1', 'Dup'); addProduct(db, 'p-d2', 'Dup'); addProduct(db, 'p-w', 'Widget');
+    const badId = seedStaged(db, 'ec-c3', mkOrder({ externalOrderId: 'ext-a', orderNumber: '#A',
+      items: [{ name: 'Dup', quantity: 1, unitPriceNet: 10, lineNet: 10, lineTax: 1, lineGross: 11, taxRate: 10 }],
+      totals: { subtotalNet: 10, taxTotal: 1, shippingTotal: 0, grandTotalGross: 11 } }));
+    const goodId = seedStaged(db, 'ec-c3', mkOrder({ externalOrderId: 'ext-b', orderNumber: '#B' }));
+    const r = ecommerceCore.commit({ connectionId: 'ec-c3', stagedIds: [badId, goodId] });
+    ok(r.success === 0 && r.failed === 2, `[EC17] any ambiguous order → whole selection posts NOTHING, got success=${r.success}/failed=${r.failed}`);
+    ok(r.errors.length === 1 && r.errors[0].stagedId === badId && r.errors[0].reasons.includes('ambiguous_product')
+      && Array.isArray(r.errors[0].detail) && r.errors[0].detail.includes('Dup'),
+      `[EC17] ambiguous reported with machine code + product name detail, got ${JSON.stringify(r.errors)}`);
+    ok(db.prepare('SELECT COUNT(*) AS c FROM sales').get().c === 0 && db.prepare('SELECT COUNT(*) AS c FROM sales_items').get().c === 0,
+      '[EC17] all-or-nothing: zero ledger rows');
+    ok(db.prepare("SELECT COUNT(*) AS c FROM ecommerce_staged_orders WHERE stage_status='staged'").get().c === 2,
+      '[EC17] both staged rows still staged');
+  }
+
+  // EC18: idempotency layers — already_committed → deterministic PK → partial unique index
+  {
+    const db = freshDb();
+    seedConn(db, 'ec-c4');
+    const sid = seedStaged(db, 'ec-c4', mkOrder({ externalOrderId: 'ext-i1', orderNumber: '#I1' }));
+    const r1 = ecommerceCore.commit({ connectionId: 'ec-c4', stagedIds: [sid] });
+    ok(r1.success === 1, '[EC18] first commit succeeds');
+    const r2 = ecommerceCore.commit({ connectionId: 'ec-c4', stagedIds: [sid] });
+    ok(r2.success === 0 && r2.errors[0].reasons.includes('already_committed'), '[EC18] re-commit rejected (already_committed)');
+    ok(db.prepare('SELECT COUNT(*) AS c FROM sales').get().c === 1, '[EC18] still exactly one sale after re-commit');
+
+    // layer 2: tamper the staged status back → Pass-1 duplicate precheck catches it with a
+    // readable per-order code (the deterministic PK stays as the DB backstop underneath)
+    db.prepare("UPDATE ecommerce_staged_orders SET stage_status='staged', committed_sale_id=NULL WHERE id = ?").run(sid);
+    const r3 = ecommerceCore.commit({ connectionId: 'ec-c4', stagedIds: [sid] });
+    ok(r3.success === 0 && r3.errors[0].reasons.includes('duplicate_external_order'), `[EC18] tampered staged row → duplicate_external_order, no double post, got ${JSON.stringify(r3.errors)}`);
+    ok(db.prepare('SELECT COUNT(*) AS c FROM sales').get().c === 1, '[EC18] sale count unchanged after blocked tamper');
+    ok(db.prepare('SELECT stage_status FROM ecommerce_staged_orders WHERE id = ?').get(sid).stage_status === 'staged',
+      '[EC18] blocked tampered row stays un-marked (nothing half-done)');
+
+    // layer 3: same (connection, external id) already in sales from ANOTHER row → precheck
+    // rejects per-order (the partial unique index is the DB backstop, covered in test-migrations)
+    db.prepare("INSERT INTO sales (id, date, external_order_id, platform_source, ecommerce_connection_id) VALUES ('sale-manual-dup', '2026-06-03', 'ext-i2', 'shopify', 'ec-c4')").run();
+    const sid2 = seedStaged(db, 'ec-c4', mkOrder({ externalOrderId: 'ext-i2', orderNumber: '#I2' }));
+    const r4 = ecommerceCore.commit({ connectionId: 'ec-c4', stagedIds: [sid2] });
+    ok(r4.success === 0 && r4.errors[0].reasons.includes('duplicate_external_order'), '[EC18] existing (connection, external id) in sales → duplicate_external_order');
+    ok(db.prepare("SELECT COUNT(*) AS c FROM sales WHERE external_order_id = 'ext-i2'").get().c === 1, '[EC18] no duplicate ledger row for ext-i2');
+  }
+
+  // EC19: guard matrix — every rejection is a machine code and writes NOTHING
+  {
+    const db = freshDb();
+    // store currency unset → reject, never guess a currency
+    seedConn(db, 'ec-nc', { currency: null });
+    const s1 = seedStaged(db, 'ec-nc', mkOrder({ externalOrderId: 'g1' }));
+    const rn = ecommerceCore.commit({ connectionId: 'ec-nc', stagedIds: [s1] });
+    ok(rn.success === 0 && rn.errors[0].reasons.includes('store_currency_missing'), '[EC19] store_currency unset → reject (no currency guessing)');
+
+    seedConn(db, 'ec-g', {}); // USD
+    const cases = [
+      ['currency_mismatch', mkOrder({ externalOrderId: 'g2', currency: 'EUR' })],
+      ['has_refunds', mkOrder({ externalOrderId: 'g3', refunds: [{ id: 'r1', createdAt: null, amount: 5 }] })],
+      ['amount_inconsistent', mkOrder({ externalOrderId: 'g5',
+        items: [{ name: 'W', quantity: 1, unitPriceNet: 100, lineNet: 100, lineTax: 10, lineGross: 120, taxRate: 10 }],
+        totals: { subtotalNet: 100, taxTotal: 10, shippingTotal: 0, grandTotalGross: 120 } })],   // 行内 net+tax≠gross
+      ['amount_inconsistent', mkOrder({ externalOrderId: 'g6',
+        totals: { subtotalNet: 90, taxTotal: 12, shippingTotal: 5, grandTotalGross: 137 } })],     // Σ行≠subtotal：未分摊整单折扣被拦截
+      ['amount_missing', mkOrder({ externalOrderId: 'g7',
+        items: [{ name: 'W', quantity: 1, unitPriceNet: null, lineNet: null, lineTax: null, lineGross: null, taxRate: null }],
+        totals: { subtotalNet: 0, taxTotal: 0, shippingTotal: 0, grandTotalGross: 0 } })],
+      ['totals_missing', mkOrder({ externalOrderId: 'g8', totals: { subtotalNet: null, taxTotal: null, shippingTotal: null, grandTotalGross: null } })],
+      ['empty_items', mkOrder({ externalOrderId: 'g9', items: [], totals: { subtotalNet: 0, taxTotal: 0, shippingTotal: 0, grandTotalGross: 0 } })],
+      ['date_missing', mkOrder({ externalOrderId: 'g10', createdAt: null })],
+      ['quantity_invalid', mkOrder({ externalOrderId: 'g11',
+        items: [{ name: 'W', quantity: null, unitPriceNet: 10, lineNet: 10, lineTax: 0, lineGross: 10, taxRate: null }],
+        totals: { subtotalNet: 10, taxTotal: 0, shippingTotal: 0, grandTotalGross: 10 } })],
+      ['currency_missing', mkOrder({ externalOrderId: 'g12', currency: null })],
+      // tax-inclusive-price store shape (Shopify taxesIncluded): lineGross=net+tax OVERSTATES
+      // the real charge (grand 120 = tax-embedded subtotal) → reconciliation tripwire fires,
+      // revenue is never posted inflated
+      ['total_mismatch', mkOrder({ externalOrderId: 'g13',
+        items: [{ name: 'W', quantity: 1, unitPriceNet: 120, lineNet: 120, lineTax: 20, lineGross: 140, taxRate: 20 }],
+        totals: { subtotalNet: 120, taxTotal: 20, shippingTotal: 0, grandTotalGross: 120 } })],
+    ];
+    for (const [code, n] of cases) {
+      const sid = seedStaged(db, 'ec-g', n);
+      const res = ecommerceCore.commit({ connectionId: 'ec-g', stagedIds: [sid] });
+      ok(res.success === 0 && res.errors[0]?.reasons.includes(code), `[EC19] guard '${code}' rejects, got ${JSON.stringify(res.errors[0]?.reasons)}`);
+    }
+    ok(db.prepare('SELECT COUNT(*) AS c FROM sales').get().c === 0, '[EC19] every guarded rejection wrote NOTHING');
+  }
+
+  // EC20: D2 status → payment_status matrix (both platforms, accepted AND rejected states)
+  {
+    const db = freshDb();
+    seedConn(db, 'ec-ms', { platform: 'shopify' });
+    seedConn(db, 'ec-mw', { platform: 'woocommerce' });
+    const matrix = [
+      ['shopify', 'ec-ms', 'PAID', 'paid'], ['shopify', 'ec-ms', 'PENDING', 'unpaid'], ['shopify', 'ec-ms', 'AUTHORIZED', 'unpaid'],
+      ['shopify', 'ec-ms', 'PARTIALLY_PAID', null], ['shopify', 'ec-ms', 'PARTIALLY_REFUNDED', null],
+      ['shopify', 'ec-ms', 'REFUNDED', null], ['shopify', 'ec-ms', 'VOIDED', null], ['shopify', 'ec-ms', 'EXPIRED', null],
+      ['woocommerce', 'ec-mw', 'completed', 'paid'], ['woocommerce', 'ec-mw', 'processing', 'paid'],
+      ['woocommerce', 'ec-mw', 'pending', 'unpaid'], ['woocommerce', 'ec-mw', 'on-hold', 'unpaid'],
+      ['woocommerce', 'ec-mw', 'cancelled', null], ['woocommerce', 'ec-mw', 'refunded', null],
+      ['woocommerce', 'ec-mw', 'failed', null], ['woocommerce', 'ec-mw', 'trash', null],
+      // case normalisation: shopify statuses compare uppercased, woo lowercased
+      ['shopify', 'ec-ms', 'paid', 'paid'], ['woocommerce', 'ec-mw', 'Completed', 'paid'],
+    ];
+    let k = 0;
+    for (const [platform, connId, status, expected] of matrix) {
+      const n = mkOrder({ platform, externalOrderId: `m-${k++}`, orderStatus: status });
+      const sid = seedStaged(db, connId, n);
+      const res = ecommerceCore.commit({ connectionId: connId, stagedIds: [sid] });
+      if (expected === null) {
+        ok(res.success === 0 && res.errors[0]?.reasons.includes('status_not_committable'),
+          `[EC20] ${platform}/${status} → rejected (status_not_committable), got ${JSON.stringify(res.errors[0]?.reasons)}`);
+      } else {
+        const sale = db.prepare('SELECT payment_status, paid_amount, totalAmount FROM sales WHERE id = ?').get(`sale-ec-${sid}`);
+        ok(res.success === 1 && sale?.payment_status === expected,
+          `[EC20] ${platform}/${status} → payment_status=${expected}, got ${JSON.stringify({ errors: res.errors, sale })}`);
+        ok(sale && (expected === 'paid' ? approx(sale.paid_amount, sale.totalAmount) : sale.paid_amount === 0),
+          `[EC20] ${platform}/${status} → paid_amount ${expected === 'paid' ? '= total' : '= 0'}`);
+      }
+    }
+  }
+
+  // EC21: D8 — mixed / absent line tax rates → header taxRate NULL (never the legacy 13 fallback)
+  {
+    const db = freshDb();
+    seedConn(db, 'ec-tx');
+    const mixed = mkOrder({ externalOrderId: 't1', orderNumber: '#T1',
+      items: [
+        { name: 'A', quantity: 1, unitPriceNet: 100, lineNet: 100, lineTax: 10, lineGross: 110, taxRate: 10 },
+        { name: 'B', quantity: 1, unitPriceNet: 50, lineNet: 50, lineTax: 2.5, lineGross: 52.5, taxRate: 5 },
+      ],
+      totals: { subtotalNet: 150, taxTotal: 12.5, shippingTotal: 0, grandTotalGross: 162.5 } });
+    const sid1 = seedStaged(db, 'ec-tx', mixed);
+    const r1 = ecommerceCore.commit({ connectionId: 'ec-tx', stagedIds: [sid1] });
+    const sale1 = db.prepare('SELECT taxRate FROM sales WHERE id = ?').get(`sale-ec-${sid1}`);
+    ok(r1.success === 1 && sale1.taxRate === null, `[EC21] mixed line tax rates → header taxRate NULL (never 13), got ${sale1?.taxRate}`);
+
+    const noRate = mkOrder({ externalOrderId: 't2', orderNumber: '#T2',
+      items: [{ name: 'C', quantity: 1, unitPriceNet: 10, lineNet: 10, lineTax: 0, lineGross: 10, taxRate: null }],
+      totals: { subtotalNet: 10, taxTotal: 0, shippingTotal: 0, grandTotalGross: 10 } });
+    const sid2 = seedStaged(db, 'ec-tx', noRate);
+    const r2 = ecommerceCore.commit({ connectionId: 'ec-tx', stagedIds: [sid2] });
+    const sale2 = db.prepare('SELECT taxRate FROM sales WHERE id = ?').get(`sale-ec-${sid2}`);
+    ok(r2.success === 1 && sale2.taxRate === null, '[EC21] absent line tax rate → header taxRate NULL');
+  }
+
+  // EC22: commit has NO side effects beyond sales/sales_items/staged; pull never overwrites committed
+  {
+    const db = freshDb();
+    seedConn(db, 'ec-se');
+    const sid = seedStaged(db, 'ec-se', mkOrder({ externalOrderId: 'se-1', orderNumber: '#SE1' }));
+    const before = {
+      purchases: db.prepare('SELECT COUNT(*) AS c FROM purchases').get().c,
+      txns: db.prepare('SELECT COUNT(*) AS c FROM transactions').get().c,
+      syncLogs: db.prepare('SELECT COUNT(*) AS c FROM ecommerce_sync_log').get().c,
+      conn: db.prepare("SELECT last_cursor, last_order_updated_at FROM ecommerce_connections WHERE id='ec-se'").get(),
+    };
+    const r = ecommerceCore.commit({ connectionId: 'ec-se', stagedIds: [sid] });
+    ok(r.success === 1, '[EC22] commit ok');
+    ok(db.prepare('SELECT COUNT(*) AS c FROM purchases').get().c === before.purchases, '[EC22] purchases untouched');
+    ok(db.prepare('SELECT COUNT(*) AS c FROM transactions').get().c === before.txns, '[EC22] transactions untouched (no AR/AP entity, no txn write)');
+    ok(db.prepare('SELECT COUNT(*) AS c FROM ecommerce_sync_log').get().c === before.syncLogs, '[EC22] commit writes NO sync_log row');
+    const connAfter = db.prepare("SELECT last_cursor, last_order_updated_at FROM ecommerce_connections WHERE id='ec-se'").get();
+    ok(connAfter.last_cursor === before.conn.last_cursor && connAfter.last_order_updated_at === before.conn.last_order_updated_at,
+      '[EC22] pull watermark/cursor untouched by commit');
+
+    // pull after commit must NOT overwrite the committed staged row (upsert skips committed)
+    const changed = mkOrder({ externalOrderId: 'se-1', orderNumber: '#SE1-CHANGED', updatedAt: '2026-07-01T00:00:00Z' });
+    const providers = { shopify: { meta: { id: 'shopify', name: 'M', transport: 'graphql', authMode: 'manual_token' },
+      testConnection: async () => ({ ok: true }),
+      async pullOrdersPage() { return { rawOrders: [changed], hasNextPage: false, nextCursor: null }; },
+      normalizeOrder: (raw) => raw } };
+    const pr = await ecommerceCore.pull('ec-se', { providers, creds: { token: 'x' } });
+    ok(pr.stagedNew === 0 && pr.stagedUpdated === 0, `[EC22] re-pull of a committed order is SKIPPED (no overwrite), got ${JSON.stringify(pr)}`);
+    const st = db.prepare('SELECT stage_status, order_number, committed_sale_id FROM ecommerce_staged_orders WHERE id = ?').get(sid);
+    ok(st.stage_status === 'committed' && st.order_number === '#SE1' && st.committed_sale_id === `sale-ec-${sid}`,
+      '[EC22] committed staged row content unchanged after pull');
+  }
+
+  // EC23: input hardening — bad connection / empty or oversized selection throw; duplicate ids
+  //        dedupe (no double post); another connection's staged id → not_found
+  {
+    const db = freshDb();
+    seedConn(db, 'ec-in');
+    await expectThrow(async () => ecommerceCore.commit({ connectionId: 'nope', stagedIds: [1] }), '[EC23] unknown connection');
+    await expectThrow(async () => ecommerceCore.commit({ connectionId: 'ec-in', stagedIds: [] }), '[EC23] empty stagedIds');
+    await expectThrow(async () => ecommerceCore.commit({ connectionId: 'ec-in', stagedIds: Array.from({ length: 101 }, (_, i) => i + 1) }), '[EC23] >100 stagedIds');
+    const sid = seedStaged(db, 'ec-in', mkOrder({ externalOrderId: 'in-1' }));
+    const r = ecommerceCore.commit({ connectionId: 'ec-in', stagedIds: [sid, sid, String(sid)] });
+    ok(r.success === 1 && db.prepare('SELECT COUNT(*) AS c FROM sales').get().c === 1, '[EC23] duplicated stagedIds deduped → exactly one post');
+    seedConn(db, 'ec-in2');
+    const sidOther = seedStaged(db, 'ec-in2', mkOrder({ externalOrderId: 'in-2' }));
+    const r2 = ecommerceCore.commit({ connectionId: 'ec-in', stagedIds: [sidOther] });
+    ok(r2.success === 0 && r2.errors[0].reasons.includes('not_found'), "[EC23] another connection's staged id → not_found");
+  }
+
+  // EC24: adapter normalization refinements from the EC5a review — Woo discounted lines use
+  //        post-discount totals (couponed orders stay committable), Woo free orders keep
+  //        subtotalNet=0 (not null), Shopify multi-jurisdiction lines report taxRate NULL
+  {
+    const woo = ecommerceCore._PROVIDERS.woocommerce;
+    const dn = woo.normalizeOrder({
+      id: 901, number: '901', status: 'completed', date_created_gmt: '2026-06-01T00:00:00', currency: 'USD',
+      total: '99.00', total_tax: '9.00', shipping_total: '0.00', customer_id: 1,
+      line_items: [{ name: 'Coupon Item', quantity: 1, subtotal: '100.00', total: '90.00', total_tax: '9.00' }],
+      shipping_lines: [], tax_lines: [], fee_lines: [], refunds: [],
+    });
+    ok(dn.items[0].lineNet === 90 && dn.items[0].lineGross === 99,
+      `[EC24] woo discounted line: net = post-discount total (90), gross = 99, got ${dn.items[0].lineNet}/${dn.items[0].lineGross}`);
+    ok(approx(dn.totals.subtotalNet, 90), '[EC24] woo subtotalNet follows discounted lines');
+    // …and such an order now COMMITS (line consistency + whole-order reconciliation both hold)
+    const db = freshDb();
+    seedConn(db, 'ec-wd', { platform: 'woocommerce' });
+    const sid = seedStaged(db, 'ec-wd', dn);
+    const r = ecommerceCore.commit({ connectionId: 'ec-wd', stagedIds: [sid] });
+    ok(r.success === 1 && approx(db.prepare('SELECT totalAmount FROM sales WHERE id = ?').get(`sale-ec-${sid}`)?.totalAmount, 99),
+      `[EC24] couponed woo order commits at the discounted amount (99), got ${JSON.stringify(r.errors)}`);
+
+    const free = woo.normalizeOrder({
+      id: 902, number: '902', status: 'completed', date_created_gmt: '2026-06-01T00:00:00', currency: 'USD',
+      total: '0.00', total_tax: '0.00', shipping_total: '0.00', customer_id: 1,
+      line_items: [{ name: 'Giveaway', quantity: 1, subtotal: '0.00', total: '0.00', total_tax: '0.00' }],
+      shipping_lines: [], tax_lines: [], fee_lines: [], refunds: [],
+    });
+    ok(free.totals.subtotalNet === 0, '[EC24] woo free order keeps subtotalNet=0 (not collapsed to null)');
+
+    const multi = ecommerceCore._PROVIDERS.shopify.normalizeOrder({
+      id: 'gid://shopify/Order/903', name: '#903', createdAt: '2026-06-01T00:00:00Z', updatedAt: '2026-06-01T00:00:00Z',
+      displayFinancialStatus: 'PAID', currentTotalPriceSet: { shopMoney: { amount: '112.00', currencyCode: 'CAD' } },
+      subtotalPriceSet: { shopMoney: { amount: '100.00' } }, totalTaxSet: { shopMoney: { amount: '12.00' } },
+      totalShippingPriceSet: { shopMoney: { amount: '0.00' } }, customer: null,
+      lineItems: { edges: [{ node: { sku: null, title: 'CA Item', quantity: 1,
+        originalUnitPriceSet: { shopMoney: { amount: '100.00' } },
+        taxLines: [
+          { title: 'GST', ratePercentage: 5, priceSet: { shopMoney: { amount: '5.00' } } },
+          { title: 'PST', ratePercentage: 7, priceSet: { shopMoney: { amount: '7.00' } } },
+        ] } }] },
+      shippingLines: { edges: [] }, taxLines: [], refunds: [],
+    });
+    ok(multi.items[0].taxRate === null && multi.items[0].lineTax === 12,
+      '[EC24] shopify multi-jurisdiction line: taxRate NULL (never just the first rate), lineTax = Σ taxLines');
+  }
+}
+
 if (failures.length) {
   console.error(`✗ handlers: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + fx-reference-conversion(multi-currency reference conversion read-only, PR-7B P3-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears) + ecommerce connections(EC1 no-credential-leak/EC2 shopify catalog/EC3 setEnabled/EC4 remove/EC5 shopify-domain normalise/EC6 woocommerce key_secret catalog/EC7 11-platform catalog display-only/EC8 non-connectable save-test whitelist reject/EC9 woocommerce https-only URL normalise) + ecommerce pull→staging(EC10 normalizeOrder pure/no-PII/EC11 pull ok staged+watermark+no-ledger-write/EC12 idempotent re-pull/EC13 20-page cap→partial/EC14 error→sync_log+redacted+watermark-frozen)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + fx-reference-conversion(multi-currency reference conversion read-only, PR-7B P3-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears) + ecommerce connections(EC1 no-credential-leak/EC2 shopify catalog/EC3 setEnabled/EC4 remove/EC5 shopify-domain normalise/EC6 woocommerce key_secret catalog/EC7 11-platform catalog display-only/EC8 non-connectable save-test whitelist reject/EC9 woocommerce https-only URL normalise) + ecommerce pull→staging(EC10 normalizeOrder pure/no-PII/EC11 pull ok staged+watermark+no-ledger-write/EC12 idempotent re-pull/EC13 20-page cap→partial/EC14 error→sync_log+redacted+watermark-frozen) + ecommerce staged→commit(EC15 happy path header=Σitems+provenance+report-breakdown+derived-inventory/EC16 description-only NULL product_id no-inventory-move/EC17 ambiguous blocks + all-or-nothing/EC18 idempotency staged-status→PK→partial-unique/EC19 guard matrix zero-write/EC20 status→payment matrix/EC21 mixed-rate header taxRate NULL/EC22 no side effects + pull skips committed/EC23 input hardening+dedupe/EC24 adapter refinements woo-discount+free-order+multi-taxline)) via real dispatch on :memory: DB');

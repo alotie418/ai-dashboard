@@ -811,6 +811,33 @@ const MIGRATIONS = [
     d.exec('CREATE INDEX IF NOT EXISTS idx_sync_log_conn ON ecommerce_sync_log(connection_id, run_at)');
     console.log('[db] v22: ecommerce_staged_orders + ecommerce_sync_log + connection sync columns ready (pull→staging; NO ledger write)');
   },
+
+  // v23: sales e-commerce provenance + commit idempotency (PR-EC5a). Additive only.
+  //   Adds 3 NULLABLE provenance columns to sales so a committed platform order is
+  //   traceable and can NEVER be double-posted:
+  //     - external_order_id       platform order id (NULL on every manual / CSV record)
+  //     - platform_source         'shopify' | 'woocommerce' | ... (display / filter only)
+  //     - ecommerce_connection_id source connection id (plain column, NO FK — historical
+  //       snapshot; deleting a connection must not orphan or block its committed sales)
+  //   Idempotency: PARTIAL unique index on (ecommerce_connection_id, external_order_id) —
+  //   scoped to the CONNECTION, not the platform, because WooCommerce order ids are
+  //   per-site sequential integers: two stores on the same platform can both have an
+  //   order "1005". Manual / CSV rows keep all three columns NULL and are ignored by the
+  //   partial index (WHERE both NOT NULL). Carries NO accounting meaning: no money / tax /
+  //   status column changes; reports / inventory / dashboards read the same columns as
+  //   before. No backfill. Idempotent via PRAGMA table_info guards + IF NOT EXISTS.
+  (d) => {
+    const cols = d.prepare('PRAGMA table_info(sales)').all().map((c) => c.name);
+    const add = (name, def) => { if (!cols.includes(name)) d.exec(`ALTER TABLE sales ADD COLUMN ${name} ${def}`); };
+    add('external_order_id', 'TEXT');
+    add('platform_source', 'TEXT');
+    add('ecommerce_connection_id', 'TEXT');
+    d.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_ec_conn_order
+      ON sales(ecommerce_connection_id, external_order_id)
+      WHERE ecommerce_connection_id IS NOT NULL AND external_order_id IS NOT NULL`);
+    d.exec('CREATE INDEX IF NOT EXISTS idx_sales_platform_source ON sales(platform_source)');
+    console.log('[db] v23: sales e-commerce provenance columns + partial unique index ready (commit idempotency; NO money/status change)');
+  },
 ];
 
 function runMigrations(d) {
