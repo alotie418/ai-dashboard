@@ -3369,9 +3369,122 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   }
 }
 
+// ───────────── EC25: WooCommerce end-to-end — raw JSON → real normalizeOrder → real pull() →
+//                staged → real commit() → sales/sales_items (mock ADAPTER only, no network) ─────────────
+// The strongest local simulation of the WooCommerce ledger path short of a real store: the mock
+// adapter's pullOrdersPage returns RAW WooCommerce JSON and its normalizeOrder is the PRODUCTION
+// woocommerce.normalizeOrder (not the passthrough EC11 uses). This links the two previously
+// separate halves (EC11 pull, EC15 commit) into one continuous chain and proves the same guard
+// codes fire on rows produced by the real normalize+pull path — not just on hand-built fixtures.
+{
+  const FAKE_ENC = 'QkFTRTY0RFVNTVlDSVBIRVI=';
+  const wooReal = ecommerceCore._PROVIDERS.woocommerce;
+  const connId = 'ec-woo-e2e';
+
+  const db = freshDb();
+  db.prepare(`INSERT INTO ecommerce_connections (id, platform, label, shop_identifier, credentials_encrypted, store_currency, enabled)
+              VALUES (?, 'woocommerce', 'Woo Store', 'demo', ?, 'EUR', 1)`).run(connId, FAKE_ENC);
+  db.prepare("INSERT INTO products (id, name, unit, is_active) VALUES ('prod-w', 'Widget', 'piece', 1)").run();
+  // opening stock so the derived-inventory read is observable (legacy header purchase, qty 10)
+  db.prepare("INSERT INTO purchases (id, date, supplier, tons, product_id, amountWithoutTax, totalAmount) VALUES ('pu-w', '2026-01-01', 'S', 10, 'prod-w', 450, 495)").run();
+
+  // Raw WooCommerce order shape. Base reconciles: line net 45 + tax 5 = gross 50; shipping 5;
+  // total 55 = Σ gross (50) + shipping (5) + shipping-tax (0). Buyer PII present in the raw
+  // payload MUST be dropped by normalizeOrder before it is staged.
+  const rawWoo = (over = {}) => ({
+    id: 5000, number: '5000', status: 'processing',
+    date_created_gmt: '2026-06-01T10:00:00', date_modified_gmt: '2026-06-02T00:00:00',
+    currency: 'EUR', total: '55.00', total_tax: '5.00', shipping_total: '5.00', customer_id: 10,
+    line_items: [{ name: 'Widget', sku: 'W1', quantity: 1, subtotal: '45.00', total: '45.00', total_tax: '5.00' }],
+    shipping_lines: [{ method_title: 'Flat', total: '5.00' }],
+    tax_lines: [{ rate_code: 'VAT', rate_percent: 10, tax_total: '5.00' }],
+    fee_lines: [], refunds: [],
+    billing: { first_name: 'Alice', last_name: 'Buyer', email: 'alice@example.com', phone: '555-0000', address_1: '9 Any Rd' },
+    ...over,
+  });
+
+  const normal    = rawWoo({ id: 5001, number: '5001', status: 'processing' });                                   // → paid
+  const pending    = rawWoo({ id: 5002, number: '5002', status: 'pending' });                                     // → unpaid
+  const completed  = rawWoo({ id: 5003, number: '5003', status: 'completed' });                                   // → paid
+  const refunded   = rawWoo({ id: 5004, number: '5004', status: 'refunded' });                                    // status_not_committable
+  const cancelled  = rawWoo({ id: 5005, number: '5005', status: 'cancelled' });                                   // status_not_committable
+  const mismatchCur = rawWoo({ id: 5006, number: '5006', currency: 'USD' });                                      // currency_mismatch (store EUR)
+  const withRefund = rawWoo({ id: 5007, number: '5007', refunds: [{ id: 9, total: '-3.00' }] });                  // has_refunds
+  const badTotal   = rawWoo({ id: 5008, number: '5008', total: '60.00' });                                        // total_mismatch (55 expected)
+
+  // mock adapter: 2 pages of RAW woo orders, REAL normalizeOrder, no network
+  let pageCall = 0;
+  const pages = [
+    { rawOrders: [normal, pending, completed, refunded], hasNextPage: true, nextCursor: 2 },
+    { rawOrders: [cancelled, mismatchCur, withRefund, badTotal], hasNextPage: false, nextCursor: null },
+  ];
+  const providers = { woocommerce: {
+    meta: wooReal.meta,
+    testConnection: async () => ({ ok: true }),
+    async pullOrdersPage() { const p = pages[pageCall] || { rawOrders: [], hasNextPage: false, nextCursor: null }; pageCall++; return p; },
+    normalizeOrder: wooReal.normalizeOrder,   // PRODUCTION normalization (not a passthrough)
+  } };
+
+  const pr = await ecommerceCore.pull(connId, { providers, creds: { token: 'x' } });
+  ok(pr.status === 'ok' && pr.pulled === 8 && pr.stagedNew === 8 && pr.pages === 2,
+    `[EC25] real pull staged 8 woo orders across 2 pages, got ${JSON.stringify(pr)}`);
+  ok(db.prepare('SELECT COUNT(*) AS c FROM sales').get().c === 0 && db.prepare('SELECT COUNT(*) AS c FROM sales_items').get().c === 0,
+    '[EC25] pull wrote NOTHING to the ledger');
+  const stagedJson = db.prepare('SELECT normalized_json FROM ecommerce_staged_orders WHERE connection_id = ?').all(connId).map((r) => r.normalized_json).join('|');
+  ok(!/alice@example\.com|Alice|Buyer|Any Rd|"555-0000"/.test(stagedJson),
+    '[EC25] staged rows (via REAL normalizeOrder) carry NO buyer PII');
+
+  const staged = db.prepare('SELECT id, external_order_id FROM ecommerce_staged_orders WHERE connection_id = ?').all(connId);
+  const byExt = Object.fromEntries(staged.map((s) => [s.external_order_id, s.id]));
+
+  // commit the 3 committable orders together (one transaction, mixed paid/unpaid)
+  const rOk = ecommerceCore.commit({ connectionId: connId, stagedIds: [byExt['5001'], byExt['5002'], byExt['5003']] });
+  ok(rOk.success === 3 && rOk.failed === 0, `[EC25] the 3 committable woo orders post together, got ${JSON.stringify(rOk.errors)}`);
+
+  const s1 = db.prepare('SELECT * FROM sales WHERE id = ?').get(`sale-ec-${byExt['5001']}`);
+  ok(s1 && s1.date === '2026-06-01' && s1.customer === 'Woo Store 5001', '[EC25] date = order date; customer = label + order number (no PII)');
+  ok(s1 && approx(s1.totalAmount, 50) && approx(s1.amountWithoutTax, 45) && approx(s1.taxAmount, 5),
+    `[EC25] header money = Σ items (50/45/5), got ${s1?.totalAmount}/${s1?.amountWithoutTax}/${s1?.taxAmount}`);
+  ok(s1 && s1.shippingCost === 0, '[EC25] D1: platform shipping (5) NOT posted');
+  ok(s1 && s1.payment_status === 'paid' && approx(s1.paid_amount, s1.totalAmount), '[EC25] processing → paid, paid_amount = total');
+  ok(s1 && s1.external_order_id === '5001' && s1.platform_source === 'woocommerce' && s1.ecommerce_connection_id === connId,
+    '[EC25] provenance columns written from the real pull→commit chain');
+  ok(db.prepare('SELECT payment_status FROM sales WHERE id = ?').get(`sale-ec-${byExt['5002']}`)?.payment_status === 'unpaid', '[EC25] pending → unpaid');
+  ok(db.prepare('SELECT payment_status FROM sales WHERE id = ?').get(`sale-ec-${byExt['5003']}`)?.payment_status === 'paid', '[EC25] completed → paid');
+  const it1 = db.prepare('SELECT product_id, description, quantity FROM sales_items WHERE sale_id = ?').get(`sale-ec-${byExt['5001']}`);
+  ok(it1 && it1.product_id === 'prod-w' && it1.description === 'Widget' && it1.quantity === 1, '[EC25] matched Widget line carries product_id');
+
+  // derived inventory (existing read path): 3 committed Widget lines consume opening stock 10 → 7
+  const inv = await call('GET', '/api/inventory/summary', null);
+  ok(approx(inv.details.find((x) => x.product_id === 'prod-w')?.qtyOnHand, 7),
+    `[EC25] 3 committed Widget lines consume derived stock (10−3=7), got ${inv.details.find((x) => x.product_id === 'prod-w')?.qtyOnHand}`);
+
+  // every non-committable status/guard, committed individually so all-or-nothing doesn't mask codes
+  const negatives = [
+    ['5004', 'status_not_committable'],   // refunded status (refunds array empty → isolates the status guard)
+    ['5005', 'status_not_committable'],   // cancelled status
+    ['5006', 'currency_mismatch'],        // order USD vs store EUR
+    ['5007', 'has_refunds'],              // refund line present
+    ['5008', 'total_mismatch'],           // header total ≠ Σ gross + shipping
+  ];
+  for (const [ext, code] of negatives) {
+    const r = ecommerceCore.commit({ connectionId: connId, stagedIds: [byExt[ext]] });
+    ok(r.success === 0 && r.errors[0]?.reasons.includes(code),
+      `[EC25] woo order ${ext} → ${code}, got ${JSON.stringify(r.errors[0]?.reasons)}`);
+  }
+
+  ok(db.prepare('SELECT COUNT(*) AS c FROM sales').get().c === 3, '[EC25] exactly 3 sales after all commits (5 rejects wrote nothing)');
+  ok(db.prepare("SELECT COUNT(*) AS c FROM sales WHERE platform_source = 'woocommerce' AND id LIKE 'sale-ec-%'").get().c === 3,
+    '[EC25] all posted sales are woo-sourced with deterministic sale-ec-<id> ids');
+  ok(db.prepare("SELECT COUNT(*) AS c FROM ecommerce_staged_orders WHERE connection_id = ? AND stage_status = 'staged'").get(connId).c === 5,
+    '[EC25] the 5 rejected orders remain staged (nothing half-committed)');
+  ok(db.prepare("SELECT COUNT(*) AS c FROM ecommerce_staged_orders WHERE connection_id = ? AND stage_status = 'committed'").get(connId).c === 3,
+    '[EC25] the 3 committed orders are marked committed');
+}
+
 if (failures.length) {
   console.error(`✗ handlers: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + fx-reference-conversion(multi-currency reference conversion read-only, PR-7B P3-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears) + ecommerce connections(EC1 no-credential-leak/EC2 shopify catalog/EC3 setEnabled/EC4 remove/EC5 shopify-domain normalise/EC6 woocommerce key_secret catalog/EC7 11-platform catalog display-only/EC8 non-connectable save-test whitelist reject/EC9 woocommerce https-only URL normalise) + ecommerce pull→staging(EC10 normalizeOrder pure/no-PII/EC11 pull ok staged+watermark+no-ledger-write/EC12 idempotent re-pull/EC13 20-page cap→partial/EC14 error→sync_log+redacted+watermark-frozen) + ecommerce staged→commit(EC15 happy path header=Σitems+provenance+report-breakdown+derived-inventory/EC16 description-only NULL product_id no-inventory-move/EC17 ambiguous blocks + all-or-nothing/EC18 idempotency staged-status→PK→partial-unique/EC19 guard matrix zero-write/EC20 status→payment matrix/EC21 mixed-rate header taxRate NULL/EC22 no side effects + pull skips committed/EC23 input hardening+dedupe/EC24 adapter refinements woo-discount+free-order+multi-taxline)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + fx-reference-conversion(multi-currency reference conversion read-only, PR-7B P3-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears) + ecommerce connections(EC1 no-credential-leak/EC2 shopify catalog/EC3 setEnabled/EC4 remove/EC5 shopify-domain normalise/EC6 woocommerce key_secret catalog/EC7 11-platform catalog display-only/EC8 non-connectable save-test whitelist reject/EC9 woocommerce https-only URL normalise) + ecommerce pull→staging(EC10 normalizeOrder pure/no-PII/EC11 pull ok staged+watermark+no-ledger-write/EC12 idempotent re-pull/EC13 20-page cap→partial/EC14 error→sync_log+redacted+watermark-frozen) + ecommerce staged→commit(EC15 happy path header=Σitems+provenance+report-breakdown+derived-inventory/EC16 description-only NULL product_id no-inventory-move/EC17 ambiguous blocks + all-or-nothing/EC18 idempotency staged-status→PK→partial-unique/EC19 guard matrix zero-write/EC20 status→payment matrix/EC21 mixed-rate header taxRate NULL/EC22 no side effects + pull skips committed/EC23 input hardening+dedupe/EC24 adapter refinements woo-discount+free-order+multi-taxline/EC25 WooCommerce end-to-end raw→real-normalizeOrder→real-pull→commit, mixed accept/reject, PII-dropped, derived-inventory)) via real dispatch on :memory: DB');
