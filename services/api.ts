@@ -200,6 +200,57 @@ export function testEcommerceConnection(payload: { id?: string; platform: string
   return electronInvoke<TestEcommerceConnectionResult>('ecommerce:test', payload);
 }
 
+// ==================== 电商订单：拉单 → 暂存预览（PR-EC4 · 仅读，不写账本）====================
+// 拉单落 ecommerce_staged_orders + 写 sync_log（主进程），前端只做预览展示；不提交、不入账。
+
+export interface EcommerceNormalizedItem {
+  sku: string | null; name: string | null; quantity: number | null;
+  unitPriceNet?: number | null; lineNet?: number | null; lineTax?: number | null; lineGross?: number | null; taxRate?: number | null;
+}
+export interface EcommerceNormalizedOrder {
+  platform: string; externalOrderId: string; orderNumber: string | null; orderStatus: string | null;
+  createdAt: string | null; updatedAt: string | null; currency: string | null;
+  header: { customerRef: string | null };           // 脱敏：仅不透明买家标识，无姓名/邮箱/地址/电话
+  items: EcommerceNormalizedItem[];
+  shipping: { total: number | null; lines: { title: string | null; amount: number | null }[] };
+  taxes: { total: number | null; lines: { title: string | null; rate: number | null; amount: number | null }[] };
+  fees: { title: string | null; amount: number | null }[];       // 信息性·不入账
+  refunds: { id: string | null; createdAt: string | null; amount: number | null }[];  // 信息性·不冲账
+  totals: { subtotalNet: number | null; taxTotal: number | null; shippingTotal: number | null; grandTotalGross: number | null };
+}
+export interface StagedOrder {
+  id: number; connectionId: string; platform: string; externalOrderId: string;
+  orderNumber: string | null; orderStatus: string | null; orderCreatedAt: string | null; orderUpdatedAt: string | null;
+  currency: string | null; totalGross: number | null; normalized: EcommerceNormalizedOrder | null;
+  matchStatus: string | null; stageStatus: string | null; committedSaleId: string | null;
+  firstSeenAt: string | null; lastPulledAt: string | null; error: string | null;
+}
+export interface EcommerceSyncLogEntry {
+  id: number; connectionId: string | null; platform: string | null; runAt: string | null; status: string | null;
+  pulled: number; stagedNew: number; stagedUpdated: number; errors: number; pages: number;
+  sinceUsed: string | null; cursorBefore: string | null; cursorAfter: string | null; durationMs: number | null;
+  error: { code?: string; message?: string } | null;
+}
+export interface EcommercePullResult {
+  ok: boolean; status?: string; pulled?: number; stagedNew?: number; stagedUpdated?: number;
+  errors?: number; pages?: number; code?: string; message?: string; error?: { code?: string; message?: string };
+}
+
+/** 触发一次拉单（主进程调平台 API → 落暂存 + 同步日志）。不写账本 */
+export function pullEcommerce(connectionId: string): Promise<EcommercePullResult> {
+  return electronInvoke<EcommercePullResult>('ecommerce:pull', { connectionId });
+}
+
+/** 读取暂存订单（预览·绝不含凭证） */
+export function listStagedOrders(payload: { connectionId?: string; status?: string; limit?: number } = {}): Promise<StagedOrder[]> {
+  return electronInvoke<StagedOrder[]>('ecommerce:staged', payload);
+}
+
+/** 读取拉单同步日志（错误已脱敏） */
+export function listEcommerceSyncLog(payload: { connectionId?: string; limit?: number } = {}): Promise<EcommerceSyncLogEntry[]> {
+  return electronInvoke<EcommerceSyncLogEntry[]>('ecommerce:syncLog', payload);
+}
+
 // ==================== AI 助手聊天（走统一 apiFetch：桌面 IPC / Web fetch）====================
 // 业务上下文由 /api/ai/context 现查（本地聚合 DB，不调外部 AI）；对话走 /api/ai/chat。
 // 系统提示词由调用方（useAssistant）按 accountingLocale×uiLanguage 组装后传入。
