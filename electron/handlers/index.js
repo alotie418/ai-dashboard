@@ -115,6 +115,18 @@ function registerHandlers({ ipcMain, dialog }) {
     return ecommerceCore.listSyncLog(payload || {});
   });
 
+  // PR-EC5a: commit selected staged orders → sales/sales_items (FIRST ledger write).
+  // Two-pass all-or-nothing; per-order failures come back as machine codes in
+  // result.errors (never a partial post). Genuine exceptions (bad connection id /
+  // empty selection / db) surface as { ok:false }.
+  ipcMain.handle('ecommerce:commit', async (_evt, payload) => {
+    try {
+      return { ok: true, ...ecommerceCore.commit(payload || {}) };
+    } catch (err) {
+      return { ok: false, code: err?.code || 'unknown', message: err?.message };
+    }
+  });
+
   // ====== 数据库备份 / 导出（文件夹 bundle：DB + 附件，§2A#3）======
   // 导出为一个文件夹（sololedger.db + attachments/docs/*），而非单 .db——否则换机导入后
   // tax_invoice_attachment_path 全部悬空。与 #152 启动自动备份同形，可互相恢复。

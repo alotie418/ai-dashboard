@@ -263,7 +263,10 @@ function normalizeOrder(o) {
     const qty = Number.isFinite(li.quantity) ? li.quantity : null;
     const lineTax = (li.taxLines || []).reduce((s, t) => s + (money(t.priceSet) || 0), 0);
     const lineNet = unitNet != null && qty != null ? unitNet * qty : null;
-    const rate = li.taxLines && li.taxLines[0] && li.taxLines[0].ratePercentage != null ? Number(li.taxLines[0].ratePercentage) : null;
+    // a single tax jurisdiction gives an honest per-line rate; multiple taxLines (e.g. CA
+    // GST+PST, US state+county) would make rate×net ≠ tax — report NULL instead of the
+    // first jurisdiction's rate (PR-EC5a review fix; lineTax stays the Σ of all taxLines)
+    const rate = li.taxLines && li.taxLines.length === 1 && li.taxLines[0].ratePercentage != null ? Number(li.taxLines[0].ratePercentage) : null;
     return {
       sku: li.sku || null, name: li.title || null, quantity: qty,
       unitPriceNet: unitNet, lineNet, lineTax: lineTax || null,

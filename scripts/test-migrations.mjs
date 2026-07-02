@@ -341,11 +341,45 @@ const count = (d, table) => d.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(
                    'duration_ms', 'error_json']) {
     ok(colExists(d, 'ecommerce_sync_log', c), `[14] ecommerce_sync_log.${c} column must exist`);
   }
-  // 14e. 红线：v22 未给 sales / sales_items 加任何订单列（去重列留 PR-EC5）
-  for (const c of ['external_order_id', 'platform_source']) {
-    ok(!colExists(d, 'sales', c), `[14] sales must NOT carry '${c}' yet (deferred to commit phase PR-EC5)`);
-    ok(!colExists(d, 'sales_items', c), `[14] sales_items must NOT carry '${c}'`);
+  // 14e. 红线（改为 v22 时点断言）：截至 v22，sales/sales_items 尚无任何订单列——
+  //      sales 侧溯源列由 v23（PR-EC5a）新增，见 block 15；sales_items 永不加。
+  {
+    const d22 = fresh();
+    for (let v = 0; v < 22; v++) d22.transaction(() => { MIGRATIONS[v](d22); d22.pragma(`user_version = ${v + 1}`); })();
+    for (const c of ['external_order_id', 'platform_source', 'ecommerce_connection_id']) {
+      ok(!colExists(d22, 'sales', c), `[14] sales must NOT carry '${c}' at v22 (added by v23)`);
+      ok(!colExists(d22, 'sales_items', c), `[14] sales_items must NOT carry '${c}' at v22`);
+    }
+    d22.close();
   }
+  d.close();
+}
+
+// ---- 15. v23 sales 电商溯源列：3 列可空 + 连接级部分唯一索引 + 旧写路径/手工行不受影响 ----
+{
+  const d = fresh();
+  runMigrations(d);
+  // 15a. 3 列存在于 sales；sales_items 永不承载溯源列（溯源只在表头）
+  for (const c of ['external_order_id', 'platform_source', 'ecommerce_connection_id']) {
+    ok(colExists(d, 'sales', c), `[15] sales.${c} column must exist (v23)`);
+    ok(!colExists(d, 'sales_items', c), `[15] sales_items must NOT carry '${c}' (provenance is header-level only)`);
+  }
+  // 15b. 旧写路径（不带新列）不受影响；两行全 NULL 共存 → 部分索引不误伤手工/CSV 记录
+  d.prepare("INSERT INTO sales (id, date, customer) VALUES ('s-m1', '2026-01-01', 'A')").run();
+  d.prepare("INSERT INTO sales (id, date, customer) VALUES ('s-m2', '2026-01-02', 'B')").run();
+  ok(count(d, 'sales') === 2, '[15] two manual rows with NULL provenance coexist (partial index ignores NULL)');
+  const r = d.prepare("SELECT external_order_id, platform_source, ecommerce_connection_id FROM sales WHERE id='s-m1'").get();
+  ok(r.external_order_id === null && r.platform_source === null && r.ecommerce_connection_id === null,
+    '[15] new columns default NULL (no backfill)');
+  // 15c. 同 (connection, external_order_id) 第二行被部分唯一索引拒绝（幂等的 DB 层最后防线）
+  d.prepare("INSERT INTO sales (id, date, external_order_id, platform_source, ecommerce_connection_id) VALUES ('s-e1', '2026-01-03', 'o1', 'shopify', 'conn1')").run();
+  let dup = null;
+  try { d.prepare("INSERT INTO sales (id, date, external_order_id, platform_source, ecommerce_connection_id) VALUES ('s-e2', '2026-01-04', 'o1', 'shopify', 'conn1')").run(); }
+  catch (e) { dup = e?.message || String(e); }
+  ok(dup && /unique/i.test(dup), '[15] partial unique index rejects duplicate (connection, external_order_id)');
+  // 15d. 不同连接同订单号允许——同平台两家店订单号可撞（Woo 站内自增），索引取连接级正是为此
+  d.prepare("INSERT INTO sales (id, date, external_order_id, platform_source, ecommerce_connection_id) VALUES ('s-e3', '2026-01-05', 'o1', 'woocommerce', 'conn2')").run();
+  ok(count(d, 'sales') === 4, '[15] same external id under a DIFFERENT connection is allowed');
   d.close();
 }
 
@@ -354,4 +388,4 @@ if (failures.length) {
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema + v15 liabilities schema + v16 fixed_assets schema + v17 equity schema + v18 tax_payments schema + v19 fixed_assets depreciation params + v21 ecommerce_connections schema + v22 staged_orders/sync_log + sales untouched)`);
+console.log(`✓ migrations: all checks passed (fresh→head v${MIGRATIONS.length} + idempotent + seeds + per-version replay + old→head row preservation + v14 accounts schema + v15 liabilities schema + v16 fixed_assets schema + v17 equity schema + v18 tax_payments schema + v19 fixed_assets depreciation params + v21 ecommerce_connections schema + v22 staged_orders/sync_log + v23 sales provenance/partial-unique)`);

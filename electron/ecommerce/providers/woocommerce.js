@@ -225,9 +225,14 @@ const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : nu
 function normalizeOrder(o) {
   const items = (o?.line_items || []).map((li) => {
     const qty = Number.isFinite(li.quantity) ? li.quantity : num(li.quantity);
-    const lineNet = num(li.subtotal);              // WooCommerce: subtotal = net line before tax (confirm)
+    // WooCommerce REST: line_items.total = line total AFTER discounts, tax-exclusive;
+    // total_tax is computed on that discounted amount (official-docs-confirm). Coupons are
+    // allocated per line by the platform, so total (NOT the pre-discount `subtotal`) is the
+    // committable net — using `subtotal` made every couponed order fail the commit-phase
+    // net+tax=gross consistency guard (PR-EC5a review fix).
+    const lineNet = num(li.total);
     const lineTax = num(li.total_tax);
-    const lineGross = num(li.total) != null && lineTax != null ? num(li.total) + lineTax : num(li.total);
+    const lineGross = lineNet != null ? lineNet + (lineTax || 0) : null;
     return {
       sku: li.sku || null, name: li.name || null, quantity: qty,
       unitPriceNet: lineNet != null && qty ? lineNet / qty : null,
@@ -253,7 +258,9 @@ function normalizeOrder(o) {
     fees,
     refunds,
     totals: {
-      subtotalNet: items.reduce((s, i) => s + (i.lineNet || 0), 0) || null,
+      // keep 0 for legitimately free orders (a `|| null` here collapsed 0 → null and made
+      // the commit phase mis-report them as 'totals_missing' — PR-EC5a review fix)
+      subtotalNet: items.length > 0 ? items.reduce((s, i) => s + (i.lineNet || 0), 0) : null,
       taxTotal: num(o?.total_tax),
       shippingTotal: num(o?.shipping_total),
       grandTotalGross: num(o?.total),

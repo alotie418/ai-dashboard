@@ -68,9 +68,50 @@ const products = [
   ok(matchOrderItems([{ name: 'Widget' }, { name: 'Dup' }], products).orderStatus === 'ambiguous', '[M7] any ambiguous → ambiguous');
 }
 
+// ── PR-EC5a parity: the main-process matcher (electron/ecommerce/matchItems.js) is the
+// AUTHORITY at commit time and MUST behave identically to the renderer's preview matcher
+// above. Run the same cases through both and require field-identical results.
+{
+  const backend = await import(join(ROOT, 'electron/ecommerce/matchItems.js'));
+  const jsMatchItem = backend.matchItem ?? backend.default?.matchItem;
+  const jsMatchOrderItems = backend.matchOrderItems ?? backend.default?.matchOrderItems;
+  ok(typeof jsMatchItem === 'function' && typeof jsMatchOrderItems === 'function', '[P0] backend matcher exports matchItem/matchOrderItems');
+
+  const itemCases = [
+    { name: 'Widget' }, { name: 'Dup' }, { name: 'Unknown' }, { name: 'OldThing' },
+    { name: '' }, {}, { sku: 'SKU-9', name: 'NoSuchProductName' }, { sku: 'whatever', name: 'Widget' },
+    { name: '  Widget  ' },   // trimming parity
+  ];
+  for (const c of itemCases) {
+    const ts = matchItem(c, products);
+    const js = jsMatchItem(c, products);
+    ok(ts.status === js.status && ts.productId === js.productId && ts.matchedName === js.matchedName,
+      `[P1] matchItem parity for ${JSON.stringify(c)}: ts=${JSON.stringify(ts)} js=${JSON.stringify(js)}`);
+  }
+  const orderCases = [
+    [], [{ name: 'Widget' }, { name: 'Widget' }], [{ name: 'Widget' }, { name: 'Unknown' }],
+    [{ name: 'Unknown' }, { name: 'Nope' }], [{ name: 'Widget' }, { name: 'Dup' }],
+  ];
+  for (const c of orderCases) {
+    const ts = matchOrderItems(c, products);
+    const js = jsMatchOrderItems(c, products);
+    ok(ts.orderStatus === js.orderStatus && JSON.stringify(ts.items) === JSON.stringify(js.items),
+      `[P2] matchOrderItems parity for ${JSON.stringify(c)}: ts=${ts.orderStatus} js=${js.orderStatus}`);
+  }
+
+  // backend-only tolerance: raw DB rows carry is_active as INTEGER 0/1 (the renderer gets
+  // booleans from products.list). 0 must count as INACTIVE for the authoritative matcher.
+  const dbRows = [
+    { id: 'p1', name: 'Widget', is_active: 1 },
+    { id: 'p4', name: 'OldThing', is_active: 0 },
+  ];
+  ok(jsMatchItem({ name: 'Widget' }, dbRows).status === 'matched', '[P3] backend: is_active=1 (integer) → active');
+  ok(jsMatchItem({ name: 'OldThing' }, dbRows).status === 'unmatched', '[P3] backend: is_active=0 (integer) → inactive, excluded');
+}
+
 if (failures.length) {
   console.error(`✗ ecommerce-match: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ ecommerce-match: all checks passed (matched / ambiguous / description-only + SKU-not-used + order aggregation)');
+console.log('✓ ecommerce-match: all checks passed (matched / ambiguous / description-only + SKU-not-used + order aggregation + frontend/backend parity)');
