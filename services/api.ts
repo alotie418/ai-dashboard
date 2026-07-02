@@ -251,6 +251,47 @@ export function listEcommerceSyncLog(payload: { connectionId?: string; limit?: n
   return electronInvoke<EcommerceSyncLogEntry[]>('ecommerce:syncLog', payload);
 }
 
+// ==================== 电商订单：暂存 → 提交入账（PR-EC5b · 消费 EC5a 后端）====================
+// 主进程 commit.js 两遍式全或无：任一单校验失败整批不写入，errors 携带稳定机器拒因码
+// （settings.ecommerce.orders.reasons.* 本地化展示）。运费/平台费用/退款绝不入账。
+
+/** 单笔已入账订单回执（difference = 平台总额 − 入账金额，纯信息展示） */
+export interface EcommerceCommittedOrder {
+  stagedId: number;
+  saleId: string;
+  externalOrderId: string;
+  orderNumber: string | null;
+  grandTotalGross: number;          // 平台订单总额
+  committedTotalAmount: number;     // 实际入账金额 = 表头合计 = Σ商品行含税
+  difference: number;               // grandTotalGross − committedTotalAmount
+  breakdown: { shippingNotPosted: number; otherDifference: number };
+  lines: { total: number; matched: number; descriptionOnly: number };
+}
+
+/** 单笔被拒订单：reasons 为稳定机器码；detail 可携带同名歧义商品名 */
+export interface EcommerceCommitErrorEntry {
+  stagedId: number | null;
+  orderNumber: string | null;
+  reasons: string[];
+  detail?: string[];
+  message?: string;
+}
+
+export interface EcommerceCommitResult {
+  ok: boolean;
+  success?: number;
+  failed?: number;
+  committed?: EcommerceCommittedOrder[];
+  errors?: EcommerceCommitErrorEntry[];
+  code?: string;      // ok=false 的异常路径（连接不存在/空选择等）
+  message?: string;
+}
+
+/** 提交选中的暂存订单 → 写入销售记录（后端全或无 + 幂等；单次上限 100 单） */
+export function commitStagedOrders(connectionId: string, stagedIds: number[]): Promise<EcommerceCommitResult> {
+  return electronInvoke<EcommerceCommitResult>('ecommerce:commit', { connectionId, stagedIds });
+}
+
 // ==================== AI 助手聊天（走统一 apiFetch：桌面 IPC / Web fetch）====================
 // 业务上下文由 /api/ai/context 现查（本地聚合 DB，不调外部 AI）；对话走 /api/ai/chat。
 // 系统提示词由调用方（useAssistant）按 accountingLocale×uiLanguage 组装后传入。
