@@ -395,7 +395,7 @@
         "confirmEstimate": "Estimated total to post: {{amount}} (final amounts are shown in the result)",
         "confirmNotPostedNote": "Shipping, platform fees and refunds are never posted; the posted amount is the sum of the item lines and may be less than the platform order total.",
         "confirmCurrencyNote": "Amounts are recorded in your ledger's base currency — make sure the store currency matches.",
-        "confirmIrreversibleNote": "This cannot be undone here: to remove a posted sale, delete it manually on the Sales page; the staged order cannot be committed again.",
+        "confirmIrreversibleNote": "This cannot be undone here: to remove a posted sale, delete it manually on the Sales page, then unlock the staged order to commit it again.",
         "confirmProceed": "Confirm commit",
         "confirmCancel": "Cancel",
         "commitSuccess": "{{n}} order(s) committed to the ledger.",
@@ -406,6 +406,15 @@
         "resultDiffOther": "Other difference",
         "resultLines": "{{matched}} matched · {{descriptionOnly}} description-only",
         "commitFailedTitle": "Commit failed",
+        "committedSaleDeleted": "Committed · sales record deleted",
+        "unlockRecommit": "Unlock & re-commit",
+        "unlockConfirmTitle": "Unlock this order for re-commit?",
+        "unlockConfirmBody": "The sales record for order {{order}} has been deleted. Unlocking returns it to \"staged\" so it can be committed again.",
+        "unlockConfirmWarn": "Only do this if the posted sale was intentionally removed. Re-committing writes a new sales record; if the original sale still exists, unlocking is refused to prevent double posting.",
+        "unlockConfirmProceed": "Unlock",
+        "unlocking": "Unlocking…",
+        "unlockSuccess": "Order {{order}} unlocked — it can be committed again.",
+        "unlockError": "Unlock failed: {{msg}}",
         "reasons": {
           "not_found": "Staged order not found or belongs to another connection",
           "already_committed": "Already committed — cannot be committed again",
@@ -425,7 +434,9 @@
           "totals_missing": "Order totals are missing",
           "total_mismatch": "Order total does not reconcile (possibly tax-inclusive pricing or unsynced charges) — conservatively blocked",
           "ambiguous_product": "Multiple products share the same name — no unique match",
-          "write_failed": "Write failed — the whole batch was rolled back"
+          "write_failed": "Write failed — the whole batch was rolled back",
+          "not_committed": "This staged order is not committed",
+          "sale_still_exists": "The posted sales record still exists — delete it first, then unlock"
         }
       }
     }

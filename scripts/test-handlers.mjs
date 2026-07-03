@@ -3482,9 +3482,115 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
     '[EC25] the 3 committed orders are marked committed');
 }
 
+// ───────────── EC26: unlock a committed staged order whose posted sale was DELETED (PR-EC5c) ─────────────
+// Proves the orphan-recovery path: commit → delete the sale → the staged row becomes an orphan
+// (committedSaleMissing) → unlockStaged returns it to 'staged' → it re-commits. Unlock is
+// narrow: refused while the sale exists (double check), touches ONLY the staged row (no ledger /
+// sync_log / cursor writes), and re-commit still flows through the unchanged commit.js.
+{
+  const FAKE_ENC = 'QkFTRTY0RFVNTVlDSVBIRVI=';
+  const seedConn = (db, id) => db.prepare(`INSERT INTO ecommerce_connections
+      (id, platform, label, shop_identifier, credentials_encrypted, store_currency, enabled)
+      VALUES (?, 'shopify', 'My Store', 'demo', ?, 'USD', 1)`).run(id, FAKE_ENC);
+  const addProduct = (db, id, name) => db.prepare("INSERT INTO products (id, name, unit, is_active) VALUES (?, ?, 'piece', 1)").run(id, name);
+  const mkOrder = (over = {}) => ({
+    platform: 'shopify', externalOrderId: 'ext-u1', orderNumber: '#U1', orderStatus: 'PAID',
+    createdAt: '2026-06-01T10:00:00Z', updatedAt: '2026-06-02T00:00:00Z', currency: 'USD',
+    header: { customerRef: null },
+    items: [{ sku: 'SKU1', name: 'Widget', quantity: 2, unitPriceNet: 50, lineNet: 100, lineTax: 10, lineGross: 110, taxRate: 10 }],
+    shipping: { total: 5, lines: [] }, taxes: { total: 10, lines: [] }, fees: [], refunds: [],
+    totals: { subtotalNet: 100, taxTotal: 10, shippingTotal: 5, grandTotalGross: 115 },
+    ...over,
+  });
+  const seedStaged = (db, connId, n) => db.prepare(`INSERT INTO ecommerce_staged_orders
+      (connection_id, platform, external_order_id, order_number, order_status, order_created_at,
+       order_updated_at, currency, total_gross, normalized_json, match_status, stage_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unresolved', 'staged')`)
+    .run(connId, n.platform, n.externalOrderId, n.orderNumber, n.orderStatus, n.createdAt,
+      n.updatedAt, n.currency, n.totals?.grandTotalGross ?? null, JSON.stringify(n)).lastInsertRowid;
+  const unlockCode = (payload) => { try { ecommerceCore.unlockStaged(payload); return null; } catch (e) { return e.code; } };
+
+  const db = freshDb();
+  seedConn(db, 'ec-ul');
+  addProduct(db, 'prod-w', 'Widget');
+
+  // commit an order → sale-ec-<id> written
+  const sidA = seedStaged(db, 'ec-ul', mkOrder({ externalOrderId: 'ext-u1', orderNumber: '#U1' }));
+  ok(ecommerceCore.commit({ connectionId: 'ec-ul', stagedIds: [sidA] }).success === 1, '[EC26] setup: order commits');
+  const saleId = `sale-ec-${sidA}`;
+
+  // while the sale is live: not an orphan, and unlock is refused
+  let st = ecommerceCore.listStaged({ connectionId: 'ec-ul' }).find((o) => o.id === sidA);
+  ok(st && st.stageStatus === 'committed' && st.committedSaleMissing === false, '[EC26] committed row with live sale → committedSaleMissing false');
+  ok(unlockCode({ connectionId: 'ec-ul', stagedId: sidA }) === 'sale_still_exists', '[EC26] unlock refused while the posted sale exists → sale_still_exists');
+  ok(db.prepare('SELECT stage_status FROM ecommerce_staged_orders WHERE id = ?').get(sidA).stage_status === 'committed', '[EC26] refused unlock leaves the row committed');
+
+  // snapshot everything unlock must NOT touch
+  const beforeLog = db.prepare('SELECT COUNT(*) AS c FROM ecommerce_sync_log').get().c;
+  const beforeConn = db.prepare("SELECT last_cursor, last_order_updated_at, last_synced_at FROM ecommerce_connections WHERE id = 'ec-ul'").get();
+  const beforeItems = db.prepare('SELECT COUNT(*) AS c FROM sales_items WHERE sale_id = ?').get(saleId).c;
+  ok(beforeItems > 0, '[EC26] (guard) the committed sale had line items');
+
+  // delete the posted sale via the REAL handler → sales_items cascade
+  await call('DELETE', `/api/sales/${saleId}`, null);
+  ok(db.prepare('SELECT COUNT(*) AS c FROM sales WHERE id = ?').get(saleId).c === 0, '[EC26] posted sale deleted');
+  ok(db.prepare('SELECT COUNT(*) AS c FROM sales_items WHERE sale_id = ?').get(saleId).c === 0, '[EC26] sales_items cascade-deleted with the sale');
+
+  // now an orphan → surfaced to the UI, and unlockable
+  st = ecommerceCore.listStaged({ connectionId: 'ec-ul' }).find((o) => o.id === sidA);
+  ok(st && st.committedSaleMissing === true, '[EC26] committed row whose sale was deleted → committedSaleMissing true');
+  const ur = ecommerceCore.unlockStaged({ connectionId: 'ec-ul', stagedId: sidA });
+  ok(ur.success === true, '[EC26] unlock orphan succeeds');
+  const rowAfter = db.prepare('SELECT stage_status, committed_sale_id, error FROM ecommerce_staged_orders WHERE id = ?').get(sidA);
+  ok(rowAfter.stage_status === 'staged' && rowAfter.committed_sale_id === null && rowAfter.error === null,
+    '[EC26] unlocked row back to staged; committed_sale_id + error cleared');
+
+  // unlock touched ONLY the staged row — no sync_log, no cursor/watermark move
+  ok(db.prepare('SELECT COUNT(*) AS c FROM ecommerce_sync_log').get().c === beforeLog, '[EC26] unlock writes NO sync_log row');
+  const afterConn = db.prepare("SELECT last_cursor, last_order_updated_at, last_synced_at FROM ecommerce_connections WHERE id = 'ec-ul'").get();
+  ok(afterConn.last_cursor === beforeConn.last_cursor && afterConn.last_order_updated_at === beforeConn.last_order_updated_at
+    && afterConn.last_synced_at === beforeConn.last_synced_at, '[EC26] unlock does NOT move the pull cursor/watermark');
+
+  // re-commit the unlocked order → deterministic sale id rebuilt exactly once, no duplicate
+  ok(ecommerceCore.commit({ connectionId: 'ec-ul', stagedIds: [sidA] }).success === 1, '[EC26] unlocked order re-commits');
+  ok(db.prepare('SELECT COUNT(*) AS c FROM sales WHERE id = ?').get(saleId).c === 1, '[EC26] deterministic sale id rebuilt exactly once');
+  ok(db.prepare("SELECT COUNT(*) AS c FROM sales WHERE ecommerce_connection_id = 'ec-ul' AND external_order_id = 'ext-u1'").get().c === 1,
+    '[EC26] no duplicate sale for the external order');
+
+  // guard codes: not_committed / not_found (unknown conn, unknown id, cross-connection)
+  const sidFresh = seedStaged(db, 'ec-ul', mkOrder({ externalOrderId: 'ext-fresh', orderNumber: '#F' }));
+  ok(unlockCode({ connectionId: 'ec-ul', stagedId: sidFresh }) === 'not_committed', '[EC26] unlock a staged (never-committed) row → not_committed');
+  ok(unlockCode({ connectionId: 'nope', stagedId: sidFresh }) === 'not_found', '[EC26] unknown connection → not_found');
+  ok(unlockCode({ connectionId: 'ec-ul', stagedId: 999999 }) === 'not_found', '[EC26] unknown staged id → not_found');
+  seedConn(db, 'ec-ul2');
+  const sidOther = seedStaged(db, 'ec-ul2', mkOrder({ externalOrderId: 'ext-o' }));
+  ok(unlockCode({ connectionId: 'ec-ul', stagedId: sidOther }) === 'not_found', "[EC26] another connection's staged id → not_found");
+
+  // after unlock, a re-pull UPDATES the row (no longer skipped-as-committed) → refreshed data
+  {
+    const db2 = freshDb();
+    seedConn(db2, 'ec-rp');
+    const sidR = seedStaged(db2, 'ec-rp', mkOrder({ externalOrderId: 'ext-r', orderNumber: '#R' }));
+    ecommerceCore.commit({ connectionId: 'ec-rp', stagedIds: [sidR] });
+    await call('DELETE', `/api/sales/sale-ec-${sidR}`, null);
+    ecommerceCore.unlockStaged({ connectionId: 'ec-rp', stagedId: sidR });
+    const changed = mkOrder({ externalOrderId: 'ext-r', orderNumber: '#R-CHANGED', updatedAt: '2026-07-02T00:00:00Z' });
+    const providers = { shopify: {
+      meta: { id: 'shopify', name: 'M', transport: 'graphql', authMode: 'manual_token' },
+      testConnection: async () => ({ ok: true }),
+      async pullOrdersPage() { return { rawOrders: [changed], hasNextPage: false, nextCursor: null }; },
+      normalizeOrder: (raw) => raw,
+    } };
+    const pr = await ecommerceCore.pull('ec-rp', { providers, creds: { token: 'x' } });
+    ok(pr.stagedUpdated === 1 && pr.stagedNew === 0, `[EC26] after unlock, re-pull UPDATES the row (not skipped), got ${JSON.stringify(pr)}`);
+    const rowR = db2.prepare('SELECT order_number, stage_status FROM ecommerce_staged_orders WHERE id = ?').get(sidR);
+    ok(rowR.order_number === '#R-CHANGED' && rowR.stage_status === 'staged', '[EC26] re-pull refreshed normalized_json on the unlocked row');
+  }
+}
+
 if (failures.length) {
   console.error(`✗ handlers: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + fx-reference-conversion(multi-currency reference conversion read-only, PR-7B P3-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears) + ecommerce connections(EC1 no-credential-leak/EC2 shopify catalog/EC3 setEnabled/EC4 remove/EC5 shopify-domain normalise/EC6 woocommerce key_secret catalog/EC7 11-platform catalog display-only/EC8 non-connectable save-test whitelist reject/EC9 woocommerce https-only URL normalise) + ecommerce pull→staging(EC10 normalizeOrder pure/no-PII/EC11 pull ok staged+watermark+no-ledger-write/EC12 idempotent re-pull/EC13 20-page cap→partial/EC14 error→sync_log+redacted+watermark-frozen) + ecommerce staged→commit(EC15 happy path header=Σitems+provenance+report-breakdown+derived-inventory/EC16 description-only NULL product_id no-inventory-move/EC17 ambiguous blocks + all-or-nothing/EC18 idempotency staged-status→PK→partial-unique/EC19 guard matrix zero-write/EC20 status→payment matrix/EC21 mixed-rate header taxRate NULL/EC22 no side effects + pull skips committed/EC23 input hardening+dedupe/EC24 adapter refinements woo-discount+free-order+multi-taxline/EC25 WooCommerce end-to-end raw→real-normalizeOrder→real-pull→commit, mixed accept/reject, PII-dropped, derived-inventory)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + fx-reference-conversion(multi-currency reference conversion read-only, PR-7B P3-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears) + ecommerce connections(EC1 no-credential-leak/EC2 shopify catalog/EC3 setEnabled/EC4 remove/EC5 shopify-domain normalise/EC6 woocommerce key_secret catalog/EC7 11-platform catalog display-only/EC8 non-connectable save-test whitelist reject/EC9 woocommerce https-only URL normalise) + ecommerce pull→staging(EC10 normalizeOrder pure/no-PII/EC11 pull ok staged+watermark+no-ledger-write/EC12 idempotent re-pull/EC13 20-page cap→partial/EC14 error→sync_log+redacted+watermark-frozen) + ecommerce staged→commit(EC15 happy path header=Σitems+provenance+report-breakdown+derived-inventory/EC16 description-only NULL product_id no-inventory-move/EC17 ambiguous blocks + all-or-nothing/EC18 idempotency staged-status→PK→partial-unique/EC19 guard matrix zero-write/EC20 status→payment matrix/EC21 mixed-rate header taxRate NULL/EC22 no side effects + pull skips committed/EC23 input hardening+dedupe/EC24 adapter refinements woo-discount+free-order+multi-taxline/EC25 WooCommerce end-to-end raw→real-normalizeOrder→real-pull→commit, mixed accept/reject, PII-dropped, derived-inventory/EC26 unlock orphaned committed staged order (posted sale deleted)→re-commit, double existence check sale_still_exists, unlock touches only staged row no sync_log/cursor, re-pull refreshes)) via real dispatch on :memory: DB');

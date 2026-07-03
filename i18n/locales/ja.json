@@ -395,7 +395,7 @@
         "confirmEstimate": "概算計上合計：{{amount}}（確定額は結果画面に表示されます）",
         "confirmNotPostedNote": "送料・手数料・返金は計上しません。計上額は商品明細行の合計で、プラットフォームの注文合計より少なくなる場合があります。",
         "confirmCurrencyNote": "金額は帳簿の基準通貨で記録されます。ストア通貨が一致しているかご確認ください。",
-        "confirmIrreversibleNote": "計上後はここでは取り消せません。削除する場合は販売ページで手動で削除してください。対応するステージ注文は再計上できません。",
+        "confirmIrreversibleNote": "計上後はここでは取り消せません。削除する場合は販売ページで手動で削除してください。削除後、対応するステージ注文のロックを解除すれば再計上できます。",
         "confirmProceed": "計上を確定",
         "confirmCancel": "キャンセル",
         "commitSuccess": "{{n}} 件の注文を計上しました。",
@@ -406,6 +406,15 @@
         "resultDiffOther": "その他の差額",
         "resultLines": "一致 {{matched}} 行 · 説明のみ {{descriptionOnly}} 行",
         "commitFailedTitle": "計上に失敗しました",
+        "committedSaleDeleted": "計上済み · 販売記録は削除されました",
+        "unlockRecommit": "ロック解除して再計上",
+        "unlockConfirmTitle": "この注文のロックを解除して再計上しますか？",
+        "unlockConfirmBody": "注文 {{order}} に対応する販売記録は削除されました。ロックを解除すると「ステージ」状態に戻り、再度計上できます。",
+        "unlockConfirmWarn": "計上済みの販売を意図的に削除した場合のみ実行してください。再計上すると新しい販売記録が書き込まれます。元の販売が残っている場合、二重計上を防ぐためロック解除は拒否されます。",
+        "unlockConfirmProceed": "ロック解除",
+        "unlocking": "ロック解除中…",
+        "unlockSuccess": "注文 {{order}} のロックを解除しました。再度計上できます。",
+        "unlockError": "ロック解除に失敗しました：{{msg}}",
         "reasons": {
           "not_found": "ステージ注文が見つからないか、別の接続に属しています",
           "already_committed": "計上済みのため再計上できません",
@@ -425,7 +434,9 @@
           "totals_missing": "注文合計がありません",
           "total_mismatch": "注文全体の金額が一致しません（税込価格ストアや未同期の費用の可能性）。保守的にブロックしました",
           "ambiguous_product": "同名の商品が複数あり、一意に特定できません",
-          "write_failed": "書き込みに失敗しました。バッチ全体をロールバックしました"
+          "write_failed": "書き込みに失敗しました。バッチ全体をロールバックしました",
+          "not_committed": "このステージ注文は計上されていません",
+          "sale_still_exists": "計上済みの販売記録がまだ存在します。先に削除してからロックを解除してください"
         }
       }
     }

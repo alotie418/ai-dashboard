@@ -14,6 +14,7 @@ import {
   listStagedOrders,
   listEcommerceSyncLog,
   commitStagedOrders,
+  unlockStagedOrder,
   type Product,
   type StagedOrder,
   type EcommerceSyncLogEntry,
@@ -25,13 +26,14 @@ import { matchOrderItems, type OrderMatchStatus, type ItemMatchStatus } from './
 // 与后端 electron/ecommerce/commit.js 的 MAX_COMMIT 对齐（单次提交上限）
 const MAX_COMMIT = 100;
 
-// 后端 19 个稳定拒因码（commit.js validateOne + write_failed）；未知码回退通用失败文案，
-// 严防 raw key 直出
+// 稳定机器拒因码：commit.js 的 19 个（validateOne + write_failed）+ unlockStaged 的 2 个
+// （not_committed / sale_still_exists；not_found 已含）；未知码回退通用失败文案，严防 raw key 直出
 const REASON_CODES = new Set([
   'not_found', 'already_committed', 'not_staged', 'bad_normalized', 'duplicate_external_order',
   'status_not_committable', 'has_refunds', 'store_currency_missing', 'currency_missing',
   'currency_mismatch', 'date_missing', 'empty_items', 'quantity_invalid', 'amount_missing',
   'amount_inconsistent', 'totals_missing', 'total_mismatch', 'ambiguous_product', 'write_failed',
+  'not_committed', 'sale_still_exists',
 ]);
 
 type CommitPhase = 'confirm' | 'committing' | 'result' | null;
@@ -48,6 +50,9 @@ const EcommerceOrdersModal: React.FC<{ connection: EcommerceConnection; onClose:
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [commitPhase, setCommitPhase] = useState<CommitPhase>(null);
   const [commitResult, setCommitResult] = useState<EcommerceCommitResult | null>(null);
+  // PR-EC5c 解锁重提：仅对孤儿行（committed 但销售记录已删）显示；unlockTarget 打开确认弹窗
+  const [unlockTarget, setUnlockTarget] = useState<StagedOrder | null>(null);
+  const [unlocking, setUnlocking] = useState(false);
 
   const reload = async () => {
     const [prod, rows, log] = await Promise.all([
@@ -155,6 +160,25 @@ const EcommerceOrdersModal: React.FC<{ connection: EcommerceConnection; onClose:
   };
 
   const closeCommitOverlay = () => { setCommitPhase(null); setCommitResult(null); };
+
+  // 解锁孤儿单：后端双重存在性检查（sale 仍在→sale_still_exists 拒绝）；成功后回到 staged 可重提。
+  // 无论成功/失败都 reload，以反映最新状态（如 sale 期间被重建）。
+  const doUnlock = async () => {
+    if (!unlockTarget) return;
+    const label = unlockTarget.orderNumber || unlockTarget.externalOrderId;
+    setUnlocking(true);
+    try {
+      const r = await unlockStagedOrder(connection.id, unlockTarget.id);
+      if (r.ok) flash('success', t('settings.ecommerce.orders.unlockSuccess', { order: label }));
+      else flash('error', t('settings.ecommerce.orders.unlockError', { msg: reasonText(r.code || 'unknown') }));
+    } catch (e: any) {
+      flash('error', t('settings.ecommerce.orders.unlockError', { msg: e?.message || t('common.error') }));
+    } finally {
+      setUnlocking(false);
+      setUnlockTarget(null);
+      await reload();
+    }
+  };
 
   const orderMatchBadge = (s: OrderMatchStatus) => {
     const map: Record<OrderMatchStatus, { key: string; cls: string }> = {
@@ -285,7 +309,9 @@ const EcommerceOrdersModal: React.FC<{ connection: EcommerceConnection; onClose:
                           <span className="text-[10px] text-[#8a8a88] mr-1">{o.platform}</span>
                           <span className="text-sm font-semibold text-[#191918]">{o.orderNumber || o.externalOrderId}</span>
                           {stageBadge(o.stageStatus)}
-                          {o.stageStatus === 'committed' && <span className="text-[10px] text-[#8a8a88] ml-1">{t('settings.ecommerce.orders.committedReadonly')}</span>}
+                          {o.stageStatus === 'committed' && (o.committedSaleMissing
+                            ? <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded ml-1">{t('settings.ecommerce.orders.committedSaleDeleted')}</span>
+                            : <span className="text-[10px] text-[#8a8a88] ml-1">{t('settings.ecommerce.orders.committedReadonly')}</span>)}
                         </span>
                         <span className="text-xs text-[#5c5c5a]">{o.orderStatus || '—'}</span>
                         <span className="text-xs text-[#5c5c5a]">{fmtTime(o.orderUpdatedAt)}</span>
@@ -293,6 +319,15 @@ const EcommerceOrdersModal: React.FC<{ connection: EcommerceConnection; onClose:
                         <span className="text-xs text-[#5c5c5a] text-center">{t('settings.ecommerce.orders.itemsCount', { n: items.length })}</span>
                         <span className="text-center">{orderMatchBadge(m.orderStatus)}</span>
                       </button>
+                      {/* 孤儿单（已入账但销售记录已删）行内解锁重提入口——仅此状态显示 */}
+                      {o.stageStatus === 'committed' && o.committedSaleMissing && (
+                        <span className="flex items-center pr-3">
+                          <button onClick={() => setUnlockTarget(o)}
+                            className="text-[11px] font-medium text-amber-800 border border-amber-300 bg-amber-50 hover:bg-amber-100 rounded-lg px-2.5 py-1 whitespace-nowrap">
+                            <i className="fas fa-unlock mr-1"></i>{t('settings.ecommerce.orders.unlockRecommit')}
+                          </button>
+                        </span>
+                      )}
                     </div>
 
                     {isOpen && (
@@ -449,6 +484,33 @@ const EcommerceOrdersModal: React.FC<{ connection: EcommerceConnection; onClose:
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ===== PR-EC5c 解锁重提确认（仅孤儿单；点击遮罩不关闭） ===== */}
+        {unlockTarget && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl w-full max-w-md flex flex-col overflow-hidden">
+              <div className="px-6 py-4 border-b border-[#e0ddd5]">
+                <h4 className="text-base font-bold text-[#191918]">{t('settings.ecommerce.orders.unlockConfirmTitle')}</h4>
+              </div>
+              <div className="px-6 py-4 space-y-3 text-sm text-[#191918]">
+                <p>{t('settings.ecommerce.orders.unlockConfirmBody', { order: unlockTarget.orderNumber || unlockTarget.externalOrderId })}</p>
+                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{t('settings.ecommerce.orders.unlockConfirmWarn')}</p>
+              </div>
+              <div className="px-6 py-3 border-t border-[#e0ddd5] flex justify-end gap-2">
+                <button onClick={() => setUnlockTarget(null)} disabled={unlocking}
+                  className="px-4 py-2 border border-[#e0ddd5] text-[#4a4a48] rounded-lg text-sm hover:bg-[#f0eeeb] disabled:opacity-50">
+                  {t('settings.ecommerce.orders.confirmCancel')}
+                </button>
+                <button onClick={doUnlock} disabled={unlocking}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                  {unlocking
+                    ? <><i className="fas fa-spinner fa-spin mr-1.5"></i>{t('settings.ecommerce.orders.unlocking')}</>
+                    : <><i className="fas fa-unlock mr-1.5"></i>{t('settings.ecommerce.orders.unlockConfirmProceed')}</>}
+                </button>
+              </div>
             </div>
           </div>
         )}

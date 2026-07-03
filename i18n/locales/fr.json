@@ -395,7 +395,7 @@
         "confirmEstimate": "Total estimé à comptabiliser : {{amount}} (montants définitifs affichés dans le résultat)",
         "confirmNotPostedNote": "Livraison, frais de plateforme et remboursements ne sont jamais comptabilisés ; le montant comptabilisé est la somme des lignes d'articles et peut être inférieur au total de la commande.",
         "confirmCurrencyNote": "Les montants sont enregistrés dans la devise de base du livre — vérifiez que la devise de la boutique correspond.",
-        "confirmIrreversibleNote": "Irréversible ici : pour supprimer une vente comptabilisée, supprimez-la manuellement sur la page Ventes ; la commande en attente ne pourra pas être soumise à nouveau.",
+        "confirmIrreversibleNote": "Irréversible ici : pour supprimer une vente comptabilisée, supprimez-la manuellement sur la page Ventes, puis déverrouillez la commande en attente pour la soumettre à nouveau.",
         "confirmProceed": "Confirmer",
         "confirmCancel": "Annuler",
         "commitSuccess": "{{n}} commande(s) comptabilisée(s).",
@@ -406,6 +406,15 @@
         "resultDiffOther": "Autre écart",
         "resultLines": "{{matched}} associée(s) · {{descriptionOnly}} description seule",
         "commitFailedTitle": "Échec de la comptabilisation",
+        "committedSaleDeleted": "Comptabilisée · vente supprimée",
+        "unlockRecommit": "Déverrouiller et resoumettre",
+        "unlockConfirmTitle": "Déverrouiller cette commande pour la resoumettre ?",
+        "unlockConfirmBody": "La vente correspondant à la commande {{order}} a été supprimée. Le déverrouillage la remet à l'état « en attente » pour pouvoir la comptabiliser à nouveau.",
+        "unlockConfirmWarn": "À ne faire que si la vente comptabilisée a été supprimée intentionnellement. Une nouvelle comptabilisation crée un nouvel enregistrement de vente ; si la vente d'origine existe toujours, le déverrouillage est refusé pour éviter un double enregistrement.",
+        "unlockConfirmProceed": "Déverrouiller",
+        "unlocking": "Déverrouillage…",
+        "unlockSuccess": "Commande {{order}} déverrouillée — elle peut être comptabilisée à nouveau.",
+        "unlockError": "Échec du déverrouillage : {{msg}}",
         "reasons": {
           "not_found": "Commande en attente introuvable ou liée à une autre connexion",
           "already_committed": "Déjà comptabilisée — nouvel envoi impossible",
@@ -425,7 +434,9 @@
           "totals_missing": "Totaux de commande manquants",
           "total_mismatch": "Total non réconcilié (prix TTC ou frais non synchronisés possibles) — bloqué par prudence",
           "ambiguous_product": "Plusieurs produits portent le même nom — association impossible",
-          "write_failed": "Échec d'écriture — tout le lot a été annulé"
+          "write_failed": "Échec d'écriture — tout le lot a été annulé",
+          "not_committed": "Cette commande en attente n'est pas comptabilisée",
+          "sale_still_exists": "L'enregistrement de vente comptabilisé existe encore — supprimez-le d'abord, puis déverrouillez"
         }
       }
     }
