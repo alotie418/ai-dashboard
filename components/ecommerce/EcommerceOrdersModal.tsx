@@ -222,10 +222,21 @@ const EcommerceOrdersModal: React.FC<{ connection: EcommerceConnection; onClose:
   const commitOk = !!(commitResult && commitResult.ok && (commitResult.errors?.length ?? 0) === 0);
 
   // Render through a portal to document.body so the modal escapes the main content area's
-  // stacking context (App.tsx <main> is `relative z-10`, which otherwise traps this modal
-  // BELOW the sidebar `z-20` — clipping its left edge). At body level z-[100] beats the sidebar.
+  // stacking context (App.tsx <main> is `relative z-10`). z-[10001] matches the app's other
+  // full-screen modals (DocumentModal / TaxInvoiceModal / …) so it sits ABOVE the assistant
+  // widget (z-[10000]) and the SnowflakeEffect overlay (z-[9999]); at z-[100] those higher-z
+  // layers sat over this modal and swallowed clicks on its controls (e.g. the header ✕).
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    // WebkitAppRegion:'no-drag' is the real close-button fix: App.tsx's window <header> is a
+    // macOS drag region (-webkit-app-region: drag, top ~64px). The centered modal's header
+    // overlaps that band, and without an explicit no-drag the OS swallows clicks there as window
+    // DRAGS — so the header ✕ never fired onClose while the footer Close (below the band) worked.
+    // Marking the whole overlay no-drag punches the drag region out while the modal is open.
+    <div
+      className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 p-4"
+      style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      onClick={onClose}
+    >
       <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[88vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header — title takes remaining space & truncates so it can NEVER overflow onto the
             close button; the ✕ is a ≥32×32 target, shrink-0 and z-10 so it is always clickable. */}
@@ -236,7 +247,7 @@ const EcommerceOrdersModal: React.FC<{ connection: EcommerceConnection; onClose:
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={(event) => { event.stopPropagation(); onClose(); }}
             aria-label={t('common.close')}
             className="shrink-0 relative z-10 w-9 h-9 inline-flex items-center justify-center rounded-lg text-[#8a8a88] hover:text-[#191918] hover:bg-[#f0eeeb]"
           >
