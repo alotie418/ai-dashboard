@@ -227,13 +227,21 @@ const EcommerceOrdersModal: React.FC<{ connection: EcommerceConnection; onClose:
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[88vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e0ddd5]">
-          <div className="min-w-0">
-            <h3 className="text-lg font-bold text-[#191918]">{t('settings.ecommerce.orders.title')}</h3>
-            <p className="text-xs text-[#6b6b69] mt-0.5 break-all">{connection.label || connection.platformName} · {connection.shopIdentifier}</p>
+        {/* Header — title takes remaining space & truncates so it can NEVER overflow onto the
+            close button; the ✕ is a ≥32×32 target, shrink-0 and z-10 so it is always clickable. */}
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-[#e0ddd5]">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-bold text-[#191918] truncate">{t('settings.ecommerce.orders.title')}</h3>
+            <p className="text-xs text-[#6b6b69] mt-0.5 truncate">{connection.label || connection.platformName} · {connection.shopIdentifier}</p>
           </div>
-          <button onClick={onClose} className="text-[#8a8a88] hover:text-[#191918] p-1" aria-label={t('common.close')}><i className="fas fa-times text-lg"></i></button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t('common.close')}
+            className="shrink-0 relative z-10 w-9 h-9 inline-flex items-center justify-center rounded-lg text-[#8a8a88] hover:text-[#191918] hover:bg-[#f0eeeb]"
+          >
+            <i className="fas fa-times text-lg"></i>
+          </button>
         </div>
 
         {/* Notices + toolbar */}
