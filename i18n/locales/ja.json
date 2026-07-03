@@ -34,7 +34,8 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "ひとり会社のためのスマート帳簿"
+    "subtitle": "ひとり会社のためのスマート帳簿",
+    "demoBanner": "デモモード · サンプルデータ · 実際の帳簿ではありません"
   },
   "nav": {
     "dashboard": "ダッシュボード",

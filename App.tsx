@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { MOCK_BUSINESS_DATA } from './constants';
 import { fetchAIAnalysis } from './services/aiBriefingService';
 import { AIAnalysis, BusinessData } from './types';
-import { fetchDashboardData, fetchPurchases, fetchSettings, listProviders, fetchReceivablesSummary, fetchPayablesSummary } from './services/api';
+import { fetchDashboardData, fetchPurchases, fetchSettings, listProviders, fetchReceivablesSummary, fetchPayablesSummary, getRuntimeInfo } from './services/api';
 import { parseAiErrorCode, aiErrorMessage } from './services/aiErrors';
 import MetricCard from './components/MetricCard';
 import AIInsights from './components/AIInsights';
@@ -93,6 +93,12 @@ const AppContent: React.FC = () => {
   // 避免控制台反复刷 api:request 错误。时间戳(ms)，0 表示无冷却。
   const aiQuotaCooldownRef = useRef(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  // 全局演示模式标识：仅 SOLOLEDGER_DEMO=1 && !app.isPackaged 时后端返回 demo:true（Web/正常模式恒 false）。
+  const [demoMode, setDemoMode] = useState(false);
+  useEffect(() => {
+    try { getRuntimeInfo().then((r) => setDemoMode(!!r?.demo)).catch(() => { /* not demo */ }); }
+    catch { /* web build: no IPC → not demo */ }
+  }, []);
   const [currentPage, setCurrentPage] = useState<PageId>('dashboard');
 
   const [selectedYear, setSelectedYear] = useState('2026');
@@ -508,6 +514,13 @@ const AppContent: React.FC = () => {
 
       {/* Main */}
       <main className="flex-1 flex flex-col overflow-hidden relative z-10">
+        {/* 全局演示模式指示条：覆盖所有页面（看板/销售/库存等），固定在主内容区顶部、不随内容滚动。
+            仅演示模式显示；正常模式此分支不渲染。 */}
+        {demoMode && (
+          <div className="shrink-0 flex items-center justify-center gap-2 bg-amber-100 border-b-2 border-amber-400 text-amber-900 text-sm font-semibold px-8 py-2">
+            <i className="fas fa-flask"></i>{t('app.demoBanner')}
+          </div>
+        )}
         {(
           <header
             className="h-16 glass-bar border-b border-[#e0ddd5] flex items-center justify-between px-8 z-10 shrink-0"

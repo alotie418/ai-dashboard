@@ -34,7 +34,8 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "独账 · 一人公司的智能账本"
+    "subtitle": "独账 · 一人公司的智能账本",
+    "demoBanner": "演示模式 · 示例数据 · 非真实账本"
   },
   "nav": {
     "dashboard": "经营看板",

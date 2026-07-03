@@ -7,6 +7,7 @@
 // 运费/平台费用/退款绝不入账；提交前的合计一律标注「估算」，实际以提交结果为准。
 // 提交不依赖 connection.enabled（后端有意允许对已暂存的本地数据离线提交）。
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   listProducts,
@@ -206,8 +207,11 @@ const EcommerceOrdersModal: React.FC<{ connection: EcommerceConnection; onClose:
   const storeCur = connection.storeCurrency || null;
   const commitOk = !!(commitResult && commitResult.ok && (commitResult.errors?.length ?? 0) === 0);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+  // Render through a portal to document.body so the modal escapes the main content area's
+  // stacking context (App.tsx <main> is `relative z-10`, which otherwise traps this modal
+  // BELOW the sidebar `z-20` — clipping its left edge). At body level z-[100] beats the sidebar.
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[88vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#e0ddd5]">
@@ -515,7 +519,8 @@ const EcommerceOrdersModal: React.FC<{ connection: EcommerceConnection; onClose:
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

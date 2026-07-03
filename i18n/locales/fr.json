@@ -34,7 +34,8 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "Comptabilité intelligente pour entrepreneurs solo"
+    "subtitle": "Comptabilité intelligente pour entrepreneurs solo",
+    "demoBanner": "Mode démo · données d'exemple · PAS votre comptabilité réelle"
   },
   "nav": {
     "dashboard": "Tableau de bord",

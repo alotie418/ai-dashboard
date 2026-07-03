@@ -34,7 +34,8 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "獨帳 · 一人公司的智慧帳本"
+    "subtitle": "獨帳 · 一人公司的智慧帳本",
+    "demoBanner": "示範模式 · 範例資料 · 非真實帳本"
   },
   "nav": {
     "dashboard": "經營看板",

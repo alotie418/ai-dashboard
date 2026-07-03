@@ -34,7 +34,8 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "1인 회사를 위한 스마트 장부"
+    "subtitle": "1인 회사를 위한 스마트 장부",
+    "demoBanner": "데모 모드 · 샘플 데이터 · 실제 장부가 아님"
   },
   "nav": {
     "dashboard": "대시보드",

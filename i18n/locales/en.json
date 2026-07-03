@@ -34,7 +34,8 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "Smart ledger for one-person companies"
+    "subtitle": "Smart ledger for one-person companies",
+    "demoBanner": "Demo mode · sample data · NOT your real ledger"
   },
   "nav": {
     "dashboard": "Dashboard",
