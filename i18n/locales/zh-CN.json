@@ -395,7 +395,7 @@
         "confirmEstimate": "估算入账合计：{{amount}}（实际以提交结果为准）",
         "confirmNotPostedNote": "运费、平台费用、退款不入账；入账金额为商品行合计，可能小于平台订单总额。",
         "confirmCurrencyNote": "金额按账本本位币记录，请确认店铺币种与账本一致。",
-        "confirmIrreversibleNote": "提交后不可在此撤销：如需删除请到销售页手动删除，且对应暂存订单不可重新提交。",
+        "confirmIrreversibleNote": "提交后不可在此撤销：如需删除请到销售页手动删除；删除后可解锁该暂存订单以重新提交。",
         "confirmProceed": "确认提交",
         "confirmCancel": "取消",
         "commitSuccess": "已入账 {{n}} 笔订单。",
@@ -406,6 +406,15 @@
         "resultDiffOther": "其他差额",
         "resultLines": "已匹配 {{matched}} 行 · 仅描述 {{descriptionOnly}} 行",
         "commitFailedTitle": "提交失败",
+        "committedSaleDeleted": "已入账 · 销售记录已删除",
+        "unlockRecommit": "解锁重提",
+        "unlockConfirmTitle": "解锁此订单以重新提交？",
+        "unlockConfirmBody": "订单 {{order}} 对应的销售记录已被删除。解锁后该订单回到「已暂存」状态，可再次提交入账。",
+        "unlockConfirmWarn": "请仅在确实已主动删除该销售记录时操作。重新提交会写入一条新的销售记录；若原销售记录仍存在，解锁将被拒绝以防重复入账。",
+        "unlockConfirmProceed": "解锁",
+        "unlocking": "解锁中…",
+        "unlockSuccess": "订单 {{order}} 已解锁，可重新提交入账。",
+        "unlockError": "解锁失败：{{msg}}",
         "reasons": {
           "not_found": "暂存订单不存在或不属于该连接",
           "already_committed": "已入账，不可重复提交",
@@ -425,7 +434,9 @@
           "totals_missing": "订单合计金额缺失",
           "total_mismatch": "整单对账不平（可能为含税价店铺或含未同步费用），已保守拦截",
           "ambiguous_product": "商品名称存在多个同名匹配，无法唯一确定",
-          "write_failed": "写入失败，整批已回滚"
+          "write_failed": "写入失败，整批已回滚",
+          "not_committed": "该暂存订单未入账",
+          "sale_still_exists": "对应销售记录仍然存在——请先删除再解锁"
         }
       }
     }

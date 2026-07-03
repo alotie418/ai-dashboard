@@ -223,6 +223,9 @@ export interface StagedOrder {
   orderNumber: string | null; orderStatus: string | null; orderCreatedAt: string | null; orderUpdatedAt: string | null;
   currency: string | null; totalGross: number | null; normalized: EcommerceNormalizedOrder | null;
   matchStatus: string | null; stageStatus: string | null; committedSaleId: string | null;
+  // true iff this row is committed but its posted sale was later deleted (orphan) — the only
+  // state the "unlock & re-commit" affordance is offered for (see unlockStagedOrder).
+  committedSaleMissing?: boolean;
   firstSeenAt: string | null; lastPulledAt: string | null; error: string | null;
 }
 export interface EcommerceSyncLogEntry {
@@ -290,6 +293,20 @@ export interface EcommerceCommitResult {
 /** 提交选中的暂存订单 → 写入销售记录（后端全或无 + 幂等；单次上限 100 单） */
 export function commitStagedOrders(connectionId: string, stagedIds: number[]): Promise<EcommerceCommitResult> {
   return electronInvoke<EcommerceCommitResult>('ecommerce:commit', { connectionId, stagedIds });
+}
+
+/** 解锁一笔「已入账但销售记录已被删除」的孤儿暂存单 → 回到 staged 可重新提交。
+ *  code: not_found / not_committed / sale_still_exists（后端双重存在性检查，sale 仍在则拒绝）。
+ *  只更新该 staged 行，不写 sales/sales_items、不写 sync_log、不动拉单水位。 */
+export interface EcommerceUnlockResult {
+  ok: boolean;
+  success?: boolean;
+  stagedId?: number;
+  code?: string;      // not_found / not_committed / sale_still_exists / unknown
+  message?: string;
+}
+export function unlockStagedOrder(connectionId: string, stagedId: number): Promise<EcommerceUnlockResult> {
+  return electronInvoke<EcommerceUnlockResult>('ecommerce:unlockStaged', { connectionId, stagedId });
 }
 
 // ==================== AI 助手聊天（走统一 apiFetch：桌面 IPC / Web fetch）====================

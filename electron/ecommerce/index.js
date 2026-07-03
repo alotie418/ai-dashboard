@@ -271,9 +271,18 @@ function listStaged({ connectionId, status, limit = 200 } = {}) {
   const args = [];
   if (connectionId) { where.push('connection_id = ?'); args.push(connectionId); }
   if (status) { where.push('stage_status = ?'); args.push(status); }
+  // committed_sale_missing: a committed row whose posted sale was later DELETED (orphan) — the
+  // ONLY state the unlock affordance is offered for. Mirrors unlockStaged's double existence
+  // check (deterministic PK AND (connection, external_order_id)) so the button appears exactly
+  // when an unlock would be permitted. Read-only derived flag; changes nothing.
   const sql = `SELECT id, connection_id, platform, external_order_id, order_number, order_status,
       order_created_at, order_updated_at, currency, total_gross, normalized_json, match_status,
-      stage_status, committed_sale_id, first_seen_at, last_pulled_at, error
+      stage_status, committed_sale_id, first_seen_at, last_pulled_at, error,
+      CASE WHEN stage_status = 'committed'
+        AND NOT EXISTS (SELECT 1 FROM sales sx WHERE sx.id = ecommerce_staged_orders.committed_sale_id)
+        AND NOT EXISTS (SELECT 1 FROM sales sy WHERE sy.ecommerce_connection_id = ecommerce_staged_orders.connection_id
+                          AND sy.external_order_id = ecommerce_staged_orders.external_order_id)
+      THEN 1 ELSE 0 END AS committed_sale_missing
     FROM ecommerce_staged_orders
     ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
     ORDER BY order_updated_at DESC, id DESC LIMIT ?`;
@@ -287,6 +296,7 @@ function listStaged({ connectionId, status, limit = 200 } = {}) {
       orderCreatedAt: r.order_created_at, orderUpdatedAt: r.order_updated_at,
       currency: r.currency, totalGross: r.total_gross, normalized,
       matchStatus: r.match_status, stageStatus: r.stage_status, committedSaleId: r.committed_sale_id,
+      committedSaleMissing: !!r.committed_sale_missing,
       firstSeenAt: r.first_seen_at, lastPulledAt: r.last_pulled_at, error: r.error,
     };
   });
@@ -314,6 +324,42 @@ function listSyncLog({ connectionId, limit = 50 } = {}) {
   });
 }
 
+// PR-EC5c: unlock a COMMITTED staged order whose posted sale was later DELETED, so it can be
+// committed again. This is the ONLY escape from the commit-time 'already_committed' lock, and it
+// is deliberately narrow:
+//   - refuses unless the posted sale is truly gone — DOUBLE existence check: neither the
+//     deterministic PK 'sale-ec-<id>' NOR any sale on (connection, external_order_id) may exist
+//     (returns 'sale_still_exists'); you can never unlock a live posting.
+//   - touches ONLY this staged row (stage_status → 'staged', clears committed_sale_id / error).
+//     Writes NOTHING to sales / sales_items / sync_log and never moves the pull cursor/watermark.
+//   - re-commit still flows through the UNCHANGED commit.js — its three idempotency layers
+//     (staged-status → deterministic PK → partial unique index) stay fully intact, so a stale
+//     unlock still cannot double-post.
+// Synchronous (better-sqlite3): the read checks and the UPDATE cannot interleave.
+function unlockStaged({ connectionId, stagedId } = {}) {
+  const db = getDb();
+  if (!connectionId) throw new Error('connectionId required');
+  const conn = db.prepare('SELECT id FROM ecommerce_connections WHERE id = ?').get(connectionId);
+  if (!conn) { const e = new Error('连接不存在'); e.code = 'not_found'; throw e; }
+
+  const sid = Number(stagedId);
+  if (!Number.isInteger(sid)) { const e = new Error('invalid stagedId'); e.code = 'not_found'; throw e; }
+  const row = db.prepare('SELECT id, connection_id, external_order_id, stage_status, committed_sale_id FROM ecommerce_staged_orders WHERE id = ?').get(sid);
+  if (!row || row.connection_id !== connectionId) { const e = new Error('staged order not found'); e.code = 'not_found'; throw e; }
+  if (row.stage_status !== 'committed') { const e = new Error('staged order is not committed'); e.code = 'not_committed'; throw e; }
+
+  // double existence check — refuse while the posted sale is still there (deterministic PK OR key)
+  const byId = row.committed_sale_id ? db.prepare('SELECT 1 FROM sales WHERE id = ?').get(row.committed_sale_id) : null;
+  const byKey = db.prepare('SELECT 1 FROM sales WHERE ecommerce_connection_id = ? AND external_order_id = ?').get(connectionId, row.external_order_id);
+  if (byId || byKey) { const e = new Error('posted sale still exists'); e.code = 'sale_still_exists'; throw e; }
+
+  const u = db.prepare(`UPDATE ecommerce_staged_orders
+    SET stage_status = 'staged', committed_sale_id = NULL, error = NULL, updated_at = datetime('now')
+    WHERE id = ? AND stage_status = 'committed'`).run(sid);
+  if (u.changes !== 1) { const e = new Error('unlock failed'); e.code = 'not_committed'; throw e; }
+  return { success: true, stagedId: sid };
+}
+
 // PR-EC5a: staged → sales/sales_items commit (the ONLY ledger-writing path in this
 // module tree; two-pass all-or-nothing, see ./commit.js)
 const { commit } = require('./commit');
@@ -324,6 +370,8 @@ module.exports = {
   pull, listStaged, listSyncLog,
   // PR-EC5a: commit staged orders into the ledger
   commit,
+  // PR-EC5c: unlock an orphaned committed staged order (posted sale deleted) for re-commit
+  unlockStaged,
   // exported for tests
   _PROVIDERS: PROVIDERS, _VALID_IDS: VALID_IDS,
 };

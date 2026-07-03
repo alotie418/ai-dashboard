@@ -127,6 +127,17 @@ function registerHandlers({ ipcMain, dialog }) {
     }
   });
 
+  // PR-EC5c: unlock a committed staged order whose posted sale was DELETED, so it can be
+  // re-committed. Refuses (sale_still_exists) if the sale is still present. Updates ONLY the
+  // staged row — no ledger / sync_log / cursor writes. Guard failures come back as { ok:false }.
+  ipcMain.handle('ecommerce:unlockStaged', async (_evt, payload) => {
+    try {
+      return { ok: true, ...ecommerceCore.unlockStaged(payload || {}) };
+    } catch (err) {
+      return { ok: false, code: err?.code || 'unknown', message: err?.message };
+    }
+  });
+
   // ====== 数据库备份 / 导出（文件夹 bundle：DB + 附件，§2A#3）======
   // 导出为一个文件夹（sololedger.db + attachments/docs/*），而非单 .db——否则换机导入后
   // tax_invoice_attachment_path 全部悬空。与 #152 启动自动备份同形，可互相恢复。
