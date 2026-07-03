@@ -1,9 +1,20 @@
 # 电商平台接入 · 连接器架构与多平台目录计划
 
-> 状态：**设计文档（只读产出）**。本文件不改 schema、不改运行代码。
-> 基线：main `c44bb92` / #330 · schema **v21**（`ecommerce_connections` 已上线）。
-> 进度：**#329（本设计文档初版）已合并**；**#330（Shopify 连接设置 MVP）已合并** —— Shopify 连接管理 + safeStorage 加密凭证 + `testConnection` 已落地（仅连接设置，未拉单、未写账本）。
-> 本次修订：目标平台扩展为 **11 个**、按**三档**分层、系统设置改为**平台目录**、provider 接口写入 **5 种 authMode**、修正后续代码 PR 范围（Shopify 已完成，下一步只补 WooCommerce）。
+> 状态：**架构设计文档（只读产出）**。本文件不改 schema、不改运行代码。
+> 当前基线：main `e83ca5d` / #339 · schema **v23**。
+> 历史初版基线：main `c44bb92` / #330 · schema v21（下文 §6–§7 部分「下一步 / 拟定」措辞为**当时的规划**，实际落地状态以 §9 PR 表与 [MVP 状态文档](./ECOMMERCE_MVP_STATUS.md) 为准）。
+
+---
+
+## 状态更新（#339 · MVP 闭环收尾）
+
+Shopify + WooCommerce 的**连接设置 → 拉单暂存 → 预览 → 提交入账 → 孤儿单解锁重提**闭环已全部落地（#330 · #332 · #333 · #334 · #335 · #336 · #339），schema 从 v21 演进到 **v23**。本文档保留为**架构设计与平台目录**的权威说明；**当前能力、不支持/暂缓项、测试覆盖、真实店铺 QA 待验项与 EC6 会计决策**改由以下三份文档承载：
+
+- [电商订单接入 · MVP 状态与能力清单](./ECOMMERCE_MVP_STATUS.md)
+- [WooCommerce 真实店铺 · 人工 QA 准备与验收清单](./ECOMMERCE_WOO_REAL_STORE_QA.md)
+- [EC6 · 平台费 / 退款 / 结算入账 · 会计决策问题单](./ECOMMERCE_EC6_ACCOUNTANT_QUESTIONS.md)
+
+> 定位不变：本模块是**订单数据导入 / 暂存 / 预览 / 入账辅助**工具，属经营管理与记账辅助，**不是**自动税务合规、自动会计合规、自动报税或完整电商 ERP。WooCommerce 链路**本地自动化已覆盖，真实店铺行为仍待实证**（见 QA 清单）。
 
 ---
 
@@ -23,7 +34,9 @@
 
 ## 1. 现状盘点（订单导入相关）
 
-### 1.1 账本与连接数据结构（schema v21）
+### 1.1 账本与连接数据结构（schema v21 时点快照）
+
+> **更新（#339）**：现状已演进到 schema **v23**（v22 加连接同步列 + `ecommerce_staged_orders` + `ecommerce_sync_log`；v23 加 `sales` 溯源列 + 部分唯一索引）。下表为 v21 时点快照，最新结构见 §7 更新说明与 [MVP 状态文档 §3](./ECOMMERCE_MVP_STATUS.md)。
 
 | 表 | 版本 | 关键列 |
 |---|---|---|
@@ -184,7 +197,9 @@ interface EcommerceProvider {
 
 ---
 
-## 6. 路线决策（Shopify 已完成，下一步 WooCommerce）
+## 6. 路线决策（历史规划 · 现已全部落地）
+
+> **更新（#339）**：下表为初版路线规划。截至 #339，Shopify 与 WooCommerce 全链路均已落地，schema 到 v23；「下一步 WooCommerce」「多币种先限单店铺」等措辞为当时状态，实际能力见 [MVP 状态文档](./ECOMMERCE_MVP_STATUS.md)。费用/退款仍为 EC6 后置项（需会计师，见 [EC6 问题单](./ECOMMERCE_EC6_ACCOUNTANT_QUESTIONS.md)）。
 
 | 项 | 决策 |
 |---|---|
@@ -205,9 +220,16 @@ interface EcommerceProvider {
 
 ---
 
-## 7. 拟定 schema 字段与约束（拉单 PR 前定稿）
+## 7. schema 字段与约束（草案 → 已落地 v22/v23）
 
-> `ecommerce_connections` 已在 **v21（#330）** 上线（仅连接设置列，见 §1.1）。以下为**拉单/提交阶段**才需要的**新增草案**，均为 additive、不改会计含义列；**落地前需最终确认**。
+> **更新（#339）**：以下代码块为**当时的草案**。截至 #339 全部已落地为 additive 迁移（不改会计含义列），但**最终字段与草案有两处差异**，以实际实现为准：
+>
+> 1. **`sales` 溯源列（§7.2）**：最终新增了 **3 列** `external_order_id` / `platform_source` / **`ecommerce_connection_id`**（草案只列前两列）；部分唯一索引 `idx_sales_ec_conn_order` 建在 **`(ecommerce_connection_id, external_order_id)`**（**连接级**，草案写的是 `(platform_source, external_order_id)`）——连接级去重更严谨（同平台两家店订单号可撞）。
+> 2. **`ecommerce_staged_orders`（§7.3）**：最终列名为 `stage_status`（默认 `staged`）/ `match_status`（默认 `unresolved`）/ `first_seen_at` / `last_pulled_at` / `order_number` / `order_status` / `currency` / `total_gross` 等（草案的 `status` / `dedup_status` / `created_at` 未采用该命名）。
+>
+> 迁移落地对应：**v22**（#333）= 连接同步列 + `ecommerce_staged_orders` + `ecommerce_sync_log`；**v23**（#335）= `sales` 溯源列 + 部分唯一索引。守卫见 `test-migrations.mjs` block 13/14/15。下方草案保留为设计留档。
+>
+> `ecommerce_connections` 已在 **v21（#330）** 上线（仅连接设置列，见 §1.1）。以下为**拉单/提交阶段**新增草案，均为 additive、不改会计含义列。
 
 ### 7.1 `ecommerce_connections` 增量（拉单 PR 再加游标列）
 
@@ -325,14 +347,17 @@ CREATE TABLE ecommerce_sync_log (
 | PR | 内容 | 状态 / 风险 |
 |---|---|---|
 | **设计文档 #329** | 本文件初版（连接器架构 + Shopify MVP 计划） | ✅ **MERGED**（main `ed98aed`） |
-| **本次文档修订** | 11 平台目录 + 三档 + 5 种 authMode + 平台目录 UI 设计 + 范围修正 | 📄 **当前 PR（仅本文档，无代码）** |
+| **文档修订 #331** | 11 平台目录 + 三档 + 5 种 authMode + 平台目录 UI 设计 + 范围修正 | ✅ **MERGED** |
 | **PR-EC1 · Shopify 连接设置 #330** | schema v21 `ecommerce_connections` + 通用 provider 接口 + Shopify `manual_token` `testConnection` + 设置页 | ✅ **MERGED**（main `c44bb92`） |
-| **PR-EC2 · WooCommerce + 平台目录 + authMode 泛化（下一步代码）** | WooCommerce 连接器（`key_secret`）+ 设置页改**平台目录**（11 平台状态徽标）+ provider 接口 meta 加 **5 种 authMode + status**；**其余 9 平台仅目录占位**，不实现 API、不写 schema 特化字段。**不新增 schema**（复用 v21） | 中 · 需批准 |
-| **PR-EC3 · 拉单 → 暂存** | 加 §7 schema（sales 幂等列 + staged_orders + sync_log + connections 游标列）+ 手动拉单 + 分页/限流/游标 + 同步日志，**对账本只读** | 中 · 需批准 |
-| **PR-EC4 · 预览 UI** | 克隆 `CsvImportModal` + 商品解析 + 去重展示（**仍不提交**） | 低 · 需批准 |
-| **PR-EC5 · 暂存 → 提交** | batch 写 `sales/sales_items` + 幂等去重 + 全或无 —— **首次真正写账本** | 高 · 需批准，最高谨慎 |
-| **PR-EC6（后置 · 需会计师）** | 平台费 / 退款 / 结算入账 —— 政策决策 | 高 · 暂缓 |
-| **二/三档平台接入（各自独立 PR）** | Amazon/TikTok/TEMU/SHEIN + 国内平台；多数需先解决 §8.4 云端 OAuth/签名 + 官方文档确认 | 高 · 后置 |
+| **PR-EC2 · WooCommerce + 平台目录 + authMode 泛化 #332** | WooCommerce 连接器（`key_secret`）+ 平台目录（11 平台状态徽标）+ provider 接口 5 种 authMode + status；其余 9 平台仅目录占位。**不新增 schema**（复用 v21） | ✅ **MERGED** |
+| **PR-EC3 · 拉单 → 暂存 #333** | schema **v22**（连接同步列 + `ecommerce_staged_orders` + `ecommerce_sync_log`）+ 手动拉单 + 分页/限流/水位 + 同步日志，**对账本只读** | ✅ **MERGED**（main `f1721b4`） |
+| **PR-EC4 · 预览 UI #334** | 暂存订单预览模态 + 商品名称匹配（**仍不提交**） | ✅ **MERGED**（main `f7efbe2`） |
+| **PR-EC5a · 暂存 → 提交（后端）#335** | schema **v23**（`sales` 溯源列 + 部分唯一索引）+ 两遍式全或无 + 四层幂等 + 整单对账守卫 —— **首次写账本** | ✅ **MERGED**（main `2c99a32`） |
+| **PR-EC5b · 提交入账 UI #336** | 勾选 + 确认弹窗 + 结果/拒因面板（纯前端） | ✅ **MERGED**（main `11a7fd0`） |
+| **PR-EC5c · 孤儿单解锁重提 #339** | 删除已入账 sale 后可解锁重提（双重存在性检查防重复）；零 schema 变更 | ✅ **MERGED**（main `e83ca5d`） |
+| **#337 / #338** | 电商 i18n 占位符修复 / WooCommerce 本地 QA 测试补覆盖 | ✅ **MERGED** |
+| **PR-EC6（后置 · 需会计师）** | 平台费 / 退款 / 结算入账 —— 政策决策，见 [EC6 问题单](./ECOMMERCE_EC6_ACCOUNTANT_QUESTIONS.md) | ⏸ 暂缓（需会计师） |
+| **二/三档平台接入（各自独立 PR）** | Amazon/TikTok/TEMU/SHEIN + 国内平台；多数需先解决 §8.4 云端 OAuth/签名 + 官方文档确认 | ⏸ 后置 |
 
 ---
 
@@ -340,22 +365,25 @@ CREATE TABLE ecommerce_sync_log (
 
 ### 10.1 验证命令
 
-- UI/i18n（PR-EC2/4）：`npm run check:all` · `npm run typecheck` · `npm run build` · `npm run test:locale-ui`
-- schema/handler（PR-EC3/5）：`npm run check:migrations` · `npm run check:handlers` · `npm run check:all` · `npm run typecheck` · `npm run build`
+- UI/i18n：`npm run check:all` · `npm run typecheck` · `npm run build` · `npm run test:locale-ui`
+- schema/handler：`npm run check:migrations` · `npm run check:handlers` · `npm run check:all` · `npm run typecheck` · `npm run build`
   - 本机 better-sqlite3 ABI 会 SKIP handlers/migrations → 用既有流程真跑：`npm rebuild better-sqlite3` → `npm run check:handlers`/`check:migrations` → `npm run electron:rebuild`
-- 真 IPC/凭证/出网（PR-EC2/3/5）：`npm run test:electron`
+- 电商专项（均已并入 `check:all`）：`npm run check:ecommerce-match`（商品匹配前后端 parity）· `npm run check:ecommerce-http`（WooCommerce provider HTTP 分支，stub fetch，无需 sqlite/electron，plain node 直跑）
+- 真 IPC/凭证/出网：`npm run test:electron`
 
 ### 10.2 人工 QA
 
-- **PR-EC2（WooCommerce + 目录）**：目录显示 11 平台正确分档/状态；一档可添加连接、二三档置灰不可连；WooCommerce 用 key/secret 测试连接（错误→友好报错不泄密，正确→显示站点信息）；**确认无任何「账号+密码」输入**；账本零变化。
-- **拉单/提交 PR** 沿用（Shopify 开发店铺 + token）：拉样例订单→暂存出现、账本零变化；预览多明细/商品匹配；幂等重复拉/提交不重复；提交后表头=Σ明细；换机恢复提示重录；PII 脱敏；断网退避重试。
+- **WooCommerce 真实店铺 QA**：本地自动化已覆盖，真实店铺行为仍待实证——逐项验收清单见 [WooCommerce 真实店铺 QA 清单](./ECOMMERCE_WOO_REAL_STORE_QA.md)（TLS/证书、只读 key 权限语义、HPOS/税含价/插件 payload 变异、`X-WP-TotalPages`、`modified_after`、真实限流、量级性能、`store_currency` UX，以及拉单→预览→提交→删 sale→解锁重提端到端）。
+- **Shopify 真实店铺 QA**：同为后续人工 QA 项（本地自动化覆盖，仍待真实店铺实证）：拉样例订单→暂存出现、账本零变化；预览多明细/商品匹配；幂等重复拉/提交不重复；提交后表头=Σ明细；换机恢复提示重录；PII 脱敏；断网退避重试。
 
 ---
 
 ## 11. 官方文档待确认清单（不臆造字段）
 
-- **Shopify GraphQL Admin API**：订单查询字段、line items / shipping / refunds / transactions 结构、custom app token 权限 scope、游标翻页与限流、季度 API 版本（`SHOPIFY_API_VERSION` 常量需每季度维护）。
-- **WooCommerce REST API**：consumer key/secret 生成与鉴权、orders 端点字段、翻页参数（官方说明 REST API 使用 generated consumer key/secret）。
+> **更新（#339）**：Shopify / WooCommerce 的字段映射已按官方文档实现并有本地自动化守卫（`normalizeOrder` 纯函数测试 + provider HTTP 分支测试），但**真实店铺 payload 变异仍待实证**（见 [WooCommerce QA 清单](./ECOMMERCE_WOO_REAL_STORE_QA.md)）；其余平台仍为纯待确认。
+
+- **Shopify GraphQL Admin API**：订单查询字段、line items / shipping / refunds / transactions 结构、custom app token 权限 scope、游标翻页与限流、季度 API 版本（`SHOPIFY_API_VERSION` 常量需每季度维护）。**（一档已实现，字段按官方文档，真店待实证）**
+- **WooCommerce REST API**：consumer key/secret 生成与鉴权、orders 端点字段、翻页参数、`X-WP-TotalPages`、`modified_after`。**（一档已实现，字段按官方文档，真店待实证）**
 - **Amazon SP-API**：LWA/OAuth2 授权、开发者/应用注册、Orders API scope、限流；回调与 app secret 托管要求（§8.4）。
 - **TikTok Shop / TEMU / SHEIN 开放平台**：应用注册与授权流程、订单 API 可用性与 scope、OAuth 回调、限流 —— **逐一按官方文档确认可用性**。
 - **国内平台**（拼多多 / 淘宝天猫 TOP / 京东宙斯 / 抖店 / 小红书）：签名算法、订单 scope、ISV/服务商资质要求、桌面端持 app secret 的合规性与云端托管必要性（§8.4）—— **逐一按官方文档确认**。
