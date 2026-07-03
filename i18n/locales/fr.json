@@ -289,6 +289,7 @@
       "title": "Plateformes e-commerce",
       "subtitle": "Connectez une boutique en ligne pour importer des commandes ultérieurement. Cette version enregistre et teste uniquement la connexion.",
       "mvpNotice": "Aperçu : cette version enregistre les identifiants de la boutique et teste la connexion uniquement. L'import des commandes n'est pas encore activé — rien n'est écrit dans votre comptabilité.",
+      "demoBanner": "Mode démo —— données d'exemple dans une base de démonstration isolée, PAS votre comptabilité réelle. Tout ici est fictif.",
       "desktopOnly": "Les connexions e-commerce sont disponibles uniquement dans l'application de bureau.",
       "addStore": "Ajouter une boutique Shopify",
       "noConnections": "Aucune boutique connectée pour le moment.",

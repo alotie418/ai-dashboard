@@ -19,6 +19,11 @@ export function isDesktop(): boolean {
   return isElectron();
 }
 
+/** 运行时信息：是否处于隔离的演示模式（示例数据·非真实账本·仅开发环境）。仅桌面版可用。 */
+export function getRuntimeInfo(): Promise<{ demo: boolean }> {
+  return electronInvoke<{ demo: boolean }>('app:runtimeInfo');
+}
+
 export interface BackupResult {
   ok: boolean;
   path?: string;   // 成功时：备份文件保存路径

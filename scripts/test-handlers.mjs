@@ -3588,9 +3588,50 @@ const isoDay = (offset) => new Date(Date.now() - offset * dayMs).toISOString().s
   }
 }
 
+// ───────────── EC27: isolated demo-mode seed (sample data, no network, no real ledger) ─────────────
+// Proves demoSeed's guard (refuses outside demo mode), its idempotency (empty→seeds, non-empty→no-op),
+// and that it produces the intended showcase state: 9 sample orders, 2 committed, 1 orphan, an
+// ambiguous order that rejects. Runs on a :memory: DB with the in-memory demo provider injected —
+// the exact seam demoSeed uses in production (opts.providers), so nothing hits the network.
+{
+  const { seedDemoIfEmpty, DEMO_CONNECTION_ID } = require(join(ROOT, 'electron/ecommerce/demoSeed.js'));
+  const { demoProviders } = require(join(ROOT, 'electron/ecommerce/providers/demo.js'));
+
+  const db = freshDb();
+
+  // guard: refuses when NOT in demo mode and no test override → writes nothing
+  await expectThrow(async () => seedDemoIfEmpty({ providers: demoProviders() }), '[EC27] seed refuses outside demo mode');
+  ok(db.prepare('SELECT COUNT(*) AS c FROM ecommerce_connections').get().c === 0
+    && db.prepare('SELECT COUNT(*) AS c FROM ecommerce_staged_orders').get().c === 0, '[EC27] refused seed wrote nothing');
+
+  // seed the empty (test) demo DB via the injected in-memory provider (no network)
+  const r1 = await seedDemoIfEmpty({ _allowAnyEnv: true, providers: demoProviders() });
+  ok(r1.seeded === true && r1.connectionId === DEMO_CONNECTION_ID, `[EC27] seed runs on empty db, got ${JSON.stringify(r1)}`);
+  ok(db.prepare('SELECT COUNT(*) AS c FROM ecommerce_staged_orders WHERE connection_id = ?').get(DEMO_CONNECTION_ID).c === 9, '[EC27] 9 sample orders staged');
+  ok(db.prepare("SELECT COUNT(*) AS c FROM ecommerce_staged_orders WHERE stage_status = 'staged'").get().c === 7, '[EC27] 7 orders remain staged for the user to try');
+  ok(db.prepare("SELECT COUNT(*) AS c FROM ecommerce_staged_orders WHERE stage_status = 'committed'").get().c === 2, '[EC27] 2 orders committed by the seed');
+  ok(db.prepare('SELECT COUNT(*) AS c FROM sales').get().c === 1, '[EC27] one committed sale remains (the other was deleted to make the orphan)');
+
+  const rows = ecommerceCore.listStaged({ connectionId: DEMO_CONNECTION_ID });
+  ok(rows.filter((o) => o.committedSaleMissing).length === 1, '[EC27] exactly one committed orphan (unlock & re-commit demo)');
+  ok(db.prepare("SELECT COUNT(*) AS c FROM products WHERE name = 'Dup Item' AND is_active = 1").get().c === 2, '[EC27] two same-named products seed the ambiguous demo');
+
+  // idempotency: a second seed on the non-empty demo DB is a no-op (no overwrite/reset/append)
+  const r2 = await seedDemoIfEmpty({ _allowAnyEnv: true, providers: demoProviders() });
+  ok(r2.seeded === false && r2.reason === 'already_seeded', '[EC27] second seed is a no-op (already seeded)');
+  ok(db.prepare('SELECT COUNT(*) AS c FROM ecommerce_staged_orders').get().c === 9
+    && db.prepare('SELECT COUNT(*) AS c FROM sales').get().c === 1, '[EC27] idempotent: staged + sales counts unchanged');
+
+  // the "Dup Item" sample order rejects with ambiguous_product (spot-check a demo rejection path)
+  const amb = rows.find((o) => (o.normalized?.items || []).some((it) => it.name === 'Dup Item'));
+  const ambRes = ecommerceCore.commit({ connectionId: DEMO_CONNECTION_ID, stagedIds: [amb.id] });
+  ok(ambRes.success === 0 && ambRes.errors[0]?.reasons.includes('ambiguous_product'), '[EC27] the Dup Item sample order rejects with ambiguous_product');
+  ok(db.prepare('SELECT COUNT(*) AS c FROM sales').get().c === 1, '[EC27] rejected demo commit wrote nothing new');
+}
+
 if (failures.length) {
   console.error(`✗ handlers: ${failures.length} assertion(s) failed:`);
   for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
-console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + fx-reference-conversion(multi-currency reference conversion read-only, PR-7B P3-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears) + ecommerce connections(EC1 no-credential-leak/EC2 shopify catalog/EC3 setEnabled/EC4 remove/EC5 shopify-domain normalise/EC6 woocommerce key_secret catalog/EC7 11-platform catalog display-only/EC8 non-connectable save-test whitelist reject/EC9 woocommerce https-only URL normalise) + ecommerce pull→staging(EC10 normalizeOrder pure/no-PII/EC11 pull ok staged+watermark+no-ledger-write/EC12 idempotent re-pull/EC13 20-page cap→partial/EC14 error→sync_log+redacted+watermark-frozen) + ecommerce staged→commit(EC15 happy path header=Σitems+provenance+report-breakdown+derived-inventory/EC16 description-only NULL product_id no-inventory-move/EC17 ambiguous blocks + all-or-nothing/EC18 idempotency staged-status→PK→partial-unique/EC19 guard matrix zero-write/EC20 status→payment matrix/EC21 mixed-rate header taxRate NULL/EC22 no side effects + pull skips committed/EC23 input hardening+dedupe/EC24 adapter refinements woo-discount+free-order+multi-taxline/EC25 WooCommerce end-to-end raw→real-normalizeOrder→real-pull→commit, mixed accept/reject, PII-dropped, derived-inventory/EC26 unlock orphaned committed staged order (posted sale deleted)→re-commit, double existence check sale_still_exists, unlock touches only staged row no sync_log/cursor, re-pull refreshes)) via real dispatch on :memory: DB');
+console.log('✓ handlers: round-trips passed (transactions/purchases/sales CRUD+payment+validation + dashboard e2e + router + categories/products/inventory + accounts(cash/bank master data + opening balance, PR-7D-1) + liabilities(loans/other liabilities ledger, PR-7D-2) + fixed_assets(fixed-assets register, PR-7D-3) + equity(equity/capital ledger, PR-7D-4) + tax_payments(tax-payments ledger, PR-7D-5) + ledger-summary(read-only snapshot, PR-7B-1) + cash-position(read-only roll-forward preview, PR-7B P1-2) + balance-overview(management-basis read-only aggregation, PR-7B P1-3) + depreciation-preview(straight-line read-only, PR-7B P2-2) + retained-earnings-preview(management-basis read-only, PR-7B P2-4a) + income-tax-position(income-tax accrual−paid read-only, PR-7B P3-1) + fx-reference-conversion(multi-currency reference conversion read-only, PR-7B P3-3) + alerts + receivables/payables aging + settings + reports(structural) + batch + conversations + mileage + homeOffice + legacy data-migrations + business documents(fs-free) + cashflow operating aggregation + cashflow acceptance(reports.generate, PR-7E) + provider key security(N5 no-plaintext/N6 delete-clears) + ecommerce connections(EC1 no-credential-leak/EC2 shopify catalog/EC3 setEnabled/EC4 remove/EC5 shopify-domain normalise/EC6 woocommerce key_secret catalog/EC7 11-platform catalog display-only/EC8 non-connectable save-test whitelist reject/EC9 woocommerce https-only URL normalise) + ecommerce pull→staging(EC10 normalizeOrder pure/no-PII/EC11 pull ok staged+watermark+no-ledger-write/EC12 idempotent re-pull/EC13 20-page cap→partial/EC14 error→sync_log+redacted+watermark-frozen) + ecommerce staged→commit(EC15 happy path header=Σitems+provenance+report-breakdown+derived-inventory/EC16 description-only NULL product_id no-inventory-move/EC17 ambiguous blocks + all-or-nothing/EC18 idempotency staged-status→PK→partial-unique/EC19 guard matrix zero-write/EC20 status→payment matrix/EC21 mixed-rate header taxRate NULL/EC22 no side effects + pull skips committed/EC23 input hardening+dedupe/EC24 adapter refinements woo-discount+free-order+multi-taxline/EC25 WooCommerce end-to-end raw→real-normalizeOrder→real-pull→commit, mixed accept/reject, PII-dropped, derived-inventory/EC26 unlock orphaned committed staged order (posted sale deleted)→re-commit, double existence check sale_still_exists, unlock touches only staged row no sync_log/cursor, re-pull refreshes/EC27 isolated demo-mode seed guard+idempotency+9-order showcase (2 committed/1 orphan/ambiguous reject) via injected in-memory demo provider, no network)) via real dispatch on :memory: DB');

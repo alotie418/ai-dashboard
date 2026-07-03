@@ -11,10 +11,27 @@ const MAX_AUTO_BACKUPS = 10;
 
 let db = null;
 
-function getDbPath() {
+// Demo mode = an isolated, throwaway sandbox for exercising / showcasing the full app with
+// sample data. Gate: BOTH SOLOLEDGER_DEMO=1 AND a non-packaged (dev) build — a PACKAGED build
+// can NEVER enter demo mode. (In non-Electron test runtimes `app` is undefined here → false.)
+function isDemoMode() {
+  return !!(process.env.SOLOLEDGER_DEMO === '1' && app && !app.isPackaged);
+}
+
+// The demo-aware DATA ROOT. Everything that must stay isolated in demo mode — the DB, its
+// auto-backups / snapshots, document attachments, and export/import bundles — derives its path
+// from HERE, so this single branch keeps them ALL under userData/demo/ in demo mode and byte-
+// identical to userData otherwise. Callers outside this module must use getDataDir()/getDbPath()
+// rather than app.getPath('userData') directly, or they leak demo data into the real root.
+function getDataDir() {
   const userData = app.getPath('userData');
-  if (!fs.existsSync(userData)) fs.mkdirSync(userData, { recursive: true });
-  return path.join(userData, 'sololedger.db');
+  const dir = isDemoMode() ? path.join(userData, 'demo') : userData;
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function getDbPath() {
+  return path.join(getDataDir(), 'sololedger.db');
 }
 
 function initDatabase() {
@@ -872,4 +889,4 @@ function _setDbForTest(testDb) { db = testDb; }
 
 // MIGRATIONS / runMigrations / _setDbForTest 导出仅供测试（test-migrations / test-handlers）
 // 在 :memory: 库上驱动真实迁移与 handler 往返；应用运行时仍只用 initDatabase。
-module.exports = { initDatabase, getDb, getDbPath, closeDb, SCHEMA_VERSION, MIGRATIONS, runMigrations, _setDbForTest };
+module.exports = { initDatabase, getDb, getDbPath, getDataDir, isDemoMode, closeDb, SCHEMA_VERSION, MIGRATIONS, runMigrations, _setDbForTest };

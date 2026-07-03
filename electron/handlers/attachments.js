@@ -14,16 +14,18 @@ function isValidAttachmentRelPath(rel) {
   return typeof rel === 'string' && REL_RE.test(rel) && !rel.includes('..');
 }
 
+// Attachment root descends from the demo-aware data dir (== userData outside demo mode), so demo
+// attachments stay under userData/demo/ and never leak into the real root.
 function getDocsAttachmentsRoot() {
-  const { app } = require('electron');
-  return path.join(app.getPath('userData'), 'attachments', 'docs');
+  const { getDataDir } = require('../db');
+  return path.join(getDataDir(), 'attachments', 'docs');
 }
 
 // 相对路径 → 绝对路径；非法/越界返回 null
 function resolveAttachment(rel) {
   if (!isValidAttachmentRelPath(rel)) return null;
-  const { app } = require('electron');
-  const userData = app.getPath('userData');
+  const { getDataDir } = require('../db');
+  const userData = getDataDir();
   const abs = path.resolve(userData, rel);
   const root = path.resolve(userData, 'attachments', 'docs');
   if (!abs.startsWith(root + path.sep)) return null;

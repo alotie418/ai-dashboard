@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   isDesktop,
+  getRuntimeInfo,
   listEcommerceProviders,
   listEcommerceConnections,
   saveEcommerceConnection,
@@ -54,6 +55,7 @@ const EcommerceConnectionsSection: React.FC = () => {
   const [rowTest, setRowTest] = useState<Record<string, { testing: boolean; result: 'ok' | 'fail' | null; msg: string }>>({});
   const [globalMessage, setGlobalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [ordersFor, setOrdersFor] = useState<EcommerceConnection | null>(null);
+  const [demo, setDemo] = useState(false);   // 隔离演示模式（示例数据·非真实账本）
 
   const activeProvider = providers.find((p) => p.id === form.platform) || null;
   const activeCredKeys = activeProvider ? (CRED_KEYS[activeProvider.authMode] || []) : [];
@@ -65,9 +67,14 @@ const EcommerceConnectionsSection: React.FC = () => {
 
   const reload = async () => {
     try {
-      const [prov, conns] = await Promise.all([listEcommerceProviders(), listEcommerceConnections()]);
+      const [prov, conns, rt] = await Promise.all([
+        listEcommerceProviders(),
+        listEcommerceConnections(),
+        getRuntimeInfo().catch(() => ({ demo: false })),
+      ]);
       setProviders(prov);
       setConnections(conns);
+      setDemo(!!rt.demo);
     } catch (e: any) {
       setLoadError(t('settings.ecommerce.loadError', { msg: e?.message || t('common.error') }));
     } finally {
@@ -196,6 +203,12 @@ const EcommerceConnectionsSection: React.FC = () => {
         <h3 className="text-xl font-bold text-[#191918]">{t('settings.ecommerce.title')}</h3>
         <p className="text-xs text-[#6b6b69] mt-1">{t('settings.ecommerce.subtitle')}</p>
       </div>
+
+      {demo && (
+        <div className="text-sm font-semibold text-amber-900 bg-amber-100 border-2 border-amber-400 rounded-xl px-4 py-3">
+          <i className="fas fa-flask mr-2"></i>{t('settings.ecommerce.demoBanner')}
+        </div>
+      )}
 
       <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
         <i className="fas fa-circle-info mr-1.5"></i>{t('settings.ecommerce.mvpNotice')}

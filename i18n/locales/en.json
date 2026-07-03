@@ -289,6 +289,7 @@
       "title": "E-commerce Platforms",
       "subtitle": "Connect an online store to import orders later. This version only saves and tests the connection.",
       "mvpNotice": "Preview: this saves store credentials and tests the connection only. Order import is not enabled yet — nothing is written to your ledger.",
+      "demoBanner": "Demo mode — sample data in an isolated demo database, NOT your real ledger. Everything here is fictional.",
       "desktopOnly": "E-commerce connections are available in the desktop app only.",
       "addStore": "Add Shopify store",
       "noConnections": "No store connected yet.",
