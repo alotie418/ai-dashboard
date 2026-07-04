@@ -7,6 +7,7 @@
 // 运费/平台费用/退款绝不入账；提交前的合计一律标注「估算」，实际以提交结果为准。
 // 提交不依赖 connection.enabled（后端有意允许对已暂存的本地数据离线提交）。
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   listProducts,
@@ -196,26 +197,62 @@ const EcommerceOrdersModal: React.FC<{ connection: EcommerceConnection; onClose:
     if (s === 'ambiguous') return <span className="text-[10px] text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded" title={t('settings.ecommerce.orders.ambiguousHint')}>{t('settings.ecommerce.orders.matchAmbiguous')}</span>;
     return <span className="text-[10px] text-[#8a8a88] bg-[#f0eeeb] px-1.5 py-0.5 rounded" title={t('settings.ecommerce.orders.descriptionOnly')}>{t('settings.ecommerce.orders.matchUnmatched')}</span>;
   };
-  const stageBadge = (s: string | null) => {
-    if (s === 'committed') return <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">{t('settings.ecommerce.orders.stageCommitted')}</span>;
-    if (s === 'error') return <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">{t('settings.ecommerce.orders.stageError')}</span>;
-    return <span className="text-[10px] font-bold text-[#5c5c5a] bg-[#f0eeeb] px-2 py-0.5 rounded">{t('settings.ecommerce.orders.stageStaged')}</span>;
+  const stageBadge = (s: string | null, title?: string) => {
+    if (s === 'committed') return <span title={title} className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded whitespace-nowrap">{t('settings.ecommerce.orders.stageCommitted')}</span>;
+    if (s === 'error') return <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded whitespace-nowrap">{t('settings.ecommerce.orders.stageError')}</span>;
+    return <span className="text-[10px] font-bold text-[#5c5c5a] bg-[#f0eeeb] px-2 py-0.5 rounded whitespace-nowrap">{t('settings.ecommerce.orders.stageStaged')}</span>;
+  };
+
+  // Friendly platform display name — never the bare 'woocommerce' enum in the UI.
+  const platformLabel = (p: string | null) =>
+    (({ shopify: 'Shopify', woocommerce: 'WooCommerce' } as Record<string, string>)[p || '']) || (p || '—');
+
+  // Platform order status → localised label (WooCommerce lowercase / Shopify uppercase enums).
+  // Known statuses are localised for readability (esp. the Chinese demo UI); unknown ones fall
+  // back to the raw value, which is always kept in the cell's title. Display layer only — the
+  // backend status enums are NOT changed.
+  const statusLabel = (raw: string | null) => {
+    if (!raw) return '—';
+    const key = String(raw).trim().toLowerCase().replace(/[\s-]+/g, '_');
+    return t('settings.ecommerce.orders.status.' + key, { defaultValue: '' }) || raw;
   };
 
   const lastRun = syncLog[0] || null;
   const storeCur = connection.storeCurrency || null;
   const commitOk = !!(commitResult && commitResult.ok && (commitResult.errors?.length ?? 0) === 0);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+  // Render through a portal to document.body so the modal escapes the main content area's
+  // stacking context (App.tsx <main> is `relative z-10`). z-[10001] matches the app's other
+  // full-screen modals (DocumentModal / TaxInvoiceModal / …) so it sits ABOVE the assistant
+  // widget (z-[10000]) and the SnowflakeEffect overlay (z-[9999]); at z-[100] those higher-z
+  // layers sat over this modal and swallowed clicks on its controls (e.g. the header ✕).
+  return createPortal(
+    // WebkitAppRegion:'no-drag' is the real close-button fix: App.tsx's window <header> is a
+    // macOS drag region (-webkit-app-region: drag, top ~64px). The centered modal's header
+    // overlaps that band, and without an explicit no-drag the OS swallows clicks there as window
+    // DRAGS — so the header ✕ never fired onClose while the footer Close (below the band) worked.
+    // Marking the whole overlay no-drag punches the drag region out while the modal is open.
+    <div
+      className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 p-4"
+      style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      onClick={onClose}
+    >
       <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[88vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e0ddd5]">
-          <div className="min-w-0">
-            <h3 className="text-lg font-bold text-[#191918]">{t('settings.ecommerce.orders.title')}</h3>
-            <p className="text-xs text-[#6b6b69] mt-0.5 break-all">{connection.label || connection.platformName} · {connection.shopIdentifier}</p>
+        {/* Header — title takes remaining space & truncates so it can NEVER overflow onto the
+            close button; the ✕ is a ≥32×32 target, shrink-0 and z-10 so it is always clickable. */}
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-[#e0ddd5]">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-bold text-[#191918] truncate">{t('settings.ecommerce.orders.title')}</h3>
+            <p className="text-xs text-[#6b6b69] mt-0.5 truncate">{connection.label || connection.platformName} · {connection.shopIdentifier}</p>
           </div>
-          <button onClick={onClose} className="text-[#8a8a88] hover:text-[#191918] p-1" aria-label={t('common.close')}><i className="fas fa-times text-lg"></i></button>
+          <button
+            type="button"
+            onClick={(event) => { event.stopPropagation(); onClose(); }}
+            aria-label={t('common.close')}
+            className="shrink-0 relative z-10 w-9 h-9 inline-flex items-center justify-center rounded-lg text-[#8a8a88] hover:text-[#191918] hover:bg-[#f0eeeb]"
+          >
+            <i className="fas fa-times text-lg"></i>
+          </button>
         </div>
 
         {/* Notices + toolbar */}
@@ -304,16 +341,17 @@ const EcommerceOrdersModal: React.FC<{ connection: EcommerceConnection; onClose:
                           aria-label={o.orderNumber || o.externalOrderId} />
                       </span>
                       <button onClick={() => toggle(o.id)} className="flex-1 min-w-0 text-left px-3 py-2.5 grid grid-cols-1 md:grid-cols-[1.5fr_1fr_1fr_0.8fr_0.6fr_0.9fr] gap-2 items-center hover:bg-[#faf9f7] rounded-r-xl">
-                        <span className="min-w-0">
-                          <i className={`fas fa-chevron-${isOpen ? 'down' : 'right'} text-[9px] text-[#8a8a88] mr-1.5`}></i>
-                          <span className="text-[10px] text-[#8a8a88] mr-1">{o.platform}</span>
-                          <span className="text-sm font-semibold text-[#191918]">{o.orderNumber || o.externalOrderId}</span>
-                          {stageBadge(o.stageStatus)}
-                          {o.stageStatus === 'committed' && (o.committedSaleMissing
-                            ? <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded ml-1">{t('settings.ecommerce.orders.committedSaleDeleted')}</span>
-                            : <span className="text-[10px] text-[#8a8a88] ml-1">{t('settings.ecommerce.orders.committedReadonly')}</span>)}
+                        {/* 主行单行不换行：平台友好名(短) + 订单号(可截断) + 状态徽标；只读说明进徽标 title */}
+                        <span className="min-w-0 flex items-center gap-1.5 overflow-hidden">
+                          <i className={`fas fa-chevron-${isOpen ? 'down' : 'right'} text-[9px] text-[#8a8a88] shrink-0`}></i>
+                          <span className="text-[10px] text-[#8a8a88] shrink-0">{platformLabel(o.platform)}</span>
+                          <span className="text-sm font-semibold text-[#191918] truncate min-w-0">{o.orderNumber || o.externalOrderId}</span>
+                          {stageBadge(o.stageStatus, o.stageStatus === 'committed' && !o.committedSaleMissing ? t('settings.ecommerce.orders.committedReadonly') : undefined)}
+                          {o.stageStatus === 'committed' && o.committedSaleMissing && (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap">{t('settings.ecommerce.orders.committedSaleDeleted')}</span>
+                          )}
                         </span>
-                        <span className="text-xs text-[#5c5c5a]">{o.orderStatus || '—'}</span>
+                        <span className="text-xs text-[#5c5c5a] truncate" title={o.orderStatus || undefined}>{statusLabel(o.orderStatus)}</span>
                         <span className="text-xs text-[#5c5c5a]">{fmtTime(o.orderUpdatedAt)}</span>
                         <span className="text-xs text-[#191918] text-right font-medium">{money(o.totalGross, o.currency)}</span>
                         <span className="text-xs text-[#5c5c5a] text-center">{t('settings.ecommerce.orders.itemsCount', { n: items.length })}</span>
@@ -515,7 +553,8 @@ const EcommerceOrdersModal: React.FC<{ connection: EcommerceConnection; onClose:
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

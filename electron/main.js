@@ -6,6 +6,8 @@ const path = require('node:path');
 const fs = require('node:fs');
 
 const isDev = !app.isPackaged;
+// Demo mode is decided in one place (electron/db/index.js): SOLOLEDGER_DEMO=1 AND non-packaged.
+const { isDemoMode } = require('./db');
 
 let mainWindow = null;
 
@@ -36,6 +38,7 @@ function createMainWindow() {
     height: 900,
     minWidth: 1100,
     minHeight: 700,
+    title: isDemoMode() ? 'SoloLedger [DEMO]' : 'SoloLedger',
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#ffffff',
     show: false,
@@ -100,6 +103,18 @@ if (!gotSingleInstanceLock) {
       registerHandlers({ ipcMain, dialog });
     } catch (e) {
       console.error('[handlers] registration failed:', e?.message || e);
+    }
+
+    // Demo mode: seed the isolated demo DB with sample e-commerce data on first launch.
+    // Idempotent (no-op if already seeded) and gated to demo mode; never runs for a real DB.
+    if (isDemoMode()) {
+      try {
+        const { seedDemoIfEmpty } = require('./ecommerce/demoSeed');
+        const res = await seedDemoIfEmpty();
+        console.log('[demo] seed:', res?.seeded ? `seeded ${res.staged} sample orders` : `skipped (${res?.reason})`);
+      } catch (e) {
+        console.error('[demo] seed failed:', e?.message || e);
+      }
     }
 
     createMainWindow();

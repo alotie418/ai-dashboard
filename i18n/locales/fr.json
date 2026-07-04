@@ -34,7 +34,8 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "Comptabilité intelligente pour entrepreneurs solo"
+    "subtitle": "Comptabilité intelligente pour entrepreneurs solo",
+    "demoBanner": "Mode démo · données d'exemple · PAS votre comptabilité réelle"
   },
   "nav": {
     "dashboard": "Tableau de bord",
@@ -289,6 +290,7 @@
       "title": "Plateformes e-commerce",
       "subtitle": "Connectez une boutique en ligne pour importer des commandes ultérieurement. Cette version enregistre et teste uniquement la connexion.",
       "mvpNotice": "Aperçu : cette version enregistre les identifiants de la boutique et teste la connexion uniquement. L'import des commandes n'est pas encore activé — rien n'est écrit dans votre comptabilité.",
+      "demoBanner": "Mode démo —— données d'exemple dans une base de démonstration isolée, PAS votre comptabilité réelle. Tout ici est fictif.",
       "desktopOnly": "Les connexions e-commerce sont disponibles uniquement dans l'application de bureau.",
       "addStore": "Ajouter une boutique Shopify",
       "noConnections": "Aucune boutique connectée pour le moment.",
@@ -406,7 +408,7 @@
         "resultDiffOther": "Autre écart",
         "resultLines": "{{matched}} associée(s) · {{descriptionOnly}} description seule",
         "commitFailedTitle": "Échec de la comptabilisation",
-        "committedSaleDeleted": "Comptabilisée · vente supprimée",
+        "committedSaleDeleted": "Vente supprimée",
         "unlockRecommit": "Déverrouiller et resoumettre",
         "unlockConfirmTitle": "Déverrouiller cette commande pour la resoumettre ?",
         "unlockConfirmBody": "La vente correspondant à la commande {{order}} a été supprimée. Le déverrouillage la remet à l'état « en attente » pour pouvoir la comptabiliser à nouveau.",
@@ -415,6 +417,21 @@
         "unlocking": "Déverrouillage…",
         "unlockSuccess": "Commande {{order}} déverrouillée — elle peut être comptabilisée à nouveau.",
         "unlockError": "Échec du déverrouillage : {{msg}}",
+        "status": {
+          "pending": "En attente",
+          "processing": "En cours",
+          "on_hold": "En pause",
+          "completed": "Terminée",
+          "cancelled": "Annulée",
+          "refunded": "Remboursée",
+          "failed": "Échouée",
+          "paid": "Payée",
+          "authorized": "Autorisée",
+          "partially_paid": "Partiellement payée",
+          "partially_refunded": "Partiellement remboursée",
+          "voided": "Paiement annulé",
+          "expired": "Expirée"
+        },
         "reasons": {
           "not_found": "Commande en attente introuvable ou liée à une autre connexion",
           "already_committed": "Déjà comptabilisée — nouvel envoi impossible",

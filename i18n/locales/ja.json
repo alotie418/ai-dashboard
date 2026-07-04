@@ -34,7 +34,8 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "ひとり会社のためのスマート帳簿"
+    "subtitle": "ひとり会社のためのスマート帳簿",
+    "demoBanner": "デモモード · サンプルデータ · 実際の帳簿ではありません"
   },
   "nav": {
     "dashboard": "ダッシュボード",
@@ -289,6 +290,7 @@
       "title": "ECプラットフォーム連携",
       "subtitle": "オンラインストアを接続し、後で注文を取り込む準備をします。現在のバージョンは接続の保存とテストのみ行います。",
       "mvpNotice": "プレビュー機能：ストアの認証情報を保存し接続をテストするだけです。注文の取り込みはまだ有効ではなく、帳簿には何も書き込まれません。",
+      "demoBanner": "デモモード —— 分離されたデモ用データベース内のサンプルデータです。実際の帳簿ではありません。ここのデータはすべて架空です。",
       "desktopOnly": "EC連携はデスクトップ版でのみ利用できます。",
       "addStore": "Shopifyストアを追加",
       "noConnections": "まだストアが接続されていません。",
@@ -406,7 +408,7 @@
         "resultDiffOther": "その他の差額",
         "resultLines": "一致 {{matched}} 行 · 説明のみ {{descriptionOnly}} 行",
         "commitFailedTitle": "計上に失敗しました",
-        "committedSaleDeleted": "計上済み · 販売記録は削除されました",
+        "committedSaleDeleted": "販売記録は削除済み",
         "unlockRecommit": "ロック解除して再計上",
         "unlockConfirmTitle": "この注文のロックを解除して再計上しますか？",
         "unlockConfirmBody": "注文 {{order}} に対応する販売記録は削除されました。ロックを解除すると「ステージ」状態に戻り、再度計上できます。",
@@ -415,6 +417,21 @@
         "unlocking": "ロック解除中…",
         "unlockSuccess": "注文 {{order}} のロックを解除しました。再度計上できます。",
         "unlockError": "ロック解除に失敗しました：{{msg}}",
+        "status": {
+          "pending": "処理待ち",
+          "processing": "処理中",
+          "on_hold": "保留中",
+          "completed": "完了",
+          "cancelled": "キャンセル",
+          "refunded": "返金済み",
+          "failed": "失敗",
+          "paid": "支払済み",
+          "authorized": "承認済み",
+          "partially_paid": "一部支払い",
+          "partially_refunded": "一部返金",
+          "voided": "無効",
+          "expired": "期限切れ"
+        },
         "reasons": {
           "not_found": "ステージ注文が見つからないか、別の接続に属しています",
           "already_committed": "計上済みのため再計上できません",

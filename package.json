@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "electron": "electron .",
     "electron:dev": "concurrently -k \"npm:dev\" \"wait-on http://localhost:3000 && electron .\"",
+    "electron:demo": "concurrently -k \"npm:dev\" \"wait-on http://localhost:3000 && SOLOLEDGER_DEMO=1 electron .\"",
     "electron:rebuild": "electron-rebuild -f -w better-sqlite3",
     "check:locale-matrix": "node --experimental-loader ./scripts/_ts-resolver.mjs scripts/check-locale-matrix.mjs",
     "check:raw-keys": "node scripts/check-raw-key-leaks.mjs",

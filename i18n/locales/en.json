@@ -34,7 +34,8 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "Smart ledger for one-person companies"
+    "subtitle": "Smart ledger for one-person companies",
+    "demoBanner": "Demo mode · sample data · NOT your real ledger"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -289,6 +290,7 @@
       "title": "E-commerce Platforms",
       "subtitle": "Connect an online store to import orders later. This version only saves and tests the connection.",
       "mvpNotice": "Preview: this saves store credentials and tests the connection only. Order import is not enabled yet — nothing is written to your ledger.",
+      "demoBanner": "Demo mode — sample data in an isolated demo database, NOT your real ledger. Everything here is fictional.",
       "desktopOnly": "E-commerce connections are available in the desktop app only.",
       "addStore": "Add Shopify store",
       "noConnections": "No store connected yet.",
@@ -406,7 +408,7 @@
         "resultDiffOther": "Other difference",
         "resultLines": "{{matched}} matched · {{descriptionOnly}} description-only",
         "commitFailedTitle": "Commit failed",
-        "committedSaleDeleted": "Committed · sales record deleted",
+        "committedSaleDeleted": "Sales record deleted",
         "unlockRecommit": "Unlock & re-commit",
         "unlockConfirmTitle": "Unlock this order for re-commit?",
         "unlockConfirmBody": "The sales record for order {{order}} has been deleted. Unlocking returns it to \"staged\" so it can be committed again.",
@@ -415,6 +417,21 @@
         "unlocking": "Unlocking…",
         "unlockSuccess": "Order {{order}} unlocked — it can be committed again.",
         "unlockError": "Unlock failed: {{msg}}",
+        "status": {
+          "pending": "Pending",
+          "processing": "Processing",
+          "on_hold": "On hold",
+          "completed": "Completed",
+          "cancelled": "Cancelled",
+          "refunded": "Refunded",
+          "failed": "Failed",
+          "paid": "Paid",
+          "authorized": "Authorized",
+          "partially_paid": "Partially paid",
+          "partially_refunded": "Partially refunded",
+          "voided": "Voided",
+          "expired": "Expired"
+        },
         "reasons": {
           "not_found": "Staged order not found or belongs to another connection",
           "already_committed": "Already committed — cannot be committed again",

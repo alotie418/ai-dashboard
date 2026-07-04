@@ -34,7 +34,8 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "独账 · 一人公司的智能账本"
+    "subtitle": "独账 · 一人公司的智能账本",
+    "demoBanner": "演示模式 · 示例数据 · 非真实账本"
   },
   "nav": {
     "dashboard": "经营看板",
@@ -289,6 +290,7 @@
       "title": "电商平台接入",
       "subtitle": "连接线上店铺，为后续导入订单做准备。当前版本仅保存并测试连接。",
       "mvpNotice": "预览功能：仅保存店铺凭证并测试连接，暂不导入订单——不会写入任何账本数据。",
+      "demoBanner": "演示模式 —— 示例数据，存放在隔离的演示数据库，非真实账本。此处所有数据均为虚构。",
       "desktopOnly": "电商连接仅在桌面版可用。",
       "addStore": "添加 Shopify 店铺",
       "noConnections": "尚未连接任何店铺。",
@@ -406,7 +408,7 @@
         "resultDiffOther": "其他差额",
         "resultLines": "已匹配 {{matched}} 行 · 仅描述 {{descriptionOnly}} 行",
         "commitFailedTitle": "提交失败",
-        "committedSaleDeleted": "已入账 · 销售记录已删除",
+        "committedSaleDeleted": "销售记录已删除",
         "unlockRecommit": "解锁重提",
         "unlockConfirmTitle": "解锁此订单以重新提交？",
         "unlockConfirmBody": "订单 {{order}} 对应的销售记录已被删除。解锁后该订单回到「已暂存」状态，可再次提交入账。",
@@ -415,6 +417,21 @@
         "unlocking": "解锁中…",
         "unlockSuccess": "订单 {{order}} 已解锁，可重新提交入账。",
         "unlockError": "解锁失败：{{msg}}",
+        "status": {
+          "pending": "待处理",
+          "processing": "处理中",
+          "on_hold": "挂起",
+          "completed": "已完成",
+          "cancelled": "已取消",
+          "refunded": "已退款",
+          "failed": "失败",
+          "paid": "已付款",
+          "authorized": "已授权",
+          "partially_paid": "部分付款",
+          "partially_refunded": "部分退款",
+          "voided": "已作废",
+          "expired": "已过期"
+        },
         "reasons": {
           "not_found": "暂存订单不存在或不属于该连接",
           "already_committed": "已入账，不可重复提交",

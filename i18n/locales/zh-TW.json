@@ -34,7 +34,8 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "獨帳 · 一人公司的智慧帳本"
+    "subtitle": "獨帳 · 一人公司的智慧帳本",
+    "demoBanner": "示範模式 · 範例資料 · 非真實帳本"
   },
   "nav": {
     "dashboard": "經營看板",
@@ -289,6 +290,7 @@
       "title": "電商平台接入",
       "subtitle": "連接線上商店，為後續匯入訂單做準備。目前版本僅儲存並測試連線。",
       "mvpNotice": "預覽功能：僅儲存商店憑證並測試連線，暫不匯入訂單——不會寫入任何帳本資料。",
+      "demoBanner": "示範模式 —— 範例資料，存放在隔離的示範資料庫，非真實帳本。此處所有資料均為虛構。",
       "desktopOnly": "電商連線僅在桌面版可用。",
       "addStore": "新增 Shopify 商店",
       "noConnections": "尚未連接任何商店。",
@@ -406,7 +408,7 @@
         "resultDiffOther": "其他差額",
         "resultLines": "已比對 {{matched}} 行 · 僅描述 {{descriptionOnly}} 行",
         "commitFailedTitle": "提交失敗",
-        "committedSaleDeleted": "已入帳 · 銷售記錄已刪除",
+        "committedSaleDeleted": "銷售記錄已刪除",
         "unlockRecommit": "解鎖重新提交",
         "unlockConfirmTitle": "解鎖此訂單以重新提交？",
         "unlockConfirmBody": "訂單 {{order}} 對應的銷售記錄已被刪除。解鎖後該訂單回到「已暫存」狀態，可再次提交入帳。",
@@ -415,6 +417,21 @@
         "unlocking": "解鎖中…",
         "unlockSuccess": "訂單 {{order}} 已解鎖，可重新提交入帳。",
         "unlockError": "解鎖失敗：{{msg}}",
+        "status": {
+          "pending": "待處理",
+          "processing": "處理中",
+          "on_hold": "擱置",
+          "completed": "已完成",
+          "cancelled": "已取消",
+          "refunded": "已退款",
+          "failed": "失敗",
+          "paid": "已付款",
+          "authorized": "已授權",
+          "partially_paid": "部分付款",
+          "partially_refunded": "部分退款",
+          "voided": "已作廢",
+          "expired": "已過期"
+        },
         "reasons": {
           "not_found": "暫存訂單不存在或不屬於此連線",
           "already_committed": "已入帳，不可重複提交",

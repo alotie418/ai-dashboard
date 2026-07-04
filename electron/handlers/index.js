@@ -6,6 +6,7 @@
 const { dispatch } = require('./router');
 const aiCore = require('../ai');
 const ecommerceCore = require('../ecommerce');
+const { isDemoMode } = require('../db');
 // §2A PR-1：把 SQLite/fs 写失败（磁盘满/IO/只读）归一化为稳定码，供备份·附件 catch 贴码。
 // 仅用于 app:* 备份/附件路径；不触碰 api:request CRUD 保存路径（那是 PR-2 范围）。
 const { diskErrorCode } = require('./_dbError');
@@ -88,6 +89,8 @@ function registerHandlers({ ipcMain, dialog }) {
 
   ipcMain.handle('ecommerce:test', async (_evt, payload) => {
     try {
+      // Demo mode: answer OK in-process — never reach the network with a real provider.
+      if (isDemoMode()) return { ok: true, storeInfo: { name: 'demo-store.local', domain: 'demo-store.local', currency: null } };
       // ecommerceCore.test already returns { ok, ... } (never throws for expected
       // auth/network failures); wrap only genuine exceptions (bad id / db).
       return await ecommerceCore.test(payload || {});
@@ -100,7 +103,13 @@ function registerHandlers({ ipcMain, dialog }) {
   // ecommerce:staged / ecommerce:syncLog are read-only lists (never carry credentials).
   ipcMain.handle('ecommerce:pull', async (_evt, payload) => {
     try {
-      const summary = await ecommerceCore.pull((payload && payload.connectionId), payload || {});
+      const opts = { ...(payload || {}) };
+      // Demo mode: pull the in-memory sample orders (no network, no credential decrypt).
+      if (isDemoMode()) {
+        opts.providers = require('../ecommerce/providers/demo').demoProviders();
+        opts.creds = { demo: true };
+      }
+      const summary = await ecommerceCore.pull(opts.connectionId, opts);
       return { ok: true, ...summary };
     } catch (err) {
       return { ok: false, code: err?.code || 'unknown', message: err?.message };
@@ -138,11 +147,14 @@ function registerHandlers({ ipcMain, dialog }) {
     }
   });
 
+  // Runtime info for the renderer — currently just the demo-mode flag (drives the demo banner).
+  ipcMain.handle('app:runtimeInfo', async () => ({ demo: isDemoMode() }));
+
   // ====== 数据库备份 / 导出（文件夹 bundle：DB + 附件，§2A#3）======
   // 导出为一个文件夹（sololedger.db + attachments/docs/*），而非单 .db——否则换机导入后
   // tax_invoice_attachment_path 全部悬空。与 #152 启动自动备份同形，可互相恢复。
   ipcMain.handle('app:exportDb', async () => {
-    const { getDbPath, getDb } = require('../db');
+    const { getDbPath, getDataDir, getDb } = require('../db');
     const path = require('node:path');
     const { app } = require('electron');
     const { writeExportBundle } = require('./_backupBundle');
@@ -155,7 +167,7 @@ function registerHandlers({ ipcMain, dialog }) {
       defaultPath: path.join(app.getPath('documents'), `sololedger-backup-${new Date().toISOString().slice(0, 10)}`),
     });
     if (result.canceled || !result.filePath) return { ok: false };
-    const res = writeExportBundle({ dbPath, userDataDir: app.getPath('userData'), destDir: result.filePath });
+    const res = writeExportBundle({ dbPath, userDataDir: getDataDir(), destDir: result.filePath });
     if (!res.ok) return { ok: false, error: diskErrorCode(res) || 'EXPORT_FAILED' };
     return { ok: true, path: res.path, attachments: res.attachments };
   });
@@ -168,7 +180,7 @@ function registerHandlers({ ipcMain, dialog }) {
     const fs = require('node:fs');
     const path = require('node:path');
     const { app } = require('electron');
-    const { getDbPath, getDb, closeDb, SCHEMA_VERSION } = require('../db');
+    const { getDbPath, getDataDir, getDb, closeDb, SCHEMA_VERSION } = require('../db');
     const { resolveImportSource, mergeAttachments } = require('./_backupBundle');
 
     // 1. 选择 bundle 文件夹 或 旧单 .db 文件
@@ -223,7 +235,9 @@ function registerHandlers({ ipcMain, dialog }) {
     let autoBackupPath;
     try {
       try { getDb().pragma('wal_checkpoint(TRUNCATE)'); } catch { /* best effort */ }
-      const backupsDir = path.join(app.getPath('userData'), 'backups');
+      // demo-aware: derive from getDataDir() so a restore in demo mode snapshots the DEMO db into
+      // userData/demo/backups (== userData/backups outside demo mode), never the real root.
+      const backupsDir = path.join(getDataDir(), 'backups');
       if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       autoBackupPath = path.join(backupsDir, `sololedger-autobackup-before-restore-${stamp}.db`);
@@ -251,7 +265,7 @@ function registerHandlers({ ipcMain, dialog }) {
     //     DB 已成功恢复，附件合并失败只记日志、不让整个恢复失败（缺失附件 UI 已优雅处理）。
     let attachmentsMerged = 0;
     if (attachSrc) {
-      const m = mergeAttachments({ attachSrc, userDataDir: app.getPath('userData') });
+      const m = mergeAttachments({ attachSrc, userDataDir: getDataDir() });
       attachmentsMerged = m.merged || 0;
       if (!m.ok) console.warn('[app:importDb] attachment merge failed:', m.error);
     }

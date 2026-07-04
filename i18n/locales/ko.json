@@ -34,7 +34,8 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "1인 회사를 위한 스마트 장부"
+    "subtitle": "1인 회사를 위한 스마트 장부",
+    "demoBanner": "데모 모드 · 샘플 데이터 · 실제 장부가 아님"
   },
   "nav": {
     "dashboard": "대시보드",
@@ -289,6 +290,7 @@
       "title": "이커머스 플랫폼 연동",
       "subtitle": "온라인 상점을 연결하여 이후 주문을 가져올 준비를 합니다. 현재 버전은 연결 저장 및 테스트만 지원합니다.",
       "mvpNotice": "미리보기 기능: 상점 자격 증명을 저장하고 연결을 테스트하기만 합니다. 주문 가져오기는 아직 활성화되지 않았으며 장부에 아무것도 기록되지 않습니다.",
+      "demoBanner": "데모 모드 —— 격리된 데모 데이터베이스의 샘플 데이터이며 실제 장부가 아닙니다. 여기의 모든 데이터는 가상입니다.",
       "desktopOnly": "이커머스 연결은 데스크톱 앱에서만 사용할 수 있습니다.",
       "addStore": "Shopify 상점 추가",
       "noConnections": "아직 연결된 상점이 없습니다.",
@@ -406,7 +408,7 @@
         "resultDiffOther": "기타 차액",
         "resultLines": "매칭 {{matched}}행 · 설명만 {{descriptionOnly}}행",
         "commitFailedTitle": "반영 실패",
-        "committedSaleDeleted": "반영됨 · 판매 기록 삭제됨",
+        "committedSaleDeleted": "판매 기록 삭제됨",
         "unlockRecommit": "잠금 해제 후 재반영",
         "unlockConfirmTitle": "이 주문의 잠금을 해제하여 다시 반영할까요?",
         "unlockConfirmBody": "주문 {{order}}에 해당하는 판매 기록이 삭제되었습니다. 잠금을 해제하면 「스테이징」 상태로 돌아가 다시 반영할 수 있습니다.",
@@ -415,6 +417,21 @@
         "unlocking": "잠금 해제 중…",
         "unlockSuccess": "주문 {{order}} 잠금이 해제되었습니다. 다시 반영할 수 있습니다.",
         "unlockError": "잠금 해제 실패: {{msg}}",
+        "status": {
+          "pending": "대기 중",
+          "processing": "처리 중",
+          "on_hold": "보류",
+          "completed": "완료",
+          "cancelled": "취소됨",
+          "refunded": "환불됨",
+          "failed": "실패",
+          "paid": "결제됨",
+          "authorized": "승인됨",
+          "partially_paid": "부분 결제",
+          "partially_refunded": "부분 환불",
+          "voided": "무효",
+          "expired": "만료됨"
+        },
         "reasons": {
           "not_found": "스테이징 주문이 없거나 다른 연결에 속해 있습니다",
           "already_committed": "이미 반영되어 다시 반영할 수 없습니다",
