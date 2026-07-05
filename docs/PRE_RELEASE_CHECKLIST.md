@@ -42,7 +42,7 @@
 
 | Blocker | 级别 | 说明 |
 |---|---|---|
-| **对外分发缺签名 + 公证** | 🔴 对外分发硬 blocker | `electron-builder.dmg.yml` `identity:null` / `hardenedRuntime:false` / 无 notarize 钩子（`@electron/notarize` 已装但零引用）。对外分发前必须补：Apple 账号($99/yr) + CSC/APPLE_ID secrets + afterSign notarize + `hardenedRuntime:true` + entitlements。**当前作为「本地自用未签名 DMG」是自洽的。** |
+| **对外分发缺签名 + 公证** | 🔴 对外分发硬 blocker | `electron-builder.dmg.yml` `identity:null` / `hardenedRuntime:false` / 无 notarize。只读实施方案已固化于 [`SIGNING_NOTARIZATION_PLAN.md`](SIGNING_NOTARIZATION_PLAN.md)：electron-builder 25.1.8 **内建** `mac.notarize:true`（免 afterSign，凭证走 `APPLE_ID`/`APPLE_APP_SPECIFIC_PASSWORD`/`APPLE_TEAM_ID` 环境变量）+ `hardenedRuntime:true` + 最小 entitlements（`allow-jit`+`allow-unsigned-executable-memory`，`disable-library-validation` 仅 .node 加载失败时补）。**排在 Electron 43 + CSP 之后（发布线最后一步）**；Apple 账号可现在并行注册；safeStorage 换签名后旧 Key 需重录。**当前作为「本地自用未签名 DMG」是自洽的。** |
 | **Electron 33 已 EOL（已核实）** | 🔴 安全 | 实装 33.4.11。**已核实 E33 EOL 2025-04-29**，至今约 14 个月无 Chromium 安全 backport → 升级非可选。只读评估已固化于 [`ELECTRON_UPGRADE_ASSESSMENT.md`](ELECTRON_UPGRADE_ASSESSMENT.md)：推荐目标 **Electron 43**；关键风险 = `better-sqlite3 11.10.0`（raw-V8，E41+ 无法编译）**强制耦合升到 12.x**；`@napi-rs/canvas`/pdf.js 绿灯；`electron-builder 25.1.8` 可用（可选升 26.x）。实施为 PR-2，需授权。 |
 | **arm64-only** | 🟡 分发覆盖决策 | `mac.target.arch: arm64`。Intel 用户无包；`universal` 或 Intel 属分发决策。 |
 | **CSP 尚未 enforce** | 🟡 纵深防御 | 已有 `docs/CSP_PLAN.md`（NOT ENABLED）。优先级**低于**签名与 Electron 升级。 |
@@ -64,7 +64,7 @@
 
 1. **Electron 升级**：只读评估 **✅ 已出**（[`ELECTRON_UPGRADE_ASSESSMENT.md`](ELECTRON_UPGRADE_ASSESSMENT.md)——E33 确已 EOL，推荐 E43，better-sqlite3 强制耦合升 12.x）；再单开升级实施 PR-2（中风险·需 `test:electron` + 人工启动验收）。**安全价值最高**。
 2. **CSP PR-2**（按 `docs/CSP_PLAN.md`）：生产构建注入 meta CSP（仅 build·Vite `transformIndexHtml`）+ 新增 `check:csp` 守卫 + 人工 QA。中风险·需人工预览。
-3. **签名 / 公证**：需 Apple 账号 + CSC/APPLE_ID secrets；afterSign notarize 钩子 + `hardenedRuntime:true` + entitlements + `identity`。决策门控。
+3. **签名 / 公证**：只读方案 **✅ 已出**（[`SIGNING_NOTARIZATION_PLAN.md`](SIGNING_NOTARIZATION_PLAN.md)——内建 `mac.notarize:true`+环境变量凭证+最小 entitlements）。需 Apple 账号（可现在并行注册）；接线/执行排在 **Electron 43 + CSP 之后**（发布线最后一步，只公证一次）。决策门控 = Apple 账号。
 4. **arch universal / Intel 决策**：是否构建 universal 或 Intel 包。产品决策。
 5. **是否做 auto-update 决策**：local-first 可不做；若做需先具备签名 + 发布通道。产品决策。
 6. **干净机断网 DMG 人工冒烟**（见 §5）。
@@ -97,4 +97,4 @@
 
 ---
 
-*相关文档：[README](../README.md) ｜ [PRIVACY](../PRIVACY.md) ｜ [Electron 升级评估](ELECTRON_UPGRADE_ASSESSMENT.md) ｜ [CSP 计划](CSP_PLAN.md) ｜ [test:locale-ui 工作流](TESTING_LOCALE_UI.md) ｜ [产品路线图](ROADMAP-to-v1.md)。本文件为工程盘点记录，非安全合规认证。*
+*相关文档：[README](../README.md) ｜ [PRIVACY](../PRIVACY.md) ｜ [Electron 升级评估](ELECTRON_UPGRADE_ASSESSMENT.md) ｜ [签名/公证方案](SIGNING_NOTARIZATION_PLAN.md) ｜ [CSP 计划](CSP_PLAN.md) ｜ [test:locale-ui 工作流](TESTING_LOCALE_UI.md) ｜ [产品路线图](ROADMAP-to-v1.md)。本文件为工程盘点记录，非安全合规认证。*
