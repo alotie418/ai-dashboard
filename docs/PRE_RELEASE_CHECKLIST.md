@@ -43,7 +43,7 @@
 | Blocker | 级别 | 说明 |
 |---|---|---|
 | **对外分发缺签名 + 公证** | 🔴 对外分发硬 blocker | `electron-builder.dmg.yml` `identity:null` / `hardenedRuntime:false` / 无 notarize 钩子（`@electron/notarize` 已装但零引用）。对外分发前必须补：Apple 账号($99/yr) + CSC/APPLE_ID secrets + afterSign notarize + `hardenedRuntime:true` + entitlements。**当前作为「本地自用未签名 DMG」是自洽的。** |
-| **Electron 33 可能已超支持窗口** | 🟠 安全（需核实） | 实装 33.4.11（E33 ≈ 2024-10）。Electron 仅维护最新 3 个 major 的安全补丁；到 2026 年中很可能已停 Chromium 安全 backport → **需单独核实当前支持状态并评估升级**（中风险：better-sqlite3 / @napi-rs ABI rebuild + 回归 + `test:electron`）。 |
+| **Electron 33 已 EOL（已核实）** | 🔴 安全 | 实装 33.4.11。**已核实 E33 EOL 2025-04-29**，至今约 14 个月无 Chromium 安全 backport → 升级非可选。只读评估已固化于 [`ELECTRON_UPGRADE_ASSESSMENT.md`](ELECTRON_UPGRADE_ASSESSMENT.md)：推荐目标 **Electron 43**；关键风险 = `better-sqlite3 11.10.0`（raw-V8，E41+ 无法编译）**强制耦合升到 12.x**；`@napi-rs/canvas`/pdf.js 绿灯；`electron-builder 25.1.8` 可用（可选升 26.x）。实施为 PR-2，需授权。 |
 | **arm64-only** | 🟡 分发覆盖决策 | `mac.target.arch: arm64`。Intel 用户无包；`universal` 或 Intel 属分发决策。 |
 | **CSP 尚未 enforce** | 🟡 纵深防御 | 已有 `docs/CSP_PLAN.md`（NOT ENABLED）。优先级**低于**签名与 Electron 升级。 |
 | **干净机断网 DMG 冒烟未验收** | 🟠 需人工 | Gatekeeper 右键打开 + 离线启动 + 核心流程，只能人工验证（见 §5）。 |
@@ -62,7 +62,7 @@
 
 > 每项开做前各自先只读评估 / 细化，再按低风险小 PR 实施。涉及人工的项见 §5。
 
-1. **Electron 升级只读评估**：核实 E33 支持状态 + 目标 major 的 breaking changes + better-sqlite3 / @napi-rs ABI 兼容性 → 出评估 doc；再单开升级实施 PR（中风险·需 `test:electron` + 人工启动验收）。**安全价值最高**。
+1. **Electron 升级**：只读评估 **✅ 已出**（[`ELECTRON_UPGRADE_ASSESSMENT.md`](ELECTRON_UPGRADE_ASSESSMENT.md)——E33 确已 EOL，推荐 E43，better-sqlite3 强制耦合升 12.x）；再单开升级实施 PR-2（中风险·需 `test:electron` + 人工启动验收）。**安全价值最高**。
 2. **CSP PR-2**（按 `docs/CSP_PLAN.md`）：生产构建注入 meta CSP（仅 build·Vite `transformIndexHtml`）+ 新增 `check:csp` 守卫 + 人工 QA。中风险·需人工预览。
 3. **签名 / 公证**：需 Apple 账号 + CSC/APPLE_ID secrets；afterSign notarize 钩子 + `hardenedRuntime:true` + entitlements + `identity`。决策门控。
 4. **arch universal / Intel 决策**：是否构建 universal 或 Intel 包。产品决策。
@@ -97,4 +97,4 @@
 
 ---
 
-*相关文档：[README](../README.md) ｜ [PRIVACY](../PRIVACY.md) ｜ [CSP 计划](CSP_PLAN.md) ｜ [test:locale-ui 工作流](TESTING_LOCALE_UI.md) ｜ [产品路线图](ROADMAP-to-v1.md)。本文件为工程盘点记录，非安全合规认证。*
+*相关文档：[README](../README.md) ｜ [PRIVACY](../PRIVACY.md) ｜ [Electron 升级评估](ELECTRON_UPGRADE_ASSESSMENT.md) ｜ [CSP 计划](CSP_PLAN.md) ｜ [test:locale-ui 工作流](TESTING_LOCALE_UI.md) ｜ [产品路线图](ROADMAP-to-v1.md)。本文件为工程盘点记录，非安全合规认证。*
