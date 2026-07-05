@@ -46,7 +46,10 @@ function createMainWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false, // preload 里用 require('electron')，需要 sandbox=false
+      // preload 仅用 contextBridge / ipcRenderer / process.platform —— 均为 sandbox
+      // preload 可用能力（allowlisted 渲染端模块 + polyfilled process），无需完整 Node
+      // 模块，故可开启沙箱。渲染层本身已 Node-free（全走 electronAPI.invoke IPC）。
+      sandbox: true,
     },
   });
 
