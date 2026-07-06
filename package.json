@@ -60,7 +60,7 @@
     "audit:locale-ui:smoke": "node scripts/audit-locale-ui.mjs --smoke",
     "audit:locale-ui:candidates": "node scripts/audit-locale-ui.mjs --candidates",
     "audit:locale-ui": "node scripts/audit-locale-ui.mjs --full",
-    "build:dmg": "BUILD_TARGET=dmg npm run build && electron-builder --mac dmg --config electron-builder.dmg.yml",
+    "build:dmg": "npm run build && electron-builder --mac dmg --config electron-builder.dmg.yml",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
