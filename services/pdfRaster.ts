@@ -14,7 +14,10 @@ export async function rasterizePdfFirstPage(file: File): Promise<{ base64: strin
   pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
   const data = await file.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data }).promise;
+  // isEvalSupported:false — 生产 CSP 的 script-src 无 'unsafe-eval'；默认 true 时 pdf.js 会
+  // 探测 new Function（编译 PostScript Type-4 函数）产生一次被捕获的 CSP 违规（功能会自动
+  // 降级、不坏，但污染“零违规”验收）。显式关闭 = 直接走纯 JS 解释器，行为不变、无违规噪声。
+  const pdf = await pdfjs.getDocument({ data, isEvalSupported: false }).promise;
   try {
     const page = await pdf.getPage(1); // first page only
     const unit = page.getViewport({ scale: 1 });
