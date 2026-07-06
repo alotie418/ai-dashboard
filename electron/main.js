@@ -4,8 +4,15 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const { pathToFileURL } = require('node:url');
 
 const isDev = !app.isPackaged;
+// QA 门控（CSP file:// 验收）：SOLOLEDGER_LOAD_DIST=1 时，未打包运行也加载构建产物
+// dist/index.html（file://，生产注入的 meta CSP 生效）——用于不打包就真机验证 CSP。
+// 双门控：仅 !app.isPackaged 时生效，打包版永远走正常 loadFile 分支、不受此开关影响。
+const loadDistForQa = isDev && process.env.SOLOLEDGER_LOAD_DIST === '1';
+// QA 模式的「应用内」资源前缀：只认 dist/ 目录下的 file:// URL，不放行任意 file://。
+const distDirFileUrl = pathToFileURL(path.join(__dirname, '..', 'dist')).href + '/';
 // Demo mode is decided in one place (electron/db/index.js): SOLOLEDGER_DEMO=1 AND non-packaged.
 const { isDemoMode } = require('./db');
 
@@ -27,6 +34,8 @@ function openExternalIfAllowed(url) {
 }
 
 function isInternalUrl(url) {
+  // QA 模式：仅 dist/ 目录内的 file:// 资源算「应用内」（不粗放地认所有 file://）。
+  if (loadDistForQa) return url.startsWith(distDirFileUrl);
   return isDev
     ? url.startsWith('http://localhost:3000')
     : url.startsWith('file://');
@@ -55,7 +64,11 @@ function createMainWindow() {
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
 
-  if (isDev) {
+  if (loadDistForQa) {
+    // CSP QA：加载构建产物（file:// + meta CSP 生效）；开 DevTools 便于观察 securitypolicyviolation
+    mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  } else if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {

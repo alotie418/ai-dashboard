@@ -2,6 +2,40 @@ import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+// 生产构建注入的 meta CSP（策略与逐条依据见 docs/CSP_PLAN.md §3）。
+// 仅 build 注入（apply:'build'）——dev/HMR 依赖 inline script/eval/ws://，注入会直接
+// 破坏 npm run dev；file:// 无 HTTP 响应头，meta 是生产环境唯一注入形式。
+// script-src 无 'unsafe-eval'：pdf.js 已显式 isEvalSupported:false（services/pdfRaster.ts）。
+// 形态由 scripts/check-csp.mjs 守卫（dist 必须有且仅有这一个 CSP meta；源 index.html 必须没有）。
+const CSP_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'none'",
+].join('; ');
+
+const injectCspMeta = () => ({
+  name: 'inject-csp-meta',
+  apply: 'build' as const,
+  transformIndexHtml(html: string) {
+    return {
+      html,
+      tags: [{
+        tag: 'meta',
+        attrs: { 'http-equiv': 'Content-Security-Policy', content: CSP_POLICY },
+        // head-prepend：meta CSP 只约束其后的内容，置于 <head> 最前保证全覆盖（含内联 <style>）
+        injectTo: 'head-prepend' as const,
+      }],
+    };
+  },
+});
+
 export default defineConfig(({ mode }) => {
     return {
       // Electron 加载本地 dist/index.html 时必须用相对路径
@@ -41,7 +75,7 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
       },
-      plugins: [react()],
+      plugins: [react(), injectCspMeta()],
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),
