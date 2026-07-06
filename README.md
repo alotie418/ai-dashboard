@@ -185,4 +185,4 @@ npm run test:locale-ui        # vite build + Playwright 六语言界面验收
 
 ## 许可证
 
-暂未确定开源许可。在正式发布前,以仓库所有者后续添加的 `LICENSE` 为准。
+**专有软件,保留所有权利**(© 2026 alotie418. All rights reserved.)。未经版权持有人明确的事先书面许可,不得复制、修改、分发或用于商业用途。未来是否以开源协议发布尚未确定。完整条款见 [`LICENSE`](LICENSE)。
