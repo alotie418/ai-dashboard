@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- 最小硬化运行时 entitlements（V8 JIT 所需）；方案与逐条依据见
+     docs/SIGNING_NOTARIZATION_PLAN.md §3.2。
+     com.apple.security.cs.disable-library-validation 故意不写：electron-builder 会用
+     同一 Developer ID 证书签名 asarUnpack 出来的 .node（better-sqlite3 / @napi-rs/canvas），
+     通常无需放开库校验；仅当签名版启动时 .node 加载失败（报错含
+     "library load disallowed by system policy" / "code signature invalid"）才追加该项。 -->
+<dict>
+  <key>com.apple.security.cs.allow-jit</key><true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/>
+</dict>
+</plist>

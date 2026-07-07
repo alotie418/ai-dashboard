@@ -26,6 +26,10 @@ artifacts
 .env.production
 .env.local
 
+# 签名/公证凭证兜底：证书放钥匙串、.p8 放安全位置，绝不入库（防误放仓库目录）
+*.p12
+*.p8
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

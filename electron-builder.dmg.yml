@@ -1,5 +1,9 @@
-# electron-builder 配置 —— 本地自用未签名 macOS DMG（不上架 / 不公证 / 不自动更新）。
-# 用法：npm run build:dmg （= BUILD_TARGET=dmg vite build && electron-builder --mac dmg --config 本文件）
+# electron-builder 配置 —— macOS DMG（签名/公证已接线，PR-B；不自动更新）。
+# 凭证在场时（钥匙串有 Developer ID Application 证书 + APPLE_ID /
+# APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID 三个环境变量）产出「签名 + 公证 + staple」
+# 的分发级 DMG；无凭证时应降级为未签名构建（探测不到证书 → 跳过签名 → 跳过公证），
+# 本地开发照旧可用。执行 runbook 与验证命令见 docs/RELEASE.md。
+# 用法：npm run build:dmg （= npm run build && electron-builder --mac dmg --config 本文件）
 # 产物：release/SoloLedger-<version>-arm64.dmg
 appId: com.alotie418.sololedger
 productName: SoloLedger
@@ -34,9 +38,16 @@ mac:
   icon: build/icon.icns
   target:
     - target: dmg
-      arch: arm64          # Apple Silicon；要兼容 Intel 改 universal
-  identity: null           # 不签名（本地自用）；首次启动需右键→打开过 Gatekeeper
-  hardenedRuntime: false   # 未签名/不公证，无需硬化运行时
+      arch: arm64          # Apple Silicon；要兼容 Intel 改 universal（签名/公证流程不受影响）
+  # identity 不写 → electron-builder 自动探测钥匙串里的 Developer ID Application 证书；
+  # 探测不到（机器上无证书）则跳过签名，降级为未签名构建（行为同旧 identity:null）。
+  hardenedRuntime: true    # 公证硬前提（Hardened Runtime）
+  gatekeeperAssess: false  # 构建期跳过本地 spctl 评估（公证完成之前必失败，评估留给 PR-C 验证步）
+  entitlements: build/entitlements.mac.plist        # 最小集：仅 V8 JIT 两项（见该文件内注释）
+  entitlementsInherit: build/entitlements.mac.plist
+  # 公证凭证绝不写进本文件：electron-builder 从 APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD /
+  # APPLE_TEAM_ID 环境变量读取（见 docs/RELEASE.md §2）。
+  notarize: true
 
 dmg:
   title: SoloLedger ${version}
