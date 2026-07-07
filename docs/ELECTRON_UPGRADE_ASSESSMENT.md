@@ -4,6 +4,7 @@
 > 文档日期：2026-07-04 ｜ 基线：main HEAD `c754af0`（#341·schema v23·working tree clean）
 > 本文件仅固化一次「Electron 主版本升级」的只读评估结果，**不改任何代码 / 依赖 / package-lock / 打包配置**。实际升级为后续独立 PR（PR-2），需显式授权。
 > 事实核实：外部版本 / EOL / breaking changes / 依赖兼容性均以 2026-07 官方一手来源核对（见文末「主要来源」），并经对抗式复核。
+> **实施状态更新（2026-07-07·main `3fc241e`）**：PR-2 第一步已按文中「分阶段回退」路径落地——**#348（2026-07-06）升至 Electron 42.6.0 + better-sqlite3 12.11.1**；生产 CSP enforce 随 #349 落地。E42→E43 再 bump 仍等 better-sqlite3 **12.11.2 上 npm**（截至 2026-07-07 npm latest = 12.11.1，仅 GitHub tag），有界止损决策待定：超期则带 E42 直接进入签名/公证（E42 EOL 2026-10-20）。
 
 ---
 

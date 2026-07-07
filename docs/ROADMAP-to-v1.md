@@ -3,6 +3,14 @@
 > 来源:2026-06-15 全项目只读审计(8 个并行 agent 覆盖 构建/分发、双架构、测试/CI、会计口径、AI·OCR、数据安全、安全、文档·i18n·UX)。
 > 性质:**只读审计的产出清单**,本文件本身不改任何代码。每项给出 严重度 / 证据(file:line) / 动作 / 工作量(S/M/L)。
 > 用法:把每个 `- [ ]` 当 tracker 勾。**永不在工程 PR 内擅自改税务口径公式**(见 Track A)。
+>
+> **状态更新（2026-07-07·main `3fc241e`）**:本文件是 2026-06-15 时点的审计快照,原文与勾选框保留不动;此后大量条目已落地,**活跃发布状态以 [`PRE_RELEASE_CHECKLIST.md`](PRE_RELEASE_CHECKLIST.md) 为准**。已核实完成的主要簇:
+> - **§2A 数据安全——全部落地**:启动滚动快照(保留 N 份+迁移前强制)、备份默认落「文稿」目录、附件随 bundle 备份/恢复、单实例锁、`synchronous=FULL`+`busy_timeout`、磁盘错误码映射(diskErrorCode)、per-table CSV 导出。
+> - **§2B 测试/CI——大部落地**:GitHub Actions CI(`.github/workflows/ci.yml`)、handler round-trip(`test-handlers.mjs`)、迁移守卫(`test-migrations.mjs`)、`typecheck` 门禁、真 Electron e2e 26 条(附件 IPC/附件 fs/**备份恢复闭环 #353**)。未做:vitest 框架迁移、husky。
+> - **§4 Track B——全部落地**:web 栈已于 2026-06-16 删除归档(`archive/web-legacy` 分支)、云资源退役、`services/api.ts` 已 IPC-only 且有 `check:no-web-fetch` 守卫、`worker/src/index.js` 第二套会计引擎**已随 worker/ 删除**。
+> - **§1 分发门槛——部分落地**:LICENSE(#346)、copyright/死 `BUILD_TARGET` 清理(#347)、`publish:null` 关闭误导性更新 feed、`asarUnpack @napi-rs/canvas` 已入 `dmg.yml`、`build:mas` 已删。**未做:签名/公证(唯一硬 blocker)、universal/Intel 决策、版本纪律/CHANGELOG 填充(0.1.0+骨架)**。
+> - **仍未完成**:§2C 8 家 provider 真实 Key 验收、Track A 会计师确认(B1–B5)、§5 打磨项若干。
+> - 2026-07 增量:依赖安全 #350(genai 1.52)、onboarding 免 AI Key 准入 #351、xlsx→SheetJS CDN 0.20.3 #352(**生产 `npm audit --omit=dev` = 0**)。
 
 ---
 

@@ -1,8 +1,9 @@
 # CSP 安全策略计划（Content-Security-Policy）
 
-> 状态：**计划草案 / 当前未启用（NOT ENABLED, NOT ENFORCED）**
+> 状态：~~计划草案 / 当前未启用~~ → ✅ **已 ENFORCE（#349·2026-07-06）**
 > 文档日期：2026-06-26 ｜ 基线：main HEAD `bc05230`（🟢×15）
-> 本文件仅记录只读分析与未来计划，**不改变任何运行时行为**。本仓当前**没有** CSP。
+> **状态更新（2026-07-07）**：本计划已按 §「实施」落地——生产构建经 Vite `transformIndexHtml` 注入 meta CSP，`check:csp` 守卫已入 `check:all`，file://（`SOLOLEDGER_LOAD_DIST=1`）真机验收零违规。头部原「NOT ENABLED」已过期；下文保留为策略设计依据与逐条 directive 出处。
+> 本文件仅记录只读分析与未来计划，**不改变任何运行时行为**。~~本仓当前**没有** CSP。~~
 
 本文档固化一次针对 SoloLedger（Electron + Vite 本地桌面应用）的 CSP 只读分析结果，给出推荐策略草案、每条 directive 的代码依据、当前不能直接启用的原因，以及未来 PR-2 的实施与验证计划。
 
