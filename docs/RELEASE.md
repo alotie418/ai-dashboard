@@ -1,6 +1,7 @@
 # SoloLedger macOS 发布 Runbook（签名 / 公证 / 验证 / 冒烟）
 
-> 状态：**PR-B 已接线配置（entitlements + dmg.yml + 本 runbook）；真实签名 / 公证 / staple / 干净机冒烟属 PR-C，执行需显式授权。**
+> 状态：**PR-B 接线（#355）+ PR-C 真实签名 / 公证 / staple 已执行成功（2026-07-07，实测记录见 §9）。**
+> 剩余人工验收（1.0.0 正式版门槛）：干净机断网 Gatekeeper 冒烟（§5）、safeStorage 重录 QA、xlsx 真实文件导入冒烟。
 > 方案依据：[`SIGNING_NOTARIZATION_PLAN.md`](SIGNING_NOTARIZATION_PLAN.md)（目标配置 §3 / 凭证 §4-§5 / safeStorage §6 / 验证 §10）。
 > 铁律：**任何证书、密码、Team ID、API Key 不入库、不写进本文件、不出现在任何日志/汇报里。**
 
@@ -94,6 +95,20 @@ xcrun stapler validate "release/SoloLedger-<version>-arm64.dmg"
 
 ## 8. 发布收尾（PR-C 完成后）
 
-- [ ] bump `version` + 填 `CHANGELOG.md`（含 §6 用户须知）+ 打 git tag
+- [x] bump `version`（**1.0.0-rc.1**）+ 填 `CHANGELOG.md`（含 §6 用户须知）——发布收尾 PR；git tag `v1.0.0-rc.1` 于该 PR merge 后由维护者打
 - [ ] 只分发签名版；旧的未签名 DMG 不再外发
-- [ ] 更新 `PRE_RELEASE_CHECKLIST.md` §2/§4/§6 状态
+- [x] 更新 `PRE_RELEASE_CHECKLIST.md` §2/§4/§6 状态——发布收尾 PR
+
+## 9. PR-C 实测记录（2026-07-07 · 真机执行）
+
+- 执行环境：**非 iCloud 路径 clean checkout**（§3 的路径要求已实践确认——iCloud 同步目录内签名必败，见 §7）。
+- `npm run build:dmg`：成功（签名 + 公证全链路一次通过）。
+- SoloLedger.app：Developer ID 签名成功；Apple **notarization successful**。
+- DMG：单独 `notarytool submit` → **Accepted**；`xcrun stapler validate`（DMG）→ 通过。
+- `hdiutil attach` 成功；**DMG 内 App 与安装到 /Applications 后的 App 均**：
+  - `spctl -a -t exec` → **accepted / source=Notarized Developer ID**
+  - `codesign --verify` → valid on disk / satisfies its Designated Requirement
+  - `open /Applications/SoloLedger.app` → 正常打开
+- **最小 entitlements（两项）已足够**：better-sqlite3 / @napi-rs/canvas 在 hardened runtime 下加载正常，`disable-library-validation` 确认无需添加。
+- 已知非阻塞现象：DMG 自身 `spctl --type open/install` 显示 rejected / no usable signature——DMG 本体未单独 codesign 所致；因 DMG notarytool **Accepted** + stapler validate 通过、且 DMG 内与安装后 App 均过 Gatekeeper，**判定不阻塞发布**。如需消除该观感，可后续评估对 DMG 本体签名（可选优化）。
+- 尚未完成（1.0.0 正式版门槛）：§5 干净机断网冒烟、safeStorage 重录 QA、xlsx 真实文件导入冒烟。
