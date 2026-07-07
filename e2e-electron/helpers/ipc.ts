@@ -76,6 +76,16 @@ export async function stubOpenDialog(
   }, result);
 }
 
+/** Stub dialog.showSaveDialog on the live electron singleton (next export uses this result). */
+export async function stubSaveDialog(
+  electronApp: ElectronApplication,
+  result: { canceled: boolean; filePath?: string },
+): Promise<void> {
+  await electronApp.evaluate(({ dialog }, ret) => {
+    (dialog as any).showSaveDialog = async () => ret;
+  }, result);
+}
+
 /** Stub shell.openPath on the live singleton; resets a global call-log read back later. */
 export async function stubShellOpenPath(electronApp: ElectronApplication, returnValue: string): Promise<void> {
   await electronApp.evaluate(({ shell }, ret) => {
