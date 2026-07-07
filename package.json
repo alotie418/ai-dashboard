@@ -2,7 +2,7 @@
   "name": "sololedger",
   "productName": "SoloLedger",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0-rc.1",
   "description": "SoloLedger 独账 — 为一人公司打造的智能记账与经营管理桌面应用",
   "author": "alotie418",
   "license": "UNLICENSED",

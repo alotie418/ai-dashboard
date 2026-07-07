@@ -3,7 +3,7 @@
 本文件记录 SoloLedger（独账）对外可见的重要变更。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本 SemVer](https://semver.org/lang/zh-CN/)。
 
-> **状态说明**：应用当前处于**发布前（pre-release）**阶段——仅有本地自用、未签名/未公证的构建，尚未对外正式发布，故暂无 git tag。首个对外发布版将从这里开始逐版记录（届时打对应 tag）。
+> **状态说明**：当前处于 **1.0.0 候选（RC）阶段**——已具备**签名 + 公证**的 Apple Silicon 构建（Developer ID · notarized · stapled）。正式 1.0.0 待 RC 剩余人工验收（见 1.0.0-rc.1 条目末尾）通过后发布。git tag 自 `v1.0.0-rc.1` 起逐版对应。
 >
 > 变更分类：`新增` / `变更` / `修复` / `移除` / `安全`。
 
@@ -11,15 +11,34 @@
 
 ## [Unreleased]
 
-### 发布准备（进行中，尚未发布）
-- 主窗口启用 `sandbox: true`（渲染进程纵深防御）。
-- 新增专有 `LICENSE`（保留所有权利）。
-- 文档：Electron 升级评估、CSP enforce 计划、macOS 签名/公证方案、电商 MVP 状态与 README 补全。
+（暂无）
 
-### 路线图（尚未开始 / 待授权）
-- Electron 升级至 43 + `better-sqlite3` 12.x（耦合升级）。
-- CSP enforce；代码签名 + 公证（对外分发前）。
-- 详见 [`docs/PRE_RELEASE_CHECKLIST.md`](docs/PRE_RELEASE_CHECKLIST.md)。
+---
+
+## [1.0.0-rc.1] — 2026-07-07
+
+首个**签名 + 公证**的候选发布版本（Apple Silicon DMG）。**RC 版本，非正式 1.0.0**。
+
+### 安全
+- 运行时升级：Electron 33（已 EOL）→ **Electron 42.6.0** + better-sqlite3 12.11.1（#348）。
+- 生产构建启用 **CSP enforce**：构建期注入 meta CSP + `check:csp` 守卫，file:// 真机验收零违规（#349）。
+- 主窗口启用 `sandbox: true`（#343）。
+- **生产依赖 `npm audit --omit=dev` 清零**：`@google/genai` → 1.52.0，清理 protobufjs（critical）/ ws / minimatch 等传递依赖通告（#350）；`xlsx` 由 npm registry 弃更版 0.18.5 换用 SheetJS 官方发行版 **0.20.3**，修复原型污染与 ReDoS（#352）。
+- **macOS 代码签名 + 公证 + staple**：Developer ID Application 签名、Apple notarization successful、公证票据已 staple 至 DMG；安装后 Gatekeeper 直接放行（`spctl accepted / source=Notarized Developer ID`）（#355 + 真机执行验证，记录见 `docs/RELEASE.md` §9）。
+
+### 新增
+- 首次启动可**跳过 AI 配置**直接进入应用——AI Key 不再是使用门槛，可随时在「设置 → AI 服务商」添加；无 Key 时 AI 功能入口会给出配置引导（#351）。
+- 备份 / 恢复链路新增真 Electron 端到端测试闭环（导出 / 恢复 / 恢复前安全网 / 附件合并 / 失败中止保旧库）（#353）。
+
+### 重要须知（从未签名旧版升级的用户）
+> 本版本启用了 macOS 代码签名与公证。由于系统钥匙串的加密密钥与应用签名身份绑定，升级后**此前保存的 AI 服务商 API Key 与电商平台凭证需要重新填写一次**（设置 → AI 服务商 / 电商连接）。
+> **你的业务数据不受任何影响**：记账、采购、销售、库存、单据、报表、附件与备份全部原样保留，无需任何迁移操作。
+> 若打开 AI 或电商功能时看到「无法解密凭证」类提示，按提示重新录入即可。
+
+### RC 阶段剩余验收（1.0.0 正式版发布前完成）
+- [ ] 干净机断网 Gatekeeper 冒烟（`docs/RELEASE.md` §5）
+- [ ] safeStorage 旧 Key 重录流程 QA
+- [ ] xlsx 真实 `.xlsx` / `.xls` 文件导入冒烟（解析器 0.18.5 → 0.20.3）
 
 ---
 
