@@ -591,20 +591,36 @@ const AppContent: React.FC = () => {
   );
 };
 
-// Auth wrapper — 桌面版默认无需登录；启动时检测 BYOK 是否已配置 API Key，未配置则进入 Onboarding
+// Auth wrapper — 桌面版默认无需登录；首启进入 Onboarding，但 AI Key 不是必须项：
+// 已配置 provider 或用户完成/跳过过引导（本地标记）都直接进主界面。
+// AI 功能在无 Key 时由稳定码 noProvider → aiError.noProvider 引导用户去设置，不在此强制。
 const isElectronEnv = typeof window !== 'undefined' && !!(window as any).electronAPI?.isElectron;
+
+// 引导完成标记：主存储在 localStorage（与 ui_language / sololedger-lang 同一惯例），
+// 不进 settings 表 —— 纯 UI 门槛，不属于业务数据，换机/恢复备份后重新判定即可。
+const ONBOARDING_DONE_KEY = 'sololedger-onboarding-done';
+const hasOnboardingDoneFlag = () => {
+  try { return localStorage.getItem(ONBOARDING_DONE_KEY) === '1'; } catch { return false; }
+};
+const markOnboardingDone = () => {
+  try { localStorage.setItem(ONBOARDING_DONE_KEY, '1'); } catch { /* ignore */ }
+};
 
 const AuthWrapper: React.FC = () => {
   const { t } = useTranslation();
-  // 桌面版需要 BYOK：启动时检测是否已配置 API Key，未配置时显示 Onboarding
   const [onboardingState, setOnboardingState] = useState<'checking' | 'needed' | 'done'>(
-    isElectronEnv ? 'checking' : 'done'
+    !isElectronEnv || hasOnboardingDoneFlag() ? 'done' : 'checking'
   );
 
   useEffect(() => {
+    if (!isElectronEnv || hasOnboardingDoneFlag()) return;
     const electronAPI = (window as any).electronAPI;
     electronAPI.invoke('providers:hasAny')
-      .then((has: boolean) => setOnboardingState(has ? 'done' : 'needed'))
+      .then((has: boolean) => {
+        // 已有 provider = 引导事实上已完成，补打标记：之后即使删光 Key 也不再被拽回首启向导
+        if (has) markOnboardingDone();
+        setOnboardingState(has ? 'done' : 'needed');
+      })
       .catch(() => setOnboardingState('needed'));
   }, []);
 
@@ -620,7 +636,7 @@ const AuthWrapper: React.FC = () => {
   }
 
   if (onboardingState === 'needed') {
-    return <OnboardingWizard onComplete={() => setOnboardingState('done')} />;
+    return <OnboardingWizard onComplete={() => { markOnboardingDone(); setOnboardingState('done'); }} />;
   }
 
   return <AppContent />;
