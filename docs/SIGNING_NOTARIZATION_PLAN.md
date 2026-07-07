@@ -3,6 +3,7 @@
 > 状态：**只读方案 / 未接线（READ-ONLY PLAN — NOT WIRED）**
 > 文档日期：2026-07-05 ｜ 基线：main HEAD `4637b44`（schema v23·working tree clean）
 > 本文件仅固化「macOS 代码签名 + 公证」的实施方案，**不改 `electron-builder.dmg.yml` / `package.json` / `package-lock` / `build/` / 任何代码**。实际接线与执行为后续独立 PR，需 Apple 账号 + 显式授权。
+> **前置状态更新（2026-07-07·main `3fc241e`）**：§0 要求的两项前置已落地——**Electron 升级（#348·E42.6.0 + better-sqlite3 12.11.1 过渡）**与**生产 CSP enforce（#349）**；sandbox 亦已加固 true（#343）；Apple 凭证已备。剩余执行门控 = **E43/E42 止损决策**（better-sqlite3 12.11.2 截至 2026-07-07 未上 npm；超期可按 E42 直接公证）。执行顺序：决策 → `build/entitlements.mac.plist` → `dmg.yml` 接线 → 公证 → 干净机断网冒烟；**§0 的 safeStorage 旧 Key 重录风险须以用户须知形式随执行 PR 落地**。本方案其余内容仍有效。
 
 ---
 
