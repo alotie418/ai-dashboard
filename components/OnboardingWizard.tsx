@@ -567,6 +567,17 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                 {savedCount > 0 ? t('onboarding.configuredCount', { count: savedCount }) : t('onboarding.atLeastOneRequired')}
               </button>
             </div>
+
+            {/* AI Key 不是使用门槛（本地记账为核心）：无已存 provider 时提供跳过路径，
+                与 company 步骤的 skipCompany 同构；无 Key 时 AI 入口由 aiError.noProvider 引导 */}
+            {savedCount === 0 && (
+              <button
+                onClick={() => setStep('company')}
+                className="w-full text-xs text-[#5c5c5a] hover:text-[#4a4a48] py-1"
+              >
+                {t('onboarding.skipProviders')}
+              </button>
+            )}
           </div>
         )}
 
