@@ -3,7 +3,7 @@
 本文件记录 SoloLedger（独账）对外可见的重要变更。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本 SemVer](https://semver.org/lang/zh-CN/)。
 
-> **状态说明**：当前处于 **1.0.0 候选（RC）阶段**——已具备**签名 + 公证**的 Apple Silicon 构建（Developer ID · notarized · stapled）。正式 1.0.0 待 RC 剩余人工验收（见 1.0.0-rc.1 条目末尾）通过后发布。git tag 自 `v1.0.0-rc.1` 起逐版对应。
+> **状态说明**：当前最新版本 **1.0.0（首个正式版）**——签名 + 公证的 Apple Silicon 构建（Developer ID · notarized · stapled），发布验收记录见 1.0.0 条目。git tag 逐版对应。
 >
 > 变更分类：`新增` / `变更` / `修复` / `移除` / `安全`。
 
@@ -12,6 +12,25 @@
 ## [Unreleased]
 
 （暂无）
+
+---
+
+## [1.0.0] — 2026-07-08
+
+**首个正式版本**（签名 + 公证 Apple Silicon DMG）。**与 1.0.0-rc.2 代码零差异**——本版本仅更新版本号与文档（QA 收官记录、电商 Beta 标注），全部功能与修复内容见 rc.1 / rc.2 条目。
+
+### 发布验收（RC 阶段全部完成）
+- ✅ 断网 Gatekeeper 首启（同机新用户模拟口径，QA-1）
+- ✅ 首启可跳过 AI 配置、重开不再弹向导（QA-2）
+- ✅ 断网基础功能 + 无 Key 时 AI 入口本地化引导（QA-3）
+- ✅ 真实 `.xlsx` / `.xls` 导入（rc.1 发现日期缺陷 → #357 修复 → rc.2 真机复测通过，QA-4）
+- ✅ safeStorage 签名切换（QA-6）：实测走 **(a) 分支——钥匙串授权后旧 AI Key 直接可用**；零崩溃 / 白屏 / 原始报错；业务数据完好；电商旧凭证路径 N/A（无旧凭证可测，底层机制与 AI Key 同源、已由同一验证覆盖）
+
+### 从未签名旧版升级的用户须知（据 QA-6 实测修正）
+> 从未签名旧版升级时，macOS **可能弹出钥匙串授权对话框**——选择「始终允许」后**旧 Key 可直接使用**；若遇「无法解密」提示则按引导重新录入一次。**业务数据不受影响**（记账 / 库存 / 单据 / 报表 / 附件 / 备份原样保留）。
+
+### 已知边界：电商订单导入为 Beta
+- 电商订单导入（Shopify / WooCommerce）以 **Beta** 状态随 1.0.0 发布：本地自动化覆盖充分（EC1–EC27），但**未经真实店铺实证**；真实店铺联调为**发布后验证项**（2026-07-08 决策 B，待验证清单见 [`docs/ECOMMERCE_MVP_STATUS.md`](docs/ECOMMERCE_MVP_STATUS.md) §8）。
 
 ---
 
@@ -52,9 +71,9 @@
 
 ### RC 阶段剩余验收（1.0.0 正式版发布前完成）
 - [x] 干净机断网 Gatekeeper 冒烟——2026-07-08 同机新用户模拟口径完成（详见 `docs/PRE_RELEASE_CHECKLIST.md` §6）
-- [ ] safeStorage 旧 Key 重录流程 QA
+- [x] safeStorage 旧 Key 重录流程 QA——2026-07-08 通过（(a) 分支：钥匙串授权后旧 Key 直接可用，见 1.0.0 条目）
 - [x] xlsx 真实 `.xlsx` / `.xls` 文件导入冒烟——rc.1 发现日期缺陷，**rc.2（#357）修复并复测通过**
-- [ ] WooCommerce 真实店铺 QA
+- WooCommerce 真实店铺 QA——**决策 B（2026-07-08）：降级为 Beta / 发布后验证项**，不作 1.0.0 blocker（不标通过也不标失败）
 
 ---
 
