@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- MAS 子进程（Electron Helper / GPU / Renderer / Plugin、框架与内嵌二进制）entitlements。
+     模板依据：Electron 官方 Mac App Store Submission Guide —— 子进程必须显式声明
+     app-sandbox 并继承父进程的沙箱权限。 -->
+<dict>
+  <key>com.apple.security.app-sandbox</key><true/>
+  <key>com.apple.security.inherit</key><true/>
+</dict>
+</plist>

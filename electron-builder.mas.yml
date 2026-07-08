@@ -1,0 +1,53 @@
+# electron-builder 配置 —— Mac App Store（MAS）构建骨架（MAS-1）。
+# 与 electron-builder.dmg.yml 的 Developer ID 直分发线完全独立、互不影响：
+# GitHub/Developer ID 仍是正式主线，本文件只是 MAS 上架线的构建入口。
+# 产物为「Apple Distribution 签名的 .app + Mac Installer Distribution 签名的 .pkg」，
+# 经 Transporter 上传 App Store Connect（本配置不做任何上传/提审）。
+#
+# 构建前置（缺任一则 build:mas 失败——属预期，不要绕过真实 MAS 签名要求）：
+#   1. 钥匙串有「Apple Distribution」与「Mac Installer Distribution」两张证书
+#      （注意：都不是现有 Developer ID 证书，MAS 不复用 Developer ID 身份）；
+#   2. build/embedded.provisionprofile —— App ID com.alotie418.sololedger 的
+#      Mac App Store provisioning profile，本地放置，**勿提交入库**；
+#   3. build/entitlements.mas.plist 里 TEAM_ID 占位符已替换为真实 Team ID。
+# 完整流程 / 数据迁移 / QA 清单见 docs/MAS_SUBMISSION.md。
+appId: com.alotie418.sololedger
+productName: SoloLedger
+copyright: © 2026 alotie418
+
+# MAS 由 App Store 分发更新；不生成任何更新 feed。
+publish: null
+
+directories:
+  output: release
+  buildResources: build
+
+# 进包内容与 DMG 线保持一致（vite 渲染端 + 主进程/preload/handlers/ai/db/ecommerce）。
+files:
+  - dist/**
+  - electron/**
+  - package.json
+  - "!**/*.{map,md}"
+
+# 原生模块（.node）必须从 asar 解包（与 DMG 线一致）。
+asarUnpack:
+  - "**/node_modules/better-sqlite3/**"
+  - "**/node_modules/@napi-rs/**"
+
+mac:
+  category: public.app-category.finance
+  icon: build/icon.icns
+  target:
+    - target: mas
+      arch: arm64          # 与 Developer ID 线一致：Apple Silicon；universal 属独立分发决策
+
+mas:
+  # distribution = 上架构建（Apple Distribution 证书）；本地沙箱调试可临时改
+  # mas-dev target + Apple Development 证书（见 docs/MAS_SUBMISSION.md §5）。
+  type: distribution
+  hardenedRuntime: false   # MAS 采用 App Sandbox（entitlements 里声明），不使用硬化运行时
+  entitlements: build/entitlements.mas.plist
+  entitlementsInherit: build/entitlements.mas.inherit.plist
+  # provisioning profile 本地放置于以下【仓库相对路径】（不含任何本机绝对路径/私密值）；
+  # 文件本身勿提交入库。
+  provisioningProfile: build/embedded.provisionprofile
