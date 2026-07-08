@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- MAS 主 App entitlements（App Sandbox 分发线）——与 Developer ID 直分发的
+     entitlements.mac.plist（硬化运行时语义）互不相干、互不影响。
+     模板依据：Electron 官方 Mac App Store Submission Guide。
+     ⚠️ 首次真实构建前，必须把下方 application-groups 的 TEAM_ID 占位符替换为
+     真实 10 位 Team ID（开发者门户 Membership 页）。该键是 Electron MAS 模板
+     必需项：沙箱内 Chromium Helper 进程经 Mach IPC / 共享内存协作需要同组。
+     keychain-access-groups 故意不加：safeStorage 在沙箱内使用默认 Keychain 即可，
+     仅当 MAS 构建实测出 Keychain 访问问题时再补（见 docs/MAS_SUBMISSION.md）。 -->
+<dict>
+  <key>com.apple.security.app-sandbox</key><true/>
+  <key>com.apple.security.application-groups</key>
+  <array>
+    <string>TEAM_ID.com.alotie418.sololedger</string>
+  </array>
+  <!-- 主进程出网：AI provider（BYOK）与电商平台 API 调用 -->
+  <key>com.apple.security.network.client</key><true/>
+  <!-- 用户经系统对话框选择的文件/目录读写：备份导出/恢复、CSV/PDF 导出、附件挑选、
+       Excel/CSV 导入（全部文件流均为 dialog 驱动，Powerbox 兼容） -->
+  <key>com.apple.security.files.user-selected.read-write</key><true/>
+</dict>
+</plist>

@@ -63,6 +63,7 @@
     "audit:locale-ui:candidates": "node scripts/audit-locale-ui.mjs --candidates",
     "audit:locale-ui": "node scripts/audit-locale-ui.mjs --full",
     "build:dmg": "npm run build && electron-builder --mac dmg --config electron-builder.dmg.yml",
+    "build:mas": "npm run build && electron-builder --mac mas --config electron-builder.mas.yml",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
