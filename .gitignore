@@ -30,6 +30,10 @@ artifacts
 *.p12
 *.p8
 
+# MAS provisioning profile 兜底：build/embedded.provisionprofile 本地放置，绝不入库
+*.provisionprofile
+*.mobileprovision
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
