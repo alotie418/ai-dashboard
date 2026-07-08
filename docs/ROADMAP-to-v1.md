@@ -8,7 +8,7 @@
 > - **§2A 数据安全——全部落地**:启动滚动快照(保留 N 份+迁移前强制)、备份默认落「文稿」目录、附件随 bundle 备份/恢复、单实例锁、`synchronous=FULL`+`busy_timeout`、磁盘错误码映射(diskErrorCode)、per-table CSV 导出。
 > - **§2B 测试/CI——大部落地**:GitHub Actions CI(`.github/workflows/ci.yml`)、handler round-trip(`test-handlers.mjs`)、迁移守卫(`test-migrations.mjs`)、`typecheck` 门禁、真 Electron e2e 26 条(附件 IPC/附件 fs/**备份恢复闭环 #353**)。未做:vitest 框架迁移、husky。
 > - **§4 Track B——全部落地**:web 栈已于 2026-06-16 删除归档(`archive/web-legacy` 分支)、云资源退役、`services/api.ts` 已 IPC-only 且有 `check:no-web-fetch` 守卫、`worker/src/index.js` 第二套会计引擎**已随 worker/ 删除**。
-> - **§1 分发门槛——基本落地（2026-07-07 更新）**:LICENSE(#346)、copyright/死 `BUILD_TARGET` 清理(#347)、`publish:null` 关闭误导性更新 feed、`asarUnpack @napi-rs/canvas` 已入 `dmg.yml`、`build:mas` 已删;**签名/公证已完成**(#355 接线 + PR-C 真机执行成功·Notarized Developer ID·实测记录见 [`RELEASE.md`](RELEASE.md) §9);**版本纪律进行中**(1.0.0-rc.1 + CHANGELOG 已填)。未做:universal/Intel 决策、auto-update(local-first 有意不做)。
+> - **§1 分发门槛——基本落地（2026-07-07 更新）**:LICENSE(#346)、copyright/死 `BUILD_TARGET` 清理(#347)、`publish:null` 关闭误导性更新 feed、`asarUnpack @napi-rs/canvas` 已入 `dmg.yml`、`build:mas` 已删;**签名/公证已完成**(#355 接线 + PR-C 真机执行成功·Notarized Developer ID·实测记录见 [`RELEASE.md`](RELEASE.md) §9);**版本纪律进行中**(当前 **1.0.0-rc.2 准备中**——rc.1 已发 Pre-release,RC QA 发现的 **Excel 导入日期 blocker 已由 #357 修复并真机复测通过**,rc.2 负责把修复交付到可下载构建;正式 1.0.0 前剩余 QA:Woo 真店、safeStorage 重录)。未做:universal/Intel 决策、auto-update(local-first 有意不做)。
 > - **仍未完成**:§2C 8 家 provider 真实 Key 验收、Track A 会计师确认(B1–B5)、§5 打磨项若干。
 > - 2026-07 增量:依赖安全 #350(genai 1.52)、onboarding 免 AI Key 准入 #351、xlsx→SheetJS CDN 0.20.3 #352(**生产 `npm audit --omit=dev` = 0**)。
 

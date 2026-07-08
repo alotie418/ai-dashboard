@@ -95,7 +95,7 @@ xcrun stapler validate "release/SoloLedger-<version>-arm64.dmg"
 
 ## 8. 发布收尾（PR-C 完成后）
 
-- [x] bump `version`（**1.0.0-rc.1**）+ 填 `CHANGELOG.md`（含 §6 用户须知）——发布收尾 PR；git tag `v1.0.0-rc.1` 于该 PR merge 后由维护者打
+- [x] bump `version` + 填 `CHANGELOG.md`（含 §6 用户须知）——每个 RC/正式版的收尾 PR 各做一次（rc.1 ✓ / rc.2 ✓）；git tag 于 merge 后由维护者打
 - [ ] 只分发签名版；旧的未签名 DMG 不再外发
 - [x] 更新 `PRE_RELEASE_CHECKLIST.md` §2/§4/§6 状态——发布收尾 PR
 
@@ -112,3 +112,9 @@ xcrun stapler validate "release/SoloLedger-<version>-arm64.dmg"
 - **最小 entitlements（两项）已足够**：better-sqlite3 / @napi-rs/canvas 在 hardened runtime 下加载正常，`disable-library-validation` 确认无需添加。
 - 已知非阻塞现象：DMG 自身 `spctl --type open/install` 显示 rejected / no usable signature——DMG 本体未单独 codesign 所致；因 DMG notarytool **Accepted** + stapler validate 通过、且 DMG 内与安装后 App 均过 Gatekeeper，**判定不阻塞发布**。如需消除该观感，可后续评估对 DMG 本体签名（可选优化）。
 - 尚未完成（1.0.0 正式版门槛）：§5 干净机断网冒烟、safeStorage 重录 QA、xlsx 真实文件导入冒烟。
+
+## 10. rc.2 重发说明（2026-07-08）
+
+- `v1.0.0-rc.1` 的 DMG 构建于 #357 之前，**含 Excel 导入日期缺陷**（真实 `.xlsx`/`.xls` 的日期单元格被解析为序列数 → 整批导入失败），不再外发；CHANGELOG 已给 rc.1 标注已知问题。
+- **`v1.0.0-rc.2` 必须重新走完整发布流程**：非 iCloud 路径 clean checkout（§3 硬前提）→ §2 三凭证变量 → `npm run build:dmg`（签名 + 公证 + staple 一次到位）→ §4 四条验证命令 → 上传 GitHub Pre-release 附件并标注 rc.2。签名配置零改动，流程与 rc.1 完全相同。
+- RC QA 进度随版本推进记录在 [`PRE_RELEASE_CHECKLIST.md`](PRE_RELEASE_CHECKLIST.md) §5/§6。
