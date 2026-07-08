@@ -62,6 +62,23 @@ const NUMERIC_FIELDS = ['tons', 'pricePerTon', 'totalAmount', 'taxRate', 'shippi
 
 const round2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 const has = (v: any) => v != null && String(v).trim() !== '';
+
+// Excel 日期单元格 → 'YYYY-MM-DD'（QA-4 修复）。XLSX.read({ cellDates:true }) 把日期
+// 单元格解析成 JS Date；这里用【本地】年月日分量格式化——不能用 toISOString()，
+// UTC 偏移会把日历日前后挪一天。非 Date 值（已是 'YYYY-MM-DD' 的文本、数字金额等）
+// 原样透传；Invalid Date 也原样透传，由校验层照旧报 csvImport.errDateFormat。
+// scripts/test-xlsx-import-dates.mjs 按函数名从本文件源码提取直测——改名/移动须同步。
+function excelCellToYMD(v: any): any {
+  if (v instanceof Date) {
+    if (isNaN(v.getTime())) return v;
+    const y = v.getFullYear();
+    const m = String(v.getMonth() + 1).padStart(2, '0');
+    const d = String(v.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return v;
+}
+
 const cleanNum = (v: any): number => {
   const cleaned = String(v ?? '').replace(/[,，]/g, '');
   const m = cleaned.match(/-?[\d.]+/);
@@ -421,7 +438,9 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
         const reader = new FileReader();
         reader.onload = (e) => {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
+          // cellDates:true——真日期单元格解析为 Date（默认是 Excel 序列数，如 46174，
+          // 会让日期校验整批失败）；数字/文本单元格不受影响。
+          const workbook = XLSX.read(data, { type: 'array', cellDates: true });
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
           const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
           if (json.length < 2) return;
@@ -429,7 +448,7 @@ const CsvImportModal: React.FC<Props> = ({ type, onClose, onSuccess }) => {
           setHeaders(hdrs);
           const rows = json.slice(1).map(row => {
             const obj: any = {};
-            hdrs.forEach((h, i) => { obj[h] = row[i] ?? ''; });
+            hdrs.forEach((h, i) => { obj[h] = excelCellToYMD(row[i] ?? ''); });
             return obj;
           });
           setCsvData(rows);
