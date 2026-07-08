@@ -5,6 +5,7 @@
 > **状态更新：2026-07-07 ｜ 基线 main `3fc241e`** —— §2 的「Electron 33 已 EOL」「CSP 尚未 enforce」两项 blocker 已解决（#348 / #349）；sandbox 已加固为 true（#343）；新增 §5「2026-07 工程体检执行记录（#350–#353）」。
 > **状态更新 2（PR-C 后）**：**签名/公证已完成**（#355 + PR-C 真机执行成功，见 §2 表与 [`RELEASE.md`](RELEASE.md) §9）——**对外分发已无硬 blocker**。
 > **状态更新 3（2026-07-08·RC QA 进行中）**：`v1.0.0-rc.1` 已发 GitHub Pre-release；RC 人工 QA **1/2/3 项通过**（断网 Gatekeeper 首启·首启跳过 AI·断网基础功能），**QA-4 Excel 导入曾失败 → #357 修复并真机复测通过**；当前版本 **1.0.0-rc.2 准备中**（把 #357 交付到可下载构建，需重跑签名/公证）。正式 1.0.0 门槛 = §5 第 5/6 条（Woo 真店 + safeStorage 重录）。
+> **状态更新 4（2026-07-08·1.0.0 正式版准备）**：`v1.0.0-rc.2` 已发 Pre-release；**QA-6 safeStorage 通过**（rc.2 覆盖安装实测·(a) 分支：钥匙串授权后旧 AI Key 直接可用·零崩溃/白屏/原始报错·业务数据完好·电商旧凭证路径 N/A 无旧数据可测）；**Woo 真店 QA 按决策 B 降级为「Beta / 发布后验证项」**（不作本地财务核心 blocker，README / CHANGELOG / ECOMMERCE_MVP_STATUS §8 已同步标注）。**本地财务核心的 1.0.0 发布门槛已全部闭合**，版本 **1.0.0 正式版准备中**。
 > 本文件仅固化一次只读盘点结果与后续计划，**不改变任何产品行为、不改任何代码 / 配置**。
 
 本文档把「发布前安全与发布准备」的只读盘点整理为可追踪清单：已达标项、对外分发 blocker、不属 blocker 的项、后续任务顺序、人工 QA 清单。~~当前**没有**启用签名 / 公证 / auto-update / CSP enforce。~~（2026-07-07：CSP 已 enforce #349；**签名 + 公证已启用并真机验证**（#355 + PR-C）；auto-update 仍未做——local-first 有意决策。）
@@ -93,8 +94,8 @@
 2. ~~E43 / better-sqlite3 12.11.2 决策~~ ✅ **决策已定（2026-07-07）**：不等 12.11.2 上 npm，按 **E42 直接发布**；E43 留作发布后例行 re-bump。
 3. **版本策略**：✅ 版本纪律已建立（rc.1 → **rc.2** 滚动，CHANGELOG 逐版记录 + tag 对应）；「检查更新」入口**暂缓**——发布渠道事实上已定 GitHub Releases，链接入口留 1.0.0 后小 PR。
 4. ~~xlsx 真实 `.xlsx` / `.xls` 导入人工冒烟~~ ✅ **已完成（rc.2 / #357 后）**：RC QA 首测发现日期单元格序列数缺陷（rc.1 阻塞）→ #357 修复 → 真机真实文件复测通过（销售×.xlsx + 采购×.xls，DB 实查各 11 条；0 金额行按设计拦截）。
-5. **WooCommerce / Shopify 真实店铺人工 QA**（照 [`ECOMMERCE_WOO_REAL_STORE_QA.md`](ECOMMERCE_WOO_REAL_STORE_QA.md)）——未完成。
-6. **干净机断网 Gatekeeper 冒烟**：✅ **已完成（2026-07-08·同机模拟口径）**——单机策略：同一台 Mac 新建标准用户 SoloLedgerQA，浏览器下载 rc.1 DMG（带 quarantine）→ 断网 → 装入 `~/Applications` → 直接打开无任何 Gatekeeper 拦截；残余差距：同机共享系统级 Gatekeeper 缓存，非真·第二台干净机。**safeStorage 重录 QA——未完成**（须在装过未签名旧版且存过 Key 的开发用户里测，见 [`RELEASE.md`](RELEASE.md) §5/§6）。
+5. **WooCommerce / Shopify 真实店铺人工 QA**：**决策 B（2026-07-08）——降级为「Beta / 发布后验证项」**，不作 1.0.0 blocker（不标通过也不标失败）；模块以 Beta 标注随 1.0.0 发布，待真实店铺可用后照 [`ECOMMERCE_WOO_REAL_STORE_QA.md`](ECOMMERCE_WOO_REAL_STORE_QA.md) 逐项回填。
+6. **干净机断网 Gatekeeper 冒烟**：✅ **已完成（2026-07-08·同机模拟口径）**——单机策略：同一台 Mac 新建标准用户 SoloLedgerQA，浏览器下载 rc.1 DMG（带 quarantine）→ 断网 → 装入 `~/Applications` → 直接打开无任何 Gatekeeper 拦截；残余差距：同机共享系统级 Gatekeeper 缓存，非真·第二台干净机。**safeStorage 重录 QA（QA-6）：✅ 已完成（2026-07-08·开发用户·rc.2 覆盖安装）**——S1 覆盖安装无 Gatekeeper 提示 ✓ / S2 AI 旧 Key 解密走 **(a) 分支**（钥匙串授权后直接可用）✓ / S3 电商旧凭证 **N/A**（从未保存过电商凭证、无旧数据；底层机制与 AI Key 同源同钥匙串条目，已由 S2 覆盖；真实电商凭证功能验证并入第 5 条 Woo 项）/ S4 退出重开凭证持久 ✓ / S5 业务数据完好 ✓；零崩溃 / 白屏 / 无限转圈 / 原始英文报错。
 
 ---
 

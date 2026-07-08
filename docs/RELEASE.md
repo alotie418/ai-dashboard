@@ -1,7 +1,7 @@
 # SoloLedger macOS 发布 Runbook（签名 / 公证 / 验证 / 冒烟）
 
-> 状态：**PR-B 接线（#355）+ PR-C 真实签名 / 公证 / staple 已执行成功（2026-07-07，实测记录见 §9）。**
-> 剩余人工验收（1.0.0 正式版门槛）：干净机断网 Gatekeeper 冒烟（§5）、safeStorage 重录 QA、xlsx 真实文件导入冒烟。
+> 状态：**PR-B 接线（#355）+ PR-C 真实签名 / 公证 / staple 已执行成功（2026-07-07，实测记录见 §9）；rc.1 / rc.2 均已按本 runbook 发布。**
+> **1.0.0 正式版门槛已全部闭合（2026-07-08）**：断网 Gatekeeper 冒烟 ✓（同机模拟口径）、safeStorage 重录 QA ✓（(a) 分支）、xlsx 真实导入 ✓（rc.2 / #357）；Woo 真店 QA 按决策 B 降级为 Beta / 发布后验证项。1.0.0 发布步骤见 §11。
 > 方案依据：[`SIGNING_NOTARIZATION_PLAN.md`](SIGNING_NOTARIZATION_PLAN.md)（目标配置 §3 / 凭证 §4-§5 / safeStorage §6 / 验证 §10）。
 > 铁律：**任何证书、密码、Team ID、API Key 不入库、不写进本文件、不出现在任何日志/汇报里。**
 
@@ -73,8 +73,8 @@ xcrun stapler validate "release/SoloLedger-<version>-arm64.dmg"
 - [ ] 打开 DMG → 拖入「应用程序」→ 双击启动
 - [ ] 期望：**无「无法验证开发者」拦截、无 Gatekeeper 提示、离线直接打开**（staple = 公证票据随包，离线可验）
 - [ ] 核心记账流程冒烟：新建销售/采购 → 看板 → 报表 → 备份导出/恢复
-- [ ] safeStorage 重录流程（见 §6）：进「设置 → AI 服务商」重新填 Key → 测试连接通过；电商连接同理
-- [ ] 解密失败提示是**可操作的重录引导**而非崩溃
+- [x] safeStorage 重录流程（见 §6）：✅ 2026-07-08 实测——实际走 **(a) 分支**：钥匙串授权后**旧 Key 直接可用**，无需重录；退出重开持久
+- [ ] 解密失败提示是**可操作的重录引导**而非崩溃（未触发——本次走 (a) 分支未遇解密失败；保留为后续观察项）
 
 ## 6. safeStorage 旧 Key 重录 —— 用户须知模板（随首个签名版发布说明原样使用）
 
@@ -118,3 +118,10 @@ xcrun stapler validate "release/SoloLedger-<version>-arm64.dmg"
 - `v1.0.0-rc.1` 的 DMG 构建于 #357 之前，**含 Excel 导入日期缺陷**（真实 `.xlsx`/`.xls` 的日期单元格被解析为序列数 → 整批导入失败），不再外发；CHANGELOG 已给 rc.1 标注已知问题。
 - **`v1.0.0-rc.2` 必须重新走完整发布流程**：非 iCloud 路径 clean checkout（§3 硬前提）→ §2 三凭证变量 → `npm run build:dmg`（签名 + 公证 + staple 一次到位）→ §4 四条验证命令 → 上传 GitHub Pre-release 附件并标注 rc.2。签名配置零改动，流程与 rc.1 完全相同。
 - RC QA 进度随版本推进记录在 [`PRE_RELEASE_CHECKLIST.md`](PRE_RELEASE_CHECKLIST.md) §5/§6。
+
+## 11. 1.0.0 正式版发布说明（2026-07-08）
+
+- **流程与 rc.2 完全相同**（§1–§4：非 iCloud 路径 clean checkout → §2 三凭证变量 → `npm run build:dmg` → §4 四条验证命令）；签名配置零改动。
+- **必须重新构建 1.0.0 DMG，不能复用 rc.2 的 DMG**——版本号写进产物文件名与包内元数据，公证票据对应具体二进制。
+- GitHub Release **不标 Pre-release**（首个正式版）。发布说明包含：CHANGELOG `[1.0.0]` 条目的升级须知（钥匙串授权措辞——据 QA-6 实测修正，不写死"必须重录"）+ **电商订单导入 Beta 声明**。
+- 发布后：rc.1 / rc.2 的 Release 说明各加一行"已被 1.0.0 取代"。
