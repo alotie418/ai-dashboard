@@ -38,7 +38,9 @@ npm run build:mas
 ## 4. App Store Connect 准备清单
 
 - [ ] ASC 新建 App（名称 SoloLedger · 类别 Finance · Bundle ID 关联）
-- [ ] 隐私政策 **URL**（`PRIVACY.md`/`PRIVACY.en.md` 内容托管为可公开访问页面）+ 支持 URL
+- [x] 隐私政策 **URL** + 支持 URL：✅ 已托管于独立 public 仓库 `sololedger-legal` 的 GitHub Pages（与主仓库可见性解耦，四 URL 均验证 200·2026-07-09）——
+  **Privacy Policy URL** = `https://alotie418.github.io/sololedger-legal/privacy/`（中文 `…/privacy/zh/`）
+  **Support URL** = `https://alotie418.github.io/sololedger-legal/support/`
 - [ ] App 隐私标签问卷（如实：不收集数据 · 全本地存储 · BYOK 出网是用户主动配置第三方服务）
 - [ ] 出口合规（仅标准 HTTPS 加密 → 豁免声明）
 - [ ] 截图（≥1 张，1280×800 / 2560×1600 等规格）+ 描述/副标题/关键词（**电商 Beta 口径与 README 一致，不夸大**）

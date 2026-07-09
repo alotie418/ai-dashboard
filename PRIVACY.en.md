@@ -106,11 +106,14 @@ SoloLedger acts only as a local client between you and the provider you choose. 
 
 ## 12. Support and contact
 
-For questions about this notice or the application, please open an issue at the project's support page:
+For questions about this notice or the application, please use the public support channel (kept reachable independently of this repository's visibility):
 
-- **GitHub Issues**: <https://github.com/alotie418/ai-dashboard/issues>
+- **Support page**: <https://alotie418.github.io/sololedger-legal/support/>
+- **GitHub Issues**: <https://github.com/alotie418/sololedger-legal/issues>
 
 Please do **not** include API keys, store credentials, or sensitive business records in public issue reports.
+
+> The publicly hosted copy of this notice lives at <https://alotie418.github.io/sololedger-legal/privacy/>. When this file changes, update that copy as well (see `docs/RELEASE.md`).
 
 ## 13. Changes to this notice
 
