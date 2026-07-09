@@ -1,6 +1,6 @@
 # Privacy Notice
 
-> Draft date: 2026-06-26 (update on finalization) | Applies to: SoloLedger v0.1.x (local desktop edition)
+> Last updated: 2026-07-09 | Applies to: SoloLedger v1.0.x (local desktop edition)
 >
 > 中文版 / Chinese: [PRIVACY.md](PRIVACY.md)
 
@@ -16,6 +16,7 @@ SoloLedger is a **local-first** desktop application. All of your business data (
 
 - Database file: `sololedger.db`, under the application's `userData` directory (on macOS, typically in the app-specific directory under `~/Library/Application Support/`).
 - **No cloud account, no SoloLedger server-side storage**: core bookkeeping works without sign-in and without a network connection.
+- **SoloLedger does not operate a cloud service for collecting business records**, and there is no developer-operated account system. Your business records stay on your device by default.
 
 ## 2. How your API keys are stored
 
@@ -26,7 +27,7 @@ SoloLedger **does not include any built-in AI backend**; it uses a BYOK (bring-y
 - after you delete a key, the corresponding provider is disabled immediately, while the business data you have already entered is retained;
 - if the operating system's encryption capability is unavailable, the application cannot save the key (and the corresponding AI features cannot be used).
 
-> Note: This is **on-device local encryption** intended to protect the key on your disk. It is **not end-to-end encryption**, and it does not imply any additional guarantee about data while it is transmitted over the network.
+> Note: This is **on-device local encryption** intended to protect the key on your disk. It is **not end-to-end encryption**, and it does not imply any additional guarantee about data while it is transmitted over the network. No security mechanism can guarantee absolute protection; please also maintain your own device security and backups.
 
 ## 3. Network behavior at a glance
 
@@ -50,7 +51,17 @@ Whether to use AI features is entirely up to you. If you do not configure any ke
 - **PDF**: a PDF is rasterized into an image (first page) **locally** by `pdf.js`, a process that runs on your computer; **however, if you use that PDF for OCR, the rasterized image is likewise sent to the provider above**.
 - **CSV / Excel (xlsx)**: import parsing and export are both performed **locally, without going over the network**; an exported CSV is saved to a local location you choose (by default, the system "Documents" directory).
 
-## 6. Telemetry, logs, and crash reporting
+## 6. Optional e-commerce integrations (Beta)
+
+SoloLedger includes **optional** e-commerce order-import integrations (currently Shopify and WooCommerce, shipped as Beta). They are **off unless you actively configure them** with credentials for a third-party store that you control:
+
+- Store credentials you enter are encrypted with the operating system's **`safeStorage` (on macOS, the Keychain)** and stored locally as ciphertext, decrypted only in the main process; the interface never sees them.
+- Order pulls are sent **directly from your computer to the store platform you configured**; SoloLedger does not operate any relay server.
+- Imported orders are staged locally and written to your books only after you explicitly confirm them.
+- **Buyer personal details (names, emails, phone numbers, addresses) are never persisted** to the local database, and raw platform payloads are not stored.
+- How the third-party platform (e.g., Shopify or your WooCommerce host) handles data on its side is governed by that platform's own terms and privacy policy.
+
+## 7. Telemetry, logs, and crash reporting
 
 The **current version does not include any** of the following:
 
@@ -61,14 +72,14 @@ The **current version does not include any** of the following:
 
 Diagnostic information is only printed to the development/console output; it is not written to disk and is not transmitted.
 
-## 7. Backup and restore
+## 8. Backup and restore
 
 - A **manual backup** exports a **folder bundle** containing the database `sololedger.db` **as well as the invoice attachments `attachments/docs`** (exported by default to the system "Documents" directory).
 - **Automatic backup**: before a destructive operation such as a migration or a restore, the application creates a rolling snapshot in the local `userData/backups` directory (using verification, atomic replacement, and similar measures to reduce the risk of corruption).
 - When restoring an older backup, attachments are merged back into `userData/attachments/docs` on an "add-only" basis.
 - All backups are **local files**, kept and moved by you; please protect backups that contain business data.
 
-## 8. Third-party AI providers
+## 9. Third-party AI providers
 
 SoloLedger acts only as a local client between you and the provider you choose. Content you send through AI features is sent to the provider you have selected; currently configurable providers include:
 
@@ -83,13 +94,25 @@ SoloLedger acts only as a local client between you and the provider you choose. 
 
 **How these providers handle the content you send — including data retention, whether it is used for model training, and logging — is determined by each provider's own privacy policy and data-usage terms, and is outside SoloLedger's control.** Before using a given provider, **please refer to and review that provider's official privacy policy and data-usage terms yourself.**
 
-## 9. Your control over your data
+## 10. Your control over your data
 
 - You can delete any key at any time under "Settings → AI Providers" (deletion disables that provider immediately; your business data is retained).
 - All local data lives in the `userData` directory; deleting `sololedger.db` (along with `attachments` and `backups`) or uninstalling the application removes the data from your machine (back up first if needed).
 - Whether content already sent to a third-party provider can be recalled or deleted depends on that provider's policy; please ask the provider.
 
-## 10. Changes to this notice
+## 11. No sale of your data
+
+**SoloLedger does not sell your data.** The developer has no access to your business records — they live on your device (see Section 1) — and SoloLedger does not operate a cloud service for collecting business records.
+
+## 12. Support and contact
+
+For questions about this notice or the application, please open an issue at the project's support page:
+
+- **GitHub Issues**: <https://github.com/alotie418/ai-dashboard/issues>
+
+Please do **not** include API keys, store credentials, or sensitive business records in public issue reports.
+
+## 13. Changes to this notice
 
 This notice describes the behavior of a specific version and may change as the application is updated. Significant changes will update the date and applicable version at the top of this file.
 
