@@ -33,6 +33,8 @@ npm run build:mas
 - Info.plist 的 `ElectronTeamID` 由 electron-builder 从签名身份自动注入；若首次上传报缺失，在 `mas.extendInfo` 补。
 - 首次上传如报 ITMS 用途声明缺失（Electron 框架引用 AVFoundation 等 API 所致），按报错在 `mas.extendInfo` 精确补对应 `NS*UsageDescription`，不预猜全集。
 
+> **首跑记录（2026-07-09·iCloud checkout·MAS-2）**：证书两张均已在钥匙串（Apple Distribution ×1 / Installer ×1）、TEAM_ID 已填真值。`build:mas` 在 iCloud 路径 checkout 上按预期复现 detritus 拒签（xattr，环境性，与 Developer ID 线同款）。**待非 iCloud checkout 复跑核实的三个观察点**：①signing 日志显示 `identity=` 选中的是 Developer ID 证书指纹而非 Apple Distribution；②`platform=darwin` + `--options runtime`（硬化运行时旗标）+ osx-sign 的 `default.darwin.plist`（而非本仓库 MAS entitlements）；③`provisioningProfile=none`（该 checkout 无 profile 文件，属预期）。若干净环境 + profile 在位后 ①② 仍复现，则需要调整 mas 配置（如显式 `mas.identity`），届时单独小 PR。
+
 ## 4. App Store Connect 准备清单
 
 - [ ] ASC 新建 App（名称 SoloLedger · 类别 Finance · Bundle ID 关联）
