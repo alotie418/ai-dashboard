@@ -106,11 +106,14 @@ SoloLedger 仅作为你与所选服务商之间的本地客户端。你通过 AI
 
 ## 12. 支持与联系
 
-关于本说明或应用本身的问题，请通过项目支持页提交：
+关于本说明或应用本身的问题，请通过公开支持渠道提交（该渠道与本仓库可见性无关，长期可访问）：
 
-- **GitHub Issues**：<https://github.com/alotie418/ai-dashboard/issues>
+- **支持页**：<https://alotie418.github.io/sololedger-legal/support/>
+- **GitHub Issues**：<https://github.com/alotie418/sololedger-legal/issues>
 
 请**不要**在公开的 issue 中附带 API Key、店铺凭证或敏感业务记录。
+
+> 本说明的公开托管副本位于 <https://alotie418.github.io/sololedger-legal/privacy/zh/>。本文件变更时须同步更新该副本（见 `docs/RELEASE.md`）。
 
 ## 13. 本说明的变更
 

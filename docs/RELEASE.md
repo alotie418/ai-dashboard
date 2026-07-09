@@ -96,6 +96,7 @@ xcrun stapler validate "release/SoloLedger-<version>-arm64.dmg"
 ## 8. 发布收尾（PR-C 完成后）
 
 - [x] bump `version` + 填 `CHANGELOG.md`（含 §6 用户须知）——每个 RC/正式版的收尾 PR 各做一次（rc.1 ✓ / rc.2 ✓）；git tag 于 merge 后由维护者打
+- [ ] **隐私文档同步纪律**：`PRIVACY.en.md` / `PRIVACY.md` 有任何变更时，须手动同步到公开托管副本仓库 [`alotie418/sololedger-legal`](https://github.com/alotie418/sololedger-legal)（ASC 的 Privacy Policy / Support URL 指向该站，主仓库转 private 也不受影响）
 - [ ] 只分发签名版；旧的未签名 DMG 不再外发
 - [x] 更新 `PRE_RELEASE_CHECKLIST.md` §2/§4/§6 状态——发布收尾 PR
 
