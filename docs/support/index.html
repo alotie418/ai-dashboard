@@ -1,0 +1,147 @@
+<!doctype html>
+<!--
+  SoloLedger — Support page (deployable source).
+
+  This is a self-contained static page (no external CSS/JS/fonts/CDN) intended to be the
+  App Store Connect "Support URL" target. Deploy it to the public legal/support site that
+  is kept reachable independently of the app's source repository:
+
+    Recommended Support URL:  https://alotie418.github.io/sololedger-legal/support/
+
+  How to deploy:
+    1. Copy this file to the `sololedger-legal` GitHub Pages repo as `support/index.html`
+       (it already serves /privacy/ and /support/ — this replaces/populates /support/).
+    2. Replace the [SUPPORT_EMAIL] placeholder below (2 occurrences) with a monitored inbox.
+    3. Commit & push; GitHub Pages serves it at the URL above.
+    4. In App Store Connect, set the app's Support URL to that address.
+
+  Do NOT invent a company, address, phone number, or support-time guarantee. Only fill in
+  a real contact email you actually monitor.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SoloLedger — Support</title>
+  <style>
+    :root { --ink:#191918; --muted:#5c5c5a; --line:#e0ddd5; --bg:#f9f9f8; --card:#ffffff; --brand:#274C92; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+        "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      line-height: 1.6; -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 40px 20px 72px; }
+    header { border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 28px; }
+    h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.02em; }
+    h2 { font-size: 19px; margin: 34px 0 12px; }
+    h3 { font-size: 15px; margin: 20px 0 4px; }
+    p, li { color: var(--muted); }
+    .lede { font-size: 16px; color: var(--ink); }
+    a { color: var(--brand); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; margin: 16px 0; }
+    .contact { display: inline-block; font-weight: 600; }
+    .muted-note { font-size: 13px; color: var(--muted); }
+    hr { border: none; border-top: 1px solid var(--line); margin: 40px 0; }
+    footer { font-size: 13px; color: var(--muted); }
+    .lang-zh { margin-top: 8px; }
+    code { background: #f0eeeb; border-radius: 4px; padding: 1px 5px; font-size: 13px; }
+    @media (prefers-color-scheme: dark) {
+      :root { --ink:#f2f1ee; --muted:#a9a7a1; --line:#33322e; --bg:#1b1b19; --card:#232320; --brand:#8fb0e6; }
+      code { background:#2c2b27; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>SoloLedger — Support</h1>
+      <p class="lede">SoloLedger is a local-first desktop bookkeeping and business-management
+        app for solo operators and small businesses. Your data stays on your own Mac.</p>
+    </header>
+
+    <h2>Contact</h2>
+    <div class="card">
+      <p>For help, questions, or bug reports, email us:</p>
+      <p><a class="contact" href="mailto:[SUPPORT_EMAIL]">[SUPPORT_EMAIL]</a></p>
+      <p class="muted-note">Please include your macOS version and a short description of what
+        you were doing. Do not send passwords or sensitive financial data.</p>
+    </div>
+
+    <h2>Frequently asked questions</h2>
+
+    <h3>What is SoloLedger?</h3>
+    <p>A desktop app for recording sales and purchases, tracking products, inventory,
+      receivables and payables, generating business documents, and viewing management-basis
+      financial summaries. It is a bookkeeping and management-analysis tool — not an official
+      tax-filing, audit, or statutory-compliance system.</p>
+
+    <h3>Where is my data stored? Is it private?</h3>
+    <p>All data is stored locally in a SQLite database inside the app's private
+      Application Support directory on your Mac. SoloLedger does not require an account and does
+      not upload your bookkeeping data to any server. See the
+      <a href="https://alotie418.github.io/sololedger-legal/privacy/">Privacy Notice</a>.</p>
+
+    <h3>Does the Mac App Store version need an API key or internet connection?</h3>
+    <p>No. The Mac App Store version runs fully offline for core bookkeeping. It does not ask
+      for, store, or use any external API key.</p>
+
+    <h3>How do I back up or move my data?</h3>
+    <p>Use <em>Settings → Data Backup</em> to export a backup (database plus attachments) to a
+      folder you choose, and to restore from a previous backup. Keep your own copies of exported
+      backups; they are your data.</p>
+
+    <h3>How do I change the app language?</h3>
+    <p>Open <em>Settings → Language</em> and choose from the supported languages. The interface
+      language is independent of the accounting profile.</p>
+
+    <h3>How do I reopen the window after closing it?</h3>
+    <p>Choose <em>Window → SoloLedger</em> from the menu bar (⌘0), or click the app icon in the
+      Dock. Your saved data is never affected by closing or reopening the window.</p>
+
+    <h2>Report a problem or request a feature</h2>
+    <div class="card">
+      <p>Email <a href="mailto:[SUPPORT_EMAIL]">[SUPPORT_EMAIL]</a>, or open an issue on our public tracker:</p>
+      <p><a href="https://github.com/alotie418/sololedger-legal/issues">github.com/alotie418/sololedger-legal/issues</a></p>
+    </div>
+
+    <p class="muted-note">Related: <a href="https://alotie418.github.io/sololedger-legal/privacy/">Privacy Notice</a></p>
+
+    <hr />
+
+    <section class="lang-zh" lang="zh-CN">
+      <h2>中文支持</h2>
+      <p>SoloLedger（独账）是一款本地优先的桌面记账与经营管理应用，面向个体经营者与小微企业，数据保存在你自己的 Mac 上。</p>
+
+      <h3>联系我们</h3>
+      <p>如需帮助、咨询或反馈问题，请邮件联系：<a class="contact" href="mailto:[SUPPORT_EMAIL]">[SUPPORT_EMAIL]</a>。
+        请附上 macOS 版本与操作简述，切勿发送密码或敏感财务数据。</p>
+
+      <h3>数据存在哪里？是否私密？</h3>
+      <p>全部数据以本地 SQLite 数据库形式保存在 Mac 上应用专属的 Application Support 目录中。
+        应用无需登录，也不会把你的账本数据上传到任何服务器。详见
+        <a href="https://alotie418.github.io/sololedger-legal/privacy/zh/">隐私说明</a>。</p>
+
+      <h3>Mac App Store 版本需要 API Key 或联网吗？</h3>
+      <p>不需要。App Store 版本的核心记账功能完全离线运行，不索取、不保存、不使用任何外部 API Key。</p>
+
+      <h3>如何备份或迁移数据？</h3>
+      <p>在 <em>设置 → 数据备份</em> 中导出备份（数据库 + 附件）到你选择的文件夹，并可从既有备份恢复。
+        请自行妥善保存导出的备份文件。</p>
+
+      <h3>关闭窗口后如何重新打开？</h3>
+      <p>在菜单栏选择 <em>窗口 → SoloLedger</em>（⌘0），或点击 Dock 中的应用图标。
+        关闭与重开窗口都不会影响已保存的数据。</p>
+    </section>
+
+    <hr />
+    <footer>
+      <p>SoloLedger is a business bookkeeping and management-analysis tool. It does not replace a
+        licensed accountant, tax advisor, or statutory compliance system. This support page is a
+        product-usage reference, not legal advice.</p>
+    </footer>
+  </div>
+</body>
+</html>
