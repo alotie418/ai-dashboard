@@ -3,6 +3,7 @@
 //
 // 路由顺序很关键：更具体的路径（如 /api/sales/batch）必须排在参数路由（/api/sales/:id）之前
 
+const { IS_MAS } = require('../masBuild');
 const sales = require('./sales');
 const purchases = require('./purchases');
 const settings = require('./settings');
@@ -11,7 +12,10 @@ const payment = require('./payment');
 const accounts = require('./receivables');
 const alertsH = require('./alerts');
 const batch = require('./batch');
-const ai = require('./ai');
+// MAS build: ./ai and ./conversations are excluded from the package (see
+// electron-builder.mas.yml). Guard the require so the router loads without them, and the
+// /api/ai/* and /api/conversations routes below are simply not registered.
+const ai = IS_MAS ? null : require('./ai');
 const categories = require('./categories');
 const products = require('./products');
 const inventory = require('./inventory');
@@ -21,7 +25,7 @@ const migrationsH = require('./migrations');
 const reportsH = require('./reports');
 const mileageH = require('./mileage');
 const homeOfficeH = require('./homeOffice');
-const conversationsH = require('./conversations');
+const conversationsH = IS_MAS ? null : require('./conversations');
 const cashAccountsH = require('./cashAccounts');
 const liabilitiesH = require('./liabilities');
 const fixedAssetsH = require('./fixedAssets');
@@ -178,20 +182,24 @@ const routes = [
   ['GET', '/api/settings', settings.get],
   ['PUT', '/api/settings', settings.save],
 
-  // ---- AI（BYOK：从 safeStorage 取 Key 注入 Gemini SDK）----
-  ['POST', '/api/ai/analyze', ai.analyze],
-  ['POST', '/api/ai/ocr', ai.ocr],
-  ['POST', '/api/ai/context', ai.context],
-  ['POST', '/api/ai/chat', ai.chat],
-  ['POST', '/api/ai/agent-chat', ai.agentChat],
+  // ---- AI + 会话持久化（BYOK：从 safeStorage 取 Key 注入服务商 SDK）----
+  // MAS build: excluded entirely (ai / conversationsH are null; the spread is only
+  // evaluated when !IS_MAS, so these routes never register in the Mac App Store binary).
+  ...(IS_MAS ? [] : [
+    ['POST', '/api/ai/analyze', ai.analyze],
+    ['POST', '/api/ai/ocr', ai.ocr],
+    ['POST', '/api/ai/context', ai.context],
+    ['POST', '/api/ai/chat', ai.chat],
+    ['POST', '/api/ai/agent-chat', ai.agentChat],
 
-  // ---- AI 助手会话持久化（R4a-1；具体路径 messages 排在 :id 之前）----
-  ['GET', '/api/conversations', conversationsH.list],
-  ['POST', '/api/conversations', conversationsH.create],
-  ['GET', '/api/conversations/:id/messages', conversationsH.messages],
-  ['POST', '/api/conversations/:id/messages', conversationsH.appendMessage],
-  ['PUT', '/api/conversations/:id', conversationsH.rename],
-  ['DELETE', '/api/conversations/:id', conversationsH.remove],
+    // ---- AI 助手会话持久化（R4a-1；具体路径 messages 排在 :id 之前）----
+    ['GET', '/api/conversations', conversationsH.list],
+    ['POST', '/api/conversations', conversationsH.create],
+    ['GET', '/api/conversations/:id/messages', conversationsH.messages],
+    ['POST', '/api/conversations/:id/messages', conversationsH.appendMessage],
+    ['PUT', '/api/conversations/:id', conversationsH.rename],
+    ['DELETE', '/api/conversations/:id', conversationsH.remove],
+  ]),
 ];
 
 // 所有路由都已迁移，PENDING_ROUTES 清空

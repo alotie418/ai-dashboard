@@ -15,6 +15,11 @@ appId: com.alotie418.sololedger
 productName: SoloLedger
 copyright: © 2026 alotie418
 
+# Marketing 版本仍取自 package.json version（CFBundleShortVersionString = 1.0.0 → App Store 显示 1.0）。
+# buildVersion 单独设 CFBundleVersion（构建号），本次从 1.0.0 提升到 1.0.1 以便重新提审
+# （App Review 要求新提交的构建号必须高于上一次）。Bundle ID / 签名 / 容器均不变。
+buildVersion: "1.0.1"
+
 # MAS 由 App Store 分发更新；不生成任何更新 feed。
 publish: null
 
@@ -22,12 +27,19 @@ directories:
   output: release
   buildResources: build
 
-# 进包内容与 DMG 线保持一致（vite 渲染端 + 主进程/preload/handlers/ai/db/ecommerce）。
+# 进包内容：vite 渲染端 + 主进程/preload/handlers/db/ecommerce。
+# App Review 3.1.1：MAS 构建物理排除外部 AI / BYOK-API-Key 子系统——electron/ai/** 及
+# 依赖它的 handlers/ai.js、handlers/conversations.js 不进包。主进程用 masBuild.js 的
+# IS_MAS（process.mas=true）跳过对这些模块的 require 与路由/通道注册，渲染端用 __MAS_BUILD__
+# 编译期剔除相关 UI，故成品里没有可访问的 API Key 入口。DMG（Developer ID）线不受影响、保留 AI。
 files:
   - dist/**
   - electron/**
   - package.json
   - "!**/*.{map,md}"
+  - "!electron/ai/**"
+  - "!electron/handlers/ai.js"
+  - "!electron/handlers/conversations.js"
 
 # 原生模块（.node）必须从 asar 解包（与 DMG 线一致）。
 asarUnpack:

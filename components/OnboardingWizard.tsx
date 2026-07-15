@@ -103,6 +103,9 @@ const PROVIDER_DOCS: Record<AIProviderId, { label: string; getKeyUrl: string; pl
 const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
   const { t, i18n } = useTranslation();
   const [step, setStep] = useState<Step>('welcome');
+  // MAS build: no external-AI provider step — a slimmed welcome → locale → company flow.
+  // (The 'providers' step and all its AI/BYOK logic below are dead-code-eliminated.)
+  const STEPS: Step[] = __MAS_BUILD__ ? ['welcome', 'locale', 'company'] : ['welcome', 'locale', 'providers', 'company'];
   const [providers, setProviders] = useState<AIProviderConfig[]>([]);
   const [forms, setForms] = useState<Record<AIProviderId, ProviderFormState>>({} as any);
   const [expandedProvider, setExpandedProvider] = useState<AIProviderId | null>(null);
@@ -121,6 +124,9 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
 
   // 初始加载所有 provider 元信息
   useEffect(() => {
+    // MAS build: no AI providers — skip the fetch entirely (listProviders + its channel are
+    // excluded). Everything below is dead-code-eliminated.
+    if (__MAS_BUILD__) { setLoading(false); return; }
     listProviders().then(list => {
       setProviders(list);
       const initForms: Record<string, ProviderFormState> = {};
@@ -144,6 +150,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
   };
 
   const handleTest = async (id: AIProviderId) => {
+    if (__MAS_BUILD__) return; // MAS: no external-AI — DCE'd
     const form = forms[id];
     if (!form?.apiKey.trim()) return;
     updateForm(id, { testing: true, testResult: null, errorMsg: '', errorStatus: undefined, errorCode: undefined });
@@ -167,6 +174,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
   };
 
   const handleSave = async (id: AIProviderId) => {
+    if (__MAS_BUILD__) return; // MAS: no external-AI — DCE'd
     const form = forms[id];
     if (!form?.apiKey.trim()) return;
     updateForm(id, { saving: true, errorMsg: '' });
@@ -189,6 +197,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
   };
 
   const handleSetDefault = async (id: AIProviderId) => {
+    if (__MAS_BUILD__) return; // MAS: no external-AI — DCE'd
     try {
       await setDefaultProvider(id);
       setDefaultProviderState(id);
@@ -240,10 +249,10 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
 
         {/* Progress dots */}
         <div className="flex items-center justify-center mb-8 space-x-2">
-          {(['welcome', 'locale', 'providers', 'company'] as Step[]).map((s, i) => (
+          {STEPS.map((s, i) => (
             <React.Fragment key={s}>
-              <div className={`w-2 h-2 rounded-full transition-all ${s === step ? 'bg-primary w-6' : (['welcome', 'locale', 'providers', 'company'].indexOf(step) > i ? 'bg-primary/40' : 'bg-[#e0ddd5]')}`}></div>
-              {i < 3 && <div className="w-4 h-px bg-[#e0ddd5]"></div>}
+              <div className={`w-2 h-2 rounded-full transition-all ${s === step ? 'bg-primary w-6' : (STEPS.indexOf(step) > i ? 'bg-primary/40' : 'bg-[#e0ddd5]')}`}></div>
+              {i < STEPS.length - 1 && <div className="w-4 h-px bg-[#e0ddd5]"></div>}
             </React.Fragment>
           ))}
         </div>
@@ -259,10 +268,13 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                 <i className="fas fa-shield-alt text-primary mt-1 mr-3 w-4 text-center"></i>
                 <span>{t('onboarding.feature1')}</span>
               </li>
-              <li className="flex items-start">
-                <i className="fas fa-key text-primary mt-1 mr-3 w-4 text-center"></i>
-                <span>{t('onboarding.feature2')}</span>
-              </li>
+              {/* MAS build: no BYOK / API-key feature — hide this value prop. */}
+              {!__MAS_BUILD__ && (
+                <li className="flex items-start">
+                  <i className="fas fa-key text-primary mt-1 mr-3 w-4 text-center"></i>
+                  <span>{t('onboarding.feature2')}</span>
+                </li>
+              )}
               <li className="flex items-start">
                 <i className="fas fa-lock text-primary mt-1 mr-3 w-4 text-center"></i>
                 <span>{t('onboarding.feature3')}</span>
@@ -357,7 +369,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                       currency: p.currency,
                     } as any);
                   } catch { /* ignore */ }
-                  setStep('providers');
+                  setStep(__MAS_BUILD__ ? 'company' : 'providers');
                 }}
                 className="flex-1 bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-primary-hover transition-colors"
               >
@@ -367,7 +379,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
           </div>
         )}
 
-        {step === 'providers' && (
+        {!__MAS_BUILD__ && step === 'providers' && (
           <div className="space-y-5">
             <div>
               <h2 className="text-xl font-semibold text-[#191918] mb-2">{t('onboarding.providerTitle')}</h2>
@@ -616,7 +628,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
 
             <div className="flex space-x-3">
               <button
-                onClick={() => setStep('providers')}
+                onClick={() => setStep(__MAS_BUILD__ ? 'locale' : 'providers')}
                 className="px-6 border border-[#e0ddd5] text-[#4a4a48] py-2.5 rounded-lg font-medium hover:bg-[#f0eeeb] transition-colors"
               >
                 {t('common.back')}
