@@ -18,7 +18,8 @@ const LanguageSection: React.FC = () => {
         <div className="font-semibold"><i className="fas fa-language mr-1.5 text-blue-500"></i>{t('settings.language.scopeTitle', 'What this changes')}</div>
         <ul className="list-disc list-inside text-[11px] text-[#5c5c5a] space-y-0.5">
           <li>{t('settings.language.scopeYes1', 'Menus, buttons, labels, help text')}</li>
-          <li>{t('settings.language.scopeYes2', 'AI response language')}</li>
+          {/* MAS build: "AI response language" — hidden. */}
+          {!__MAS_BUILD__ && <li>{t('settings.language.scopeYes2', 'AI response language')}</li>}
         </ul>
         <div className="text-[11px] text-[#5c5c5a] mt-1">
           <i className="fas fa-exclamation-circle mr-1 text-amber-500"></i>

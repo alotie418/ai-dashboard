@@ -510,6 +510,8 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
         );
       })()}
 
+      {/* MAS build: no external-AI / OCR — the recognition toggle + upload dropzone are excluded (App Review 3.1.1). */}
+      {!__MAS_BUILD__ && (<>
       {/* Recognition Mode Selector */}
       <div className="flex items-center justify-between py-2">
         <div className="flex items-center space-x-4">
@@ -562,6 +564,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
           {isScanning ? (accLocale !== 'CN' ? taxLabel('scanningSubtitle') : t('sales.uploadExtracting')) : (accLocale !== 'CN' ? taxLabel('uploadSubtitleSales') : t('sales.uploadSubtitle'))}
         </p>
       </div>
+      </>)}
 
       {/* Phase C：业务单据生成成功提示 */}
       {docGenOk && (

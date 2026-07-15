@@ -122,7 +122,7 @@
     "security": {
       "title": "帳號與安全",
       "encryption": "資料加密",
-      "encryptionDesc": "帳本資料全部儲存在本機 SQLite 資料庫（不上傳、不經伺服器）；AI 服務商 API Key 由系統安全儲存（safeStorage，如 macOS 鑰匙圈）加密保存，全程不出本機。"
+      "encryptionDesc": "帳本資料全部儲存在本機 SQLite 資料庫（不上傳、不經伺服器），全程不出本機。"
     },
     "saveButton": "儲存變更",
     "savedToast": "設定已成功儲存！",
@@ -460,7 +460,7 @@
   },
   "onboarding": {
     "welcomeTitle": "歡迎使用 SoloLedger",
-    "welcomeDescription": "SoloLedger 是為一人公司、個體戶和 Solo SaaS 創始人打造的智慧帳本應用。所有資料儲存於本機，AI 能力由您自備的 API Key 驅動 — 我們看不到您的任何資料。",
+    "welcomeDescription": "SoloLedger 是為一人公司、個體戶和 Solo SaaS 創始人打造的帳本與經營管理應用。所有資料儲存於本機、離線可用 — 資料只保存在您的 Mac 上。",
     "feature1": "本機 SQLite 儲存，所有資料保存在您的 Mac 上",
     "feature2": "支援 Claude · ChatGPT · Gemini，可設定多個，按需切換預設",
     "feature3": "API Key 使用系統 Keychain 加密，永遠不離開您的裝置",

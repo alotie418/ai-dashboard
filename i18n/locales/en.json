@@ -122,7 +122,7 @@
     "security": {
       "title": "Account & Security",
       "encryption": "Data Encryption",
-      "encryptionDesc": "All ledger data is stored in a local SQLite database on this device (never uploaded, no server). AI provider API keys are encrypted by the OS secure storage (safeStorage, e.g. macOS Keychain) and never leave your machine."
+      "encryptionDesc": "All ledger data is stored in a local SQLite database on this device (never uploaded, no server) and never leaves your machine."
     },
     "saveButton": "Save Changes",
     "savedToast": "Settings saved successfully",
@@ -460,7 +460,7 @@
   },
   "onboarding": {
     "welcomeTitle": "Welcome to SoloLedger",
-    "welcomeDescription": "SoloLedger is a smart ledger app built for one-person companies, sole proprietors, and solo SaaS founders. All data stays on your device, AI is powered by your own API Key — we never see your data.",
+    "welcomeDescription": "SoloLedger is a bookkeeping and business-management app built for one-person companies, sole proprietors, and solo SaaS founders. All data stays on your device and works offline — your data never leaves your Mac.",
     "feature1": "Local SQLite storage — all data lives on your Mac",
     "feature2": "Claude · ChatGPT · Gemini supported; configure multiple, switch defaults",
     "feature3": "API Keys encrypted by system Keychain, never leave your device",

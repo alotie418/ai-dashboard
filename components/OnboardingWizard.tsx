@@ -263,18 +263,17 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
             <p className="text-sm text-[#4a4a48] leading-relaxed">
               {t('onboarding.welcomeDescription')}
             </p>
+            {/* MAS build: these value props describe AI providers / API keys / OCR — hidden (App Review 3.1.1). */}
+            {!__MAS_BUILD__ && (
             <ul className="space-y-3 text-sm text-[#4a4a48]">
               <li className="flex items-start">
                 <i className="fas fa-shield-alt text-primary mt-1 mr-3 w-4 text-center"></i>
                 <span>{t('onboarding.feature1')}</span>
               </li>
-              {/* MAS build: no BYOK / API-key feature — hide this value prop. */}
-              {!__MAS_BUILD__ && (
-                <li className="flex items-start">
-                  <i className="fas fa-key text-primary mt-1 mr-3 w-4 text-center"></i>
-                  <span>{t('onboarding.feature2')}</span>
-                </li>
-              )}
+              <li className="flex items-start">
+                <i className="fas fa-key text-primary mt-1 mr-3 w-4 text-center"></i>
+                <span>{t('onboarding.feature2')}</span>
+              </li>
               <li className="flex items-start">
                 <i className="fas fa-lock text-primary mt-1 mr-3 w-4 text-center"></i>
                 <span>{t('onboarding.feature3')}</span>
@@ -284,6 +283,7 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
                 <span>{t('onboarding.feature4')}</span>
               </li>
             </ul>
+            )}
             <button
               onClick={() => setStep('locale')}
               className="w-full bg-primary text-white py-3 rounded-lg font-medium hover:bg-primary-hover transition-colors"
@@ -597,7 +597,8 @@ const OnboardingWizard: React.FC<Props> = ({ onComplete }) => {
           <div className="space-y-5">
             <div>
               <h2 className="text-xl font-semibold text-[#191918] mb-2">{t('onboarding.companyTitle')}</h2>
-              <p className="text-sm text-[#6b6b69]">{t('onboarding.companySubtitle')}</p>
+              {/* MAS build: subtitle mentions "AI analysis" — hidden. */}
+              {!__MAS_BUILD__ && <p className="text-sm text-[#6b6b69]">{t('onboarding.companySubtitle')}</p>}
             </div>
 
             <div>

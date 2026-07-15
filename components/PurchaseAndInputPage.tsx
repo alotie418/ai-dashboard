@@ -409,6 +409,8 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
         </div>
       </div>
 
+      {/* MAS build: no external-AI / OCR — the recognition toggle + upload dropzone are excluded (App Review 3.1.1). */}
+      {!__MAS_BUILD__ && (<>
       {/* Recognition Mode Selector */}
       <div className="flex items-center justify-between py-2">
         <div className="flex items-center space-x-4">
@@ -461,6 +463,7 @@ const PurchaseAndInputPage: React.FC<Props> = ({ data, selectedYear, selectedQua
           {isScanning ? ((accLocale !== 'CN') ? taxLabel('scanningSubtitle') : t('purchases.uploadAnalyzing')) : ((accLocale !== 'CN') ? taxLabel('uploadSubtitle') : t('purchases.uploadSubtitle'))}
         </p>
       </div>
+      </>)}
 
       {/* Data Table */}
       <div className="bg-white/80 border border-[#e0ddd5] rounded-xl overflow-hidden" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.05)' }}>

@@ -122,7 +122,7 @@
     "security": {
       "title": "Compte & securite",
       "encryption": "Chiffrement des donnees",
-      "encryptionDesc": "Toutes les donnees comptables sont stockees dans une base SQLite locale sur cet appareil (jamais televersees, sans serveur). Les cles API des fournisseurs IA sont chiffrees par le stockage securise de l'OS (safeStorage, ex. Trousseau macOS) et ne quittent jamais votre machine."
+      "encryptionDesc": "Toutes les données comptables sont stockées dans une base SQLite locale sur cet appareil (jamais téléversées, sans serveur) et ne quittent jamais votre machine."
     },
     "saveButton": "Enregistrer",
     "savedToast": "Paramètres enregistrés",
@@ -460,7 +460,7 @@
   },
   "onboarding": {
     "welcomeTitle": "Bienvenue dans SoloLedger",
-    "welcomeDescription": "SoloLedger est une application de comptabilité intelligente conçue pour les entrepreneurs solo, micro-entreprises et fondateurs de Solo SaaS. Toutes les données restent sur votre appareil, l'IA fonctionne avec votre propre clé API — nous ne voyons aucune de vos données.",
+    "welcomeDescription": "SoloLedger est une application de comptabilité et de gestion conçue pour les entrepreneurs solo, micro-entreprises et fondateurs de Solo SaaS. Toutes les données restent sur votre appareil et fonctionnent hors ligne — vos données ne quittent jamais votre Mac.",
     "feature1": "Stockage SQLite local — toutes les données restent sur votre Mac",
     "feature2": "Claude · ChatGPT · Gemini supportés ; configurez plusieurs, basculez à volonté",
     "feature3": "Les clés API sont chiffrées par le trousseau système et ne quittent jamais votre appareil",

@@ -1,6 +1,6 @@
 {
   "name": "SoloLedger",
-  "description": "为一人公司打造的智能账本与经营管理桌面应用：本地存储、离线可用、自带 Gemini Key。",
+  "description": "为一人公司打造的账本与经营管理桌面应用：本地存储、离线可用。",
   "requestFramePermissions": [
     "microphone"
   ]

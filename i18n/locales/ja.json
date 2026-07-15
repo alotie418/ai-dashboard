@@ -122,7 +122,7 @@
     "security": {
       "title": "アカウントとセキュリティ",
       "encryption": "データ暗号化",
-      "encryptionDesc": "すべての台帳データは本機のローカル SQLite データベースに保存されます（アップロードなし・サーバー不使用）。AI プロバイダーの API キーは OS のセキュアストレージ（safeStorage、例：macOS キーチェーン）で暗号化され、デバイス外に出ません。"
+      "encryptionDesc": "すべての台帳データは本機のローカル SQLite データベースに保存されます（アップロードなし・サーバー不使用）。データがデバイス外に出ることはありません。"
     },
     "saveButton": "変更を保存",
     "savedToast": "設定を保存しました",
@@ -460,7 +460,7 @@
   },
   "onboarding": {
     "welcomeTitle": "SoloLedgerへようこそ",
-    "welcomeDescription": "SoloLedgerはひとり会社、個人事業主、Solo SaaSファウンダー向けに作られたスマート帳簿アプリです。すべてのデータはローカルに保存され、AI機能はあなたのAPI Keyで動作します — 私たちはあなたのデータを見ることができません。",
+    "welcomeDescription": "SoloLedgerはひとり会社、個人事業主、Solo SaaSファウンダー向けの帳簿・経営管理アプリです。すべてのデータはローカルに保存され、オフラインで利用できます — データはあなたのMacの外に出ません。",
     "feature1": "ローカルSQLiteストレージ、すべてのデータはあなたのMac上に",
     "feature2": "Claude · ChatGPT · Gemini対応、複数設定可、デフォルト切り替え自由",
     "feature3": "API Keyはシステムキーチェーンで暗号化され、デバイスから出ることはありません",
