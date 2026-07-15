@@ -34,7 +34,7 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "ひとり会社のためのスマート帳簿",
+    "subtitle": "ひとり会社のためのプロフェッショナル帳簿",
     "demoBanner": "デモモード · サンプルデータ · 実際の帳簿ではありません"
   },
   "nav": {
@@ -481,7 +481,7 @@
     "finishAndEnter": "完了してアプリに入る",
     "skipCompany": "後でスキップ、設定で後ほど記入",
     "localeDesc": "これら2つの設定は独立しています。UI言語はメニューとラベルを制御。記帳方式は税制、通貨、帳票を制御。",
-    "brandTagline": "SoloLedger · 一人会社のためのスマート台帳",
+    "brandTagline": "SoloLedger · 一人会社のためのプロフェッショナル台帳",
     "loadFailedTitle": "AI プロバイダー設定の読み込みに失敗しました",
     "loadFailedHint": "SoloLedger をアップグレードした直後の場合は、アプリを完全に終了（Cmd+Q）してから再起動してください。",
     "providersEmpty": "プロバイダー一覧が空です。SoloLedger を完全に終了（Cmd+Q）してから再起動してください。",

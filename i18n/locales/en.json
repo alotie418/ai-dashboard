@@ -34,7 +34,7 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "Smart ledger for one-person companies",
+    "subtitle": "Professional ledger for one-person companies",
     "demoBanner": "Demo mode · sample data · NOT your real ledger"
   },
   "nav": {
@@ -481,7 +481,7 @@
     "finishAndEnter": "Finish and enter app",
     "skipCompany": "Skip for now; fill in settings later",
     "localeDesc": "These are independent settings. UI language controls menus and labels. Accounting basis controls tax rules, currency, and reports.",
-    "brandTagline": "SoloLedger · smart ledger for one-person companies",
+    "brandTagline": "SoloLedger · professional ledger for one-person companies",
     "loadFailedTitle": "Failed to load AI provider configuration",
     "loadFailedHint": "If you just upgraded SoloLedger, fully quit the app (Cmd+Q) and restart.",
     "providersEmpty": "The provider list is empty. Fully quit SoloLedger (Cmd+Q) and restart.",

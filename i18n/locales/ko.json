@@ -34,7 +34,7 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "1인 회사를 위한 스마트 장부",
+    "subtitle": "1인 회사를 위한 전문 장부",
     "demoBanner": "데모 모드 · 샘플 데이터 · 실제 장부가 아님"
   },
   "nav": {
@@ -481,7 +481,7 @@
     "finishAndEnter": "완료하고 앱 진입",
     "skipCompany": "회사 정보 건너뛰기, 나중에 설정에서 입력",
     "localeDesc": "이 두 설정은 독립적입니다. UI 언어는 메뉴와 레이블을 제어합니다. 기장 기준은 세제, 통화, 보고서를 제어합니다.",
-    "brandTagline": "SoloLedger · 1인 기업을 위한 스마트 장부",
+    "brandTagline": "SoloLedger · 1인 기업을 위한 전문 장부",
     "loadFailedTitle": "AI 제공업체 설정을 불러오지 못했습니다",
     "loadFailedHint": "SoloLedger를 방금 업그레이드했다면 앱을 완전히 종료(Cmd+Q)한 후 다시 시작하세요.",
     "providersEmpty": "제공업체 목록이 비어 있습니다. SoloLedger를 완전히 종료(Cmd+Q)한 후 다시 시작하세요.",

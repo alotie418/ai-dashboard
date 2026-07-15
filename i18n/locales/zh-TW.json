@@ -34,7 +34,7 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "獨帳 · 一人公司的智慧帳本",
+    "subtitle": "獨帳 · 一人公司的專業帳本",
     "demoBanner": "示範模式 · 範例資料 · 非真實帳本"
   },
   "nav": {
@@ -481,7 +481,7 @@
     "finishAndEnter": "完成並進入應用",
     "skipCompany": "暫時略過公司資訊，稍後在設定中填寫",
     "localeDesc": "這兩個設定互相獨立。介面語言控制選單和標籤。記帳口徑控制稅制、幣種和報表。",
-    "brandTagline": "獨帳 · 一人公司的智能帳本",
+    "brandTagline": "獨帳 · 一人公司的專業帳本",
     "loadFailedTitle": "無法載入 AI 服務商設定",
     "loadFailedHint": "如果你剛剛升級了 SoloLedger，請完全結束應用程式（Cmd+Q）後重新啟動。",
     "providersEmpty": "Provider 清單為空。請完全結束 SoloLedger（Cmd+Q）後重新啟動。",

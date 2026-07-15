@@ -34,7 +34,7 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "Comptabilité intelligente pour entrepreneurs solo",
+    "subtitle": "Comptabilité professionnelle pour entrepreneurs solo",
     "demoBanner": "Mode démo · données d'exemple · PAS votre comptabilité réelle"
   },
   "nav": {
@@ -481,7 +481,7 @@
     "finishAndEnter": "Terminer et entrer dans l'app",
     "skipCompany": "Ignorer pour l'instant, remplir plus tard",
     "localeDesc": "Ces deux paramètres sont indépendants. La langue UI contrôle les menus et libellés. La méthode comptable contrôle les règles fiscales, devise et rapports.",
-    "brandTagline": "SoloLedger · un registre intelligent pour les entreprises individuelles",
+    "brandTagline": "SoloLedger · un registre professionnel pour les entreprises individuelles",
     "loadFailedTitle": "Échec du chargement de la configuration du fournisseur d'IA",
     "loadFailedHint": "Si vous venez de mettre à jour SoloLedger, quittez complètement l'application (Cmd+Q) puis redémarrez.",
     "providersEmpty": "La liste des fournisseurs est vide. Quittez complètement SoloLedger (Cmd+Q) puis redémarrez.",
