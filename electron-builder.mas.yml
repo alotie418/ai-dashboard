@@ -40,6 +40,12 @@ files:
   - "!electron/ai/**"
   - "!electron/handlers/ai.js"
   - "!electron/handlers/conversations.js"
+  # AI provider (BYOK) logo SVGs — emitted by an eager import.meta.glob in
+  # components/providerLogos.ts even though no MAS UI renders them (the provider
+  # settings + onboarding provider step are compile-time removed). These are the ONLY
+  # standalone SVGs in dist/assets (the favicon is an inline data URI), so excluding
+  # *.svg drops exactly the 8 provider logos and nothing the MAS app needs.
+  - "!dist/assets/*.svg"
 
 # 原生模块（.node）必须从 asar 解包（与 DMG 线一致）。
 asarUnpack:
