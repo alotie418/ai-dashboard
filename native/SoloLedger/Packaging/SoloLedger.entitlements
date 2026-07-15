@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- App Sandbox entitlements for the native SoloLedger.
+
+     STRICTER than the Electron MAS plist: only App Sandbox + user-selected file
+     read/write (for CSV via the system open/save panels). Deliberately OMITTED:
+       - com.apple.security.network.client  (native app ships NO AI/network/OCR)
+       - com.apple.security.application-groups (was only for Electron helpers)
+     This is the most private posture for a local-only ledger. -->
+<dict>
+  <key>com.apple.security.app-sandbox</key><true/>
+  <key>com.apple.security.files.user-selected.read-write</key><true/>
+</dict>
+</plist>

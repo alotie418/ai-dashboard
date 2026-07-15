@@ -1,0 +1,30 @@
+/* SoloLedger — 繁體中文（Phase-1 部分翻譯；缺項回退 zh-Hans） */
+
+"app.name" = "SoloLedger";
+"common.ok" = "好";
+"common.cancel" = "取消";
+"common.save" = "儲存";
+"common.edit" = "編輯";
+"common.delete" = "刪除";
+
+"nav.section" = "導覽";
+"nav.overview" = "概覽";
+"nav.transactions" = "收支流水";
+"nav.categories" = "會計類別";
+
+"type.income" = "收入";
+"type.expense" = "支出";
+"filter.all" = "全部";
+"filter.income" = "收入";
+"filter.expense" = "支出";
+
+"overview.income" = "收入合計";
+"overview.expense" = "支出合計";
+"overview.net" = "淨額";
+
+"cmd.newTransaction" = "新增流水";
+"onboarding.tagline" = "本地優先、私密的個體經營帳本";
+"onboarding.start" = "開始使用";
+
+"settings.language" = "介面語言";
+"settings.appearance" = "外觀";

@@ -1,0 +1,106 @@
+/* SoloLedger — English */
+
+"app.name" = "SoloLedger";
+
+"common.ok" = "OK";
+"common.cancel" = "Cancel";
+"common.save" = "Save";
+"common.edit" = "Edit";
+"common.delete" = "Delete";
+"common.loading" = "Loading…";
+"common.error" = "Something went wrong";
+
+"boot.error.title" = "Couldn't open the database";
+
+"nav.section" = "Navigation";
+"nav.overview" = "Overview";
+"nav.transactions" = "Transactions";
+"nav.categories" = "Categories";
+
+"overview.income" = "Total income";
+"overview.expense" = "Total expense";
+"overview.net" = "Net";
+"overview.count" = "Entries";
+"overview.monthlyTitle" = "Income & expense by month";
+"overview.month" = "Month";
+"overview.empty.title" = "No data yet";
+"overview.empty.message" = "Add your first income or expense to see the monthly chart here.";
+"overview.dataSourceNote" = "Data source: these totals are computed live from your recorded transactions, for management reference only — not an official financial statement or a basis for tax filing.";
+
+"cmd.newTransaction" = "New Transaction";
+"cmd.exportCSV" = "Export CSV";
+"cmd.importCSV" = "Import CSV";
+
+"txn.empty.title" = "No transactions yet";
+"txn.empty.message" = "Click “New Transaction” or press ⌘N to record your first income or expense.";
+"txn.col.date" = "Date";
+"txn.col.type" = "Type";
+"txn.col.category" = "Category";
+"txn.col.counterparty" = "Counterparty";
+"txn.col.amount" = "Amount";
+"txn.col.payment" = "Payment";
+
+"type.income" = "Income";
+"type.expense" = "Expense";
+
+"payment.paid" = "Paid";
+"payment.partial" = "Partial";
+"payment.unpaid" = "Unpaid";
+
+"invoice.issued" = "Issued";
+"invoice.pending" = "Pending";
+"invoice.na" = "N/A";
+
+"filter.label" = "Filter";
+"filter.all" = "All";
+"filter.income" = "Income";
+"filter.expense" = "Expense";
+
+"editor.titleNew" = "New Transaction";
+"editor.titleEdit" = "Edit Transaction";
+"editor.type" = "Type";
+"editor.date" = "Date";
+"editor.amount" = "Amount";
+"editor.currency" = "Currency";
+"editor.category" = "Category";
+"editor.uncategorized" = "Uncategorized";
+"editor.counterparty" = "Counterparty";
+"editor.payment" = "Payment status";
+"editor.note" = "Note";
+"editor.moreSection" = "More (invoice / tax)";
+"editor.invoice" = "Invoice status";
+"editor.taxAmount" = "Tax amount";
+"editor.taxRate" = "Tax rate";
+
+"cat.col.label" = "Name";
+"cat.col.slug" = "Slug";
+"cat.col.schedule" = "Report line";
+
+"settings.general" = "General";
+"settings.accounting" = "Accounting";
+"settings.data" = "Data";
+"settings.about" = "About";
+"settings.appearance" = "Appearance";
+"settings.appearance.system" = "System";
+"settings.appearance.light" = "Light";
+"settings.appearance.dark" = "Dark";
+"settings.language" = "Language";
+"settings.accountingLocale" = "Accounting profile";
+"settings.currency" = "Default currency";
+"settings.company" = "Company / business name";
+"settings.accountingNote" = "The accounting profile selects the available income/expense categories and default currency. It is separate from the UI language, and is for management analysis — not a statutory filing configuration.";
+"settings.schemaVersion" = "Database version";
+"settings.dbLocation" = "Database location";
+"settings.csv" = "CSV import / export";
+
+"onboarding.tagline" = "A local-first, private ledger for solo operators";
+"onboarding.company" = "Company / business name (optional)";
+"onboarding.start" = "Get Started";
+"onboarding.privacy" = "All data stays on your Mac. No account, no network, no AI.";
+
+"about.name" = "Name";
+"about.version" = "Version";
+"about.minOS" = "Requires";
+"about.positioning" = "SoloLedger is a local-first, private ledger for solo operators, one-person companies, and freelancers. Data stays on your device — no account, no AI, no network, no paid unlock. It is a bookkeeping and management-analysis tool, not a replacement for a licensed accountant, tax advisor, or statutory filing system.";
+
+"csv.import.partial" = "Imported {imported}, skipped {skipped}.";

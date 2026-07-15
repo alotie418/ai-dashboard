@@ -1,0 +1,106 @@
+/* SoloLedger — 简体中文（source of truth，对应 JS 版 zh-CN） */
+
+"app.name" = "SoloLedger";
+
+"common.ok" = "好";
+"common.cancel" = "取消";
+"common.save" = "保存";
+"common.edit" = "编辑";
+"common.delete" = "删除";
+"common.loading" = "正在载入…";
+"common.error" = "出错了";
+
+"boot.error.title" = "无法打开数据库";
+
+"nav.section" = "导航";
+"nav.overview" = "概览";
+"nav.transactions" = "收支流水";
+"nav.categories" = "会计类别";
+
+"overview.income" = "收入合计";
+"overview.expense" = "支出合计";
+"overview.net" = "净额";
+"overview.count" = "笔数";
+"overview.monthlyTitle" = "按月收支";
+"overview.month" = "月份";
+"overview.empty.title" = "暂无数据";
+"overview.empty.message" = "新增第一笔收入或支出后，这里会显示按月图表。";
+"overview.dataSourceNote" = "数据来源：本页汇总由已录入的收支流水实时计算，仅供管理分析参考，并非正式财务报表或报税依据。";
+
+"cmd.newTransaction" = "新增流水";
+"cmd.exportCSV" = "导出 CSV";
+"cmd.importCSV" = "导入 CSV";
+
+"txn.empty.title" = "还没有流水记录";
+"txn.empty.message" = "点击「新增流水」或按 ⌘N 记录第一笔收入或支出。";
+"txn.col.date" = "日期";
+"txn.col.type" = "类型";
+"txn.col.category" = "类别";
+"txn.col.counterparty" = "往来对象";
+"txn.col.amount" = "金额";
+"txn.col.payment" = "收付";
+
+"type.income" = "收入";
+"type.expense" = "支出";
+
+"payment.paid" = "已结";
+"payment.partial" = "部分";
+"payment.unpaid" = "未结";
+
+"invoice.issued" = "已开票";
+"invoice.pending" = "待开票";
+"invoice.na" = "不适用";
+
+"filter.label" = "筛选";
+"filter.all" = "全部";
+"filter.income" = "收入";
+"filter.expense" = "支出";
+
+"editor.titleNew" = "新增流水";
+"editor.titleEdit" = "编辑流水";
+"editor.type" = "类型";
+"editor.date" = "日期";
+"editor.amount" = "金额";
+"editor.currency" = "货币";
+"editor.category" = "类别";
+"editor.uncategorized" = "未分类";
+"editor.counterparty" = "往来对象";
+"editor.payment" = "收付状态";
+"editor.note" = "备注";
+"editor.moreSection" = "更多（发票 / 税额）";
+"editor.invoice" = "发票状态";
+"editor.taxAmount" = "税额";
+"editor.taxRate" = "税率";
+
+"cat.col.label" = "名称";
+"cat.col.slug" = "标识";
+"cat.col.schedule" = "报表行";
+
+"settings.general" = "通用";
+"settings.accounting" = "会计";
+"settings.data" = "数据";
+"settings.about" = "关于";
+"settings.appearance" = "外观";
+"settings.appearance.system" = "跟随系统";
+"settings.appearance.light" = "浅色";
+"settings.appearance.dark" = "深色";
+"settings.language" = "界面语言";
+"settings.accountingLocale" = "会计制度";
+"settings.currency" = "默认货币";
+"settings.company" = "公司/字号名称";
+"settings.accountingNote" = "会计制度决定可选的收支类别与默认货币，独立于界面语言。此为管理分析用途，非法定申报配置。";
+"settings.schemaVersion" = "数据库版本";
+"settings.dbLocation" = "数据库位置";
+"settings.csv" = "CSV 导入 / 导出";
+
+"onboarding.tagline" = "本地优先、私密的个体经营账本";
+"onboarding.company" = "公司/字号名称（可选）";
+"onboarding.start" = "开始使用";
+"onboarding.privacy" = "所有数据仅保存在你的 Mac 本地。无需账号，不联网，不含 AI。";
+
+"about.name" = "名称";
+"about.version" = "版本";
+"about.minOS" = "系统要求";
+"about.positioning" = "SoloLedger 是面向个体经营者、一人公司与自由职业者的本地优先、私密账本。数据仅存于本机，无需账号，不含 AI、不联网、无付费解锁。它是经营记账与管理分析工具，不替代持牌会计师、税务师或法定申报系统。";
+
+"csv.import.partial" = "已导入 {imported} 条，跳过 {skipped} 条。";

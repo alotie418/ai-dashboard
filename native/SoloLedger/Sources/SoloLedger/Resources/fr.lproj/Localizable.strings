@@ -1,0 +1,30 @@
+/* SoloLedger — Français (traduction partielle Phase-1 ; les clés manquantes retombent sur zh-Hans) */
+
+"app.name" = "SoloLedger";
+"common.ok" = "OK";
+"common.cancel" = "Annuler";
+"common.save" = "Enregistrer";
+"common.edit" = "Modifier";
+"common.delete" = "Supprimer";
+
+"nav.section" = "Navigation";
+"nav.overview" = "Aperçu";
+"nav.transactions" = "Transactions";
+"nav.categories" = "Catégories";
+
+"type.income" = "Recette";
+"type.expense" = "Dépense";
+"filter.all" = "Tout";
+"filter.income" = "Recettes";
+"filter.expense" = "Dépenses";
+
+"overview.income" = "Total recettes";
+"overview.expense" = "Total dépenses";
+"overview.net" = "Net";
+
+"cmd.newTransaction" = "Nouvelle transaction";
+"onboarding.tagline" = "Un livre de comptes local et privé pour indépendants";
+"onboarding.start" = "Commencer";
+
+"settings.language" = "Langue";
+"settings.appearance" = "Apparence";

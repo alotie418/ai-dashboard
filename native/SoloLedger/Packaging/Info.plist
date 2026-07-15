@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- Info.plist for the LOCAL DEV prototype bundle assembled by scripts/build-app.sh.
+     Uses the dev Bundle ID com.alotie418.sololedger.dev so it never collides with
+     the installed Mac App Store build (com.alotie418.sololedger). Production
+     packaging (a real Xcode app target) is a later phase. -->
+<dict>
+  <key>CFBundleIdentifier</key><string>com.alotie418.sololedger.dev</string>
+  <key>CFBundleName</key><string>SoloLedger</string>
+  <key>CFBundleDisplayName</key><string>SoloLedger (Native Preview)</string>
+  <key>CFBundleExecutable</key><string>SoloLedger</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0.0</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>LSApplicationCategoryType</key><string>public.app-category.finance</string>
+  <key>NSPrincipalClass</key><string>NSApplication</string>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>LSUIElement</key><false/>
+  <key>CFBundleDevelopmentRegion</key><string>zh-Hans</string>
+  <key>CFBundleLocalizations</key>
+  <array>
+    <string>zh-Hans</string>
+    <string>zh-Hant</string>
+    <string>en</string>
+    <string>ja</string>
+    <string>ko</string>
+    <string>fr</string>
+  </array>
+  <key>NSHumanReadableCopyright</key><string>Local-first. No account, no network, no AI.</string>
+</dict>
+</plist>

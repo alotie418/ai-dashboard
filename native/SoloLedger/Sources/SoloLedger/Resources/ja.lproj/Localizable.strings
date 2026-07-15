@@ -1,0 +1,30 @@
+/* SoloLedger — 日本語（Phase-1 部分翻訳；欠落は zh-Hans にフォールバック） */
+
+"app.name" = "SoloLedger";
+"common.ok" = "OK";
+"common.cancel" = "キャンセル";
+"common.save" = "保存";
+"common.edit" = "編集";
+"common.delete" = "削除";
+
+"nav.section" = "ナビゲーション";
+"nav.overview" = "概要";
+"nav.transactions" = "入出金";
+"nav.categories" = "勘定科目";
+
+"type.income" = "収入";
+"type.expense" = "支出";
+"filter.all" = "すべて";
+"filter.income" = "収入";
+"filter.expense" = "支出";
+
+"overview.income" = "収入合計";
+"overview.expense" = "支出合計";
+"overview.net" = "純額";
+
+"cmd.newTransaction" = "新規取引";
+"onboarding.tagline" = "ローカル優先・プライベートな個人事業の台帳";
+"onboarding.start" = "はじめる";
+
+"settings.language" = "表示言語";
+"settings.appearance" = "外観";
