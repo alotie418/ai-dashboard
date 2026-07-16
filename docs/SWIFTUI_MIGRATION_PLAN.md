@@ -547,10 +547,45 @@ Phase 1 **完整翻译 zh-Hans + en**；架构上**声明全部 6 语言**（`.l
 ### Phase 4 — 完整 6 语言 + `.xcstrings` + MAS 打包
 
 - 补齐 zh-TW/ja/ko/fr；迁移到 `Localizable.xcstrings` String Catalog + 构建期 parity check
-- **新建真正的 Xcode app target（`.xcodeproj`/`.xcworkspace`）**：签名 / 公证（notarization）/ MAS 提交
+- Xcode app target 已在 **Phase 1.5** 建成（`App/SoloLedger.xcodeproj`）；本阶段处理 **Release 的 MAS 签名与提交**（见下「签名与分发通道」小节的更正）
 - 此阶段才涉及证书 / Provisioning / 发布——需用户明确批准
 
 **估算**：约 3–4 周。
+
+---
+
+### 签名与分发通道（更正）
+
+macOS 有两条互斥的分发通道，证书 / 步骤不同，**不可混用**：
+
+| | Mac App Store（MAS） | 店外直分发（Direct / Developer ID） |
+| --- | --- | --- |
+| App 签名证书 | **Apple Distribution**（旧称 “3rd Party Mac Developer Application” / “Mac App Distribution”） | **Developer ID Application** |
+| 安装包签名 | **Mac Installer Distribution**（3rd Party Mac Developer Installer，签 `.pkg`） | 不适用（分发 `.app` / `.dmg`） |
+| Provisioning | **MAS provisioning profile**（内嵌 `embedded.provisionprofile`） | 无需 |
+| 公证（notarization） | **不需要**（改由 App Review 把关） | **需要**（`notarytool` + staple） |
+| 沙箱 / 运行时 | 必须 App Sandbox | 沙箱可选；通常配硬化运行时（Hardened Runtime） |
+
+即：**notarization 与 Developer ID 属店外通道**；MAS 走 Apple/Mac App Distribution + Mac Installer Distribution + MAS provisioning profile + App Review。本项目原生版目标是 **MAS**（沿用 Bundle ID `com.alotie418.sololedger`），正式发布走左列。Phase 1.5 / 1.6 只做 **Debug ad-hoc 本地签名**，不触碰任何生产证书。
+
+### Phase 1.6 — Electron → SwiftUI 数据升级验证（已完成）
+
+**路径模型（App Sandbox 容器）**
+
+| 角色 | 路径 |
+| --- | --- |
+| Electron MAS 数据库 | `~/Library/Containers/com.alotie418.sololedger/Data/Library/Application Support/SoloLedger/sololedger.db` |
+| 原生 **Release**（同 Bundle ID → 同容器）活动库 | `…/Containers/com.alotie418.sololedger/Data/Library/Application Support/SoloLedgerNativePreview/sololedger.db` |
+| 原生 **Debug** `.dev`（独立容器） | `~/Library/Containers/com.alotie418.sololedger.dev/Data/Library/Application Support/SoloLedgerNativePreview/sololedger.db` |
+
+- Release 与 Electron **共享容器**，故能发现 `SoloLedger/sololedger.db`（升级源）；Debug 在**独立 `.dev` 容器**，其中无生产数据 → 发现返回 `noLegacyData`，**永不触碰生产库**，且**不申请**任何访问生产容器的额外权限。
+- 原生活动库放在**独立的 `SoloLedgerNativePreview/`** 目录；Electron 原始 `SoloLedger/sololedger.db` 只被**文件读取**，**永不被 SQLite 打开写入、永不修改 / 删除**。
+
+**升级流程（`DatabaseUpgrade`）**：发现 → 原始拷贝全套（`.db`+`-wal`+`-shm`）到 staging（纯文件读，原库不被 SQLite 触碰）→ 在副本上 `wal_checkpoint(TRUNCATE)` 折叠 WAL + 规整单文件 → `quick_check` 完整性 → 版本闸（`>23` 视为未知 → 拒绝）→ **SQLite Backup API** 生成保留备份并校验 → 在副本上跑 `SchemaMigrator` + `integrity_check` → **原子切换**（`replaceItemAt` / `moveItem`）→ 任一步失败**回滚**（清副本，保留原库 + 备份）。原始库**永不删除**。
+
+**测试覆盖**：正常升级、损坏库、未知版本、备份失败、迁移中断 + 幂等恢复、WAL 未 checkpoint 行的一致性备份、无数据 / 已升级。fixture 由**真实 `electron/db` 迁移代码**（`ELECTRON_RUN_AS_NODE=1` 跑仓库 electron 二进制，绕开 better-sqlite3 的 Electron-ABI 限制）生成，并用 **sqlite3 CLI 独立交叉验证**。
+
+**仍未覆盖**：源库带**未 checkpoint 的 `-wal`**（Electron 非正常退出）仅靠"拷贝全套 + checkpoint"处理、未单独造例测试；多货币汇总按 Electron 语义做**朴素数值求和**（不按币种分组）；attachments 附件文件迁移、legacy `sales/purchases` → `transactions` 的二次数据迁移、`ai_providers` / `ecommerce_connections` 的加密列（safeStorage 密文，跨应用不可移植）均未纳入本阶段。
 
 ---
 
@@ -604,7 +639,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 | 原型目录 | `native/SoloLedger` |
 | 生产 Bundle ID | `com.alotie418.sololedger`（不变） |
 | 开发 Bundle ID | `com.alotie418.sololedger.dev` |
-| 原型 DB | `Application Support/com.alotie418.sololedger.dev/sololedger.db` |
+| 原型 DB（Debug/.dev 容器） | `…/Containers/com.alotie418.sololedger.dev/Data/Library/Application Support/SoloLedgerNativePreview/sololedger.db` |
 | 部署目标 | macOS 13.0（Ventura） |
 | Xcode | 26.6（`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`） |
 | schema 版本 | `user_version = 23`（v1..v23） |

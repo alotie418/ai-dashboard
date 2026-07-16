@@ -40,10 +40,12 @@ let package = Package(
             dependencies: ["CSQLite"]
         ),
 
-        // XCTest suite over the core logic.
+        // XCTest suite over the core logic. Bundles the Electron v23 fixture
+        // (built by the real Electron migration code — see Tests/Fixtures/).
         .testTarget(
             name: "SoloLedgerCoreTests",
-            dependencies: ["SoloLedgerCore"]
+            dependencies: ["SoloLedgerCore"],
+            resources: [.copy("Fixtures/electron-v23.db")]
         ),
     ]
 )

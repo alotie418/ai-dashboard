@@ -25,6 +25,17 @@ public enum DateFormat {
 
     /// Month bucket 'YYYY-MM' from a 'YYYY-MM-DD' string (chart aggregation).
     public static func monthKey(_ dayString: String) -> String { String(dayString.prefix(7)) }
+
+    private static let stampFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.dateFormat = "yyyyMMdd-HHmmss"
+        return f
+    }()
+
+    /// Filename-safe timestamp for backup/working files, e.g. "20260715-200800".
+    public static func timestamp(_ date: Date = Date()) -> String { stampFormatter.string(from: date) }
 }
 
 /// Filesystem locations for the prototype.
@@ -53,5 +64,45 @@ public enum AppPaths {
 
     public static func databaseURL() throws -> URL {
         try dataDirectory().appendingPathComponent(databaseFileName)
+    }
+
+    /// Consistent-backup directory (pre-upgrade snapshots live here).
+    public static func backupsDirectory() throws -> URL {
+        let dir = try dataDirectory().appendingPathComponent("Backups", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// Scratch directory for the upgrade working copy (before the atomic swap).
+    public static func upgradeWorkingDirectory() throws -> URL {
+        let dir = try dataDirectory().appendingPathComponent("Upgrade", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// Electron's productName folder ("SoloLedger") holding its `sololedger.db`, in
+    /// the SAME sandbox `Application Support`.
+    ///
+    /// PATH MODEL:
+    ///  - Electron MAS (Bundle ID `com.alotie418.sololedger`) stores its DB at, inside
+    ///    the sandbox container,
+    ///    `~/Library/Containers/com.alotie418.sololedger/Data/Library/Application Support/SoloLedger/sololedger.db`.
+    ///  - The native RELEASE app uses the SAME Bundle ID, hence the SAME container, so
+    ///    this URL resolves onto the Electron database — the upgrade source.
+    ///  - The native DEBUG app (`com.alotie418.sololedger.dev`) has its OWN isolated
+    ///    container; this URL resolves inside it, where no production data exists — so
+    ///    Debug can never discover or touch the real database, and NO extra entitlement
+    ///    to reach the production container is added.
+    ///
+    /// The native app reads this file READ-ONLY (integrity + backup snapshot) and never
+    /// modifies or deletes it; its own active DB lives in `previewFolderName`.
+    public static let electronProductFolderName = "SoloLedger"
+
+    public static func electronLegacyDatabaseURL() throws -> URL {
+        let base = try FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask,
+            appropriateFor: nil, create: false)
+        return base.appendingPathComponent(electronProductFolderName, isDirectory: true)
+            .appendingPathComponent(databaseFileName)
     }
 }

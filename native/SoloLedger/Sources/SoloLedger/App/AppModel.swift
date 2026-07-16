@@ -79,6 +79,23 @@ final class AppModel: ObservableObject {
         guard store == nil else { return }
         do {
             let url = try AppPaths.databaseURL()
+            // One-time safe adoption of an existing Electron database. In the native
+            // RELEASE app (same Bundle ID → same MAS container) this discovers and
+            // migrates the Electron DB via backup/integrity/atomic-swap; the original
+            // is only read and is never modified. In DEBUG (.dev, isolated container)
+            // there is no legacy data, so it is a no-op — and no extra entitlement to
+            // reach the production container is ever requested.
+            if !FileManager.default.fileExists(atPath: url.path) {
+                do {
+                    let outcome = try DatabaseUpgrade.standard(timestamp: DateFormat.timestamp()).run()
+                    if case let .upgraded(_, migrated) = outcome {
+                        NSLog("[upgrade] adopted Electron database: \(migrated) transactions")
+                    }
+                } catch {
+                    // The original is never touched on failure — start fresh, surface a note.
+                    actionError = "数据升级未完成，已保留原始数据：\(error)"
+                }
+            }
             let store = try LedgerStore(databaseURL: url)
             self.store = store
 
