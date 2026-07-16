@@ -104,3 +104,14 @@
 "about.positioning" = "SoloLedger is a local-first, private ledger for solo operators, one-person companies, and freelancers. Data stays on your device — no account, no AI, no network, no paid unlock. It is a bookkeeping and management-analysis tool, not a replacement for a licensed accountant, tax advisor, or statutory filing system.";
 
 "csv.import.partial" = "Imported {imported}, skipped {skipped}.";
+
+"recovery.title" = "Data upgrade didn't finish";
+"recovery.message" = "An earlier (Electron) ledger was found, but its migration didn't succeed. Your original data has not been modified. Choose how to proceed.";
+"recovery.retry" = "Retry migration";
+"recovery.restore" = "Restore from backup / export…";
+"recovery.viewError" = "View error details";
+"recovery.blank" = "Create blank ledger…";
+"recovery.safeNote" = "The original database is kept read-only and unmodified — you can retry any time.";
+"recovery.blankConfirmTitle" = "Start with a blank ledger?";
+"recovery.blankConfirm" = "Create blank ledger";
+"recovery.blankConfirmMessage" = "This starts an empty ledger and does NOT import your earlier data (the original stays on disk, undeleted). Only choose this if you're sure you don't need the old data.";

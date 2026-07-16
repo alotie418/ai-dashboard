@@ -49,15 +49,23 @@ public enum DateFormat {
 /// user's single source of financial truth and this experimental prototype must
 /// never touch it.
 public enum AppPaths {
-    /// Distinct from the Electron productName ("SoloLedger") on purpose.
-    public static let previewFolderName = "SoloLedgerNativePreview"
+    /// The native app's OWN data folder, deliberately distinct from Electron's
+    /// productName folder ("SoloLedger"). Debug uses a clearly-marked preview folder;
+    /// Release uses a stable production name with NO "Preview" in it.
+    public static var nativeDataFolderName: String {
+        #if DEBUG
+        return "SoloLedgerNativePreview"
+        #else
+        return "SoloLedgerNative"
+        #endif
+    }
     public static let databaseFileName = "sololedger.db"
 
     public static func dataDirectory() throws -> URL {
         let base = try FileManager.default.url(
             for: .applicationSupportDirectory, in: .userDomainMask,
             appropriateFor: nil, create: true)
-        let dir = base.appendingPathComponent(previewFolderName, isDirectory: true)
+        let dir = base.appendingPathComponent(nativeDataFolderName, isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }

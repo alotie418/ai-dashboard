@@ -26,4 +26,16 @@ extension AppModel {
             importCSV(from: url)
         }
     }
+
+    /// Recovery: pick a backup / export SoloLedger database (`.db`) to adopt.
+    func restoreFromBackupViaPanel() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "db") ?? .data]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.title = t("recovery.restore")
+        if panel.runModal() == .OK, let url = panel.url {
+            restore(fromBackupAt: url)
+        }
+    }
 }

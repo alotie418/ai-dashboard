@@ -169,4 +169,129 @@ final class DatabaseUpgradeTests: LedgerTestCase {
         _ = try DatabaseUpgrade(paths: paths, timestamp: "T8").run()
         XCTAssertEqual(try DatabaseUpgrade(paths: paths, timestamp: "T9").run(), .alreadyUpgraded)
     }
+
+    // MARK: - P0: a failed upgrade must never create an empty active DB; retry recovers
+
+    func testFailedUpgradeLeavesNoActiveDBThenRetrySucceeds() throws {
+        let source = try electronFixtureCopy()
+        let work = try trackedTempDir()
+        let paths = DatabaseUpgrade.Paths(
+            legacySource: source,
+            activeDestination: work.appendingPathComponent("native/sololedger.db"),
+            backupsDirectory: work.appendingPathComponent("Backups"),
+            workingDirectory: work.appendingPathComponent("Upgrade"))
+
+        // First "launch": force a transient failure (unwritable backups dir).
+        try FileManager.default.createDirectory(at: paths.backupsDirectory, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: paths.backupsDirectory.path)
+        let d1 = DatabaseUpgrade(paths: paths, timestamp: "R1").prepareActiveDatabase()
+        guard case .blockedMigrationFailed = d1 else { return XCTFail("expected blocked, got \(d1)") }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: paths.activeDestination.path),
+                       "a failed migration must NOT create an active database")
+
+        // Second "launch": transient issue resolved → retry migrates and succeeds.
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: paths.backupsDirectory.path)
+        let d2 = DatabaseUpgrade(paths: paths, timestamp: "R2").prepareActiveDatabase()
+        guard case .adopted = d2 else { return XCTFail("retry should adopt, got \(d2)") }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: paths.activeDestination.path))
+        XCTAssertEqual(try LedgerStore(databaseURL: paths.activeDestination).listTransactions().count, 7)
+    }
+
+    func testPrepareOpensExistingAndCreatesFresh() throws {
+        // active DB already present → open, do not re-run the upgrade.
+        let paths = try makePaths(source: try electronFixtureCopy())
+        _ = try DatabaseUpgrade(paths: paths, timestamp: "P1").run()
+        XCTAssertEqual(DatabaseUpgrade(paths: paths, timestamp: "P2").prepareActiveDatabase(), .openExisting)
+
+        // no legacy data → fresh DB is fine (new install / Debug .dev container).
+        let work = try trackedTempDir()
+        let fresh = DatabaseUpgrade.Paths(
+            legacySource: work.appendingPathComponent("absent.db"),
+            activeDestination: work.appendingPathComponent("native.db"),
+            backupsDirectory: work.appendingPathComponent("B"),
+            workingDirectory: work.appendingPathComponent("W"))
+        XCTAssertEqual(DatabaseUpgrade(paths: fresh, timestamp: "P3").prepareActiveDatabase(), .createFresh)
+    }
+
+    // MARK: - P1: full WAL path through run() (copyDBSet → checkpoint → backup → migrate → swap)
+
+    /// Build an on-disk source set (.db + -wal) with one committed-but-un-checkpointed row.
+    private func makeWALSourceWithPendingRow(_ rowId: String) throws -> URL {
+        let live = try electronFixtureCopy(named: "live.db")
+        let conn = try SQLiteDatabase(path: live.path)
+        try conn.execute("PRAGMA journal_mode = WAL")
+        try conn.execute("PRAGMA wal_autocheckpoint = 0")     // keep the row only in -wal
+        try conn.run("INSERT INTO transactions (id,type,date,amount,currency) VALUES ('\(rowId)','income','2026-04-01',999,'CNY')")
+
+        let source = try trackedTempDir().appendingPathComponent("electron.db")
+        try withExtendedLifetime(conn) {
+            try FileManager.default.copyItem(at: live, to: source)
+            let liveWal = URL(fileURLWithPath: live.path + "-wal")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: liveWal.path), "expected a -wal with the pending row")
+            try FileManager.default.copyItem(at: liveWal, to: URL(fileURLWithPath: source.path + "-wal"))
+        }
+        return source
+    }
+
+    func testFullUpgradeCapturesUncheckpointedWALInActiveAndBackup() throws {
+        let source = try makeWALSourceWithPendingRow("wal-only")
+        let paths = try makePaths(source: source)
+
+        let outcome = try DatabaseUpgrade(paths: paths, timestamp: "WAL").run()
+        guard case let .upgraded(backupPath, migrated) = outcome else { return XCTFail("\(outcome)") }
+        XCTAssertEqual(migrated, 8, "7 fixture rows + 1 WAL-only row")
+
+        // The WAL-only row is in the active DB…
+        let active = try LedgerStore(databaseURL: paths.activeDestination)
+        XCTAssertNotNil(try active.transaction(id: "wal-only"), "WAL-only row missing from active DB")
+        // …and in the preserved backup.
+        let backup = try SQLiteDatabase(path: backupPath, readOnly: true)
+        XCTAssertEqual(try backup.query("SELECT COUNT(*) c FROM transactions WHERE id='wal-only'").first?.int("c"), 1,
+                       "WAL-only row missing from backup")
+    }
+
+    /// A stale/garbage `-shm` beside the source must be ignored (never copied); SQLite
+    /// rebuilds the WAL index from the copied `-wal`.
+    func testStaleShmIsNotReused() throws {
+        let source = try makeWALSourceWithPendingRow("wal-only")
+        try Data(repeating: 0xAB, count: 4096).write(to: URL(fileURLWithPath: source.path + "-shm"))
+
+        let paths = try makePaths(source: source)
+        let outcome = try DatabaseUpgrade(paths: paths, timestamp: "SHM").run()
+        guard case .upgraded = outcome else { return XCTFail("garbage -shm broke the upgrade: \(outcome)") }
+        let active = try LedgerStore(databaseURL: paths.activeDestination)
+        XCTAssertNotNil(try active.transaction(id: "wal-only"))
+    }
+
+    // MARK: - P1: detect a still-changing source (old app writing) during the snapshot
+
+    func testSourceBusyBlocksWhenSourceKeepsChanging() throws {
+        let source = try electronFixtureCopy()
+        let paths = try makePaths(source: source)
+        var n = 0
+        let hooks = DatabaseUpgrade.Hooks(duringCopy: { _ in
+            n += 1
+            try FileManager.default.setAttributes(
+                [.modificationDate: Date(timeIntervalSince1970: 1_700_000_000 + Double(n))],
+                ofItemAtPath: source.path)   // perturb after every copy attempt
+        })
+        XCTAssertThrowsError(try DatabaseUpgrade(paths: paths, hooks: hooks, timestamp: "BUSY").run()) { error in
+            guard case DatabaseUpgrade.Failure.sourceBusy = error else { return XCTFail("expected sourceBusy, got \(error)") }
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: paths.activeDestination.path))
+    }
+
+    func testSourceBusyRecoversWhenSourceSettles() throws {
+        let source = try electronFixtureCopy()
+        let paths = try makePaths(source: source)
+        let hooks = DatabaseUpgrade.Hooks(duringCopy: { attempt in
+            if attempt == 1 {   // perturb only the first attempt; then it settles
+                try FileManager.default.setAttributes(
+                    [.modificationDate: Date(timeIntervalSince1970: 1_700_000_123)],
+                    ofItemAtPath: source.path)
+            }
+        })
+        let outcome = try DatabaseUpgrade(paths: paths, hooks: hooks, timestamp: "SETTLE").run()
+        guard case .upgraded = outcome else { return XCTFail("should recover once source settles, got \(outcome)") }
+    }
 }

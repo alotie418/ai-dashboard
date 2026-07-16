@@ -104,3 +104,14 @@
 "about.positioning" = "SoloLedger 是面向个体经营者、一人公司与自由职业者的本地优先、私密账本。数据仅存于本机，无需账号，不含 AI、不联网、无付费解锁。它是经营记账与管理分析工具，不替代持牌会计师、税务师或法定申报系统。";
 
 "csv.import.partial" = "已导入 {imported} 条，跳过 {skipped} 条。";
+
+"recovery.title" = "数据升级未完成";
+"recovery.message" = "检测到旧版（Electron）账本数据，但迁移未成功。你的原始数据未被修改。请选择如何继续。";
+"recovery.retry" = "重试迁移";
+"recovery.restore" = "从备份 / 导出文件恢复…";
+"recovery.viewError" = "查看错误详情";
+"recovery.blank" = "创建空白账本…";
+"recovery.safeNote" = "原始数据库始终保持只读、未被修改，可随时重试。";
+"recovery.blankConfirmTitle" = "确认创建空白账本？";
+"recovery.blankConfirm" = "创建空白账本";
+"recovery.blankConfirmMessage" = "这将以空账本启动，不导入旧数据（原始数据仍保留在磁盘上、未删除）。仅在确认无需迁移旧数据时选择。";

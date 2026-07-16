@@ -23,6 +23,8 @@ struct RootView: View {
     @ViewBuilder private var content: some View {
         if let error = model.bootError {
             BootErrorView(message: error)
+        } else if let failure = model.migrationFailure {
+            MigrationRecoveryView(error: failure)   // blocking — never masked by an empty ledger
         } else if !model.ready {
             ProgressView(model.t("common.loading"))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -30,6 +32,72 @@ struct RootView: View {
             OnboardingView()
         } else {
             MainSplitView()
+        }
+    }
+}
+
+/// Blocking recovery shown when an Electron database exists but its upgrade failed.
+/// The original data is never modified; the user must choose how to proceed.
+private struct MigrationRecoveryView: View {
+    @EnvironmentObject var model: AppModel
+    let error: String
+    @State private var showingError = false
+    @State private var confirmingBlank = false
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 40))
+                .foregroundStyle(.orange)
+            Text(model.t("recovery.title")).font(.title2).fontWeight(.semibold)
+            Text(model.t("recovery.message"))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: 460)
+
+            VStack(spacing: 10) {
+                Button { model.retryMigration() } label: {
+                    Label(model.t("recovery.retry"), systemImage: "arrow.clockwise").frame(maxWidth: 320)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+
+                Button { model.restoreFromBackupViaPanel() } label: {
+                    Label(model.t("recovery.restore"), systemImage: "tray.and.arrow.down").frame(maxWidth: 320)
+                }
+                Button { showingError.toggle() } label: {
+                    Label(model.t("recovery.viewError"), systemImage: "doc.text.magnifyingglass").frame(maxWidth: 320)
+                }
+                Button(role: .destructive) { confirmingBlank = true } label: {
+                    Label(model.t("recovery.blank"), systemImage: "doc.badge.plus").frame(maxWidth: 320)
+                }
+            }
+
+            if showingError {
+                ScrollView {
+                    Text(error)
+                        .font(.caption).monospaced()
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxWidth: 460, maxHeight: 140)
+                .padding(8)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+            }
+
+            Text(model.t("recovery.safeNote"))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 460)
+        }
+        .padding(40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .confirmationDialog(model.t("recovery.blankConfirmTitle"), isPresented: $confirmingBlank, titleVisibility: .visible) {
+            Button(model.t("recovery.blankConfirm"), role: .destructive) { model.createBlankLedgerConfirmed() }
+            Button(model.t("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(model.t("recovery.blankConfirmMessage"))
         }
     }
 }

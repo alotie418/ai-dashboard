@@ -53,6 +53,10 @@ final class AppModel: ObservableObject {
     @Published var bootError: String?
     @Published var actionError: String?
     @Published private(set) var ready = false
+    /// Non-nil → an Electron database exists but the upgrade FAILED. The app is in a
+    /// blocking recovery state and MUST NOT open/create an active database until the
+    /// user chooses a recovery action. The original data is never modified.
+    @Published var migrationFailure: String?
 
     // Editor sheet state (nil editingTransaction = creating a new one)
     @Published var showingEditor = false
@@ -78,41 +82,88 @@ final class AppModel: ObservableObject {
     func boot() {
         guard store == nil else { return }
         do {
-            let url = try AppPaths.databaseURL()
-            // One-time safe adoption of an existing Electron database. In the native
-            // RELEASE app (same Bundle ID → same MAS container) this discovers and
-            // migrates the Electron DB via backup/integrity/atomic-swap; the original
-            // is only read and is never modified. In DEBUG (.dev, isolated container)
-            // there is no legacy data, so it is a no-op — and no extra entitlement to
-            // reach the production container is ever requested.
-            if !FileManager.default.fileExists(atPath: url.path) {
-                do {
-                    let outcome = try DatabaseUpgrade.standard(timestamp: DateFormat.timestamp()).run()
-                    if case let .upgraded(_, migrated) = outcome {
-                        NSLog("[upgrade] adopted Electron database: \(migrated) transactions")
-                    }
-                } catch {
-                    // The original is never touched on failure — start fresh, surface a note.
-                    actionError = "数据升级未完成，已保留原始数据：\(error)"
-                }
+            // Decide what to do about the active database. In the native RELEASE app
+            // (same Bundle ID → same MAS container) this discovers an Electron DB and
+            // migrates it via backup/integrity/atomic-swap; the original is only read
+            // and is never modified. In DEBUG (.dev, isolated container) there is no
+            // legacy data, so it creates a fresh DB — no extra entitlement to reach the
+            // production container is ever requested.
+            //
+            // CRITICAL: if a legacy DB exists but the upgrade FAILS, the decision is
+            // .blockedMigrationFailed and NO active database is created. We must never
+            // paper over a failed migration with an empty ledger — the user recovers
+            // from the blocking screen (retry / restore / explicit blank).
+            let decision = try DatabaseUpgrade.standard(timestamp: DateFormat.timestamp()).prepareActiveDatabase()
+            switch decision {
+            case .blockedMigrationFailed(let error):
+                migrationFailure = error   // ready stays false, store stays nil
+                return
+            case let .adopted(_, migrated):
+                NSLog("[upgrade] adopted Electron database: \(migrated) transactions")
+            case .openExisting, .createFresh:
+                break
             }
-            let store = try LedgerStore(databaseURL: url)
-            self.store = store
+            try finishBoot(with: LedgerStore(databaseURL: AppPaths.databaseURL()))
+        } catch {
+            bootError = "\(error)"
+        }
+    }
 
-            // Load persisted preferences (created lazily on first run).
-            if let savedLang = try store.settings.string(SettingsStore.Key.uiLanguage) {
-                setLanguage(savedLang, persist: false)
-            }
-            if let savedAppearance = try store.settings.string(SettingsStore.Key.appearance),
-               let ap = Appearance(rawValue: savedAppearance) {
-                appearance = ap
-            }
-            accountingLocale = try store.settings.accountingLocale()
-            companyName = (try? store.settings.string(SettingsStore.Key.companyName)) ?? ""
-            onboardingDone = (try? store.settings.bool(SettingsStore.Key.onboardingDone)) ?? false
+    /// Open + load an active store and mark the app ready.
+    private func finishBoot(with store: LedgerStore) throws {
+        self.store = store
+        if let savedLang = try store.settings.string(SettingsStore.Key.uiLanguage) {
+            setLanguage(savedLang, persist: false)
+        }
+        if let savedAppearance = try store.settings.string(SettingsStore.Key.appearance),
+           let ap = Appearance(rawValue: savedAppearance) {
+            appearance = ap
+        }
+        accountingLocale = try store.settings.accountingLocale()
+        companyName = (try? store.settings.string(SettingsStore.Key.companyName)) ?? ""
+        onboardingDone = (try? store.settings.bool(SettingsStore.Key.onboardingDone)) ?? false
+        reloadAll()
+        migrationFailure = nil
+        ready = true
+    }
 
-            reloadAll()
-            ready = true
+    // MARK: - Migration recovery (blocking state)
+
+    /// Retry the migration. Since a failed upgrade never created an active DB, boot
+    /// re-discovers the (still-absent) active DB and runs the upgrade again.
+    func retryMigration() {
+        migrationFailure = nil
+        store = nil
+        boot()
+    }
+
+    /// Adopt a user-picked backup / export database as the active DB, via the same
+    /// safe upgrade path (integrity + backup + migrate + atomic swap).
+    func restore(fromBackupAt fileURL: URL) {
+        do {
+            let paths = DatabaseUpgrade.Paths(
+                legacySource: fileURL,
+                activeDestination: try AppPaths.databaseURL(),
+                backupsDirectory: try AppPaths.backupsDirectory(),
+                workingDirectory: try AppPaths.upgradeWorkingDirectory())
+            let outcome = try DatabaseUpgrade(paths: paths, timestamp: DateFormat.timestamp()).run()
+            guard case .upgraded = outcome else {
+                migrationFailure = "所选文件不是有效的账本数据库（\(outcome)）。"
+                return
+            }
+            store = nil
+            boot()   // active DB now exists → opens it
+        } catch {
+            migrationFailure = "从备份恢复失败：\(error)"
+        }
+    }
+
+    /// Start a BLANK ledger, accepting that the Electron data is not imported. Only
+    /// call this after explicit user confirmation in the recovery UI. The original
+    /// Electron database is still never modified.
+    func createBlankLedgerConfirmed() {
+        do {
+            try finishBoot(with: LedgerStore(databaseURL: AppPaths.databaseURL()))
         } catch {
             bootError = "\(error)"
         }
