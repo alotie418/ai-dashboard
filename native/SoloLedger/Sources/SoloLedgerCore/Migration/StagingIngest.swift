@@ -483,8 +483,19 @@ public struct StagingIngest {
         try hooks.onStep?(.beforeManifestWrite)
         try writeManifest(manifest, to: attemptDir)
 
-        // Atomic publish: rename the completed attempt onto the per-import dir (same volume).
-        try FileManager.default.moveItem(at: attemptDir, to: finalDir)
+        // Atomic publish: rename the completed attempt onto the per-import dir (same
+        // volume). moveItem THROWS if the destination exists — a concurrent ingest that
+        // published this importID inside our window wins; ITS directory is never touched
+        // (the caller cleans only OUR attempt) and the loss surfaces as the same
+        // importIDAlreadyExists the up-front check uses.
+        do {
+            try FileManager.default.moveItem(at: attemptDir, to: finalDir)
+        } catch {
+            if FileManager.default.fileExists(atPath: finalDir.path) {
+                throw IngestError.importIDAlreadyExists(importID.rawValue)
+            }
+            throw error
+        }
 
         let stagedDB = finalDir.appendingPathComponent(AppPaths.databaseFileName)
         return .published(IngestResult(

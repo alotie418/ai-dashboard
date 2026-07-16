@@ -471,6 +471,35 @@ final class MigrationSourceIngestTests: LedgerTestCase {
         XCTAssertTrue(attemptNames().isSubset(of: before))
     }
 
+    // MARK: - Publish race (2B-2 S3)
+
+    /// A concurrent ingest publishes the same importID inside our window (after the
+    /// up-front existence check, before our rename): the loss maps to
+    /// importIDAlreadyExists, the winner's directory is byte-for-byte untouched, and only
+    /// OUR attempt dir is cleaned.
+    func testPublishRaceMapsToImportIDAlreadyExistsAndNeverTouchesTheWinner() throws {
+        let dir = try makeDataDirFixture(withWal: false, withAttachments: false)
+        let id = newImportID(); defer { cleanStaging(id) }
+        let finalDir = try AppPaths.stagedImportDirectory(importID: id)
+        let sentinel = finalDir.appendingPathComponent("winner.txt")
+        let before = attemptNames()
+        let hooks = IngestHooks(onStep: { step in
+            if step == .beforeManifestWrite {   // attempt fully built; winner appears now
+                try self.fm.createDirectory(at: finalDir, withIntermediateDirectories: true)
+                try Data("winner".utf8).write(to: sentinel)
+            }
+        })
+        XCTAssertThrowsError(try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t",
+                                                        maxAttempts: 3, hooks: hooks)) { e in
+            guard case IngestError.importIDAlreadyExists(let got) = e else { return XCTFail("got \(e)") }
+            XCTAssertEqual(got, id.rawValue)
+        }
+        XCTAssertEqual(try Data(contentsOf: sentinel), Data("winner".utf8), "the winner's dir must be untouched")
+        XCTAssertEqual(try fm.contentsOfDirectory(atPath: finalDir.path), ["winner.txt"],
+                       "nothing of ours may leak into the winner's dir")
+        XCTAssertTrue(attemptNames().isSubset(of: before), "only OUR attempt is cleaned")
+    }
+
     // MARK: - Manifest persistence + deterministic hashes
 
     func testManifestPersistedWithDeterministicHashes() throws {
