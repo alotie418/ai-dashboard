@@ -60,7 +60,24 @@ struct SourceStabilityManifest: Equatable {
 /// never inherit a stale "attachments migrated" flag. `report`/terminal statuses are filled
 /// by later apply stages.
 public struct ImportManifest: Codable, Equatable {
-    public enum Status: String, Codable { case ingested }
+    public enum Status: String, Codable {
+        /// Attachments copied into isolated staging; not yet applied to the active dir.
+        case ingested
+        /// Attachments applied to the active dir (absent copied, identical skipped, missing
+        /// itemized in `report`); this manifest, persisted to ImportManifests, is the
+        /// per-import COMPLETION SENTINEL.
+        case complete
+    }
+
+    /// Outcome of the non-destructive apply stage (present only on a `.complete` manifest).
+    public struct AppliedSummary: Codable, Equatable {
+        public var copied: [String]
+        public var skippedIdentical: [String]
+        public var missing: [String]   // in the manifest but absent from staging on disk
+        public init(copied: [String], skippedIdentical: [String], missing: [String]) {
+            self.copied = copied; self.skippedIdentical = skippedIdentical; self.missing = missing
+        }
+    }
 
     public struct FileResult: Codable, Equatable {
         public enum Outcome: String, Codable {
@@ -87,6 +104,8 @@ public struct ImportManifest: Codable, Equatable {
     public var files: [FileResult]
     public var status: Status
     public var report: String?
+    /// Apply-stage outcome; nil until the attachment apply completes.
+    public var applied: AppliedSummary? = nil
 
     public var ingestedCount: Int { files.filter { $0.outcome == .ingested }.count }
     public var skippedCount: Int { files.filter { $0.outcome != .ingested }.count }
