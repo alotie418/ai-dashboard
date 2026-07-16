@@ -106,9 +106,31 @@ public struct ImportManifest: Codable, Equatable {
     public var report: String?
     /// Apply-stage outcome; nil until the attachment apply completes.
     public var applied: AppliedSummary? = nil
+    /// Everything that could not be cleanly migrated (missing / skipped / dangling); a
+    /// `.complete` sentinel with a non-empty `unresolved` also carries `acknowledgedReportHash`.
+    public var unresolved: UnresolvedReport? = nil
+    /// The unresolved-report hash the user acknowledged when completing with open items.
+    public var acknowledgedReportHash: String? = nil
+    /// True on a `.complete` sentinel iff the DB reference audit was actually run before
+    /// finalizing — so a reader can tell an audited-clean import from a never-audited one.
+    public var referenceAuditPerformed: Bool? = nil
 
     public var ingestedCount: Int { files.filter { $0.outcome == .ingested }.count }
     public var skippedCount: Int { files.filter { $0.outcome != .ingested }.count }
+
+    /// Stable hash over the WHOLE attachment manifest — every entry (ingested AND skipped/
+    /// rejected), sorted, encoding (name, outcome, sha256). Covering the skip set too makes
+    /// it tamper-evident: a dropped/renamed skipped entry (which would otherwise silently
+    /// shrink the unresolved report and bypass the acknowledgement gate) trips a mismatch.
+    /// Shared by ingest (to STORE it) and apply (to RE-VERIFY it fail-closed) so they can
+    /// never drift.
+    public static func attachmentSetHash(_ files: [FileResult]) -> String {
+        let lines = files
+            .sorted { ($0.name, $0.outcome.rawValue) < ($1.name, $1.outcome.rawValue) }
+            .map { "\($0.name)\u{0}\($0.outcome.rawValue)\u{0}\($0.sha256 ?? "")" }
+            .joined(separator: "\n")
+        return SHA256.hash(data: Data(lines.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
 }
 
 // MARK: - Ingest
@@ -401,7 +423,7 @@ public struct StagingIngest {
         return ImportManifest(importID: importID.rawValue, sourceKind: source.kind, createdAt: timestamp,
                               sourceDBSHA256: dbHash, walSHA256: walHash,
                               snapshotIdentitySHA256: snapshotIdentity(dbSHA: dbHash, walSHA: walHash),
-                              attachmentManifestSHA256: attachmentSetHash(files),
+                              attachmentManifestSHA256: ImportManifest.attachmentSetHash(files),
                               files: files, status: .ingested, report: nil)
     }
 
@@ -410,15 +432,6 @@ public struct StagingIngest {
     private static func snapshotIdentity(dbSHA: String, walSHA: String?) -> String {
         let s = "db:\(dbSHA)\u{0}wal:\(walSHA ?? "")"
         return SHA256.hash(data: Data(s.utf8)).map { String(format: "%02x", $0) }.joined()
-    }
-
-    /// Stable hash over the sorted ingested (name, sha256) set — the attachment payload identity.
-    private static func attachmentSetHash(_ files: [ImportManifest.FileResult]) -> String {
-        let lines = files.filter { $0.outcome == .ingested }
-            .sorted { $0.name < $1.name }
-            .map { "\($0.name)\u{0}\($0.sha256 ?? "")" }
-            .joined(separator: "\n")
-        return SHA256.hash(data: Data(lines.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     private static func writeManifest(_ manifest: ImportManifest, to dir: URL) throws {
