@@ -2,7 +2,7 @@ import Foundation
 import CSQLite
 
 /// A dynamically-typed SQLite value used for binds and column reads.
-public enum SQLiteValue: Equatable {
+public enum SQLiteValue: Equatable, Sendable {
     case null
     case integer(Int64)
     case real(Double)

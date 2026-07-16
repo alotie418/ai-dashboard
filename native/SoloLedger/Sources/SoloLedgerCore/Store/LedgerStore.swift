@@ -134,26 +134,25 @@ public final class LedgerStore {
     /// public API (the fault seam must never be reachable in production).
     @discardableResult
     func deleteBatch(ids: Set<String>, faultInjection: (() throws -> Void)?) throws -> DeletionSnapshot {
-        guard !ids.isEmpty else { return DeletionSnapshot(transactions: [], legacyMappings: []) }
+        guard !ids.isEmpty else { return DeletionSnapshot(transactionRows: [], legacyMappingRows: []) }
 
-        var transactions: [Transaction] = []
-        var mappings: [LegacyMapping] = []
+        var transactionRows: [RawRow] = []
+        var mappingRows: [RawRow] = []
         // Snapshot reads, mapping deletes and transaction deletes ALL run inside the
         // same transaction, so the captured snapshot is exactly the consistent set that
         // is removed (and a rollback discards both the snapshot and the deletes).
+        //
+        // Rows are captured RAW (SELECT * → RawRow), NOT via the lossy `Transaction`
+        // model: this preserves every column's NULL state and storage class so undo is
+        // byte-for-byte verbatim. A non-existent id simply yields no rows (its snapshot
+        // entry is skipped) while its DELETEs still run as harmless no-ops.
         try db.transaction {
             for id in ids {
-                if let t = try transaction(id: id) { transactions.append(t) }
-                let rows = try db.query(
-                    "SELECT id, legacy_table, legacy_id, new_id, migrated_at FROM legacy_migrations WHERE new_id = ?",
-                    [.text(id)])
-                for r in rows {
-                    mappings.append(LegacyMapping(
-                        id: r.int("id") ?? 0,
-                        legacyTable: r.string("legacy_table") ?? "",
-                        legacyId: r.string("legacy_id") ?? "",
-                        newId: r.string("new_id") ?? id,
-                        migratedAt: r.string("migrated_at")))
+                for r in try db.query("SELECT * FROM transactions WHERE id = ?", [.text(id)]) {
+                    transactionRows.append(RawRow(r))
+                }
+                for r in try db.query("SELECT * FROM legacy_migrations WHERE new_id = ?", [.text(id)]) {
+                    mappingRows.append(RawRow(r))
                 }
             }
 
@@ -165,39 +164,30 @@ public final class LedgerStore {
                 if deleted == 1 { try faultInjection?() }   // throwing here rolls back the whole batch
             }
         }
-        return DeletionSnapshot(transactions: transactions, legacyMappings: mappings)
+        return DeletionSnapshot(transactionRows: transactionRows, legacyMappingRows: mappingRows)
     }
 
-    /// Atomically restore a deletion snapshot — every transaction (with its ORIGINAL
-    /// `created_at` / `updated_at`) and every `legacy_migrations` mapping (with its
-    /// ORIGINAL primary key `id`), verbatim. All-or-nothing.
+    /// Atomically restore a deletion snapshot — every `transactions` row and every
+    /// `legacy_migrations` row, VERBATIM: each column is re-inserted with its captured
+    /// raw value, so SQL `NULL`s, storage classes, the original `created_at` /
+    /// `updated_at`, and the mapping's original primary key `id` are all preserved
+    /// exactly (no `Transaction`-model coercion). All-or-nothing.
     public func restore(_ snapshot: DeletionSnapshot) throws {
         guard !snapshot.isEmpty else { return }
         try db.transaction {
-            for t in snapshot.transactions { try insertPreservingTimestamps(t) }
-            for m in snapshot.legacyMappings {
-                try db.run("""
-                    INSERT INTO legacy_migrations (id, legacy_table, legacy_id, new_id, migrated_at)
-                    VALUES (?, ?, ?, ?, ?)
-                    """, [.integer(Int64(m.id)), .text(m.legacyTable), .text(m.legacyId), .text(m.newId),
-                          m.migratedAt.map { SQLiteValue.text($0) } ?? .null])
-            }
+            for row in snapshot.transactionRows { try insertRawRow(into: "transactions", row) }
+            for row in snapshot.legacyMappingRows { try insertRawRow(into: "legacy_migrations", row) }
         }
     }
 
-    /// INSERT that preserves `created_at` / `updated_at` (unlike `create`, which lets
-    /// them default to now) — used only to restore a deleted row exactly.
-    private func insertPreservingTimestamps(_ t: Transaction) throws {
-        try db.run("""
-            INSERT INTO transactions
-              (id, type, date, amount, amount_net, tax_amount, tax_rate, currency,
-               category_id, counterparty, invoice_no, invoice_status,
-               payment_status, paid_amount, payment_date, due_date,
-               description, attachment_path, source_meta, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, bindings(for: t)
-                + [t.createdAt.map { SQLiteValue.text($0) } ?? .null,
-                   t.updatedAt.map { SQLiteValue.text($0) } ?? .null])
+    /// Re-INSERT a captured raw row into `table`, binding every column's value
+    /// verbatim (including `.null`). Column names come from the table's own schema
+    /// (`SELECT *`), not from user input, so interpolating them is safe.
+    private func insertRawRow(into table: String, _ row: RawRow) throws {
+        guard !row.columns.isEmpty else { return }
+        let cols = row.columns.joined(separator: ", ")
+        let placeholders = Array(repeating: "?", count: row.columns.count).joined(separator: ", ")
+        try db.run("INSERT INTO \(table) (\(cols)) VALUES (\(placeholders))", row.values)
     }
 
     // MARK: - Aggregation
