@@ -127,7 +127,8 @@ public enum FileHash {
     }
 
     /// Open + verify: O_NOFOLLOW|O_NONBLOCK, fstat on the open fd, S_IFREG only.
-    private static func openVerifiedRegularFile(_ url: URL) throws -> FileHandle {
+    /// Internal so trust-boundary code can READ (not just hash) through a verified fd.
+    static func openVerifiedRegularFile(_ url: URL) throws -> FileHandle {
         let fd = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
         guard fd >= 0 else {
             let e = errno
@@ -383,7 +384,7 @@ struct IngestHooks {
     }
 }
 
-enum IngestStep { case afterDatabaseCopy, duringAttachmentCopy, beforeManifestWrite }
+enum IngestStep { case afterDatabaseCopy, duringAttachmentCopy, beforeManifestWrite, beforePublish }
 
 /// Copies a `MigrationSource` into an isolated, native-owned staging directory, verifying
 /// the source did not change during the copy. FAILURE-ATOMIC: each attempt writes to its
@@ -483,6 +484,14 @@ public struct StagingIngest {
         try hooks.onStep?(.beforeManifestWrite)
         try writeManifest(manifest, to: attemptDir)
 
+        // FINAL pre-publish gate — everything the rename is about to publish is re-read
+        // from disk and re-verified. The tiny window between this gate and the rename
+        // cannot be eliminated (a rename cannot be fd-bound); accepted residual: the
+        // attempt dir is process-private inside the native container, so nothing
+        // legitimate can write there between the two calls.
+        try hooks.onStep?(.beforePublish)
+        try validateAttemptForPublish(attemptDir: attemptDir, expected: manifest, staged: staged)
+
         // Atomic publish: rename the completed attempt onto the per-import dir (same
         // volume). moveItem THROWS if the destination exists — a concurrent ingest that
         // published this importID inside our window wins; ITS directory is never touched
@@ -507,6 +516,67 @@ public struct StagingIngest {
                 ? finalDir.appendingPathComponent("attachments", isDirectory: true).appendingPathComponent("docs", isDirectory: true)
                 : nil,
             manifest: manifest))
+    }
+
+    /// FINAL pre-publish integrity gate. Re-reads the manifest from disk through a
+    /// verified fd and re-verifies, with the no-follow fd primitives, every byte the
+    /// rename is about to publish:
+    ///  - the on-disk manifest decodes to a manifest FIELD-FOR-FIELD equal to the one we
+    ///    built (a tampered, truncated or symlink-swapped manifest.json fails);
+    ///  - the staged DB is STILL a regular file whose sha256 AND size equal the verified
+    ///    copy digest and the manifest record;
+    ///  - the WAL's on-disk presence matches `walSHA256` exactly, and when present it is
+    ///    a regular file with the exact digest (a symlink/directory/FIFO swapped in fails
+    ///    immediately — O_NONBLOCK, no hang);
+    ///  - every `.ingested` attachment is still a regular file with the manifest's exact
+    ///    sha256 and size.
+    /// ANY violation throws `stagedContentInconsistent`: the attempt is discarded by the
+    /// caller and nothing is published.
+    private static func validateAttemptForPublish(attemptDir: URL, expected: ImportManifest,
+                                                  staged: StagedLayout) throws {
+        func fail(_ what: String) -> IngestError { .stagedContentInconsistent(what) }
+        func verifiedDigest(_ url: URL, _ what: String) throws -> RegularFileDigest {
+            do { return try FileHash.digestOfRegularFile(at: url) }
+            catch { throw fail("\(what): \(error)") }
+        }
+
+        // 1. Manifest file: re-read via a verified fd and compare the DECODED object.
+        let manifestURL = attemptDir.appendingPathComponent("manifest.json")
+        let manifestData: Data
+        do {
+            let handle = try FileHash.openVerifiedRegularFile(manifestURL)
+            defer { try? handle.close() }
+            manifestData = try handle.readToEnd() ?? Data()
+        } catch { throw fail("manifest: \(error)") }
+        guard let decoded = try? JSONDecoder().decode(ImportManifest.self, from: manifestData),
+              decoded == expected else {
+            throw fail("manifest on disk does not match the built manifest")
+        }
+
+        // 2. Staged DB.
+        let dbDigest = try verifiedDigest(staged.dbURL, "db")
+        guard dbDigest == staged.dbCopyDigest, dbDigest.sha256 == expected.sourceDBSHA256 else {
+            throw fail("db")
+        }
+
+        // 3. WAL: strict presence ⇔ record, then type + digest. FileFingerprint.capture
+        //    treats ONLY ENOENT as absence — metadata errors fail closed here too.
+        let walURL = URL(fileURLWithPath: staged.dbURL.path + "-wal")
+        if let walSHA = expected.walSHA256 {
+            let walDigest = try verifiedDigest(walURL, "wal")
+            guard walDigest == staged.walCopyDigest, walDigest.sha256 == walSHA else { throw fail("wal") }
+        } else {
+            guard try FileFingerprint.capture(at: walURL) == nil else {
+                throw fail("wal present but not recorded")
+            }
+        }
+
+        // 4. Every ingested attachment: regular file, exact sha256 AND size.
+        for f in expected.files where f.outcome == .ingested {
+            guard let attachDir = staged.attachmentsDir else { throw fail("attachments dir missing") }
+            let d = try verifiedDigest(attachDir.appendingPathComponent(f.name), f.name)
+            guard d.sha256 == f.sha256, d.size == f.size else { throw fail(f.name) }
+        }
     }
 
     private static func cleanupIfPresent(_ dir: URL, hooks: IngestHooks, original: Error) throws {

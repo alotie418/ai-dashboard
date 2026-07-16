@@ -135,6 +135,24 @@ final class FilePrimitivesTests: LedgerTestCase {
         XCTAssertNil(try FileFingerprint.capture(at: dir.appendingPathComponent("absent")), "ENOENT → nil")
     }
 
+    /// A metadata error that is NOT ENOENT (here: EACCES via an unsearchable parent) must
+    /// throw — never read as "the file does not exist" (which would fail open).
+    func testFingerprintFailsClosedOnPermissionError() throws {
+        let parent = try trackedTempDir().appendingPathComponent("locked", isDirectory: true)
+        try fm.createDirectory(at: parent, withIntermediateDirectories: true)
+        let file = parent.appendingPathComponent("f.bin")
+        try Data("x".utf8).write(to: file)
+        try fm.setAttributes([.posixPermissions: 0o000], ofItemAtPath: parent.path)
+        defer { try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: parent.path) }
+
+        XCTAssertThrowsError(try FileFingerprint.capture(at: file)) { e in
+            guard let fe = e as? FileHashError, case .unreadable(_, let code) = fe else {
+                return XCTFail("got \(e)")
+            }
+            XCTAssertNotEqual(code, ENOENT, "EACCES must not masquerade as absence")
+        }
+    }
+
     func testFingerprintDetectsContentAppendAndInodeSwap() throws {
         let dir = try trackedTempDir()
         let file = try makeFile("f.bin", "abc", in: dir)

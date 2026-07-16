@@ -471,6 +471,159 @@ final class MigrationSourceIngestTests: LedgerTestCase {
         XCTAssertTrue(attemptNames().isSubset(of: before))
     }
 
+    // MARK: - Pre-publish integrity gate (2B-2 S4)
+
+    /// Locate the current run's fresh `.attempt-*` dir (exactly one) from inside a hook.
+    private func currentAttemptDir(since before: Set<String>) throws -> URL {
+        let root = try AppPaths.stagingRootDirectory()
+        let fresh = try fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix(".attempt-") && !before.contains($0.lastPathComponent) }
+        return try XCTUnwrap(fresh.first)
+    }
+
+    /// Run one ingest with a `.beforePublish` saboteur; assert stagedContentInconsistent,
+    /// no publish, no attempt residue, and byte-identical sources.
+    private func assertPublishGateRejects(_ label: String, withWal: Bool = true, withAttachments: Bool = true,
+                                          sabotage: @escaping (URL) throws -> Void,
+                                          file: StaticString = #filePath, line: UInt = #line) throws {
+        let dir = try makeDataDirFixture(withWal: withWal, withAttachments: withAttachments)
+        let sourceHashesBefore = try sourceHashes(dir)
+        let id = newImportID(); defer { cleanStaging(id) }
+        let before = attemptNames()
+        let hooks = IngestHooks(onStep: { step in
+            if step == .beforePublish { try sabotage(try self.currentAttemptDir(since: before)) }
+        })
+        XCTAssertThrowsError(try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t",
+                                                        maxAttempts: 1, hooks: hooks), label, file: file, line: line) { e in
+            guard case IngestError.stagedContentInconsistent = e else {
+                return XCTFail("\(label): got \(e)", file: file, line: line)
+            }
+        }
+        XCTAssertFalse(finalExists(id), "\(label): must not publish", file: file, line: line)
+        XCTAssertTrue(attemptNames().isSubset(of: before), "\(label): attempt cleaned", file: file, line: line)
+        XCTAssertEqual(try sourceHashes(dir), sourceHashesBefore, "\(label): source untouched", file: file, line: line)
+    }
+
+    private func sourceHashes(_ dir: URL) throws -> [String: String] {
+        var out: [String: String] = [:]
+        let db = dir.appendingPathComponent("sololedger.db")
+        out["db"] = try FileHash.sha256Hex(of: db)
+        let wal = URL(fileURLWithPath: db.path + "-wal")
+        if fm.fileExists(atPath: wal.path) { out["wal"] = try FileHash.sha256Hex(of: wal) }
+        let docs = dir.appendingPathComponent("attachments/docs")
+        for name in ["doc-a.pdf", "doc-b.jpg"] {
+            let f = docs.appendingPathComponent(name)
+            if fm.fileExists(atPath: f.path) { out[name] = try FileHash.sha256Hex(of: f) }
+        }
+        return out
+    }
+
+    /// Staged DB / WAL / attachment content tampered AFTER the manifest was written:
+    /// the pre-publish gate must reject each one.
+    func testTamperAfterManifestWriteRejectsPublish() throws {
+        func append(_ url: URL) throws {
+            let h = try FileHandle(forWritingTo: url); defer { try? h.close() }
+            try h.seekToEnd(); try h.write(contentsOf: Data([0x00]))
+        }
+        try assertPublishGateRejects("db tamper") { try append($0.appendingPathComponent("sololedger.db")) }
+        try assertPublishGateRejects("wal tamper") { try append(URL(fileURLWithPath: $0.appendingPathComponent("sololedger.db").path + "-wal")) }
+        try assertPublishGateRejects("attachment tamper") { try append($0.appendingPathComponent("attachments/docs/doc-a.pdf")) }
+        // A same-size REPLACEMENT (not just an append) is caught by the content hash.
+        try assertPublishGateRejects("attachment replace") { attempt in
+            let f = attempt.appendingPathComponent("attachments/docs/doc-a.pdf")
+            try self.fm.removeItem(at: f)
+            try Data("pdf-X".utf8).write(to: f)   // same 5-byte size as "pdf-a"
+        }
+    }
+
+    /// The staged WAL swapped for a symlink / directory / FIFO right before publish:
+    /// immediate fail-closed rejection, no follow, no hang.
+    func testWalSwappedForNonRegularBeforePublishFailsClosed() throws {
+        for kind in ["symlink", "directory", "fifo"] {
+            try assertPublishGateRejects("wal → \(kind)") { attempt in
+                let wal = URL(fileURLWithPath: attempt.appendingPathComponent("sololedger.db").path + "-wal")
+                let original = try Data(contentsOf: wal)
+                try self.fm.removeItem(at: wal)
+                switch kind {
+                case "symlink":
+                    let elsewhere = try self.trackedTempDir().appendingPathComponent("wal-copy")
+                    try original.write(to: elsewhere)   // identical bytes behind the link
+                    try self.fm.createSymbolicLink(at: wal, withDestinationURL: elsewhere)
+                case "directory":
+                    try self.fm.createDirectory(at: wal, withIntermediateDirectories: true)
+                default:
+                    guard mkfifo(wal.path, 0o644) == 0 else { throw TestError() }
+                }
+            }
+        }
+        // A WAL that simply DISAPPEARS after the manifest recorded it is equally fatal.
+        try assertPublishGateRejects("wal removed") { attempt in
+            try self.fm.removeItem(at: URL(fileURLWithPath: attempt.appendingPathComponent("sololedger.db").path + "-wal"))
+        }
+        // And a WAL APPEARING when none was recorded (fixture without one).
+        try assertPublishGateRejects("wal planted", withWal: false) { attempt in
+            try Data("stray".utf8).write(to: URL(fileURLWithPath: attempt.appendingPathComponent("sololedger.db").path + "-wal"))
+        }
+    }
+
+    /// manifest.json tampered (field flip, truncation, symlink swap) after being written:
+    /// the gate re-reads it through a verified fd and requires full-field equality.
+    func testManifestTamperBeforePublishRejected() throws {
+        try assertPublishGateRejects("manifest field flip") { attempt in
+            let url = attempt.appendingPathComponent("manifest.json")
+            var m = try JSONDecoder().decode(ImportManifest.self, from: Data(contentsOf: url))
+            m.sourceDBSHA256 = String(m.sourceDBSHA256.reversed())
+            let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+            try enc.encode(m).write(to: url)
+        }
+        try assertPublishGateRejects("manifest truncated") { attempt in
+            let url = attempt.appendingPathComponent("manifest.json")
+            let h = try FileHandle(forWritingTo: url); defer { try? h.close() }
+            try h.truncate(atOffset: 10)
+        }
+        try assertPublishGateRejects("manifest symlink swap") { attempt in
+            let url = attempt.appendingPathComponent("manifest.json")
+            let copy = try self.trackedTempDir().appendingPathComponent("manifest.json")
+            try self.fm.copyItem(at: url, to: copy)   // identical bytes behind the link
+            try self.fm.removeItem(at: url)
+            try self.fm.createSymbolicLink(at: url, withDestinationURL: copy)
+        }
+    }
+
+    // MARK: - WAL presence flips inside the stability window (2B-2 S4)
+
+    func testWalDisappearingInWindowRetriesThenPublishesWithoutIt() throws {
+        let dir = try makeDataDirFixture(withWal: true, withAttachments: false)
+        let walURL = URL(fileURLWithPath: dir.appendingPathComponent("sololedger.db").path + "-wal")
+        let id = newImportID(); defer { cleanStaging(id) }
+        var rechecks = 0
+        let result = try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t", maxAttempts: 3,
+                                                hooks: IngestHooks(onRecheck: { _ in
+            rechecks += 1
+            if rechecks == 1 { try self.fm.removeItem(at: walURL) }   // checkpoint finished mid-window
+        }))
+        XCTAssertEqual(rechecks, 2, "attempt 1 discarded, attempt 2 published")
+        XCTAssertNil(result.manifest.walSHA256)
+        XCTAssertNil(result.stagedWALURL)
+        XCTAssertFalse(fm.fileExists(atPath: result.stagedDatabaseURL.path + "-wal"))
+    }
+
+    func testWalAppearingInWindowRetriesThenPublishesWithIt() throws {
+        let dir = try makeDataDirFixture(withWal: false, withAttachments: false)
+        let walURL = URL(fileURLWithPath: dir.appendingPathComponent("sololedger.db").path + "-wal")
+        let id = newImportID(); defer { cleanStaging(id) }
+        var rechecks = 0
+        let result = try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t", maxAttempts: 3,
+                                                hooks: IngestHooks(onRecheck: { _ in
+            rechecks += 1
+            if rechecks == 1 { try Data("late-wal".utf8).write(to: walURL) }   // writer became active
+        }))
+        XCTAssertEqual(rechecks, 2, "attempt 1 discarded, attempt 2 published")
+        XCTAssertEqual(result.manifest.walSHA256, try FileHash.sha256Hex(of: walURL))
+        XCTAssertNotNil(result.stagedWALURL)
+        XCTAssertTrue(fm.fileExists(atPath: result.stagedDatabaseURL.path + "-wal"))
+    }
+
     // MARK: - Publish race (2B-2 S3)
 
     /// A concurrent ingest publishes the same importID inside our window (after the
@@ -484,7 +637,7 @@ final class MigrationSourceIngestTests: LedgerTestCase {
         let sentinel = finalDir.appendingPathComponent("winner.txt")
         let before = attemptNames()
         let hooks = IngestHooks(onStep: { step in
-            if step == .beforeManifestWrite {   // attempt fully built; winner appears now
+            if step == .beforePublish {   // attempt fully built + validated; winner appears now
                 try self.fm.createDirectory(at: finalDir, withIntermediateDirectories: true)
                 try Data("winner".utf8).write(to: sentinel)
             }
