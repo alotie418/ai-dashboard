@@ -108,10 +108,10 @@ struct TransactionListView: View {
     }
 
     @ViewBuilder private var undoBar: some View {
-        if !model.lastDeleted.isEmpty {
+        if model.canUndoDelete {
             HStack {
                 Image(systemName: "trash")
-                Text(model.t("delete.deleted", ["count": String(model.lastDeleted.count)]))
+                Text(model.t("delete.deleted", ["count": String(model.undoDeleteCount)]))
                 Spacer()
                 Button(model.t("delete.undo")) { model.undoDelete() }
                 Button { model.dismissUndo() } label: { Image(systemName: "xmark.circle.fill") }

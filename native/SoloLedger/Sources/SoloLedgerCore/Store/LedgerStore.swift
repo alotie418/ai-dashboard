@@ -121,6 +121,85 @@ public final class LedgerStore {
         }
     }
 
+    /// Atomically delete a set of transactions AND their `legacy_migrations` mappings,
+    /// returning a full snapshot for undo. All-or-nothing: any failure rolls the WHOLE
+    /// batch back — the database loses nothing. Public production API.
+    @discardableResult
+    public func deleteBatch(ids: Set<String>) throws -> DeletionSnapshot {
+        try deleteBatch(ids: ids, faultInjection: nil)
+    }
+
+    /// Internal test entry point: identical to `deleteBatch(ids:)` but with a
+    /// fault-injection seam to verify the all-or-nothing rollback. NOT part of the
+    /// public API (the fault seam must never be reachable in production).
+    @discardableResult
+    func deleteBatch(ids: Set<String>, faultInjection: (() throws -> Void)?) throws -> DeletionSnapshot {
+        guard !ids.isEmpty else { return DeletionSnapshot(transactions: [], legacyMappings: []) }
+
+        var transactions: [Transaction] = []
+        var mappings: [LegacyMapping] = []
+        // Snapshot reads, mapping deletes and transaction deletes ALL run inside the
+        // same transaction, so the captured snapshot is exactly the consistent set that
+        // is removed (and a rollback discards both the snapshot and the deletes).
+        try db.transaction {
+            for id in ids {
+                if let t = try transaction(id: id) { transactions.append(t) }
+                let rows = try db.query(
+                    "SELECT id, legacy_table, legacy_id, new_id, migrated_at FROM legacy_migrations WHERE new_id = ?",
+                    [.text(id)])
+                for r in rows {
+                    mappings.append(LegacyMapping(
+                        id: r.int("id") ?? 0,
+                        legacyTable: r.string("legacy_table") ?? "",
+                        legacyId: r.string("legacy_id") ?? "",
+                        newId: r.string("new_id") ?? id,
+                        migratedAt: r.string("migrated_at")))
+                }
+            }
+
+            var deleted = 0
+            for id in ids {
+                try db.run("DELETE FROM legacy_migrations WHERE new_id = ?", [.text(id)])
+                try db.run("DELETE FROM transactions WHERE id = ?", [.text(id)])
+                deleted += 1
+                if deleted == 1 { try faultInjection?() }   // throwing here rolls back the whole batch
+            }
+        }
+        return DeletionSnapshot(transactions: transactions, legacyMappings: mappings)
+    }
+
+    /// Atomically restore a deletion snapshot — every transaction (with its ORIGINAL
+    /// `created_at` / `updated_at`) and every `legacy_migrations` mapping (with its
+    /// ORIGINAL primary key `id`), verbatim. All-or-nothing.
+    public func restore(_ snapshot: DeletionSnapshot) throws {
+        guard !snapshot.isEmpty else { return }
+        try db.transaction {
+            for t in snapshot.transactions { try insertPreservingTimestamps(t) }
+            for m in snapshot.legacyMappings {
+                try db.run("""
+                    INSERT INTO legacy_migrations (id, legacy_table, legacy_id, new_id, migrated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """, [.integer(Int64(m.id)), .text(m.legacyTable), .text(m.legacyId), .text(m.newId),
+                          m.migratedAt.map { SQLiteValue.text($0) } ?? .null])
+            }
+        }
+    }
+
+    /// INSERT that preserves `created_at` / `updated_at` (unlike `create`, which lets
+    /// them default to now) — used only to restore a deleted row exactly.
+    private func insertPreservingTimestamps(_ t: Transaction) throws {
+        try db.run("""
+            INSERT INTO transactions
+              (id, type, date, amount, amount_net, tax_amount, tax_rate, currency,
+               category_id, counterparty, invoice_no, invoice_status,
+               payment_status, paid_amount, payment_date, due_date,
+               description, attachment_path, source_meta, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, bindings(for: t)
+                + [t.createdAt.map { SQLiteValue.text($0) } ?? .null,
+                   t.updatedAt.map { SQLiteValue.text($0) } ?? .null])
+    }
+
     // MARK: - Aggregation
 
     /// income total/count, expense total/count (net derived) — the factual summary.

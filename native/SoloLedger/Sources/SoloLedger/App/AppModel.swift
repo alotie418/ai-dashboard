@@ -318,9 +318,13 @@ final class AppModel: ObservableObject {
     /// `confirmDelete()`. All entry points (toolbar / Delete key / context menu)
     /// funnel through `requestDelete`.
     @Published var pendingDeleteIDs: Set<Transaction.ID>?
-    @Published private(set) var lastDeleted: [Transaction] = []
+    /// Full snapshot of the last batch delete (transactions with original timestamps +
+    /// legacy_migrations mappings) for a complete undo.
+    @Published private(set) var lastDeletedSnapshot: DeletionSnapshot?
 
     var pendingDeleteCount: Int { pendingDeleteIDs?.count ?? 0 }
+    var canUndoDelete: Bool { (lastDeletedSnapshot?.count ?? 0) > 0 }
+    var undoDeleteCount: Int { lastDeletedSnapshot?.count ?? 0 }
 
     func requestDelete(_ ids: Set<Transaction.ID>) {
         guard !ids.isEmpty else { return }
@@ -333,24 +337,22 @@ final class AppModel: ObservableObject {
         guard let store, let ids = pendingDeleteIDs else { return }
         pendingDeleteIDs = nil
         do {
-            // Snapshot the rows first so the delete can be undone.
-            let snapshot = ids.compactMap { try? store.transaction(id: $0) }.compactMap { $0 }
-            for id in ids { try store.delete(id: id) }
-            lastDeleted = snapshot
+            // Atomic all-or-nothing delete; the returned snapshot supports a full undo.
+            lastDeletedSnapshot = try store.deleteBatch(ids: ids)
             reloadAll()
         } catch { actionError = "\(error)" }
     }
 
     func undoDelete() {
-        guard let store, !lastDeleted.isEmpty else { return }
+        guard let store, let snapshot = lastDeletedSnapshot else { return }
         do {
-            try store.db.transaction { for t in lastDeleted { try store.create(t) } }
-            lastDeleted = []
+            try store.restore(snapshot)   // atomic; restores fields, timestamps AND mappings
+            lastDeletedSnapshot = nil
             reloadAll()
         } catch { actionError = "\(error)" }
     }
 
-    func dismissUndo() { lastDeleted = [] }
+    func dismissUndo() { lastDeletedSnapshot = nil }
 
     /// Default currency for a brand-new transaction, from the accounting regime.
     var defaultCurrency: String { accountingLocale.defaultCurrency }
