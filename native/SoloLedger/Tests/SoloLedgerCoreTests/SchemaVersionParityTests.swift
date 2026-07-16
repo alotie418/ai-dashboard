@@ -11,12 +11,20 @@ import XCTest
 /// `electron/db/index.js` in Node (`SCHEMA_VERSION = MIGRATIONS.length`). That is the
 /// single source of truth: NO duplicated constant is kept native-side, and NO fragile
 /// source-text parsing is done. The native value is read in-process from
-/// `SchemaMigrator.schemaVersion`. When the repo layout or Node is unavailable (e.g. the
-/// package is built detached from the monorepo), the check SKIPS with a visible reason
-/// rather than passing silently; in CI (an npm repo, Node always present) it is enforced.
+/// `SchemaMigrator.schemaVersion`.
+///
+/// FAIL-CLOSED: the ONLY case that skips is a genuinely detached package where
+/// `electron/db/index.js` cannot be located (no authority to compare against). Whenever
+/// the Electron source IS present — as it is in-repo and in CI — a missing Node, a failed
+/// `require`, or non-integer output all FAIL the test, so it can never pass silently. The
+/// `checks` CI job (macos-latest, Node installed) runs `swift test`, so PRs enforce this.
 final class SchemaVersionParityTests: XCTestCase {
 
     func testNativeSchemaVersionMatchesElectronAuthority() throws {
+        // The ONLY permitted skip: we are a Swift package detached from the monorepo, so
+        // there is no Electron authority to compare against. Whenever the Electron source
+        // IS present the guard is FAIL-CLOSED — a missing Node, a failed require, or invalid
+        // output all FAIL the test (never skip), so it can never pass without verifying.
         guard let electronIndex = Self.locateElectronDbIndex() else {
             throw XCTSkip("electron/db/index.js not found by walking up from \(#filePath) — package is detached from the monorepo; parity is enforced in-repo / CI")
         }
@@ -29,9 +37,15 @@ final class SchemaVersionParityTests: XCTestCase {
             "process.stdout.write(String(require(process.argv[1]).SCHEMA_VERSION))",
             electronIndex.path,
         ])
-        guard r.status == 0,
-              let electronVersion = Int(r.out.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-            throw XCTSkip("could not read Electron SCHEMA_VERSION via `env node` (status \(r.status)); stderr: \(r.err.prefix(200))")
+        guard r.status == 0 else {
+            return XCTFail("""
+                Electron source is present but its authoritative SCHEMA_VERSION could not be read \
+                (`env node` exited \(r.status) — Node missing or the require failed). In-repo the \
+                guard MUST run; install Node / fix the Electron require. stderr: \(r.err.prefix(400))
+                """)
+        }
+        guard let electronVersion = Int(r.out.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            return XCTFail("Electron SCHEMA_VERSION output was not an integer: '\(r.out)' (stderr: \(r.err.prefix(400)))")
         }
 
         XCTAssertGreaterThan(electronVersion, 0, "Electron SCHEMA_VERSION should be a positive integer")
