@@ -103,7 +103,7 @@ public enum AppPaths {
     ///    to reach the production container is added.
     ///
     /// The native app reads this file READ-ONLY (integrity + backup snapshot) and never
-    /// modifies or deletes it; its own active DB lives in `previewFolderName`.
+    /// modifies or deletes it; its own active DB lives under `nativeDataFolderName`.
     public static let electronProductFolderName = "SoloLedger"
 
     public static func electronLegacyDatabaseURL() throws -> URL {
@@ -112,5 +112,60 @@ public enum AppPaths {
             appropriateFor: nil, create: false)
         return base.appendingPathComponent(electronProductFolderName, isDirectory: true)
             .appendingPathComponent(databaseFileName)
+    }
+
+    // MARK: - Attachments & staging (Phase 2B migration infrastructure)
+
+    /// The relative layout Electron uses for document attachments
+    /// (`attachments/docs/<name>`), stored VERBATIM in the DB. The native active
+    /// attachments root mirrors it so a stored relative path resolves under the native
+    /// data dir.
+    public static let attachmentsRelativeRoot = "attachments/docs"
+
+    /// The native app's OWN active attachments root (created). Mirrors Electron's
+    /// `attachments/docs/` layout under the native data dir so migrated `attachment_path`
+    /// / `tax_invoice_attachment_path` relative strings resolve here.
+    public static func nativeAttachmentsDirectory() throws -> URL {
+        let dir = try dataDirectory()
+            .appendingPathComponent("attachments", isDirectory: true)
+            .appendingPathComponent("docs", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// Per-import ISOLATED staging root (created). Everything ingested for ONE import —
+    /// the DB, its `-wal` (only when the source legitimately has one), the attachment
+    /// copies and the import manifest — lives here, so imports never interfere and all
+    /// later work (verify / swap / retry) touches native-owned staging only, never the
+    /// original source again.
+    public static func stagingDirectory(importID: String) throws -> URL {
+        let dir = try dataDirectory()
+            .appendingPathComponent("Staging", isDirectory: true)
+            .appendingPathComponent("import-\(importID)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// Persisted ImportManifest / final-report store (created). Deliberately OUTSIDE the
+    /// database and keyed PER IMPORT: the completion record survives staging cleanup and
+    /// is never inherited by a different DB — importing an old backup must not pick up a
+    /// stale "attachments already migrated" flag (that is exactly why completion state is
+    /// not a global `settings` boolean).
+    public static func importManifestsDirectory() throws -> URL {
+        let dir = try dataDirectory().appendingPathComponent("ImportManifests", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// Electron's attachments source root, container-relative (SAME Application Support,
+    /// `SoloLedger/` product folder → `attachments/docs/`). READ-ONLY source, NOT created.
+    /// Debug `.dev` container isolation applies exactly as for `electronLegacyDatabaseURL`.
+    public static func electronLegacyAttachmentsURL() throws -> URL {
+        let base = try FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask,
+            appropriateFor: nil, create: false)
+        return base.appendingPathComponent(electronProductFolderName, isDirectory: true)
+            .appendingPathComponent("attachments", isDirectory: true)
+            .appendingPathComponent("docs", isDirectory: true)
     }
 }
