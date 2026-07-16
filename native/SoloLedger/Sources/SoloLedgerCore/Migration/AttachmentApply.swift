@@ -515,12 +515,16 @@ public struct AttachmentApply {
         return s
     }
 
-    /// Full-identity (snapshot + attachment set + prepared DB) match against an existing sentinel.
-    private static func existingSentinelMatches(_ url: URL, _ manifest: ImportManifest) -> Bool {
+    /// A pre-existing sentinel may be reused ONLY if it decodes to a manifest that is
+    /// SEMANTICALLY IDENTICAL to the completed manifest we would write — same importID,
+    /// formatVersion, status (.complete), referenceAuditPerformed, applied, unresolved,
+    /// acknowledgedReportHash, every identity hash, and all remaining fields. Anything else —
+    /// an `.ingested` manifest, a wrong importID, an old/unknown format, an unaudited or
+    /// differently-resolved completion, even with the same three identity hashes — is NOT a
+    /// match, so it is rejected and never overwritten.
+    private static func existingSentinelIsIdentical(_ url: URL, to manifest: ImportManifest) -> Bool {
         guard let existing = try? JSONDecoder().decode(ImportManifest.self, from: Data(contentsOf: url)) else { return false }
-        return existing.snapshotIdentitySHA256 == manifest.snapshotIdentitySHA256
-            && existing.attachmentManifestSHA256 == manifest.attachmentManifestSHA256
-            && existing.preparedDBIdentity == manifest.preparedDBIdentity
+        return existing == manifest
     }
 
     private static func persistCompletion(_ manifest: ImportManifest, importID: ImportID,
@@ -529,10 +533,10 @@ public struct AttachmentApply {
         try fm.createDirectory(at: manifestsDir, withIntermediateDirectories: true)
         let finalURL = manifestsDir.appendingPathComponent("\(importID.rawValue).json")
 
-        // A pre-existing sentinel is NEVER overwritten. Same FULL identity ⇒ idempotent reuse
-        // (return as-is, no rewrite); different identity ⇒ reject.
+        // A pre-existing sentinel is NEVER overwritten. Semantically identical ⇒ idempotent
+        // reuse (return as-is, no rewrite); anything else ⇒ reject.
         if fm.fileExists(atPath: finalURL.path) {
-            guard existingSentinelMatches(finalURL, manifest) else { throw AttachmentApplyError.sentinelIdentityMismatch(importID.rawValue) }
+            guard existingSentinelIsIdentical(finalURL, to: manifest) else { throw AttachmentApplyError.sentinelIdentityMismatch(importID.rawValue) }
             return finalURL
         }
 
@@ -555,7 +559,7 @@ public struct AttachmentApply {
             // reuse iff the full identity matches, else reject. Always drop our temp.
             if fm.fileExists(atPath: finalURL.path) {
                 dropTemp()
-                if existingSentinelMatches(finalURL, manifest) { return finalURL }
+                if existingSentinelIsIdentical(finalURL, to: manifest) { return finalURL }
                 throw AttachmentApplyError.sentinelIdentityMismatch(importID.rawValue)
             }
             dropTemp()

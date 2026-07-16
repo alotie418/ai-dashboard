@@ -513,6 +513,60 @@ final class AttachmentApplyTests: LedgerTestCase {
         XCTAssertTrue(fm.fileExists(atPath: staging.path), "staging kept")
     }
 
+    func testExistingNonIdenticalSentinelRejectedEvenWithSameIdentityHashes() throws {
+        // A sentinel that shares the three identity HASHES but differs in any other field —
+        // status, importID, formatVersion, referenceAuditPerformed, applied, unresolved, report —
+        // must NOT be reused; re-completion is rejected and staging is kept.
+        let mutations: [(String, (inout ImportManifest) -> Void)] = [
+            ("status .ingested", { $0.status = .ingested }),
+            ("wrong importID", { $0.importID = "apply-other-\(UUID().uuidString)" }),
+            ("old formatVersion", { $0.formatVersion = 0 }),
+            ("unknown formatVersion", { $0.formatVersion = 999 }),
+            ("not audited", { $0.referenceAuditPerformed = nil }),
+            ("audited false", { $0.referenceAuditPerformed = false }),
+            ("different applied", { $0.applied = .init(copied: ["ghost.pdf"], skippedIdentical: [], missing: []) }),
+            ("different unresolved", { $0.unresolved = UnresolvedReport(items: [.init(name: "z", kind: .danglingReference)]) }),
+            ("different ack hash", { $0.acknowledgedReportHash = "tampered" }),
+            ("different report string", { $0.report = "tampered" }),
+        ]
+        for (label, mutate) in mutations {
+            let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+            let active = try makeActive(); let manifests = try makeManifestsDir()
+            let report = try apply(staging, active)   // empty unresolved → completes without ack
+            // First complete keeps staging (cleanup throws) and writes the CORRECT sentinel.
+            let o1 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
+                                                    manifestsDir: manifests, hooks: ApplyHooks(cleanup: { _ in throw TestError() }))
+            guard case .completed = o1 else { return XCTFail("\(label): first complete should succeed") }
+            // Tamper the persisted sentinel so it is no longer identical to a fresh completion.
+            var s = try readManifest(sentinelURL(manifests, id)); mutate(&s); try writeManifest(s, to: sentinelURL(manifests, id))
+            // Re-complete on the surviving staging → rejected, never overwritten, staging kept.
+            XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
+                                                                manifestsDir: manifests, hooks: ApplyHooks())) { e in
+                guard case AttachmentApplyError.sentinelIdentityMismatch = e else { return XCTFail("\(label): got \(e)") }
+            }
+            XCTAssertTrue(fm.fileExists(atPath: staging.path), "\(label): staging must be kept on rejection")
+        }
+    }
+
+    func testIdenticalCompletedSentinelIsIdempotentlyReused() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        // First complete keeps staging (cleanup throws), writing the sentinel.
+        let o1 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
+                                                manifestsDir: manifests, hooks: ApplyHooks(cleanup: { _ in throw TestError() }))
+        guard case .completed(let r1) = o1, !r1.stagingCleaned else { return XCTFail() }
+        let before = try Data(contentsOf: sentinelURL(manifests, id))
+        // Re-complete with the IDENTICAL report → the byte-identical sentinel is reused (not
+        // rewritten) and staging is cleaned.
+        let o2 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
+                                                manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .completed(let r2) = o2 else { return XCTFail() }
+        XCTAssertTrue(r2.stagingCleaned)
+        XCTAssertFalse(fm.fileExists(atPath: staging.path))
+        XCTAssertEqual(try Data(contentsOf: sentinelURL(manifests, id)), before, "identical sentinel reused, not rewritten")
+    }
+
     // MARK: - 27. The reference auditor is not implemented → App cannot fabricate completion
 
     func testReferenceAuditorNotImplementedThrows() throws {
