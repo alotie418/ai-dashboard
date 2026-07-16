@@ -13,6 +13,13 @@ struct SoloLedgerApp: App {
             print(report.text)
             exit(report.passed ? 0 : 1)
         }
+        // Headless check that the packaged localization resources load (guards
+        // the Bundle.module launch-crash regression).
+        if CommandLine.arguments.contains("--check-resources") {
+            let report = ResourceCheck.run()
+            print(report.text)
+            exit(report.passed ? 0 : 1)
+        }
     }
 
     var body: some Scene {

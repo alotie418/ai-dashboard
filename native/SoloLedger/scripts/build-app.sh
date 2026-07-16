@@ -19,15 +19,22 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/SoloLedger" "$APP/Contents/MacOS/SoloLedger"
 cp "$HERE/Packaging/Info.plist" "$APP/Contents/Info.plist"
 
-# Localization/resource bundle for Bundle.module (SwiftPM: <Package>_<Target>.bundle)
-if [ -d "$BIN_DIR/SoloLedger_SoloLedger.bundle" ]; then
-  cp -R "$BIN_DIR/SoloLedger_SoloLedger.bundle" "$APP/Contents/Resources/"
+# Localization resource bundle -> Contents/Resources (the conventional macOS
+# location that Localizer loads via Bundle.main.resourceURL). Do NOT place it at
+# the .app root. It MUST exist — fail loudly if the build didn't produce it.
+if [ ! -d "$BIN_DIR/SoloLedger_SoloLedger.bundle" ]; then
+  echo "✗ resource bundle SoloLedger_SoloLedger.bundle not found in $BIN_DIR" >&2
+  exit 1
 fi
+cp -R "$BIN_DIR/SoloLedger_SoloLedger.bundle" "$APP/Contents/Resources/"
 
 echo "▸ ad-hoc codesigning with App Sandbox entitlements"
 codesign --force --sign - --entitlements "$HERE/Packaging/SoloLedger.entitlements" --deep "$APP"
 codesign --display --entitlements - "$APP" 2>/dev/null | grep -q "app-sandbox" \
   && echo "  sandbox entitlement present ✓"
+
+echo "▸ verifying packaged resources load (regression guard for the Bundle.module launch crash)"
+"$APP/Contents/MacOS/SoloLedger" --check-resources
 
 echo "✅ built $APP"
 echo "   run GUI:      open \"$APP\""

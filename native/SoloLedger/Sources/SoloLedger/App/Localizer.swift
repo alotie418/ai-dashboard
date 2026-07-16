@@ -49,12 +49,46 @@ final class Localizer {
         return s
     }
 
-    private static func bundle(for language: String) -> Bundle {
-        if let path = Bundle.module.path(forResource: language, ofType: "lproj"),
-           let localized = Bundle(path: path) {
-            return localized
+    /// The resource bundle holding the `.lproj` localizations.
+    ///
+    /// We resolve it EXPLICITLY from `Bundle.main` (Contents/Resources in a
+    /// packaged .app, or next to the executable under `swift run`) instead of the
+    /// SwiftPM-generated `Bundle.module`. That generated accessor looks only at
+    /// the .app ROOT and a build-time absolute `.build/...` path and hard
+    /// `fatalError`s when neither exists — which crashed the packaged app on
+    /// launch (the bundle lives in Contents/Resources, which the accessor never
+    /// checks). We fall back to `Bundle.module` ONLY when not running from a .app
+    /// (where it is safe), and otherwise degrade to the main bundle — never crash.
+    static let resourceBundle: Bundle = {
+        let name = "SoloLedger_SoloLedger.bundle"
+        let candidates: [URL?] = [
+            Bundle.main.resourceURL?.appendingPathComponent(name),  // .app/Contents/Resources
+            Bundle.main.bundleURL.appendingPathComponent(name),     // next-to-exe (swift run) / app root
+            Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent(name),
+        ]
+        for case let url? in candidates {
+            if let bundle = Bundle(url: url) { return bundle }
         }
-        return Bundle.module
+        let isAppBundle = Bundle.main.bundleURL.pathExtension == "app"
+        return isAppBundle ? Bundle.main : Bundle.module
+    }()
+
+    /// True when the localization resource bundle was actually located (not the
+    /// degraded main-bundle fallback). Used by the packaged-resource regression check.
+    static var resourcesLoaded: Bool {
+        resourceBundle.bundleURL.lastPathComponent == "SoloLedger_SoloLedger.bundle"
+    }
+
+    private static func bundle(for language: String) -> Bundle {
+        // SwiftPM lowercases .lproj dir names (zh-Hans -> zh-hans.lproj), so try
+        // the exact code and a lowercased variant.
+        for candidate in [language, language.lowercased()] {
+            if let path = resourceBundle.path(forResource: candidate, ofType: "lproj"),
+               let localized = Bundle(path: path) {
+                return localized
+            }
+        }
+        return resourceBundle
     }
 
     /// Best guess for the initial UI language from the system, constrained to the six.

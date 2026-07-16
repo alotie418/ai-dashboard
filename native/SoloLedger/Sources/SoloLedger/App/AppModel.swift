@@ -91,7 +91,7 @@ final class AppModel: ObservableObject {
                 appearance = ap
             }
             accountingLocale = try store.settings.accountingLocale()
-            companyName = (try? store.settings.string(SettingsStore.Key.companyName)) ?? "" ?? ""
+            companyName = (try? store.settings.string(SettingsStore.Key.companyName)) ?? ""
             onboardingDone = (try? store.settings.bool(SettingsStore.Key.onboardingDone)) ?? false
 
             reloadAll()
