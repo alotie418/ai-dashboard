@@ -8,11 +8,16 @@ public enum FileHashError: Error, CustomStringConvertible, Equatable {
     /// directory, FIFO or other special file. Refusing to hash it.
     case notARegularFile(String)
     case unreadable(path: String, errno: Int32)
+    /// The copy destination could not be created EXCLUSIVELY (it already exists — even as
+    /// a dangling symlink — or the create failed). The primitive never overwrites and
+    /// never follows a link at the destination.
+    case destinationUnwritable(path: String, errno: Int32)
 
     public var description: String {
         switch self {
         case .notARegularFile(let p): return "Not a regular file (symlink/directory/special): \(p)"
         case .unreadable(let p, let e): return "Cannot read file for hashing: \(p) (errno \(e))"
+        case .destinationUnwritable(let p, let e): return "Cannot exclusively create copy destination: \(p) (errno \(e))"
         }
     }
     /// True only for a definitively ABSENT path (ENOENT) — every other failure must stay
@@ -23,6 +28,48 @@ public enum FileHashError: Error, CustomStringConvertible, Equatable {
     }
 }
 
+/// Size + SHA-256 obtained from ONE verified file descriptor: `size` counts exactly the
+/// bytes that were hashed, so the two can never describe different content.
+public struct RegularFileDigest: Equatable {
+    public let sha256: String
+    public let size: Int64
+}
+
+/// lstat-based, no-follow fingerprint used for BOTH change detection and type gating.
+/// Binds file type + device + inode + size + nanosecond mtime/ctime, so a same-size/
+/// same-mtime replacement (new inode), a type swap, or a cross-device substitution can
+/// no longer masquerade as "unchanged". ONLY ENOENT reads as "absent" (nil); every other
+/// metadata failure throws — never silently treated as absence or stability.
+public struct FileFingerprint: Equatable {
+    public let fileType: UInt16   // S_IFMT bits of st_mode
+    public let device: Int32
+    public let inode: UInt64
+    public let size: Int64
+    public let mtimeSec: Int64
+    public let mtimeNSec: Int64
+    public let ctimeSec: Int64
+    public let ctimeNSec: Int64
+
+    public var isRegularFile: Bool { fileType == UInt16(S_IFREG) }
+    public var isDirectory: Bool { fileType == UInt16(S_IFDIR) }
+
+    /// nil ⇔ the path is definitively absent (ENOENT). Never follows symlinks — a symlink
+    /// fingerprints as the link itself (fileType S_IFLNK).
+    public static func capture(at url: URL) throws -> FileFingerprint? {
+        var st = stat()
+        guard lstat(url.path, &st) == 0 else {
+            let e = errno
+            if e == ENOENT { return nil }
+            throw FileHashError.unreadable(path: url.path, errno: e)
+        }
+        return FileFingerprint(fileType: UInt16(st.st_mode) & UInt16(S_IFMT),
+                               device: Int32(st.st_dev), inode: UInt64(st.st_ino),
+                               size: Int64(st.st_size),
+                               mtimeSec: Int64(st.st_mtimespec.tv_sec), mtimeNSec: Int64(st.st_mtimespec.tv_nsec),
+                               ctimeSec: Int64(st.st_ctimespec.tv_sec), ctimeNSec: Int64(st.st_ctimespec.tv_nsec))
+    }
+}
+
 public enum FileHash {
     /// Streaming SHA-256 of a file as lowercase hex. Reads in chunks so a large DB or
     /// attachment never loads fully into memory. Size alone is NEVER treated as content
@@ -30,16 +77,57 @@ public enum FileHash {
     public static func sha256Hex(of url: URL, chunkSize: Int = 1 << 20) throws -> String {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
-        return try streamHash(handle, chunkSize: chunkSize)
+        return try streamDigest(from: handle, chunkSize: chunkSize) { _ in }.sha256
     }
 
     /// No-follow, REGULAR-FILE-ONLY streaming hash — the primitive every trust decision
-    /// about an on-disk attachment/database must use. Opens with O_NOFOLLOW|O_NONBLOCK
-    /// (a symlink fails with ELOOP instead of being followed; a FIFO opens without
-    /// blocking instead of hanging), fstat's the OPENED descriptor and rejects anything
-    /// but S_IFREG, then hashes from that same descriptor — so the type that was checked
-    /// and the bytes that are hashed can never belong to different filesystem objects.
+    /// about an on-disk attachment/database must use. See `digestOfRegularFile`.
     public static func sha256HexOfRegularFile(at url: URL, chunkSize: Int = 1 << 20) throws -> String {
+        try digestOfRegularFile(at: url, chunkSize: chunkSize).sha256
+    }
+
+    /// No-follow, fd-bound digest: opens with O_NOFOLLOW|O_NONBLOCK (a symlink fails with
+    /// ELOOP instead of being followed; a FIFO opens without blocking instead of hanging),
+    /// fstat's the OPENED descriptor and rejects anything but S_IFREG, then hashes from
+    /// that same descriptor — the type that was checked, the bytes that are hashed and
+    /// the size that is reported can never belong to different filesystem objects.
+    public static func digestOfRegularFile(at url: URL, chunkSize: Int = 1 << 20) throws -> RegularFileDigest {
+        let handle = try openVerifiedRegularFile(url)
+        defer { try? handle.close() }
+        return try streamDigest(from: handle, chunkSize: chunkSize) { _ in }
+    }
+
+    /// No-follow, fd-bound COPY of a regular file. The source is opened
+    /// O_NOFOLLOW|O_NONBLOCK and fstat-verified S_IFREG on the OPEN descriptor; the
+    /// destination is created O_CREAT|O_EXCL|O_NOFOLLOW — exclusively, never overwriting
+    /// and never following a pre-planted link (even a dangling one). Bytes stream from
+    /// the verified source fd, and the returned digest (sha256 + size) describes EXACTLY
+    /// the bytes written. On any failure the partial destination is removed — a failed
+    /// copy never leaves content behind.
+    public static func copyRegularFileNoFollow(from src: URL, to dst: URL,
+                                               chunkSize: Int = 1 << 20) throws -> RegularFileDigest {
+        let source = try openVerifiedRegularFile(src)
+        defer { try? source.close() }
+
+        let dfd = open(dst.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o644)
+        guard dfd >= 0 else { throw FileHashError.destinationUnwritable(path: dst.path, errno: errno) }
+        let sink = FileHandle(fileDescriptor: dfd, closeOnDealloc: true)
+        var complete = false
+        defer {
+            try? sink.close()
+            if !complete { unlink(dst.path) }   // never leave a partial copy behind
+        }
+
+        let digest = try streamDigest(from: source, chunkSize: chunkSize) { chunk in
+            try sink.write(contentsOf: chunk)
+        }
+        try sink.close()
+        complete = true
+        return digest
+    }
+
+    /// Open + verify: O_NOFOLLOW|O_NONBLOCK, fstat on the open fd, S_IFREG only.
+    private static func openVerifiedRegularFile(_ url: URL) throws -> FileHandle {
         let fd = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
         guard fd >= 0 else {
             let e = errno
@@ -56,17 +144,20 @@ public enum FileHash {
             throw FileHashError.notARegularFile(url.path)
         }
         _ = fcntl(fd, F_SETFL, 0)   // drop O_NONBLOCK; regular-file reads ignore it anyway
-        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
-        defer { try? handle.close() }
-        return try streamHash(handle, chunkSize: chunkSize)
+        return FileHandle(fileDescriptor: fd, closeOnDealloc: true)
     }
 
-    private static func streamHash(_ handle: FileHandle, chunkSize: Int) throws -> String {
+    private static func streamDigest(from handle: FileHandle, chunkSize: Int,
+                                     onChunk: (Data) throws -> Void) throws -> RegularFileDigest {
         var hasher = SHA256()
+        var total: Int64 = 0
         while let chunk = try handle.read(upToCount: chunkSize), !chunk.isEmpty {
             hasher.update(data: chunk)
+            total += Int64(chunk.count)
+            try onChunk(chunk)
         }
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        let hex = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        return RegularFileDigest(sha256: hex, size: total)
     }
 }
 
