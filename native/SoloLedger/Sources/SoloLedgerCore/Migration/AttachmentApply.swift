@@ -24,8 +24,11 @@ public struct UnresolvedReport: Codable, Equatable {
     }
     public var items: [Item]
     public init(items: [Item]) {
+        // Total order incl. nil-vs-present detail (nil sorts before present) so the hash is
+        // deterministic even when two items differ only by absent-vs-empty detail.
         self.items = items.sorted {
-            ($0.kind.rawValue, $0.name, $0.detail ?? "") < ($1.kind.rawValue, $1.name, $1.detail ?? "")
+            ($0.kind.rawValue, $0.name, $0.detail == nil ? 0 : 1, $0.detail ?? "")
+                < ($1.kind.rawValue, $1.name, $1.detail == nil ? 0 : 1, $1.detail ?? "")
         }
     }
     public var isEmpty: Bool { items.isEmpty }
@@ -33,12 +36,14 @@ public struct UnresolvedReport: Codable, Equatable {
     /// Each field is length-prefixed (UTF-8 byte count) and the item count is prefixed, so the
     /// encoding is self-delimiting — no attacker-influenceable name/detail (e.g. a rejectedName
     /// carrying raw source-filename bytes) can smuggle a separator and collide two distinct
-    /// reports. A change in ANY field (including a user-visible `detail`, or a new dangling ref)
-    /// changes the hash, so an acknowledgement of an OLD report can never confirm a CHANGED one.
+    /// reports. `detail` carries an explicit present/absent marker so `nil` and `""` hash
+    /// DIFFERENTLY. A change in ANY field (including a user-visible `detail`, or a new dangling
+    /// ref) changes the hash, so an acknowledgement of an OLD report can never confirm a CHANGED one.
     public var reportHash: String {
         func field(_ s: String) -> String { "\(s.utf8.count):\(s)" }
+        func optField(_ s: String?) -> String { s == nil ? "-" : "+" + field(s!) }
         var s = "\(items.count)#"
-        for it in items { s += field(it.kind.rawValue) + field(it.name) + field(it.detail ?? "") }
+        for it in items { s += field(it.kind.rawValue) + field(it.name) + optField(it.detail) }
         return SHA256.hash(data: Data(s.utf8)).map { String(format: "%02x", $0) }.joined()
     }
     func merged(with extra: [Item]) -> UnresolvedReport { UnresolvedReport(items: items + extra) }
@@ -87,11 +92,14 @@ public struct AcknowledgementRequest: Equatable {
     public let importID: String
     public let snapshotIdentitySHA256: String
     public let attachmentManifestSHA256: String
+    public let preparedDBIdentity: String
     public let unresolvedReportHash: String
-    init(importID: String, snapshotIdentitySHA256: String, attachmentManifestSHA256: String, unresolvedReportHash: String) {
+    init(importID: String, snapshotIdentitySHA256: String, attachmentManifestSHA256: String,
+         preparedDBIdentity: String, unresolvedReportHash: String) {
         self.importID = importID
         self.snapshotIdentitySHA256 = snapshotIdentitySHA256
         self.attachmentManifestSHA256 = attachmentManifestSHA256
+        self.preparedDBIdentity = preparedDBIdentity
         self.unresolvedReportHash = unresolvedReportHash
     }
     public func acknowledge() -> Acknowledgement { Acknowledgement(request: self) }
@@ -101,11 +109,13 @@ public struct Acknowledgement: Equatable {
     let importID: String
     let snapshotIdentitySHA256: String
     let attachmentManifestSHA256: String
+    let preparedDBIdentity: String
     let unresolvedReportHash: String
     init(request: AcknowledgementRequest) {
         self.importID = request.importID
         self.snapshotIdentitySHA256 = request.snapshotIdentitySHA256
         self.attachmentManifestSHA256 = request.attachmentManifestSHA256
+        self.preparedDBIdentity = request.preparedDBIdentity
         self.unresolvedReportHash = request.unresolvedReportHash
     }
 }
@@ -178,8 +188,10 @@ public struct AttachmentApplyReport {
     /// merged in at `complete` time.
     public let fileUnresolved: UnresolvedReport
 
-    public init(importID: ImportID, stagingDir: URL, activeAttachmentsDir: URL, manifest: ImportManifest,
-                preparedDBIdentity: String, applied: ImportManifest.AppliedSummary, fileUnresolved: UnresolvedReport) {
+    // INTERNAL: only `apply()` (Core) produces a report; the App module cannot fabricate one.
+    // `@testable` tests may still construct it directly.
+    init(importID: ImportID, stagingDir: URL, activeAttachmentsDir: URL, manifest: ImportManifest,
+         preparedDBIdentity: String, applied: ImportManifest.AppliedSummary, fileUnresolved: UnresolvedReport) {
         self.importID = importID; self.stagingDir = stagingDir; self.activeAttachmentsDir = activeAttachmentsDir
         self.manifest = manifest; self.preparedDBIdentity = preparedDBIdentity
         self.applied = applied; self.fileUnresolved = fileUnresolved
@@ -322,11 +334,13 @@ public struct AttachmentApply {
             let request = AcknowledgementRequest(importID: report.importID.rawValue,
                                                  snapshotIdentitySHA256: report.manifest.snapshotIdentitySHA256,
                                                  attachmentManifestSHA256: report.manifest.attachmentManifestSHA256,
+                                                 preparedDBIdentity: report.preparedDBIdentity,
                                                  unresolvedReportHash: reportHash)
             guard let ack = acknowledgement,
                   ack.importID == request.importID,
                   ack.snapshotIdentitySHA256 == request.snapshotIdentitySHA256,
                   ack.attachmentManifestSHA256 == request.attachmentManifestSHA256,
+                  ack.preparedDBIdentity == request.preparedDBIdentity,
                   ack.unresolvedReportHash == request.unresolvedReportHash else {
                 return .requiresAcknowledgement(request: request, unresolved: unresolved)
             }
@@ -350,6 +364,7 @@ public struct AttachmentApply {
         final.unresolved = unresolved
         final.acknowledgedReportHash = unresolved.isEmpty ? nil : reportHash
         final.referenceAuditPerformed = true
+        final.preparedDBIdentity = report.preparedDBIdentity
         final.report = Self.reportString(applied: report.applied, unresolved: unresolved)
 
         let sentinelURL = try Self.persistCompletion(final, importID: report.importID, manifestsDir: manifestsDir, hooks: hooks)
@@ -500,21 +515,25 @@ public struct AttachmentApply {
         return s
     }
 
+    /// Full-identity (snapshot + attachment set + prepared DB) match against an existing sentinel.
+    private static func existingSentinelMatches(_ url: URL, _ manifest: ImportManifest) -> Bool {
+        guard let existing = try? JSONDecoder().decode(ImportManifest.self, from: Data(contentsOf: url)) else { return false }
+        return existing.snapshotIdentitySHA256 == manifest.snapshotIdentitySHA256
+            && existing.attachmentManifestSHA256 == manifest.attachmentManifestSHA256
+            && existing.preparedDBIdentity == manifest.preparedDBIdentity
+    }
+
     private static func persistCompletion(_ manifest: ImportManifest, importID: ImportID,
                                           manifestsDir: URL, hooks: ApplyHooks) throws -> URL {
         let fm = FileManager.default
         try fm.createDirectory(at: manifestsDir, withIntermediateDirectories: true)
         let finalURL = manifestsDir.appendingPathComponent("\(importID.rawValue).json")
 
-        // Idempotency: an existing sentinel for this ID may be replaced ONLY if it has the
-        // SAME snapshot + attachment-set identity; otherwise REJECT (never overwrite).
+        // A pre-existing sentinel is NEVER overwritten. Same FULL identity ⇒ idempotent reuse
+        // (return as-is, no rewrite); different identity ⇒ reject.
         if fm.fileExists(atPath: finalURL.path) {
-            let existing = try? JSONDecoder().decode(ImportManifest.self, from: Data(contentsOf: finalURL))
-            guard let existing,
-                  existing.snapshotIdentitySHA256 == manifest.snapshotIdentitySHA256,
-                  existing.attachmentManifestSHA256 == manifest.attachmentManifestSHA256 else {
-                throw AttachmentApplyError.sentinelIdentityMismatch(importID.rawValue)
-            }
+            guard existingSentinelMatches(finalURL, manifest) else { throw AttachmentApplyError.sentinelIdentityMismatch(importID.rawValue) }
+            return finalURL
         }
 
         let tmpURL = manifestsDir.appendingPathComponent(".tmp-\(importID.rawValue)-\(UUID().uuidString).json")
@@ -522,14 +541,24 @@ public struct AttachmentApply {
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try enc.encode(manifest)
 
+        func dropTemp() { if fm.fileExists(atPath: tmpURL.path) { do { try fm.removeItem(at: tmpURL) } catch { /* orphan temp → reaper */ } } }
+
         try hooks.onCompletionTempWrite?()
         try data.write(to: tmpURL)
         do {
             try hooks.onCompletionPublish?()
-            if fm.fileExists(atPath: finalURL.path) { _ = try fm.replaceItemAt(finalURL, withItemAt: tmpURL) }
-            else { try fm.moveItem(at: tmpURL, to: finalURL) }
+            // EXCLUSIVE publish: moveItem THROWS if a sentinel appeared between our check and now
+            // — unlike replaceItemAt, it never overwrites.
+            try fm.moveItem(at: tmpURL, to: finalURL)
         } catch let publishError {
-            if fm.fileExists(atPath: tmpURL.path) { do { try fm.removeItem(at: tmpURL) } catch { /* orphan temp → reaper */ } }
+            // A sentinel may have appeared concurrently in the TOCTOU window. NEVER overwrite:
+            // reuse iff the full identity matches, else reject. Always drop our temp.
+            if fm.fileExists(atPath: finalURL.path) {
+                dropTemp()
+                if existingSentinelMatches(finalURL, manifest) { return finalURL }
+                throw AttachmentApplyError.sentinelIdentityMismatch(importID.rawValue)
+            }
+            dropTemp()
             throw publishError
         }
         return finalURL

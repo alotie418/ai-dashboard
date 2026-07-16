@@ -96,9 +96,22 @@ final class AttachmentApplyTests: LedgerTestCase {
         XCTAssertEqual(s.status, .complete)
         XCTAssertEqual(s.formatVersion, ImportManifest.currentFormatVersion)
         XCTAssertEqual(s.referenceAuditPerformed, true)
+        XCTAssertEqual(s.preparedDBIdentity, preparedDB, "sentinel must record the prepared DB it was audited against")
         XCTAssertNil(s.acknowledgedReportHash)
         XCTAssertTrue(r.stagingCleaned)
         XCTAssertFalse(fm.fileExists(atPath: staging.path))
+    }
+
+    // MARK: - 1b. Report is produced only by apply() (App cannot fabricate it)
+
+    /// AttachmentApplyReport's initializer is INTERNAL — the App module (a non-@testable
+    /// consumer of SoloLedgerCore) cannot construct one; it must obtain it from apply(). This
+    /// test documents the sanctioned producer and that the identity it stamps is carried through.
+    func testReportProducedOnlyByApplyCarriesPreparedDBIdentity() throws {
+        let (staging, id) = try makeStaging(ingested: [("doc-a.pdf", "A")])
+        let report = try apply(staging, try makeActive())
+        XCTAssertEqual(report.preparedDBIdentity, preparedDB)
+        XCTAssertEqual(report.importID.rawValue, id.rawValue)
     }
 
     // MARK: - 2/3. Unresolved gates
@@ -428,6 +441,76 @@ final class AttachmentApplyTests: LedgerTestCase {
                                                 manifestsDir: manifests, hooks: ApplyHooks())
         guard case .requiresAcknowledgement(let reqY, _) = oy else { return XCTFail("detail change must invalidate the old ack") }
         XCTAssertNotEqual(reqX.unresolvedReportHash, reqY.unresolvedReportHash)
+    }
+
+    func testAcknowledgementFromPreparedDBAcannotConfirmB() throws {
+        // Same staging (same import/snapshot/attachment identity) applied against TWO different
+        // prepared DBs → an ack bound to prepared-DB A cannot confirm the prepared-DB-B report.
+        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A"), ("doc-b.jpg", "B")])
+        try fm.removeItem(at: stagedDoc(staging, "doc-b.jpg"))   // unresolved (missing) → ack required
+        let manifests = try makeManifestsDir()
+        let reportA = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: try makeActive(), preparedDBIdentity: "DB-A")
+        let reportB = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: try makeActive(), preparedDBIdentity: "DB-B")
+        XCTAssertEqual(reportA.manifest.snapshotIdentitySHA256, reportB.manifest.snapshotIdentitySHA256)
+        XCTAssertNotEqual(reportA.preparedDBIdentity, reportB.preparedDBIdentity)
+
+        let oA = try AttachmentApply().complete(report: reportA, referenceAudit: matchingAudit(reportA), acknowledgement: nil,
+                                                manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .requiresAcknowledgement(let reqA, _) = oA else { return XCTFail() }
+        // A's acknowledgement must NOT confirm B (different prepared DB).
+        let rejected = try AttachmentApply().complete(report: reportB, referenceAudit: matchingAudit(reportB),
+                                                      acknowledgement: reqA.acknowledge(), manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .requiresAcknowledgement = rejected else { return XCTFail("ack for prepared-DB A must not confirm B") }
+    }
+
+    func testSentinelRecordsAndVerifiesPreparedDB() throws {
+        // Two independent stagings with the SAME import id + content (⇒ same snapshot + attachment
+        // identity) but applied against DIFFERENT prepared DBs. The first completes; the second
+        // must not overwrite that sentinel.
+        let id = ImportID("apply-\(UUID().uuidString)")!
+        let (stagingA, _) = try makeStaging(ingested: [("doc-a.pdf", "A")], id: id)
+        let (stagingB, _) = try makeStaging(ingested: [("doc-a.pdf", "A")], id: id)
+        let manifests = try makeManifestsDir()
+
+        let rA = try AttachmentApply().apply(stagingDir: stagingA, activeAttachmentsDir: try makeActive(), preparedDBIdentity: "DB-A")
+        let oA = try AttachmentApply().complete(report: rA, referenceAudit: matchingAudit(rA), acknowledgement: nil,
+                                                manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .completed(let cA) = oA else { return XCTFail() }
+        XCTAssertEqual(try readManifest(cA.completionSentinelURL).preparedDBIdentity, "DB-A")
+
+        let rB = try AttachmentApply().apply(stagingDir: stagingB, activeAttachmentsDir: try makeActive(), preparedDBIdentity: "DB-B")
+        XCTAssertEqual(rA.manifest.snapshotIdentitySHA256, rB.manifest.snapshotIdentitySHA256)
+        XCTAssertThrowsError(try AttachmentApply().complete(report: rB, referenceAudit: matchingAudit(rB), acknowledgement: nil,
+                                                            manifestsDir: manifests, hooks: ApplyHooks())) { e in
+            guard case AttachmentApplyError.sentinelIdentityMismatch = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertEqual(try readManifest(sentinelURL(manifests, id)).preparedDBIdentity, "DB-A", "existing sentinel not overwritten")
+    }
+
+    func testReportHashNilVsEmptyDetailDiffer() {
+        let nilDetail = UnresolvedReport(items: [.init(name: "n", kind: .danglingReference, detail: nil)])
+        let emptyDetail = UnresolvedReport(items: [.init(name: "n", kind: .danglingReference, detail: "")])
+        XCTAssertNotEqual(nilDetail.reportHash, emptyDetail.reportHash, "absent detail must hash differently from empty-string detail")
+    }
+
+    func testConcurrentDifferentIdentitySentinelNotOverwritten() throws {
+        let (staging, id) = try makeStaging(ingested: [("doc-a.pdf", "A")], snapshot: "snapNEW")
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        // A different-identity sentinel appears in the TOCTOU window (after the initial absent
+        // check, before the exclusive rename). It must NOT be overwritten.
+        var intruder = try readManifest(manifestURL(staging))
+        intruder.snapshotIdentitySHA256 = "snapINTRUDER"; intruder.status = .complete; intruder.preparedDBIdentity = "other"
+        XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
+                                                            manifestsDir: manifests,
+                                                            hooks: ApplyHooks(onCompletionPublish: {
+            try self.writeManifest(intruder, to: self.sentinelURL(manifests, id))   // race: sentinel appears now
+        }))) { e in
+            guard case AttachmentApplyError.sentinelIdentityMismatch = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertEqual(try readManifest(sentinelURL(manifests, id)).snapshotIdentitySHA256, "snapINTRUDER", "intruder sentinel not overwritten")
+        XCTAssertTrue(tempManifests(manifests).isEmpty, "our temp is cleaned")
+        XCTAssertTrue(fm.fileExists(atPath: staging.path), "staging kept")
     }
 
     // MARK: - 27. The reference auditor is not implemented → App cannot fabricate completion

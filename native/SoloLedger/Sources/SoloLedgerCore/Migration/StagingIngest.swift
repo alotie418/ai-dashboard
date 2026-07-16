@@ -121,6 +121,9 @@ public struct ImportManifest: Codable, Equatable {
     /// True on a `.complete` sentinel iff the DB reference audit was actually run before
     /// finalizing — so a reader can tell an audited-clean import from a never-audited one.
     public var referenceAuditPerformed: Bool? = nil
+    /// The prepared/active DB this import was applied+audited against (recorded on a
+    /// `.complete` sentinel; part of the full identity that guards idempotent re-completion).
+    public var preparedDBIdentity: String? = nil
 
     public var ingestedCount: Int { files.filter { $0.outcome == .ingested }.count }
     public var skippedCount: Int { files.filter { $0.outcome != .ingested }.count }
