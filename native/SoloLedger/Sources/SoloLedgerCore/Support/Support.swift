@@ -38,6 +38,17 @@ public enum DateFormat {
     public static func timestamp(_ date: Date = Date()) -> String { stampFormatter.string(from: date) }
 }
 
+public enum AppPathsError: Error, CustomStringConvertible {
+    /// A staging path resolved outside the Staging root (should be impossible given
+    /// `ImportID` validation; this is the defense-in-depth backstop).
+    case stagingPathEscape(String)
+    public var description: String {
+        switch self {
+        case .stagingPathEscape(let p): return "Refusing a staging path that escapes the Staging root: \(p)"
+        }
+    }
+}
+
 /// Filesystem locations for the prototype.
 ///
 /// CRITICAL SAFETY: the prototype's DB lives in its OWN folder,
@@ -133,16 +144,35 @@ public enum AppPaths {
         return dir
     }
 
-    /// Per-import ISOLATED staging root (created). Everything ingested for ONE import —
-    /// the DB, its `-wal` (only when the source legitimately has one), the attachment
-    /// copies and the import manifest — lives here, so imports never interfere and all
-    /// later work (verify / swap / retry) touches native-owned staging only, never the
-    /// original source again.
-    public static func stagingDirectory(importID: String) throws -> URL {
-        let dir = try dataDirectory()
-            .appendingPathComponent("Staging", isDirectory: true)
-            .appendingPathComponent("import-\(importID)", isDirectory: true)
+    /// The Staging ROOT (created). Holds the per-import PUBLISHED dirs (`import-<id>`) and
+    /// the transient per-attempt dirs (`.attempt-<uuid>`).
+    public static func stagingRootDirectory() throws -> URL {
+        let dir = try dataDirectory().appendingPathComponent("Staging", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// The FINAL published staging dir for an import (`Staging/import-<id>`). PATH ONLY —
+    /// NOT created; ingest publishes into it atomically (rename from a completed attempt).
+    /// Defense in depth: even though `ImportID` already forbids unsafe values, the resolved
+    /// path must stay STRICTLY under the Staging root or this throws.
+    public static func stagedImportDirectory(importID: ImportID) throws -> URL {
+        let root = try stagingRootDirectory()
+        let dir = root.appendingPathComponent("import-\(importID.rawValue)", isDirectory: true)
+        guard dir.standardizedFileURL.path.hasPrefix(root.standardizedFileURL.path + "/") else {
+            throw AppPathsError.stagingPathEscape(dir.path)
+        }
+        return dir
+    }
+
+    /// A fresh, unique, EMPTY attempt directory under the Staging root (created). Each ingest
+    /// attempt writes here in isolation; on success it is atomically renamed to the published
+    /// per-import dir, and on any failure it is removed. `withIntermediateDirectories: false`
+    /// guarantees a brand-new dir (never silently reuses an existing one).
+    public static func freshStagingAttemptDirectory() throws -> URL {
+        let root = try stagingRootDirectory()
+        let dir = root.appendingPathComponent(".attempt-\(UUID().uuidString.lowercased())", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false)
         return dir
     }
 

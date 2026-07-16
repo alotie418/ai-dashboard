@@ -54,10 +54,11 @@ struct SourceStabilityManifest: Equatable {
 
 // MARK: - Import manifest (out-of-DB, per-import completion record)
 
-/// The out-of-database, per-import record. Bound to an import ID, the source DB hash, an
-/// attachment-set hash and per-file results. It is DELIBERATELY not a global `settings`
-/// boolean: importing an old backup must never inherit a stale "attachments migrated" flag
-/// and thereby skip copying. `report`/terminal statuses are filled by later apply stages.
+/// The out-of-database, per-import record. Bound to an import ID, the source DB hash, the
+/// WAL hash + a combined DB+WAL snapshot identity, an attachment-set hash and per-file
+/// results. Deliberately NOT a global `settings` boolean: importing an old backup must
+/// never inherit a stale "attachments migrated" flag. `report`/terminal statuses are filled
+/// by later apply stages.
 public struct ImportManifest: Codable, Equatable {
     public enum Status: String, Codable { case ingested }
 
@@ -75,6 +76,12 @@ public struct ImportManifest: Codable, Equatable {
     public var sourceKind: String
     public var createdAt: String
     public var sourceDBSHA256: String
+    /// Streaming SHA-256 of the WAL, or `nil` when the source has no WAL (explicitly absent,
+    /// not an empty string).
+    public var walSHA256: String?
+    /// Stable identity of the DB (+ WAL) as a combined snapshot: two ingests with the same
+    /// main DB but a different WAL produce DIFFERENT identities.
+    public var snapshotIdentitySHA256: String
     /// Stable hash over the sorted set of ingested (name, sha256) — the attachment payload identity.
     public var attachmentManifestSHA256: String
     public var files: [FileResult]
@@ -92,17 +99,25 @@ public enum IngestError: Error, CustomStringConvertible {
     /// The source kept changing across attempts — the old Electron app is likely still
     /// running and writing. The user must quit it and retry.
     case sourceBusy(attempts: Int)
+    /// The per-import staging dir already exists. The caller must decide (reject or resume);
+    /// ingest never silently clears/mixes it.
+    case importIDAlreadyExists(String)
+    /// A failing attempt could not be cleaned up. Surfaced (never swallowed) so a wedged
+    /// staging dir is visible rather than silently leaked.
+    case cleanupFailed(path: String, underlying: String, original: String)
 
     public var description: String {
         switch self {
         case .sourceDatabaseMissing(let p): return "Source database not found: \(p)"
-        case .sourceBusy(let n): return "Source kept changing across \(n) attempts — quit the old SoloLedger (Electron) app and retry the import."
+        case .sourceBusy(let n): return "Source kept changing across \(n) attempts — quit the old SoloLedger (Electron) app and retry."
+        case .importIDAlreadyExists(let id): return "An import with ID \(id) is already staged — reject or resume it, do not overwrite."
+        case let .cleanupFailed(path, underlying, original): return "Failed to clean up attempt \(path) after error [\(original)]: \(underlying)"
         }
     }
 }
 
 public struct IngestResult {
-    public let importID: String
+    public let importID: ImportID
     public let stagingDir: URL
     public let stagedDatabaseURL: URL
     public let stagedWALURL: URL?
@@ -110,31 +125,56 @@ public struct IngestResult {
     public let manifest: ImportManifest
 }
 
+/// Test-only fault seams (all `internal`, defaulting to no-op). The public `ingest` never
+/// exposes them; only the `@testable` test target can inject failures / concurrent changes.
+struct IngestHooks {
+    /// Fires after the copy, before the after-fingerprint — a test mutates the source here
+    /// to exercise the concurrent-change retry / `.sourceBusy` path.
+    var onRecheck: ((Int) throws -> Void)?
+    /// Fires at a named copy step so a test can inject a mid-copy failure.
+    var onStep: ((IngestStep) throws -> Void)?
+    /// Overrides attempt cleanup so a test can inject a cleanup failure.
+    var cleanup: ((URL) throws -> Void)?
+    init(onRecheck: ((Int) throws -> Void)? = nil,
+         onStep: ((IngestStep) throws -> Void)? = nil,
+         cleanup: ((URL) throws -> Void)? = nil) {
+        self.onRecheck = onRecheck; self.onStep = onStep; self.cleanup = cleanup
+    }
+}
+
+enum IngestStep { case afterDatabaseCopy, duringAttachmentCopy, beforeManifestWrite }
+
 /// Copies a `MigrationSource` into an isolated, native-owned staging directory, verifying
-/// the source did not change during the copy. After it returns, NOTHING touches the
-/// original source again — all later verify/swap/retry work reads from staging.
+/// the source did not change during the copy. FAILURE-ATOMIC: each attempt writes to its
+/// own fresh temp dir; on any failure that temp dir is hard-removed (a cleanup failure is
+/// surfaced, never swallowed with `try?`); only a fully-written attempt (incl. its manifest)
+/// is atomically PUBLISHED (renamed) to the per-import staging dir. After it returns, NOTHING
+/// touches the original source again — all later verify/swap/retry work reads from staging.
 public struct StagingIngest {
     public init() {}
 
-    /// Ingest `source` into `AppPaths.stagingDirectory(importID:)`. Copies the DB (and its
-    /// `-wal` only when the source legitimately has one), then every REL_RE-conforming
+    /// Ingest `source` into `AppPaths.stagedImportDirectory(importID:)`. Copies the DB (and
+    /// its `-wal` only when the source legitimately has one), then every REL_RE-conforming
     /// REGULAR attachment file; symlinks, special files, nested directories and
-    /// illegally-named entries are SKIPPED and recorded, never ingested. Re-fingerprints
-    /// the source before/after and retries on change, throwing `.sourceBusy` when exhausted.
+    /// illegally-named entries are SKIPPED and recorded, never ingested. Re-fingerprints the
+    /// source before/after and retries on change, throwing `.sourceBusy` when exhausted.
+    /// Throws `.importIDAlreadyExists` if the per-import staging dir already exists.
     @discardableResult
     public func ingest(_ source: MigrationSource,
-                       importID: String = UUID().uuidString.lowercased(),
+                       importID: ImportID = .generate(),
                        timestamp: String = DateFormat.timestamp()) throws -> IngestResult {
-        try ingest(source, importID: importID, timestamp: timestamp, maxAttempts: 3, midAttemptHook: nil)
+        try ingest(source, importID: importID, timestamp: timestamp, maxAttempts: 3, hooks: IngestHooks())
     }
 
-    /// Internal test entry point: adds an attempt bound and a fault seam invoked mid-attempt
-    /// (after the copy, before the after-fingerprint) so a test can mutate the source to
-    /// exercise the concurrent-change retry / `.sourceBusy` path. NOT part of the public API.
+    /// Internal entry point with an attempt bound + fault seams (test-only).
     @discardableResult
-    func ingest(_ source: MigrationSource, importID: String, timestamp: String,
-                maxAttempts: Int, midAttemptHook: ((Int) throws -> Void)?) throws -> IngestResult {
+    func ingest(_ source: MigrationSource, importID: ImportID, timestamp: String,
+                maxAttempts: Int, hooks: IngestHooks) throws -> IngestResult {
         let dbURL = try source.databaseURL()
+        let finalDir = try AppPaths.stagedImportDirectory(importID: importID)
+        if FileManager.default.fileExists(atPath: finalDir.path) {
+            throw IngestError.importIDAlreadyExists(importID.rawValue)
+        }
         return try source.withAccess {
             guard FileManager.default.fileExists(atPath: dbURL.path) else {
                 throw IngestError.sourceDatabaseMissing(dbURL.path)
@@ -142,30 +182,83 @@ public struct StagingIngest {
             var attempt = 0
             while true {
                 attempt += 1
-                let stagingDir = try AppPaths.stagingDirectory(importID: importID)
+                let attemptDir = try AppPaths.freshStagingAttemptDirectory()
 
-                let before = try Self.stability(source)
-                let staged = try Self.copyInto(stagingDir, source: source, dbURL: dbURL)
-                try midAttemptHook?(attempt)
-                let after = try Self.stability(source)
+                let outcome: AttemptOutcome
+                do {
+                    outcome = try Self.performAttempt(source: source, dbURL: dbURL, importID: importID,
+                                                      timestamp: timestamp, attemptDir: attemptDir,
+                                                      finalDir: finalDir, attempt: attempt, hooks: hooks)
+                } catch {
+                    // Any failure (copy / hash / manifest / publish): hard-clean this attempt,
+                    // surfacing a cleanup failure. Never leaves a partial attempt behind.
+                    try Self.cleanupIfPresent(attemptDir, hooks: hooks, original: error)
+                    throw error
+                }
 
-                if before != after {
-                    try? FileManager.default.removeItem(at: stagingDir)
+                switch outcome {
+                case .published(let result):
+                    return result
+                case .retry:
+                    // performAttempt already removed the (unpublished) attempt dir.
                     if attempt >= maxAttempts { throw IngestError.sourceBusy(attempts: attempt) }
                     continue
                 }
-
-                let manifest = try Self.buildManifest(importID: importID, source: source,
-                                                      timestamp: timestamp, staged: staged)
-                try Self.writeManifest(manifest, to: stagingDir)
-                return IngestResult(importID: importID, stagingDir: stagingDir,
-                                    stagedDatabaseURL: staged.dbURL, stagedWALURL: staged.walURL,
-                                    stagedAttachmentsDir: staged.attachmentsDir, manifest: manifest)
             }
         }
     }
 
-    // MARK: - Internals
+    // MARK: - Attempt
+
+    private enum AttemptOutcome { case published(IngestResult); case retry }
+
+    private static func performAttempt(source: MigrationSource, dbURL: URL, importID: ImportID,
+                                       timestamp: String, attemptDir: URL, finalDir: URL,
+                                       attempt: Int, hooks: IngestHooks) throws -> AttemptOutcome {
+        let before = try stability(source)
+        let staged = try copyInto(attemptDir, source: source, dbURL: dbURL, hooks: hooks)
+        try hooks.onRecheck?(attempt)
+        let after = try stability(source)
+        if before != after {
+            try removeAttempt(attemptDir, hooks: hooks)   // hard-clean the changed attempt
+            return .retry
+        }
+
+        let manifest = try buildManifest(importID: importID, source: source, timestamp: timestamp, staged: staged)
+        try hooks.onStep?(.beforeManifestWrite)
+        try writeManifest(manifest, to: attemptDir)
+
+        // Atomic publish: rename the completed attempt onto the per-import dir (same volume).
+        try FileManager.default.moveItem(at: attemptDir, to: finalDir)
+
+        let stagedDB = finalDir.appendingPathComponent(AppPaths.databaseFileName)
+        return .published(IngestResult(
+            importID: importID,
+            stagingDir: finalDir,
+            stagedDatabaseURL: stagedDB,
+            stagedWALURL: staged.hasWAL ? URL(fileURLWithPath: stagedDB.path + "-wal") : nil,
+            stagedAttachmentsDir: staged.hasAttachments
+                ? finalDir.appendingPathComponent("attachments", isDirectory: true).appendingPathComponent("docs", isDirectory: true)
+                : nil,
+            manifest: manifest))
+    }
+
+    private static func cleanupIfPresent(_ dir: URL, hooks: IngestHooks, original: Error) throws {
+        guard FileManager.default.fileExists(atPath: dir.path) else { return }
+        do {
+            try removeAttempt(dir, hooks: hooks)
+        } catch {
+            throw IngestError.cleanupFailed(path: dir.path, underlying: "\(error)", original: "\(original)")
+        }
+    }
+
+    /// Remove an attempt dir. NOT `try?` — a cleanup failure is surfaced by the caller.
+    private static func removeAttempt(_ dir: URL, hooks: IngestHooks) throws {
+        if let override = hooks.cleanup { try override(dir); return }
+        try FileManager.default.removeItem(at: dir)
+    }
+
+    // MARK: - Classification / copy
 
     private struct ClassifiedAttachment {
         let url: URL
@@ -226,17 +319,16 @@ public struct StagingIngest {
         let walURL: URL?
         let attachmentsDir: URL?
         let fileResults: [ImportManifest.FileResult]   // sha/size filled later
+        var hasWAL: Bool { walURL != nil }
+        var hasAttachments: Bool { attachmentsDir != nil }
     }
 
-    private static func copyInto(_ stagingDir: URL, source: MigrationSource, dbURL: URL) throws -> StagedLayout {
-        let fm = FileManager.default
-        // Fresh staging each attempt: clear any prior contents.
-        if let items = try? fm.contentsOfDirectory(at: stagingDir, includingPropertiesForKeys: nil) {
-            for i in items { try? fm.removeItem(at: i) }
-        }
+    private static func copyInto(_ dir: URL, source: MigrationSource, dbURL: URL, hooks: IngestHooks) throws -> StagedLayout {
+        let fm = FileManager.default   // `dir` is a fresh, empty attempt dir — no clearing needed.
 
-        let stagedDB = stagingDir.appendingPathComponent(AppPaths.databaseFileName)
+        let stagedDB = dir.appendingPathComponent(AppPaths.databaseFileName)
         try fm.copyItem(at: dbURL, to: stagedDB)
+        try hooks.onStep?(.afterDatabaseCopy)
 
         var stagedWAL: URL?
         if let w = try source.walURL(), fm.fileExists(atPath: w.path) {
@@ -250,12 +342,13 @@ public struct StagingIngest {
         if let root = try source.attachmentsRootURL() {
             let classified = try enumerateAttachments(root: root)
             if !classified.isEmpty {
-                let dstRoot = stagingDir.appendingPathComponent("attachments", isDirectory: true)
+                let dstRoot = dir.appendingPathComponent("attachments", isDirectory: true)
                     .appendingPathComponent("docs", isDirectory: true)
                 try fm.createDirectory(at: dstRoot, withIntermediateDirectories: true)
                 stagedAttachDir = dstRoot
                 for c in classified {
                     if c.isIngested {
+                        try hooks.onStep?(.duringAttachmentCopy)
                         try fm.copyItem(at: c.url, to: dstRoot.appendingPathComponent(c.name))
                     }
                     results.append(.init(name: c.name, outcome: c.outcome, sha256: nil, size: nil))
@@ -265,13 +358,17 @@ public struct StagingIngest {
         return StagedLayout(dbURL: stagedDB, walURL: stagedWAL, attachmentsDir: stagedAttachDir, fileResults: results)
     }
 
-    private static func buildManifest(importID: String, source: MigrationSource,
+    // MARK: - Manifest
+
+    private static func buildManifest(importID: ImportID, source: MigrationSource,
                                       timestamp: String, staged: StagedLayout) throws -> ImportManifest {
         let dbHash = try FileHash.sha256Hex(of: staged.dbURL)
+        let walHash = try staged.walURL.map { try FileHash.sha256Hex(of: $0) }
+
         var files: [ImportManifest.FileResult] = []
         for r in staged.fileResults {
-            if r.outcome == .ingested, let dir = staged.attachmentsDir {
-                let f = dir.appendingPathComponent(r.name)
+            if r.outcome == .ingested, let attachDir = staged.attachmentsDir {
+                let f = attachDir.appendingPathComponent(r.name)
                 let sha = try FileHash.sha256Hex(of: f)
                 let size = (try? FileManager.default.attributesOfItem(atPath: f.path))
                     .flatMap { ($0[.size] as? NSNumber)?.int64Value }
@@ -281,9 +378,19 @@ public struct StagingIngest {
             }
         }
         files.sort { $0.name < $1.name }
-        return ImportManifest(importID: importID, sourceKind: source.kind, createdAt: timestamp,
-                              sourceDBSHA256: dbHash, attachmentManifestSHA256: attachmentSetHash(files),
+
+        return ImportManifest(importID: importID.rawValue, sourceKind: source.kind, createdAt: timestamp,
+                              sourceDBSHA256: dbHash, walSHA256: walHash,
+                              snapshotIdentitySHA256: snapshotIdentity(dbSHA: dbHash, walSHA: walHash),
+                              attachmentManifestSHA256: attachmentSetHash(files),
                               files: files, status: .ingested, report: nil)
+    }
+
+    /// Stable combined identity of DB (+ WAL). Different WAL ⇒ different identity even for the
+    /// same main DB.
+    private static func snapshotIdentity(dbSHA: String, walSHA: String?) -> String {
+        let s = "db:\(dbSHA)\u{0}wal:\(walSHA ?? "")"
+        return SHA256.hash(data: Data(s.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     /// Stable hash over the sorted ingested (name, sha256) set — the attachment payload identity.
@@ -295,9 +402,9 @@ public struct StagingIngest {
         return SHA256.hash(data: Data(lines.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
-    private static func writeManifest(_ manifest: ImportManifest, to stagingDir: URL) throws {
+    private static func writeManifest(_ manifest: ImportManifest, to dir: URL) throws {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try enc.encode(manifest).write(to: stagingDir.appendingPathComponent("manifest.json"))
+        try enc.encode(manifest).write(to: dir.appendingPathComponent("manifest.json"))
     }
 }

@@ -36,21 +36,36 @@ final class MigrationPathsTests: XCTestCase {
         XCTAssertTrue(fm.fileExists(atPath: manifests.path))
     }
 
-    func testStagingDirectoryIsPerImportIsolatedAndCreated() throws {
-        let dataDir = try AppPaths.dataDirectory()
-        let idA = "test-\(UUID().uuidString)"
-        let idB = "test-\(UUID().uuidString)"
-        let a = try AppPaths.stagingDirectory(importID: idA)
-        let b = try AppPaths.stagingDirectory(importID: idB)
-        defer { try? fm.removeItem(at: a); try? fm.removeItem(at: b) }
+    func testStagedImportDirectoriesArePerImportIsolatedAndContained() throws {
+        let root = try AppPaths.stagingRootDirectory()
+        XCTAssertTrue(fm.fileExists(atPath: root.path))            // root IS created
+        XCTAssertEqual(root.lastPathComponent, "Staging")
 
-        XCTAssertNotEqual(a.path, b.path, "distinct import IDs must get distinct staging roots")
-        XCTAssertTrue(a.path.hasPrefix(dataDir.path + "/"))
+        let idA = try XCTUnwrap(ImportID("test-\(UUID().uuidString)"))
+        let idB = try XCTUnwrap(ImportID("test-\(UUID().uuidString)"))
+        let a = try AppPaths.stagedImportDirectory(importID: idA)
+        let b = try AppPaths.stagedImportDirectory(importID: idB)
+
+        XCTAssertNotEqual(a.path, b.path, "distinct import IDs must get distinct staging dirs")
         XCTAssertEqual(a.deletingLastPathComponent().lastPathComponent, "Staging")
-        XCTAssertEqual(a.lastPathComponent, "import-\(idA)")
+        XCTAssertEqual(a.lastPathComponent, "import-\(idA.rawValue)")
+        // Strictly under the Staging root; never under Electron's folder.
+        XCTAssertTrue(a.standardizedFileURL.path.hasPrefix(root.standardizedFileURL.path + "/"))
         XCTAssertFalse(a.pathComponents.contains(AppPaths.electronProductFolderName))
-        XCTAssertTrue(fm.fileExists(atPath: a.path))
-        XCTAssertTrue(fm.fileExists(atPath: b.path))
+        // Path only — the accessor does NOT create it (ingest publishes into it atomically).
+        XCTAssertFalse(fm.fileExists(atPath: a.path))
+    }
+
+    func testFreshStagingAttemptDirectoriesAreUniqueContainedAndCreated() throws {
+        let root = try AppPaths.stagingRootDirectory()
+        let x = try AppPaths.freshStagingAttemptDirectory()
+        let y = try AppPaths.freshStagingAttemptDirectory()
+        defer { try? fm.removeItem(at: x); try? fm.removeItem(at: y) }
+
+        XCTAssertNotEqual(x.path, y.path, "each attempt must get a distinct temp dir")
+        XCTAssertTrue(x.lastPathComponent.hasPrefix(".attempt-"))
+        XCTAssertTrue(x.standardizedFileURL.path.hasPrefix(root.standardizedFileURL.path + "/"))
+        XCTAssertTrue(fm.fileExists(atPath: x.path))
     }
 
     func testElectronLegacyAttachmentsURLIsContainerRelativeAndDistinct() throws {
