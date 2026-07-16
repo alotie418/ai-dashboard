@@ -8,8 +8,22 @@ import XCTest
 final class AttachmentApplyTests: LedgerTestCase {
 
     private let fm = FileManager.default
-    private let preparedDB = "preparedDB-identity-abc"
+    /// A real, quiescent prepared-DB file: complete() recomputes its identity from disk,
+    /// so a fabricated identity string can no longer stand in for it.
+    private var preparedDBURL: URL!
+    private var preparedDB = ""   // the computed identity every report/audit binds to
     private struct TestError: Error {}
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        preparedDBURL = try trackedTempDir().appendingPathComponent("prepared.db")
+        do {
+            let db = try SQLiteDatabase(path: preparedDBURL.path)
+            try db.execute("PRAGMA journal_mode = DELETE")
+            try db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+        }
+        preparedDB = try PreparedDatabaseIdentity.compute(at: preparedDBURL)
+    }
 
     // MARK: - Fixtures / helpers
 
@@ -84,6 +98,17 @@ final class AttachmentApplyTests: LedgerTestCase {
     private func apply(_ staging: URL, _ active: URL, hooks: ApplyHooks = ApplyHooks()) throws -> AttachmentApplyReport {
         try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active, preparedDBIdentity: preparedDB, hooks: hooks)
     }
+    /// A second real prepared DB with a DIFFERENT identity (cross-database tests).
+    private func makeAltPreparedDB() throws -> (url: URL, identity: String) {
+        let url = try trackedTempDir().appendingPathComponent("prepared-alt.db")
+        do {
+            let db = try SQLiteDatabase(path: url.path)
+            try db.execute("PRAGMA journal_mode = DELETE")
+            try db.execute("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+            try db.run("INSERT INTO t (id) VALUES (1)")
+        }
+        return (url, try PreparedDatabaseIdentity.compute(at: url))
+    }
 
     // MARK: - 1. Happy path
 
@@ -97,7 +122,7 @@ final class AttachmentApplyTests: LedgerTestCase {
         XCTAssertTrue(fm.fileExists(atPath: staging.path), "apply must NOT clean staging")
 
         let outcome = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report),
-                                                     acknowledgement: nil, manifestsDir: manifests, hooks: ApplyHooks())
+                                                     acknowledgement: nil, preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .completed(let r) = outcome else { return XCTFail("expected .completed, got \(outcome)") }
         let s = try readManifest(r.completionSentinelURL)
         XCTAssertEqual(s.status, .complete)
@@ -131,14 +156,14 @@ final class AttachmentApplyTests: LedgerTestCase {
         XCTAssertEqual(report.fileUnresolved.items.map { $0.name }, ["doc-b.jpg"])
 
         let o1 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report),
-                                                acknowledgement: nil, manifestsDir: manifests, hooks: ApplyHooks())
+                                                acknowledgement: nil, preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .requiresAcknowledgement(let request, let unresolved) = o1 else { return XCTFail("got \(o1)") }
         XCTAssertEqual(unresolved.items.map { $0.name }, ["doc-b.jpg"])
         XCTAssertFalse(fm.fileExists(atPath: sentinelURL(manifests, id).path))
         XCTAssertTrue(fm.fileExists(atPath: staging.path))
 
         let o2 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report),
-                                                acknowledgement: request.acknowledge(), manifestsDir: manifests, hooks: ApplyHooks())
+                                                acknowledgement: request.acknowledge(), preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .completed(let r) = o2 else { return XCTFail() }
         XCTAssertEqual(try readManifest(r.completionSentinelURL).acknowledgedReportHash, request.unresolvedReportHash)
         XCTAssertTrue(r.stagingCleaned)
@@ -151,10 +176,10 @@ final class AttachmentApplyTests: LedgerTestCase {
         let report = try apply(staging, active)
         XCTAssertEqual(Set(report.fileUnresolved.items.map { $0.kind }), [.skippedSymlink, .rejectedName])
         let o1 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report),
-                                                acknowledgement: nil, manifestsDir: manifests, hooks: ApplyHooks())
+                                                acknowledgement: nil, preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .requiresAcknowledgement(let request, _) = o1 else { return XCTFail() }
         let o2 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report),
-                                                acknowledgement: request.acknowledge(), manifestsDir: manifests, hooks: ApplyHooks())
+                                                acknowledgement: request.acknowledge(), preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .completed(let r) = o2 else { return XCTFail() }
         XCTAssertEqual(r.unresolved.items.count, 2)
     }
@@ -167,17 +192,17 @@ final class AttachmentApplyTests: LedgerTestCase {
         let report = try apply(staging, active)
 
         let o1 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report, dangling: ["ref1"]),
-                                                acknowledgement: nil, manifestsDir: manifests, hooks: ApplyHooks())
+                                                acknowledgement: nil, preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .requiresAcknowledgement(let req1, _) = o1 else { return XCTFail() }
 
         // Report changes (audit finds ref2) → an ack for req1 is stale.
         let o2 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report, dangling: ["ref1", "ref2"]),
-                                                acknowledgement: req1.acknowledge(), manifestsDir: manifests, hooks: ApplyHooks())
+                                                acknowledgement: req1.acknowledge(), preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .requiresAcknowledgement(let req2, _) = o2 else { return XCTFail("stale ack must be rejected") }
         XCTAssertNotEqual(req2.unresolvedReportHash, req1.unresolvedReportHash)
 
         let o3 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report, dangling: ["ref1", "ref2"]),
-                                                acknowledgement: req2.acknowledge(), manifestsDir: manifests, hooks: ApplyHooks())
+                                                acknowledgement: req2.acknowledge(), preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .completed = o3 else { return XCTFail() }
     }
 
@@ -253,7 +278,7 @@ final class AttachmentApplyTests: LedgerTestCase {
         try writeManifest(other, to: sentinelURL(manifests, id))
         let report = try apply(staging, active)
         XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report),
-                                                            acknowledgement: nil, manifestsDir: manifests, hooks: ApplyHooks())) { e in
+                                                            acknowledgement: nil, preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())) { e in
             guard case AttachmentApplyError.sentinelIdentityMismatch = e else { return XCTFail("got \(e)") }
         }
         XCTAssertEqual(try readManifest(sentinelURL(manifests, id)).snapshotIdentitySHA256, "snapOLD")
@@ -327,7 +352,7 @@ final class AttachmentApplyTests: LedgerTestCase {
         let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")]); let active = try makeActive(); let manifests = try makeManifestsDir()
         let report = try apply(staging, active)
         XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
-                                                            manifestsDir: manifests, hooks: ApplyHooks(onCompletionTempWrite: { throw TestError() })))
+                                                            preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks(onCompletionTempWrite: { throw TestError() })))
         XCTAssertFalse(fm.fileExists(atPath: sentinelURL(manifests, id).path))
         XCTAssertTrue(tempManifests(manifests).isEmpty)
         XCTAssertTrue(fm.fileExists(atPath: staging.path))
@@ -336,7 +361,7 @@ final class AttachmentApplyTests: LedgerTestCase {
         let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")]); let active = try makeActive(); let manifests = try makeManifestsDir()
         let report = try apply(staging, active)
         XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
-                                                            manifestsDir: manifests, hooks: ApplyHooks(onCompletionPublish: { throw TestError() })))
+                                                            preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks(onCompletionPublish: { throw TestError() })))
         XCTAssertFalse(fm.fileExists(atPath: sentinelURL(manifests, id).path))
         XCTAssertTrue(tempManifests(manifests).isEmpty)
         XCTAssertTrue(fm.fileExists(atPath: staging.path))
@@ -345,7 +370,7 @@ final class AttachmentApplyTests: LedgerTestCase {
         let (staging, _) = try makeStaging(ingested: [("a.pdf", "A")]); let active = try makeActive(); let manifests = try makeManifestsDir()
         let report = try apply(staging, active)
         let outcome = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
-                                                     manifestsDir: manifests, hooks: ApplyHooks(cleanup: { _ in throw TestError() }))
+                                                     preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks(cleanup: { _ in throw TestError() }))
         guard case .completed(let r) = outcome else { return XCTFail() }
         XCTAssertTrue(fm.fileExists(atPath: r.completionSentinelURL.path))
         XCTAssertFalse(r.stagingCleaned); XCTAssertNotNil(r.stagingCleanupError)
@@ -358,10 +383,10 @@ final class AttachmentApplyTests: LedgerTestCase {
         let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")]); let active = try makeActive(); let manifests = try makeManifestsDir()
         let report = try apply(staging, active)
         let o1 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
-                                                manifestsDir: manifests, hooks: ApplyHooks(cleanup: { _ in throw TestError() }))
+                                                preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks(cleanup: { _ in throw TestError() }))
         guard case .completed(let r1) = o1, !r1.stagingCleaned else { return XCTFail() }
         let o2 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
-                                                manifestsDir: manifests, hooks: ApplyHooks())
+                                                preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .completed(let r2) = o2 else { return XCTFail() }
         XCTAssertTrue(r2.stagingCleaned)
         XCTAssertFalse(fm.fileExists(atPath: staging.path))
@@ -378,7 +403,7 @@ final class AttachmentApplyTests: LedgerTestCase {
         let reportB = try apply(stagingB, try makeActive())
         // A's audit against B → importID mismatch.
         XCTAssertThrowsError(try AttachmentApply().complete(report: reportB, referenceAudit: matchingAudit(reportA),
-                                                            acknowledgement: nil, manifestsDir: manifests, hooks: ApplyHooks())) { e in
+                                                            acknowledgement: nil, preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())) { e in
             guard case AttachmentApplyError.referenceAuditMismatch(let f) = e else { return XCTFail("got \(e)") }
             XCTAssertEqual(f, "importID")
         }
@@ -397,7 +422,7 @@ final class AttachmentApplyTests: LedgerTestCase {
                            (audit(snapshot: good.snapshotIdentitySHA256, attach: "X", prepared: preparedDB), "attachmentManifest"),
                            (audit(snapshot: good.snapshotIdentitySHA256, attach: good.attachmentManifestSHA256, prepared: "X"), "preparedDBIdentity")] {
             XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: a, acknowledgement: nil,
-                                                                manifestsDir: manifests, hooks: ApplyHooks())) { e in
+                                                                preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())) { e in
                 guard case AttachmentApplyError.referenceAuditMismatch(let got) = e else { return XCTFail("got \(e)") }
                 XCTAssertEqual(got, field)
             }
@@ -416,17 +441,17 @@ final class AttachmentApplyTests: LedgerTestCase {
         let (_, reportA) = try mk()
         let (_, reportB) = try mk()
         let oA = try AttachmentApply().complete(report: reportA, referenceAudit: matchingAudit(reportA), acknowledgement: nil,
-                                                manifestsDir: manifests, hooks: ApplyHooks())
+                                                preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .requiresAcknowledgement(let reqA, let uA) = oA else { return XCTFail() }
         let oB = try AttachmentApply().complete(report: reportB, referenceAudit: matchingAudit(reportB), acknowledgement: nil,
-                                                manifestsDir: manifests, hooks: ApplyHooks())
+                                                preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .requiresAcknowledgement(let reqB, let uB) = oB else { return XCTFail() }
         XCTAssertEqual(uA.reportHash, uB.reportHash, "identical unresolved lists share a report hash")
         XCTAssertNotEqual(reqA.importID, reqB.importID)
 
         // A's acknowledgement must NOT complete B.
         let rejected = try AttachmentApply().complete(report: reportB, referenceAudit: matchingAudit(reportB),
-                                                      acknowledgement: reqA.acknowledge(), manifestsDir: manifests, hooks: ApplyHooks())
+                                                      acknowledgement: reqA.acknowledge(), preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .requiresAcknowledgement = rejected else { return XCTFail("A's ack must not confirm B") }
     }
 
@@ -442,11 +467,11 @@ final class AttachmentApplyTests: LedgerTestCase {
         }
         let rx = report(detail: "v1"), ry = report(detail: "v2")
         let ox = try AttachmentApply().complete(report: rx, referenceAudit: matchingAudit(rx), acknowledgement: nil,
-                                                manifestsDir: manifests, hooks: ApplyHooks())
+                                                preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .requiresAcknowledgement(let reqX, _) = ox else { return XCTFail() }
         // The ack for detail v1 must NOT confirm the v2 report.
         let oy = try AttachmentApply().complete(report: ry, referenceAudit: matchingAudit(ry), acknowledgement: reqX.acknowledge(),
-                                                manifestsDir: manifests, hooks: ApplyHooks())
+                                                preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .requiresAcknowledgement(let reqY, _) = oy else { return XCTFail("detail change must invalidate the old ack") }
         XCTAssertNotEqual(reqX.unresolvedReportHash, reqY.unresolvedReportHash)
     }
@@ -457,17 +482,20 @@ final class AttachmentApplyTests: LedgerTestCase {
         let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A"), ("doc-b.jpg", "B")])
         try fm.removeItem(at: stagedDoc(staging, "doc-b.jpg"))   // unresolved (missing) → ack required
         let manifests = try makeManifestsDir()
-        let reportA = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: try makeActive(), preparedDBIdentity: "DB-A")
-        let reportB = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: try makeActive(), preparedDBIdentity: "DB-B")
+        let alt = try makeAltPreparedDB()
+        let reportA = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: try makeActive(),
+                                                  preparedDBIdentity: preparedDB, hooks: ApplyHooks())
+        let reportB = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: try makeActive(),
+                                                  preparedDBIdentity: alt.identity, hooks: ApplyHooks())
         XCTAssertEqual(reportA.manifest.snapshotIdentitySHA256, reportB.manifest.snapshotIdentitySHA256)
         XCTAssertNotEqual(reportA.preparedDBIdentity, reportB.preparedDBIdentity)
 
         let oA = try AttachmentApply().complete(report: reportA, referenceAudit: matchingAudit(reportA), acknowledgement: nil,
-                                                manifestsDir: manifests, hooks: ApplyHooks())
+                                                preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .requiresAcknowledgement(let reqA, _) = oA else { return XCTFail() }
         // A's acknowledgement must NOT confirm B (different prepared DB).
         let rejected = try AttachmentApply().complete(report: reportB, referenceAudit: matchingAudit(reportB),
-                                                      acknowledgement: reqA.acknowledge(), manifestsDir: manifests, hooks: ApplyHooks())
+                                                      acknowledgement: reqA.acknowledge(), preparedDatabaseAt: alt.url, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .requiresAcknowledgement = rejected else { return XCTFail("ack for prepared-DB A must not confirm B") }
     }
 
@@ -480,19 +508,22 @@ final class AttachmentApplyTests: LedgerTestCase {
         let (stagingB, _) = try makeStaging(ingested: [("doc-a.pdf", "A")], id: id)
         let manifests = try makeManifestsDir()
 
-        let rA = try AttachmentApply().apply(stagingDir: stagingA, activeAttachmentsDir: try makeActive(), preparedDBIdentity: "DB-A")
+        let alt = try makeAltPreparedDB()
+        let rA = try AttachmentApply().apply(stagingDir: stagingA, activeAttachmentsDir: try makeActive(),
+                                             preparedDBIdentity: preparedDB, hooks: ApplyHooks())
         let oA = try AttachmentApply().complete(report: rA, referenceAudit: matchingAudit(rA), acknowledgement: nil,
-                                                manifestsDir: manifests, hooks: ApplyHooks())
+                                                preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .completed(let cA) = oA else { return XCTFail() }
-        XCTAssertEqual(try readManifest(cA.completionSentinelURL).preparedDBIdentity, "DB-A")
+        XCTAssertEqual(try readManifest(cA.completionSentinelURL).preparedDBIdentity, preparedDB)
 
-        let rB = try AttachmentApply().apply(stagingDir: stagingB, activeAttachmentsDir: try makeActive(), preparedDBIdentity: "DB-B")
+        let rB = try AttachmentApply().apply(stagingDir: stagingB, activeAttachmentsDir: try makeActive(),
+                                             preparedDBIdentity: alt.identity, hooks: ApplyHooks())
         XCTAssertEqual(rA.manifest.snapshotIdentitySHA256, rB.manifest.snapshotIdentitySHA256)
         XCTAssertThrowsError(try AttachmentApply().complete(report: rB, referenceAudit: matchingAudit(rB), acknowledgement: nil,
-                                                            manifestsDir: manifests, hooks: ApplyHooks())) { e in
+                                                            preparedDatabaseAt: alt.url, manifestsDir: manifests, hooks: ApplyHooks())) { e in
             guard case AttachmentApplyError.sentinelIdentityMismatch = e else { return XCTFail("got \(e)") }
         }
-        XCTAssertEqual(try readManifest(sentinelURL(manifests, id)).preparedDBIdentity, "DB-A", "existing sentinel not overwritten")
+        XCTAssertEqual(try readManifest(sentinelURL(manifests, id)).preparedDBIdentity, preparedDB, "existing sentinel not overwritten")
     }
 
     func testReportHashNilVsEmptyDetailDiffer() {
@@ -510,7 +541,7 @@ final class AttachmentApplyTests: LedgerTestCase {
         var intruder = try readManifest(manifestURL(staging))
         intruder.snapshotIdentitySHA256 = "snapINTRUDER"; intruder.status = .complete; intruder.preparedDBIdentity = "other"
         XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
-                                                            manifestsDir: manifests,
+                                                            preparedDatabaseAt: preparedDBURL, manifestsDir: manifests,
                                                             hooks: ApplyHooks(onCompletionPublish: {
             try self.writeManifest(intruder, to: self.sentinelURL(manifests, id))   // race: sentinel appears now
         }))) { e in
@@ -543,13 +574,13 @@ final class AttachmentApplyTests: LedgerTestCase {
             let report = try apply(staging, active)   // empty unresolved → completes without ack
             // First complete keeps staging (cleanup throws) and writes the CORRECT sentinel.
             let o1 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
-                                                    manifestsDir: manifests, hooks: ApplyHooks(cleanup: { _ in throw TestError() }))
+                                                    preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks(cleanup: { _ in throw TestError() }))
             guard case .completed = o1 else { return XCTFail("\(label): first complete should succeed") }
             // Tamper the persisted sentinel so it is no longer identical to a fresh completion.
             var s = try readManifest(sentinelURL(manifests, id)); mutate(&s); try writeManifest(s, to: sentinelURL(manifests, id))
             // Re-complete on the surviving staging → rejected, never overwritten, staging kept.
             XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
-                                                                manifestsDir: manifests, hooks: ApplyHooks())) { e in
+                                                                preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())) { e in
                 guard case AttachmentApplyError.sentinelIdentityMismatch = e else { return XCTFail("\(label): got \(e)") }
             }
             XCTAssertTrue(fm.fileExists(atPath: staging.path), "\(label): staging must be kept on rejection")
@@ -562,13 +593,13 @@ final class AttachmentApplyTests: LedgerTestCase {
         let report = try apply(staging, active)
         // First complete keeps staging (cleanup throws), writing the sentinel.
         let o1 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
-                                                manifestsDir: manifests, hooks: ApplyHooks(cleanup: { _ in throw TestError() }))
+                                                preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks(cleanup: { _ in throw TestError() }))
         guard case .completed(let r1) = o1, !r1.stagingCleaned else { return XCTFail() }
         let before = try Data(contentsOf: sentinelURL(manifests, id))
         // Re-complete with the IDENTICAL report → the byte-identical sentinel is reused (not
         // rewritten) and staging is cleaned.
         let o2 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
-                                                manifestsDir: manifests, hooks: ApplyHooks())
+                                                preparedDatabaseAt: preparedDBURL, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .completed(let r2) = o2 else { return XCTFail() }
         XCTAssertTrue(r2.stagingCleaned)
         XCTAssertFalse(fm.fileExists(atPath: staging.path))

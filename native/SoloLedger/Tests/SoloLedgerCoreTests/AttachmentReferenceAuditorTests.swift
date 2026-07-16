@@ -101,7 +101,7 @@ final class AttachmentReferenceAuditorTests: LedgerTestCase {
         XCTAssertEqual(a.resolved[0].sha256, try FileHash.sha256Hex(of: active.appendingPathComponent("a.pdf")))
 
         let outcome = try AttachmentApply().complete(report: report, referenceAudit: a, acknowledgement: nil,
-                                                     manifestsDir: try makeManifestsDir(), hooks: ApplyHooks())
+                                                     preparedDatabaseAt: db, manifestsDir: try makeManifestsDir(), hooks: ApplyHooks())
         guard case .completed(let r) = outcome else { return XCTFail("got \(outcome)") }
         XCTAssertTrue(r.unresolved.isEmpty)
     }
@@ -125,13 +125,13 @@ final class AttachmentReferenceAuditorTests: LedgerTestCase {
 
         let manifests = try makeManifestsDir()
         let o1 = try AttachmentApply().complete(report: report, referenceAudit: a, acknowledgement: nil,
-                                                manifestsDir: manifests, hooks: ApplyHooks())
+                                                preparedDatabaseAt: db, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .requiresAcknowledgement(let req, let unresolved) = o1 else { return XCTFail("got \(o1)") }
         XCTAssertEqual(unresolved.items, [.init(name: "ghost.pdf", kind: .danglingReference,
                                                 detail: "business_documents.tax_invoice_attachment_path×1; transactions.attachment_path×2")])
 
         let o2 = try AttachmentApply().complete(report: report, referenceAudit: a, acknowledgement: req.acknowledge(),
-                                                manifestsDir: manifests, hooks: ApplyHooks())
+                                                preparedDatabaseAt: db, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .completed(let r) = o2 else { return XCTFail("got \(o2)") }
         XCTAssertEqual(r.unresolved.items.first?.detail,
                        "business_documents.tax_invoice_attachment_path×1; transactions.attachment_path×2")
@@ -151,13 +151,13 @@ final class AttachmentReferenceAuditorTests: LedgerTestCase {
         }
         let manifests = try makeManifestsDir()
         let o1 = try AttachmentApply().complete(report: report, referenceAudit: evidence("transactions.attachment_path×1"),
-                                                acknowledgement: nil, manifestsDir: manifests, hooks: ApplyHooks())
+                                                acknowledgement: nil, preparedDatabaseAt: db, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .requiresAcknowledgement(let req1, _) = o1 else { return XCTFail("got \(o1)") }
 
         for changed in ["transactions.attachment_path×2",
                         "business_documents.tax_invoice_attachment_path×1; transactions.attachment_path×1"] {
             let o2 = try AttachmentApply().complete(report: report, referenceAudit: evidence(changed),
-                                                    acknowledgement: req1.acknowledge(), manifestsDir: manifests, hooks: ApplyHooks())
+                                                    acknowledgement: req1.acknowledge(), preparedDatabaseAt: db, manifestsDir: manifests, hooks: ApplyHooks())
             guard case .requiresAcknowledgement(let req2, _) = o2 else { return XCTFail("stale ack must be rejected for '\(changed)'") }
             XCTAssertNotEqual(req2.unresolvedReportHash, req1.unresolvedReportHash)
         }
@@ -190,12 +190,12 @@ final class AttachmentReferenceAuditorTests: LedgerTestCase {
 
         let manifests = try makeManifestsDir()
         let o1 = try AttachmentApply().complete(report: report, referenceAudit: a, acknowledgement: nil,
-                                                manifestsDir: manifests, hooks: ApplyHooks())
+                                                preparedDatabaseAt: db, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .requiresAcknowledgement(let req, let unresolved) = o1 else { return XCTFail("invalid refs must gate completion") }
         XCTAssertEqual(Set(unresolved.items.map { $0.kind }), [.invalidReference])
 
         let o2 = try AttachmentApply().complete(report: report, referenceAudit: a, acknowledgement: req.acknowledge(),
-                                                manifestsDir: manifests, hooks: ApplyHooks())
+                                                preparedDatabaseAt: db, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .completed(let r) = o2 else { return XCTFail("got \(o2)") }
         XCTAssertEqual(r.unresolved.items.count, 6)
     }
@@ -347,6 +347,110 @@ final class AttachmentReferenceAuditorTests: LedgerTestCase {
         XCTAssertThrowsError(try audit(report, db, hooks: sidecar)) { e in
             guard let pe = e as? PreparedDatabaseError, case .notQuiescent = pe else { return XCTFail("got \(e)") }
         }
+    }
+
+    // MARK: - audit → complete races (C3)
+
+    /// Setup where the audit resolves TWO references: one file this import copied, one
+    /// pre-existing active file that was NOT part of the import (only the audit knows it).
+    private func resolvedPairFixture() throws -> (db: URL, active: URL, report: AttachmentApplyReport, audit: ReferenceAudit) {
+        let db = try makePreparedDB(txnRefs: [ref("mine.pdf")], docRefs: [ref("pre.pdf")])
+        let active = try makeActive([("pre.pdf", "PRE")])   // pre-existing, never staged
+        let report = try applyReport(staged: [("mine.pdf", "M")], active: active, dbURL: db)
+        let a = try audit(report, db)
+        XCTAssertEqual(a.resolved.map { $0.name }, ["mine.pdf", "pre.pdf"])
+        return (db, active, report, a)
+    }
+
+    private func assertCompleteFailsClosed(_ f: (db: URL, active: URL, report: AttachmentApplyReport, audit: ReferenceAudit),
+                                           _ expected: (Error) -> Bool, _ label: String,
+                                           file: StaticString = #filePath, line: UInt = #line) throws {
+        let manifests = try makeManifestsDir()
+        XCTAssertThrowsError(try AttachmentApply().complete(report: f.report, referenceAudit: f.audit, acknowledgement: nil,
+                                                            preparedDatabaseAt: f.db, manifestsDir: manifests, hooks: ApplyHooks()),
+                             label, file: file, line: line) { e in
+            if !expected(e) { XCTFail("\(label): got \(e)", file: file, line: line) }
+        }
+        XCTAssertTrue(fm.fileExists(atPath: f.report.stagingDir.path), "\(label): staging must be kept", file: file, line: line)
+        XCTAssertEqual(try fm.contentsOfDirectory(atPath: manifests.path), [], "\(label): no sentinel", file: file, line: line)
+    }
+
+    func testResolvedReferenceDeletedAfterAuditFailsComplete() throws {
+        let f = try resolvedPairFixture()
+        try fm.removeItem(at: f.active.appendingPathComponent("pre.pdf"))   // NOT part of this import's copy set
+        try assertCompleteFailsClosed(f, {
+            if case AttachmentApplyError.referencedFileChangedSinceAudit("pre.pdf") = $0 { return true }; return false
+        }, "deleted after audit")
+    }
+
+    func testResolvedReferenceReplacedAfterAuditFailsComplete() throws {
+        let f = try resolvedPairFixture()
+        try Data("SWAPPED".utf8).write(to: f.active.appendingPathComponent("pre.pdf"))
+        try assertCompleteFailsClosed(f, {
+            if case AttachmentApplyError.referencedFileChangedSinceAudit("pre.pdf") = $0 { return true }; return false
+        }, "replaced after audit")
+    }
+
+    /// Same bytes behind a symlink is still a fail: the entry must remain a REGULAR file.
+    func testResolvedReferenceSwappedForSameContentSymlinkFailsComplete() throws {
+        let f = try resolvedPairFixture()
+        let target = f.active.appendingPathComponent("pre.pdf")
+        let elsewhere = try trackedTempDir().appendingPathComponent("pre.pdf")
+        try Data("PRE".utf8).write(to: elsewhere)                      // identical content
+        try fm.removeItem(at: target)
+        try fm.createSymbolicLink(at: target, withDestinationURL: elsewhere)
+        try assertCompleteFailsClosed(f, {
+            if case AttachmentApplyError.referencedFileChangedSinceAudit("pre.pdf") = $0 { return true }; return false
+        }, "symlink swap after audit")
+    }
+
+    func testDatabaseMutatedAfterAuditFailsComplete() throws {
+        let f = try resolvedPairFixture()
+        do {   // a new referencing row appears after the audit → identity recompute rejects
+            let w = try SQLiteDatabase(path: f.db.path)
+            try insertRefs(w, txnRefs: [ref("late.pdf")], docRefs: [])
+        }
+        try assertCompleteFailsClosed(f, {
+            if case AttachmentApplyError.preparedDatabaseIdentityMismatch = $0 { return true }; return false
+        }, "DB mutated after audit")
+    }
+
+    func testCompleteAgainstDifferentDatabaseFailsClosed() throws {
+        let f = try resolvedPairFixture()
+        let other = try makePreparedDB()
+        let manifests = try makeManifestsDir()
+        XCTAssertThrowsError(try AttachmentApply().complete(report: f.report, referenceAudit: f.audit, acknowledgement: nil,
+                                                            preparedDatabaseAt: other, manifestsDir: manifests, hooks: ApplyHooks())) { e in
+            guard case AttachmentApplyError.preparedDatabaseIdentityMismatch = e else { return XCTFail("got \(e)") }
+        }
+    }
+
+    func testSidecarAppearingBeforeCompleteFailsClosed() throws {
+        let f = try resolvedPairFixture()
+        try Data("j".utf8).write(to: URL(fileURLWithPath: f.db.path + "-journal"))
+        try assertCompleteFailsClosed(f, {
+            if let pe = $0 as? PreparedDatabaseError, case .notQuiescent = pe { return true }; return false
+        }, "sidecar before complete")
+    }
+
+    // MARK: - Public URL-based API end-to-end (no @testable seams)
+
+    func testPublicAPIEndToEnd() throws {
+        let db = try makePreparedDB(txnRefs: [ref("a.pdf")])
+        let active = try makeActive()
+        let staging = try makeStaging(ingested: [("a.pdf", "A")])
+
+        let report = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active, preparedDatabaseAt: db)
+        XCTAssertEqual(report.preparedDBIdentity, try PreparedDatabaseIdentity.compute(at: db),
+                       "apply must stamp the identity it computed itself")
+        let a = try AttachmentReferenceAuditor().audit(report: report, preparedDatabaseAt: db)
+        XCTAssertEqual(a.resolved.map { $0.name }, ["a.pdf"])
+        // The public complete writes to AppPaths' real manifests dir; use the internal
+        // entry point ONLY to redirect the sentinel into a temp dir — the identity
+        // recompute path is identical.
+        let outcome = try AttachmentApply().complete(report: report, referenceAudit: a, acknowledgement: nil,
+                                                     preparedDatabaseAt: db, manifestsDir: try makeManifestsDir(), hooks: ApplyHooks())
+        guard case .completed = outcome else { return XCTFail("got \(outcome)") }
     }
 
     // MARK: - Determinism

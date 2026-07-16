@@ -128,6 +128,7 @@ public enum AttachmentApplyError: Error, CustomStringConvertible {
     case preparedDatabaseCorrupt(String)
     case preparedDatabaseSchemaUnsupported(String)
     case preparedDatabaseChangedDuringAudit(before: String, after: String)
+    case referencedFileChangedSinceAudit(String)
 
     public var description: String {
         switch self {
@@ -148,6 +149,7 @@ public enum AttachmentApplyError: Error, CustomStringConvertible {
         case .preparedDatabaseCorrupt(let m): return "Prepared database failed its integrity check: \(m)"
         case .preparedDatabaseSchemaUnsupported(let m): return "Prepared database schema is unsupported (\(m)) — refusing to audit references"
         case .preparedDatabaseChangedDuringAudit: return "The prepared database changed during the reference audit — refusing to trust the scan"
+        case .referencedFileChangedSinceAudit(let n): return "Referenced attachment '\(n)' changed after the audit — re-run the reference audit before completing"
         }
     }
 }
@@ -222,9 +224,11 @@ struct ApplyHooks {
 ///  - `apply` re-validates, copies ONLY absent files (per-copy `.part-<uuid>`, hash-verified
 ///    before publish, NEVER overwriting), and returns the ACTUAL outcomes + a file-level
 ///    unresolved report. It does NOT write a sentinel or clean staging.
-///  - `complete` merges the coordinator's DB reference audit, and only if there are no
-///    unresolved items (or a matching acknowledgement) re-verifies every final active file
-///    hash, ATOMICALLY persists the completion sentinel, then cleans staging.
+///  - `complete` merges the DB reference audit, recomputes the prepared DB's identity from
+///    the actual file (post-audit mutation fails closed), and only if there are no
+///    unresolved items (or a matching acknowledgement) re-verifies every audited-resolved
+///    reference and every final active file hash, ATOMICALLY persists the completion
+///    sentinel, then cleans staging.
 ///
 /// ROLLBACK NOTE: because attachment apply is strictly add-only (never overwrites), a DB-only
 /// backup is a LOGICAL LEDGER rollback point — the DB and every pre-existing attachment are
@@ -244,21 +248,24 @@ public struct AttachmentApply {
     }
 
     /// Copy the staged import's absent attachments to the active dir (non-destructive) and
-    /// report ACTUAL outcomes + file-level unresolved items. `preparedDBIdentity` is the
-    /// coordinator's identity for the prepared/active DB — it binds the report so a reference
-    /// audit for a different DB cannot complete it. No sentinel, no staging cleanup.
-    public func apply(stagingDir: URL, activeAttachmentsDir: URL, preparedDBIdentity: String) throws -> AttachmentApplyReport {
+    /// report ACTUAL outcomes + file-level unresolved items. The report is bound to the
+    /// prepared/active DB at `preparedDatabaseAt` via an identity COMPUTED HERE through the
+    /// quiescence gate — callers never supply an identity string of their own, so a
+    /// reference audit for a different DB can never complete this report. No sentinel, no
+    /// staging cleanup.
+    public func apply(stagingDir: URL, activeAttachmentsDir: URL, preparedDatabaseAt url: URL) throws -> AttachmentApplyReport {
         try apply(stagingDir: stagingDir, activeAttachmentsDir: activeAttachmentsDir,
-                  preparedDBIdentity: preparedDBIdentity, hooks: ApplyHooks())
+                  preparedDBIdentity: try PreparedDatabaseIdentity.compute(at: url), hooks: ApplyHooks())
     }
 
     /// Finalize: merge the DB reference audit, gate on acknowledgement if anything is
-    /// unresolved, re-verify active files, persist the sentinel, then clean staging.
+    /// unresolved, recompute the prepared DB's identity and re-verify every audited-resolved
+    /// reference and every active file, persist the sentinel, then clean staging.
     @discardableResult
     public func complete(report: AttachmentApplyReport, referenceAudit: ReferenceAudit,
-                         acknowledgement: Acknowledgement?) throws -> CompleteOutcome {
+                         acknowledgement: Acknowledgement?, preparedDatabaseAt url: URL) throws -> CompleteOutcome {
         try complete(report: report, referenceAudit: referenceAudit, acknowledgement: acknowledgement,
-                     manifestsDir: try AppPaths.importManifestsDirectory(), hooks: ApplyHooks())
+                     preparedDatabaseAt: url, manifestsDir: try AppPaths.importManifestsDirectory(), hooks: ApplyHooks())
     }
 
     // MARK: - Internal (fault seams / injectable dirs)
@@ -293,13 +300,23 @@ public struct AttachmentApply {
     }
 
     func complete(report: AttachmentApplyReport, referenceAudit: ReferenceAudit,
-                  acknowledgement: Acknowledgement?, manifestsDir: URL, hooks: ApplyHooks) throws -> CompleteOutcome {
+                  acknowledgement: Acknowledgement?, preparedDatabaseAt preparedDBURL: URL,
+                  manifestsDir: URL, hooks: ApplyHooks) throws -> CompleteOutcome {
         // The audit evidence must belong to THIS exact import — reject cross-import / snapshot /
         // attachment-set / database audits field-by-field.
         guard referenceAudit.importID == report.importID.rawValue else { throw AttachmentApplyError.referenceAuditMismatch(field: "importID") }
         guard referenceAudit.snapshotIdentitySHA256 == report.manifest.snapshotIdentitySHA256 else { throw AttachmentApplyError.referenceAuditMismatch(field: "snapshotIdentity") }
         guard referenceAudit.attachmentManifestSHA256 == report.manifest.attachmentManifestSHA256 else { throw AttachmentApplyError.referenceAuditMismatch(field: "attachmentManifest") }
         guard referenceAudit.preparedDBIdentity == report.preparedDBIdentity else { throw AttachmentApplyError.referenceAuditMismatch(field: "preparedDBIdentity") }
+
+        // The prepared database must STILL be the exact database everything above was bound
+        // to — recompute its identity from the actual file (quiescence gate included). A row
+        // edited after the audit, a swapped file, or a sidecar appearing all fail here, so a
+        // sentinel can never seal evidence about a database that no longer exists as audited.
+        let currentIdentity = try PreparedDatabaseIdentity.compute(at: preparedDBURL)
+        guard currentIdentity == report.preparedDBIdentity else {
+            throw AttachmentApplyError.preparedDatabaseIdentityMismatch(expected: report.preparedDBIdentity, actual: currentIdentity)
+        }
 
         // Structured audit items flow in with their provenance as `detail`, so the display,
         // the reportHash AND the acknowledgement binding all cover "table.column×rows" — a
@@ -330,6 +347,19 @@ public struct AttachmentApply {
                   ack.preparedDBIdentity == request.preparedDBIdentity,
                   ack.unresolvedReportHash == request.unresolvedReportHash else {
                 return .requiresAcknowledgement(request: request, unresolved: unresolved)
+            }
+        }
+
+        // Re-verify EVERY reference the audit resolved — not just this import's copied/
+        // skipped files: a pre-existing referenced attachment deleted or replaced after the
+        // audit must fail closed. lstat first — the entry must STILL be a regular file (a
+        // same-content symlink swapped in is rejected) with the exact audited bytes.
+        for r in referenceAudit.resolved {
+            let target = report.activeAttachmentsDir.appendingPathComponent(r.name)
+            let attrs = try? FileManager.default.attributesOfItem(atPath: target.path)
+            guard (attrs?[.type] as? FileAttributeType) == .typeRegular,
+                  (try? FileHash.sha256Hex(of: target)) == r.sha256 else {
+                throw AttachmentApplyError.referencedFileChangedSinceAudit(r.name)
             }
         }
 
