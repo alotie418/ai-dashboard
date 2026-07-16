@@ -10,9 +10,11 @@ public enum DemoData {
     }
 
     /// Seed a spread of income/expense across months, categories, currencies and
-    /// payment states. Idempotent-ish: only meant for an empty demo ledger.
+    /// payment states. IDEMPOTENT: a no-op (returns 0) if the ledger already has any
+    /// transaction, and rows use stable `demo-N` ids so a re-run can never duplicate.
     @discardableResult
     public static func seed(into store: LedgerStore, locale: AccountingLocale = .CN) throws -> Int {
+        guard try isEmpty(store) else { return 0 }
         let cats = try store.categories(locale: locale)
         func cat(_ slug: String) -> String? { cats.first { $0.slug == slug }?.id }
 
@@ -37,8 +39,8 @@ public enum DemoData {
         ]
 
         try store.db.transaction {
-            for r in rows {
-                var t = Transaction(type: r.0, date: r.1, amount: r.2, currency: r.3,
+            for (i, r) in rows.enumerated() {
+                var t = Transaction(id: "demo-\(i + 1)", type: r.0, date: r.1, amount: r.2, currency: r.3,
                                     categoryID: cat(r.4), counterparty: r.5,
                                     invoiceStatus: r.7, paymentStatus: r.6, description: r.8)
                 if r.6 == .partial { t.paidAmount = (r.2 * 0.6).rounded() }

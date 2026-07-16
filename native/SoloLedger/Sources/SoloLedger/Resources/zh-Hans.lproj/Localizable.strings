@@ -126,6 +126,8 @@
 "overview.currency" = "币种";
 "overview.multiCurrencyNote" = "含多种货币，按币种分别列示，未做汇率换算，不可直接相加。";
 "overview.recent" = "最近交易";
+"overview.emptyPeriod.title" = "本期无数据";
+"overview.emptyPeriod.message" = "所选时段内没有流水。切换到「全部」或换一个时段查看。";
 "overview.loadDemo" = "载入示例数据";
 
 "txn.noResults.title" = "无匹配结果";
@@ -135,3 +137,9 @@
 "date.thisMonth" = "本月";
 "date.thisYear" = "本年";
 "date.filtered" = "已筛选日期";
+
+"delete.confirmTitle" = "确认删除";
+"delete.confirmButton" = "删除 {count} 条";
+"delete.confirmMessage" = "确定删除选中的 {count} 条流水？删除后可撤销。";
+"delete.deleted" = "已删除 {count} 条";
+"delete.undo" = "撤销";

@@ -6,7 +6,6 @@ struct TransactionListView: View {
     @State private var selection = Set<Transaction.ID>()
     @State private var sortOrder = [KeyPathComparator(\Transaction.date, order: .reverse)]
 
-    private var rows: [Transaction] { model.transactions.sorted(using: sortOrder) }
     private var isFiltered: Bool {
         !model.searchText.trimmingCharacters(in: .whitespaces).isEmpty || model.dateFrom != nil || model.dateTo != nil
     }
@@ -29,12 +28,29 @@ struct TransactionListView: View {
         .searchable(text: $model.searchText, placement: .toolbar, prompt: model.t("txn.searchPrompt"))
         .onChange(of: model.searchText) { _ in model.reloadTransactions() }
         .onChange(of: model.filter) { _ in selection.removeAll(); model.reloadTransactions() }
+        .onChange(of: sortOrder) { applySort($0) }
         .toolbar { toolbarContent }
-        .onDeleteCommand(perform: selection.isEmpty ? nil : deleteSelection)
+        .onDeleteCommand(perform: selection.isEmpty ? nil : requestDeleteSelection)
+        .confirmationDialog(
+            model.t("delete.confirmTitle"),
+            isPresented: Binding(get: { model.pendingDeleteIDs != nil },
+                                 set: { if !$0 { model.cancelDelete() } }),
+            titleVisibility: .visible
+        ) {
+            Button(model.t("delete.confirmButton", ["count": String(model.pendingDeleteCount)]), role: .destructive) {
+                model.confirmDelete(); selection.removeAll()
+            }
+            Button(model.t("common.cancel"), role: .cancel) { model.cancelDelete() }
+        } message: {
+            Text(model.t("delete.confirmMessage", ["count": String(model.pendingDeleteCount)]))
+        }
+        .safeAreaInset(edge: .bottom) { undoBar }
     }
 
+    // MARK: - Table (sort is query-driven, applied before LIMIT)
+
     private var table: some View {
-        Table(rows, selection: $selection, sortOrder: $sortOrder) {
+        Table(model.transactions, selection: $selection, sortOrder: $sortOrder) {
             TableColumn(model.t("txn.col.date"), value: \.date) { t in
                 Text(t.date).monospacedDigit()
             }
@@ -71,12 +87,38 @@ struct TransactionListView: View {
                 Divider()
             }
             if !ids.isEmpty {
-                Button(model.t("common.delete"), role: .destructive) {
-                    model.delete(ids: ids); selection.removeAll()
-                }
+                Button(model.t("common.delete"), role: .destructive) { model.requestDelete(ids) }
             }
         } primaryAction: { ids in
             if let id = ids.first, let t = transaction(id) { model.edit(t) }
+        }
+    }
+
+    /// Map the clicked column header to AppModel.sort and re-run the DB query, so the
+    /// ORDER BY applies BEFORE the LIMIT (not a local sort of the loaded page).
+    private func applySort(_ order: [KeyPathComparator<Transaction>]) {
+        guard let c = order.first else { return }
+        let ascending = c.order == .forward
+        if c.keyPath == \Transaction.amount {
+            model.sort = ascending ? .amountAscending : .amountDescending
+        } else {
+            model.sort = ascending ? .dateAscending : .dateDescending
+        }
+        model.reloadTransactions()
+    }
+
+    @ViewBuilder private var undoBar: some View {
+        if !model.lastDeleted.isEmpty {
+            HStack {
+                Image(systemName: "trash")
+                Text(model.t("delete.deleted", ["count": String(model.lastDeleted.count)]))
+                Spacer()
+                Button(model.t("delete.undo")) { model.undoDelete() }
+                Button { model.dismissUndo() } label: { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(.regularMaterial)
         }
     }
 
@@ -114,7 +156,7 @@ struct TransactionListView: View {
             } label: { Label(model.t("common.edit"), systemImage: "pencil") }
             .disabled(selection.count != 1)
 
-            Button(role: .destructive, action: deleteSelection) {
+            Button(role: .destructive, action: requestDeleteSelection) {
                 Label(model.t("common.delete"), systemImage: "trash")
             }
             .disabled(selection.isEmpty)
@@ -141,9 +183,7 @@ struct TransactionListView: View {
         model.reloadTransactions()
     }
 
-    private func deleteSelection() {
-        model.delete(ids: selection); selection.removeAll()
-    }
+    private func requestDeleteSelection() { model.requestDelete(selection) }
 
     private func transaction(_ id: Transaction.ID) -> Transaction? { model.transactions.first { $0.id == id } }
 

@@ -231,8 +231,14 @@ final class AppModel: ObservableObject {
             let (from, to) = overviewPeriod.range()
             summary = try store.summary(from: from, to: to)
             currencySummaries = try store.summaryByCurrency(from: from, to: to)
-            monthly = try store.monthlyTotals(currency: currencySummaries.first?.currency)
-            recent = try store.listTransactions(limit: 6)   // latest, unfiltered
+            // Chart: single primary currency within the SAME period — never a
+            // nil-currency blend, never other periods' data; empty if the period has none.
+            if let primary = currencySummaries.first?.currency {
+                monthly = try store.monthlyTotals(currency: primary, from: from, to: to)
+            } else {
+                monthly = []
+            }
+            recent = try store.listTransactions(from: from, to: to, limit: 6)   // same period, latest
             reloadTransactions()
         } catch {
             actionError = "\(error)"
@@ -259,10 +265,13 @@ final class AppModel: ObservableObject {
         categories.filter { $0.type == type }
     }
 
-    // MARK: - Demo data (Debug / .dev only — never touches production data)
+    // MARK: - Demo data (DEBUG / .dev only — never touches production data)
 
     var isLedgerEmpty: Bool { transactions.isEmpty && currencySummaries.isEmpty }
 
+    #if DEBUG
+    /// Seed anonymized demo data. Idempotent: `DemoData.seed` is a no-op on a
+    /// non-empty ledger, so repeated taps never duplicate.
     func loadDemoData() {
         guard let store else { return }
         do {
@@ -270,6 +279,7 @@ final class AppModel: ObservableObject {
             reloadAll()
         } catch { actionError = "\(error)" }
     }
+    #endif
 
     /// Duplicate a transaction (new id, same fields) — a native list convenience.
     func duplicate(id: String) {
@@ -302,13 +312,45 @@ final class AppModel: ObservableObject {
         } catch { actionError = "\(error)" }
     }
 
-    func delete(ids: Set<Transaction.ID>) {
-        guard let store, !ids.isEmpty else { return }
+    // MARK: - Delete (single confirmation flow for all entry points) + undo
+
+    /// Non-nil → a delete is awaiting confirmation. The DB is NOT modified until
+    /// `confirmDelete()`. All entry points (toolbar / Delete key / context menu)
+    /// funnel through `requestDelete`.
+    @Published var pendingDeleteIDs: Set<Transaction.ID>?
+    @Published private(set) var lastDeleted: [Transaction] = []
+
+    var pendingDeleteCount: Int { pendingDeleteIDs?.count ?? 0 }
+
+    func requestDelete(_ ids: Set<Transaction.ID>) {
+        guard !ids.isEmpty else { return }
+        pendingDeleteIDs = ids
+    }
+
+    func cancelDelete() { pendingDeleteIDs = nil }
+
+    func confirmDelete() {
+        guard let store, let ids = pendingDeleteIDs else { return }
+        pendingDeleteIDs = nil
         do {
+            // Snapshot the rows first so the delete can be undone.
+            let snapshot = ids.compactMap { try? store.transaction(id: $0) }.compactMap { $0 }
             for id in ids { try store.delete(id: id) }
+            lastDeleted = snapshot
             reloadAll()
         } catch { actionError = "\(error)" }
     }
+
+    func undoDelete() {
+        guard let store, !lastDeleted.isEmpty else { return }
+        do {
+            try store.db.transaction { for t in lastDeleted { try store.create(t) } }
+            lastDeleted = []
+            reloadAll()
+        } catch { actionError = "\(error)" }
+    }
+
+    func dismissUndo() { lastDeleted = [] }
 
     /// Default currency for a brand-new transaction, from the accounting regime.
     var defaultCurrency: String { accountingLocale.defaultCurrency }

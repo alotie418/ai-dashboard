@@ -97,17 +97,26 @@ struct OverviewView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            EmptyStateView(systemImage: "chart.pie",
-                           title: model.t("overview.empty.title"),
-                           message: model.t("overview.empty.message"))
-            #if DEBUG
-            Button(model.t("overview.loadDemo")) { model.loadDemoData() }
-                .buttonStyle(.bordered)
-            #endif
+    @ViewBuilder private var emptyState: some View {
+        if model.overviewPeriod == .all {
+            // Whole ledger is empty.
+            VStack(spacing: 12) {
+                EmptyStateView(systemImage: "chart.pie",
+                               title: model.t("overview.empty.title"),
+                               message: model.t("overview.empty.message"))
+                #if DEBUG
+                Button(model.t("overview.loadDemo")) { model.loadDemoData() }
+                    .buttonStyle(.bordered)
+                #endif
+            }
+            .frame(maxWidth: .infinity)
+        } else {
+            // Data exists in other periods, but not this one.
+            EmptyStateView(systemImage: "calendar.badge.exclamationmark",
+                           title: model.t("overview.emptyPeriod.title"),
+                           message: model.t("overview.emptyPeriod.message"))
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Monthly chart (single primary currency)

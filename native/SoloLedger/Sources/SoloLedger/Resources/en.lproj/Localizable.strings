@@ -126,6 +126,8 @@
 "overview.currency" = "Currency";
 "overview.multiCurrencyNote" = "Multiple currencies — shown separately, no FX conversion; these are not directly additive.";
 "overview.recent" = "Recent transactions";
+"overview.emptyPeriod.title" = "No data this period";
+"overview.emptyPeriod.message" = "No transactions in the selected period. Switch to “All time” or pick another period.";
 "overview.loadDemo" = "Load sample data";
 
 "txn.noResults.title" = "No matches";
@@ -135,3 +137,9 @@
 "date.thisMonth" = "This month";
 "date.thisYear" = "This year";
 "date.filtered" = "Date filtered";
+
+"delete.confirmTitle" = "Confirm delete";
+"delete.confirmButton" = "Delete {count}";
+"delete.confirmMessage" = "Delete the {count} selected transaction(s)? You can undo this.";
+"delete.deleted" = "{count} deleted";
+"delete.undo" = "Undo";

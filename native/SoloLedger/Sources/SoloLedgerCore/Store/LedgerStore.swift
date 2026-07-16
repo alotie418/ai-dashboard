@@ -171,12 +171,18 @@ public final class LedgerStore {
         }
     }
 
-    /// Monthly income/expense totals for the last `months` buckets present. Pass a
-    /// `currency` to keep amounts single-currency (the chart never blends currencies).
-    public func monthlyTotals(currency: String? = nil, limitMonths: Int = 12) throws -> [MonthlyTotal] {
-        var sql = "SELECT substr(date, 1, 7) AS m, type, COALESCE(SUM(amount), 0) AS total FROM transactions"
+    /// Monthly income/expense totals over an optional date range. Pass a `currency`
+    /// to keep amounts single-currency — the chart never blends currencies, and with
+    /// a range it never mixes in other periods' data.
+    public func monthlyTotals(currency: String? = nil, from: String? = nil, to: String? = nil,
+                              limitMonths: Int = 12) throws -> [MonthlyTotal] {
+        var clauses: [String] = []
         var params: [SQLiteValue] = []
-        if let currency { sql += " WHERE currency = ?"; params.append(.text(currency)) }
+        if let currency { clauses.append("currency = ?"); params.append(.text(currency)) }
+        if let from { clauses.append("date >= ?"); params.append(.text(from)) }
+        if let to { clauses.append("date <= ?"); params.append(.text(to)) }
+        var sql = "SELECT substr(date, 1, 7) AS m, type, COALESCE(SUM(amount), 0) AS total FROM transactions"
+        if !clauses.isEmpty { sql += " WHERE " + clauses.joined(separator: " AND ") }
         sql += " GROUP BY m, type ORDER BY m"
         let rows = try db.query(sql, params)
         var buckets: [String: (income: Double, expense: Double)] = [:]
