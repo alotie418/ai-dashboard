@@ -133,6 +133,40 @@ public struct LedgerSummary: Equatable, Sendable {
     }
 }
 
+/// Per-currency income/expense totals. Amounts in different currencies are NEVER
+/// summed into one figure — each currency is reported separately (no FX conversion
+/// is invented). Mirrors the raw stored amounts; the UI presents these per-currency.
+public struct CurrencySummary: Identifiable, Equatable, Sendable {
+    public var currency: String
+    public var incomeTotal: Double
+    public var expenseTotal: Double
+    public var incomeCount: Int
+    public var expenseCount: Int
+    public var net: Double { incomeTotal - expenseTotal }
+    public var count: Int { incomeCount + expenseCount }
+    public var id: String { currency }
+
+    public init(currency: String, incomeTotal: Double = 0, expenseTotal: Double = 0,
+                incomeCount: Int = 0, expenseCount: Int = 0) {
+        self.currency = currency; self.incomeTotal = incomeTotal; self.expenseTotal = expenseTotal
+        self.incomeCount = incomeCount; self.expenseCount = expenseCount
+    }
+}
+
+/// Sort orders for the transaction list (client- or query-side).
+public enum TransactionSort: String, CaseIterable, Sendable {
+    case dateDescending, dateAscending, amountDescending, amountAscending
+
+    var orderBy: String {
+        switch self {
+        case .dateDescending: return "date DESC, created_at DESC"
+        case .dateAscending: return "date ASC, created_at ASC"
+        case .amountDescending: return "amount DESC, date DESC"
+        case .amountAscending: return "amount ASC, date DESC"
+        }
+    }
+}
+
 /// One month's income/expense totals for the Swift Charts overview.
 public struct MonthlyTotal: Identifiable, Equatable, Sendable {
     public var month: String   // 'YYYY-MM'

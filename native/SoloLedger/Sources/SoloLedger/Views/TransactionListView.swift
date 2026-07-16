@@ -4,28 +4,38 @@ import SoloLedgerCore
 struct TransactionListView: View {
     @EnvironmentObject var model: AppModel
     @State private var selection = Set<Transaction.ID>()
+    @State private var sortOrder = [KeyPathComparator(\Transaction.date, order: .reverse)]
+
+    private var rows: [Transaction] { model.transactions.sorted(using: sortOrder) }
+    private var isFiltered: Bool {
+        !model.searchText.trimmingCharacters(in: .whitespaces).isEmpty || model.dateFrom != nil || model.dateTo != nil
+    }
 
     var body: some View {
         Group {
             if model.transactions.isEmpty {
-                EmptyStateView(systemImage: "tray",
-                               title: model.t("txn.empty.title"),
-                               message: model.t("txn.empty.message"))
+                if isFiltered {
+                    EmptyStateView(systemImage: "magnifyingglass",
+                                   title: model.t("txn.noResults.title"),
+                                   message: model.t("txn.noResults.message"))
+                } else {
+                    emptyLedger
+                }
             } else {
                 table
             }
         }
         .navigationTitle(model.t("nav.transactions"))
+        .searchable(text: $model.searchText, placement: .toolbar, prompt: model.t("txn.searchPrompt"))
+        .onChange(of: model.searchText) { _ in model.reloadTransactions() }
+        .onChange(of: model.filter) { _ in selection.removeAll(); model.reloadTransactions() }
         .toolbar { toolbarContent }
-        .onChange(of: model.filter) { _ in
-            selection.removeAll()
-            model.reloadTransactions()
-        }
+        .onDeleteCommand(perform: selection.isEmpty ? nil : deleteSelection)
     }
 
     private var table: some View {
-        Table(model.transactions, selection: $selection) {
-            TableColumn(model.t("txn.col.date")) { t in
+        Table(rows, selection: $selection, sortOrder: $sortOrder) {
+            TableColumn(model.t("txn.col.date"), value: \.date) { t in
                 Text(t.date).monospacedDigit()
             }
             .width(min: 92, ideal: 100)
@@ -34,97 +44,112 @@ struct TransactionListView: View {
                 Text(model.t("type.\(t.type.rawValue)"))
                     .foregroundStyle(t.type == .income ? Color.green : Color.red)
             }
-            .width(min: 60, ideal: 70)
+            .width(min: 56, ideal: 66)
 
-            TableColumn(model.t("txn.col.category")) { t in
-                Text(categoryName(t.categoryID))
-            }
+            TableColumn(model.t("txn.col.category")) { t in Text(categoryName(t.categoryID)) }
 
             TableColumn(model.t("txn.col.counterparty")) { t in
                 Text(t.counterparty.isEmpty ? "—" : t.counterparty)
             }
 
-            TableColumn(model.t("txn.col.amount")) { t in
+            TableColumn(model.t("txn.col.amount"), value: \.amount) { t in
                 Text(Money.string(t.amount, currency: t.currency))
                     .monospacedDigit()
                     .foregroundStyle(t.type == .income ? Color.green : Color.primary)
             }
-            .width(min: 100, ideal: 120)
+            .width(min: 100, ideal: 124)
 
             TableColumn(model.t("txn.col.payment")) { t in
-                Text(model.t("payment.\(t.paymentStatus.rawValue)"))
-                    .foregroundStyle(.secondary)
+                Text(model.t("payment.\(t.paymentStatus.rawValue)")).foregroundStyle(.secondary)
             }
-            .width(min: 70, ideal: 84)
+            .width(min: 66, ideal: 80)
         }
         .contextMenu(forSelectionType: Transaction.ID.self) { ids in
             if ids.count == 1, let t = transaction(ids.first!) {
                 Button(model.t("common.edit")) { model.edit(t) }
+                Button(model.t("common.duplicate")) { model.duplicate(id: t.id) }
+                Divider()
             }
             if !ids.isEmpty {
-                Button(model.t("common.delete"), role: .destructive) { model.delete(ids: ids) }
+                Button(model.t("common.delete"), role: .destructive) {
+                    model.delete(ids: ids); selection.removeAll()
+                }
             }
         } primaryAction: { ids in
             if let id = ids.first, let t = transaction(id) { model.edit(t) }
         }
     }
 
+    private var emptyLedger: some View {
+        VStack(spacing: 12) {
+            EmptyStateView(systemImage: "tray",
+                           title: model.t("txn.empty.title"),
+                           message: model.t("txn.empty.message"))
+            #if DEBUG
+            Button(model.t("overview.loadDemo")) { model.loadDemoData() }.buttonStyle(.bordered)
+            #endif
+        }
+    }
+
     @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigation) {
             Picker(model.t("filter.label"), selection: $model.filter) {
-                ForEach(TransactionFilter.allCases) { f in
-                    Text(model.t(f.titleKey)).tag(f)
-                }
+                ForEach(TransactionFilter.allCases) { f in Text(model.t(f.titleKey)).tag(f) }
             }
             .pickerStyle(.segmented)
             .fixedSize()
         }
+        ToolbarItem(placement: .navigation) {
+            Menu {
+                Button(model.t("date.all")) { setDateRange(nil, nil) }
+                Button(model.t("date.thisMonth")) { applyPeriod(.month) }
+                Button(model.t("date.thisYear")) { applyPeriod(.year) }
+            } label: {
+                Label(dateFilterLabel, systemImage: "calendar")
+            }
+        }
         ToolbarItemGroup(placement: .primaryAction) {
             Button {
                 if let id = selection.first, let t = transaction(id) { model.edit(t) }
-            } label: {
-                Label(model.t("common.edit"), systemImage: "pencil")
-            }
+            } label: { Label(model.t("common.edit"), systemImage: "pencil") }
             .disabled(selection.count != 1)
 
-            Button(role: .destructive) {
-                model.delete(ids: selection)
-                selection.removeAll()
-            } label: {
+            Button(role: .destructive, action: deleteSelection) {
                 Label(model.t("common.delete"), systemImage: "trash")
             }
             .disabled(selection.isEmpty)
 
-            Button {
-                model.importCSVViaPanel()
-            } label: {
-                Label(model.t("cmd.importCSV"), systemImage: "square.and.arrow.down")
-            }
-
-            Button {
-                model.exportCSVViaPanel()
-            } label: {
-                Label(model.t("cmd.exportCSV"), systemImage: "square.and.arrow.up")
-            }
-
-            Button {
-                model.newTransaction()
-            } label: {
-                Label(model.t("cmd.newTransaction"), systemImage: "plus")
-            }
-            .keyboardShortcut("n", modifiers: .command)
+            Button { model.importCSVViaPanel() } label: { Label(model.t("cmd.importCSV"), systemImage: "square.and.arrow.down") }
+            Button { model.exportCSVViaPanel() } label: { Label(model.t("cmd.exportCSV"), systemImage: "square.and.arrow.up") }
+            Button { model.newTransaction() } label: { Label(model.t("cmd.newTransaction"), systemImage: "plus") }
+                .keyboardShortcut("n", modifiers: .command)
         }
     }
 
-    private func transaction(_ id: Transaction.ID) -> Transaction? {
-        model.transactions.first { $0.id == id }
+    private var dateFilterLabel: String {
+        model.dateFrom == nil && model.dateTo == nil ? model.t("date.all") : model.t("date.filtered")
     }
+
+    private func applyPeriod(_ period: OverviewPeriod) {
+        let (from, to) = period.range()
+        setDateRange(from.flatMap(DateFormat.date(from:)), to.flatMap(DateFormat.date(from:)))
+    }
+
+    private func setDateRange(_ from: Date?, _ to: Date?) {
+        model.dateFrom = from; model.dateTo = to
+        selection.removeAll()
+        model.reloadTransactions()
+    }
+
+    private func deleteSelection() {
+        model.delete(ids: selection); selection.removeAll()
+    }
+
+    private func transaction(_ id: Transaction.ID) -> Transaction? { model.transactions.first { $0.id == id } }
 
     private func categoryName(_ id: String?) -> String {
         guard let id else { return "—" }
-        if let cat = model.categories.first(where: { $0.id == id }) {
-            return model.categoryLabel(cat)
-        }
+        if let cat = model.categories.first(where: { $0.id == id }) { return model.categoryLabel(cat) }
         return id
     }
 }

@@ -5,6 +5,7 @@ import SoloLedgerCore
 struct SoloLedgerApp: App {
     @StateObject private var model = AppModel()
 
+    @MainActor
     init() {
         // Headless smoke test: run the data-layer end-to-end and exit, without
         // opening the GUI or the preview DB. Used by scripts/tests in CI.
@@ -31,6 +32,7 @@ struct SoloLedgerApp: App {
                 .environment(\.locale, Locale(identifier: model.language))
                 .task { model.boot() }
         }
+        .defaultSize(width: 1120, height: 740)
         .windowToolbarStyle(.unified)
         .commands { AppCommands(model: model) }
 

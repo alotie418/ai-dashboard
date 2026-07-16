@@ -115,3 +115,23 @@
 "recovery.blankConfirmTitle" = "确认创建空白账本？";
 "recovery.blankConfirm" = "创建空白账本";
 "recovery.blankConfirmMessage" = "这将以空账本启动，不导入旧数据（原始数据仍保留在磁盘上、未删除）。仅在确认无需迁移旧数据时选择。";
+
+"common.duplicate" = "复制";
+
+"overview.period" = "时段";
+"period.month" = "本月";
+"period.year" = "本年";
+"period.all" = "全部";
+"overview.byCurrency" = "按币种";
+"overview.currency" = "币种";
+"overview.multiCurrencyNote" = "含多种货币，按币种分别列示，未做汇率换算，不可直接相加。";
+"overview.recent" = "最近交易";
+"overview.loadDemo" = "载入示例数据";
+
+"txn.noResults.title" = "无匹配结果";
+"txn.noResults.message" = "没有符合当前搜索或筛选条件的流水。清除条件再试。";
+"txn.searchPrompt" = "搜索往来对象、备注、发票号";
+"date.all" = "全部日期";
+"date.thisMonth" = "本月";
+"date.thisYear" = "本年";
+"date.filtered" = "已筛选日期";

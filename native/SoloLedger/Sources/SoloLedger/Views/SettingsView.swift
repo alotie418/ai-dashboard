@@ -88,6 +88,11 @@ private struct DataSettingsTab: View {
                     Button(model.t("cmd.importCSV")) { model.importCSVViaPanel() }
                 }
             }
+            #if DEBUG
+            Section("Debug") {
+                Button(model.t("overview.loadDemo")) { model.loadDemoData() }
+            }
+            #endif
         }
         .formStyle(.grouped)
     }

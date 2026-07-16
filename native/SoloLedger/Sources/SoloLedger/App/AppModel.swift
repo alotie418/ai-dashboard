@@ -30,6 +30,28 @@ enum TransactionFilter: String, CaseIterable, Identifiable, Hashable {
     var titleKey: String { "filter.\(rawValue)" }
 }
 
+/// Overview time window.
+enum OverviewPeriod: String, CaseIterable, Identifiable, Hashable {
+    case month, year, all
+    var id: String { rawValue }
+    var titleKey: String { "period.\(rawValue)" }
+
+    /// (from, to) as 'YYYY-MM-DD' strings, or nil for all-time.
+    func range(now: Date = Date()) -> (from: String?, to: String?) {
+        let cal = Calendar(identifier: .gregorian)
+        switch self {
+        case .all:
+            return (nil, nil)
+        case .month:
+            let start = cal.date(from: cal.dateComponents([.year, .month], from: now)) ?? now
+            return (DateFormat.string(from: start), DateFormat.string(from: now))
+        case .year:
+            let start = cal.date(from: cal.dateComponents([.year], from: now)) ?? now
+            return (DateFormat.string(from: start), DateFormat.string(from: now))
+        }
+    }
+}
+
 /// Central observable app state. Owns the single `LedgerStore` connection and the
 /// UI-language localizer. All mutations funnel through here so views stay thin.
 @MainActor
@@ -38,7 +60,16 @@ final class AppModel: ObservableObject {
     @Published private(set) var transactions: [Transaction] = []
     @Published private(set) var categories: [Category] = []
     @Published private(set) var summary = LedgerSummary()
+    @Published private(set) var currencySummaries: [CurrencySummary] = []
     @Published private(set) var monthly: [MonthlyTotal] = []
+    @Published private(set) var recent: [Transaction] = []
+
+    // Overview + transaction-list filters
+    @Published var overviewPeriod: OverviewPeriod = .all
+    @Published var searchText = ""
+    @Published var sort: TransactionSort = .dateDescending
+    @Published var dateFrom: Date?
+    @Published var dateTo: Date?
 
     // Preferences
     @Published var section: SidebarSection = .overview
@@ -81,6 +112,14 @@ final class AppModel: ObservableObject {
 
     func boot() {
         guard store == nil else { return }
+        #if DEBUG
+        if CommandLine.arguments.contains("--demo") {
+            let url = (try? AppPaths.dataDirectory().appendingPathComponent("demo.db"))
+                ?? FileManager.default.temporaryDirectory.appendingPathComponent("demo.db")
+            bootDemo(databaseURL: url)
+            return
+        }
+        #endif
         do {
             // Decide what to do about the active database. In the native RELEASE app
             // (same Bundle ID → same MAS container) this discovers an Electron DB and
@@ -169,15 +208,32 @@ final class AppModel: ObservableObject {
         }
     }
 
+    #if DEBUG
+    /// Boot against a specific DB (for screenshots), seeding demo data. Never used
+    /// with the production container.
+    func bootDemo(databaseURL: URL, language: String = "zh-Hans") {
+        do {
+            let store = try LedgerStore(databaseURL: databaseURL)
+            if try DemoData.isEmpty(store) { try DemoData.seed(into: store) }
+            try finishBoot(with: store)
+            setLanguage(language, persist: false)
+            onboardingDone = true
+        } catch { bootError = "\(error)" }
+    }
+    #endif
+
     // MARK: - Loading
 
     func reloadAll() {
         guard let store else { return }
         do {
             categories = try store.categories(locale: accountingLocale)
-            transactions = try store.listTransactions(type: filter.type)
-            summary = try store.summary()
-            monthly = try store.monthlyTotals()
+            let (from, to) = overviewPeriod.range()
+            summary = try store.summary(from: from, to: to)
+            currencySummaries = try store.summaryByCurrency(from: from, to: to)
+            monthly = try store.monthlyTotals(currency: currencySummaries.first?.currency)
+            recent = try store.listTransactions(limit: 6)   // latest, unfiltered
+            reloadTransactions()
         } catch {
             actionError = "\(error)"
         }
@@ -186,12 +242,41 @@ final class AppModel: ObservableObject {
     func reloadTransactions() {
         guard let store else { return }
         do {
-            transactions = try store.listTransactions(type: filter.type)
+            transactions = try store.listTransactions(
+                type: filter.type,
+                from: dateFrom.map(DateFormat.string(from:)),
+                to: dateTo.map(DateFormat.string(from:)),
+                search: searchText,
+                sort: sort)
         } catch { actionError = "\(error)" }
     }
 
+    /// True when more than one currency is present → the UI must NOT show a single
+    /// blended total; it presents per-currency figures instead.
+    var isMultiCurrency: Bool { currencySummaries.count > 1 }
+
     func categories(for type: TransactionType) -> [Category] {
         categories.filter { $0.type == type }
+    }
+
+    // MARK: - Demo data (Debug / .dev only — never touches production data)
+
+    var isLedgerEmpty: Bool { transactions.isEmpty && currencySummaries.isEmpty }
+
+    func loadDemoData() {
+        guard let store else { return }
+        do {
+            try DemoData.seed(into: store, locale: accountingLocale)
+            reloadAll()
+        } catch { actionError = "\(error)" }
+    }
+
+    /// Duplicate a transaction (new id, same fields) — a native list convenience.
+    func duplicate(id: String) {
+        guard let store, var t = try? store.transaction(id: id) else { return }
+        t.id = IDGenerator.transactionID()
+        t.createdAt = nil; t.updatedAt = nil
+        save(t, isNew: true)
     }
 
     // MARK: - Editor intents

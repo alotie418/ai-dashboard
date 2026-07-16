@@ -115,3 +115,23 @@
 "recovery.blankConfirmTitle" = "Start with a blank ledger?";
 "recovery.blankConfirm" = "Create blank ledger";
 "recovery.blankConfirmMessage" = "This starts an empty ledger and does NOT import your earlier data (the original stays on disk, undeleted). Only choose this if you're sure you don't need the old data.";
+
+"common.duplicate" = "Duplicate";
+
+"overview.period" = "Period";
+"period.month" = "This month";
+"period.year" = "This year";
+"period.all" = "All time";
+"overview.byCurrency" = "By currency";
+"overview.currency" = "Currency";
+"overview.multiCurrencyNote" = "Multiple currencies — shown separately, no FX conversion; these are not directly additive.";
+"overview.recent" = "Recent transactions";
+"overview.loadDemo" = "Load sample data";
+
+"txn.noResults.title" = "No matches";
+"txn.noResults.message" = "No transactions match the current search or filters. Try clearing them.";
+"txn.searchPrompt" = "Search counterparty, note, invoice #";
+"date.all" = "All dates";
+"date.thisMonth" = "This month";
+"date.thisYear" = "This year";
+"date.filtered" = "Date filtered";

@@ -56,6 +56,8 @@ public final class LedgerStore {
                                  from: String? = nil,
                                  to: String? = nil,
                                  categoryID: String? = nil,
+                                 search: String? = nil,
+                                 sort: TransactionSort = .dateDescending,
                                  limit: Int = 500) throws -> [Transaction] {
         var clauses: [String] = []
         var params: [SQLiteValue] = []
@@ -63,10 +65,15 @@ public final class LedgerStore {
         if let from { clauses.append("date >= ?"); params.append(.text(from)) }
         if let to { clauses.append("date <= ?"); params.append(.text(to)) }
         if let categoryID { clauses.append("category_id = ?"); params.append(.text(categoryID)) }
+        if let raw = search?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty {
+            let like = "%\(raw)%"
+            clauses.append("(counterparty LIKE ? OR description LIKE ? OR invoice_no LIKE ?)")
+            params.append(.text(like)); params.append(.text(like)); params.append(.text(like))
+        }
 
         var sql = "SELECT * FROM transactions"
         if !clauses.isEmpty { sql += " WHERE " + clauses.joined(separator: " AND ") }
-        sql += " ORDER BY date DESC, created_at DESC"
+        sql += " ORDER BY \(sort.orderBy)"
         let clamped = min(max(limit, 1), 5000)
         sql += " LIMIT \(clamped)"
         return try db.query(sql, params).compactMap(Transaction.from)
@@ -132,12 +139,46 @@ public final class LedgerStore {
         return LedgerSummary(incomeTotal: inc.0, incomeCount: inc.1, expenseTotal: exp.0, expenseCount: exp.1)
     }
 
-    /// Monthly income/expense totals for the last `months` calendar buckets present.
-    public func monthlyTotals(limitMonths: Int = 12) throws -> [MonthlyTotal] {
+    /// Income/expense totals grouped BY currency — never a single blended total.
+    /// Sorted by activity (most transactions first), then currency code.
+    public func summaryByCurrency(from: String? = nil, to: String? = nil) throws -> [CurrencySummary] {
+        var clauses: [String] = []
+        var params: [SQLiteValue] = []
+        if let from { clauses.append("date >= ?"); params.append(.text(from)) }
+        if let to { clauses.append("date <= ?"); params.append(.text(to)) }
+        let whereSQL = clauses.isEmpty ? "" : " WHERE " + clauses.joined(separator: " AND ")
         let rows = try db.query("""
-            SELECT substr(date, 1, 7) AS m, type, COALESCE(SUM(amount), 0) AS total
-            FROM transactions GROUP BY m, type ORDER BY m
-            """)
+            SELECT currency, type, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS cnt
+            FROM transactions\(whereSQL)
+            GROUP BY currency, type
+            """, params)
+
+        var map: [String: CurrencySummary] = [:]
+        for row in rows {
+            let cur = row.string("currency") ?? "CNY"
+            var s = map[cur] ?? CurrencySummary(currency: cur)
+            let total = row.double("total") ?? 0
+            let cnt = row.int("cnt") ?? 0
+            if row.string("type") == TransactionType.income.rawValue {
+                s.incomeTotal += total; s.incomeCount += cnt
+            } else {
+                s.expenseTotal += total; s.expenseCount += cnt
+            }
+            map[cur] = s
+        }
+        return map.values.sorted { a, b in
+            a.count != b.count ? a.count > b.count : a.currency < b.currency
+        }
+    }
+
+    /// Monthly income/expense totals for the last `months` buckets present. Pass a
+    /// `currency` to keep amounts single-currency (the chart never blends currencies).
+    public func monthlyTotals(currency: String? = nil, limitMonths: Int = 12) throws -> [MonthlyTotal] {
+        var sql = "SELECT substr(date, 1, 7) AS m, type, COALESCE(SUM(amount), 0) AS total FROM transactions"
+        var params: [SQLiteValue] = []
+        if let currency { sql += " WHERE currency = ?"; params.append(.text(currency)) }
+        sql += " GROUP BY m, type ORDER BY m"
+        let rows = try db.query(sql, params)
         var buckets: [String: (income: Double, expense: Double)] = [:]
         var order: [String] = []
         for row in rows {
