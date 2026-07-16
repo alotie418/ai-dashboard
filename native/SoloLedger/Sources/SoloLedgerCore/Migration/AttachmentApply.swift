@@ -14,6 +14,10 @@ public struct UnresolvedReport: Codable, Equatable {
             case missingStagedFile
             case skippedSymlink, skippedDirectory, skippedSpecial, rejectedName
             case danglingReference
+            /// A stored DB reference that is not a well-formed `attachments/docs/<name>`
+            /// value at all (wrong prefix, traversal, absolute path, non-TEXT column value).
+            /// Introduced with manifest formatVersion 2.
+            case invalidReference
         }
         public var name: String
         public var kind: Kind
@@ -49,40 +53,9 @@ public struct UnresolvedReport: Codable, Equatable {
     func merged(with extra: [Item]) -> UnresolvedReport { UnresolvedReport(items: items + extra) }
 }
 
-// MARK: - Reference audit + acknowledgement
+// MARK: - Acknowledgement
 
-/// Un-forgeable DB-reference-audit evidence, BOUND to the exact import it scanned: the
-/// importID, the snapshot identity (DB+WAL), the attachment-manifest identity, and the
-/// prepared DB it audited. `complete` matches every field against the report and rejects any
-/// cross-import / cross-snapshot / cross-database audit. The initializer is INTERNAL, so only
-/// Core (`AttachmentReferenceAuditor`) and `@testable` tests can construct evidence — a
-/// production caller can never fabricate an audit.
-public struct ReferenceAudit: Equatable {
-    public let importID: String
-    public let snapshotIdentitySHA256: String
-    public let attachmentManifestSHA256: String
-    public let preparedDBIdentity: String
-    public let danglingReferences: [String]
-    init(importID: String, snapshotIdentitySHA256: String, attachmentManifestSHA256: String,
-         preparedDBIdentity: String, danglingReferences: [String]) {
-        self.importID = importID
-        self.snapshotIdentitySHA256 = snapshotIdentitySHA256
-        self.attachmentManifestSHA256 = attachmentManifestSHA256
-        self.preparedDBIdentity = preparedDBIdentity
-        self.danglingReferences = danglingReferences
-    }
-}
-
-/// The ONLY sanctioned producer of `ReferenceAudit` evidence — it binds the audit to the exact
-/// import + snapshot + attachment set + prepared DB it scanned. The real ledger-reference scan
-/// is a LATER commit; until then `audit` throws, so no valid audit can be produced and the App
-/// cannot reach completion (it has no other way to construct a `ReferenceAudit`).
-public struct AttachmentReferenceAuditor {
-    public init() {}
-    public func audit(report: AttachmentApplyReport, preparedDatabaseAt url: URL) throws -> ReferenceAudit {
-        throw AttachmentApplyError.referenceAuditNotImplemented
-    }
-}
+// `ReferenceAudit` + its only sanctioned producer live in AttachmentReferenceAuditor.swift.
 
 /// What a caller must acknowledge: the FULL operation identity plus the unresolved-report hash.
 /// An `Acknowledgement` can only be produced from a request, so it is inseparable from that
@@ -150,8 +123,11 @@ public enum AttachmentApplyError: Error, CustomStringConvertible {
     case activeFileHashMismatch(String)
     case sentinelIdentityMismatch(String)
     case unsupportedManifestFormat(Int?)
-    case referenceAuditNotImplemented
     case referenceAuditMismatch(field: String)
+    case preparedDatabaseIdentityMismatch(expected: String, actual: String)
+    case preparedDatabaseCorrupt(String)
+    case preparedDatabaseSchemaUnsupported(String)
+    case preparedDatabaseChangedDuringAudit(before: String, after: String)
 
     public var description: String {
         switch self {
@@ -167,8 +143,11 @@ public enum AttachmentApplyError: Error, CustomStringConvertible {
         case .activeFileHashMismatch(let n): return "Active attachment '\(n)' changed after planning — refusing to complete"
         case .sentinelIdentityMismatch(let id): return "A completion sentinel for import \(id) already exists with a different identity — refusing to overwrite"
         case .unsupportedManifestFormat(let v): return "Unsupported manifest formatVersion \(v.map(String.init) ?? "nil") — refusing to process"
-        case .referenceAuditNotImplemented: return "The DB reference auditor is not implemented yet — completion cannot be reached"
         case .referenceAuditMismatch(let field): return "Reference audit does not belong to this import (\(field) mismatch) — refusing to complete"
+        case .preparedDatabaseIdentityMismatch: return "The prepared database is not the one this import was applied against — refusing to audit"
+        case .preparedDatabaseCorrupt(let m): return "Prepared database failed its integrity check: \(m)"
+        case .preparedDatabaseSchemaUnsupported(let m): return "Prepared database schema is unsupported (\(m)) — refusing to audit references"
+        case .preparedDatabaseChangedDuringAudit: return "The prepared database changed during the reference audit — refusing to trust the scan"
         }
     }
 }
@@ -322,8 +301,16 @@ public struct AttachmentApply {
         guard referenceAudit.attachmentManifestSHA256 == report.manifest.attachmentManifestSHA256 else { throw AttachmentApplyError.referenceAuditMismatch(field: "attachmentManifest") }
         guard referenceAudit.preparedDBIdentity == report.preparedDBIdentity else { throw AttachmentApplyError.referenceAuditMismatch(field: "preparedDBIdentity") }
 
-        let dangling = referenceAudit.danglingReferences.map { UnresolvedReport.Item(name: $0, kind: .danglingReference) }
-        let unresolved = report.fileUnresolved.merged(with: dangling)
+        // Structured audit items flow in with their provenance as `detail`, so the display,
+        // the reportHash AND the acknowledgement binding all cover "table.column×rows" — a
+        // changed provenance or count invalidates a previously issued acknowledgement.
+        let dangling = referenceAudit.dangling.map {
+            UnresolvedReport.Item(name: $0.name, kind: .danglingReference, detail: $0.provenance)
+        }
+        let invalid = referenceAudit.invalid.map {
+            UnresolvedReport.Item(name: $0.value, kind: .invalidReference, detail: $0.provenance)
+        }
+        let unresolved = report.fileUnresolved.merged(with: dangling + invalid)
         let reportHash = unresolved.reportHash
 
         // Acknowledgement gate: unresolved ⇒ no auto-complete, no staging cleanup. The ack must

@@ -112,10 +112,16 @@ public struct ImportManifest: Codable, Equatable {
     }
 
     /// Explicit on-disk format version. The current writer stamps `currentFormatVersion`;
-    /// a manifest whose version is missing (old format) or newer/unknown is REJECTED
-    /// fail-closed rather than best-effort parsed. Decoded as optional so a missing key
-    /// surfaces as an explicit unsupported-version rejection, not a decode error.
-    public static let currentFormatVersion = 1
+    /// a manifest whose version is missing (old format), older, or newer/unknown is
+    /// REJECTED fail-closed rather than best-effort parsed. Decoded as optional so a
+    /// missing key surfaces as an explicit unsupported-version rejection, not a decode
+    /// error.
+    ///
+    /// v1 → v2: `UnresolvedReport.Item.Kind` gained `invalidReference` (malformed DB
+    /// attachment-reference values recorded by the reference audit), so a v2 sentinel can
+    /// carry items a v1 reader cannot represent. Pre-release contract: v1 manifests are
+    /// rejected (staging must be re-ingested); no best-effort upgrade path is offered.
+    public static let currentFormatVersion = 2
     public var formatVersion: Int? = nil
 
     public var importID: String

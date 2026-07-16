@@ -69,10 +69,17 @@ final class AttachmentApplyTests: LedgerTestCase {
     private func tempManifests(_ dir: URL) -> [String] { names(dir) { $0.hasPrefix(".tmp-") } }
 
     /// Un-forgeable audit evidence bound to `report`, produced here (tests are `@testable`).
-    private func matchingAudit(_ r: AttachmentApplyReport, dangling: [String] = []) -> ReferenceAudit {
+    private func matchingAudit(_ r: AttachmentApplyReport,
+                               dangling: [ReferenceAudit.DanglingReference] = [],
+                               invalid: [ReferenceAudit.InvalidReference] = [],
+                               resolved: [ReferenceAudit.ResolvedReference] = []) -> ReferenceAudit {
         ReferenceAudit(importID: r.importID.rawValue, snapshotIdentitySHA256: r.manifest.snapshotIdentitySHA256,
                        attachmentManifestSHA256: r.manifest.attachmentManifestSHA256,
-                       preparedDBIdentity: r.preparedDBIdentity, danglingReferences: dangling)
+                       preparedDBIdentity: r.preparedDBIdentity,
+                       resolved: resolved, dangling: dangling, invalid: invalid)
+    }
+    private func matchingAudit(_ r: AttachmentApplyReport, dangling: [String]) -> ReferenceAudit {
+        matchingAudit(r, dangling: dangling.map { .init(name: $0, provenance: "transactions.attachment_path×1") })
     }
     private func apply(_ staging: URL, _ active: URL, hooks: ApplyHooks = ApplyHooks()) throws -> AttachmentApplyReport {
         try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active, preparedDBIdentity: preparedDB, hooks: hooks)
@@ -228,7 +235,8 @@ final class AttachmentApplyTests: LedgerTestCase {
     }
     func testUnknownManifestFormatVersionRejected() throws {
         let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")])
-        for bad: Int? in [nil, 0, 999] {
+        // 1 is the RETIRED pre-invalidReference format: rejected fail-closed, never upgraded.
+        for bad: Int? in [nil, 0, 1, 999] {
             var m = try readManifest(manifestURL(staging)); m.formatVersion = bad; try writeManifest(m, to: manifestURL(staging))
             XCTAssertThrowsError(try apply(staging, try makeActive())) { e in
                 guard case AttachmentApplyError.unsupportedManifestFormat = e else { return XCTFail("formatVersion \(String(describing: bad)) → \(e)") }
@@ -382,7 +390,7 @@ final class AttachmentApplyTests: LedgerTestCase {
         let report = try apply(staging, try makeActive())
         func audit(snapshot: String, attach: String, prepared: String) -> ReferenceAudit {
             ReferenceAudit(importID: report.importID.rawValue, snapshotIdentitySHA256: snapshot,
-                           attachmentManifestSHA256: attach, preparedDBIdentity: prepared, danglingReferences: [])
+                           attachmentManifestSHA256: attach, preparedDBIdentity: prepared)
         }
         let good = matchingAudit(report)
         for (a, field) in [(audit(snapshot: "X", attach: good.attachmentManifestSHA256, prepared: preparedDB), "snapshotIdentity"),
@@ -567,14 +575,17 @@ final class AttachmentApplyTests: LedgerTestCase {
         XCTAssertEqual(try Data(contentsOf: sentinelURL(manifests, id)), before, "identical sentinel reused, not rewritten")
     }
 
-    // MARK: - 27. The reference auditor is not implemented → App cannot fabricate completion
+    // MARK: - 27. The auditor only yields evidence for the bound prepared DB (fail-closed)
 
-    func testReferenceAuditorNotImplementedThrows() throws {
+    /// The real auditor (AttachmentReferenceAuditorTests covers its scan) still cannot be
+    /// used to fabricate completion: a target that is not the quiescent prepared database
+    /// the report was applied against is rejected before any evidence is produced.
+    func testReferenceAuditorRejectsNonDatabaseTarget() throws {
         let (staging, _) = try makeStaging(ingested: [("a.pdf", "A")])
         let report = try apply(staging, try makeActive())
         XCTAssertThrowsError(try AttachmentReferenceAuditor().audit(report: report,
                                                                     preparedDatabaseAt: try makeActive())) { e in
-            guard case AttachmentApplyError.referenceAuditNotImplemented = e else { return XCTFail("got \(e)") }
+            guard let pe = e as? PreparedDatabaseError, case .databaseNotRegularFile = pe else { return XCTFail("got \(e)") }
         }
     }
 
