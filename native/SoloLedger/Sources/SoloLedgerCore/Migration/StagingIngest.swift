@@ -40,6 +40,28 @@ public enum AttachmentName {
     }
 }
 
+// MARK: - Stored attachment reference parsing
+
+/// Parses a STORED attachment reference — the verbatim `attachments/docs/<name>` relative
+/// string Electron writes to `transactions.attachment_path` and
+/// `business_documents.tax_invoice_attachment_path` (its `REL_RE` whitelist) — into the bare
+/// filename. Fail-closed: anything that is not EXACTLY the fixed prefix followed by ONE
+/// `AttachmentName`-valid segment (absolute paths, traversal, extra slashes, empty or illegal
+/// names, non-ASCII) yields nil. Parsing never touches the filesystem.
+public enum AttachmentRelPath {
+    /// The only legal prefix, derived from the shared layout constant so the parser and the
+    /// on-disk mirror can never drift.
+    public static let requiredPrefix = AppPaths.attachmentsRelativeRoot + "/"
+
+    /// The bare filename iff `raw` is exactly `attachments/docs/<valid name>`, else nil.
+    public static func bareName(of raw: String) -> String? {
+        guard raw.hasPrefix(requiredPrefix) else { return nil }
+        let name = String(raw.dropFirst(requiredPrefix.count))
+        guard AttachmentName.isValid(name) else { return nil }
+        return name
+    }
+}
+
 // MARK: - Source stability (concurrent-change detector)
 
 /// A cheap fingerprint of the SOURCE, used ONLY to detect whether the source changed
