@@ -21,7 +21,11 @@ let package = Package(
         .macOS(.v13) // NavigationSplitView + Swift Charts require macOS 13 (approved uplift from Electron's 12.0)
     ],
     products: [
-        .executable(name: "SoloLedger", targets: ["SoloLedger"]),
+        // The Xcode app project (App/SoloLedger.xcodeproj) links this library as a
+        // LOCAL package product. The SwiftUI app itself is built by Xcode, not SPM,
+        // so this package intentionally exposes NO executable product — that also
+        // avoids a name collision with the Xcode "SoloLedger" app target during
+        // UI-test host resolution.
         .library(name: "SoloLedgerCore", targets: ["SoloLedgerCore"]),
     ],
     targets: [
@@ -30,19 +34,10 @@ let package = Package(
 
         // Pure-logic core: SQLite wrapper, schema migrator, category seed,
         // ledger store, CSV, models, headless self-test. No SwiftUI here so it
-        // is fully unit-testable by XCTest.
+        // is fully unit-testable by XCTest and linkable by the Xcode app.
         .target(
             name: "SoloLedgerCore",
             dependencies: ["CSQLite"]
-        ),
-
-        // The SwiftUI app shell (@main). Imports SoloLedgerCore.
-        .executableTarget(
-            name: "SoloLedger",
-            dependencies: ["SoloLedgerCore"],
-            resources: [
-                .process("Resources") // .lproj localization slots for all six languages
-            ]
         ),
 
         // XCTest suite over the core logic.
@@ -52,3 +47,6 @@ let package = Package(
         ),
     ]
 )
+// The SwiftUI app sources live in Sources/SoloLedger/ and are compiled by the
+// Xcode app target (App/SoloLedger.xcodeproj), which references them without
+// copying. SwiftPM ignores that directory since no package target claims it.

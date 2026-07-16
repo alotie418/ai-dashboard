@@ -1,65 +1,79 @@
-# SoloLedger — native SwiftUI rewrite (Phase-1 prototype)
+# SoloLedger — native SwiftUI rewrite
 
 A local-first, private macOS ledger for solo operators, one-person companies, and
-freelancers. This directory holds the **native SwiftUI rewrite prototype**; it is
-independent of the Electron app in the repo root and does not touch it.
+freelancers. Independent of the Electron app in the repo root; it does not touch it.
 
 See `../docs/SWIFTUI_MIGRATION_PLAN.md` for the full plan, schema mapping, and
 data-compatibility strategy.
 
+## Structure (Phase 1.5)
+
+The **data layer** is a SwiftPM package; the **app** is a real Xcode project that
+links the package's `SoloLedgerCore` library locally (no source copy) and compiles
+the SwiftUI sources in `Sources/SoloLedger/`.
+
+```
+Package.swift                    SwiftPM package: SoloLedgerCore library + tests
+Sources/CSQLite/                 system libsqlite3 shim (module map)
+Sources/SoloLedgerCore/          data layer (SQLite, migrations, seed, store, CSV, self-test) — no SwiftUI
+Sources/SoloLedger/              SwiftUI app code (compiled by the Xcode app target)
+Tests/SoloLedgerCoreTests/       XCTest for the Core (run via `swift test`)
+App/
+  project.yml                    XcodeGen spec (regenerates the project)
+  SoloLedger.xcodeproj           the Xcode project (App + Unit-Test + UI-Test targets)
+  Support/                       Info.plist, Debug/Release entitlements, Assets.xcassets (AppIcon, AccentColor)
+  Tests/SoloLedgerUnitTests/     Xcode unit tests (public Core API)
+  Tests/SoloLedgerUITests/       Xcode UI launch test
+```
+
 ## Requirements
 
 - macOS 13.0+ (deployment target)
-- Xcode 26.x (the SDK/toolchain). If `xcode-select` points at the Command Line
-  Tools, prefix commands with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
+- Xcode 26.x. If `xcode-select` points at the Command Line Tools, prefix commands
+  with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
+- To regenerate the project: `xcodegen` (`brew install xcodegen`). The committed
+  `.xcodeproj` opens directly — xcodegen is only needed to regenerate from `project.yml`.
 
-## Build & test
+## Build, test, run (Xcode project)
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+cd App
 
-swift build                 # or: xcodebuild -scheme SoloLedger -destination 'platform=macOS' build
-swift test                  # XCTest suite (schema / seed / CRUD / CSV round-trip)
+# Open in Xcode and press Run (⌘R):
+open SoloLedger.xcodeproj
 
-# Headless end-to-end smoke test (no GUI needed):
-swift run SoloLedger --self-test
+# Or from the command line — build / test / archive (Debug):
+xcodebuild -project SoloLedger.xcodeproj -scheme SoloLedger -configuration Debug -destination 'platform=macOS' build
+xcodebuild test    -project SoloLedger.xcodeproj -scheme SoloLedger -configuration Debug -destination 'platform=macOS'
+xcodebuild archive -project SoloLedger.xcodeproj -scheme SoloLedger -configuration Debug -destination 'generic/platform=macOS' -archivePath build/SoloLedger-Debug.xcarchive
 
-# Assemble a runnable, ad-hoc-signed .app (App Sandbox) and launch it:
-bash scripts/build-app.sh
-open build/SoloLedger.app
+# Regenerate the project after editing project.yml:
+xcodegen generate
 ```
 
-## Layout
+- **Debug** builds as Bundle ID `com.alotie418.sololedger.dev`; **Release** as
+  `com.alotie418.sololedger`. Only Debug is built for now — no production signing.
+- The built app supports two headless smoke flags (used by CI / regression guards):
+  `SoloLedger.app/Contents/MacOS/SoloLedger --self-test` (data-layer end-to-end) and
+  `--check-resources` (packaged localization loads).
 
-```
-Sources/CSQLite/           system libsqlite3 shim (module map)
-Sources/SoloLedgerCore/    data layer (no SwiftUI, fully unit-tested)
-  SQLite/                  thin C-API wrapper
-  Schema/                  SchemaMigrator (23-version ladder) + CategorySeed (78 rows)
-  Models/                  Transaction / Category / enums / summaries
-  Store/                   LedgerStore (CRUD/summary) + SettingsStore
-  CSV/                     RFC-4180 writer/reader + transactions export/import
-  SelfTest/                headless end-to-end check
-Sources/SoloLedger/        SwiftUI app (@main, NavigationSplitView, Table, Charts, Settings)
-  App/                     entry, model, localizer, commands, file panels
-  Views/                   Overview / Transactions / Editor / Categories / Onboarding / Settings
-  Resources/*.lproj/       6-language localization slots (zh-Hans + en full; others partial)
-Tests/SoloLedgerCoreTests/ XCTest
-Packaging/                 Info.plist + App Sandbox entitlements (dev Bundle ID)
-scripts/build-app.sh       assemble + ad-hoc sign a runnable .app
+## Core (SwiftPM) directly
+
+```bash
+swift build     # builds SoloLedgerCore
+swift test      # 31 XCTest: schema / seed / CRUD / CSV round-trip
 ```
 
 ## Safety / scope
 
-- **Never writes the production database.** The prototype uses its own isolated
-  file at `Application Support/SoloLedgerNativePreview/sololedger.db`, never the
-  Electron app's `Application Support/SoloLedger/sololedger.db`.
-- The schema + migration ladder are a faithful port of `electron/db/index.js`
-  (`user_version` reaches 23; all 26 tables created), so a file this app creates is
-  schema-compatible with the Electron build.
-- **No AI, no API key, no OCR, no network, no paid unlock.** Entitlements are only
-  App Sandbox + user-selected file read/write.
-- Dev Bundle ID `com.alotie418.sololedger.dev` (production stays
-  `com.alotie418.sololedger`).
-- Reports, tax, COGS and other accounting-policy logic are deliberately **out of
-  Phase-1 scope** — the native app must mirror, never reinvent, that logic.
+- **Never writes the production database.** Uses an isolated file at
+  `Application Support/SoloLedgerNativePreview/sololedger.db` (or the sandbox
+  container), never the Electron app's `Application Support/SoloLedger/sololedger.db`.
+- Schema + migrations are a faithful port of `electron/db/index.js` (`user_version`
+  reaches 23, all 26 tables), so a file this app creates is schema-compatible.
+- **No AI, no API key, no OCR, no network, no StoreKit, no paid unlock.** Entitlements
+  are only App Sandbox + user-selected file read/write (Debug also has get-task-allow
+  for the debugger / UI-test runner).
+- Reports, tax, COGS, and other accounting-policy logic are deliberately **out of
+  scope** — the native app must mirror, never reinvent, that logic.
