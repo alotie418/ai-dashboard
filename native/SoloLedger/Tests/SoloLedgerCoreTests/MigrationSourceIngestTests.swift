@@ -285,6 +285,192 @@ final class MigrationSourceIngestTests: LedgerTestCase {
         removeNewAttempts(since: before)   // cleanup was (intentionally) prevented — tidy up the leftover here
     }
 
+    // MARK: - Trust boundary: non-regular sources fail closed (2B-2 S2)
+
+    /// The source DB must be an existing REGULAR file: a symlink (even to a valid DB),
+    /// a dangling symlink, a directory or a FIFO is rejected fail-closed — never followed,
+    /// never opened blocking, never copied.
+    func testSourceDBNonRegularFailsClosed() throws {
+        for kind in ["symlink", "dangling", "directory", "fifo"] {
+            let dir = try makeDataDirFixture(withWal: false, withAttachments: false)
+            let dbURL = dir.appendingPathComponent("sololedger.db")
+            try fm.removeItem(at: dbURL)
+            switch kind {
+            case "symlink":
+                let real = try trackedTempDir().appendingPathComponent("real.db")
+                try writeBytes("real-db", to: real)
+                try fm.createSymbolicLink(at: dbURL, withDestinationURL: real)
+            case "dangling":
+                try fm.createSymbolicLink(at: dbURL, withDestinationURL: dir.appendingPathComponent("absent"))
+            case "directory":
+                try fm.createDirectory(at: dbURL, withIntermediateDirectories: true)
+            default:
+                guard mkfifo(dbURL.path, 0o644) == 0 else { throw XCTSkip("mkfifo unavailable") }
+            }
+            let id = newImportID(); defer { cleanStaging(id) }
+            let before = attemptNames()
+            XCTAssertThrowsError(try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t"), kind) { e in
+                guard case IngestError.sourceNotRegularFile(let p) = e else { return XCTFail("\(kind): got \(e)") }
+                XCTAssertEqual(p, dbURL.path)
+            }
+            XCTAssertFalse(finalExists(id), kind)
+            XCTAssertTrue(attemptNames().isSubset(of: before), kind)
+        }
+    }
+
+    func testSourceWalNonRegularFailsClosed() throws {
+        for kind in ["symlink", "fifo"] {
+            let dir = try makeDataDirFixture(withWal: false, withAttachments: false)
+            let walURL = URL(fileURLWithPath: dir.appendingPathComponent("sololedger.db").path + "-wal")
+            switch kind {
+            case "symlink":
+                let real = try trackedTempDir().appendingPathComponent("real-wal")
+                try writeBytes("wal-bytes", to: real)
+                try fm.createSymbolicLink(at: walURL, withDestinationURL: real)
+            default:
+                guard mkfifo(walURL.path, 0o644) == 0 else { throw XCTSkip("mkfifo unavailable") }
+            }
+            let id = newImportID(); defer { cleanStaging(id) }
+            XCTAssertThrowsError(try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t"), kind) { e in
+                guard case IngestError.sourceNotRegularFile(let p) = e else { return XCTFail("\(kind): got \(e)") }
+                XCTAssertEqual(p, walURL.path)
+            }
+            XCTAssertFalse(finalExists(id), kind)
+        }
+    }
+
+    /// attachments/docs: ENOENT ⇒ "no attachments" (fine); anything present must be a REAL
+    /// non-symlink directory — a symlinked root (final component) or a plain file is rejected.
+    func testAttachmentsRootMustBeARealDirectory() throws {
+        for kind in ["symlink", "file"] {
+            let dir = try makeDataDirFixture(withWal: false, withAttachments: false)
+            let attachments = dir.appendingPathComponent("attachments", isDirectory: true)
+            try fm.createDirectory(at: attachments, withIntermediateDirectories: true)
+            let docs = attachments.appendingPathComponent("docs")
+            if kind == "symlink" {
+                let real = try trackedTempDir().appendingPathComponent("real-docs", isDirectory: true)
+                try fm.createDirectory(at: real, withIntermediateDirectories: true)
+                try writeBytes("a", to: real.appendingPathComponent("doc-a.pdf"))
+                try fm.createSymbolicLink(at: docs, withDestinationURL: real)
+            } else {
+                try writeBytes("not-a-dir", to: docs)
+            }
+            let id = newImportID(); defer { cleanStaging(id) }
+            XCTAssertThrowsError(try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t"), kind) { e in
+                guard case IngestError.attachmentsRootNotADirectory = e else { return XCTFail("\(kind): got \(e)") }
+            }
+            XCTAssertFalse(finalExists(id), kind)
+        }
+    }
+
+    // MARK: - Post-classification races (2B-2 S2)
+
+    /// Classified as a regular file, swapped for a FIFO before its copy: the fd-bound copy
+    /// gate must reject it IMMEDIATELY at copy time (no hang, no reliance on the later
+    /// manifest hash), clean the attempt and never publish.
+    func testAttachmentSwappedToFifoAfterClassificationFailsImmediately() throws {
+        let dir = try makeDataDirFixture(withWal: false, withAttachments: true)
+        let victim = dir.appendingPathComponent("attachments", isDirectory: true)
+            .appendingPathComponent("docs", isDirectory: true).appendingPathComponent("doc-a.pdf")
+        let id = newImportID(); defer { cleanStaging(id) }
+        let before = attemptNames()
+        var swapped = false
+        let hooks = IngestHooks(onStep: { step in
+            if step == .duringAttachmentCopy && !swapped {
+                swapped = true
+                try self.fm.removeItem(at: victim)
+                guard mkfifo(victim.path, 0o644) == 0 else { throw TestError() }
+            }
+        })
+        XCTAssertThrowsError(try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t",
+                                                        maxAttempts: 3, hooks: hooks)) { e in
+            guard case IngestError.sourceNotRegularFile(let p) = e else { return XCTFail("got \(e)") }
+            // contentsOfDirectory may hand back /private/var for a /var fixture — compare resolved.
+            XCTAssertEqual(URL(fileURLWithPath: p).resolvingSymlinksInPath().path,
+                           victim.resolvingSymlinksInPath().path)
+        }
+        XCTAssertTrue(swapped)
+        XCTAssertFalse(finalExists(id))
+        XCTAssertTrue(attemptNames().isSubset(of: before))
+    }
+
+    /// Same-size replacement with the mtime forged back to the original: the inode change
+    /// must still trip the stability fingerprint and force a retry (a size+mtime-only
+    /// fingerprint accepted this silently).
+    func testInodeSwapWithForgedMtimeTriggersRetryThenSucceeds() throws {
+        let dir = try makeDataDirFixture(withWal: false, withAttachments: true)
+        let victim = dir.appendingPathComponent("attachments", isDirectory: true)
+            .appendingPathComponent("docs", isDirectory: true).appendingPathComponent("doc-a.pdf")
+        let id = newImportID(); defer { cleanStaging(id) }
+        var rechecks = 0
+        let hooks = IngestHooks(onRecheck: { _ in
+            rechecks += 1
+            guard rechecks == 1 else { return }   // only sabotage attempt 1
+            let fp = try XCTUnwrap(FileFingerprint.capture(at: victim))
+            let mtime = Date(timeIntervalSince1970: TimeInterval(fp.mtimeSec) + TimeInterval(fp.mtimeNSec) / 1e9)
+            try self.fm.removeItem(at: victim)
+            try self.writeBytes("pdf-X", to: victim)              // same 5-byte size as "pdf-a"
+            try self.fm.setAttributes([.modificationDate: mtime], ofItemAtPath: victim.path)
+            let swapped = try XCTUnwrap(FileFingerprint.capture(at: victim))
+            XCTAssertEqual(swapped.size, fp.size, "swap must preserve size for this test to prove anything")
+            XCTAssertNotEqual(swapped.inode, fp.inode)
+        })
+        let result = try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t",
+                                                maxAttempts: 3, hooks: hooks)
+        XCTAssertEqual(rechecks, 2, "attempt 1 must be discarded, attempt 2 published")
+        let staged = try XCTUnwrap(result.stagedAttachmentsDir).appendingPathComponent("doc-a.pdf")
+        XCTAssertEqual(try Data(contentsOf: staged), Data("pdf-X".utf8), "attempt 2 staged the post-swap content")
+        XCTAssertEqual(result.manifest.files.first { $0.name == "doc-a.pdf" }?.sha256,
+                       try FileHash.sha256HexOfRegularFile(at: staged))
+    }
+
+    /// An entry that vanishes between classification and its copy (ENOENT) is treated as a
+    /// source change: retry, then publish the source's new steady state — never a silent skip
+    /// of a file the manifest would still have promised.
+    func testAttachmentVanishingMidCopyRetriesThenPublishesWithoutIt() throws {
+        let dir = try makeDataDirFixture(withWal: false, withAttachments: true)
+        let victim = dir.appendingPathComponent("attachments", isDirectory: true)
+            .appendingPathComponent("docs", isDirectory: true).appendingPathComponent("doc-b.jpg")
+        let id = newImportID(); defer { cleanStaging(id) }
+        var copies = 0
+        let hooks = IngestHooks(onStep: { step in
+            if step == .duringAttachmentCopy {
+                copies += 1
+                if copies == 2 { try self.fm.removeItem(at: victim) }   // vanish right before ITS copy
+            }
+        })
+        let result = try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t",
+                                                maxAttempts: 3, hooks: hooks)
+        XCTAssertEqual(copies, 3, "attempt 1: doc-a + doc-b(vanished) → retry; attempt 2: doc-a only")
+        XCTAssertNil(result.manifest.files.first { $0.name == "doc-b.jpg" }, "the vanished file is not promised")
+        XCTAssertEqual(result.manifest.files.first { $0.name == "doc-a.pdf" }?.outcome, .ingested)
+    }
+
+    /// A STAGED file tampered between copy and manifest build fails the copy-digest
+    /// consistency re-check — the manifest can never describe bytes other than the ones
+    /// the verified copy wrote.
+    func testStagedTamperAfterCopyFailsConsistencyCheck() throws {
+        let dir = try makeDataDirFixture(withWal: false, withAttachments: false)
+        let id = newImportID(); defer { cleanStaging(id) }
+        let before = attemptNames()
+        let hooks = IngestHooks(onRecheck: { _ in
+            // Locate this run's attempt dir and corrupt the staged DB copy.
+            let root = try AppPaths.stagingRootDirectory()
+            let attempts = try self.fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+                .filter { $0.lastPathComponent.hasPrefix(".attempt-") && !before.contains($0.lastPathComponent) }
+            let staged = try XCTUnwrap(attempts.first).appendingPathComponent("sololedger.db")
+            let h = try FileHandle(forWritingTo: staged); defer { try? h.close() }
+            try h.seekToEnd(); try h.write(contentsOf: Data([0xFF]))
+        })
+        XCTAssertThrowsError(try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t",
+                                                        maxAttempts: 1, hooks: hooks)) { e in
+            guard case IngestError.stagedContentInconsistent(let what) = e else { return XCTFail("got \(e)") }
+            XCTAssertEqual(what, "db")
+        }
+        XCTAssertFalse(finalExists(id))
+        XCTAssertTrue(attemptNames().isSubset(of: before))
+    }
+
     // MARK: - Manifest persistence + deterministic hashes
 
     func testManifestPersistedWithDeterministicHashes() throws {

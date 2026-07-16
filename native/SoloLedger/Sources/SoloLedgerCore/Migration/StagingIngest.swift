@@ -207,14 +207,16 @@ public enum AttachmentRelPath {
 
 // MARK: - Source stability (concurrent-change detector)
 
-/// A cheap fingerprint of the SOURCE, used ONLY to detect whether the source changed
-/// DURING ingest (a live old Electron app still writing). Uses size + mtime — a write
-/// bumps mtime — so it is a change-DETECTOR, never a content-equality proof.
+/// A fingerprint of the SOURCE, used ONLY to detect whether the source changed DURING
+/// ingest (a live old Electron app still writing). Built on `FileFingerprint` (type +
+/// device + inode + size + ns mtime/ctime, lstat, metadata errors fail-closed), so a
+/// same-size/same-mtime replacement or a type swap trips it too. Still a change-DETECTOR,
+/// never a content-equality proof — the staged bytes' identity comes from the manifest
+/// digests, and pair-level semantics from the later snapshot verification.
 struct SourceStabilityManifest: Equatable {
-    struct Entry: Equatable { let name: String; let size: Int64; let mtime: TimeInterval }
-    var db: Entry?
-    var wal: Entry?
-    var attachments: [Entry]   // ingest-set only, sorted by name
+    var db: FileFingerprint?
+    var wal: FileFingerprint?
+    var attachments: [String: FileFingerprint]   // ingest-set only, keyed by name
 }
 
 // MARK: - Import manifest (out-of-DB, per-import completion record)
@@ -318,12 +320,21 @@ public struct ImportManifest: Codable, Equatable {
 
 public enum IngestError: Error, CustomStringConvertible {
     case sourceDatabaseMissing(String)
+    /// A source DB/WAL/attachment that must be a regular file is a symlink, directory,
+    /// FIFO or other special file. Never followed, never copied.
+    case sourceNotRegularFile(String)
+    /// The attachments root exists but is not a real (non-symlink) directory.
+    case attachmentsRootNotADirectory(String)
     /// The source kept changing across attempts — the old Electron app is likely still
     /// running and writing. The user must quit it and retry.
     case sourceBusy(attempts: Int)
     /// The per-import staging dir already exists. The caller must decide (reject or resume);
     /// ingest never silently clears/mixes it.
     case importIDAlreadyExists(String)
+    /// A staged file's re-verified digest does not match the digest of the bytes written
+    /// at copy time, or the staged DB/WAL on disk does not match what the manifest is
+    /// about to record. The attempt is untrustworthy and is discarded.
+    case stagedContentInconsistent(String)
     /// A failing attempt could not be cleaned up. Surfaced (never swallowed) so a wedged
     /// staging dir is visible rather than silently leaked.
     case cleanupFailed(path: String, underlying: String, original: String)
@@ -331,12 +342,20 @@ public enum IngestError: Error, CustomStringConvertible {
     public var description: String {
         switch self {
         case .sourceDatabaseMissing(let p): return "Source database not found: \(p)"
+        case .sourceNotRegularFile(let p): return "Source entry is not a regular file (symlink/directory/special) — refusing to ingest: \(p)"
+        case .attachmentsRootNotADirectory(let p): return "Source attachments folder is not a real directory — refusing to ingest: \(p)"
         case .sourceBusy(let n): return "Source kept changing across \(n) attempts — quit the old SoloLedger (Electron) app and retry."
         case .importIDAlreadyExists(let id): return "An import with ID \(id) is already staged — reject or resume it, do not overwrite."
+        case .stagedContentInconsistent(let what): return "Staged copy failed its consistency re-check (\(what)) — the attempt was discarded; retry the import."
         case let .cleanupFailed(path, underlying, original): return "Failed to clean up attempt \(path) after error [\(original)]: \(underlying)"
         }
     }
 }
+
+/// Internal marker: an entry that was fingerprinted/classified as present had definitively
+/// vanished (ENOENT) by copy time — the source is changing underneath us. Mapped to the
+/// same retry path as a stability mismatch, NEVER to "skip it silently".
+struct SourceVanished: Error { let path: String }
 
 public struct IngestResult {
     public let importID: ImportID
@@ -398,8 +417,14 @@ public struct StagingIngest {
             throw IngestError.importIDAlreadyExists(importID.rawValue)
         }
         return try source.withAccess {
-            guard FileManager.default.fileExists(atPath: dbURL.path) else {
+            // Early, clear gates (lstat, no-follow). The copy primitive re-enforces both
+            // on the open fd at copy time, so these are UX, not the security boundary.
+            guard let dbFP = try FileFingerprint.capture(at: dbURL) else {
                 throw IngestError.sourceDatabaseMissing(dbURL.path)
+            }
+            guard dbFP.isRegularFile else { throw IngestError.sourceNotRegularFile(dbURL.path) }
+            if let w = try source.walURL(), let walFP = try FileFingerprint.capture(at: w) {
+                guard walFP.isRegularFile else { throw IngestError.sourceNotRegularFile(w.path) }
             }
             var attempt = 0
             while true {
@@ -438,7 +463,15 @@ public struct StagingIngest {
                                        timestamp: String, attemptDir: URL, finalDir: URL,
                                        attempt: Int, hooks: IngestHooks) throws -> AttemptOutcome {
         let before = try stability(source)
-        let staged = try copyInto(attemptDir, source: source, dbURL: dbURL, hooks: hooks)
+        let staged: StagedLayout
+        do {
+            staged = try copyInto(attemptDir, source: source, dbURL: dbURL, hooks: hooks)
+        } catch is SourceVanished {
+            // Fingerprinted/classified as present, ENOENT by copy time: the source is
+            // changing — same treatment as a stability mismatch.
+            try removeAttempt(attemptDir, hooks: hooks)
+            return .retry
+        }
         try hooks.onRecheck?(attempt)
         let after = try stability(source)
         if before != after {
@@ -491,10 +524,13 @@ public struct StagingIngest {
 
     /// Classify the TOP-LEVEL entries of an attachments root (never recursive). Order:
     /// symlink (lstat, not followed) → directory → regular file (name-validated) → special.
+    /// Root gate: ENOENT means "no attachments"; anything present must be a REAL
+    /// (non-symlink) directory — a symlinked or non-directory root is rejected, and any
+    /// other metadata error stays fail-closed (FileFingerprint.capture throws).
     private static func enumerateAttachments(root: URL) throws -> [ClassifiedAttachment] {
         let fm = FileManager.default
-        var isDir: ObjCBool = false
-        guard fm.fileExists(atPath: root.path, isDirectory: &isDir), isDir.boolValue else { return [] }
+        guard let rootFP = try FileFingerprint.capture(at: root) else { return [] }
+        guard rootFP.isDirectory else { throw IngestError.attachmentsRootNotADirectory(root.path) }
         let keys: [URLResourceKey] = [.isSymbolicLinkKey, .isDirectoryKey, .isRegularFileKey]
         let entries = try fm.contentsOfDirectory(at: root, includingPropertiesForKeys: keys, options: [])
         var out: [ClassifiedAttachment] = []
@@ -516,24 +552,20 @@ public struct StagingIngest {
         return out.sorted { $0.name < $1.name }
     }
 
+    /// Fail-closed fingerprinting: ONLY ENOENT reads as absence (the entry simply doesn't
+    /// appear, so a presence flip still trips the before/after comparison); any other
+    /// metadata error throws instead of masquerading as "stable" or "no WAL".
     private static func stability(_ source: MigrationSource) throws -> SourceStabilityManifest {
-        let fm = FileManager.default
-        func entry(_ url: URL, name: String) -> SourceStabilityManifest.Entry? {
-            guard let attrs = try? fm.attributesOfItem(atPath: url.path) else { return nil }
-            let size = (attrs[.size] as? NSNumber)?.int64Value ?? -1
-            let mtime = (attrs[.modificationDate] as? Date)?.timeIntervalSince1970 ?? -1
-            return .init(name: name, size: size, mtime: mtime)
-        }
-        let db = entry(try source.databaseURL(), name: "db")
-        var wal: SourceStabilityManifest.Entry?
-        if let w = try source.walURL(), fm.fileExists(atPath: w.path) { wal = entry(w, name: "wal") }
-        var atts: [SourceStabilityManifest.Entry] = []
+        let db = try FileFingerprint.capture(at: try source.databaseURL())
+        var wal: FileFingerprint?
+        if let w = try source.walURL() { wal = try FileFingerprint.capture(at: w) }
+        var atts: [String: FileFingerprint] = [:]
         if let root = try source.attachmentsRootURL() {
             for c in try enumerateAttachments(root: root) where c.isIngested {
-                if let e = entry(c.url, name: c.name) { atts.append(e) }
+                if let fp = try FileFingerprint.capture(at: c.url) { atts[c.name] = fp }
             }
         }
-        return SourceStabilityManifest(db: db, wal: wal, attachments: atts.sorted { $0.name < $1.name })
+        return SourceStabilityManifest(db: db, wal: wal, attachments: atts)
     }
 
     private struct StagedLayout {
@@ -541,26 +573,48 @@ public struct StagingIngest {
         let walURL: URL?
         let attachmentsDir: URL?
         let fileResults: [ImportManifest.FileResult]   // sha/size filled later
+        /// Digests of EXACTLY the bytes written at copy time (from the verified source
+        /// fds) — buildManifest re-digests the staged files and requires equality.
+        let dbCopyDigest: RegularFileDigest
+        let walCopyDigest: RegularFileDigest?
+        let attachmentCopyDigests: [String: RegularFileDigest]
         var hasWAL: Bool { walURL != nil }
         var hasAttachments: Bool { attachmentsDir != nil }
+    }
+
+    /// Fd-bound no-follow copy with ingest error mapping: a non-regular source (symlink —
+    /// even to valid content — directory, FIFO) is `sourceNotRegularFile` IMMEDIATELY at
+    /// copy time, never discovered later at the hash stage; a source that definitively
+    /// vanished (ENOENT) after being classified is `SourceVanished` (→ retry); everything
+    /// else stays fail-closed as-is.
+    private static func copyGate(from src: URL, to dst: URL) throws -> RegularFileDigest {
+        do {
+            return try FileHash.copyRegularFileNoFollow(from: src, to: dst)
+        } catch let e as FileHashError {
+            if case .notARegularFile = e { throw IngestError.sourceNotRegularFile(src.path) }
+            if e.isFileMissing { throw SourceVanished(path: src.path) }
+            throw e
+        }
     }
 
     private static func copyInto(_ dir: URL, source: MigrationSource, dbURL: URL, hooks: IngestHooks) throws -> StagedLayout {
         let fm = FileManager.default   // `dir` is a fresh, empty attempt dir — no clearing needed.
 
         let stagedDB = dir.appendingPathComponent(AppPaths.databaseFileName)
-        try fm.copyItem(at: dbURL, to: stagedDB)
+        let dbDigest = try copyGate(from: dbURL, to: stagedDB)
         try hooks.onStep?(.afterDatabaseCopy)
 
         var stagedWAL: URL?
-        if let w = try source.walURL(), fm.fileExists(atPath: w.path) {
+        var walDigest: RegularFileDigest?
+        if let w = try source.walURL(), try FileFingerprint.capture(at: w) != nil {
             let dst = URL(fileURLWithPath: stagedDB.path + "-wal")
-            try fm.copyItem(at: w, to: dst)
+            walDigest = try copyGate(from: w, to: dst)
             stagedWAL = dst
         }
 
         var stagedAttachDir: URL?
         var results: [ImportManifest.FileResult] = []
+        var attachmentDigests: [String: RegularFileDigest] = [:]
         if let root = try source.attachmentsRootURL() {
             let classified = try enumerateAttachments(root: root)
             if !classified.isEmpty {
@@ -571,35 +625,55 @@ public struct StagingIngest {
                 for c in classified {
                     if c.isIngested {
                         try hooks.onStep?(.duringAttachmentCopy)
-                        try fm.copyItem(at: c.url, to: dstRoot.appendingPathComponent(c.name))
+                        attachmentDigests[c.name] = try copyGate(from: c.url, to: dstRoot.appendingPathComponent(c.name))
                     }
                     results.append(.init(name: c.name, outcome: c.outcome, sha256: nil, size: nil))
                 }
             }
         }
-        return StagedLayout(dbURL: stagedDB, walURL: stagedWAL, attachmentsDir: stagedAttachDir, fileResults: results)
+        return StagedLayout(dbURL: stagedDB, walURL: stagedWAL, attachmentsDir: stagedAttachDir,
+                            fileResults: results, dbCopyDigest: dbDigest, walCopyDigest: walDigest,
+                            attachmentCopyDigests: attachmentDigests)
     }
 
     // MARK: - Manifest
 
     private static func buildManifest(importID: ImportID, source: MigrationSource,
                                       timestamp: String, staged: StagedLayout) throws -> ImportManifest {
-        let dbHash = try FileHash.sha256Hex(of: staged.dbURL)
-        let walHash = try staged.walURL.map { try FileHash.sha256Hex(of: $0) }
+        // Every manifest hash/size comes from the no-follow fd primitive over the STAGED
+        // file, and must equal the digest of the bytes written at copy time — a staged
+        // entry that changed, was swapped, or is no longer a regular file fails here.
+        func verifiedDigest(_ url: URL, copyDigest: RegularFileDigest?, what: String) throws -> RegularFileDigest {
+            let d = try FileHash.digestOfRegularFile(at: url)
+            guard d == copyDigest else { throw IngestError.stagedContentInconsistent(what) }
+            return d
+        }
+        let dbDigest = try verifiedDigest(staged.dbURL, copyDigest: staged.dbCopyDigest, what: "db")
+        let walDigest = try staged.walURL.map { try verifiedDigest($0, copyDigest: staged.walCopyDigest, what: "wal") }
 
         var files: [ImportManifest.FileResult] = []
         for r in staged.fileResults {
             if r.outcome == .ingested, let attachDir = staged.attachmentsDir {
                 let f = attachDir.appendingPathComponent(r.name)
-                let sha = try FileHash.sha256Hex(of: f)
-                let size = (try? FileManager.default.attributesOfItem(atPath: f.path))
-                    .flatMap { ($0[.size] as? NSNumber)?.int64Value }
-                files.append(.init(name: r.name, outcome: .ingested, sha256: sha, size: size))
+                let d = try verifiedDigest(f, copyDigest: staged.attachmentCopyDigests[r.name], what: r.name)
+                files.append(.init(name: r.name, outcome: .ingested, sha256: d.sha256, size: d.size))
             } else {
                 files.append(r)
             }
         }
         files.sort { $0.name < $1.name }
+
+        // Existence-vs-record: what the manifest is about to claim must match the disk —
+        // the staged DB is a regular file, and a `-wal` exists IFF walSHA256 is recorded.
+        guard (try FileFingerprint.capture(at: staged.dbURL))?.isRegularFile == true else {
+            throw IngestError.stagedContentInconsistent("db missing before manifest write")
+        }
+        let walOnDisk = try FileFingerprint.capture(at: URL(fileURLWithPath: staged.dbURL.path + "-wal"))
+        guard (walOnDisk != nil) == (walDigest != nil) else {
+            throw IngestError.stagedContentInconsistent("wal presence does not match record")
+        }
+        let dbHash = dbDigest.sha256
+        let walHash = walDigest?.sha256
 
         return ImportManifest(formatVersion: ImportManifest.currentFormatVersion,
                               importID: importID.rawValue, sourceKind: source.kind, createdAt: timestamp,
