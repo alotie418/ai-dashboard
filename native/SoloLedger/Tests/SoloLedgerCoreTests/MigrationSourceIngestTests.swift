@@ -624,7 +624,162 @@ final class MigrationSourceIngestTests: LedgerTestCase {
         XCTAssertTrue(fm.fileExists(atPath: result.stagedDatabaseURL.path + "-wal"))
     }
 
-    // MARK: - Publish race (2B-2 S3)
+    // MARK: - Manifest write must never follow a pre-planted link (2B-2 S5)
+
+    func testManifestWriteNeverFollowsPreplantedSymlink() throws {
+        // Variant A: link → an EXTERNAL sentinel file that must stay byte-identical.
+        // Variant B: dangling link → a path that must NEVER come into existence.
+        for variant in ["sentinel", "dangling"] {
+            let dir = try makeDataDirFixture(withWal: false, withAttachments: false)
+            let external = try trackedTempDir()
+            let sentinel = external.appendingPathComponent("sentinel.json")
+            let neverCreated = external.appendingPathComponent("never-created.json")
+            if variant == "sentinel" { try Data("SENTINEL".utf8).write(to: sentinel) }
+
+            let id = newImportID(); defer { cleanStaging(id) }
+            let before = attemptNames()
+            let hooks = IngestHooks(onStep: { step in
+                if step == .beforeManifestWrite {
+                    let attempt = try self.currentAttemptDir(since: before)
+                    try self.fm.createSymbolicLink(at: attempt.appendingPathComponent("manifest.json"),
+                                                   withDestinationURL: variant == "sentinel" ? sentinel : neverCreated)
+                }
+            })
+            XCTAssertThrowsError(try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t",
+                                                            maxAttempts: 1, hooks: hooks), variant) { e in
+                guard let fe = e as? FileHashError, case .destinationUnwritable = fe else {
+                    return XCTFail("\(variant): got \(e)")
+                }
+            }
+            if variant == "sentinel" {
+                XCTAssertEqual(try Data(contentsOf: sentinel), Data("SENTINEL".utf8),
+                               "the planted link's target must be byte-identical")
+            } else {
+                XCTAssertNil(try FileFingerprint.capture(at: neverCreated),
+                             "nothing may be created through the dangling link")
+            }
+            XCTAssertFalse(finalExists(id), variant)
+            XCTAssertTrue(attemptNames().isSubset(of: before), "\(variant): attempt (incl. planted link) cleaned")
+        }
+    }
+
+    // MARK: - Descriptor-rooted final gate (2B-2 S5)
+
+    /// The attempt ENTRY itself swapped for a symlink (to the real, byte-identical tree,
+    /// or dangling): O_NOFOLLOW|O_DIRECTORY refuses it; cleanup removes the LINK (lstat
+    /// semantics) and never reaches through it.
+    func testAttemptEntrySwappedForSymlinkFailsClosed() throws {
+        for variant in ["real-target", "dangling"] {
+            let dir = try makeDataDirFixture(withWal: false, withAttachments: true)
+            let aside = try trackedTempDir().appendingPathComponent("aside", isDirectory: true)
+            let id = newImportID(); defer { cleanStaging(id) }
+            let before = attemptNames()
+            let hooks = IngestHooks(onStep: { step in
+                if step == .beforePublish {
+                    let attempt = try self.currentAttemptDir(since: before)
+                    if variant == "real-target" {
+                        try self.fm.moveItem(at: attempt, to: aside)          // the very same bytes...
+                        try self.fm.createSymbolicLink(at: attempt, withDestinationURL: aside)
+                    } else {
+                        try self.fm.removeItem(at: attempt)
+                        try self.fm.createSymbolicLink(at: attempt,
+                                                       withDestinationURL: aside.appendingPathComponent("gone"))
+                    }
+                }
+            })
+            XCTAssertThrowsError(try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t",
+                                                            maxAttempts: 1, hooks: hooks), variant) { e in
+                guard case IngestError.stagedContentInconsistent = e else { return XCTFail("\(variant): got \(e)") }
+            }
+            XCTAssertFalse(finalExists(id), variant)
+            XCTAssertTrue(attemptNames().isSubset(of: before), "\(variant): dangling/planted attempt link cleaned")
+            if variant == "real-target" {
+                XCTAssertTrue(fm.fileExists(atPath: aside.appendingPathComponent("manifest.json").path),
+                              "cleanup must remove the LINK, never the tree behind it")
+            }
+        }
+    }
+
+    /// `attachments` / `docs` swapped for symlinks pointing at directories with the SAME
+    /// bytes: openat(O_NOFOLLOW|O_DIRECTORY) refuses the hop.
+    func testAttachmentsOrDocsSwappedForSymlinkFailsClosed() throws {
+        for target in ["attachments", "docs"] {
+            let dir = try makeDataDirFixture(withWal: false, withAttachments: true)
+            let aside = try trackedTempDir().appendingPathComponent("aside", isDirectory: true)
+            let id = newImportID(); defer { cleanStaging(id) }
+            let before = attemptNames()
+            let hooks = IngestHooks(onStep: { step in
+                if step == .beforePublish {
+                    let attempt = try self.currentAttemptDir(since: before)
+                    let victim = target == "attachments"
+                        ? attempt.appendingPathComponent("attachments")
+                        : attempt.appendingPathComponent("attachments/docs")
+                    try self.fm.moveItem(at: victim, to: aside)               // identical bytes behind the link
+                    try self.fm.createSymbolicLink(at: victim, withDestinationURL: aside)
+                }
+            })
+            XCTAssertThrowsError(try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t",
+                                                            maxAttempts: 1, hooks: hooks), target) { e in
+                guard case IngestError.stagedContentInconsistent = e else { return XCTFail("\(target): got \(e)") }
+            }
+            XCTAssertFalse(finalExists(id), target)
+            XCTAssertTrue(attemptNames().isSubset(of: before), target)
+        }
+    }
+
+    /// The tree must contain EXACTLY what the manifest promises: extra attachments,
+    /// root-level junk, -shm / -journal sidecars, and on-disk entities for names the
+    /// manifest recorded as SKIPPED are all rejected.
+    func testExtraEntriesInAttemptRejected() throws {
+        let plants: [(String, (URL) throws -> Void)] = [
+            ("extra attachment", { try Data("x".utf8).write(to: $0.appendingPathComponent("attachments/docs/extra.pdf")) }),
+            ("root junk file", { try Data("x".utf8).write(to: $0.appendingPathComponent("junk.txt")) }),
+            ("-shm sidecar", { try Data("x".utf8).write(to: $0.appendingPathComponent("sololedger.db-shm")) }),
+            ("-journal sidecar", { try Data("x".utf8).write(to: $0.appendingPathComponent("sololedger.db-journal")) }),
+            ("unrecorded wal", { try Data("x".utf8).write(to: $0.appendingPathComponent("sololedger.db-wal")) }),
+            ("entity for a skipped name", { try Data("x".utf8).write(to: $0.appendingPathComponent("attachments/docs/link.pdf")) }),
+            ("root subdirectory", { try self.fm.createDirectory(at: $0.appendingPathComponent("nested"), withIntermediateDirectories: true) }),
+        ]
+        for (label, plant) in plants {
+            let dir = try makeDataDirFixture(withWal: false, withAttachments: true)
+            let id = newImportID(); defer { cleanStaging(id) }
+            let before = attemptNames()
+            let hooks = IngestHooks(onStep: { step in
+                if step == .beforePublish { try plant(try self.currentAttemptDir(since: before)) }
+            })
+            XCTAssertThrowsError(try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t",
+                                                            maxAttempts: 1, hooks: hooks), label) { e in
+                guard case IngestError.stagedContentInconsistent = e else { return XCTFail("\(label): got \(e)") }
+            }
+            XCTAssertFalse(finalExists(id), label)
+            XCTAssertTrue(attemptNames().isSubset(of: before), label)
+        }
+    }
+
+    /// AFTER the final gate, BEFORE the rename: the attempt entry replaced by a fresh
+    /// directory — the device/inode re-check refuses to publish the impostor.
+    func testAttemptReplacedAfterValidationRejected() throws {
+        let dir = try makeDataDirFixture(withWal: false, withAttachments: false)
+        let aside = try trackedTempDir().appendingPathComponent("aside", isDirectory: true)
+        let id = newImportID(); defer { cleanStaging(id) }
+        let before = attemptNames()
+        let hooks = IngestHooks(onStep: { step in
+            if step == .afterValidation {
+                let attempt = try self.currentAttemptDir(since: before)
+                try self.fm.moveItem(at: attempt, to: aside)
+                try self.fm.createDirectory(at: attempt, withIntermediateDirectories: true)   // impostor
+            }
+        })
+        XCTAssertThrowsError(try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t",
+                                                        maxAttempts: 1, hooks: hooks)) { e in
+            guard case IngestError.stagedContentInconsistent(let what) = e else { return XCTFail("got \(e)") }
+            XCTAssertTrue(what.contains("after validation"), what)
+        }
+        XCTAssertFalse(finalExists(id))
+        XCTAssertTrue(attemptNames().isSubset(of: before), "the impostor at the attempt path is cleaned")
+    }
+
+    // MARK: - Publish race (2B-2 S3; hook corrected to .afterValidation in S5)
 
     /// A concurrent ingest publishes the same importID inside our window (after the
     /// up-front existence check, before our rename): the loss maps to
@@ -637,7 +792,7 @@ final class MigrationSourceIngestTests: LedgerTestCase {
         let sentinel = finalDir.appendingPathComponent("winner.txt")
         let before = attemptNames()
         let hooks = IngestHooks(onStep: { step in
-            if step == .beforePublish {   // attempt fully built + validated; winner appears now
+            if step == .afterValidation {   // genuinely after the final gate, before the rename
                 try self.fm.createDirectory(at: finalDir, withIntermediateDirectories: true)
                 try Data("winner".utf8).write(to: sentinel)
             }

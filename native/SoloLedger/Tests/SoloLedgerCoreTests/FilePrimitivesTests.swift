@@ -113,6 +113,57 @@ final class FilePrimitivesTests: LedgerTestCase {
         XCTAssertEqual(try Data(contentsOf: victim), Data("SAFE".utf8))
     }
 
+    // MARK: - DirectoryHandle (descriptor-bound directory, 2B-2 S5)
+
+    func testDirectoryHandleBindsRealDirectoriesOnly() throws {
+        let dir = try trackedTempDir()
+        let real = dir.appendingPathComponent("real", isDirectory: true)
+        try fm.createDirectory(at: real, withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: real.appendingPathComponent("a.txt"))
+
+        let handle = try DirectoryHandle.open(at: real)
+        XCTAssertEqual(try handle.entryNames(), ["a.txt"])
+        let fp = try XCTUnwrap(FileFingerprint.capture(at: real))
+        XCTAssertEqual(handle.device, fp.device)
+        XCTAssertEqual(handle.inode, fp.inode)
+
+        // A symlink to that very directory is refused — same bytes, wrong object.
+        let link = dir.appendingPathComponent("link")
+        try fm.createSymbolicLink(at: link, withDestinationURL: real)
+        XCTAssertThrowsError(try DirectoryHandle.open(at: link)) { e in
+            guard let fe = e as? FileHashError, case .notADirectory = fe else { return XCTFail("got \(e)") }
+        }
+        // So is a plain file, and a symlinked SUBdirectory hop.
+        XCTAssertThrowsError(try DirectoryHandle.open(at: real.appendingPathComponent("a.txt")))
+        let subLink = real.appendingPathComponent("sub")
+        try fm.createSymbolicLink(at: subLink, withDestinationURL: dir)
+        XCTAssertThrowsError(try handle.subdirectory(named: "sub")) { e in
+            guard let fe = e as? FileHashError, case .notADirectory = fe else { return XCTFail("got \(e)") }
+        }
+    }
+
+    func testDirectoryHandleExclusiveCreateRefusesAnyExistingEntry() throws {
+        let dir = try trackedTempDir()
+        let handle = try DirectoryHandle.open(at: dir)
+
+        try handle.createRegularFileExclusively(named: "fresh.json", contents: Data("DATA".utf8))
+        XCTAssertEqual(try Data(contentsOf: dir.appendingPathComponent("fresh.json")), Data("DATA".utf8))
+        let mode = try fm.attributesOfItem(atPath: dir.appendingPathComponent("fresh.json").path)[.posixPermissions] as? Int
+        XCTAssertEqual(mode, 0o600)
+
+        // Existing regular file → EEXIST, byte-identical afterwards.
+        XCTAssertThrowsError(try handle.createRegularFileExclusively(named: "fresh.json", contents: Data("NEW".utf8)))
+        XCTAssertEqual(try Data(contentsOf: dir.appendingPathComponent("fresh.json")), Data("DATA".utf8))
+
+        // Dangling symlink → EEXIST; the target must never be created.
+        let target = dir.appendingPathComponent("never.json")
+        try fm.createSymbolicLink(at: dir.appendingPathComponent("planted.json"), withDestinationURL: target)
+        XCTAssertThrowsError(try handle.createRegularFileExclusively(named: "planted.json", contents: Data("NEW".utf8))) { e in
+            guard let fe = e as? FileHashError, case .destinationUnwritable = fe else { return XCTFail("got \(e)") }
+        }
+        XCTAssertNil(try FileFingerprint.capture(at: target), "nothing may be written through the planted link")
+    }
+
     // MARK: - FileFingerprint
 
     func testFingerprintCapturesTypeAndIdentity() throws {

@@ -7,6 +7,9 @@ public enum FileHashError: Error, CustomStringConvertible, Equatable {
     /// The path names something other than a regular file — a symlink (O_NOFOLLOW),
     /// directory, FIFO or other special file. Refusing to hash it.
     case notARegularFile(String)
+    /// The path names something other than a real directory — a symlinked directory
+    /// (O_NOFOLLOW|O_DIRECTORY), a file, or a special entry.
+    case notADirectory(String)
     case unreadable(path: String, errno: Int32)
     /// The copy destination could not be created EXCLUSIVELY (it already exists — even as
     /// a dangling symlink — or the create failed). The primitive never overwrites and
@@ -16,6 +19,7 @@ public enum FileHashError: Error, CustomStringConvertible, Equatable {
     public var description: String {
         switch self {
         case .notARegularFile(let p): return "Not a regular file (symlink/directory/special): \(p)"
+        case .notADirectory(let p): return "Not a real directory (symlink/file/special): \(p)"
         case .unreadable(let p, let e): return "Cannot read file for hashing: \(p) (errno \(e))"
         case .destinationUnwritable(let p, let e): return "Cannot exclusively create copy destination: \(p) (errno \(e))"
         }
@@ -53,6 +57,21 @@ public struct FileFingerprint: Equatable {
     public var isRegularFile: Bool { fileType == UInt16(S_IFREG) }
     public var isDirectory: Bool { fileType == UInt16(S_IFDIR) }
 
+    init(stat st: stat) {
+        self.init(fileType: UInt16(st.st_mode) & UInt16(S_IFMT),
+                  device: Int32(st.st_dev), inode: UInt64(st.st_ino),
+                  size: Int64(st.st_size),
+                  mtimeSec: Int64(st.st_mtimespec.tv_sec), mtimeNSec: Int64(st.st_mtimespec.tv_nsec),
+                  ctimeSec: Int64(st.st_ctimespec.tv_sec), ctimeNSec: Int64(st.st_ctimespec.tv_nsec))
+    }
+
+    init(fileType: UInt16, device: Int32, inode: UInt64, size: Int64,
+         mtimeSec: Int64, mtimeNSec: Int64, ctimeSec: Int64, ctimeNSec: Int64) {
+        self.fileType = fileType; self.device = device; self.inode = inode; self.size = size
+        self.mtimeSec = mtimeSec; self.mtimeNSec = mtimeNSec
+        self.ctimeSec = ctimeSec; self.ctimeNSec = ctimeNSec
+    }
+
     /// nil ⇔ the path is definitively absent (ENOENT). Never follows symlinks — a symlink
     /// fingerprints as the link itself (fileType S_IFLNK).
     public static func capture(at url: URL) throws -> FileFingerprint? {
@@ -62,11 +81,136 @@ public struct FileFingerprint: Equatable {
             if e == ENOENT { return nil }
             throw FileHashError.unreadable(path: url.path, errno: e)
         }
-        return FileFingerprint(fileType: UInt16(st.st_mode) & UInt16(S_IFMT),
-                               device: Int32(st.st_dev), inode: UInt64(st.st_ino),
-                               size: Int64(st.st_size),
-                               mtimeSec: Int64(st.st_mtimespec.tv_sec), mtimeNSec: Int64(st.st_mtimespec.tv_nsec),
-                               ctimeSec: Int64(st.st_ctimespec.tv_sec), ctimeNSec: Int64(st.st_ctimespec.tv_nsec))
+        return FileFingerprint(stat: st)
+    }
+}
+
+// MARK: - Descriptor-bound directory
+
+/// A directory opened O_NOFOLLOW|O_DIRECTORY (a symlinked directory fails with ELOOP,
+/// anything else with ENOTDIR), verified and identity-bound (device+inode) on the OPEN
+/// descriptor. Every member operation runs RELATIVE TO THIS DESCRIPTOR
+/// (openat/fstatat/unlinkat), so once bound, no path component substitution — the
+/// directory itself, a parent, or an entry — can redirect reads, writes or checks.
+final class DirectoryHandle {
+    let fd: Int32
+    let device: Int32
+    let inode: UInt64
+    private let pathHint: String   // diagnostics only; never used for I/O after open
+
+    private init(fd: Int32, device: Int32, inode: UInt64, pathHint: String) {
+        self.fd = fd; self.device = device; self.inode = inode; self.pathHint = pathHint
+    }
+    deinit { close(fd) }
+
+    private static func adopt(fd: Int32, pathHint: String) throws -> DirectoryHandle {
+        var st = stat()
+        guard fstat(fd, &st) == 0 else {
+            let e = errno; close(fd)
+            throw FileHashError.unreadable(path: pathHint, errno: e)
+        }
+        guard (st.st_mode & S_IFMT) == S_IFDIR else {
+            close(fd)
+            throw FileHashError.notADirectory(pathHint)
+        }
+        return DirectoryHandle(fd: fd, device: Int32(st.st_dev), inode: UInt64(st.st_ino), pathHint: pathHint)
+    }
+
+    static func open(at url: URL) throws -> DirectoryHandle {
+        let fd = Darwin.open(url.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+        guard fd >= 0 else {
+            let e = errno
+            if e == ELOOP || e == ENOTDIR { throw FileHashError.notADirectory(url.path) }
+            throw FileHashError.unreadable(path: url.path, errno: e)
+        }
+        return try adopt(fd: fd, pathHint: url.path)
+    }
+
+    /// Open a DIRECT child directory of this descriptor, no-follow.
+    func subdirectory(named name: String) throws -> DirectoryHandle {
+        let hint = pathHint + "/" + name
+        let child = openat(fd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+        guard child >= 0 else {
+            let e = errno
+            if e == ELOOP || e == ENOTDIR { throw FileHashError.notADirectory(hint) }
+            throw FileHashError.unreadable(path: hint, errno: e)
+        }
+        return try Self.adopt(fd: child, pathHint: hint)
+    }
+
+    /// All entry names (sorted, excluding "." / "..") read through the descriptor.
+    func entryNames() throws -> [String] {
+        let dupFD = dup(fd)
+        guard dupFD >= 0 else { throw FileHashError.unreadable(path: pathHint, errno: errno) }
+        guard let dirp = fdopendir(dupFD) else {
+            let e = errno; close(dupFD)
+            throw FileHashError.unreadable(path: pathHint, errno: e)
+        }
+        defer { closedir(dirp) }
+        rewinddir(dirp)
+        var names: [String] = []
+        while let ent = readdir(dirp) {
+            let name = withUnsafeBytes(of: ent.pointee.d_name) { raw in
+                String(cString: raw.baseAddress!.assumingMemoryBound(to: CChar.self))
+            }
+            if name != "." && name != ".." { names.append(name) }
+        }
+        return names.sorted()
+    }
+
+    /// lstat-equivalent of a DIRECT child via fstatat(AT_SYMLINK_NOFOLLOW).
+    /// nil ⇔ ENOENT; other metadata errors throw.
+    func fingerprint(named name: String) throws -> FileFingerprint? {
+        var st = stat()
+        guard fstatat(fd, name, &st, AT_SYMLINK_NOFOLLOW) == 0 else {
+            let e = errno
+            if e == ENOENT { return nil }
+            throw FileHashError.unreadable(path: pathHint + "/" + name, errno: e)
+        }
+        return FileFingerprint(stat: st)
+    }
+
+    /// Open a DIRECT child as a verified regular file (openat, no-follow, non-blocking).
+    func openRegularFile(named name: String) throws -> FileHandle {
+        let hint = pathHint + "/" + name
+        let f = openat(fd, name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
+        guard f >= 0 else {
+            let e = errno
+            if e == ELOOP { throw FileHashError.notARegularFile(hint) }
+            throw FileHashError.unreadable(path: hint, errno: e)
+        }
+        return try FileHash.verifyRegularAndWrap(fd: f, path: hint)
+    }
+
+    func digestOfRegularFile(named name: String) throws -> RegularFileDigest {
+        let handle = try openRegularFile(named: name)
+        defer { try? handle.close() }
+        return try FileHash.streamDigest(from: handle, chunkSize: 1 << 20) { _ in }
+    }
+
+    func readRegularFile(named name: String) throws -> Data {
+        let handle = try openRegularFile(named: name)
+        defer { try? handle.close() }
+        return try handle.readToEnd() ?? Data()
+    }
+
+    /// Create a DIRECT child EXCLUSIVELY (O_CREAT|O_EXCL|O_NOFOLLOW): an existing entry —
+    /// regular file, symlink, even a DANGLING symlink — fails with EEXIST, so a
+    /// pre-planted link is never followed and its target never written. On any failure
+    /// only the file created by THIS call is unlinked (via the descriptor).
+    func createRegularFileExclusively(named name: String, contents: Data, mode: mode_t = 0o600) throws {
+        let hint = pathHint + "/" + name
+        let f = openat(fd, name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, mode)
+        guard f >= 0 else { throw FileHashError.destinationUnwritable(path: hint, errno: errno) }
+        let handle = FileHandle(fileDescriptor: f, closeOnDealloc: true)
+        var complete = false
+        defer {
+            try? handle.close()
+            if !complete { unlinkat(fd, name, 0) }
+        }
+        try handle.write(contentsOf: contents)
+        try handle.close()
+        complete = true
     }
 }
 
@@ -135,21 +279,27 @@ public enum FileHash {
             if e == ELOOP { throw FileHashError.notARegularFile(url.path) }   // symlink under O_NOFOLLOW
             throw FileHashError.unreadable(path: url.path, errno: e)
         }
+        return try verifyRegularAndWrap(fd: fd, path: url.path)
+    }
+
+    /// Verify an ALREADY-OPEN descriptor (fstat: S_IFREG only) and wrap it. Takes
+    /// ownership: the fd is closed on failure, or by the returned handle.
+    static func verifyRegularAndWrap(fd: Int32, path: String) throws -> FileHandle {
         var st = stat()
         guard fstat(fd, &st) == 0 else {
             let e = errno; close(fd)
-            throw FileHashError.unreadable(path: url.path, errno: e)
+            throw FileHashError.unreadable(path: path, errno: e)
         }
         guard (st.st_mode & S_IFMT) == S_IFREG else {
             close(fd)
-            throw FileHashError.notARegularFile(url.path)
+            throw FileHashError.notARegularFile(path)
         }
         _ = fcntl(fd, F_SETFL, 0)   // drop O_NONBLOCK; regular-file reads ignore it anyway
         return FileHandle(fileDescriptor: fd, closeOnDealloc: true)
     }
 
-    private static func streamDigest(from handle: FileHandle, chunkSize: Int,
-                                     onChunk: (Data) throws -> Void) throws -> RegularFileDigest {
+    static func streamDigest(from handle: FileHandle, chunkSize: Int,
+                             onChunk: (Data) throws -> Void) throws -> RegularFileDigest {
         var hasher = SHA256()
         var total: Int64 = 0
         while let chunk = try handle.read(upToCount: chunkSize), !chunk.isEmpty {
@@ -384,7 +534,14 @@ struct IngestHooks {
     }
 }
 
-enum IngestStep { case afterDatabaseCopy, duringAttachmentCopy, beforeManifestWrite, beforePublish }
+enum IngestStep {
+    case afterDatabaseCopy, duringAttachmentCopy, beforeManifestWrite
+    /// Fires BEFORE the final validation gate — the adversary window the gate must catch.
+    case beforePublish
+    /// Fires AFTER the final validation gate and BEFORE the entry re-check + rename —
+    /// the (documented) residual window.
+    case afterValidation
+}
 
 /// Copies a `MigrationSource` into an isolated, native-owned staging directory, verifying
 /// the source did not change during the copy. FAILURE-ATOMIC: each attempt writes to its
@@ -414,7 +571,9 @@ public struct StagingIngest {
                 maxAttempts: Int, hooks: IngestHooks) throws -> IngestResult {
         let dbURL = try source.databaseURL()
         let finalDir = try AppPaths.stagedImportDirectory(importID: importID)
-        if FileManager.default.fileExists(atPath: finalDir.path) {
+        // lstat semantics: ANY entry at the final path — including a dangling symlink —
+        // means this importID is taken; we must never rename onto it.
+        if try FileFingerprint.capture(at: finalDir) != nil {
             throw IngestError.importIDAlreadyExists(importID.rawValue)
         }
         return try source.withAccess {
@@ -484,26 +643,38 @@ public struct StagingIngest {
         try hooks.onStep?(.beforeManifestWrite)
         try writeManifest(manifest, to: attemptDir)
 
-        // FINAL pre-publish gate — everything the rename is about to publish is re-read
-        // from disk and re-verified. The tiny window between this gate and the rename
-        // cannot be eliminated (a rename cannot be fd-bound); accepted residual: the
-        // attempt dir is process-private inside the native container, so nothing
-        // legitimate can write there between the two calls.
+        // FINAL pre-publish gate — descriptor-rooted re-verification of the ENTIRE
+        // attempt tree (see validateAttemptForPublish). Returns the bound handle.
         try hooks.onStep?(.beforePublish)
-        try validateAttemptForPublish(attemptDir: attemptDir, expected: manifest, staged: staged)
+        let bound = try validateAttemptForPublish(attemptDir: attemptDir, expected: manifest, staged: staged)
 
-        // Atomic publish: rename the completed attempt onto the per-import dir (same
-        // volume). moveItem THROWS if the destination exists — a concurrent ingest that
-        // published this importID inside our window wins; ITS directory is never touched
-        // (the caller cleans only OUR attempt) and the loss surfaces as the same
-        // importIDAlreadyExists the up-front check uses.
-        do {
-            try FileManager.default.moveItem(at: attemptDir, to: finalDir)
-        } catch {
-            if FileManager.default.fileExists(atPath: finalDir.path) {
-                throw IngestError.importIDAlreadyExists(importID.rawValue)
+        try hooks.onStep?(.afterValidation)
+
+        try withExtendedLifetime(bound) {
+            // The path entry must STILL be the very directory we validated — same device
+            // and inode, a real directory, not a symlink or a substituted tree. Accepted
+            // residual (documented): this re-check → rename window cannot be fd-bound
+            // (rename is path-based); attempt dirs are process-private inside the native
+            // container, so nothing legitimate writes there between the two calls.
+            guard let entry = try FileFingerprint.capture(at: attemptDir),
+                  entry.isDirectory, entry.device == bound.device, entry.inode == bound.inode else {
+                throw IngestError.stagedContentInconsistent("attempt dir entry changed after validation")
             }
-            throw error
+
+            // Atomic publish: rename the completed attempt onto the per-import dir (same
+            // volume). moveItem THROWS if the destination exists — a concurrent ingest
+            // that published this importID inside our window wins; ITS directory is never
+            // touched (the caller cleans only OUR attempt) and the loss surfaces as the
+            // same importIDAlreadyExists the up-front check uses. lstat semantics: even a
+            // dangling symlink at the destination counts as "exists".
+            do {
+                try FileManager.default.moveItem(at: attemptDir, to: finalDir)
+            } catch {
+                if (try? FileFingerprint.capture(at: finalDir)) ?? nil != nil {
+                    throw IngestError.importIDAlreadyExists(importID.rawValue)
+                }
+                throw error
+            }
         }
 
         let stagedDB = finalDir.appendingPathComponent(AppPaths.databaseFileName)
@@ -518,69 +689,110 @@ public struct StagingIngest {
             manifest: manifest))
     }
 
-    /// FINAL pre-publish integrity gate. Re-reads the manifest from disk through a
-    /// verified fd and re-verifies, with the no-follow fd primitives, every byte the
-    /// rename is about to publish:
-    ///  - the on-disk manifest decodes to a manifest FIELD-FOR-FIELD equal to the one we
-    ///    built (a tampered, truncated or symlink-swapped manifest.json fails);
-    ///  - the staged DB is STILL a regular file whose sha256 AND size equal the verified
-    ///    copy digest and the manifest record;
-    ///  - the WAL's on-disk presence matches `walSHA256` exactly, and when present it is
-    ///    a regular file with the exact digest (a symlink/directory/FIFO swapped in fails
-    ///    immediately — O_NONBLOCK, no hang);
-    ///  - every `.ingested` attachment is still a regular file with the manifest's exact
-    ///    sha256 and size.
-    /// ANY violation throws `stagedContentInconsistent`: the attempt is discarded by the
-    /// caller and nothing is published.
+    /// FINAL pre-publish integrity gate, DESCRIPTOR-ROOTED: the attempt directory is
+    /// opened O_NOFOLLOW|O_DIRECTORY and identity-bound (device+inode); every check and
+    /// every read below runs relative to that descriptor (openat / fstatat
+    /// AT_SYMLINK_NOFOLLOW), so swapping the attempt dir, `attachments`, `docs` or any
+    /// entry for a symlink — even one pointing at byte-identical content — fails, and no
+    /// path re-resolution can redirect a read. Verifies:
+    ///  - the attempt root's entry set is EXACTLY {manifest.json, sololedger.db,
+    ///    [sololedger.db-wal], [attachments]} — no extras (-shm, -journal, junk), and
+    ///    each entry is the right type;
+    ///  - manifest.json (read through the descriptor) decodes FIELD-FOR-FIELD equal to
+    ///    the built manifest;
+    ///  - the staged DB / WAL digests equal both the verified copy digests and the
+    ///    manifest records (a FIFO/symlink/directory swap fails immediately, no hang);
+    ///  - `attachments` contains EXACTLY the real directory `docs`, whose entry set is
+    ///    EXACTLY the manifest's `.ingested` names (no extra attachments, no entities
+    ///    for skipped names), each a regular file with the exact sha256 AND size.
+    /// ANY violation throws `stagedContentInconsistent`; the attempt is discarded and
+    /// nothing is published. Returns the bound handle so the caller can confirm, right
+    /// before the rename, that the path entry is STILL this very directory.
     private static func validateAttemptForPublish(attemptDir: URL, expected: ImportManifest,
-                                                  staged: StagedLayout) throws {
+                                                  staged: StagedLayout) throws -> DirectoryHandle {
         func fail(_ what: String) -> IngestError { .stagedContentInconsistent(what) }
-        func verifiedDigest(_ url: URL, _ what: String) throws -> RegularFileDigest {
-            do { return try FileHash.digestOfRegularFile(at: url) }
-            catch { throw fail("\(what): \(error)") }
+
+        let root: DirectoryHandle
+        do { root = try DirectoryHandle.open(at: attemptDir) }
+        catch { throw fail("attempt dir: \(error)") }
+
+        // 1. Exact root entry set + types.
+        let dbName = AppPaths.databaseFileName
+        let walName = dbName + "-wal"
+        var expectedRoot: Set<String> = ["manifest.json", dbName]
+        if expected.walSHA256 != nil { expectedRoot.insert(walName) }
+        if staged.hasAttachments { expectedRoot.insert("attachments") }
+        let rootEntries = Set(try root.entryNames())
+        guard rootEntries == expectedRoot else {
+            throw fail("attempt root is \(rootEntries.sorted()) but must be exactly \(expectedRoot.sorted())")
+        }
+        for name in expectedRoot {
+            guard let fp = try root.fingerprint(named: name) else { throw fail("\(name) vanished") }
+            let wantDir = (name == "attachments")
+            guard wantDir ? fp.isDirectory : fp.isRegularFile else { throw fail("\(name) has the wrong type") }
         }
 
-        // 1. Manifest file: re-read via a verified fd and compare the DECODED object.
-        let manifestURL = attemptDir.appendingPathComponent("manifest.json")
+        // 2. Manifest: read through the descriptor, decoded object must equal ours.
         let manifestData: Data
-        do {
-            let handle = try FileHash.openVerifiedRegularFile(manifestURL)
-            defer { try? handle.close() }
-            manifestData = try handle.readToEnd() ?? Data()
-        } catch { throw fail("manifest: \(error)") }
+        do { manifestData = try root.readRegularFile(named: "manifest.json") }
+        catch { throw fail("manifest: \(error)") }
         guard let decoded = try? JSONDecoder().decode(ImportManifest.self, from: manifestData),
               decoded == expected else {
             throw fail("manifest on disk does not match the built manifest")
         }
 
-        // 2. Staged DB.
-        let dbDigest = try verifiedDigest(staged.dbURL, "db")
+        // 3. DB + WAL digests through the descriptor.
+        func verifiedDigest(_ dir: DirectoryHandle, _ name: String) throws -> RegularFileDigest {
+            do { return try dir.digestOfRegularFile(named: name) }
+            catch { throw fail("\(name): \(error)") }
+        }
+        let dbDigest = try verifiedDigest(root, dbName)
         guard dbDigest == staged.dbCopyDigest, dbDigest.sha256 == expected.sourceDBSHA256 else {
             throw fail("db")
         }
-
-        // 3. WAL: strict presence ⇔ record, then type + digest. FileFingerprint.capture
-        //    treats ONLY ENOENT as absence — metadata errors fail closed here too.
-        let walURL = URL(fileURLWithPath: staged.dbURL.path + "-wal")
         if let walSHA = expected.walSHA256 {
-            let walDigest = try verifiedDigest(walURL, "wal")
+            let walDigest = try verifiedDigest(root, walName)
             guard walDigest == staged.walCopyDigest, walDigest.sha256 == walSHA else { throw fail("wal") }
-        } else {
-            guard try FileFingerprint.capture(at: walURL) == nil else {
-                throw fail("wal present but not recorded")
-            }
         }
 
-        // 4. Every ingested attachment: regular file, exact sha256 AND size.
-        for f in expected.files where f.outcome == .ingested {
-            guard let attachDir = staged.attachmentsDir else { throw fail("attachments dir missing") }
-            let d = try verifiedDigest(attachDir.appendingPathComponent(f.name), f.name)
-            guard d.sha256 == f.sha256, d.size == f.size else { throw fail(f.name) }
+        // 4. Attachment tree: attachments → docs, both REAL directories reached via
+        //    openat; docs' entry set must equal the ingested name set exactly.
+        let ingested = expected.files.filter { $0.outcome == .ingested }
+        if staged.hasAttachments {
+            let attachments: DirectoryHandle
+            let docs: DirectoryHandle
+            do {
+                attachments = try root.subdirectory(named: "attachments")
+                guard try attachments.entryNames() == ["docs"] else {
+                    throw fail("attachments dir must contain exactly 'docs'")
+                }
+                docs = try attachments.subdirectory(named: "docs")
+            } catch let e as IngestError { throw e }
+            catch { throw fail("attachment tree: \(error)") }
+
+            let docsEntries = Set(try docs.entryNames())
+            let expectedDocs = Set(ingested.map { $0.name })
+            guard docsEntries == expectedDocs else {
+                throw fail("docs is \(docsEntries.sorted()) but must be exactly \(expectedDocs.sorted())")
+            }
+            for f in ingested {
+                let d = try verifiedDigest(docs, f.name)
+                guard d.sha256 == f.sha256, d.size == f.size else { throw fail(f.name) }
+            }
+        } else {
+            guard ingested.isEmpty else { throw fail("ingested files recorded but no attachments dir staged") }
         }
+
+        return root
     }
 
     private static func cleanupIfPresent(_ dir: URL, hooks: IngestHooks, original: Error) throws {
-        guard FileManager.default.fileExists(atPath: dir.path) else { return }
+        // lstat semantics: a DANGLING attempt symlink must be cleaned too (fileExists
+        // would follow it, report false and leak the entry). A metadata error reads as
+        // "present" so we still attempt the removal rather than silently skipping.
+        let present: Bool
+        do { present = try FileFingerprint.capture(at: dir) != nil } catch { present = true }
+        guard present else { return }
         do {
             try removeAttempt(dir, hooks: hooks)
         } catch {
@@ -771,9 +983,15 @@ public struct StagingIngest {
         return SHA256.hash(data: Data(s.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
+    /// Write manifest.json through the VERIFIED attempt-directory descriptor, exclusively
+    /// and no-follow: a pre-planted entry at that name — regular file, symlink, even a
+    /// DANGLING symlink — fails with EEXIST before a single byte is written, so a planted
+    /// link's target can never be touched. Failure unlinks only the file this call created.
     private static func writeManifest(_ manifest: ImportManifest, to dir: URL) throws {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try enc.encode(manifest).write(to: dir.appendingPathComponent("manifest.json"))
+        let data = try enc.encode(manifest)
+        let root = try DirectoryHandle.open(at: dir)
+        try root.createRegularFileExclusively(named: "manifest.json", contents: data, mode: 0o600)
     }
 }
