@@ -24,14 +24,21 @@ public struct UnresolvedReport: Codable, Equatable {
     }
     public var items: [Item]
     public init(items: [Item]) {
-        self.items = items.sorted { ($0.kind.rawValue, $0.name) < ($1.kind.rawValue, $1.name) }
+        self.items = items.sorted {
+            ($0.kind.rawValue, $0.name, $0.detail ?? "") < ($1.kind.rawValue, $1.name, $1.detail ?? "")
+        }
     }
     public var isEmpty: Bool { items.isEmpty }
-    /// Stable hash over the sorted (kind, name) set. Any change — e.g. new dangling refs added
-    /// by the DB audit — changes this hash, so an acknowledgement of an OLD report can never
-    /// confirm a CHANGED one.
+    /// Canonical, order-stable, INJECTIVE hash over (kind, name, detail) for every item.
+    /// Each field is length-prefixed (UTF-8 byte count) and the item count is prefixed, so the
+    /// encoding is self-delimiting — no attacker-influenceable name/detail (e.g. a rejectedName
+    /// carrying raw source-filename bytes) can smuggle a separator and collide two distinct
+    /// reports. A change in ANY field (including a user-visible `detail`, or a new dangling ref)
+    /// changes the hash, so an acknowledgement of an OLD report can never confirm a CHANGED one.
     public var reportHash: String {
-        let s = items.map { "\($0.kind.rawValue)\u{0}\($0.name)" }.joined(separator: "\n")
+        func field(_ s: String) -> String { "\(s.utf8.count):\(s)" }
+        var s = "\(items.count)#"
+        for it in items { s += field(it.kind.rawValue) + field(it.name) + field(it.detail ?? "") }
         return SHA256.hash(data: Data(s.utf8)).map { String(format: "%02x", $0) }.joined()
     }
     func merged(with extra: [Item]) -> UnresolvedReport { UnresolvedReport(items: items + extra) }
@@ -39,30 +46,68 @@ public struct UnresolvedReport: Codable, Equatable {
 
 // MARK: - Reference audit + acknowledgement
 
-/// The DB reference audit the coordinator runs AFTER the active DB exists: whether it was
-/// actually performed, and which attachment reference values the ledger points at resolve to
-/// no present file. `complete` REFUSES to finalize unless `performed` is true, and records
-/// that fact in the sentinel — so "audited, nothing dangling" is never confused with
-/// "not yet audited". An empty `danglingReferences` with `performed == false` is explicitly
-/// NOT a clean audit.
+/// Un-forgeable DB-reference-audit evidence, BOUND to the exact import it scanned: the
+/// importID, the snapshot identity (DB+WAL), the attachment-manifest identity, and the
+/// prepared DB it audited. `complete` matches every field against the report and rejects any
+/// cross-import / cross-snapshot / cross-database audit. The initializer is INTERNAL, so only
+/// Core (`AttachmentReferenceAuditor`) and `@testable` tests can construct evidence — a
+/// production caller can never fabricate an audit.
 public struct ReferenceAudit: Equatable {
-    public let performed: Bool
+    public let importID: String
+    public let snapshotIdentitySHA256: String
+    public let attachmentManifestSHA256: String
+    public let preparedDBIdentity: String
     public let danglingReferences: [String]
-    public init(performed: Bool, danglingReferences: [String]) {
-        self.performed = performed; self.danglingReferences = danglingReferences
+    init(importID: String, snapshotIdentitySHA256: String, attachmentManifestSHA256: String,
+         preparedDBIdentity: String, danglingReferences: [String]) {
+        self.importID = importID
+        self.snapshotIdentitySHA256 = snapshotIdentitySHA256
+        self.attachmentManifestSHA256 = attachmentManifestSHA256
+        self.preparedDBIdentity = preparedDBIdentity
+        self.danglingReferences = danglingReferences
     }
-    /// The audit RAN and found the given dangling references (empty ⇒ clean).
-    public static func audited(danglingReferences: [String] = []) -> ReferenceAudit {
-        ReferenceAudit(performed: true, danglingReferences: danglingReferences)
-    }
-    /// The audit has NOT run — `complete` will refuse with `.referenceAuditNotPerformed`.
-    public static let notPerformed = ReferenceAudit(performed: false, danglingReferences: [])
 }
 
-/// A user acknowledgement, bound to the exact unresolved-report hash it confirms.
+/// The ONLY sanctioned producer of `ReferenceAudit` evidence — it binds the audit to the exact
+/// import + snapshot + attachment set + prepared DB it scanned. The real ledger-reference scan
+/// is a LATER commit; until then `audit` throws, so no valid audit can be produced and the App
+/// cannot reach completion (it has no other way to construct a `ReferenceAudit`).
+public struct AttachmentReferenceAuditor {
+    public init() {}
+    public func audit(report: AttachmentApplyReport, preparedDatabaseAt url: URL) throws -> ReferenceAudit {
+        throw AttachmentApplyError.referenceAuditNotImplemented
+    }
+}
+
+/// What a caller must acknowledge: the FULL operation identity plus the unresolved-report hash.
+/// An `Acknowledgement` can only be produced from a request, so it is inseparable from that
+/// identity — an acknowledgement of import A can never confirm import B (even with an identical
+/// unresolved list).
+public struct AcknowledgementRequest: Equatable {
+    public let importID: String
+    public let snapshotIdentitySHA256: String
+    public let attachmentManifestSHA256: String
+    public let unresolvedReportHash: String
+    init(importID: String, snapshotIdentitySHA256: String, attachmentManifestSHA256: String, unresolvedReportHash: String) {
+        self.importID = importID
+        self.snapshotIdentitySHA256 = snapshotIdentitySHA256
+        self.attachmentManifestSHA256 = attachmentManifestSHA256
+        self.unresolvedReportHash = unresolvedReportHash
+    }
+    public func acknowledge() -> Acknowledgement { Acknowledgement(request: self) }
+}
+
 public struct Acknowledgement: Equatable {
-    public let reportHash: String
-    public init(reportHash: String) { self.reportHash = reportHash }
+    let importID: String
+    let snapshotIdentitySHA256: String
+    let attachmentManifestSHA256: String
+    let unresolvedReportHash: String
+    init(request: AcknowledgementRequest) {
+        self.importID = request.importID
+        self.snapshotIdentitySHA256 = request.snapshotIdentitySHA256
+        self.attachmentManifestSHA256 = request.attachmentManifestSHA256
+        self.unresolvedReportHash = request.unresolvedReportHash
+    }
 }
 
 // MARK: - Plan (pre-swap gate)
@@ -94,7 +139,9 @@ public enum AttachmentApplyError: Error, CustomStringConvertible {
     case conflictDuringApply(String)
     case activeFileHashMismatch(String)
     case sentinelIdentityMismatch(String)
-    case referenceAuditNotPerformed
+    case unsupportedManifestFormat(Int?)
+    case referenceAuditNotImplemented
+    case referenceAuditMismatch(field: String)
 
     public var description: String {
         switch self {
@@ -109,7 +156,9 @@ public enum AttachmentApplyError: Error, CustomStringConvertible {
         case .conflictDuringApply(let n): return "Attachment '\(n)' changed under us during apply — refusing to overwrite"
         case .activeFileHashMismatch(let n): return "Active attachment '\(n)' changed after planning — refusing to complete"
         case .sentinelIdentityMismatch(let id): return "A completion sentinel for import \(id) already exists with a different identity — refusing to overwrite"
-        case .referenceAuditNotPerformed: return "Refusing to complete: the DB reference audit has not been run (referenceAudit.performed == false)"
+        case .unsupportedManifestFormat(let v): return "Unsupported manifest formatVersion \(v.map(String.init) ?? "nil") — refusing to process"
+        case .referenceAuditNotImplemented: return "The DB reference auditor is not implemented yet — completion cannot be reached"
+        case .referenceAuditMismatch(let field): return "Reference audit does not belong to this import (\(field) mismatch) — refusing to complete"
         }
     }
 }
@@ -121,10 +170,20 @@ public struct AttachmentApplyReport {
     public let stagingDir: URL
     public let activeAttachmentsDir: URL
     public let manifest: ImportManifest
+    /// Identity of the prepared/active DB this apply is bound to (supplied by the coordinator).
+    /// The reference audit must carry the SAME value or `complete` rejects it as cross-database.
+    public let preparedDBIdentity: String
     public let applied: ImportManifest.AppliedSummary
     /// Missing staged files + ingest-stage skips. The DB reference audit's dangling refs are
     /// merged in at `complete` time.
     public let fileUnresolved: UnresolvedReport
+
+    public init(importID: ImportID, stagingDir: URL, activeAttachmentsDir: URL, manifest: ImportManifest,
+                preparedDBIdentity: String, applied: ImportManifest.AppliedSummary, fileUnresolved: UnresolvedReport) {
+        self.importID = importID; self.stagingDir = stagingDir; self.activeAttachmentsDir = activeAttachmentsDir
+        self.manifest = manifest; self.preparedDBIdentity = preparedDBIdentity
+        self.applied = applied; self.fileUnresolved = fileUnresolved
+    }
 }
 
 public struct ApplyResult: Equatable {
@@ -138,23 +197,26 @@ public struct ApplyResult: Equatable {
 
 public enum CompleteOutcome: Equatable {
     case completed(ApplyResult)
-    /// Unresolved items remain (files and/or dangling refs). The caller must obtain a user
-    /// acknowledgement bound to `reportHash` and call `complete` again. Nothing was persisted;
-    /// staging is kept.
-    case requiresAcknowledgement(reportHash: String, unresolved: UnresolvedReport)
+    /// Unresolved items remain (files and/or dangling refs). The caller must turn `request`
+    /// into an `Acknowledgement` (via `request.acknowledge()`) after the user confirms, then
+    /// call `complete` again. Nothing was persisted; staging is kept.
+    case requiresAcknowledgement(request: AcknowledgementRequest, unresolved: UnresolvedReport)
 }
 
 /// Test-only fault seams (all `internal`, defaulting to no-op).
 struct ApplyHooks {
     var onAttachmentCopy: ((String) throws -> Void)?
+    var onBeforePublish: ((String) throws -> Void)?
     var onCompletionTempWrite: (() throws -> Void)?
     var onCompletionPublish: (() throws -> Void)?
     var cleanup: ((URL) throws -> Void)?
     init(onAttachmentCopy: ((String) throws -> Void)? = nil,
+         onBeforePublish: ((String) throws -> Void)? = nil,
          onCompletionTempWrite: (() throws -> Void)? = nil,
          onCompletionPublish: (() throws -> Void)? = nil,
          cleanup: ((URL) throws -> Void)? = nil) {
         self.onAttachmentCopy = onAttachmentCopy
+        self.onBeforePublish = onBeforePublish
         self.onCompletionTempWrite = onCompletionTempWrite
         self.onCompletionPublish = onCompletionPublish
         self.cleanup = cleanup
@@ -191,9 +253,12 @@ public struct AttachmentApply {
     }
 
     /// Copy the staged import's absent attachments to the active dir (non-destructive) and
-    /// report ACTUAL outcomes + file-level unresolved items. No sentinel, no staging cleanup.
-    public func apply(stagingDir: URL, activeAttachmentsDir: URL) throws -> AttachmentApplyReport {
-        try apply(stagingDir: stagingDir, activeAttachmentsDir: activeAttachmentsDir, hooks: ApplyHooks())
+    /// report ACTUAL outcomes + file-level unresolved items. `preparedDBIdentity` is the
+    /// coordinator's identity for the prepared/active DB — it binds the report so a reference
+    /// audit for a different DB cannot complete it. No sentinel, no staging cleanup.
+    public func apply(stagingDir: URL, activeAttachmentsDir: URL, preparedDBIdentity: String) throws -> AttachmentApplyReport {
+        try apply(stagingDir: stagingDir, activeAttachmentsDir: activeAttachmentsDir,
+                  preparedDBIdentity: preparedDBIdentity, hooks: ApplyHooks())
     }
 
     /// Finalize: merge the DB reference audit, gate on acknowledgement if anything is
@@ -207,7 +272,7 @@ public struct AttachmentApply {
 
     // MARK: - Internal (fault seams / injectable dirs)
 
-    func apply(stagingDir: URL, activeAttachmentsDir: URL, hooks: ApplyHooks) throws -> AttachmentApplyReport {
+    func apply(stagingDir: URL, activeAttachmentsDir: URL, preparedDBIdentity: String, hooks: ApplyHooks) throws -> AttachmentApplyReport {
         let v = try Self.validate(stagingDir: stagingDir)
         let plan = try Self.buildPlan(validated: v, activeDir: activeAttachmentsDir)
         if plan.hasConflicts { throw AttachmentApplyError.conflicts(plan.conflicts) }   // PRE-SWAP gate
@@ -232,22 +297,38 @@ public struct AttachmentApply {
                                                     missing: plan.missing)
         return AttachmentApplyReport(importID: v.importID, stagingDir: stagingDir,
                                      activeAttachmentsDir: activeAttachmentsDir, manifest: v.manifest,
-                                     applied: applied, fileUnresolved: Self.fileUnresolved(v))
+                                     preparedDBIdentity: preparedDBIdentity, applied: applied,
+                                     fileUnresolved: Self.fileUnresolved(v))
     }
 
     func complete(report: AttachmentApplyReport, referenceAudit: ReferenceAudit,
                   acknowledgement: Acknowledgement?, manifestsDir: URL, hooks: ApplyHooks) throws -> CompleteOutcome {
-        // The attachment migration is never `complete` until the DB references were audited.
-        guard referenceAudit.performed else { throw AttachmentApplyError.referenceAuditNotPerformed }
+        // The audit evidence must belong to THIS exact import — reject cross-import / snapshot /
+        // attachment-set / database audits field-by-field.
+        guard referenceAudit.importID == report.importID.rawValue else { throw AttachmentApplyError.referenceAuditMismatch(field: "importID") }
+        guard referenceAudit.snapshotIdentitySHA256 == report.manifest.snapshotIdentitySHA256 else { throw AttachmentApplyError.referenceAuditMismatch(field: "snapshotIdentity") }
+        guard referenceAudit.attachmentManifestSHA256 == report.manifest.attachmentManifestSHA256 else { throw AttachmentApplyError.referenceAuditMismatch(field: "attachmentManifest") }
+        guard referenceAudit.preparedDBIdentity == report.preparedDBIdentity else { throw AttachmentApplyError.referenceAuditMismatch(field: "preparedDBIdentity") }
+
         let dangling = referenceAudit.danglingReferences.map { UnresolvedReport.Item(name: $0, kind: .danglingReference) }
         let unresolved = report.fileUnresolved.merged(with: dangling)
         let reportHash = unresolved.reportHash
 
-        // Acknowledgement gate: unresolved ⇒ no auto-complete, no staging cleanup. A stale ack
-        // (bound to a different hash) is treated as no ack.
+        // Acknowledgement gate: unresolved ⇒ no auto-complete, no staging cleanup. The ack must
+        // match the FULL operation identity (importID + snapshot + attachment set + this report's
+        // unresolved hash), so an ack from another import — even with an identical unresolved
+        // list — cannot confirm this one.
         if !unresolved.isEmpty {
-            guard let ack = acknowledgement, ack.reportHash == reportHash else {
-                return .requiresAcknowledgement(reportHash: reportHash, unresolved: unresolved)
+            let request = AcknowledgementRequest(importID: report.importID.rawValue,
+                                                 snapshotIdentitySHA256: report.manifest.snapshotIdentitySHA256,
+                                                 attachmentManifestSHA256: report.manifest.attachmentManifestSHA256,
+                                                 unresolvedReportHash: reportHash)
+            guard let ack = acknowledgement,
+                  ack.importID == request.importID,
+                  ack.snapshotIdentitySHA256 == request.snapshotIdentitySHA256,
+                  ack.attachmentManifestSHA256 == request.attachmentManifestSHA256,
+                  ack.unresolvedReportHash == request.unresolvedReportHash else {
+                return .requiresAcknowledgement(request: request, unresolved: unresolved)
             }
         }
 
@@ -288,6 +369,11 @@ public struct AttachmentApply {
 
     static func validate(stagingDir: URL) throws -> ValidatedStaging {
         let manifest = try loadManifest(stagingDir)
+        // Fail-closed on format: a missing (old) or newer/unknown version is rejected, never
+        // best-effort parsed.
+        guard manifest.formatVersion == ImportManifest.currentFormatVersion else {
+            throw AttachmentApplyError.unsupportedManifestFormat(manifest.formatVersion)
+        }
         // Reconstruct + validate a strongly-typed ImportID — never use the raw string for paths.
         guard let importID = ImportID(manifest.importID) else {
             throw AttachmentApplyError.invalidImportID(manifest.importID)
@@ -364,14 +450,18 @@ public struct AttachmentApply {
     /// is hash-verified against the expected SHA before an atomic rename; on any failure the
     /// part is cleaned. A `dst` that appears mid-copy: identical ⇒ skip; different ⇒ conflict,
     /// never overwrite.
+    /// A target already present at the destination: identical content ⇒ skip, different ⇒
+    /// conflict. NEVER overwrites.
+    private static func classifyExistingTarget(_ dst: URL, expectedSHA: String, name: String) throws -> CopyOutcome {
+        let dstSHA = try FileHash.sha256Hex(of: dst)
+        if dstSHA == expectedSHA { return .skippedIdenticalRace }
+        throw AttachmentApplyError.conflictDuringApply(name)
+    }
+
     private static func copyNonDestructive(from src: URL, to dst: URL, name: String,
                                            expectedSHA: String, hooks: ApplyHooks) throws -> CopyOutcome {
         let fm = FileManager.default
-        if fm.fileExists(atPath: dst.path) {
-            let dstSHA = try FileHash.sha256Hex(of: dst)
-            if dstSHA == expectedSHA { return .skippedIdenticalRace }
-            throw AttachmentApplyError.conflictDuringApply(name)
-        }
+        if fm.fileExists(atPath: dst.path) { return try classifyExistingTarget(dst, expectedSHA: expectedSHA, name: name) }
         try hooks.onAttachmentCopy?(name)
 
         let part = URL(fileURLWithPath: dst.path + ".part-\(UUID().uuidString)")
@@ -384,12 +474,19 @@ public struct AttachmentApply {
         try fm.copyItem(at: src, to: part)
         let partSHA = try FileHash.sha256Hex(of: part)
         guard partSHA == expectedSHA else { throw AttachmentApplyError.stagedFileHashMismatch(name) }
-        if fm.fileExists(atPath: dst.path) {   // race: dst appeared during our copy
-            let dstSHA = try FileHash.sha256Hex(of: dst)
-            if dstSHA == expectedSHA { return .skippedIdenticalRace }   // defer cleans the part
-            throw AttachmentApplyError.conflictDuringApply(name)
+
+        if fm.fileExists(atPath: dst.path) { return try classifyExistingTarget(dst, expectedSHA: expectedSHA, name: name) }   // post-copy check
+        // FINAL-publish race seam: fires in the genuine TOCTOU window — AFTER the last
+        // deterministic check and immediately BEFORE the rename — so a target appearing here is
+        // caught by moveItem (which THROWS on an existing destination, never overwriting) and
+        // re-classified same-hash-skip / different-conflict. This exercises the catch path.
+        try hooks.onBeforePublish?(name)
+        do {
+            try fm.moveItem(at: part, to: dst)
+        } catch {
+            if fm.fileExists(atPath: dst.path) { return try classifyExistingTarget(dst, expectedSHA: expectedSHA, name: name) }
+            throw error   // some other move failure (not an existing-target race)
         }
-        try fm.moveItem(at: part, to: dst)
         published = true
         return .copied
     }

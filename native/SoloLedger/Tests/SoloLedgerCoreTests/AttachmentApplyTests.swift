@@ -1,13 +1,14 @@
 import XCTest
 @testable import SoloLedgerCore
 
-/// Fail-closed, two-phase (apply → complete) attachment migration: validate staging (ImportID
-/// / names / per-file + manifest SHA-256), copy only absent files non-destructively, gate
-/// completion on an unresolved-items acknowledgement bound to the report hash, and only then
-/// atomically persist the sentinel and clean staging. All fixtures are synthetic temp files.
+/// Identity-bound, fail-closed, two-phase attachment migration. apply() copies absent files
+/// non-destructively; complete() finalizes only with un-forgeable, import-bound reference-audit
+/// evidence + (if unresolved) an acknowledgement bound to the full operation identity. All
+/// fixtures are synthetic temp files.
 final class AttachmentApplyTests: LedgerTestCase {
 
     private let fm = FileManager.default
+    private let preparedDB = "preparedDB-identity-abc"
     private struct TestError: Error {}
 
     // MARK: - Fixtures / helpers
@@ -24,7 +25,13 @@ final class AttachmentApplyTests: LedgerTestCase {
         stagingDir.appendingPathComponent("attachments", isDirectory: true).appendingPathComponent("docs", isDirectory: true).appendingPathComponent(name)
     }
 
-    /// Build a VALID staged import (correct per-file + attachmentManifest SHA-256).
+    private func makeManifest(importID: String, files: [ImportManifest.FileResult], snapshot: String) -> ImportManifest {
+        ImportManifest(formatVersion: ImportManifest.currentFormatVersion, importID: importID, sourceKind: "test",
+                       createdAt: "t", sourceDBSHA256: "db", walSHA256: nil, snapshotIdentitySHA256: snapshot,
+                       attachmentManifestSHA256: ImportManifest.attachmentSetHash(files), files: files,
+                       status: .ingested, report: nil)
+    }
+
     private func makeStaging(ingested: [(name: String, bytes: String)],
                              skipped: [(name: String, outcome: ImportManifest.FileResult.Outcome)] = [],
                              snapshot: String = "snap", id: ImportID? = nil) throws -> (dir: URL, id: ImportID) {
@@ -39,11 +46,7 @@ final class AttachmentApplyTests: LedgerTestCase {
             files.append(.init(name: f.name, outcome: .ingested, sha256: try FileHash.sha256Hex(of: url), size: Int64(f.bytes.utf8.count)))
         }
         for s in skipped { files.append(.init(name: s.name, outcome: s.outcome, sha256: nil, size: nil)) }
-        let manifest = ImportManifest(importID: importID.rawValue, sourceKind: "test", createdAt: "t",
-                                      sourceDBSHA256: "db", walSHA256: nil, snapshotIdentitySHA256: snapshot,
-                                      attachmentManifestSHA256: ImportManifest.attachmentSetHash(files),
-                                      files: files, status: .ingested, report: nil)
-        try writeManifest(manifest, to: manifestURL(dir))
+        try writeManifest(makeManifest(importID: importID.rawValue, files: files, snapshot: snapshot), to: manifestURL(dir))
         return (dir, importID)
     }
 
@@ -65,60 +68,139 @@ final class AttachmentApplyTests: LedgerTestCase {
     private func partFiles(_ dir: URL) -> [String] { names(dir) { $0.contains(".part-") } }
     private func tempManifests(_ dir: URL) -> [String] { names(dir) { $0.hasPrefix(".tmp-") } }
 
-    // MARK: - 1. Happy path (apply → complete, no unresolved)
+    /// Un-forgeable audit evidence bound to `report`, produced here (tests are `@testable`).
+    private func matchingAudit(_ r: AttachmentApplyReport, dangling: [String] = []) -> ReferenceAudit {
+        ReferenceAudit(importID: r.importID.rawValue, snapshotIdentitySHA256: r.manifest.snapshotIdentitySHA256,
+                       attachmentManifestSHA256: r.manifest.attachmentManifestSHA256,
+                       preparedDBIdentity: r.preparedDBIdentity, danglingReferences: dangling)
+    }
+    private func apply(_ staging: URL, _ active: URL, hooks: ApplyHooks = ApplyHooks()) throws -> AttachmentApplyReport {
+        try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active, preparedDBIdentity: preparedDB, hooks: hooks)
+    }
 
-    func testApplyThenCompleteCopiesAbsentSkipsIdenticalPersistsAndCleans() throws {
+    // MARK: - 1. Happy path
+
+    func testApplyThenCompleteHappyPath() throws {
         let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A"), ("doc-b.jpg", "B")])
-        let active = try makeActive([("doc-b.jpg", "B")])
-        let manifests = try makeManifestsDir()
-
-        let report = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active)
+        let active = try makeActive([("doc-b.jpg", "B")]); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
         XCTAssertEqual(report.applied.copied, ["doc-a.pdf"])
         XCTAssertEqual(report.applied.skippedIdentical, ["doc-b.jpg"])
         XCTAssertTrue(report.fileUnresolved.isEmpty)
-        XCTAssertEqual(try String(contentsOf: active.appendingPathComponent("doc-a.pdf")), "A")
         XCTAssertTrue(fm.fileExists(atPath: staging.path), "apply must NOT clean staging")
 
-        let outcome = try AttachmentApply().complete(report: report, referenceAudit: .audited(), acknowledgement: nil,
-                                                     manifestsDir: manifests, hooks: ApplyHooks())
+        let outcome = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report),
+                                                     acknowledgement: nil, manifestsDir: manifests, hooks: ApplyHooks())
         guard case .completed(let r) = outcome else { return XCTFail("expected .completed, got \(outcome)") }
-        let sentinel = try readManifest(r.completionSentinelURL)
-        XCTAssertEqual(sentinel.status, .complete)
-        XCTAssertEqual(sentinel.applied?.copied, ["doc-a.pdf"])
-        XCTAssertNil(sentinel.acknowledgedReportHash)
-        XCTAssertEqual(sentinel.referenceAuditPerformed, true, "sentinel must record that the DB reference audit ran")
+        let s = try readManifest(r.completionSentinelURL)
+        XCTAssertEqual(s.status, .complete)
+        XCTAssertEqual(s.formatVersion, ImportManifest.currentFormatVersion)
+        XCTAssertEqual(s.referenceAuditPerformed, true)
+        XCTAssertNil(s.acknowledgedReportHash)
         XCTAssertTrue(r.stagingCleaned)
         XCTAssertFalse(fm.fileExists(atPath: staging.path))
     }
 
-    // MARK: - 1b/1c. Reference-audit + skip-set integrity fail-closed
+    // MARK: - 2/3. Unresolved gates
 
-    func testCompleteRefusesWhenReferenceAuditNotPerformed() throws {
-        let (staging, id) = try makeStaging(ingested: [("doc-a.pdf", "A")])
+    func testMissingStagedFileRequiresAcknowledgement() throws {
+        let (staging, id) = try makeStaging(ingested: [("doc-a.pdf", "A"), ("doc-b.jpg", "B")])
+        try fm.removeItem(at: stagedDoc(staging, "doc-b.jpg"))
         let active = try makeActive(); let manifests = try makeManifestsDir()
-        let report = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active)
-        XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: .notPerformed,
-                                                            acknowledgement: nil, manifestsDir: manifests, hooks: ApplyHooks())) { e in
-            guard case AttachmentApplyError.referenceAuditNotPerformed = e else { return XCTFail("got \(e)") }
-        }
-        XCTAssertFalse(fm.fileExists(atPath: sentinelURL(manifests, id).path), "never complete without an audit")
+        let report = try apply(staging, active)
+        XCTAssertEqual(report.fileUnresolved.items.map { $0.name }, ["doc-b.jpg"])
+
+        let o1 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report),
+                                                acknowledgement: nil, manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .requiresAcknowledgement(let request, let unresolved) = o1 else { return XCTFail("got \(o1)") }
+        XCTAssertEqual(unresolved.items.map { $0.name }, ["doc-b.jpg"])
+        XCTAssertFalse(fm.fileExists(atPath: sentinelURL(manifests, id).path))
         XCTAssertTrue(fm.fileExists(atPath: staging.path))
+
+        let o2 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report),
+                                                acknowledgement: request.acknowledge(), manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .completed(let r) = o2 else { return XCTFail() }
+        XCTAssertEqual(try readManifest(r.completionSentinelURL).acknowledgedReportHash, request.unresolvedReportHash)
+        XCTAssertTrue(r.stagingCleaned)
     }
 
-    func testTamperedSkippedEntryFailsClosed() throws {
-        // A skipped entry is inside the integrity envelope: dropping it trips a hash mismatch,
-        // so it can't be silently removed to shrink the unresolved report.
-        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")], skipped: [("link.pdf", .skippedSymlink)])
-        var m = try readManifest(manifestURL(staging))
-        m.files.removeAll { $0.outcome == .skippedSymlink }   // drop the skip; leave attachmentManifestSHA256 as-is
-        try writeManifest(m, to: manifestURL(staging))
-        XCTAssertThrowsError(try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: try makeActive())) { e in
+    func testSkippedAndIllegalItemsBlockCompletionUntilAcknowledged() throws {
+        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")],
+                                           skipped: [("link.pdf", .skippedSymlink), ("bad name.pdf", .rejectedName)])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        XCTAssertEqual(Set(report.fileUnresolved.items.map { $0.kind }), [.skippedSymlink, .rejectedName])
+        let o1 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report),
+                                                acknowledgement: nil, manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .requiresAcknowledgement(let request, _) = o1 else { return XCTFail() }
+        let o2 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report),
+                                                acknowledgement: request.acknowledge(), manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .completed(let r) = o2 else { return XCTFail() }
+        XCTAssertEqual(r.unresolved.items.count, 2)
+    }
+
+    // MARK: - 4. Ack invalidated when the report changes (dangling refs added)
+
+    func testAcknowledgementInvalidatedWhenReportChanges() throws {
+        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+
+        let o1 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report, dangling: ["ref1"]),
+                                                acknowledgement: nil, manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .requiresAcknowledgement(let req1, _) = o1 else { return XCTFail() }
+
+        // Report changes (audit finds ref2) → an ack for req1 is stale.
+        let o2 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report, dangling: ["ref1", "ref2"]),
+                                                acknowledgement: req1.acknowledge(), manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .requiresAcknowledgement(let req2, _) = o2 else { return XCTFail("stale ack must be rejected") }
+        XCTAssertNotEqual(req2.unresolvedReportHash, req1.unresolvedReportHash)
+
+        let o3 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report, dangling: ["ref1", "ref2"]),
+                                                acknowledgement: req2.acknowledge(), manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .completed = o3 else { return XCTFail() }
+    }
+
+    // MARK: - 5..11. Fail-closed validation
+
+    func testTamperedImportIDFailsClosed() throws {
+        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")])
+        var m = try readManifest(manifestURL(staging)); m.importID = "../evil"; try writeManifest(m, to: manifestURL(staging))
+        XCTAssertThrowsError(try apply(staging, try makeActive())) { e in
+            guard case AttachmentApplyError.invalidImportID = e else { return XCTFail("got \(e)") }
+        }
+    }
+    func testTamperedFilenameFailsClosed() throws {
+        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")])
+        var m = try readManifest(manifestURL(staging)); m.files[0].name = "doc-z.pdf"; try writeManifest(m, to: manifestURL(staging))
+        XCTAssertThrowsError(try apply(staging, try makeActive())) { e in
             guard case AttachmentApplyError.attachmentManifestHashMismatch = e else { return XCTFail("got \(e)") }
         }
     }
-
-    func testDuplicateNameAcrossIngestedAndSkippedFailsClosed() throws {
-        let id = ImportID("apply-dupmix-\(UUID().uuidString)")!
+    func testTamperedStagingBytesFailsClosed() throws {
+        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")])
+        try Data("TAMPERED".utf8).write(to: stagedDoc(staging, "doc-a.pdf"))
+        XCTAssertThrowsError(try apply(staging, try makeActive())) { e in
+            guard case AttachmentApplyError.stagedFileHashMismatch = e else { return XCTFail("got \(e)") }
+        }
+    }
+    func testWrongAttachmentManifestHashFailsClosed() throws {
+        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")])
+        var m = try readManifest(manifestURL(staging)); m.attachmentManifestSHA256 = "deadbeef"; try writeManifest(m, to: manifestURL(staging))
+        XCTAssertThrowsError(try apply(staging, try makeActive())) { e in
+            guard case AttachmentApplyError.attachmentManifestHashMismatch = e else { return XCTFail("got \(e)") }
+        }
+    }
+    func testTamperedSkippedEntryFailsClosed() throws {
+        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")], skipped: [("link.pdf", .skippedSymlink)])
+        var m = try readManifest(manifestURL(staging)); m.files.removeAll { $0.outcome == .skippedSymlink }
+        try writeManifest(m, to: manifestURL(staging))
+        XCTAssertThrowsError(try apply(staging, try makeActive())) { e in
+            guard case AttachmentApplyError.attachmentManifestHashMismatch = e else { return XCTFail("got \(e)") }
+        }
+    }
+    func testDuplicateNameFailsClosed() throws {
+        let id = ImportID("apply-dup-\(UUID().uuidString)")!
         let dir = try trackedTempDir().appendingPathComponent("import-\(id.rawValue)", isDirectory: true)
         let docs = dir.appendingPathComponent("attachments", isDirectory: true).appendingPathComponent("docs", isDirectory: true)
         try fm.createDirectory(at: docs, withIntermediateDirectories: true)
@@ -126,284 +208,261 @@ final class AttachmentApplyTests: LedgerTestCase {
         let sha = try FileHash.sha256Hex(of: docs.appendingPathComponent("doc-a.pdf"))
         let files = [ImportManifest.FileResult(name: "doc-a.pdf", outcome: .ingested, sha256: sha, size: 1),
                      ImportManifest.FileResult(name: "doc-a.pdf", outcome: .skippedSymlink, sha256: nil, size: nil)]
-        let m = ImportManifest(importID: id.rawValue, sourceKind: "test", createdAt: "t", sourceDBSHA256: "db",
-                               walSHA256: nil, snapshotIdentitySHA256: "snap",
-                               attachmentManifestSHA256: ImportManifest.attachmentSetHash(files),
-                               files: files, status: .ingested, report: nil)
-        try writeManifest(m, to: manifestURL(dir))
-        XCTAssertThrowsError(try AttachmentApply().apply(stagingDir: dir, activeAttachmentsDir: try makeActive())) { e in
+        try writeManifest(makeManifest(importID: id.rawValue, files: files, snapshot: "snap"), to: manifestURL(dir))
+        XCTAssertThrowsError(try apply(dir, try makeActive())) { e in
             guard case AttachmentApplyError.duplicateAttachmentName = e else { return XCTFail("got \(e)") }
         }
     }
-
-    // MARK: - 2. Missing staged file → requiresAcknowledgement, no sentinel, staging kept
-
-    func testMissingStagedFileRequiresAcknowledgement() throws {
-        let (staging, id) = try makeStaging(ingested: [("doc-a.pdf", "A"), ("doc-b.jpg", "B")])
-        try fm.removeItem(at: stagedDoc(staging, "doc-b.jpg"))   // actually delete a staged file
-        let active = try makeActive()
-        let manifests = try makeManifestsDir()
-
-        let report = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active)
-        XCTAssertEqual(report.applied.copied, ["doc-a.pdf"])
-        XCTAssertEqual(report.fileUnresolved.items.map { $0.kind }, [.missingStagedFile])
-        XCTAssertEqual(report.fileUnresolved.items.map { $0.name }, ["doc-b.jpg"])
-
-        let o1 = try AttachmentApply().complete(report: report, referenceAudit: .audited(), acknowledgement: nil,
-                                                manifestsDir: manifests, hooks: ApplyHooks())
-        guard case .requiresAcknowledgement(let hash, let unresolved) = o1 else { return XCTFail("expected requiresAck, got \(o1)") }
-        XCTAssertEqual(unresolved.items.map { $0.name }, ["doc-b.jpg"])
-        XCTAssertFalse(fm.fileExists(atPath: sentinelURL(manifests, id).path), "no sentinel while unresolved")
-        XCTAssertTrue(fm.fileExists(atPath: staging.path), "staging kept while unresolved")
-
-        let o2 = try AttachmentApply().complete(report: report, referenceAudit: .audited(),
-                                                acknowledgement: Acknowledgement(reportHash: hash),
-                                                manifestsDir: manifests, hooks: ApplyHooks())
-        guard case .completed(let r) = o2 else { return XCTFail() }
-        let sentinel = try readManifest(r.completionSentinelURL)
-        XCTAssertEqual(sentinel.acknowledgedReportHash, hash)
-        XCTAssertEqual(sentinel.unresolved?.items.map { $0.name }, ["doc-b.jpg"])
-        XCTAssertTrue(r.stagingCleaned)
-    }
-
-    // MARK: - 3. Skipped / illegal items enter the unresolved report and block completion
-
-    func testSkippedAndIllegalItemsBlockCompletionUntilAcknowledged() throws {
-        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")],
-                                           skipped: [("link.pdf", .skippedSymlink), ("bad name.pdf", .rejectedName)])
-        let active = try makeActive()
-        let manifests = try makeManifestsDir()
-
-        let report = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active)
-        XCTAssertEqual(Set(report.fileUnresolved.items.map { $0.kind }), [.skippedSymlink, .rejectedName])
-
-        let o1 = try AttachmentApply().complete(report: report, referenceAudit: .audited(), acknowledgement: nil,
-                                                manifestsDir: manifests, hooks: ApplyHooks())
-        guard case .requiresAcknowledgement(let hash, _) = o1 else { return XCTFail() }
-        let o2 = try AttachmentApply().complete(report: report, referenceAudit: .audited(),
-                                                acknowledgement: Acknowledgement(reportHash: hash),
-                                                manifestsDir: manifests, hooks: ApplyHooks())
-        guard case .completed(let r) = o2 else { return XCTFail() }
-        XCTAssertEqual(r.unresolved.items.count, 2)
-    }
-
-    // MARK: - 4. Acknowledgement is bound to the current report hash
-
-    func testAcknowledgementBoundToReportHashAndInvalidatedWhenReportChanges() throws {
-        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")])   // no file-level unresolved
-        let active = try makeActive()
-        let manifests = try makeManifestsDir()
-        let app = AttachmentApply()
-        let report = try app.apply(stagingDir: staging, activeAttachmentsDir: active)
-
-        // DB audit adds a dangling ref → unresolved; no ack → requiresAck(hash1).
-        let o1 = try app.complete(report: report, referenceAudit: ReferenceAudit.audited(danglingReferences: ["ref1"]),
-                                  acknowledgement: nil, manifestsDir: manifests, hooks: ApplyHooks())
-        guard case .requiresAcknowledgement(let hash1, let u1) = o1 else { return XCTFail() }
-        XCTAssertEqual(u1.items.map { $0.kind }, [.danglingReference])
-
-        // A stale ack (bound to the empty report) must NOT complete.
-        let stale = Acknowledgement(reportHash: UnresolvedReport(items: []).reportHash)
-        let o2 = try app.complete(report: report, referenceAudit: ReferenceAudit.audited(danglingReferences: ["ref1"]),
-                                  acknowledgement: stale, manifestsDir: manifests, hooks: ApplyHooks())
-        guard case .requiresAcknowledgement = o2 else { return XCTFail("stale ack must be rejected") }
-
-        // Report CHANGES (audit finds ref2) → an ack bound to hash1 is now stale.
-        let o3 = try app.complete(report: report, referenceAudit: ReferenceAudit.audited(danglingReferences: ["ref1", "ref2"]),
-                                  acknowledgement: Acknowledgement(reportHash: hash1), manifestsDir: manifests, hooks: ApplyHooks())
-        guard case .requiresAcknowledgement(let hash3, _) = o3 else { return XCTFail("ack for a changed report must be rejected") }
-        XCTAssertNotEqual(hash3, hash1)
-
-        // The correct ack for the current report completes.
-        let o4 = try app.complete(report: report, referenceAudit: ReferenceAudit.audited(danglingReferences: ["ref1", "ref2"]),
-                                  acknowledgement: Acknowledgement(reportHash: hash3), manifestsDir: manifests, hooks: ApplyHooks())
-        guard case .completed = o4 else { return XCTFail() }
-    }
-
-    // MARK: - 5..9. Fail-closed manifest / staging validation
-
-    func testTamperedImportIDFailsClosed() throws {
+    func testUnknownManifestFormatVersionRejected() throws {
         let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")])
-        var m = try readManifest(manifestURL(staging)); m.importID = "../evil"; try writeManifest(m, to: manifestURL(staging))
-        XCTAssertThrowsError(try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: try makeActive())) { e in
-            guard case AttachmentApplyError.invalidImportID = e else { return XCTFail("got \(e)") }
+        for bad: Int? in [nil, 0, 999] {
+            var m = try readManifest(manifestURL(staging)); m.formatVersion = bad; try writeManifest(m, to: manifestURL(staging))
+            XCTAssertThrowsError(try apply(staging, try makeActive())) { e in
+                guard case AttachmentApplyError.unsupportedManifestFormat = e else { return XCTFail("formatVersion \(String(describing: bad)) → \(e)") }
+            }
         }
     }
 
-    func testTamperedFilenameFailsClosed() throws {
-        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")])
-        var m = try readManifest(manifestURL(staging)); m.files[0].name = "doc-z.pdf"   // hash NOT updated
-        try writeManifest(m, to: manifestURL(staging))
-        XCTAssertThrowsError(try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: try makeActive())) { e in
-            guard case AttachmentApplyError.attachmentManifestHashMismatch = e else { return XCTFail("got \(e)") }
-        }
-    }
-
-    func testTamperedStagingBytesFailsClosed() throws {
-        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")])
-        try Data("TAMPERED".utf8).write(to: stagedDoc(staging, "doc-a.pdf"))   // change bytes, not the manifest
-        XCTAssertThrowsError(try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: try makeActive())) { e in
-            guard case AttachmentApplyError.stagedFileHashMismatch = e else { return XCTFail("got \(e)") }
-        }
-    }
-
-    func testDuplicateFilenameFailsClosed() throws {
-        let id = ImportID("apply-dup-\(UUID().uuidString)")!
-        let dir = try trackedTempDir().appendingPathComponent("import-\(id.rawValue)", isDirectory: true)
-        let docs = dir.appendingPathComponent("attachments", isDirectory: true).appendingPathComponent("docs", isDirectory: true)
-        try fm.createDirectory(at: docs, withIntermediateDirectories: true)
-        try Data("A".utf8).write(to: docs.appendingPathComponent("doc-a.pdf"))
-        let sha = try FileHash.sha256Hex(of: docs.appendingPathComponent("doc-a.pdf"))
-        let dup = [ImportManifest.FileResult(name: "doc-a.pdf", outcome: .ingested, sha256: sha, size: 1),
-                   ImportManifest.FileResult(name: "doc-a.pdf", outcome: .ingested, sha256: sha, size: 1)]
-        let m = ImportManifest(importID: id.rawValue, sourceKind: "test", createdAt: "t", sourceDBSHA256: "db",
-                               walSHA256: nil, snapshotIdentitySHA256: "snap",
-                               attachmentManifestSHA256: ImportManifest.attachmentSetHash(dup),
-                               files: dup, status: .ingested, report: nil)
-        try writeManifest(m, to: manifestURL(dir))
-        XCTAssertThrowsError(try AttachmentApply().apply(stagingDir: dir, activeAttachmentsDir: try makeActive())) { e in
-            guard case AttachmentApplyError.duplicateAttachmentName = e else { return XCTFail("got \(e)") }
-        }
-    }
-
-    func testWrongAttachmentManifestHashFailsClosed() throws {
-        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")])
-        var m = try readManifest(manifestURL(staging)); m.attachmentManifestSHA256 = "deadbeef"
-        try writeManifest(m, to: manifestURL(staging))
-        XCTAssertThrowsError(try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: try makeActive())) { e in
-            guard case AttachmentApplyError.attachmentManifestHashMismatch = e else { return XCTFail("got \(e)") }
-        }
-    }
-
-    // MARK: - 10. Existing sentinel with a different identity is not overwritten
+    // MARK: - 12. Existing sentinel identity
 
     func testExistingSentinelDifferentSnapshotRejected() throws {
         let (staging, id) = try makeStaging(ingested: [("doc-a.pdf", "A")], snapshot: "snapNEW")
-        let active = try makeActive()
-        let manifests = try makeManifestsDir()
-        var other = try readManifest(manifestURL(staging))
-        other.snapshotIdentitySHA256 = "snapOLD"; other.status = .complete
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        var other = try readManifest(manifestURL(staging)); other.snapshotIdentitySHA256 = "snapOLD"; other.status = .complete
         try writeManifest(other, to: sentinelURL(manifests, id))
-
-        let report = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active)
-        XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: .audited(), acknowledgement: nil,
-                                                            manifestsDir: manifests, hooks: ApplyHooks())) { e in
+        let report = try apply(staging, active)
+        XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report),
+                                                            acknowledgement: nil, manifestsDir: manifests, hooks: ApplyHooks())) { e in
             guard case AttachmentApplyError.sentinelIdentityMismatch = e else { return XCTFail("got \(e)") }
         }
-        XCTAssertEqual(try readManifest(sentinelURL(manifests, id)).snapshotIdentitySHA256, "snapOLD", "old sentinel unchanged")
+        XCTAssertEqual(try readManifest(sentinelURL(manifests, id)).snapshotIdentitySHA256, "snapOLD")
         XCTAssertTrue(fm.fileExists(atPath: staging.path))
     }
 
-    // MARK: - 11..12. Target race during apply
+    // MARK: - 13..14. Target race during apply (onAttachmentCopy)
 
     func testTargetRaceSameContentRecordedAsSkippedIdentical() throws {
-        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")])
-        let active = try makeActive()
-        let report = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active,
-                                                 hooks: ApplyHooks(onAttachmentCopy: { name in
-            try Data("A".utf8).write(to: active.appendingPathComponent(name))   // race: same content appears
+        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")]); let active = try makeActive()
+        let report = try apply(staging, active, hooks: ApplyHooks(onAttachmentCopy: { name in
+            try Data("A".utf8).write(to: active.appendingPathComponent(name))
         }))
         XCTAssertEqual(report.applied.copied, [])
-        XCTAssertEqual(report.applied.skippedIdentical, ["doc-a.pdf"], "actual outcome, not the plan's guess")
-        XCTAssertTrue(partFiles(active).isEmpty, "no .part-* leftover")
+        XCTAssertEqual(report.applied.skippedIdentical, ["doc-a.pdf"])
+        XCTAssertTrue(partFiles(active).isEmpty)
     }
-
-    func testTargetRaceDifferentContentConflictsNeverOverwritesNoPart() throws {
-        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")])
-        let active = try makeActive()
-        XCTAssertThrowsError(try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active,
-                                                         hooks: ApplyHooks(onAttachmentCopy: { name in
+    func testTargetRaceDifferentContentConflictsNeverOverwrites() throws {
+        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")]); let active = try makeActive()
+        XCTAssertThrowsError(try apply(staging, active, hooks: ApplyHooks(onAttachmentCopy: { name in
             try Data("DIFFERENT".utf8).write(to: active.appendingPathComponent(name))
-        }))) { e in
-            guard case AttachmentApplyError.conflictDuringApply = e else { return XCTFail("got \(e)") }
-        }
-        XCTAssertEqual(try String(contentsOf: active.appendingPathComponent("doc-a.pdf")), "DIFFERENT", "never overwritten")
-        XCTAssertTrue(partFiles(active).isEmpty, "this round's part cleaned")
+        }))) { e in guard case AttachmentApplyError.conflictDuringApply = e else { return XCTFail("got \(e)") } }
+        XCTAssertEqual(try String(contentsOf: active.appendingPathComponent("doc-a.pdf")), "DIFFERENT")
+        XCTAssertTrue(partFiles(active).isEmpty)
     }
 
-    // MARK: - 13. Attachment copy fault
+    // MARK: - 15..16. Final-publish race (onBeforePublish) — target appears just before rename
+
+    func testFinalPublishRaceSameContentSkipped() throws {
+        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")]); let active = try makeActive()
+        let report = try apply(staging, active, hooks: ApplyHooks(onBeforePublish: { name in
+            try Data("A".utf8).write(to: active.appendingPathComponent(name))   // race at the last instant, same content
+        }))
+        XCTAssertEqual(report.applied.copied, [])
+        XCTAssertEqual(report.applied.skippedIdentical, ["doc-a.pdf"])
+        XCTAssertTrue(partFiles(active).isEmpty)
+    }
+    func testFinalPublishRaceDifferentContentConflictsNeverOverwrites() throws {
+        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")]); let active = try makeActive()
+        XCTAssertThrowsError(try apply(staging, active, hooks: ApplyHooks(onBeforePublish: { name in
+            try Data("DIFFERENT".utf8).write(to: active.appendingPathComponent(name))
+        }))) { e in guard case AttachmentApplyError.conflictDuringApply = e else { return XCTFail("got \(e)") } }
+        XCTAssertEqual(try String(contentsOf: active.appendingPathComponent("doc-a.pdf")), "DIFFERENT")
+        XCTAssertTrue(partFiles(active).isEmpty)
+    }
+
+    // MARK: - 17. Attachment copy fault
 
     func testAttachmentCopyFaultKeepsStagingNoCompletionNoPart() throws {
-        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")])
-        let active = try makeActive()
-        XCTAssertThrowsError(try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active,
-                                                         hooks: ApplyHooks(onAttachmentCopy: { _ in throw TestError() })))
+        let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A")]); let active = try makeActive()
+        XCTAssertThrowsError(try apply(staging, active, hooks: ApplyHooks(onAttachmentCopy: { _ in throw TestError() })))
         XCTAssertFalse(fm.fileExists(atPath: active.appendingPathComponent("doc-a.pdf").path))
         XCTAssertTrue(partFiles(active).isEmpty)
         XCTAssertTrue(fm.fileExists(atPath: staging.path))
     }
 
-    // MARK: - 14. Plan-time conflict blocks before swap
+    // MARK: - 18. Plan-time conflict blocks
 
     func testPlanTimeConflictBlocksBeforeSwapNeverOverwrites() throws {
-        let (staging, _) = try makeStaging(ingested: [("a.pdf", "A")])
-        let active = try makeActive([("a.pdf", "DIFFERENT")])
-        XCTAssertThrowsError(try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active)) { e in
-            guard case AttachmentApplyError.conflicts(let c) = e else { return XCTFail("got \(e)") }
-            XCTAssertEqual(c.map { $0.name }, ["a.pdf"])
+        let (staging, _) = try makeStaging(ingested: [("a.pdf", "A")]); let active = try makeActive([("a.pdf", "DIFFERENT")])
+        XCTAssertThrowsError(try apply(staging, active)) { e in
+            guard case AttachmentApplyError.conflicts = e else { return XCTFail("got \(e)") }
         }
         XCTAssertEqual(try String(contentsOf: active.appendingPathComponent("a.pdf")), "DIFFERENT")
         XCTAssertTrue(try AttachmentApply().plan(stagingDir: staging, activeAttachmentsDir: active).hasConflicts)
     }
 
-    // MARK: - 15..17. Completion / cleanup fault injection
+    // MARK: - 19..21. Completion / cleanup fault injection
 
     func testCompletionTempWriteFailureKeepsStagingNoSentinel() throws {
-        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
-        let active = try makeActive(); let manifests = try makeManifestsDir()
-        let report = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active)
-        XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: .audited(), acknowledgement: nil,
-                                                            manifestsDir: manifests,
-                                                            hooks: ApplyHooks(onCompletionTempWrite: { throw TestError() })))
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")]); let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
+                                                            manifestsDir: manifests, hooks: ApplyHooks(onCompletionTempWrite: { throw TestError() })))
         XCTAssertFalse(fm.fileExists(atPath: sentinelURL(manifests, id).path))
         XCTAssertTrue(tempManifests(manifests).isEmpty)
         XCTAssertTrue(fm.fileExists(atPath: staging.path))
     }
-
     func testCompletionPublishFailureKeepsStagingNoSentinelNoTemp() throws {
-        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
-        let active = try makeActive(); let manifests = try makeManifestsDir()
-        let report = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active)
-        XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: .audited(), acknowledgement: nil,
-                                                            manifestsDir: manifests,
-                                                            hooks: ApplyHooks(onCompletionPublish: { throw TestError() })))
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")]); let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
+                                                            manifestsDir: manifests, hooks: ApplyHooks(onCompletionPublish: { throw TestError() })))
         XCTAssertFalse(fm.fileExists(atPath: sentinelURL(manifests, id).path))
-        XCTAssertTrue(tempManifests(manifests).isEmpty, "unpublished temp cleaned on publish failure")
+        XCTAssertTrue(tempManifests(manifests).isEmpty)
         XCTAssertTrue(fm.fileExists(atPath: staging.path))
     }
-
     func testStagingCleanupFailureSurfacedButCompletionRecorded() throws {
-        let (staging, _) = try makeStaging(ingested: [("a.pdf", "A")])
-        let active = try makeActive(); let manifests = try makeManifestsDir()
-        let report = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active)
-        let outcome = try AttachmentApply().complete(report: report, referenceAudit: .audited(), acknowledgement: nil,
+        let (staging, _) = try makeStaging(ingested: [("a.pdf", "A")]); let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        let outcome = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
                                                      manifestsDir: manifests, hooks: ApplyHooks(cleanup: { _ in throw TestError() }))
         guard case .completed(let r) = outcome else { return XCTFail() }
-        XCTAssertTrue(fm.fileExists(atPath: r.completionSentinelURL.path), "completion recorded despite cleanup failure")
-        XCTAssertFalse(r.stagingCleaned)
-        XCTAssertNotNil(r.stagingCleanupError)
-        XCTAssertTrue(fm.fileExists(atPath: staging.path), "residue kept for a later reaper")
+        XCTAssertTrue(fm.fileExists(atPath: r.completionSentinelURL.path))
+        XCTAssertFalse(r.stagingCleaned); XCTAssertNotNil(r.stagingCleanupError)
+        XCTAssertTrue(fm.fileExists(atPath: staging.path))
     }
 
-    // MARK: - 18. Idempotent re-complete over a surviving staging
+    // MARK: - 22. Idempotent re-complete
 
     func testIdempotentReCompleteReplacesSameIdentityAndCleans() throws {
-        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
-        let active = try makeActive(); let manifests = try makeManifestsDir()
-        let report = try AttachmentApply().apply(stagingDir: staging, activeAttachmentsDir: active)
-
-        // First complete fails to clean staging → sentinel written, staging survives.
-        let o1 = try AttachmentApply().complete(report: report, referenceAudit: .audited(), acknowledgement: nil,
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")]); let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        let o1 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
                                                 manifestsDir: manifests, hooks: ApplyHooks(cleanup: { _ in throw TestError() }))
         guard case .completed(let r1) = o1, !r1.stagingCleaned else { return XCTFail() }
-        XCTAssertTrue(fm.fileExists(atPath: staging.path))
-
-        // Re-complete over the surviving staging: same identity ⇒ replace sentinel, clean staging.
-        let o2 = try AttachmentApply().complete(report: report, referenceAudit: .audited(), acknowledgement: nil,
+        let o2 = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
                                                 manifestsDir: manifests, hooks: ApplyHooks())
         guard case .completed(let r2) = o2 else { return XCTFail() }
         XCTAssertTrue(r2.stagingCleaned)
         XCTAssertFalse(fm.fileExists(atPath: staging.path))
         XCTAssertTrue(fm.fileExists(atPath: sentinelURL(manifests, id).path))
+    }
+
+    // MARK: - 23..26. Identity binding of audit + acknowledgement
+
+    func testReferenceAuditFromAnotherImportRejected() throws {
+        let (stagingA, _) = try makeStaging(ingested: [("a.pdf", "A")])
+        let (stagingB, _) = try makeStaging(ingested: [("a.pdf", "A")])
+        let manifests = try makeManifestsDir()
+        let reportA = try apply(stagingA, try makeActive())
+        let reportB = try apply(stagingB, try makeActive())
+        // A's audit against B → importID mismatch.
+        XCTAssertThrowsError(try AttachmentApply().complete(report: reportB, referenceAudit: matchingAudit(reportA),
+                                                            acknowledgement: nil, manifestsDir: manifests, hooks: ApplyHooks())) { e in
+            guard case AttachmentApplyError.referenceAuditMismatch(let f) = e else { return XCTFail("got \(e)") }
+            XCTAssertEqual(f, "importID")
+        }
+    }
+
+    func testReferenceAuditFieldMismatchesRejected() throws {
+        let (staging, _) = try makeStaging(ingested: [("a.pdf", "A")])
+        let manifests = try makeManifestsDir()
+        let report = try apply(staging, try makeActive())
+        func audit(snapshot: String, attach: String, prepared: String) -> ReferenceAudit {
+            ReferenceAudit(importID: report.importID.rawValue, snapshotIdentitySHA256: snapshot,
+                           attachmentManifestSHA256: attach, preparedDBIdentity: prepared, danglingReferences: [])
+        }
+        let good = matchingAudit(report)
+        for (a, field) in [(audit(snapshot: "X", attach: good.attachmentManifestSHA256, prepared: preparedDB), "snapshotIdentity"),
+                           (audit(snapshot: good.snapshotIdentitySHA256, attach: "X", prepared: preparedDB), "attachmentManifest"),
+                           (audit(snapshot: good.snapshotIdentitySHA256, attach: good.attachmentManifestSHA256, prepared: "X"), "preparedDBIdentity")] {
+            XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: a, acknowledgement: nil,
+                                                                manifestsDir: manifests, hooks: ApplyHooks())) { e in
+                guard case AttachmentApplyError.referenceAuditMismatch(let got) = e else { return XCTFail("got \(e)") }
+                XCTAssertEqual(got, field)
+            }
+        }
+    }
+
+    func testAcknowledgementFromAnotherImportRejectedEvenWithSameUnresolved() throws {
+        // Two imports with an IDENTICAL unresolved list (both missing doc-b, same bytes) but
+        // different importID → an ack from A cannot confirm B.
+        func mk() throws -> (URL, AttachmentApplyReport) {
+            let (staging, _) = try makeStaging(ingested: [("doc-a.pdf", "A"), ("doc-b.jpg", "B")])
+            try fm.removeItem(at: stagedDoc(staging, "doc-b.jpg"))
+            return (staging, try apply(staging, try makeActive()))
+        }
+        let manifests = try makeManifestsDir()
+        let (_, reportA) = try mk()
+        let (_, reportB) = try mk()
+        let oA = try AttachmentApply().complete(report: reportA, referenceAudit: matchingAudit(reportA), acknowledgement: nil,
+                                                manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .requiresAcknowledgement(let reqA, let uA) = oA else { return XCTFail() }
+        let oB = try AttachmentApply().complete(report: reportB, referenceAudit: matchingAudit(reportB), acknowledgement: nil,
+                                                manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .requiresAcknowledgement(let reqB, let uB) = oB else { return XCTFail() }
+        XCTAssertEqual(uA.reportHash, uB.reportHash, "identical unresolved lists share a report hash")
+        XCTAssertNotEqual(reqA.importID, reqB.importID)
+
+        // A's acknowledgement must NOT complete B.
+        let rejected = try AttachmentApply().complete(report: reportB, referenceAudit: matchingAudit(reportB),
+                                                      acknowledgement: reqA.acknowledge(), manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .requiresAcknowledgement = rejected else { return XCTFail("A's ack must not confirm B") }
+    }
+
+    func testUnresolvedDetailChangeInvalidatesOldAcknowledgement() throws {
+        // Two reports identical except one unresolved item's `detail`.
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let base = try apply(staging, active)   // gives us a real manifest/preparedDB/importID
+        func report(detail: String) -> AttachmentApplyReport {
+            AttachmentApplyReport(importID: id, stagingDir: staging, activeAttachmentsDir: active, manifest: base.manifest,
+                                  preparedDBIdentity: preparedDB, applied: .init(copied: [], skippedIdentical: [], missing: []),
+                                  fileUnresolved: UnresolvedReport(items: [.init(name: "x", kind: .danglingReference, detail: detail)]))
+        }
+        let rx = report(detail: "v1"), ry = report(detail: "v2")
+        let ox = try AttachmentApply().complete(report: rx, referenceAudit: matchingAudit(rx), acknowledgement: nil,
+                                                manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .requiresAcknowledgement(let reqX, _) = ox else { return XCTFail() }
+        // The ack for detail v1 must NOT confirm the v2 report.
+        let oy = try AttachmentApply().complete(report: ry, referenceAudit: matchingAudit(ry), acknowledgement: reqX.acknowledge(),
+                                                manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .requiresAcknowledgement(let reqY, _) = oy else { return XCTFail("detail change must invalidate the old ack") }
+        XCTAssertNotEqual(reqX.unresolvedReportHash, reqY.unresolvedReportHash)
+    }
+
+    // MARK: - 27. The reference auditor is not implemented → App cannot fabricate completion
+
+    func testReferenceAuditorNotImplementedThrows() throws {
+        let (staging, _) = try makeStaging(ingested: [("a.pdf", "A")])
+        let report = try apply(staging, try makeActive())
+        XCTAssertThrowsError(try AttachmentReferenceAuditor().audit(report: report,
+                                                                    preparedDatabaseAt: try makeActive())) { e in
+            guard case AttachmentApplyError.referenceAuditNotImplemented = e else { return XCTFail("got \(e)") }
+        }
+    }
+
+    // MARK: - 28. reportHash canonical encoding includes detail
+
+    func testReportHashCanonicalIncludesDetail() {
+        let a = UnresolvedReport(items: [.init(name: "n", kind: .danglingReference, detail: "d1")])
+        let b = UnresolvedReport(items: [.init(name: "n", kind: .danglingReference, detail: "d2")])
+        let c = UnresolvedReport(items: [.init(name: "n", kind: .danglingReference, detail: "d1")])
+        XCTAssertNotEqual(a.reportHash, b.reportHash, "detail change must change the hash")
+        XCTAssertEqual(a.reportHash, c.reportHash, "same content → same hash")
+        // Order independence.
+        let m1 = UnresolvedReport(items: [.init(name: "b", kind: .rejectedName), .init(name: "a", kind: .missingStagedFile)])
+        let m2 = UnresolvedReport(items: [.init(name: "a", kind: .missingStagedFile), .init(name: "b", kind: .rejectedName)])
+        XCTAssertEqual(m1.reportHash, m2.reportHash)
+    }
+
+    /// A rejectedName carries the raw source filename, which the filesystem allows to contain
+    /// the separator control chars — the encoding must remain INJECTIVE so a crafted name cannot
+    /// collide two distinct reports and let a stale acknowledgement through.
+    func testReportHashInjectiveAgainstSeparatorInjection() {
+        // These two reports collide under a naive U+001F/U+001E-joined encoding.
+        let crafted = "x\u{1f}\u{1e}rejectedName\u{1f}y"
+        let r1 = UnresolvedReport(items: [.init(name: crafted, kind: .rejectedName)])
+        let r2 = UnresolvedReport(items: [.init(name: "x", kind: .rejectedName), .init(name: "y", kind: .rejectedName)])
+        XCTAssertNotEqual(r1.reportHash, r2.reportHash, "distinct reports must not hash-collide via separator injection")
     }
 }

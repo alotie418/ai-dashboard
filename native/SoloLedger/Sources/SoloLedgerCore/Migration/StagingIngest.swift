@@ -89,6 +89,13 @@ public struct ImportManifest: Codable, Equatable {
         public var size: Int64?      // ingested files only
     }
 
+    /// Explicit on-disk format version. The current writer stamps `currentFormatVersion`;
+    /// a manifest whose version is missing (old format) or newer/unknown is REJECTED
+    /// fail-closed rather than best-effort parsed. Decoded as optional so a missing key
+    /// surfaces as an explicit unsupported-version rejection, not a decode error.
+    public static let currentFormatVersion = 1
+    public var formatVersion: Int? = nil
+
     public var importID: String
     public var sourceKind: String
     public var createdAt: String
@@ -420,7 +427,8 @@ public struct StagingIngest {
         }
         files.sort { $0.name < $1.name }
 
-        return ImportManifest(importID: importID.rawValue, sourceKind: source.kind, createdAt: timestamp,
+        return ImportManifest(formatVersion: ImportManifest.currentFormatVersion,
+                              importID: importID.rawValue, sourceKind: source.kind, createdAt: timestamp,
                               sourceDBSHA256: dbHash, walSHA256: walHash,
                               snapshotIdentitySHA256: snapshotIdentity(dbSHA: dbHash, walSHA: walHash),
                               attachmentManifestSHA256: ImportManifest.attachmentSetHash(files),
