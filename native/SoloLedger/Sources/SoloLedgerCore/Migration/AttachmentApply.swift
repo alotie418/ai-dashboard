@@ -129,6 +129,8 @@ public enum AttachmentApplyError: Error, CustomStringConvertible {
     case preparedDatabaseSchemaUnsupported(String)
     case preparedDatabaseChangedDuringAudit(before: String, after: String)
     case referencedFileChangedSinceAudit(String)
+    case stagedEntryNotRegularFile(String)
+    case activeEntryNotRegularFile(String)
 
     public var description: String {
         switch self {
@@ -150,6 +152,8 @@ public enum AttachmentApplyError: Error, CustomStringConvertible {
         case .preparedDatabaseSchemaUnsupported(let m): return "Prepared database schema is unsupported (\(m)) — refusing to audit references"
         case .preparedDatabaseChangedDuringAudit: return "The prepared database changed during the reference audit — refusing to trust the scan"
         case .referencedFileChangedSinceAudit(let n): return "Referenced attachment '\(n)' changed after the audit — re-run the reference audit before completing"
+        case .stagedEntryNotRegularFile(let n): return "Staged attachment '\(n)' is not a regular file (symlink/directory/special) — refusing to apply"
+        case .activeEntryNotRegularFile(let n): return "Active attachment entry '\(n)' is not a regular file (symlink/directory/special) — refusing to touch it"
         }
     }
 }
@@ -352,27 +356,28 @@ public struct AttachmentApply {
 
         // Re-verify EVERY reference the audit resolved — not just this import's copied/
         // skipped files: a pre-existing referenced attachment deleted or replaced after the
-        // audit must fail closed. lstat first — the entry must STILL be a regular file (a
-        // same-content symlink swapped in is rejected) with the exact audited bytes.
+        // audit must fail closed. The no-follow regular-file-only hash guarantees the entry
+        // is STILL a regular file (a same-content symlink swapped in is rejected, a FIFO is
+        // never opened blocking) with the exact audited bytes.
         for r in referenceAudit.resolved {
             let target = report.activeAttachmentsDir.appendingPathComponent(r.name)
-            let attrs = try? FileManager.default.attributesOfItem(atPath: target.path)
-            guard (attrs?[.type] as? FileAttributeType) == .typeRegular,
-                  (try? FileHash.sha256Hex(of: target)) == r.sha256 else {
+            guard let actual = try? FileHash.sha256HexOfRegularFile(at: target), actual == r.sha256 else {
                 throw AttachmentApplyError.referencedFileChangedSinceAudit(r.name)
             }
         }
 
-        // Re-verify EVERY final active file against the manifest SHA (catch post-plan changes).
+        // Re-verify EVERY final active file against the manifest SHA (catch post-plan
+        // changes). Same no-follow primitive: missing, swapped-for-symlink, directory or
+        // special all fail as a hash mismatch.
         let expected = Dictionary(uniqueKeysWithValues:
             report.manifest.files.filter { $0.outcome == .ingested }.compactMap { f in f.sha256.map { (f.name, $0) } })
         for name in report.applied.copied + report.applied.skippedIdentical {
             let active = report.activeAttachmentsDir.appendingPathComponent(name)
-            guard let exp = expected[name], FileManager.default.fileExists(atPath: active.path) else {
+            guard let exp = expected[name],
+                  let actual = try? FileHash.sha256HexOfRegularFile(at: active),
+                  actual == exp else {
                 throw AttachmentApplyError.activeFileHashMismatch(name)
             }
-            let actual = try FileHash.sha256Hex(of: active)
-            guard actual == exp else { throw AttachmentApplyError.activeFileHashMismatch(name) }
         }
 
         var final = report.manifest
@@ -415,7 +420,6 @@ public struct AttachmentApply {
             throw AttachmentApplyError.attachmentManifestHashMismatch
         }
 
-        let fm = FileManager.default
         let stagedDocs = stagedDocsDir(stagingDir)
         let stagedDocsPath = stagedDocs.standardizedFileURL.path
         var seen = Set<String>()
@@ -431,10 +435,18 @@ public struct AttachmentApply {
                 throw AttachmentApplyError.attachmentPathEscape(f.name)
             }
             guard let expected = f.sha256 else { throw AttachmentApplyError.stagedFileHashMismatch(f.name) }
-            let present = fm.fileExists(atPath: staged.path)
-            if present {
-                let actual = try FileHash.sha256Hex(of: staged)
+            // No-follow, regular-file-only: a staged symlink/directory/FIFO where the
+            // manifest promises an ingested regular file is tampering — fail closed.
+            // Only a definitive ENOENT counts as "missing" (an unresolved item).
+            let present: Bool
+            do {
+                let actual = try FileHash.sha256HexOfRegularFile(at: staged)
                 guard actual == expected else { throw AttachmentApplyError.stagedFileHashMismatch(f.name) }
+                present = true
+            } catch let e as FileHashError {
+                if case .notARegularFile = e { throw AttachmentApplyError.stagedEntryNotRegularFile(f.name) }
+                guard e.isFileMissing else { throw e }
+                present = false
             }
             files.append(ValidatedFile(name: f.name, expectedSHA: expected, staged: staged, present: present))
         }
@@ -459,14 +471,24 @@ public struct AttachmentApply {
     }
 
     static func buildPlan(validated: ValidatedStaging, activeDir: URL) throws -> AttachmentPlan {
-        let fm = FileManager.default
         var toCopy: [String] = [], identical: [String] = [], missing: [String] = []
         var conflicts: [AttachmentPlan.Conflict] = []
         for vf in validated.files {
             if !vf.present { missing.append(vf.name); continue }
             let active = activeDir.appendingPathComponent(vf.name)
-            if !fm.fileExists(atPath: active.path) { toCopy.append(vf.name); continue }
-            let activeSHA = try FileHash.sha256Hex(of: active)
+            // No-follow, regular-file-only: a same-name symlink (even to identical
+            // content, even dangling), directory or FIFO in the active dir is an explicit
+            // pre-swap error — it is never followed, never opened blocking, and never
+            // classified as identical/toCopy.
+            let activeSHA: String?
+            do {
+                activeSHA = try FileHash.sha256HexOfRegularFile(at: active)
+            } catch let e as FileHashError {
+                if case .notARegularFile = e { throw AttachmentApplyError.activeEntryNotRegularFile(vf.name) }
+                guard e.isFileMissing else { throw e }
+                activeSHA = nil
+            }
+            guard let activeSHA else { toCopy.append(vf.name); continue }
             if activeSHA == vf.expectedSHA { identical.append(vf.name) }
             else { conflicts.append(.init(name: vf.name, stagedSHA256: vf.expectedSHA, activeSHA256: activeSHA)) }
         }
@@ -483,9 +505,16 @@ public struct AttachmentApply {
     /// part is cleaned. A `dst` that appears mid-copy: identical ⇒ skip; different ⇒ conflict,
     /// never overwrite.
     /// A target already present at the destination: identical content ⇒ skip, different ⇒
-    /// conflict. NEVER overwrites.
+    /// conflict. NEVER overwrites, NEVER follows a symlink, NEVER opens a FIFO blocking —
+    /// a non-regular entry (however it appeared, including mid-publish races) is an error.
     private static func classifyExistingTarget(_ dst: URL, expectedSHA: String, name: String) throws -> CopyOutcome {
-        let dstSHA = try FileHash.sha256Hex(of: dst)
+        let dstSHA: String
+        do {
+            dstSHA = try FileHash.sha256HexOfRegularFile(at: dst)
+        } catch let e as FileHashError {
+            if case .notARegularFile = e { throw AttachmentApplyError.activeEntryNotRegularFile(name) }
+            throw e
+        }
         if dstSHA == expectedSHA { return .skippedIdenticalRace }
         throw AttachmentApplyError.conflictDuringApply(name)
     }
@@ -504,7 +533,7 @@ public struct AttachmentApply {
             }
         }
         try fm.copyItem(at: src, to: part)
-        let partSHA = try FileHash.sha256Hex(of: part)
+        let partSHA = try FileHash.sha256HexOfRegularFile(at: part)
         guard partSHA == expectedSHA else { throw AttachmentApplyError.stagedFileHashMismatch(name) }
 
         if fm.fileExists(atPath: dst.path) { return try classifyExistingTarget(dst, expectedSHA: expectedSHA, name: name) }   // post-copy check

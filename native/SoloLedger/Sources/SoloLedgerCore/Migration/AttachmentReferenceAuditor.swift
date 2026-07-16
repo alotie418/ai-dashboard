@@ -150,9 +150,8 @@ public struct AttachmentReferenceAuditor {
 
         try hooks.afterScan?()
 
-        // Classify each referenced name against the active dir. lstat FIRST (a fifo must
-        // never be opened for hashing); only a REGULAR file inside the container resolves.
-        let fm = FileManager.default
+        // Classify each referenced name against the active dir; only a REGULAR file inside
+        // the container resolves (no-follow hash — a FIFO is never opened blocking).
         let activeRoot = report.activeAttachmentsDir.standardizedFileURL.path
         var resolved: [ReferenceAudit.ResolvedReference] = []
         var dangling: [ReferenceAudit.DanglingReference] = []
@@ -165,13 +164,20 @@ public struct AttachmentReferenceAuditor {
                 extraInvalid.append(.init(value: name, provenance: prov + "; escapes the active attachments dir"))
                 continue
             }
-            let attrs = try? fm.attributesOfItem(atPath: target.path)   // lstat: reports a symlink itself
-            if attrs == nil {
-                dangling.append(.init(name: name, provenance: prov))
-            } else if (attrs?[.type] as? FileAttributeType) == .typeRegular {
-                resolved.append(.init(name: name, sha256: try FileHash.sha256Hex(of: target), provenance: prov))
-            } else {
-                dangling.append(.init(name: name, provenance: prov + "; active entry is not a regular file"))
+            // No-follow, regular-file-only hash: absent (ENOENT) → dangling; symlink/
+            // directory/FIFO → dangling with an explicit note (never followed, never
+            // opened blocking); any other read failure stays fail-closed.
+            do {
+                let sha = try FileHash.sha256HexOfRegularFile(at: target)
+                resolved.append(.init(name: name, sha256: sha, provenance: prov))
+            } catch let e as FileHashError {
+                if case .notARegularFile = e {
+                    dangling.append(.init(name: name, provenance: prov + "; active entry is not a regular file"))
+                } else if e.isFileMissing {
+                    dangling.append(.init(name: name, provenance: prov))
+                } else {
+                    throw e
+                }
             }
         }
         let invalid = (invalidCounts.map {

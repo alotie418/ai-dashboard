@@ -606,6 +606,99 @@ final class AttachmentApplyTests: LedgerTestCase {
         XCTAssertEqual(try Data(contentsOf: sentinelURL(manifests, id)), before, "identical sentinel reused, not rewritten")
     }
 
+    // MARK: - 26b. Non-regular filesystem entries fail closed across the whole flow (C4)
+
+    /// A same-name symlink (even to IDENTICAL content — the sharpest case: it used to
+    /// classify as skippedIdentical), directory or FIFO in the ACTIVE dir must be an
+    /// explicit pre-swap error: never followed, never opened blocking.
+    func testPlanAndApplyFailClosedOnNonRegularActiveEntry() throws {
+        for kind in ["symlink", "directory", "fifo"] {
+            let (staging, _) = try makeStaging(ingested: [("a.pdf", "A")])
+            let active = try makeActive()
+            let target = active.appendingPathComponent("a.pdf")
+            switch kind {
+            case "symlink":
+                let elsewhere = try trackedTempDir().appendingPathComponent("a.pdf")
+                try Data("A".utf8).write(to: elsewhere)   // identical content
+                try fm.createSymbolicLink(at: target, withDestinationURL: elsewhere)
+            case "directory":
+                try fm.createDirectory(at: target, withIntermediateDirectories: true)
+            default:
+                guard mkfifo(target.path, 0o644) == 0 else { throw XCTSkip("mkfifo unavailable") }
+            }
+            XCTAssertThrowsError(try AttachmentApply().plan(stagingDir: staging, activeAttachmentsDir: active), kind) { e in
+                guard case AttachmentApplyError.activeEntryNotRegularFile("a.pdf") = e else { return XCTFail("\(kind): got \(e)") }
+            }
+            XCTAssertThrowsError(try apply(staging, active), kind) { e in
+                guard case AttachmentApplyError.activeEntryNotRegularFile("a.pdf") = e else { return XCTFail("\(kind): got \(e)") }
+            }
+            XCTAssertTrue(fm.fileExists(atPath: staging.path), "\(kind): staging kept")
+        }
+    }
+
+    /// A staged entry that is not a regular file where the manifest promises an ingested
+    /// file is tampering — fail closed even when the symlink target has matching content.
+    func testStagedNonRegularEntryFailsClosed() throws {
+        for kind in ["symlink", "directory", "fifo"] {
+            let (staging, _) = try makeStaging(ingested: [("a.pdf", "A")])
+            let staged = stagedDoc(staging, "a.pdf")
+            try fm.removeItem(at: staged)
+            switch kind {
+            case "symlink":
+                let elsewhere = try trackedTempDir().appendingPathComponent("a.pdf")
+                try Data("A".utf8).write(to: elsewhere)   // content matches the manifest SHA
+                try fm.createSymbolicLink(at: staged, withDestinationURL: elsewhere)
+            case "directory":
+                try fm.createDirectory(at: staged, withIntermediateDirectories: true)
+            default:
+                guard mkfifo(staged.path, 0o644) == 0 else { throw XCTSkip("mkfifo unavailable") }
+            }
+            XCTAssertThrowsError(try apply(staging, try makeActive()), kind) { e in
+                guard case AttachmentApplyError.stagedEntryNotRegularFile("a.pdf") = e else { return XCTFail("\(kind): got \(e)") }
+            }
+        }
+    }
+
+    /// A symlink appearing at the destination in the publish TOCTOU window is re-classified
+    /// by the no-follow primitive: explicit error, part cleaned, nothing followed.
+    func testPublishRaceSymlinkTargetFailsClosed() throws {
+        let (staging, _) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive()
+        let elsewhere = try trackedTempDir().appendingPathComponent("a.pdf")
+        try Data("A".utf8).write(to: elsewhere)
+        let hooks = ApplyHooks(onBeforePublish: { name in
+            try self.fm.createSymbolicLink(at: active.appendingPathComponent(name), withDestinationURL: elsewhere)
+        })
+        XCTAssertThrowsError(try apply(staging, active, hooks: hooks)) { e in
+            guard case AttachmentApplyError.activeEntryNotRegularFile("a.pdf") = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertEqual(partFiles(active), [], "no .part leftovers")
+        XCTAssertTrue(fm.fileExists(atPath: staging.path), "staging kept")
+    }
+
+    /// After apply, an applied file swapped for a same-content symlink must fail the
+    /// complete-stage re-verification (the primitive never follows it).
+    func testCompleteAppliedFileSwappedForSymlinkFailsClosed() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        XCTAssertEqual(report.applied.copied, ["a.pdf"])
+
+        let target = active.appendingPathComponent("a.pdf")
+        let elsewhere = try trackedTempDir().appendingPathComponent("a.pdf")
+        try Data("A".utf8).write(to: elsewhere)   // identical content
+        try fm.removeItem(at: target)
+        try fm.createSymbolicLink(at: target, withDestinationURL: elsewhere)
+
+        XCTAssertThrowsError(try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report),
+                                                            acknowledgement: nil, preparedDatabaseAt: preparedDBURL,
+                                                            manifestsDir: manifests, hooks: ApplyHooks())) { e in
+            guard case AttachmentApplyError.activeFileHashMismatch("a.pdf") = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertFalse(fm.fileExists(atPath: sentinelURL(manifests, id).path), "no sentinel")
+        XCTAssertTrue(fm.fileExists(atPath: staging.path), "staging kept")
+    }
+
     // MARK: - 27. The auditor only yields evidence for the bound prepared DB (fail-closed)
 
     /// The real auditor (AttachmentReferenceAuditorTests covers its scan) still cannot be

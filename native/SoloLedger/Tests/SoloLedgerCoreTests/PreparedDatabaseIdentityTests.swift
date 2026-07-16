@@ -117,6 +117,56 @@ final class PreparedDatabaseIdentityTests: LedgerTestCase {
         XCTAssertEqual(try FileHash.sha256Hex(of: url), hashBefore, "compute must not modify the database")
     }
 
+    // MARK: - No-follow, regular-file-only hash primitive
+
+    func testRegularFileHashMatchesPlainHash() throws {
+        let url = try trackedTempDir().appendingPathComponent("f.bin")
+        try Data("hello".utf8).write(to: url)
+        XCTAssertEqual(try FileHash.sha256HexOfRegularFile(at: url), try FileHash.sha256Hex(of: url))
+    }
+
+    func testNoFollowHashRejectsSymlinkDirectoryAndFifo() throws {
+        let dir = try trackedTempDir()
+        let real = dir.appendingPathComponent("real.bin")
+        try Data("X".utf8).write(to: real)
+
+        let link = dir.appendingPathComponent("link.bin")
+        try fm.createSymbolicLink(at: link, withDestinationURL: real)
+        let dangling = dir.appendingPathComponent("dangling.bin")
+        try fm.createSymbolicLink(at: dangling, withDestinationURL: dir.appendingPathComponent("absent"))
+        let sub = dir.appendingPathComponent("sub", isDirectory: true)
+        try fm.createDirectory(at: sub, withIntermediateDirectories: true)
+        let fifo = dir.appendingPathComponent("fifo.bin")
+        guard mkfifo(fifo.path, 0o644) == 0 else { throw XCTSkip("mkfifo unavailable") }
+
+        // The FIFO case must return PROMPTLY (O_NONBLOCK) — a hang here is the regression.
+        for url in [link, dangling, sub, fifo] {
+            XCTAssertThrowsError(try FileHash.sha256HexOfRegularFile(at: url), url.lastPathComponent) { e in
+                guard let fe = e as? FileHashError, case .notARegularFile = fe else {
+                    return XCTFail("\(url.lastPathComponent): got \(e)")
+                }
+            }
+        }
+    }
+
+    func testNoFollowHashMissingFileIsFileMissing() throws {
+        let url = try trackedTempDir().appendingPathComponent("absent.bin")
+        XCTAssertThrowsError(try FileHash.sha256HexOfRegularFile(at: url)) { e in
+            guard let fe = e as? FileHashError, fe.isFileMissing else { return XCTFail("got \(e)") }
+        }
+    }
+
+    /// The identity hash itself goes through the no-follow primitive AND quiescence is
+    /// re-checked after hashing — dedicated regression guard for the ordering.
+    func testIdentityUsesNoFollowHash() throws {
+        let real = try makeQuiescentDB()
+        let link = try trackedTempDir().appendingPathComponent("linked.db")
+        try fm.createSymbolicLink(at: link, withDestinationURL: real)
+        assertThrows(link, { if case .databaseNotRegularFile = $0 { return true }; return false }, "symlinked db")
+        XCTAssertEqual(try PreparedDatabaseIdentity.compute(at: real),
+                       "sha256:" + (try FileHash.sha256HexOfRegularFile(at: real)))
+    }
+
     // MARK: - AttachmentRelPath parsing
 
     func testRelPathParsesValidReference() {

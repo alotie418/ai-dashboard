@@ -3,6 +3,26 @@ import CryptoKit
 
 // MARK: - Streaming file hash
 
+public enum FileHashError: Error, CustomStringConvertible, Equatable {
+    /// The path names something other than a regular file — a symlink (O_NOFOLLOW),
+    /// directory, FIFO or other special file. Refusing to hash it.
+    case notARegularFile(String)
+    case unreadable(path: String, errno: Int32)
+
+    public var description: String {
+        switch self {
+        case .notARegularFile(let p): return "Not a regular file (symlink/directory/special): \(p)"
+        case .unreadable(let p, let e): return "Cannot read file for hashing: \(p) (errno \(e))"
+        }
+    }
+    /// True only for a definitively ABSENT path (ENOENT) — every other failure must stay
+    /// fail-closed at the caller.
+    public var isFileMissing: Bool {
+        if case .unreadable(_, let e) = self { return e == ENOENT }
+        return false
+    }
+}
+
 public enum FileHash {
     /// Streaming SHA-256 of a file as lowercase hex. Reads in chunks so a large DB or
     /// attachment never loads fully into memory. Size alone is NEVER treated as content
@@ -10,6 +30,38 @@ public enum FileHash {
     public static func sha256Hex(of url: URL, chunkSize: Int = 1 << 20) throws -> String {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
+        return try streamHash(handle, chunkSize: chunkSize)
+    }
+
+    /// No-follow, REGULAR-FILE-ONLY streaming hash — the primitive every trust decision
+    /// about an on-disk attachment/database must use. Opens with O_NOFOLLOW|O_NONBLOCK
+    /// (a symlink fails with ELOOP instead of being followed; a FIFO opens without
+    /// blocking instead of hanging), fstat's the OPENED descriptor and rejects anything
+    /// but S_IFREG, then hashes from that same descriptor — so the type that was checked
+    /// and the bytes that are hashed can never belong to different filesystem objects.
+    public static func sha256HexOfRegularFile(at url: URL, chunkSize: Int = 1 << 20) throws -> String {
+        let fd = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
+        guard fd >= 0 else {
+            let e = errno
+            if e == ELOOP { throw FileHashError.notARegularFile(url.path) }   // symlink under O_NOFOLLOW
+            throw FileHashError.unreadable(path: url.path, errno: e)
+        }
+        var st = stat()
+        guard fstat(fd, &st) == 0 else {
+            let e = errno; close(fd)
+            throw FileHashError.unreadable(path: url.path, errno: e)
+        }
+        guard (st.st_mode & S_IFMT) == S_IFREG else {
+            close(fd)
+            throw FileHashError.notARegularFile(url.path)
+        }
+        _ = fcntl(fd, F_SETFL, 0)   // drop O_NONBLOCK; regular-file reads ignore it anyway
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        defer { try? handle.close() }
+        return try streamHash(handle, chunkSize: chunkSize)
+    }
+
+    private static func streamHash(_ handle: FileHandle, chunkSize: Int) throws -> String {
         var hasher = SHA256()
         while let chunk = try handle.read(upToCount: chunkSize), !chunk.isEmpty {
             hasher.update(data: chunk)

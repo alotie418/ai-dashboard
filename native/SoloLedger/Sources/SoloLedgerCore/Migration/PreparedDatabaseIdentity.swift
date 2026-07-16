@@ -70,7 +70,21 @@ public enum PreparedDatabaseIdentity {
         }
 
         try assertQuiescent(at: url)   // re-check after the probe: still single-file
-        return "sha256:" + (try FileHash.sha256Hex(of: url))
+
+        // No-follow, regular-file-only hash: the fstat'ed descriptor IS the hashed file,
+        // so a symlink swapped in after the lstat gate can never be followed.
+        let hash: String
+        do {
+            hash = try FileHash.sha256HexOfRegularFile(at: url)
+        } catch let e as FileHashError {
+            if case .notARegularFile = e { throw PreparedDatabaseError.databaseNotRegularFile(url.path) }
+            throw PreparedDatabaseError.unreadable("\(e)")
+        }
+
+        // Final gate AFTER the hash: if a sidecar appeared (a writer attached) while we
+        // were reading, the hashed bytes are not a quiescent state — reject them.
+        try assertQuiescent(at: url)
+        return "sha256:" + hash
     }
 
     /// True iff the file carries a valid SQLite header whose format read/write version
@@ -84,20 +98,27 @@ public enum PreparedDatabaseIdentity {
         return header[18] == 2 || header[19] == 2
     }
 
-    /// The filesystem half of the gate. `attributesOfItem` does not traverse symlinks, so a
-    /// symlinked main file is rejected and a symlink NAMED like a sidecar counts as present.
+    /// The filesystem half of the gate, built on raw lstat so every failure mode is
+    /// explicit: lstat never traverses symlinks (a symlinked main file is rejected and a
+    /// symlink NAMED like a sidecar counts as present), and for the sidecars ONLY a
+    /// definitive ENOENT means "absent" — any other metadata error (EACCES, EIO, …) is
+    /// fail-closed, never silently treated as quiescent.
     static func assertQuiescent(at url: URL) throws {
-        let fm = FileManager.default
-        guard let attrs = try? fm.attributesOfItem(atPath: url.path) else {
-            throw PreparedDatabaseError.databaseMissing(url.path)
+        var st = stat()
+        if lstat(url.path, &st) != 0 {
+            let e = errno
+            if e == ENOENT { throw PreparedDatabaseError.databaseMissing(url.path) }
+            throw PreparedDatabaseError.unreadable("lstat \(url.path): errno \(e)")
         }
-        guard (attrs[.type] as? FileAttributeType) == .typeRegular else {
+        guard (st.st_mode & S_IFMT) == S_IFREG else {
             throw PreparedDatabaseError.databaseNotRegularFile(url.path)
         }
         for suffix in sidecarSuffixes {
             let side = url.path + suffix
-            if (try? fm.attributesOfItem(atPath: side)) != nil {
-                throw PreparedDatabaseError.notQuiescent(sidecar: side)
+            var sst = stat()
+            if lstat(side, &sst) == 0 { throw PreparedDatabaseError.notQuiescent(sidecar: side) }
+            guard errno == ENOENT else {
+                throw PreparedDatabaseError.unreadable("lstat \(side): errno \(errno)")
             }
         }
     }

@@ -220,6 +220,56 @@ final class AttachmentReferenceAuditorTests: LedgerTestCase {
         XCTAssertEqual(a.resolved, []); XCTAssertEqual(a.dangling, [])
     }
 
+    // MARK: - Embedded NUL in TEXT (never truncated into a plausible path)
+
+    func testEmbeddedNulTextRoundTripsThroughSQLite() throws {
+        let url = try trackedTempDir().appendingPathComponent("nul.db")
+        let db = try SQLiteDatabase(path: url.path)
+        try db.execute("CREATE TABLE t (v TEXT)")
+        let value = "attachments/docs/a.pdf\u{0}suffix"
+        try db.run("INSERT INTO t (v) VALUES (?)", [.text(value)])
+        // length(v) on TEXT counts only up to the first NUL (documented SQLite behavior),
+        // so probe the stored size via the BLOB cast: the byte count must be the FULL value.
+        let rows = try db.query("SELECT v, length(CAST(v AS BLOB)) AS n FROM t")
+        XCTAssertEqual(rows.first?["v"], .text(value), "embedded NUL must survive bind AND read intact")
+        XCTAssertEqual(rows.first?.int("n"), value.utf8.count, "SQLite must have stored every byte")
+    }
+
+    func testEmbeddedNulReferenceIsInvalidNeverResolvedOrDangling() throws {
+        // "attachments/docs/a.pdf\0suffix" would String(cString:)-truncate to a VALID
+        // reference to a.pdf — which exists in the active dir. It must instead surface as
+        // an invalidReference for the FULL value: never resolved, never dangling.
+        let smuggled = "attachments/docs/a.pdf\u{0}suffix"
+        let db = try makePreparedDB(txnRefs: [.text(smuggled)])
+        let active = try makeActive()
+        let report = try applyReport(staged: [("a.pdf", "A")], active: active, dbURL: db)
+
+        let hashBefore = try FileHash.sha256Hex(of: db)
+        let a = try audit(report, db)
+        XCTAssertEqual(try FileHash.sha256Hex(of: db), hashBefore, "audit stayed read-only")
+
+        XCTAssertEqual(a.resolved, [], "a.pdf is NOT referenced — truncation would fabricate this")
+        XCTAssertEqual(a.dangling, [])
+        XCTAssertEqual(a.invalid, [.init(value: smuggled, provenance: "transactions.attachment_path×1")])
+
+        // The item flows through ack + reportHash + sentinel with the full NUL-bearing value.
+        let manifests = try makeManifestsDir()
+        let o1 = try AttachmentApply().complete(report: report, referenceAudit: a, acknowledgement: nil,
+                                                preparedDatabaseAt: db, manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .requiresAcknowledgement(let req, let unresolved) = o1 else { return XCTFail("got \(o1)") }
+        XCTAssertEqual(unresolved.items, [.init(name: smuggled, kind: .invalidReference,
+                                                detail: "transactions.attachment_path×1")])
+        // A truncated variant of the same report must NOT share the hash (injective encoding).
+        let truncated = UnresolvedReport(items: [.init(name: "attachments/docs/a.pdf", kind: .invalidReference,
+                                                       detail: "transactions.attachment_path×1")])
+        XCTAssertNotEqual(req.unresolvedReportHash, truncated.reportHash)
+
+        let o2 = try AttachmentApply().complete(report: report, referenceAudit: a, acknowledgement: req.acknowledge(),
+                                                preparedDatabaseAt: db, manifestsDir: manifests, hooks: ApplyHooks())
+        guard case .completed(let r) = o2 else { return XCTFail("got \(o2)") }
+        XCTAssertEqual(r.unresolved.items.first?.name, smuggled)
+    }
+
     // MARK: - Non-regular active targets are never resolved
 
     func testActiveNonRegularTargetsAreNotResolved() throws {

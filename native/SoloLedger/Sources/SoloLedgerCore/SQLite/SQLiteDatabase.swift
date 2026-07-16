@@ -258,7 +258,9 @@ public final class SQLiteDatabase {
             case .real(let d):
                 rc = sqlite3_bind_double(stmt, position, d)
             case .text(let s):
-                rc = sqlite3_bind_text(stmt, position, s, -1, SQLITE_TRANSIENT)
+                // Explicit byte length (not -1) so a bound String with an embedded NUL is
+                // stored in full — the read side (readColumn) is symmetric.
+                rc = sqlite3_bind_text(stmt, position, s, Int32(s.utf8.count), SQLITE_TRANSIENT)
             case .blob(let data):
                 rc = data.withUnsafeBytes { raw in
                     sqlite3_bind_blob(stmt, position, raw.baseAddress, Int32(data.count), SQLITE_TRANSIENT)
@@ -278,7 +280,12 @@ public final class SQLiteDatabase {
             return .real(sqlite3_column_double(stmt, index))
         case SQLITE_TEXT:
             if let c = sqlite3_column_text(stmt, index) {
-                return .text(String(cString: c))
+                // NEVER String(cString:): it stops at the first NUL, silently truncating
+                // TEXT with embedded \0 (e.g. "…a.pdf\0suffix" would read back as a
+                // plausible "…a.pdf"). Read the exact byte length instead; invalid UTF-8
+                // decodes lossily to U+FFFD, which can never form a valid ASCII-only path.
+                let count = Int(sqlite3_column_bytes(stmt, index))
+                return .text(String(decoding: UnsafeBufferPointer(start: c, count: count), as: UTF8.self))
             }
             return .null
         case SQLITE_BLOB:
