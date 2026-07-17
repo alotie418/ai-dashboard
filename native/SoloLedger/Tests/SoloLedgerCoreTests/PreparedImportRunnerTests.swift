@@ -255,6 +255,8 @@ final class PreparedImportRunnerTests: LedgerTestCase {
             ("db bytes changed", { art in
                 let db = art.appendingPathComponent("sololedger.db")
                 let h = try FileHandle(forWritingTo: db); try h.seekToEnd(); try h.write(contentsOf: Data([0])); try h.close() }),
+            ("txn count only", { art in
+                var p = try self.readProvenance(art); p.transactionsMigrated = Int.max; try self.writeProvenance(p, art) }),
             ("db symlink", { art in
                 let db = art.appendingPathComponent("sololedger.db"); let copy = try self.trackedTempDir().appendingPathComponent("d.db")
                 try self.fm.copyItem(at: db, to: copy); try self.fm.removeItem(at: db)
@@ -338,6 +340,78 @@ final class PreparedImportRunnerTests: LedgerTestCase {
         XCTAssertTrue(fm.fileExists(atPath: art.path), "empty winner dir must survive")
         XCTAssertEqual(try fm.contentsOfDirectory(atPath: art.path), [], "empty winner dir never replaced")
     }
+
+    // MARK: - Descriptor-bound publish: swaps + beforePublish tamper fail closed (2B-3 C6)
+
+    private func currentArtifactAttemptName(_ prep: URL) throws -> String {
+        try XCTUnwrap(fm.contentsOfDirectory(atPath: prep.path).first { $0.hasPrefix(".artifact-") })
+    }
+
+    /// The preparedRoot PATH is replaced with a DIFFERENT real directory (holding a same-named
+    /// empty impostor attempt) during beforePublish. Because the runner bound preparedRoot once
+    /// and re-verifies its inode before publishing, it fails closed and the impostor is NEVER
+    /// promoted to a published artifact.
+    func testPreparedRootSwappedBeforePublishFailsClosedImpostorNeverPromoted() throws {
+        let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
+        let prep = try preparedRoot()
+        let newRoot = try trackedTempDir().appendingPathComponent("swapped-root", isDirectory: true)
+        try fm.createDirectory(at: newRoot, withIntermediateDirectories: true)
+        let importName = "import-\(id.rawValue)"
+        let hooks = RunnerHooks(beforePublish: { _ in
+            let art = try self.currentArtifactAttemptName(prep)
+            // Same-named empty impostor in the new root.
+            try self.fm.createDirectory(at: newRoot.appendingPathComponent(art), withIntermediateDirectories: true)
+            // Swap the preparedRoot PATH → newRoot (a real directory, different inode).
+            let aside = try self.trackedTempDir().appendingPathComponent("orig-root", isDirectory: true)
+            try self.fm.moveItem(at: prep, to: aside)
+            try self.fm.moveItem(at: newRoot, to: prep)
+        })
+        XCTAssertThrowsError(try PreparedImportRunner().run(gated, workingDirectory: try workingRoot(), preparedRoot: prep, hooks: hooks)) { e in
+            guard case PreparedRunFailure.publishFailed = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertFalse(fm.fileExists(atPath: prep.appendingPathComponent(importName).path),
+                       "the impostor must never be promoted to a published artifact")
+    }
+
+    /// Tampering the ARTIFACT ATTEMPT during beforePublish (after build, before the final gate)
+    /// must fail closed — the gate re-verifies the whole artifact THROUGH the bound descriptor.
+    func testArtifactAttemptTamperDuringBeforePublishFailsClosed() throws {
+        let cases: [(String, (URL) throws -> Void)] = [
+            ("db append", { art in
+                let db = art.appendingPathComponent("sololedger.db")
+                let h = try FileHandle(forWritingTo: db); try h.seekToEnd(); try h.write(contentsOf: Data([0])); try h.close() }),
+            ("db same-size replace", { art in
+                let db = art.appendingPathComponent("sololedger.db")
+                let n = (try self.fm.attributesOfItem(atPath: db.path)[.size] as? NSNumber)?.intValue ?? 0
+                try self.fm.removeItem(at: db); try Data(repeating: 0xFF, count: n).write(to: db) }),
+            ("db symlink", { art in
+                let db = art.appendingPathComponent("sololedger.db"); let elsewhere = try self.trackedTempDir().appendingPathComponent("x.db")
+                try self.fm.copyItem(at: db, to: elsewhere); try self.fm.removeItem(at: db)
+                try self.fm.createSymbolicLink(at: db, withDestinationURL: elsewhere) }),
+            ("db fifo", { art in
+                let db = art.appendingPathComponent("sololedger.db"); try self.fm.removeItem(at: db)
+                guard mkfifo(db.path, 0o644) == 0 else { throw TestError() } }),
+            ("provenance tamper", { art in
+                var p = try self.readProvenance(art); p.snapshotIdentitySHA256 = String(p.snapshotIdentitySHA256.reversed())
+                try self.writeProvenance(p, art) }),
+            ("extra entry", { art in try Data("x".utf8).write(to: art.appendingPathComponent("stray.txt")) }),
+        ]
+        for (label, mutate) in cases {
+            let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
+            let prep = try preparedRoot(); let work = try workingRoot()
+            let hooks = RunnerHooks(beforePublish: { _ in try mutate(prep.appendingPathComponent(try self.currentArtifactAttemptName(prep))) })
+            XCTAssertThrowsError(try PreparedImportRunner().run(gated, workingDirectory: work, preparedRoot: prep, hooks: hooks), label) { e in
+                switch e {
+                case PreparedRunFailure.preparedPublishConflict, PreparedRunFailure.publishFailed: break
+                default: XCTFail("\(label): got \(e)")
+                }
+            }
+            XCTAssertFalse(fm.fileExists(atPath: artifactDir(prep, id).path), "\(label): must not publish")
+            XCTAssertEqual(attemptsLeft(prep, ".artifact-"), [], "\(label): attempt cleaned")
+        }
+    }
+
+    private struct TestError: Error {}
 
     // MARK: - Fault → rollback → retriable; no attempt leak
 

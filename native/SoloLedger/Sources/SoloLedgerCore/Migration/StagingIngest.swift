@@ -277,6 +277,52 @@ final class DirectoryHandle {
         try handle.close()
         complete = true
     }
+
+    /// Create a DIRECT child directory (mkdirat, 0700) and return a bound handle to it —
+    /// so an entire artifact can be assembled and published relative to ONE root fd,
+    /// immune to a swap of the root path.
+    func makeChildDirectory(named name: String) throws -> DirectoryHandle {
+        guard mkdirat(fd, name, 0o700) == 0 else {
+            throw FileHashError.destinationUnwritable(path: pathHint + "/" + name, errno: errno)
+        }
+        return try subdirectory(named: name)
+    }
+
+    /// Stream a regular file INTO this directory as `dstName`, created exclusively
+    /// (openat O_CREAT|O_EXCL|O_NOFOLLOW). Returns the digest of the bytes written; a
+    /// failure unlinks the partial destination via the descriptor.
+    func importRegularFile(named dstName: String, from source: FileHandle, chunkSize: Int = 1 << 20) throws -> RegularFileDigest {
+        let dfd = openat(fd, dstName, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+        guard dfd >= 0 else { throw FileHashError.destinationUnwritable(path: pathHint + "/" + dstName, errno: errno) }
+        let sink = FileHandle(fileDescriptor: dfd, closeOnDealloc: true)
+        var complete = false
+        defer { try? sink.close(); if !complete { unlinkat(fd, dstName, 0) } }
+        let d = try FileHash.streamDigest(from: source, chunkSize: chunkSize) { try sink.write(contentsOf: $0) }
+        try sink.close()
+        complete = true
+        return d
+    }
+
+    /// Exclusive, SAME-DIRECTORY rename of a child (`renameatx_np(RENAME_EXCL)`, both names
+    /// resolved relative to THIS fd). Atomic, same-volume, never overwrites. Returns false
+    /// iff the destination already exists.
+    func renameChildExclusively(from: String, to: String) throws -> Bool {
+        let RENAME_EXCL_FLAG: UInt32 = 0x0004   // <sys/stdio.h> RENAME_EXCL
+        let rc = from.withCString { f in to.withCString { t in renameatx_np(fd, f, fd, t, RENAME_EXCL_FLAG) } }
+        if rc == 0 { return true }
+        let e = errno
+        if e == EEXIST || e == ENOTEMPTY { return false }
+        throw FileHashError.destinationUnwritable(path: pathHint + "/" + to, errno: e)
+    }
+
+    /// Remove a DIRECT child directory (its entries, then the directory) via the descriptor.
+    /// Best-effort — used for attempt cleanup; a leftover is a reaper concern, not a fault.
+    func removeChildDir(named name: String) {
+        if let child = try? subdirectory(named: name) {
+            for entry in (try? child.entryNames()) ?? [] { unlinkat(child.fd, entry, 0) }
+        }
+        _ = unlinkat(fd, name, AT_REMOVEDIR)   // Darwin AT_REMOVEDIR == 0x0080
+    }
 }
 
 public enum FileHash {

@@ -34,10 +34,9 @@ public enum PreparedRunFailure: Error, CustomStringConvertible, Equatable {
 /// prepared product so a crash-interrupted import can be RESUMED (idempotently reused) on the
 /// next run without re-deriving byte-identical output. Migration writes `datetime('now')` into
 /// seed rows, so the prepared DB is NOT byte-deterministic across runs — reuse therefore binds
-/// on the SNAPSHOT identity + the recorded prepared identity, not on prepared-byte equality.
-///
-/// Its own `formatVersion` is independent of `ImportManifest.currentFormatVersion` (this is
-/// runner metadata, not the ingest manifest).
+/// on the SNAPSHOT identity + the recorded prepared identity + the actual transaction count,
+/// not on prepared-byte equality. Its own `formatVersion` is independent of
+/// `ImportManifest.currentFormatVersion`.
 struct PreparedProvenance: Codable, Equatable {
     static let currentFormatVersion = 1
     var formatVersion: Int
@@ -50,25 +49,35 @@ struct PreparedProvenance: Codable, Equatable {
     var transactionsMigrated: Int
 }
 
-/// A normalized, migrated, QUIESCENT single-file prepared database + its computed identity.
-/// It carries the gate evidence (`gated`) forward so the coordinator can run the
-/// descriptor-bound attachment apply against the SAME staging the DB came from. Internal init.
+/// Result of a full descriptor-rooted artifact validation.
+struct ValidatedArtifact {
+    let preparedDBIdentity: String     // recomputed from a copy taken THROUGH the artifact fd
+    let transactionsMigrated: Int      // counted from that same copy
+    let provenance: PreparedProvenance
+}
+
+/// A normalized, migrated, QUIESCENT single-file prepared database + its computed identity,
+/// published as an atomic artifact directory. Carries the gate evidence AND the bound artifact
+/// descriptor forward so the coordinator can act on the SAME verified objects. Internal init.
 public struct PreparedImport {
     public let importID: ImportID
-    /// The published prepared DB, INSIDE the atomic artifact dir
+    /// Path to the prepared DB inside the published artifact
     /// (`preparedRoot/import-<id>/sololedger.db`). DELETE-journal, no sidecars.
     public let preparedDatabaseURL: URL
-    /// `"sha256:…"` from PreparedDatabaseIdentity.compute — the ONLY sanctioned identity.
     public let preparedDBIdentity: String
     public let manifest: ImportManifest
     public let gated: GatedStagedSnapshot
     public let transactionsMigrated: Int
     /// True when this run RESUMED an already-published artifact rather than migrating afresh.
     public let reusedExisting: Bool
+    /// The bound (O_NOFOLLOW|O_DIRECTORY, dev+inode) descriptor for the published artifact dir.
+    /// Survives the publish rename (an fd tracks the inode, not the name), so the coordinator
+    /// can read the prepared DB / provenance through it without re-resolving the path.
+    let artifactHandle: DirectoryHandle
 
     init(importID: ImportID, preparedDatabaseURL: URL, preparedDBIdentity: String,
          manifest: ImportManifest, gated: GatedStagedSnapshot, transactionsMigrated: Int,
-         reusedExisting: Bool) {
+         reusedExisting: Bool, artifactHandle: DirectoryHandle) {
         self.importID = importID
         self.preparedDatabaseURL = preparedDatabaseURL
         self.preparedDBIdentity = preparedDBIdentity
@@ -76,6 +85,7 @@ public struct PreparedImport {
         self.gated = gated
         self.transactionsMigrated = transactionsMigrated
         self.reusedExisting = reusedExisting
+        self.artifactHandle = artifactHandle
     }
 }
 
@@ -83,7 +93,7 @@ public struct PreparedImport {
 struct RunnerHooks {
     var afterCopy: ((URL) throws -> Void)?               // working attempt, after DB(+WAL) copied
     var beforeMigrate: ((SQLiteDatabase) throws -> Void)?
-    var beforePublish: ((URL) throws -> Void)?           // final artifact URL, before the atomic rename
+    var beforePublish: ((URL) throws -> Void)?           // final artifact URL, before validate+rename
     var afterPublish: ((URL) throws -> Void)?            // final artifact URL, AFTER the rename (crash sim)
     init(afterCopy: ((URL) throws -> Void)? = nil,
          beforeMigrate: ((SQLiteDatabase) throws -> Void)? = nil,
@@ -97,17 +107,16 @@ struct RunnerHooks {
 // MARK: - The runner
 
 /// Turns a GATED staging snapshot into a normalized, migrated, quiescent prepared database,
-/// published as an ATOMIC ARTIFACT DIRECTORY (`preparedRoot/import-<id>/` containing exactly
+/// published as an ATOMIC ARTIFACT DIRECTORY (`preparedRoot/import-<id>/` = exactly
 /// `sololedger.db` + `provenance.json`).
 ///
-/// The staged original is NEVER opened by SQLite. The DB (+ WAL) are copied THROUGH the gate's
-/// descriptor into a fresh, process-private attempt, migrated on that private copy, then the
-/// closed prepared DB is copied (no-follow, digest-re-verified) into an artifact attempt built
-/// INSIDE `preparedRoot` (same volume as the final location) and published via an exclusive,
-/// same-directory `renameatx_np(RENAME_EXCL)` — a true atomic rename that never overwrites a
-/// winner and never degrades to a cross-volume copy. A crash after publish is recoverable: the
-/// next run finds the artifact, re-validates it descriptor-rooted against this snapshot, and
-/// reuses it idempotently.
+/// The `preparedRoot` is bound to ONE descriptor at the start of `run`, and every artifact
+/// operation — create, write, validate, clean, and the exclusive `renameatx_np(RENAME_EXCL)`
+/// publish — is relative to THAT fd, so a swap of the `preparedRoot` path cannot redirect the
+/// publish. The staged original is never opened by SQLite; the DB (+ WAL) are copied through
+/// the gate's descriptor into a private working copy, migrated there, then copied through the
+/// bound descriptors into the artifact. The final integrity gate runs AFTER the adversary
+/// `beforePublish` window and re-verifies everything through the bound artifact descriptor.
 public struct PreparedImportRunner {
     public init() {}
 
@@ -119,21 +128,27 @@ public struct PreparedImportRunner {
              hooks: RunnerHooks) throws -> PreparedImport {
         let fm = FileManager.default
         let dbName = AppPaths.databaseFileName
+        let importName = "import-\(gated.importID.rawValue)"
         try fm.createDirectory(at: preparedRoot, withIntermediateDirectories: true)
-        let finalArtifact = preparedRoot.appendingPathComponent("import-\(gated.importID.rawValue)", isDirectory: true)
-
-        // FAST PATH / crash-resume: an artifact already published → reuse iff fully consistent
-        // with THIS snapshot, else hard conflict (never touch the winner).
-        if let reused = try Self.reuseIfConsistent(finalArtifact, gated: gated) { return reused }
-
-        // 1. Fresh, process-private working attempt (brand-new — never reuses a planted one).
         try fm.createDirectory(at: workingDirectory, withIntermediateDirectories: true)
+
+        // Bind preparedRoot ONCE. Every artifact op below is relative to this fd.
+        let root: DirectoryHandle
+        do { root = try DirectoryHandle.open(at: preparedRoot) }
+        catch { throw PreparedRunFailure.publishFailed("preparedRoot unreadable / not a directory: \(error)") }
+
+        // FAST PATH / crash-resume.
+        if let reused = try Self.reuseIfConsistent(root: root, importName: importName, gated: gated,
+                                                   preparedRoot: preparedRoot, workingDirectory: workingDirectory) {
+            return reused
+        }
+
+        // 1. Private working attempt: copy DB(+WAL) through the gate descriptor, migrate.
         let workAttempt = workingDirectory.appendingPathComponent(".prep-\(UUID().uuidString)", isDirectory: true)
         try fm.createDirectory(at: workAttempt, withIntermediateDirectories: false)
         var workDone = false
         defer { if !workDone { try? fm.removeItem(at: workAttempt) } }
 
-        // 2. Copy DB (+ optional WAL) THROUGH the gate descriptor, verifying digests.
         let workDB = workAttempt.appendingPathComponent(dbName)
         do {
             let dbDigest = try gated.root.copyRegularFile(named: dbName, to: workDB)
@@ -150,36 +165,28 @@ public struct PreparedImportRunner {
         catch { throw PreparedRunFailure.snapshotCopyFailed("\(error)") }
         try hooks.afterCopy?(workAttempt)
 
-        // 3. Normalize + migrate on the COPY (read-write-EXISTING: never CREATE).
         let migratedCount = try Self.normalizeAndMigrate(preparedDB: workDB, hooks: hooks)
-
-        // 3b. Drop rebuildable WAL sidecars SQLite may leave after WAL→DELETE; require single file.
         try Self.dropSidecars(besides: workDB)
         try Self.assertSingleFile(workAttempt, dbName: dbName)
-
-        // 4. Identity — after every connection is closed and all sidecars are gone.
         let identity: String
         do { identity = try PreparedDatabaseIdentity.compute(at: workDB) }
         catch { throw PreparedRunFailure.identityFailed("\(error)") }
 
-        // 5. Build the artifact ATTEMPT inside preparedRoot (SAME VOLUME as the final): copy the
-        //    closed prepared DB in (no-follow, digest+identity re-verified) + provenance.
-        let artAttempt = preparedRoot.appendingPathComponent(".artifact-\(UUID().uuidString)", isDirectory: true)
-        try fm.createDirectory(at: artAttempt, withIntermediateDirectories: false)
-        var artDone = false
-        defer { if !artDone { try? fm.removeItem(at: artAttempt) } }
+        // 2. Build the artifact attempt as a CHILD of the bound root (same volume, fd-relative).
+        let artName = ".artifact-\(UUID().uuidString)"
+        let art: DirectoryHandle
+        do { art = try root.makeChildDirectory(named: artName) }
+        catch { throw PreparedRunFailure.publishFailed("artifact attempt create: \(error)") }
+        var artPublished = false
+        defer { if !artPublished { root.removeChildDir(named: artName) } }
 
-        let artDB = artAttempt.appendingPathComponent(dbName)
         do {
-            let src = try DirectoryHandle.open(at: workAttempt)
-            _ = try src.copyRegularFile(named: dbName, to: artDB)   // no-follow, fd-bound; byte-identity re-checked below
-        } catch { throw PreparedRunFailure.snapshotCopyFailed("artifact db copy: \(error)") }
-        let artIdentity: String
-        do { artIdentity = try PreparedDatabaseIdentity.compute(at: artDB) }
-        catch { throw PreparedRunFailure.identityFailed("artifact: \(error)") }
-        guard artIdentity == identity else {
-            throw PreparedRunFailure.snapshotCopyFailed("artifact db identity != working copy identity")
-        }
+            let workHandle = try DirectoryHandle.open(at: workAttempt)
+            let src = try workHandle.openRegularFile(named: dbName)
+            defer { try? src.close() }
+            _ = try art.importRegularFile(named: dbName, from: src)
+        } catch { throw PreparedRunFailure.publishFailed("artifact db import: \(error)") }
+
         let provenance = PreparedProvenance(
             formatVersion: PreparedProvenance.currentFormatVersion, importID: gated.importID.rawValue,
             snapshotIdentitySHA256: gated.manifest.snapshotIdentitySHA256,
@@ -188,56 +195,87 @@ public struct PreparedImportRunner {
             preparedDBIdentity: identity, transactionsMigrated: migratedCount)
         do {
             let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-            try DirectoryHandle.open(at: artAttempt).createRegularFileExclusively(named: "provenance.json", contents: try enc.encode(provenance))
+            try art.createRegularFileExclusively(named: "provenance.json", contents: try enc.encode(provenance))
         } catch { throw PreparedRunFailure.publishFailed("provenance write: \(error)") }
-        try Self.assertArtifactEntrySet(artAttempt, dbName: dbName)
 
-        // 6. Atomic, exclusive, SAME-DIRECTORY publish: renameatx_np(RENAME_EXCL). Never
-        //    overwrites, never a cross-volume copy (both entries live in preparedRoot).
-        try hooks.beforePublish?(finalArtifact)
-        let published = try Self.exclusiveRename(inDir: preparedRoot,
-                                                 from: artAttempt.lastPathComponent,
-                                                 to: finalArtifact.lastPathComponent)
-        if published {
-            artDone = true; workDone = true
-            try? fm.removeItem(at: workAttempt)
-            try hooks.afterPublish?(finalArtifact)   // crash-simulation window
-            return PreparedImport(importID: gated.importID, preparedDatabaseURL: finalArtifact.appendingPathComponent(dbName),
-                                  preparedDBIdentity: identity, manifest: gated.manifest, gated: gated,
-                                  transactionsMigrated: migratedCount, reusedExisting: false)
+        // 3. Adversary window, THEN the FINAL integrity gate (descriptor-rooted re-verify of the
+        //    artifact we are about to publish — entry set, types, provenance, DB identity, count).
+        let finalURL = preparedRoot.appendingPathComponent(importName, isDirectory: true)
+        try hooks.beforePublish?(finalURL)
+        let validated = try Self.validateArtifact(art, gated: gated, expectedIdentity: identity,
+                                                  expectedCount: migratedCount, workingDirectory: workingDirectory)
+
+        // 4. Re-verify the bindings are intact, then publish via the bound root fd.
+        try Self.assertStillBound(root, path: preparedRoot)
+        guard let artFP = try root.fingerprint(named: artName), artFP.isDirectory,
+              artFP.device == art.device, artFP.inode == art.inode else {
+            throw PreparedRunFailure.publishFailed("artifact attempt entry changed before publish")
         }
-        // The destination appeared between the fast-path check and the rename (publish race).
-        // Reuse iff the winner is consistent with THIS snapshot, else conflict — never overwrite.
-        if let reused = try Self.reuseIfConsistent(finalArtifact, gated: gated) { return reused }
+        let published: Bool
+        do { published = try root.renameChildExclusively(from: artName, to: importName) }
+        catch { throw PreparedRunFailure.publishFailed("exclusive rename: \(error)") }
+
+        if published {
+            artPublished = true; workDone = true
+            try? fm.removeItem(at: workAttempt)
+            try Self.assertStillBound(root, path: preparedRoot)   // after: root path still the bound dir
+            try hooks.afterPublish?(finalURL)                      // crash-simulation window
+            return PreparedImport(importID: gated.importID, preparedDatabaseURL: finalURL.appendingPathComponent(dbName),
+                                  preparedDBIdentity: validated.preparedDBIdentity, manifest: gated.manifest, gated: gated,
+                                  transactionsMigrated: validated.transactionsMigrated, reusedExisting: false, artifactHandle: art)
+        }
+        // Destination appeared between the fast-path check and the rename (publish race).
+        if let reused = try Self.reuseIfConsistent(root: root, importName: importName, gated: gated,
+                                                   preparedRoot: preparedRoot, workingDirectory: workingDirectory) {
+            return reused
+        }
         throw PreparedRunFailure.preparedPublishConflict("import-\(gated.importID.rawValue): a different artifact won the publish race")
     }
 
-    // MARK: - Crash-resume: validate + reuse an existing artifact
+    // MARK: - Crash-resume (fully descriptor-bound)
 
-    /// nil ⇔ no artifact exists yet (proceed to migrate). A present artifact is validated
-    /// DESCRIPTOR-ROOTED against `gated`; consistent ⇒ reuse (returns the PreparedImport),
-    /// anything else ⇒ hard conflict (throws, never touches the artifact).
-    static func reuseIfConsistent(_ artifact: URL, gated: GatedStagedSnapshot) throws -> PreparedImport? {
-        let root: DirectoryHandle
-        do { root = try DirectoryHandle.open(at: artifact) }
-        catch let e as FileHashError where e.isFileMissing { return nil }
-        catch { throw PreparedRunFailure.preparedPublishConflict("existing artifact unreadable / not a directory: \(error)") }
+    /// nil ⇔ no artifact exists yet. A present artifact is validated ENTIRELY through a bound
+    /// descriptor (openat from `root`): provenance, DB identity, transaction count all come from
+    /// a copy taken THROUGH that descriptor. Consistent ⇒ reuse; else ⇒ hard conflict.
+    static func reuseIfConsistent(root: DirectoryHandle, importName: String, gated: GatedStagedSnapshot,
+                                  preparedRoot: URL, workingDirectory: URL) throws -> PreparedImport? {
+        guard let fp = try root.fingerprint(named: importName) else { return nil }   // ENOENT ⇒ not published yet
+        func conflict(_ m: String) -> PreparedRunFailure { .preparedPublishConflict("import-\(gated.importID.rawValue): \(m)") }
+        guard fp.isDirectory else { throw conflict("existing artifact is not a directory") }
 
+        let art: DirectoryHandle
+        do { art = try root.subdirectory(named: importName) }   // openat O_NOFOLLOW|O_DIRECTORY, bound
+        catch { throw conflict("existing artifact unreadable: \(error)") }
+
+        let validated = try validateArtifact(art, gated: gated, expectedIdentity: nil, expectedCount: nil,
+                                             workingDirectory: workingDirectory)
+        let dbURL = preparedRoot.appendingPathComponent(importName, isDirectory: true).appendingPathComponent(AppPaths.databaseFileName)
+        return PreparedImport(importID: gated.importID, preparedDatabaseURL: dbURL,
+                              preparedDBIdentity: validated.preparedDBIdentity, manifest: gated.manifest, gated: gated,
+                              transactionsMigrated: validated.transactionsMigrated, reusedExisting: true, artifactHandle: art)
+    }
+
+    /// Descriptor-rooted validation of an artifact directory (`art`): exact entry set + types,
+    /// provenance fields bound to `gated`, and — since SQLite is path-based — the DB is copied
+    /// THROUGH `art` (no-follow) into a private verify dir where its identity and transaction
+    /// count are computed. Everything is bound to `art`'s fd; nothing re-resolves the artifact
+    /// path. `expected*` are supplied on the publish side (must also equal the freshly-migrated
+    /// values). Any mismatch throws `preparedPublishConflict`.
+    static func validateArtifact(_ art: DirectoryHandle, gated: GatedStagedSnapshot,
+                                 expectedIdentity: String?, expectedCount: Int?,
+                                 workingDirectory: URL) throws -> ValidatedArtifact {
         func conflict(_ m: String) -> PreparedRunFailure { .preparedPublishConflict("import-\(gated.importID.rawValue): \(m)") }
         let dbName = AppPaths.databaseFileName
 
-        // Exact entry set + per-entry type, through the bound descriptor.
-        guard let entries = try? root.entryNames(), Set(entries) == [dbName, "provenance.json"] else {
+        guard let entries = try? art.entryNames(), Set(entries) == [dbName, "provenance.json"] else {
             throw conflict("artifact entry set is not exactly {\(dbName), provenance.json}")
         }
-        guard let dbFP = try? root.fingerprint(named: dbName), dbFP.isRegularFile,
-              let pFP = try? root.fingerprint(named: "provenance.json"), pFP.isRegularFile else {
+        guard let dbFP = try? art.fingerprint(named: dbName), dbFP.isRegularFile,
+              let pFP = try? art.fingerprint(named: "provenance.json"), pFP.isRegularFile else {
             throw conflict("artifact entries are not both regular files")
         }
-
-        // Provenance, read THROUGH the descriptor, decoded and bound to THIS snapshot.
-        guard let data = try? root.readRegularFile(named: "provenance.json"),
-              let prov = try? JSONDecoder().decode(PreparedProvenance.self, from: data) else {
+        guard let pdata = try? art.readRegularFile(named: "provenance.json"),
+              let prov = try? JSONDecoder().decode(PreparedProvenance.self, from: pdata) else {
             throw conflict("provenance.json is missing / undecodable")
         }
         let m = gated.manifest
@@ -250,19 +288,33 @@ public struct PreparedImportRunner {
             throw conflict("provenance does not match this snapshot")
         }
 
-        // Recompute the existing prepared DB's identity — it must equal what provenance records
-        // (the artifact's own DB was not swapped/corrupted after publish).
-        let dbURL = artifact.appendingPathComponent(dbName)
-        let current: String
-        do { current = try PreparedDatabaseIdentity.compute(at: dbURL) }
-        catch { throw conflict("existing prepared DB identity unreadable: \(error)") }
-        guard current == prov.preparedDBIdentity else {
-            throw conflict("existing prepared DB identity \(current) != provenance \(prov.preparedDBIdentity)")
-        }
+        // Copy the DB OUT through the bound descriptor (no-follow) into a private verify dir.
+        let verifyDir = workingDirectory.appendingPathComponent(".verify-\(UUID().uuidString)", isDirectory: true)
+        do { try FileManager.default.createDirectory(at: verifyDir, withIntermediateDirectories: false) }
+        catch { throw conflict("verify dir: \(error)") }
+        defer { try? FileManager.default.removeItem(at: verifyDir) }
+        let verifyDB = verifyDir.appendingPathComponent(dbName)
+        do { _ = try art.copyRegularFile(named: dbName, to: verifyDB) }
+        catch { throw conflict("prepared DB copy-for-verification failed (symlink/FIFO/read error): \(error)") }
 
-        return PreparedImport(importID: gated.importID, preparedDatabaseURL: dbURL,
-                              preparedDBIdentity: prov.preparedDBIdentity, manifest: m, gated: gated,
-                              transactionsMigrated: prov.transactionsMigrated, reusedExisting: true)
+        let identity: String
+        do { identity = try PreparedDatabaseIdentity.compute(at: verifyDB) }
+        catch { throw conflict("prepared DB identity unreadable: \(error)") }
+        guard identity == prov.preparedDBIdentity else { throw conflict("prepared DB identity != provenance") }
+        if let e = expectedIdentity, identity != e { throw conflict("prepared DB identity != freshly-migrated identity") }
+
+        let count: Int
+        do {
+            let db = try SQLiteDatabase(path: verifyDB.path, mode: .readOnly)
+            defer { try? db.close() }
+            count = try db.query("SELECT COUNT(*) AS c FROM transactions").first?.int("c") ?? -1
+        } catch { throw conflict("prepared DB transaction count unreadable: \(error)") }
+        guard count == prov.transactionsMigrated else {
+            throw conflict("actual transaction count \(count) != provenance \(prov.transactionsMigrated)")
+        }
+        if let e = expectedCount, count != e { throw conflict("transaction count != freshly-migrated count") }
+
+        return ValidatedArtifact(preparedDBIdentity: identity, transactionsMigrated: count, provenance: prov)
     }
 
     // MARK: - Normalize + migrate (on the private copy only)
@@ -337,27 +389,13 @@ public struct PreparedImportRunner {
         }
     }
 
-    private static func assertArtifactEntrySet(_ dir: URL, dbName: String) throws {
-        let h = try DirectoryHandle.open(at: dir)
-        let entries = Set(try h.entryNames())
-        guard entries == [dbName, "provenance.json"] else {
-            throw PreparedRunFailure.publishFailed("artifact attempt is \(entries.sorted()), expected exactly [\(dbName), provenance.json]")
+    /// The `preparedRoot` PATH must still refer to the very directory `root` is bound to — same
+    /// device+inode, a real directory (not a symlink or a substituted tree). Guards against a
+    /// root-path swap between binding and publish.
+    private static func assertStillBound(_ root: DirectoryHandle, path: URL) throws {
+        guard let fp = try FileFingerprint.capture(at: path), fp.isDirectory,
+              fp.device == root.device, fp.inode == root.inode else {
+            throw PreparedRunFailure.publishFailed("preparedRoot path no longer refers to the bound directory (swapped)")
         }
-    }
-
-    /// Atomic, exclusive, same-directory rename via `renameatx_np(RENAME_EXCL)`. Both names are
-    /// resolved relative to the SAME `preparedRoot` descriptor, so the rename is guaranteed
-    /// same-volume and atomic; RENAME_EXCL means it NEVER overwrites an existing destination.
-    /// Returns false iff the destination already exists (EEXIST/ENOTEMPTY).
-    private static func exclusiveRename(inDir dir: URL, from: String, to: String) throws -> Bool {
-        let d = try DirectoryHandle.open(at: dir)
-        let RENAME_EXCL_FLAG: UInt32 = 0x0004   // <sys/stdio.h> RENAME_EXCL
-        let rc = from.withCString { f in to.withCString { t in
-            renameatx_np(d.fd, f, d.fd, t, RENAME_EXCL_FLAG)
-        } }
-        if rc == 0 { return true }
-        let e = errno
-        if e == EEXIST || e == ENOTEMPTY { return false }
-        throw PreparedRunFailure.publishFailed("renameatx_np(RENAME_EXCL) failed: errno \(e)")
     }
 }
