@@ -63,10 +63,11 @@ public struct PreparedImport {
     public let importID: ImportID
     /// LOCATION HINT for the prepared DB inside the published artifact
     /// (`preparedRoot/import-<id>/sololedger.db`), DELETE-journal, no sidecars. For display /
-    /// logging / locating ONLY — NEVER a trust input: it is a path and could be redirected by a
-    /// component swap. Every security-sensitive read MUST go through `artifactHandle` (the
-    /// bound inode). The runner only returns this URL after confirming it still resolves to the
-    /// same inode as `artifactHandle`.
+    /// logging / locating ONLY — NEVER a trust input: it is a path and can be redirected by a
+    /// component swap at ANY moment. The runner checks, at return time, that the path resolved
+    /// to the same inode as `artifactHandle` — a POINT-IN-TIME check only; nothing keeps the
+    /// path bound afterwards, so no consumer may treat this URL as verified. Every
+    /// security-sensitive read MUST go through `artifactHandle` (the bound inode).
     public let preparedDatabaseURL: URL
     public let preparedDBIdentity: String
     public let manifest: ImportManifest
@@ -77,6 +78,12 @@ public struct PreparedImport {
     /// The bound (O_NOFOLLOW|O_DIRECTORY, dev+inode) descriptor for the published artifact dir.
     /// Survives the publish rename (an fd tracks the inode, not the name), so the coordinator
     /// can read the prepared DB / provenance through it without re-resolving the path.
+    ///
+    /// CONTRACT for the future coordinator: it must live inside SoloLedgerCore, or Core must
+    /// grow descriptor-bound operations built on this handle for it to call. This property is
+    /// `internal` ON PURPOSE — code outside Core (the App module) must NOT respond to that by
+    /// falling back to trusting `preparedDatabaseURL`, and the raw fd is deliberately never
+    /// exposed.
     let artifactHandle: DirectoryHandle
 
     init(importID: ImportID, preparedDatabaseURL: URL, preparedDBIdentity: String,
@@ -127,21 +134,28 @@ struct RunnerHooks {
 /// presence, NOT full per-column DDL: a same-UID racer could substitute a DB with the right
 /// table names but wrong columns — that is left in the registered same-UID residual below
 /// (verifying byte-exact DDL would false-reject legitimate Electron-authored v23 imports, whose
-/// CREATE text need not match the Swift port's).
+/// CREATE text need not match the Swift port's). A per-column schema contract is a REGISTERED
+/// FOLLOW-UP: it requires a separate read-only analysis over real Electron v23 fixtures and a
+/// compatibility matrix before any tightening decision — do not extend the gate ad hoc.
 ///
 /// RESIDUAL (deliberately NOT called "fully" atomic): `renameatx_np` resolves its SOURCE by
 /// NAME relative to the bound root, and Darwin offers no rename-by-fd nor a way to re-link a
 /// directory by fd (`linkat` cannot hardlink directories), so the `fingerprint(artName) →
 /// rename` step has an irreducible window in which a same-UID process could swap `artName`.
-/// It is bounded on both sides — an early pre-rename fingerprint abort, and an AUTHORITATIVE
+/// It is bounded on both sides — an early pre-rename fingerprint abort, and a POINT-IN-TIME
 /// post-publish check (`assertPublishedIsArt`) that the published entry resolves to the bound,
-/// validated artifact inode, else fail closed — and the artifact is carried forward as a BOUND
-/// descriptor so a coordinator never re-trusts the path. Cleanup of a failed attempt is keyed
-/// on that same bound handle (`removeBoundChildDir`), never on the re-resolved name, so a
-/// planted same-named replacement is never enumerated or deleted. Exploiting the rename gap
-/// requires code running as the SAME user inside the process-private 0700 container racing
-/// between two adjacent syscalls; such an attacker can already tamper with the data directly,
-/// so this window is defense-in-depth, not a privilege boundary.
+/// validated artifact inode, else fail closed. That check detects a swap that has ALREADY
+/// happened; it cannot exclude one after it returns (a path lookup cannot be pinned), which is
+/// why the artifact is carried forward as a BOUND descriptor and the public URL stays a hint.
+/// Cleanup of a failed attempt is keyed on that same bound handle (`removeBoundChildDir`) and
+/// unlinks ONLY the runner's own known files — never an enumeration, so an entry the runner
+/// did not create is never deleted; if one remains, the rmdir fails and the leftover is reaper
+/// residue. THREAT-MODEL PRECONDITION (not verified by this code): `run` accepts arbitrary
+/// URLs and does NOT check that `preparedRoot` / `workingDirectory` live in a process-private
+/// (0700) container — placing them there is the caller's contract; only the artifact attempt
+/// itself is created 0700. Within that precondition, exploiting these gaps requires same-UID
+/// code racing between adjacent syscalls — code that could already tamper with the data
+/// directly — so the windows are defense-in-depth, not a privilege boundary.
 public struct PreparedImportRunner {
     public init() {}
 
@@ -203,9 +217,11 @@ public struct PreparedImportRunner {
         do { art = try root.makeChildDirectory(named: artName) }
         catch { throw PreparedRunFailure.publishFailed("artifact attempt create: \(error)") }
         var artPublished = false
-        // Cleanup keyed on the BOUND `art` handle, never re-resolving `artName` (which could
-        // bind a swapped-in replacement). See DirectoryHandle.removeBoundChildDir.
-        defer { if !artPublished { root.removeBoundChildDir(art, named: artName) } }
+        // Cleanup keyed on the BOUND `art` handle and limited to the runner's OWN files: never
+        // re-resolving `artName` (which could bind a swapped-in replacement) and never
+        // enumerating — an entry the runner did not create is never deleted; if one is present
+        // the rmdir fails and the attempt is left as reaper residue. See removeBoundChildDir.
+        defer { if !artPublished { root.removeBoundChildDir(art, named: artName, knownEntries: [dbName, "provenance.json"]) } }
 
         do {
             let workHandle = try DirectoryHandle.open(at: workAttempt)
@@ -237,9 +253,10 @@ public struct PreparedImportRunner {
         //    rename-by-fd, and a directory cannot be re-linked by fd (linkat), so the
         //    fingerprint→rename step is NOT atomic: a same-UID racer could swap `artName` in
         //    that sub-microsecond gap. The pre-rename fingerprint is an early abort for swaps
-        //    that ALREADY happened; the AUTHORITATIVE guard is the POST-rename check below —
-        //    the published entry must resolve to the bound, validated artifact inode, else we
-        //    fail closed. See the type doc for the registered residual window.
+        //    that ALREADY happened; the decisive gate on the publish OUTCOME is the
+        //    point-in-time POST-rename check below — the published entry must resolve to the
+        //    bound, validated artifact inode, else we fail closed. See the type doc for the
+        //    registered residual window.
         try Self.assertStillBound(root, path: preparedRoot)
         guard let artFP = try root.fingerprint(named: artName), artFP.isDirectory,
               artFP.device == art.device, artFP.inode == art.inode else {
@@ -252,13 +269,15 @@ public struct PreparedImportRunner {
         if published {
             artPublished = true; workDone = true
             try? fm.removeItem(at: workAttempt)
-            // Authoritative post-publish verification (blockers B/D): the published entry MUST
-            // be the very inode we built and validated, and the root path MUST still be the
-            // bound root — else a source-name swap won the rename window; fail closed.
+            // Point-in-time post-publish verification (blockers B/D): the published entry MUST
+            // — at this instant — be the very inode we built and validated, and the root path
+            // MUST still be the bound root; else a source-name swap won the rename window and
+            // we fail closed.
             try Self.assertPublishedIsArt(root: root, importName: importName, art: art, preparedRoot: preparedRoot)
             try hooks.afterPublish?(finalURL)                      // crash-simulation window
-            // Re-verify AFTER the crash-sim window too, so a swap there can never let us return
-            // a PreparedImport whose public URL points at a different object than `art`.
+            // Re-check AFTER the crash-sim window so a swap performed IN that window is
+            // detected and fails closed. This does not pin the path — after this check the URL
+            // is still only a hint; consumers must use `artifactHandle`.
             try Self.assertPublishedIsArt(root: root, importName: importName, art: art, preparedRoot: preparedRoot)
             return PreparedImport(importID: gated.importID, preparedDatabaseURL: finalURL.appendingPathComponent(dbName),
                                   preparedDBIdentity: validated.preparedDBIdentity, manifest: gated.manifest, gated: gated,
@@ -290,10 +309,11 @@ public struct PreparedImportRunner {
         let validated = try validateArtifact(art, gated: gated, expectedIdentity: nil, expectedCount: nil,
                                              workingDirectory: workingDirectory)
         // Validation ran entirely through `art`'s fd; the PUBLIC URL, however, is rebuilt from
-        // the path. Before handing it back, confirm the root path still binds to `root` AND
-        // `importName` still resolves to the very inode we validated — so the returned URL
-        // cannot point at object B while `artifactHandle` is object A. (Security-sensitive
-        // reads must still use `artifactHandle`; the URL is a location hint only.)
+        // the path. Before handing it back, confirm — at this instant — that the root path
+        // still binds to `root` AND `importName` still resolves to the very inode we validated,
+        // catching a URL that ALREADY points at a different object than `artifactHandle`. The
+        // check cannot pin the path afterwards: the URL stays an untrusted hint and
+        // security-sensitive reads must use `artifactHandle`.
         try assertPublishedIsArt(root: root, importName: importName, art: art, preparedRoot: preparedRoot)
         let dbURL = preparedRoot.appendingPathComponent(importName, isDirectory: true).appendingPathComponent(AppPaths.databaseFileName)
         return PreparedImport(importID: gated.importID, preparedDatabaseURL: dbURL,
@@ -357,8 +377,10 @@ public struct PreparedImportRunner {
         // mode is already enforced by PreparedDatabaseIdentity.compute above.) This proves table
         // PRESENCE, not per-column DDL — a right-names/wrong-columns substitution is the
         // registered same-UID residual (see the type doc); byte-exact DDL is deliberately NOT
-        // required so legitimate Electron-authored v23 imports are not false-rejected. Every
-        // check runs on the private verify copy taken no-follow THROUGH the bound artifact fd.
+        // required so legitimate Electron-authored v23 imports are not false-rejected. A
+        // per-column contract is a registered follow-up gated on a separate read-only analysis
+        // with real Electron v23 fixtures — do not tighten here. Every check runs on the
+        // private verify copy taken no-follow THROUGH the bound artifact fd.
         let count: Int
         do {
             let db = try SQLiteDatabase(path: verifyDB.path, mode: .readOnly)
@@ -466,12 +488,13 @@ public struct PreparedImportRunner {
         }
     }
 
-    /// Authoritative post-publish / pre-return check: `importName` under the bound `root` MUST
+    /// POINT-IN-TIME post-publish / pre-return check: `importName` under the bound `root` must
     /// resolve (device+inode) to the artifact handle we built and validated, AND the root PATH
-    /// must still be the bound root. This is what closes out the publish rename's non-atomic
-    /// source-name window and any post-publish swap: it verifies the ACTUAL OUTCOME against the
-    /// bound handle rather than re-checking a name before an action, so a swapped-in impostor
-    /// (or a redirected root path) fails closed instead of being returned as ours.
+    /// must still be the bound root. It verifies the publish OUTCOME against the bound handle —
+    /// a swap that ALREADY happened (the rename's source-name window, or a tamper inside a test
+    /// hook window) fails closed instead of being returned as ours. It does NOT — and on a
+    /// path-based filesystem cannot — guarantee the path stays bound after it returns; the URL
+    /// remains an untrusted hint and consumers must use `artifactHandle`.
     private static func assertPublishedIsArt(root: DirectoryHandle, importName: String,
                                              art: DirectoryHandle, preparedRoot: URL) throws {
         try assertStillBound(root, path: preparedRoot)

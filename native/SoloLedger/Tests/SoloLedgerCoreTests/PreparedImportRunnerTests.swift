@@ -375,6 +375,9 @@ final class PreparedImportRunnerTests: LedgerTestCase {
 
     /// Tampering the ARTIFACT ATTEMPT during beforePublish (after build, before the final gate)
     /// must fail closed — the gate re-verifies the whole artifact THROUGH the bound descriptor.
+    /// Cleanup removes only the runner's OWN files: for the "extra entry" case the unknown
+    /// entry is preserved and the attempt stays behind as reaper residue (cleanup never
+    /// enumerates); every other case leaves no attempt.
     func testArtifactAttemptTamperDuringBeforePublishFailsClosed() throws {
         let cases: [(String, (URL) throws -> Void)] = [
             ("db append", { art in
@@ -407,7 +410,18 @@ final class PreparedImportRunnerTests: LedgerTestCase {
                 }
             }
             XCTAssertFalse(fm.fileExists(atPath: artifactDir(prep, id).path), "\(label): must not publish")
-            XCTAssertEqual(attemptsLeft(prep, ".artifact-"), [], "\(label): attempt cleaned")
+            if label == "extra entry" {
+                // Cleanup unlinks only the runner's OWN files (db + provenance); the unknown
+                // entry is never deleted, the rmdir fails, the attempt is reaper residue.
+                let residue = attemptsLeft(prep, ".artifact-")
+                XCTAssertEqual(residue.count, 1, "extra entry: attempt left for the reaper")
+                if let r = residue.first {
+                    XCTAssertEqual(Set(try fm.contentsOfDirectory(atPath: prep.appendingPathComponent(r).path)),
+                                   ["stray.txt"], "extra entry: own files removed, unknown entry preserved")
+                }
+            } else {
+                XCTAssertEqual(attemptsLeft(prep, ".artifact-"), [], "\(label): attempt cleaned")
+            }
         }
     }
 
@@ -448,14 +462,47 @@ final class PreparedImportRunnerTests: LedgerTestCase {
                        "the replacement must never be promoted to a published artifact")
     }
 
-    // MARK: - Post-publish outcome is verified against the bound handle (2B-3 C7, blockers B/D)
+    // MARK: - Cleanup unlinks ONLY runner-owned files; unknowns are reaper residue (2B-3 C8)
 
-    /// The published `import-<id>` entry is swapped for a DIFFERENT directory during the
-    /// afterPublish (crash-simulation) window. The authoritative post-publish check re-verifies
-    /// the published entry against the BOUND artifact inode, so the runner fails closed and never
-    /// returns a PreparedImport whose public URL would point at object B while the handle
-    /// validated object A.
-    func testPublishedEntrySwapAfterPublishFailsClosedNeverReturnsMismatchedURL() throws {
+    /// C8: attempt cleanup never enumerates — it unlinks only the runner's OWN known files
+    /// (sololedger.db, provenance.json) through the bound handle. An UNKNOWN sentinel planted
+    /// inside the REAL bound attempt must survive cleanup byte-for-byte, the attempt dir must
+    /// remain (rmdir fails ENOTEMPTY → reaper residue, never force-deleted), and nothing may
+    /// be published.
+    func testUnknownEntryInAttemptSurvivesCleanupAttemptLeftForReaper() throws {
+        let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
+        let prep = try preparedRoot(); let work = try workingRoot()
+        let sentinel = Data("UNKNOWN-SENTINEL-must-survive".utf8)
+        var attemptURL: URL?
+        let hooks = RunnerHooks(beforePublish: { _ in
+            let art = prep.appendingPathComponent(try self.currentArtifactAttemptName(prep))
+            try sentinel.write(to: art.appendingPathComponent("sentinel.bin"))
+            attemptURL = art
+        })
+        XCTAssertThrowsError(try PreparedImportRunner().run(gated, workingDirectory: work, preparedRoot: prep, hooks: hooks)) { e in
+            switch e {
+            case PreparedRunFailure.preparedPublishConflict, PreparedRunFailure.publishFailed: break
+            default: XCTFail("got \(e)")
+            }
+        }
+        let art = try XCTUnwrap(attemptURL)
+        XCTAssertTrue(fm.fileExists(atPath: art.path), "attempt dir must remain as reaper residue, never force-deleted")
+        XCTAssertEqual(try Data(contentsOf: art.appendingPathComponent("sentinel.bin")), sentinel,
+                       "unknown sentinel must survive cleanup byte-for-byte")
+        XCTAssertEqual(Set(try fm.contentsOfDirectory(atPath: art.path)), ["sentinel.bin"],
+                       "runner's own files removed; only the unknown entry remains")
+        XCTAssertFalse(fm.fileExists(atPath: artifactDir(prep, id).path), "must not publish")
+    }
+
+    // MARK: - Publish outcome re-checked against the bound handle (2B-3 C7/C8, blockers B/D)
+
+    /// The published `import-<id>` entry is swapped for a DIFFERENT directory inside the
+    /// afterPublish (crash-simulation) test window. The POINT-IN-TIME post-publish re-check
+    /// detects this DETERMINISTIC swap and fails closed, so this run does not hand back a URL
+    /// that — at check time — pointed at the impostor. This test does NOT claim races after
+    /// the final check are eliminated (a path cannot be pinned); consumers must use the bound
+    /// artifactHandle.
+    func testDeterministicSwapInAfterPublishWindowDetectedFailsClosed() throws {
         let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
         let prep = try preparedRoot(); let work = try workingRoot()
         let hooks = RunnerHooks(afterPublish: { finalURL in

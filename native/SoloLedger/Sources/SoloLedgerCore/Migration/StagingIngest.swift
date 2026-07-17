@@ -278,23 +278,25 @@ final class DirectoryHandle {
         complete = true
     }
 
-    /// Create a DIRECT child directory (mkdirat, 0700) and return a bound handle to THAT SAME
-    /// object — so an entire artifact can be assembled and published relative to ONE root fd,
-    /// immune to a swap of the root path.
+    /// Create a DIRECT child directory (mkdirat, 0700) and return a bound handle to ONE
+    /// consistent object at that name — so an entire artifact can be assembled and published
+    /// relative to ONE root fd, immune to a swap of the root path.
     ///
     /// `mkdirat` + openat-by-name is NOT atomic on Darwin (there is no mkdirat that returns an
-    /// fd), so a same-UID racer could rmdir our new dir and plant a replacement at `name` in
-    /// the gap. We therefore CAPTURE the identity (device+inode) of the dir we just created and
-    /// bind against it: the returned handle MUST be that same object (else fail closed rather
-    /// than adopt a replacement), and the bind-failure cleanup removes ONLY that object (only
-    /// when `name` still resolves to it), never a foreign substitution. The residual
-    /// mkdirat→fstatat sub-gap is the module's registered same-UID window (see PreparedImportRunner).
+    /// fd). We fingerprint `name` immediately after mkdirat and require every later step — the
+    /// bind and the bind-failure cleanup — to match that fingerprint, so they all act on the
+    /// SAME object. HONEST LIMIT: that fingerprint is the FIRST OBSERVED inode at the name,
+    /// not proof it is the inode mkdirat created — a same-UID racer swapping inside the
+    /// mkdirat→fstatat sub-gap would be observed (and consistently bound and cleaned) as if it
+    /// were ours. That sub-gap is a registered same-UID residual (see PreparedImportRunner);
+    /// its consequence is bounded downstream by O_EXCL creates and the full pre-publish
+    /// validation of the artifact contents.
     func makeChildDirectory(named name: String) throws -> DirectoryHandle {
         guard mkdirat(fd, name, 0o700) == 0 else {
             throw FileHashError.destinationUnwritable(path: pathHint + "/" + name, errno: errno)
         }
-        // Identity of the dir we just created. If it already vanished / was retyped, it is not
-        // ours to clean — leave whatever is there and fail closed.
+        // First OBSERVED identity at the name (see doc — not proof mkdirat created it). If it
+        // already vanished / was retyped, it is not ours to clean — leave it and fail closed.
         guard let created = try? fingerprint(named: name), created.isDirectory else {
             throw FileHashError.destinationUnwritable(path: pathHint + "/" + name, errno: ENOENT)
         }
@@ -302,8 +304,8 @@ final class DirectoryHandle {
         do {
             child = try subdirectory(named: name)
         } catch {
-            // Bind failed after mkdirat succeeded — remove ONLY our own created dir, i.e. only
-            // when `name` STILL resolves (device+inode) to the object we made; a substitution
+            // Bind failed after mkdirat succeeded — remove ONLY the first-observed object, i.e.
+            // only when `name` STILL resolves (device+inode) to it; a later substitution
             // (foreign dir, symlink, file) is left untouched.
             if let now = try? fingerprint(named: name), now.isDirectory,
                now.device == created.device, now.inode == created.inode {
@@ -312,9 +314,9 @@ final class DirectoryHandle {
             throw error
         }
         guard child.device == created.device, child.inode == created.inode else {
-            // The bound handle is NOT the dir we created — swapped in the mkdirat→openat gap.
-            // Do not touch `name` (it is a replacement, not ours); fail closed. `child` closes
-            // on deinit.
+            // The bound handle does NOT match the first-observed fingerprint — swapped in the
+            // fstatat→openat gap. Do not touch `name` (not observably ours); fail closed.
+            // `child` closes on deinit.
             throw FileHashError.destinationUnwritable(path: pathHint + "/" + name, errno: EEXIST)
         }
         return child
@@ -350,24 +352,26 @@ final class DirectoryHandle {
     /// Best-effort cleanup of an attempt directory we CREATED and still hold a BOUND handle
     /// to (`child`). The vulnerability this avoids: re-resolving `name` (openat/subdirectory)
     /// could bind a DIFFERENT object — an attacker who moved our real attempt away and planted
-    /// a same-named replacement — and then enumerate + unlink the REPLACEMENT's contents.
+    /// a same-named replacement — and then delete the REPLACEMENT's contents.
     ///
-    /// Instead the contents are cleared strictly THROUGH the bound `child` fd (entries are
-    /// enumerated and unlinked relative to the inode we created, never via the name), so a
-    /// replacement can never be touched. The directory ENTRY is removed from THIS directory
-    /// ONLY if `name` STILL resolves (device+inode) to that same bound `child`; if it now
-    /// points at a different object the entry is LEFT for a future reaper — we fail closed
-    /// rather than rmdir a replacement. The dir-type check keeps AT_REMOVEDIR from following a
-    /// substituted symlink. The only irreducible residual: `unlinkat(AT_REMOVEDIR)` re-resolves
-    /// `name` independently of the fingerprint, so in the fingerprint→rmdir gap a same-UID racer
-    /// could rename ANY empty dir onto `name` and have it removed (AT_REMOVEDIR only ever removes
-    /// an EMPTY dir — never data). That is no worse than the publish rename's window and stays
-    /// inside the process-private 0700 container.
-    func removeBoundChildDir(_ child: DirectoryHandle, named name: String) {
-        for entry in (try? child.entryNames()) ?? [] { unlinkat(child.fd, entry, 0) }
+    /// Deliberately scope-limited on BOTH axes: unlinks go strictly THROUGH the bound `child`
+    /// fd (never via the name), and ONLY the caller's own `knownEntries` are unlinked — the
+    /// directory is NEVER enumerated, so an entry this caller did not create is never deleted,
+    /// whatever it is. The directory ENTRY is then removed from THIS directory only if `name`
+    /// STILL resolves (device+inode) to that same bound `child`; if unknown entries remain the
+    /// AT_REMOVEDIR simply fails (ENOTEMPTY) and the leftover is reaper residue, and if `name`
+    /// points at a different object it is LEFT untouched. The dir-type check keeps AT_REMOVEDIR
+    /// from following a substituted symlink. Irreducible residual: `unlinkat(AT_REMOVEDIR)`
+    /// re-resolves `name` independently of the fingerprint, so in the fingerprint→rmdir gap a
+    /// same-UID racer could rename ANY empty dir onto `name` and have it removed (an empty dir
+    /// only — never data). Same-UID threat model throughout; the private placement of the
+    /// parent directory is a CALLER precondition (see PreparedImportRunner), not something this
+    /// code verifies.
+    func removeBoundChildDir(_ child: DirectoryHandle, named name: String, knownEntries: [String]) {
+        for entry in knownEntries { unlinkat(child.fd, entry, 0) }   // ENOENT fine (not yet created)
         guard let fp = try? fingerprint(named: name), fp.isDirectory,
               fp.device == child.device, fp.inode == child.inode else { return }
-        _ = unlinkat(fd, name, AT_REMOVEDIR)   // Darwin AT_REMOVEDIR == 0x0080
+        _ = unlinkat(fd, name, AT_REMOVEDIR)   // AT_REMOVEDIR == 0x0080; ENOTEMPTY ⇒ reaper residue
     }
 }
 
