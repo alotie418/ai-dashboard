@@ -347,6 +347,11 @@ final class PreparedImportRunnerTests: LedgerTestCase {
         try XCTUnwrap(fm.contentsOfDirectory(atPath: prep.path).first { $0.hasPrefix(".artifact-") })
     }
 
+    /// The current runner-private work-area name (`.prep-*` / `.verify-*`) inside a work dir.
+    private func currentWorkName(_ work: URL, _ prefix: String) throws -> String {
+        try XCTUnwrap(fm.contentsOfDirectory(atPath: work.path).first { $0.hasPrefix(prefix) })
+    }
+
     /// The preparedRoot PATH is replaced with a DIFFERENT real directory (holding a same-named
     /// empty impostor attempt) during beforePublish. Because the runner bound preparedRoot once
     /// and re-verifies its inode before publishing, it fails closed and the impostor is NEVER
@@ -582,6 +587,277 @@ final class PreparedImportRunnerTests: LedgerTestCase {
                 guard case PreparedRunFailure.preparedPublishConflict = e else { return XCTFail("\(label): got \(e)") }
             }
         }
+    }
+
+    // MARK: - Work/verify areas are two-layer bound around every path-based step (2B-3 C9)
+
+    /// W1 — CHILD swap of the `.prep` attempt (holding a VALID DB + sentinel) after the copy
+    /// but before SQLite opens. B1's child layer fails closed with `.workAreaSwapped` BEFORE
+    /// SQLite touches anything, so the impostor DB is never opened/migrated (bytes identical),
+    /// the sentinel is untouched, nothing is published.
+    func testWorkAttemptChildSwapBeforeMigrateFailsClosedImpostorUntouched() throws {
+        let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
+        let prep = try preparedRoot(); let work = try workingRoot()
+        let validDB = try makeSQLiteDB(userVersion: 0, named: "impostorW1.db")
+        let sentinel = Data("WORK-CHILD-SENTINEL".utf8)
+        var replacement: URL?
+        let hooks = RunnerHooks(afterCopy: { _ in
+            let name = try self.currentWorkName(work, ".prep-")
+            let aside = try self.trackedTempDir().appendingPathComponent("real-prep-aside", isDirectory: true)
+            try self.fm.moveItem(at: work.appendingPathComponent(name), to: aside)
+            let planted = work.appendingPathComponent(name)
+            try self.fm.createDirectory(at: planted, withIntermediateDirectories: false)
+            try self.fm.copyItem(at: validDB, to: planted.appendingPathComponent("sololedger.db"))
+            try sentinel.write(to: planted.appendingPathComponent("sentinel"))
+            replacement = planted
+        })
+        XCTAssertThrowsError(try PreparedImportRunner().run(gated, workingDirectory: work, preparedRoot: prep, hooks: hooks)) { e in
+            guard case PreparedRunFailure.workAreaSwapped = e else { return XCTFail("got \(e)") }
+        }
+        let planted = try XCTUnwrap(replacement)
+        XCTAssertEqual(try Data(contentsOf: planted.appendingPathComponent("sololedger.db")), try Data(contentsOf: validDB),
+                       "impostor DB must be byte-identical — SQLite never opened it")
+        XCTAssertEqual(try? Data(contentsOf: planted.appendingPathComponent("sentinel")), sentinel)
+        XCTAssertFalse(fm.fileExists(atPath: artifactDir(prep, id).path), "must not publish")
+    }
+
+    /// WR1 — the ENTIRE workingDirectory is swapped for a replacement root carrying a same-named
+    /// `.prep` child with a VALID DB + sentinel. B1's ROOT-PATH layer must fail closed; the
+    /// child-relative layer alone would pass (the real child moved WITH the old root, still
+    /// reachable via the bound work-root fd), so without the root layer SQLite would open the
+    /// impostor under the replacement root.
+    func testWorkingDirectorySwapBeforeMigrateFailsClosedImpostorUntouched() throws {
+        let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
+        let prep = try preparedRoot(); let work = try workingRoot()
+        let validDB = try makeSQLiteDB(userVersion: 0, named: "impostorWR1.db")
+        let sentinel = Data("WORK-ROOT-SENTINEL".utf8)
+        var plantedName: String?
+        let hooks = RunnerHooks(afterCopy: { _ in
+            let name = try self.currentWorkName(work, ".prep-"); plantedName = name
+            let newRoot = try self.trackedTempDir().appendingPathComponent("swapped-work-root", isDirectory: true)
+            let child = newRoot.appendingPathComponent(name, isDirectory: true)
+            try self.fm.createDirectory(at: child, withIntermediateDirectories: true)
+            try self.fm.copyItem(at: validDB, to: child.appendingPathComponent("sololedger.db"))
+            try sentinel.write(to: child.appendingPathComponent("sentinel"))
+            let aside = try self.trackedTempDir().appendingPathComponent("orig-work-root", isDirectory: true)
+            try self.fm.moveItem(at: work, to: aside)          // swap the whole workingDirectory PATH
+            try self.fm.moveItem(at: newRoot, to: work)
+        })
+        XCTAssertThrowsError(try PreparedImportRunner().run(gated, workingDirectory: work, preparedRoot: prep, hooks: hooks)) { e in
+            guard case PreparedRunFailure.workAreaSwapped = e else { return XCTFail("got \(e)") }
+        }
+        let child = work.appendingPathComponent(try XCTUnwrap(plantedName))
+        XCTAssertEqual(try Data(contentsOf: child.appendingPathComponent("sololedger.db")), try Data(contentsOf: validDB),
+                       "impostor DB under the swapped root must be byte-identical (never opened)")
+        XCTAssertEqual(try? Data(contentsOf: child.appendingPathComponent("sentinel")), sentinel)
+        XCTAssertFalse(fm.fileExists(atPath: artifactDir(prep, id).path), "must not publish")
+    }
+
+    /// W4 — CHILD swap BEFORE the fd→fd copy-in. The copy MUST land in the bound attempt
+    /// handle, so the replacement never receives a DB; B1 then fails closed.
+    func testWorkAttemptCopyInLandsInBoundHandleNotReplacement() throws {
+        let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
+        let prep = try preparedRoot(); let work = try workingRoot()
+        let sentinel = Data("W4-SENTINEL".utf8)
+        var replacement: URL?
+        let hooks = RunnerHooks(afterWorkAttemptCreated: { _ in
+            let name = try self.currentWorkName(work, ".prep-")
+            let aside = try self.trackedTempDir().appendingPathComponent("w4-aside", isDirectory: true)
+            try self.fm.moveItem(at: work.appendingPathComponent(name), to: aside)
+            let planted = work.appendingPathComponent(name)
+            try self.fm.createDirectory(at: planted, withIntermediateDirectories: false)
+            try sentinel.write(to: planted.appendingPathComponent("sentinel"))   // NO sololedger.db
+            replacement = planted
+        })
+        XCTAssertThrowsError(try PreparedImportRunner().run(gated, workingDirectory: work, preparedRoot: prep, hooks: hooks)) { e in
+            guard case PreparedRunFailure.workAreaSwapped = e else { return XCTFail("got \(e)") }
+        }
+        let planted = try XCTUnwrap(replacement)
+        XCTAssertFalse(fm.fileExists(atPath: planted.appendingPathComponent("sololedger.db").path),
+                       "fd→fd copy-in must land in the bound attempt, not the replacement")
+        XCTAssertEqual(try? Data(contentsOf: planted.appendingPathComponent("sentinel")), sentinel)
+        XCTAssertFalse(fm.fileExists(atPath: artifactDir(prep, id).path))
+    }
+
+    /// W2 — an UNKNOWN entry inside the real bound attempt survives cleanup (cleanup unlinks
+    /// only the runner's own names, never enumerates); the attempt is reaper residue.
+    func testWorkAttemptUnknownEntrySurvivesCleanupResidueLeft() throws {
+        let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
+        let prep = try preparedRoot(); let work = try workingRoot()
+        let sentinel = Data("WORK-UNKNOWN".utf8)
+        var attemptURL: URL?
+        let hooks = RunnerHooks(afterCopy: { _ in
+            let a = work.appendingPathComponent(try self.currentWorkName(work, ".prep-"))
+            try sentinel.write(to: a.appendingPathComponent("unknown.bin"))
+            attemptURL = a
+        })
+        XCTAssertThrowsError(try PreparedImportRunner().run(gated, workingDirectory: work, preparedRoot: prep, hooks: hooks)) { e in
+            guard case PreparedRunFailure.notQuiescent = e else { return XCTFail("got \(e)") }
+        }
+        let a = try XCTUnwrap(attemptURL)
+        XCTAssertTrue(fm.fileExists(atPath: a.path), "attempt residue must remain for the reaper")
+        XCTAssertEqual(try Data(contentsOf: a.appendingPathComponent("unknown.bin")), sentinel, "unknown entry survives cleanup")
+        XCTAssertFalse(fm.fileExists(atPath: artifactDir(prep, id).path))
+    }
+
+    /// W3 — a DIRECTORY planted at a sidecar name is never recursively deleted: dropSidecars
+    /// uses removeNonDirectoryChild (fails closed on a dir), so the planted dir + its contents
+    /// stay intact and the run fails `.notQuiescent`.
+    func testSidecarNameOccupiedByDirectoryFailsClosedNeverRecursed() throws {
+        let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
+        let prep = try preparedRoot(); let work = try workingRoot()
+        var shmDir: URL?
+        let hooks = RunnerHooks(afterCopy: { _ in
+            // -shm is untouched by DELETE-mode migration, so this reaches dropSidecars.
+            let dir = work.appendingPathComponent(try self.currentWorkName(work, ".prep-")).appendingPathComponent("sololedger.db-shm", isDirectory: true)
+            try self.fm.createDirectory(at: dir, withIntermediateDirectories: false)
+            try Data("inner".utf8).write(to: dir.appendingPathComponent("inner.txt"))
+            shmDir = dir
+        })
+        XCTAssertThrowsError(try PreparedImportRunner().run(gated, workingDirectory: work, preparedRoot: prep, hooks: hooks)) { e in
+            guard case PreparedRunFailure.notQuiescent = e else { return XCTFail("got \(e)") }
+        }
+        let dir = try XCTUnwrap(shmDir)
+        XCTAssertEqual(try Data(contentsOf: dir.appendingPathComponent("inner.txt")), Data("inner".utf8),
+                       "planted sidecar directory contents must never be recursively deleted")
+        XCTAssertFalse(fm.fileExists(atPath: artifactDir(prep, id).path))
+    }
+
+    /// V2 — CHILD swap of the `.verify` area (holding a BYTE-IDENTICAL valid DB + sentinel)
+    /// during resume's validateArtifact. Even though the impostor would pass identity/schema/
+    /// count, VB1's child layer fails closed; resume neither reuses nor republishes, the winner
+    /// is untouched, and the impostor + sentinel are not cleaned.
+    func testVerifyChildSwapDuringResumeFailsClosedEvenWithValidImpostor() throws {
+        let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
+        let prep = try preparedRoot()
+        _ = try PreparedImportRunner().run(gated, workingDirectory: try workingRoot(), preparedRoot: prep)
+        let art = artifactDir(prep, id)
+        let winnerDB = try Data(contentsOf: art.appendingPathComponent("sololedger.db"))
+        let winnerProv = try Data(contentsOf: art.appendingPathComponent("provenance.json"))
+        let work2 = try workingRoot()
+        let sentinel = Data("VERIFY-CHILD-SENTINEL".utf8)
+        var replacement: URL?
+        let hooks = RunnerHooks(afterVerifyCopy: { _ in
+            let name = try self.currentWorkName(work2, ".verify-")
+            let aside = try self.trackedTempDir().appendingPathComponent("real-verify-aside", isDirectory: true)
+            try self.fm.moveItem(at: work2.appendingPathComponent(name), to: aside)
+            let planted = work2.appendingPathComponent(name)
+            try self.fm.createDirectory(at: planted, withIntermediateDirectories: false)
+            try winnerDB.write(to: planted.appendingPathComponent("sololedger.db"))   // would pass identity/schema/count
+            try sentinel.write(to: planted.appendingPathComponent("sentinel"))
+            replacement = planted
+        })
+        XCTAssertThrowsError(try PreparedImportRunner().run(gated, workingDirectory: work2, preparedRoot: prep, hooks: hooks)) { e in
+            guard case PreparedRunFailure.workAreaSwapped = e else { return XCTFail("got \(e)") }
+        }
+        let planted = try XCTUnwrap(replacement)
+        XCTAssertEqual(try Data(contentsOf: planted.appendingPathComponent("sololedger.db")), winnerDB, "impostor verify DB not cleaned")
+        XCTAssertEqual(try? Data(contentsOf: planted.appendingPathComponent("sentinel")), sentinel)
+        XCTAssertEqual(try Data(contentsOf: art.appendingPathComponent("sololedger.db")), winnerDB, "winner DB untouched")
+        XCTAssertEqual(try Data(contentsOf: art.appendingPathComponent("provenance.json")), winnerProv, "winner provenance untouched")
+    }
+
+    /// VR1 — the whole workingDirectory is swapped during resume's validateArtifact; VB1's
+    /// ROOT-PATH layer must fail closed even though the child-relative layer would pass.
+    func testVerifyRootSwapDuringResumeFailsClosed() throws {
+        let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
+        let prep = try preparedRoot()
+        _ = try PreparedImportRunner().run(gated, workingDirectory: try workingRoot(), preparedRoot: prep)
+        let art = artifactDir(prep, id)
+        let winnerDB = try Data(contentsOf: art.appendingPathComponent("sololedger.db"))
+        let work2 = try workingRoot()
+        let sentinel = Data("VERIFY-ROOT-SENTINEL".utf8)
+        var plantedName: String?
+        let hooks = RunnerHooks(afterVerifyCopy: { _ in
+            let name = try self.currentWorkName(work2, ".verify-"); plantedName = name
+            let newRoot = try self.trackedTempDir().appendingPathComponent("swapped-verify-root", isDirectory: true)
+            let child = newRoot.appendingPathComponent(name, isDirectory: true)
+            try self.fm.createDirectory(at: child, withIntermediateDirectories: true)
+            try winnerDB.write(to: child.appendingPathComponent("sololedger.db"))
+            try sentinel.write(to: child.appendingPathComponent("sentinel"))
+            let aside = try self.trackedTempDir().appendingPathComponent("orig-verify-root", isDirectory: true)
+            try self.fm.moveItem(at: work2, to: aside)
+            try self.fm.moveItem(at: newRoot, to: work2)
+        })
+        XCTAssertThrowsError(try PreparedImportRunner().run(gated, workingDirectory: work2, preparedRoot: prep, hooks: hooks)) { e in
+            guard case PreparedRunFailure.workAreaSwapped = e else { return XCTFail("got \(e)") }
+        }
+        let child = work2.appendingPathComponent(try XCTUnwrap(plantedName))
+        XCTAssertEqual(try Data(contentsOf: child.appendingPathComponent("sololedger.db")), winnerDB, "impostor verify DB under swapped root untouched")
+        XCTAssertEqual(try Data(contentsOf: art.appendingPathComponent("sololedger.db")), winnerDB, "winner untouched")
+    }
+
+    /// V3 — CHILD swap BEFORE the verify fd→fd copy-in: the copy lands in the bound verify
+    /// handle, so the replacement never receives a DB; VB1 then fails closed.
+    func testVerifyCopyInLandsInBoundHandleNotReplacement() throws {
+        let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
+        let prep = try preparedRoot()
+        _ = try PreparedImportRunner().run(gated, workingDirectory: try workingRoot(), preparedRoot: prep)
+        let work2 = try workingRoot()
+        let sentinel = Data("V3-SENTINEL".utf8)
+        var replacement: URL?
+        let hooks = RunnerHooks(afterVerifyDirCreated: { _ in
+            let name = try self.currentWorkName(work2, ".verify-")
+            let aside = try self.trackedTempDir().appendingPathComponent("v3-aside", isDirectory: true)
+            try self.fm.moveItem(at: work2.appendingPathComponent(name), to: aside)
+            let planted = work2.appendingPathComponent(name)
+            try self.fm.createDirectory(at: planted, withIntermediateDirectories: false)
+            try sentinel.write(to: planted.appendingPathComponent("sentinel"))   // NO db
+            replacement = planted
+        })
+        XCTAssertThrowsError(try PreparedImportRunner().run(gated, workingDirectory: work2, preparedRoot: prep, hooks: hooks)) { e in
+            guard case PreparedRunFailure.workAreaSwapped = e else { return XCTFail("got \(e)") }
+        }
+        let planted = try XCTUnwrap(replacement)
+        XCTAssertFalse(fm.fileExists(atPath: planted.appendingPathComponent("sololedger.db").path),
+                       "verify fd→fd copy-in must land in the bound verify dir, not the replacement")
+        XCTAssertEqual(try? Data(contentsOf: planted.appendingPathComponent("sentinel")), sentinel)
+    }
+
+    /// V1 — an UNKNOWN entry inside the real bound verify dir survives cleanup, and the run
+    /// still SUCCEEDS (the sentinel does not affect identity/schema/count on the real verify DB).
+    func testVerifyUnknownEntrySurvivesCleanupRunStillSucceeds() throws {
+        let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
+        let prep = try preparedRoot(); let work = try workingRoot()
+        let sentinel = Data("VERIFY-UNKNOWN".utf8)
+        var verifyURL: URL?
+        let hooks = RunnerHooks(afterVerifyCopy: { _ in
+            let v = work.appendingPathComponent(try self.currentWorkName(work, ".verify-"))
+            try sentinel.write(to: v.appendingPathComponent("unknown.bin"))
+            verifyURL = v
+        })
+        let p = try PreparedImportRunner().run(gated, workingDirectory: work, preparedRoot: prep, hooks: hooks)
+        XCTAssertFalse(p.reusedExisting, "fresh publish")
+        let v = try XCTUnwrap(verifyURL)
+        XCTAssertEqual(try Data(contentsOf: v.appendingPathComponent("unknown.bin")), sentinel, "unknown verify entry survives cleanup")
+        XCTAssertTrue(fm.fileExists(atPath: artifactDir(prep, id).path), "publish still succeeds")
+    }
+
+    /// P1 — removeNonDirectoryChild removes regular files and symlinks (the link, not its
+    /// target) but structurally refuses a directory; ENOENT is a no-op.
+    func testRemoveNonDirectoryChildPrimitive() throws {
+        let dir = try trackedTempDir().appendingPathComponent("nd", isDirectory: true)
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let h = try DirectoryHandle.open(at: dir)
+        try Data("x".utf8).write(to: dir.appendingPathComponent("f.txt"))
+        try h.removeNonDirectoryChild(named: "f.txt")
+        XCTAssertFalse(fm.fileExists(atPath: dir.appendingPathComponent("f.txt").path))
+
+        let target = try trackedTempDir().appendingPathComponent("target.txt")
+        try Data("keep".utf8).write(to: target)
+        try fm.createSymbolicLink(at: dir.appendingPathComponent("l"), withDestinationURL: target)
+        try h.removeNonDirectoryChild(named: "l")
+        XCTAssertFalse(fm.fileExists(atPath: dir.appendingPathComponent("l").path), "the link is removed")
+        XCTAssertEqual(try Data(contentsOf: target), Data("keep".utf8), "the symlink target survives")
+
+        let sub = dir.appendingPathComponent("sub", isDirectory: true)
+        try fm.createDirectory(at: sub, withIntermediateDirectories: false)
+        try Data("inner".utf8).write(to: sub.appendingPathComponent("inner.txt"))
+        XCTAssertThrowsError(try h.removeNonDirectoryChild(named: "sub"), "a directory must be refused")
+        XCTAssertEqual(try Data(contentsOf: sub.appendingPathComponent("inner.txt")), Data("inner".utf8),
+                       "a planted directory's contents are structurally untouchable")
+
+        XCTAssertNoThrow(try h.removeNonDirectoryChild(named: "absent"), "ENOENT is a no-op")
     }
 
     // MARK: - Fault → rollback → retriable; no attempt leak

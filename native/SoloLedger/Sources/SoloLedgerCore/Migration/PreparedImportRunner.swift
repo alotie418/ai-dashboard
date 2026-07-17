@@ -13,6 +13,10 @@ public enum PreparedRunFailure: Error, CustomStringConvertible, Equatable {
     case identityFailed(String)
     case publishFailed(String)
     case preparedPublishConflict(String)
+    /// A runner-private work area (`.prep-*` / `.verify-*`) — or the workingDirectory path
+    /// above it — no longer resolves to the handles bound at creation. Detected by the
+    /// two-layer point-in-time gates around every path-trusting (SQLite/identity) step.
+    case workAreaSwapped(String)
 
     public var description: String {
         switch self {
@@ -26,6 +30,7 @@ public enum PreparedRunFailure: Error, CustomStringConvertible, Equatable {
         case .identityFailed(let m): return "Computing the prepared database identity failed: \(m)"
         case .publishFailed(let m): return "Publishing the prepared artifact failed: \(m)"
         case .preparedPublishConflict(let m): return "A prepared artifact for this import already exists but does not match this snapshot: \(m)"
+        case .workAreaSwapped(let m): return "A runner-private work area was swapped underneath the runner (failing closed): \(m)"
         }
     }
 }
@@ -102,16 +107,24 @@ public struct PreparedImport {
 
 /// Test-only fault seams (internal, no-op by default).
 struct RunnerHooks {
+    var afterWorkAttemptCreated: ((URL) throws -> Void)? // .prep created+bound, BEFORE DB copy-in
     var afterCopy: ((URL) throws -> Void)?               // working attempt, after DB(+WAL) copied
     var beforeMigrate: ((SQLiteDatabase) throws -> Void)?
     var beforePublish: ((URL) throws -> Void)?           // final artifact URL, before validate+rename
     var afterPublish: ((URL) throws -> Void)?            // final artifact URL, AFTER the rename (crash sim)
-    init(afterCopy: ((URL) throws -> Void)? = nil,
+    var afterVerifyDirCreated: ((URL) throws -> Void)?   // .verify created+bound, BEFORE verify copy-in
+    var afterVerifyCopy: ((URL) throws -> Void)?         // after verify copy-in, before the VB1 gate
+    init(afterWorkAttemptCreated: ((URL) throws -> Void)? = nil,
+         afterCopy: ((URL) throws -> Void)? = nil,
          beforeMigrate: ((SQLiteDatabase) throws -> Void)? = nil,
          beforePublish: ((URL) throws -> Void)? = nil,
-         afterPublish: ((URL) throws -> Void)? = nil) {
+         afterPublish: ((URL) throws -> Void)? = nil,
+         afterVerifyDirCreated: ((URL) throws -> Void)? = nil,
+         afterVerifyCopy: ((URL) throws -> Void)? = nil) {
+        self.afterWorkAttemptCreated = afterWorkAttemptCreated
         self.afterCopy = afterCopy; self.beforeMigrate = beforeMigrate
         self.beforePublish = beforePublish; self.afterPublish = afterPublish
+        self.afterVerifyDirCreated = afterVerifyDirCreated; self.afterVerifyCopy = afterVerifyCopy
     }
 }
 
@@ -150,12 +163,27 @@ struct RunnerHooks {
 /// Cleanup of a failed attempt is keyed on that same bound handle (`removeBoundChildDir`) and
 /// unlinks ONLY the runner's own known files — never an enumeration, so an entry the runner
 /// did not create is never deleted; if one remains, the rmdir fails and the leftover is reaper
-/// residue. THREAT-MODEL PRECONDITION (not verified by this code): `run` accepts arbitrary
-/// URLs and does NOT check that `preparedRoot` / `workingDirectory` live in a process-private
-/// (0700) container — placing them there is the caller's contract; only the artifact attempt
-/// itself is created 0700. Within that precondition, exploiting these gaps requires same-UID
-/// code racing between adjacent syscalls — code that could already tamper with the data
-/// directly — so the windows are defense-in-depth, not a privilege boundary.
+/// residue.
+///
+/// WORK AREAS (`.prep-*` / `.verify-*`): what IS bound to handles taken at creation is their
+/// creation (mkdirat 0700 via the bound work root), the fd→fd copy-in of the DB/WAL, entry
+/// enumeration, known-name deletion and cleanup. What is NOT bindable: the SQLite migration,
+/// `PreparedDatabaseIdentity.compute` and the verify schema/count probes all consume the area
+/// by FULL PATH (SQLite has no openat), so each of those steps is bracketed by TWO-LAYER
+/// point-in-time gates (`assertWorkAreaStillBound`: workingDirectory path → bound work root,
+/// child name → bound child; either mismatch ⇒ `.workAreaSwapped`). The gates only detect a
+/// swap that already happened and was not restored — a root or child swap-and-restore within
+/// one SQLite/identity call is undetectable, and an inode replacement at a runner-owned name
+/// INSIDE the bound area remains the registered same-UID residual — so the work area is NOT
+/// fully descriptor-bound and is deliberately not described as such.
+///
+/// THREAT-MODEL PRECONDITION (not verified by this code): `run` accepts arbitrary URLs and
+/// does NOT check that `preparedRoot` / `workingDirectory` live in a process-private (0700)
+/// container — placing them there is the caller's contract; the artifact attempt and the
+/// work areas are created 0700 (and `workingDirectory` itself only when this call creates
+/// it). Within that precondition, exploiting these gaps requires same-UID code racing
+/// between adjacent syscalls — code that could already tamper with the data directly — so
+/// the windows are defense-in-depth, not a privilege boundary.
 public struct PreparedImportRunner {
     public init() {}
 
@@ -169,33 +197,59 @@ public struct PreparedImportRunner {
         let dbName = AppPaths.databaseFileName
         let importName = "import-\(gated.importID.rawValue)"
         try fm.createDirectory(at: preparedRoot, withIntermediateDirectories: true)
-        try fm.createDirectory(at: workingDirectory, withIntermediateDirectories: true)
+        // 0700 applies only when this call CREATES the directory; a pre-existing
+        // workingDirectory keeps its permissions (private placement stays a caller contract).
+        try fm.createDirectory(at: workingDirectory, withIntermediateDirectories: true,
+                               attributes: [.posixPermissions: 0o700])
 
         // Bind preparedRoot ONCE. Every artifact op below is relative to this fd.
         let root: DirectoryHandle
         do { root = try DirectoryHandle.open(at: preparedRoot) }
         catch { throw PreparedRunFailure.publishFailed("preparedRoot unreadable / not a directory: \(error)") }
 
+        // Bind workingDirectory ONCE. Work areas (.prep-*/.verify-*) are created, filled,
+        // enumerated and cleaned relative to this fd; SQLite/identity still consume them by
+        // PATH, so those steps are bracketed by two-layer gates (assertWorkAreaStillBound).
+        let workRoot: DirectoryHandle
+        do { workRoot = try DirectoryHandle.open(at: workingDirectory) }
+        catch { throw PreparedRunFailure.snapshotCopyFailed("workingDirectory unreadable / not a directory: \(error)") }
+
         // FAST PATH / crash-resume.
         if let reused = try Self.reuseIfConsistent(root: root, importName: importName, gated: gated,
-                                                   preparedRoot: preparedRoot, workingDirectory: workingDirectory) {
+                                                   preparedRoot: preparedRoot, workRoot: workRoot,
+                                                   workingDirectory: workingDirectory, hooks: hooks) {
             return reused
         }
 
-        // 1. Private working attempt: copy DB(+WAL) through the gate descriptor, migrate.
-        let workAttempt = workingDirectory.appendingPathComponent(".prep-\(UUID().uuidString)", isDirectory: true)
-        try fm.createDirectory(at: workAttempt, withIntermediateDirectories: false)
+        // 1. Private working attempt: created AND BOUND via the work-root fd (mkdirat 0700 +
+        //    first-observed bind). The URL below is for SQLite/identity/hooks ONLY — every
+        //    create/enumerate/unlink goes through the bound handles.
+        let prepName = ".prep-\(UUID().uuidString)"
+        let attempt: DirectoryHandle
+        do { attempt = try workRoot.makeChildDirectory(named: prepName) }
+        catch { throw PreparedRunFailure.snapshotCopyFailed("working attempt create: \(error)") }
+        let workAttempt = workingDirectory.appendingPathComponent(prepName, isDirectory: true)
         var workDone = false
-        defer { if !workDone { try? fm.removeItem(at: workAttempt) } }
+        // Cleanup keyed on the BOUND handles and limited to the runner's OWN file names —
+        // never re-resolving, never enumerating; unknowns are reaper residue.
+        defer { if !workDone { workRoot.removeBoundChildDir(attempt, named: prepName, knownEntries: Self.workOwnedEntries(dbName)) } }
+        try hooks.afterWorkAttemptCreated?(workAttempt)
 
+        // Copy DB (+WAL) fd→fd: source through the gate descriptor, DESTINATION through the
+        // bound attempt descriptor (openat O_CREAT|O_EXCL|O_NOFOLLOW) — a swap of the attempt
+        // entry or the workingDirectory path cannot redirect where the bytes land.
         let workDB = workAttempt.appendingPathComponent(dbName)
         do {
-            let dbDigest = try gated.root.copyRegularFile(named: dbName, to: workDB)
+            let src = try gated.root.openRegularFile(named: dbName)
+            defer { try? src.close() }
+            let dbDigest = try attempt.importRegularFile(named: dbName, from: src)
             guard dbDigest.sha256 == gated.manifest.sourceDBSHA256 else {
                 throw PreparedRunFailure.snapshotCopyFailed("copied db digest != manifest.sourceDBSHA256")
             }
             if gated.hasWAL {
-                let walDigest = try gated.root.copyRegularFile(named: dbName + "-wal", to: URL(fileURLWithPath: workDB.path + "-wal"))
+                let walSrc = try gated.root.openRegularFile(named: dbName + "-wal")
+                defer { try? walSrc.close() }
+                let walDigest = try attempt.importRegularFile(named: dbName + "-wal", from: walSrc)
                 guard walDigest.sha256 == gated.manifest.walSHA256 else {
                     throw PreparedRunFailure.snapshotCopyFailed("copied wal digest != manifest.walSHA256")
                 }
@@ -204,12 +258,21 @@ public struct PreparedImportRunner {
         catch { throw PreparedRunFailure.snapshotCopyFailed("\(error)") }
         try hooks.afterCopy?(workAttempt)
 
+        // B1 — LAST gate before SQLite opens by path: both layers (workingDirectory path →
+        // bound workRoot; prepName → bound attempt) must hold, or an impostor DB planted
+        // under a swapped name/root would be OPENED AND MIGRATED (modified) by SQLite.
+        try Self.assertWorkAreaStillBound(root: workRoot, rootPath: workingDirectory, childName: prepName, child: attempt)
         let migratedCount = try Self.normalizeAndMigrate(preparedDB: workDB, hooks: hooks)
-        try Self.dropSidecars(besides: workDB)
-        try Self.assertSingleFile(workAttempt, dbName: dbName)
+        // B2 — the migration output is only trusted if the area never observably drifted.
+        try Self.assertWorkAreaStillBound(root: workRoot, rootPath: workingDirectory, childName: prepName, child: attempt)
+        try Self.dropSidecars(in: attempt, dbName: dbName)
+        try Self.assertSingleFile(attempt, dbName: dbName)
+        // B3/B4 — bracket the path-based identity computation.
+        try Self.assertWorkAreaStillBound(root: workRoot, rootPath: workingDirectory, childName: prepName, child: attempt)
         let identity: String
         do { identity = try PreparedDatabaseIdentity.compute(at: workDB) }
         catch { throw PreparedRunFailure.identityFailed("\(error)") }
+        try Self.assertWorkAreaStillBound(root: workRoot, rootPath: workingDirectory, childName: prepName, child: attempt)
 
         // 2. Build the artifact attempt as a CHILD of the bound root (same volume, fd-relative).
         let artName = ".artifact-\(UUID().uuidString)"
@@ -224,8 +287,8 @@ public struct PreparedImportRunner {
         defer { if !artPublished { root.removeBoundChildDir(art, named: artName, knownEntries: [dbName, "provenance.json"]) } }
 
         do {
-            let workHandle = try DirectoryHandle.open(at: workAttempt)
-            let src = try workHandle.openRegularFile(named: dbName)
+            // Source read through the BOUND attempt handle — no path re-resolution.
+            let src = try attempt.openRegularFile(named: dbName)
             defer { try? src.close() }
             _ = try art.importRegularFile(named: dbName, from: src)
         } catch { throw PreparedRunFailure.publishFailed("artifact db import: \(error)") }
@@ -246,7 +309,8 @@ public struct PreparedImportRunner {
         let finalURL = preparedRoot.appendingPathComponent(importName, isDirectory: true)
         try hooks.beforePublish?(finalURL)
         let validated = try Self.validateArtifact(art, gated: gated, expectedIdentity: identity,
-                                                  expectedCount: migratedCount, workingDirectory: workingDirectory)
+                                                  expectedCount: migratedCount, workRoot: workRoot,
+                                                  workingDirectory: workingDirectory, hooks: hooks)
 
         // 4. Re-verify the bindings, then publish via the bound root fd. NOTE: renameatx_np
         //    resolves its SOURCE by NAME (`artName`) relative to root — Darwin has no
@@ -268,7 +332,7 @@ public struct PreparedImportRunner {
 
         if published {
             artPublished = true; workDone = true
-            try? fm.removeItem(at: workAttempt)
+            workRoot.removeBoundChildDir(attempt, named: prepName, knownEntries: Self.workOwnedEntries(dbName))
             // Point-in-time post-publish verification (blockers B/D): the published entry MUST
             // — at this instant — be the very inode we built and validated, and the root path
             // MUST still be the bound root; else a source-name swap won the rename window and
@@ -285,7 +349,8 @@ public struct PreparedImportRunner {
         }
         // Destination appeared between the fast-path check and the rename (publish race).
         if let reused = try Self.reuseIfConsistent(root: root, importName: importName, gated: gated,
-                                                   preparedRoot: preparedRoot, workingDirectory: workingDirectory) {
+                                                   preparedRoot: preparedRoot, workRoot: workRoot,
+                                                   workingDirectory: workingDirectory, hooks: hooks) {
             return reused
         }
         throw PreparedRunFailure.preparedPublishConflict("import-\(gated.importID.rawValue): a different artifact won the publish race")
@@ -297,7 +362,8 @@ public struct PreparedImportRunner {
     /// descriptor (openat from `root`): provenance, DB identity, transaction count all come from
     /// a copy taken THROUGH that descriptor. Consistent ⇒ reuse; else ⇒ hard conflict.
     static func reuseIfConsistent(root: DirectoryHandle, importName: String, gated: GatedStagedSnapshot,
-                                  preparedRoot: URL, workingDirectory: URL) throws -> PreparedImport? {
+                                  preparedRoot: URL, workRoot: DirectoryHandle, workingDirectory: URL,
+                                  hooks: RunnerHooks) throws -> PreparedImport? {
         guard let fp = try root.fingerprint(named: importName) else { return nil }   // ENOENT ⇒ not published yet
         func conflict(_ m: String) -> PreparedRunFailure { .preparedPublishConflict("import-\(gated.importID.rawValue): \(m)") }
         guard fp.isDirectory else { throw conflict("existing artifact is not a directory") }
@@ -307,7 +373,7 @@ public struct PreparedImportRunner {
         catch { throw conflict("existing artifact unreadable: \(error)") }
 
         let validated = try validateArtifact(art, gated: gated, expectedIdentity: nil, expectedCount: nil,
-                                             workingDirectory: workingDirectory)
+                                             workRoot: workRoot, workingDirectory: workingDirectory, hooks: hooks)
         // Validation ran entirely through `art`'s fd; the PUBLIC URL, however, is rebuilt from
         // the path. Before handing it back, confirm — at this instant — that the root path
         // still binds to `root` AND `importName` still resolves to the very inode we validated,
@@ -329,7 +395,8 @@ public struct PreparedImportRunner {
     /// values). Any mismatch throws `preparedPublishConflict`.
     static func validateArtifact(_ art: DirectoryHandle, gated: GatedStagedSnapshot,
                                  expectedIdentity: String?, expectedCount: Int?,
-                                 workingDirectory: URL) throws -> ValidatedArtifact {
+                                 workRoot: DirectoryHandle, workingDirectory: URL,
+                                 hooks: RunnerHooks) throws -> ValidatedArtifact {
         func conflict(_ m: String) -> PreparedRunFailure { .preparedPublishConflict("import-\(gated.importID.rawValue): \(m)") }
         let dbName = AppPaths.databaseFileName
 
@@ -354,18 +421,33 @@ public struct PreparedImportRunner {
             throw conflict("provenance does not match this snapshot")
         }
 
-        // Copy the DB OUT through the bound descriptor (no-follow) into a private verify dir.
-        let verifyDir = workingDirectory.appendingPathComponent(".verify-\(UUID().uuidString)", isDirectory: true)
-        do { try FileManager.default.createDirectory(at: verifyDir, withIntermediateDirectories: false) }
+        // Copy the DB OUT fd→fd into a private verify area: created AND BOUND via the
+        // work-root fd (mkdirat 0700 + first-observed bind), destination created through the
+        // bound verify descriptor (openat O_CREAT|O_EXCL|O_NOFOLLOW). The URL is for the
+        // path-based SQLite/identity probes and hooks ONLY.
+        let verifyName = ".verify-\(UUID().uuidString)"
+        let verify: DirectoryHandle
+        do { verify = try workRoot.makeChildDirectory(named: verifyName) }
         catch { throw conflict("verify dir: \(error)") }
-        defer { try? FileManager.default.removeItem(at: verifyDir) }
+        let verifyDir = workingDirectory.appendingPathComponent(verifyName, isDirectory: true)
+        defer { workRoot.removeBoundChildDir(verify, named: verifyName, knownEntries: workOwnedEntries(dbName)) }
+        try hooks.afterVerifyDirCreated?(verifyDir)
         let verifyDB = verifyDir.appendingPathComponent(dbName)
-        do { _ = try art.copyRegularFile(named: dbName, to: verifyDB) }
-        catch { throw conflict("prepared DB copy-for-verification failed (symlink/FIFO/read error): \(error)") }
+        do {
+            let src = try art.openRegularFile(named: dbName)
+            defer { try? src.close() }
+            _ = try verify.importRegularFile(named: dbName, from: src)
+        } catch { throw conflict("prepared DB copy-for-verification failed (symlink/FIFO/read error): \(error)") }
+        try hooks.afterVerifyCopy?(verifyDir)
 
+        // VB1 — LAST gate before the path-based identity probe: both layers must hold, or a
+        // planted verify area (even one holding a FULLY VALID DB) would be what gets verified.
+        try assertWorkAreaStillBound(root: workRoot, rootPath: workingDirectory, childName: verifyName, child: verify)
         let identity: String
         do { identity = try PreparedDatabaseIdentity.compute(at: verifyDB) }
         catch { throw conflict("prepared DB identity unreadable: \(error)") }
+        // VB2 — the identity result is only trusted if the area never observably drifted.
+        try assertWorkAreaStillBound(root: workRoot, rootPath: workingDirectory, childName: verifyName, child: verify)
         guard identity == prov.preparedDBIdentity else { throw conflict("prepared DB identity != provenance") }
         if let e = expectedIdentity, identity != e { throw conflict("prepared DB identity != freshly-migrated identity") }
 
@@ -381,6 +463,8 @@ public struct PreparedImportRunner {
         // per-column contract is a registered follow-up gated on a separate read-only analysis
         // with real Electron v23 fixtures — do not tighten here. Every check runs on the
         // private verify copy taken no-follow THROUGH the bound artifact fd.
+        // VB3 — LAST gate before the path-based schema/count probe opens SQLite.
+        try assertWorkAreaStillBound(root: workRoot, rootPath: workingDirectory, childName: verifyName, child: verify)
         let count: Int
         do {
             let db = try SQLiteDatabase(path: verifyDB.path, mode: .readOnly)
@@ -398,6 +482,9 @@ public struct PreparedImportRunner {
             count = try db.query("SELECT COUNT(*) AS c FROM transactions").first?.int("c") ?? -1
         } catch let e as PreparedRunFailure { throw e }
         catch { throw conflict("prepared DB schema/verify unreadable: \(error)") }
+        // VB4 — schema/count results are only trusted if the area never observably drifted
+        // (the read-only connection is closed by the do-block's defer before this check).
+        try assertWorkAreaStillBound(root: workRoot, rootPath: workingDirectory, childName: verifyName, child: verify)
         guard count == prov.transactionsMigrated else {
             throw conflict("actual transaction count \(count) != provenance \(prov.transactionsMigrated)")
         }
@@ -457,24 +544,50 @@ public struct PreparedImportRunner {
 
     // MARK: - Filesystem helpers
 
-    private static func dropSidecars(besides db: URL) throws {
-        let fm = FileManager.default
+    /// Every entry name the runner (or SQLite acting on its behalf) may create inside a
+    /// runner-private work area — the ONLY names cleanup and sidecar-dropping may unlink.
+    private static func workOwnedEntries(_ dbName: String) -> [String] {
+        [dbName, dbName + "-wal", dbName + "-shm", dbName + "-journal"]
+    }
+
+    /// Drop rebuildable SQLite sidecars from the BOUND attempt — fd-relative and
+    /// non-recursive by construction (`removeNonDirectoryChild`): a DIRECTORY planted at a
+    /// sidecar name fails closed and its contents are structurally untouchable.
+    private static func dropSidecars(in attempt: DirectoryHandle, dbName: String) throws {
         for suffix in ["-wal", "-shm", "-journal"] {
-            let side = URL(fileURLWithPath: db.path + suffix)
-            if fm.fileExists(atPath: side.path) {
-                do { try fm.removeItem(at: side) }
-                catch { throw PreparedRunFailure.notQuiescent("could not drop stale \(suffix): \(error)") }
-            }
+            do { try attempt.removeNonDirectoryChild(named: dbName + suffix) }
+            catch { throw PreparedRunFailure.notQuiescent("could not drop stale \(suffix): \(error)") }
         }
     }
 
-    private static func assertSingleFile(_ dir: URL, dbName: String) throws {
-        let h: DirectoryHandle
-        do { h = try DirectoryHandle.open(at: dir) }
-        catch { throw PreparedRunFailure.notQuiescent("attempt dir unreadable: \(error)") }
-        let entries = Set(try h.entryNames())
+    /// Entry-set check on the BOUND attempt handle — no path re-open, no re-resolution.
+    private static func assertSingleFile(_ attempt: DirectoryHandle, dbName: String) throws {
+        let entries = Set(try attempt.entryNames())
         guard entries == [dbName] else {
             throw PreparedRunFailure.notQuiescent("attempt dir is \(entries.sorted()), expected exactly [\(dbName)]")
+        }
+    }
+
+    /// TWO-LAYER point-in-time gate on a runner-private work area (`.prep-*` / `.verify-*`).
+    /// BOTH layers are required because SQLite/identity consume the area by FULL PATH:
+    ///  1. the workingDirectory PATH must still resolve (lstat, no-follow) to the bound work
+    ///     root (device+inode) — a swap of the WHOLE workingDirectory would otherwise leave
+    ///     the child-relative check passing inside the OLD root while `workDB.path` /
+    ///     `verifyDB.path` traverse the REPLACEMENT root;
+    ///  2. `childName` under the bound work-root fd must still resolve to the bound child
+    ///     directory (device+inode).
+    /// Either failure throws `.workAreaSwapped`. POINT-IN-TIME only: it detects a swap that
+    /// has already happened and was not restored; a swap-and-restore within one SQLite /
+    /// identity call is undetectable (registered residual — see the type doc).
+    private static func assertWorkAreaStillBound(root: DirectoryHandle, rootPath: URL,
+                                                 childName: String, child: DirectoryHandle) throws {
+        guard let rfp = try FileFingerprint.capture(at: rootPath), rfp.isDirectory,
+              rfp.device == root.device, rfp.inode == root.inode else {
+            throw PreparedRunFailure.workAreaSwapped("workingDirectory path no longer resolves to the bound work root")
+        }
+        guard let cfp = try root.fingerprint(named: childName), cfp.isDirectory,
+              cfp.device == child.device, cfp.inode == child.inode else {
+            throw PreparedRunFailure.workAreaSwapped("\(childName) no longer resolves to the bound work-area directory")
         }
     }
 

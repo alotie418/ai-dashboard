@@ -349,6 +349,21 @@ final class DirectoryHandle {
         throw FileHashError.destinationUnwritable(path: pathHint + "/" + to, errno: e)
     }
 
+    /// Remove a DIRECT child that must NOT be a directory. `unlinkat(flag 0)` removes a
+    /// regular file, a symlink (the LINK itself — never followed, target untouched) or a
+    /// special file; it CANNOT remove a directory, so this primitive can never recurse into
+    /// anything. ENOENT (absent, also mid-call) is a no-op; a DIRECTORY at the name throws
+    /// fail-closed — a planted directory's contents are structurally untouchable here.
+    func removeNonDirectoryChild(named name: String) throws {
+        guard let fp = try fingerprint(named: name) else { return }          // ENOENT ⇒ absent
+        guard !fp.isDirectory else { throw FileHashError.notARegularFile(pathHint + "/" + name) }
+        guard unlinkat(fd, name, 0) == 0 else {
+            let e = errno
+            if e == ENOENT { return }
+            throw FileHashError.unreadable(path: pathHint + "/" + name, errno: e)
+        }
+    }
+
     /// Best-effort cleanup of an attempt directory we CREATED and still hold a BOUND handle
     /// to (`child`). The vulnerability this avoids: re-resolving `name` (openat/subdirectory)
     /// could bind a DIFFERENT object — an attacker who moved our real attempt away and planted
