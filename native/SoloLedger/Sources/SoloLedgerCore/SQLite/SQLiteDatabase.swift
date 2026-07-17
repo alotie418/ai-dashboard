@@ -128,15 +128,37 @@ public final class SQLiteDatabase {
     /// throws rather than being swallowed). Callers that must compute a file identity after
     /// closing (PreparedDatabaseIdentity) rely on this being deterministic, not deinit-timed.
     public func close() throws {
-        guard let h = handle else { return }
-        handle = nil
+        guard let h = handle else { return }   // idempotent after a successful close
         let rc = sqlite3_close(h)
-        guard rc == SQLITE_OK else { throw SQLiteError.message("close failed (code \(rc))") }
+        // Nil the handle ONLY on success. On SQLITE_BUSY (an un-finalized statement or an
+        // active backup) the connection is STILL OPEN — keep the handle so the caller can
+        // finalize and retry close(), and so deinit can still close it. Losing the handle
+        // here would leak the connection permanently.
+        guard rc == SQLITE_OK else {
+            throw SQLiteError.message("close failed (code \(rc)); connection remains open")
+        }
+        handle = nil
     }
 
     deinit {
         if let handle { sqlite3_close(handle) }   // best-effort backstop if close() was not called
     }
+
+    // MARK: - Test seams (internal)
+
+    /// Prepare a statement and DO NOT finalize it, so the NEXT `close()` sees SQLITE_BUSY.
+    /// The caller MUST later pass the returned pointer to `finalizeTestStatement`. Test-only.
+    func prepareUnfinalizedStatementForTesting(_ sql: String) throws -> OpaquePointer {
+        guard let handle else { throw SQLiteError.message("connection closed") }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(handle, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
+            throw SQLiteError.prepare(lastMessage)
+        }
+        return stmt
+    }
+
+    /// Finalize a statement obtained from `prepareUnfinalizedStatementForTesting`. Test-only.
+    func finalizeTestStatement(_ stmt: OpaquePointer) { sqlite3_finalize(stmt) }
 
     private var lastMessage: String {
         guard let handle else { return "no connection" }

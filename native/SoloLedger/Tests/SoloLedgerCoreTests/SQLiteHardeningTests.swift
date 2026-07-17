@@ -46,6 +46,31 @@ final class SQLiteHardeningTests: LedgerTestCase {
         XCTAssertThrowsError(try db.execute("SELECT 1"))
     }
 
+    /// close() must NOT lose the handle when sqlite3_close returns SQLITE_BUSY (an
+    /// un-finalized statement): it must throw with the connection STILL OPEN, so the caller
+    /// can finalize and retry — never a permanent leak, never a swallowed error.
+    func testCloseWithUnfinalizedStatementThrowsAndKeepsHandleThenRetrySucceeds() throws {
+        let url = try trackedTempDir().appendingPathComponent("busy.db")
+        let db = try SQLiteDatabase(path: url.path, mode: .readWriteCreate)
+        try db.execute("CREATE TABLE t (id INTEGER)")
+        try db.run("INSERT INTO t (id) VALUES (1)")
+        let stmt = try db.prepareUnfinalizedStatementForTesting("SELECT id FROM t")
+
+        // First close: SQLITE_BUSY → throws, connection still open (handle NOT lost).
+        XCTAssertThrowsError(try db.close()) { e in
+            guard case SQLiteError.message = e else { return XCTFail("got \(e)") }
+        }
+        // Proof the handle is still valid: a query still works.
+        XCTAssertEqual(try db.query("SELECT id FROM t").first?.int("id"), 1,
+                       "connection must remain usable after a failed close")
+
+        // Finalize the statement, then close succeeds and is idempotent.
+        db.finalizeTestStatement(stmt)
+        XCTAssertNoThrow(try db.close(), "close must succeed once the statement is finalized")
+        XCTAssertNoThrow(try db.close(), "idempotent after success")
+        XCTAssertThrowsError(try db.execute("SELECT 1"), "connection is now released")
+    }
+
     // MARK: - SchemaMigrator hardening
 
     func testMigrateRejectsNegativeVersionWithoutTrapping() throws {
