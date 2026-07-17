@@ -505,6 +505,17 @@ public struct ImportManifest: Codable, Equatable {
             .joined(separator: "\n")
         return SHA256.hash(data: Data(lines.utf8)).map { String(format: "%02x", $0) }.joined()
     }
+
+    /// Stable combined identity of the DB (+ WAL) as ONE snapshot: two ingests with the
+    /// same main DB but a different WAL produce DIFFERENT identities, and a `nil` WAL
+    /// (no sidecar) differs from a present-but-empty WAL. NUL-separated with an explicit
+    /// `wal:` marker so the two fields cannot be smuggled into each other. Shared by ingest
+    /// (to STORE `snapshotIdentitySHA256`) and the read side (the staged-snapshot gate, to
+    /// RE-VERIFY it fail-closed) so they can never drift.
+    public static func snapshotIdentity(dbSHA: String, walSHA: String?) -> String {
+        let s = "db:\(dbSHA)\u{0}wal:\(walSHA ?? "")"
+        return SHA256.hash(data: Data(s.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
 }
 
 // MARK: - Ingest
@@ -1030,16 +1041,9 @@ public struct StagingIngest {
         return ImportManifest(formatVersion: ImportManifest.currentFormatVersion,
                               importID: importID.rawValue, sourceKind: source.kind, createdAt: timestamp,
                               sourceDBSHA256: dbHash, walSHA256: walHash,
-                              snapshotIdentitySHA256: snapshotIdentity(dbSHA: dbHash, walSHA: walHash),
+                              snapshotIdentitySHA256: ImportManifest.snapshotIdentity(dbSHA: dbHash, walSHA: walHash),
                               attachmentManifestSHA256: ImportManifest.attachmentSetHash(files),
                               files: files, status: .ingested, report: nil)
-    }
-
-    /// Stable combined identity of DB (+ WAL). Different WAL ⇒ different identity even for the
-    /// same main DB.
-    private static func snapshotIdentity(dbSHA: String, walSHA: String?) -> String {
-        let s = "db:\(dbSHA)\u{0}wal:\(walSHA ?? "")"
-        return SHA256.hash(data: Data(s.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     /// Write manifest.json through the VERIFIED attempt-directory descriptor, exclusively
