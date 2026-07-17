@@ -135,7 +135,15 @@ public struct StagedSnapshotGate {
         let walName = dbName + "-wal"
         let ingested = manifest.files.filter { $0.outcome == .ingested }
         let hasWAL = manifest.walSHA256 != nil
-        let hasAttachments = !ingested.isEmpty
+        // Mirror the PRODUCER exactly: ingest creates attachments/docs on disk whenever the
+        // source docs folder had ANY classified entry — ingested OR skipped — i.e. whenever
+        // manifest.files is non-empty (StagingIngest.copyInto guards on `!classified.isEmpty`,
+        // and manifest.files IS that classified set). Keying off `ingested` here would reject a
+        // legitimately-published staging whose docs folder held only SKIPPED entries (a lone
+        // .DS_Store → rejectedName, a symlink, a subdir), permanently and non-retriably. Step 6
+        // still keys the docs entry-set check on the ingested names, so an all-skipped staging
+        // has an empty docs dir that matches an empty ingested set.
+        let hasAttachments = !manifest.files.isEmpty
         var expectedRoot: Set<String> = ["manifest.json", dbName]
         if hasWAL { expectedRoot.insert(walName) }
         if hasAttachments { expectedRoot.insert("attachments") }

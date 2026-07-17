@@ -76,6 +76,34 @@ final class StagedSnapshotGateTests: LedgerTestCase {
         XCTAssertNotNil(gated.manifest.walSHA256)
     }
 
+    /// Regression (2B-3 C4): ingest publishes an attachments/docs dir whenever the source
+    /// docs folder had ANY entry — even if every entry was SKIPPED (symlink / subdir / invalid
+    /// name like a .DS_Store). The gate must ACCEPT that legitimately-published staging, not
+    /// reject it on a root-entry-set mismatch. (The docs dir is empty on disk; manifest.files
+    /// carries the skipped entries.)
+    func testGateAcceptsStagingWhoseAttachmentsAreAllSkipped() throws {
+        let src = try trackedTempDir().appendingPathComponent("SoloLedger", isDirectory: true)
+        try fm.createDirectory(at: src, withIntermediateDirectories: true)
+        try Data("db".utf8).write(to: src.appendingPathComponent("sololedger.db"))
+        let docs = src.appendingPathComponent("attachments", isDirectory: true).appendingPathComponent("docs", isDirectory: true)
+        try fm.createDirectory(at: docs, withIntermediateDirectories: true)
+        // ONLY skippable entries — nothing ingestable.
+        try fm.createSymbolicLink(at: docs.appendingPathComponent("link.pdf"),
+                                  withDestinationURL: docs.appendingPathComponent("nowhere"))
+        try Data("cruft".utf8).write(to: docs.appendingPathComponent(".DS_Store"))   // rejectedName
+        try fm.createDirectory(at: docs.appendingPathComponent("sub"), withIntermediateDirectories: true)
+
+        let id = ImportID("gate-\(UUID().uuidString)")!; defer { cleanup(id) }
+        let result = try StagingIngest().ingest(.userSelectedDataDir(src), importID: id, timestamp: "t")
+        // Sanity: ingest DID publish an attachments dir but recorded ZERO ingested files.
+        XCTAssertTrue(fm.fileExists(atPath: result.stagingDir.appendingPathComponent("attachments").path))
+        XCTAssertFalse(result.manifest.files.contains { $0.outcome == .ingested })
+        XCTAssertFalse(result.manifest.files.isEmpty)
+
+        let gated = try StagedSnapshotGate().gate(result)   // must NOT throw
+        XCTAssertTrue(gated.hasAttachments, "an all-skipped attachments dir still exists on disk")
+    }
+
     func testGateAcceptsViaIngestResultConvenience() throws {
         let src = try trackedTempDir().appendingPathComponent("SoloLedger", isDirectory: true)
         try fm.createDirectory(at: src, withIntermediateDirectories: true)
