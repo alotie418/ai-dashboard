@@ -808,6 +808,81 @@ final class MigrationSourceIngestTests: LedgerTestCase {
         XCTAssertTrue(attemptNames().isSubset(of: before), "only OUR attempt is cleaned")
     }
 
+    // MARK: - Source attachment enumeration is fail-closed (2B-2 S7)
+
+    /// A directory READ error while enumerating the source attachments must abort the
+    /// ingest — never a truncated-but-self-consistent manifest. Making the source docs dir
+    /// unreadable (chmod 000) forces the descriptor-rooted open/enumeration to fail; the
+    /// old FileManager.contentsOfDirectory path would also throw here, but this pins the
+    /// end-to-end fail-closed contract: no publish, no attempt residue, source untouched.
+    func testAttachmentsEnumerationReadErrorAbortsIngestFailClosed() throws {
+        if getuid() == 0 { throw XCTSkip("cannot exercise an EACCES read error as root") }
+        let dir = try makeDataDirFixture(withWal: false, withAttachments: true)
+        let docs = dir.appendingPathComponent("attachments", isDirectory: true).appendingPathComponent("docs", isDirectory: true)
+        let dbURL = dir.appendingPathComponent("sololedger.db")
+        let dbBefore = try FileHash.sha256Hex(of: dbURL)
+
+        try fm.setAttributes([.posixPermissions: 0o000], ofItemAtPath: docs.path)
+        defer { try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: docs.path) }  // let tearDown clean up
+
+        let id = newImportID(); defer { cleanStaging(id) }
+        let before = attemptNames()
+        XCTAssertThrowsError(try StagingIngest().ingest(.userSelectedDataDir(dir), importID: id, timestamp: "t")) { e in
+            guard let fe = e as? FileHashError, case .unreadable(_, let code) = fe else {
+                return XCTFail("a directory read error must fail closed, got \(e)")
+            }
+            XCTAssertNotEqual(code, ENOENT, "a real read error must never be read as absence/empty")
+        }
+        XCTAssertFalse(finalExists(id), "no publish on an enumeration error")
+        XCTAssertTrue(attemptNames().isSubset(of: before), "attempt cleaned")
+        XCTAssertEqual(try FileHash.sha256Hex(of: dbURL), dbBefore, "source must be untouched")
+    }
+
+    /// classifyAttachments delegates to the errno-checked DirectoryHandle.entryNames(), so a
+    /// directory read error THROWS rather than returning a truncated/empty set. Poison the
+    /// handle's fd by pointing it at /dev/null (a non-directory): entryNames' fdopendir then
+    /// fails ENOTDIR. If this returned [] (as the old contentsOfDirectory could on a
+    /// mid-read error) the publish gate's exact-set check could wrongly accept it.
+    func testClassifyAttachmentsFailsClosedOnDirectoryReadError() throws {
+        let dir = try trackedTempDir()
+        for n in ["a.pdf", "b.pdf"] { try Data("x".utf8).write(to: dir.appendingPathComponent(n)) }
+        let handle = try DirectoryHandle.open(at: dir)
+        let devnull = open("/dev/null", O_RDONLY)
+        try XCTUnwrap(devnull >= 0 ? devnull : nil, "open /dev/null")
+        XCTAssertEqual(dup2(devnull, handle.fd), handle.fd, "poison the handle fd -> /dev/null")
+        close(devnull)   // handle.fd remains valid (a non-directory); deinit closes it exactly once
+        XCTAssertThrowsError(try StagingIngest.classifyAttachments(in: handle, root: dir)) { e in
+            guard let fe = e as? FileHashError, case .unreadable = fe else { return XCTFail("got \(e)") }
+        }
+    }
+
+    /// The fstatat(AT_SYMLINK_NOFOLLOW) classification preserves the exact prior semantics:
+    /// symlink / directory / regular(name-validated) / special, sorted by name.
+    func testClassifyAttachmentsPreservesTypeAndNameSemantics() throws {
+        let dir = try trackedTempDir()
+        try Data("a".utf8).write(to: dir.appendingPathComponent("doc-a.pdf"))        // valid regular → ingested
+        try Data("b".utf8).write(to: dir.appendingPathComponent("bad name.pdf"))     // invalid name → rejectedName
+        try fm.createSymbolicLink(at: dir.appendingPathComponent("link.pdf"),
+                                  withDestinationURL: dir.appendingPathComponent("doc-a.pdf"))   // → skippedSymlink
+        try fm.createDirectory(at: dir.appendingPathComponent("sub"), withIntermediateDirectories: true)  // → skippedDirectory
+        let fifo = dir.appendingPathComponent("pipe")
+        guard mkfifo(fifo.path, 0o644) == 0 else { throw XCTSkip("mkfifo unavailable") }          // → skippedSpecial
+        // A symlink to a DIRECTORY must still classify as a symlink (no-follow), not a dir.
+        try fm.createSymbolicLink(at: dir.appendingPathComponent("dirlink"), withDestinationURL: dir.appendingPathComponent("sub"))
+
+        let handle = try DirectoryHandle.open(at: dir)
+        let classified = try StagingIngest.classifyAttachments(in: handle, root: dir)
+        let byName = Dictionary(uniqueKeysWithValues: classified.map { ($0.name, $0.outcome) })
+        XCTAssertEqual(byName["doc-a.pdf"], .ingested)
+        XCTAssertEqual(byName["bad name.pdf"], .rejectedName)
+        XCTAssertEqual(byName["link.pdf"], .skippedSymlink)
+        XCTAssertEqual(byName["dirlink"], .skippedSymlink, "a symlink to a dir is a symlink, not followed")
+        XCTAssertEqual(byName["sub"], .skippedDirectory)
+        XCTAssertEqual(byName["pipe"], .skippedSpecial)
+        XCTAssertEqual(classified.map { $0.name }, ["bad name.pdf", "dirlink", "doc-a.pdf", "link.pdf", "pipe", "sub"],
+                       "entries sorted by name")
+    }
+
     // MARK: - Manifest persistence + deterministic hashes
 
     func testManifestPersistedWithDeterministicHashes() throws {

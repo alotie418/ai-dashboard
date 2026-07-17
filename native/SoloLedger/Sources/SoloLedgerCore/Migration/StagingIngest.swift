@@ -56,6 +56,7 @@ public struct FileFingerprint: Equatable {
 
     public var isRegularFile: Bool { fileType == UInt16(S_IFREG) }
     public var isDirectory: Bool { fileType == UInt16(S_IFDIR) }
+    public var isSymbolicLink: Bool { fileType == UInt16(S_IFLNK) }
 
     init(stat st: stat) {
         self.init(fileType: UInt16(st.st_mode) & UInt16(S_IFMT),
@@ -847,41 +848,60 @@ public struct StagingIngest {
 
     // MARK: - Classification / copy
 
-    private struct ClassifiedAttachment {
+    struct ClassifiedAttachment {
         let url: URL
         let name: String
         let outcome: ImportManifest.FileResult.Outcome
         var isIngested: Bool { outcome == .ingested }
     }
 
-    /// Classify the TOP-LEVEL entries of an attachments root (never recursive). Order:
-    /// symlink (lstat, not followed) → directory → regular file (name-validated) → special.
-    /// Root gate: ENOENT means "no attachments"; anything present must be a REAL
-    /// (non-symlink) directory — a symlinked or non-directory root is rejected, and any
-    /// other metadata error stays fail-closed (FileFingerprint.capture throws).
+    /// Classify the TOP-LEVEL entries of an attachments root (never recursive), through the
+    /// SAME descriptor-rooted, errno-checked machinery the publish gate uses — NEVER
+    /// `FileManager.contentsOfDirectory`, whose readdir loop stops at NULL without
+    /// inspecting errno and can hand back a TRUNCATED-but-self-consistent listing on a
+    /// mid-read error (which would silently shrink the imported attachment set). Root gate:
+    /// ENOENT ⇒ "no attachments"; a symlinked or non-directory root ⇒
+    /// attachmentsRootNotADirectory; any other open error is fail-closed. Sorted by name.
     private static func enumerateAttachments(root: URL) throws -> [ClassifiedAttachment] {
-        let fm = FileManager.default
-        guard let rootFP = try FileFingerprint.capture(at: root) else { return [] }
-        guard rootFP.isDirectory else { throw IngestError.attachmentsRootNotADirectory(root.path) }
-        let keys: [URLResourceKey] = [.isSymbolicLinkKey, .isDirectoryKey, .isRegularFileKey]
-        let entries = try fm.contentsOfDirectory(at: root, includingPropertiesForKeys: keys, options: [])
+        let dir: DirectoryHandle
+        do {
+            dir = try DirectoryHandle.open(at: root)   // O_NOFOLLOW|O_DIRECTORY, identity-bound
+        } catch let e as FileHashError {
+            if e.isFileMissing { return [] }                                     // ENOENT ⇒ no attachments
+            if case .notADirectory = e { throw IngestError.attachmentsRootNotADirectory(root.path) }
+            throw e                                                              // any other error ⇒ fail-closed
+        }
+        return try classifyAttachments(in: dir, root: root)
+    }
+
+    /// Classify the entries of an ALREADY-OPENED attachments directory through its
+    /// descriptor: `entryNames()` is errno-checked (a mid-enumeration read error THROWS
+    /// rather than truncating), and each member's type is read by
+    /// `fstatat(AT_SYMLINK_NOFOLLOW)` on the SAME fd (no path re-resolution, no symlink
+    /// following). Classification order is preserved verbatim — symlink → directory →
+    /// regular (name-validated: valid ⇒ ingested, else rejectedName) → special. A member
+    /// that vanished between listing and stat (ENOENT) is fail-closed as a source change
+    /// (SourceVanished), never silently dropped. Internal so the fail-closed-on-read-error
+    /// behavior is directly unit-testable.
+    static func classifyAttachments(in dir: DirectoryHandle, root: URL) throws -> [ClassifiedAttachment] {
         var out: [ClassifiedAttachment] = []
-        for url in entries {
-            let name = url.lastPathComponent
-            let v = try url.resourceValues(forKeys: Set(keys))
+        for name in try dir.entryNames() {                                       // fail-closed on read error
+            guard let fp = try dir.fingerprint(named: name) else {               // fail-closed on non-ENOENT
+                throw SourceVanished(path: root.appendingPathComponent(name).path)
+            }
             let outcome: ImportManifest.FileResult.Outcome
-            if v.isSymbolicLink == true {
+            if fp.isSymbolicLink {
                 outcome = .skippedSymlink
-            } else if v.isDirectory == true {
+            } else if fp.isDirectory {
                 outcome = .skippedDirectory
-            } else if v.isRegularFile == true {
+            } else if fp.isRegularFile {
                 outcome = AttachmentName.isValid(name) ? .ingested : .rejectedName
             } else {
                 outcome = .skippedSpecial
             }
-            out.append(ClassifiedAttachment(url: url, name: name, outcome: outcome))
+            out.append(ClassifiedAttachment(url: root.appendingPathComponent(name), name: name, outcome: outcome))
         }
-        return out.sorted { $0.name < $1.name }
+        return out.sorted { $0.name < $1.name }   // entryNames() already sorts; keep the guarantee explicit
     }
 
     /// Fail-closed fingerprinting: ONLY ENOENT reads as absence (the entry simply doesn't
