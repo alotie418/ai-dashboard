@@ -228,6 +228,31 @@ final class DirectoryHandle {
         return try FileHash.streamDigest(from: handle, chunkSize: 1 << 20) { _ in }
     }
 
+    /// Copy a DIRECT child regular file THROUGH this descriptor (openat, no-follow,
+    /// S_IFREG-verified on the open fd) into an exclusively-created destination
+    /// (O_CREAT|O_EXCL|O_NOFOLLOW). Because the source is resolved relative to this bound
+    /// directory fd, no swap of the directory or a parent component can redirect the read;
+    /// the returned digest describes exactly the bytes written. A failed copy unlinks its
+    /// partial destination.
+    func copyRegularFile(named name: String, to dst: URL, chunkSize: Int = 1 << 20) throws -> RegularFileDigest {
+        let source = try openRegularFile(named: name)
+        defer { try? source.close() }
+        let dfd = Darwin.open(dst.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+        guard dfd >= 0 else { throw FileHashError.destinationUnwritable(path: dst.path, errno: errno) }
+        let sink = FileHandle(fileDescriptor: dfd, closeOnDealloc: true)
+        var complete = false
+        defer {
+            try? sink.close()
+            if !complete { unlink(dst.path) }
+        }
+        let digest = try FileHash.streamDigest(from: source, chunkSize: chunkSize) { chunk in
+            try sink.write(contentsOf: chunk)
+        }
+        try sink.close()
+        complete = true
+        return digest
+    }
+
     func readRegularFile(named name: String) throws -> Data {
         let handle = try openRegularFile(named: name)
         defer { try? handle.close() }

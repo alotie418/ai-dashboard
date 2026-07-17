@@ -85,13 +85,31 @@ public final class SQLiteDatabase {
     private var handle: OpaquePointer?
     public let path: String
 
-    public init(path: String, readOnly: Bool = false) throws {
+    /// How to open a database file.
+    public enum OpenMode {
+        /// Read/write, CREATE the file if absent. The historical default.
+        case readWriteCreate
+        /// Read/write but the file MUST already exist — sqlite3_open_v2 without
+        /// SQLITE_OPEN_CREATE. A vanished/swapped path fails closed instead of
+        /// fabricating a fresh EMPTY database (which every downstream check would then
+        /// pass, presenting a blank ledger as a successful import).
+        case readWriteExisting
+        /// Read-only — used to inspect a source without ever modifying it.
+        case readOnly
+
+        var flags: Int32 {
+            switch self {
+            case .readWriteCreate: return SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
+            case .readWriteExisting: return SQLITE_OPEN_READWRITE
+            case .readOnly: return SQLITE_OPEN_READONLY
+            }
+        }
+    }
+
+    public init(path: String, mode: OpenMode) throws {
         self.path = path
         var db: OpaquePointer?
-        // Read-only opens are used to inspect a legacy database during upgrade so
-        // the original is never modified.
-        let flags = readOnly ? SQLITE_OPEN_READONLY : (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE)
-        let rc = sqlite3_open_v2(path, &db, flags, nil)
+        let rc = sqlite3_open_v2(path, &db, mode.flags, nil)
         guard rc == SQLITE_OK, let db else {
             let msg = db.map { String(cString: sqlite3_errmsg($0)) } ?? "unknown"
             if let db { sqlite3_close(db) }
@@ -100,8 +118,24 @@ public final class SQLiteDatabase {
         self.handle = db
     }
 
+    /// Compatibility convenience: `readOnly` selects `.readOnly`, otherwise `.readWriteCreate`.
+    public convenience init(path: String, readOnly: Bool = false) throws {
+        try self.init(path: path, mode: readOnly ? .readOnly : .readWriteCreate)
+    }
+
+    /// Explicitly close the connection. IDEMPOTENT (a second call is a no-op) and
+    /// error-VISIBLE (a non-OK close — e.g. SQLITE_BUSY from an un-finalized statement —
+    /// throws rather than being swallowed). Callers that must compute a file identity after
+    /// closing (PreparedDatabaseIdentity) rely on this being deterministic, not deinit-timed.
+    public func close() throws {
+        guard let h = handle else { return }
+        handle = nil
+        let rc = sqlite3_close(h)
+        guard rc == SQLITE_OK else { throw SQLiteError.message("close failed (code \(rc))") }
+    }
+
     deinit {
-        if let handle { sqlite3_close(handle) }
+        if let handle { sqlite3_close(handle) }   // best-effort backstop if close() was not called
     }
 
     private var lastMessage: String {

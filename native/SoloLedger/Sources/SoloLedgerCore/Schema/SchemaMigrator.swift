@@ -18,17 +18,37 @@ public enum SchemaMigrator {
 
     public enum MigrationError: Error, CustomStringConvertible {
         case newerThanSupported(found: Int, supported: Int)
+        /// A negative `user_version` (a corrupt/tampered source). Rejected fail-closed
+        /// BEFORE the migration loop, which would otherwise index `migrations[negative]`
+        /// and trap the process.
+        case corruptVersion(found: Int)
         public var description: String {
             switch self {
             case let .newerThanSupported(found, supported):
                 return "Database user_version \(found) is newer than supported \(supported); refusing to migrate."
+            case let .corruptVersion(found):
+                return "Database user_version \(found) is negative (corrupt/tampered); refusing to migrate."
             }
         }
     }
 
+    /// The complete set of tables a fully-migrated (head) database must contain — the
+    /// authoritative list, defined ONCE. A consumer that needs to prove a database reached
+    /// head verifies every one of these, not an ad-hoc subset. Kept in lockstep with the
+    /// ladder (one CREATE TABLE per name at v23) by `testRequiredTablesMatchLadder`.
+    public static let requiredTables: [String] = [
+        "accounts", "ai_providers", "alerts", "assistant_conversations", "assistant_messages",
+        "business_document_items", "business_documents", "categories", "ecommerce_connections",
+        "ecommerce_staged_orders", "ecommerce_sync_log", "equity", "fixed_assets", "home_office",
+        "legacy_migrations", "liabilities", "mileage_logs", "price_history", "products",
+        "purchase_items", "purchases", "sales", "sales_items", "settings", "tax_payments",
+        "transactions",
+    ]
+
     /// Apply all pending migrations. Index `i` reaches `user_version = i + 1`.
     public static func migrate(_ db: SQLiteDatabase) throws {
         let current = try db.userVersion()
+        guard current >= 0 else { throw MigrationError.corruptVersion(found: current) }
         if current > schemaVersion {
             throw MigrationError.newerThanSupported(found: current, supported: schemaVersion)
         }
