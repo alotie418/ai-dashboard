@@ -164,6 +164,93 @@ final class FilePrimitivesTests: LedgerTestCase {
         XCTAssertNil(try FileFingerprint.capture(at: target), "nothing may be written through the planted link")
     }
 
+    // MARK: - Directory read errno discipline (2B-2 S6)
+
+    /// A clean read (entries then EOF) returns the sorted set with "." / ".." filtered.
+    func testCollectEntriesReturnsSortedFilteredSetOnCleanEof() throws {
+        var steps: [DirectoryHandle.DirStep] = [
+            .entry("b.txt"), .entry("."), .entry("a.txt"), .entry(".."), .entry("c.txt"), .end,
+        ]
+        let names = try DirectoryHandle.collectEntries(pathHint: "/x") {
+            steps.isEmpty ? .end : steps.removeFirst()
+        }
+        XCTAssertEqual(names, ["a.txt", "b.txt", "c.txt"])
+    }
+
+    /// The core regression: a read error AFTER a partial listing must THROW, never be
+    /// treated as EOF — even when the partial set is byte-for-byte the expected whitelist.
+    /// This is the fail-open the publish gate depended on being closed.
+    func testCollectEntriesFailsClosedOnMidEnumerationError() throws {
+        // Partial listing == a plausible complete attempt root; if this were mistaken for
+        // EOF the publish gate's exact-set check would wrongly pass.
+        var steps: [DirectoryHandle.DirStep] = [
+            .entry("manifest.json"), .entry("sololedger.db"), .failure(EIO),
+        ]
+        XCTAssertThrowsError(try DirectoryHandle.collectEntries(pathHint: "/attempt") {
+            steps.isEmpty ? .end : steps.removeFirst()
+        }) { e in
+            guard let fe = e as? FileHashError, case .unreadable(_, let code) = fe else {
+                return XCTFail("got \(e)")
+            }
+            XCTAssertEqual(code, EIO, "the read error must be surfaced, not swallowed as EOF")
+        }
+    }
+
+    /// An error on the very first read also fails closed.
+    func testCollectEntriesFailsClosedOnImmediateError() throws {
+        XCTAssertThrowsError(try DirectoryHandle.collectEntries(pathHint: "/x") { .failure(EBADF) }) { e in
+            guard let fe = e as? FileHashError, case .unreadable(_, let code) = fe, code == EBADF else {
+                return XCTFail("got \(e)")
+            }
+        }
+    }
+
+    /// The real descriptor-backed reader still works end-to-end through the new seam:
+    /// a genuine EOF yields the real entries, "." / ".." filtered.
+    func testEntryNamesReadsRealDirectoryThroughSeam() throws {
+        let dir = try trackedTempDir()
+        for n in ["z.bin", "a.bin", "m.bin"] { try Data("x".utf8).write(to: dir.appendingPathComponent(n)) }
+        let handle = try DirectoryHandle.open(at: dir)
+        XCTAssertEqual(try handle.entryNames(), ["a.bin", "m.bin", "z.bin"])
+    }
+
+    /// Exercises the PRODUCTION readdir→DirStep translation (nextDirStep) against a REAL
+    /// forced readdir error, not a synthetic DirStep. Poisoning the stream's fd makes the
+    /// first readdir fail with EBADF (NULL + errno != 0); the fix must surface that as
+    /// .failure. This is the guard the collectEntries seam tests alone cannot provide:
+    /// reverting the closure to `else { return .end }` would flip this to .end and fail.
+    func testNextDirStepFailsClosedOnRealReaddirError() throws {
+        let dir = try trackedTempDir()
+        try Data("x".utf8).write(to: dir.appendingPathComponent("a.bin"))
+        let dirp = try XCTUnwrap(opendir(dir.path), "opendir failed")
+        defer { closedir(dirp) }
+        close(dirfd(dirp))   // poison BEFORE any read → first readdir syscalls a bad fd (Darwin does not preread)
+        let step = DirectoryHandle.nextDirStep(dirp)
+        guard case .failure(let e) = step else {
+            return XCTFail("a real readdir error must map to .failure, got \(step)")
+        }
+        XCTAssertEqual(e, EBADF, "the actual errno must be surfaced")
+    }
+
+    /// Proves the per-call `errno = 0` pre-clear: readdir does NOT touch errno at EOF, so
+    /// a nonzero errno left by an unrelated prior call must not be mis-read as a failure.
+    /// Without the pre-clear, a stale errno would turn a clean EOF into a spurious .failure.
+    func testNextDirStepClearsStaleErrnoBeforeEofDecision() throws {
+        let dir = try trackedTempDir()   // empty except "." / ".."
+        let dirp = try XCTUnwrap(opendir(dir.path), "opendir failed")
+        defer { closedir(dirp) }
+        var sawEnd = false
+        for _ in 0..<16 {
+            errno = EIO                                  // stale error from "some prior call"
+            let step = DirectoryHandle.nextDirStep(dirp)
+            if case .failure = step {
+                return XCTFail("clean traversal must never yield .failure (stale errno leaked)")
+            }
+            if case .end = step { sawEnd = true; break }
+        }
+        XCTAssertTrue(sawEnd, "traversal of a real directory must reach a clean .end")
+    }
+
     // MARK: - FileFingerprint
 
     func testFingerprintCapturesTypeAndIdentity() throws {

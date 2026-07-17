@@ -138,7 +138,53 @@ final class DirectoryHandle {
         return try Self.adopt(fd: child, pathHint: hint)
     }
 
+    /// One step of a directory read. `readdir` distinguishes end-of-directory from an
+    /// error ONLY through errno: on EOF it returns NULL and leaves errno unchanged; on an
+    /// error (EIO, EBADF, …) it returns NULL and sets errno. Conflating the two would let
+    /// a truncated listing pass as complete.
+    enum DirStep: Equatable { case entry(String); case end; case failure(Int32) }
+
+    /// Fail-closed accumulation of a directory read. A `.failure` — NULL with a non-zero
+    /// errno — THROWS rather than being treated as EOF, so a partial listing (even one
+    /// that happens to equal the expected whitelist) can never be mistaken for the whole
+    /// directory. Split out from the syscall loop so the errno discipline is unit-testable
+    /// without having to provoke a real EIO.
+    static func collectEntries(pathHint: String, next: () -> DirStep) throws -> [String] {
+        var names: [String] = []
+        loop: while true {
+            switch next() {
+            case .entry(let name):
+                if name != "." && name != ".." { names.append(name) }
+            case .end:
+                break loop
+            case .failure(let e):
+                throw FileHashError.unreadable(path: pathHint, errno: e)
+            }
+        }
+        return names.sorted()
+    }
+
+    /// One PRODUCTION directory-read step, translating a `readdir` outcome into a
+    /// `DirStep`. errno is cleared before the call because `readdir` only SETS errno on an
+    /// error and may clobber it on a valid entry, so a single pre-loop reset is
+    /// insufficient — it must be cleared before EACH call. A NULL return with errno == 0
+    /// is genuine end-of-directory; NULL with errno != 0 is a real error and must NOT be
+    /// mistaken for EOF. Internal so this exact syscall→DirStep translation (not merely
+    /// the pure accumulator) is unit-testable against a forced `readdir` failure.
+    static func nextDirStep(_ dirp: UnsafeMutablePointer<DIR>) -> DirStep {
+        errno = 0
+        guard let ent = readdir(dirp) else {
+            let e = errno
+            return e == 0 ? .end : .failure(e)
+        }
+        let name = withUnsafeBytes(of: ent.pointee.d_name) { raw in
+            String(cString: raw.baseAddress!.assumingMemoryBound(to: CChar.self))
+        }
+        return .entry(name)
+    }
+
     /// All entry names (sorted, excluding "." / "..") read through the descriptor.
+    /// A read error mid-enumeration is fail-closed (throws), never a short EOF.
     func entryNames() throws -> [String] {
         let dupFD = dup(fd)
         guard dupFD >= 0 else { throw FileHashError.unreadable(path: pathHint, errno: errno) }
@@ -148,14 +194,7 @@ final class DirectoryHandle {
         }
         defer { closedir(dirp) }
         rewinddir(dirp)
-        var names: [String] = []
-        while let ent = readdir(dirp) {
-            let name = withUnsafeBytes(of: ent.pointee.d_name) { raw in
-                String(cString: raw.baseAddress!.assumingMemoryBound(to: CChar.self))
-            }
-            if name != "." && name != ".." { names.append(name) }
-        }
-        return names.sorted()
+        return try Self.collectEntries(pathHint: pathHint) { Self.nextDirStep(dirp) }
     }
 
     /// lstat-equivalent of a DIRECT child via fstatat(AT_SYMLINK_NOFOLLOW).
