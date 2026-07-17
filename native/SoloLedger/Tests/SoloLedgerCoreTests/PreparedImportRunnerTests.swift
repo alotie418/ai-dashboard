@@ -413,6 +413,130 @@ final class PreparedImportRunnerTests: LedgerTestCase {
 
     private struct TestError: Error {}
 
+    // MARK: - Attempt cleanup is keyed on the BOUND handle, never a replacement (2B-3 C7)
+
+    /// The real bound `.artifact-*` attempt is MOVED AWAY during beforePublish and a same-named
+    /// NON-EMPTY replacement (carrying a sentinel) is planted at that name. The run fails closed
+    /// (pre-rename inode gate), and — critically — attempt cleanup, which is keyed on the bound
+    /// `art` handle and NOT the re-resolved name, must NEVER enumerate or delete the replacement:
+    /// the replacement dir and its sentinel bytes must be completely unchanged, and never
+    /// promoted to a published artifact.
+    func testArtifactAttemptReplacedDuringBeforePublishReplacementUntouchedNotPublished() throws {
+        let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
+        let prep = try preparedRoot(); let work = try workingRoot()
+        let importName = "import-\(id.rawValue)"
+        let sentinel = Data("REPLACEMENT-SENTINEL-do-not-delete".utf8)
+        var replacementURL: URL?
+        let hooks = RunnerHooks(beforePublish: { _ in
+            let artName = try self.currentArtifactAttemptName(prep)
+            // Move the real, bound attempt away, then plant a same-named NON-EMPTY replacement.
+            let aside = try self.trackedTempDir().appendingPathComponent("real-attempt-aside", isDirectory: true)
+            try self.fm.moveItem(at: prep.appendingPathComponent(artName), to: aside)
+            let planted = prep.appendingPathComponent(artName)
+            try self.fm.createDirectory(at: planted, withIntermediateDirectories: false)
+            try sentinel.write(to: planted.appendingPathComponent("sentinel"))
+            replacementURL = planted
+        })
+        XCTAssertThrowsError(try PreparedImportRunner().run(gated, workingDirectory: work, preparedRoot: prep, hooks: hooks)) { e in
+            guard case PreparedRunFailure.publishFailed = e else { return XCTFail("got \(e)") }
+        }
+        let planted = try XCTUnwrap(replacementURL)
+        XCTAssertTrue(fm.fileExists(atPath: planted.path), "planted replacement dir must survive cleanup")
+        XCTAssertEqual(try? Data(contentsOf: planted.appendingPathComponent("sentinel")), sentinel,
+                       "replacement sentinel bytes must be untouched (never enumerated/deleted)")
+        XCTAssertFalse(fm.fileExists(atPath: prep.appendingPathComponent(importName).path),
+                       "the replacement must never be promoted to a published artifact")
+    }
+
+    // MARK: - Post-publish outcome is verified against the bound handle (2B-3 C7, blockers B/D)
+
+    /// The published `import-<id>` entry is swapped for a DIFFERENT directory during the
+    /// afterPublish (crash-simulation) window. The authoritative post-publish check re-verifies
+    /// the published entry against the BOUND artifact inode, so the runner fails closed and never
+    /// returns a PreparedImport whose public URL would point at object B while the handle
+    /// validated object A.
+    func testPublishedEntrySwapAfterPublishFailsClosedNeverReturnsMismatchedURL() throws {
+        let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
+        let prep = try preparedRoot(); let work = try workingRoot()
+        let hooks = RunnerHooks(afterPublish: { finalURL in
+            let aside = try self.trackedTempDir().appendingPathComponent("published-aside", isDirectory: true)
+            try self.fm.moveItem(at: finalURL, to: aside)                       // move our real artifact away
+            try self.fm.createDirectory(at: finalURL, withIntermediateDirectories: false)   // impostor inode
+            try Data("impostor".utf8).write(to: finalURL.appendingPathComponent("sololedger.db"))
+        })
+        XCTAssertThrowsError(try PreparedImportRunner().run(gated, workingDirectory: work, preparedRoot: prep, hooks: hooks)) { e in
+            guard case PreparedRunFailure.publishFailed = e else { return XCTFail("got \(e)") }
+        }
+    }
+
+    // MARK: - Resume re-verifies HEAD SCHEMA, not just identity + count (2B-3 C7, blocker C)
+
+    /// A COORDINATED tamper — swap the published DB for a valid, openable, DELETE-journal DB that
+    /// has a `transactions` table but is NOT head schema, AND rewrite provenance
+    /// preparedDBIdentity + transactionsMigrated to the replacement's real values — must still
+    /// make resume CONFLICT. The schema gate is checked against SchemaMigrator constants
+    /// (user_version == head, required-table NAMES, integrity, foreign keys), which
+    /// attacker-writable provenance cannot forge. Three distinct defects, each tripping a
+    /// distinct gate. (A right-NAMES/wrong-COLUMNS substitution is the registered same-UID
+    /// residual — the gate proves table presence, not per-column DDL — and is intentionally not
+    /// asserted here; byte-exact DDL would false-reject legitimate Electron-authored v23 imports.)
+    func testResumeRejectsCoordinatedSchemaTamper() throws {
+        func wrongVersionDB() throws -> URL {
+            let url = try trackedTempDir().appendingPathComponent("wrong-version.db")
+            let d = try SQLiteDatabase(path: url.path, mode: .readWriteCreate)
+            try d.execute("PRAGMA journal_mode = DELETE")
+            try d.execute("CREATE TABLE transactions (id TEXT)")
+            try d.run("INSERT INTO transactions (id) VALUES ('x')")
+            try d.execute("PRAGMA user_version = 1")
+            try d.close(); return url
+        }
+        func missingTablesDB() throws -> URL {
+            let url = try trackedTempDir().appendingPathComponent("missing-tables.db")
+            let d = try SQLiteDatabase(path: url.path, mode: .readWriteCreate)
+            try d.execute("PRAGMA journal_mode = DELETE")
+            try d.execute("CREATE TABLE transactions (id TEXT)")
+            try d.run("INSERT INTO transactions (id) VALUES ('x')")
+            try d.execute("PRAGMA user_version = \(SchemaMigrator.schemaVersion)")   // head version, tables missing
+            try d.close(); return url
+        }
+        func danglingFKDB() throws -> URL {
+            let url = try makeSQLiteDB(userVersion: 0, named: "fk.db")
+            let d = try SQLiteDatabase(path: url.path, mode: .readWriteExisting)
+            try SchemaMigrator.migrate(d)                                            // full head schema
+            try d.execute("PRAGMA foreign_keys = OFF")
+            try d.run("INSERT INTO transactions (id,type,date,amount,currency,category_id) VALUES ('fk','income','2026-01-01',1,'CNY','no-cat')")
+            try d.execute("PRAGMA journal_mode = DELETE")
+            try d.close(); return url
+        }
+        let builders: [(String, () throws -> URL)] = [
+            ("wrong user_version", wrongVersionDB),
+            ("head version, missing required tables", missingTablesDB),
+            ("head schema, dangling foreign key", danglingFKDB),
+        ]
+        for (label, build) in builders {
+            let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
+            let prep = try preparedRoot()
+            _ = try PreparedImportRunner().run(gated, workingDirectory: try workingRoot(), preparedRoot: prep)
+            let art = artifactDir(prep, id)
+            let db = art.appendingPathComponent("sololedger.db")
+            let fake = try build()
+            let fakeCount: Int = try {
+                let d = try SQLiteDatabase(path: fake.path, readOnly: true); defer { try? d.close() }
+                return try d.query("SELECT COUNT(*) AS c FROM transactions").first?.int("c") ?? -1
+            }()
+            // Coordinated swap: replace the published DB AND rewrite provenance identity + count
+            // to the replacement's real values, so only the schema gate can catch it.
+            try fm.removeItem(at: db); try fm.copyItem(at: fake, to: db)
+            var p = try readProvenance(art)
+            p.preparedDBIdentity = try PreparedDatabaseIdentity.compute(at: db)
+            p.transactionsMigrated = fakeCount
+            try writeProvenance(p, art)
+            XCTAssertThrowsError(try PreparedImportRunner().run(gated, workingDirectory: try workingRoot(), preparedRoot: prep), label) { e in
+                guard case PreparedRunFailure.preparedPublishConflict = e else { return XCTFail("\(label): got \(e)") }
+            }
+        }
+    }
+
     // MARK: - Fault → rollback → retriable; no attempt leak
 
     func testMigrationStageFailureCleansUpAndIsRetriable() throws {

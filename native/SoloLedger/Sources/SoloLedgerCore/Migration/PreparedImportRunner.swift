@@ -61,8 +61,12 @@ struct ValidatedArtifact {
 /// descriptor forward so the coordinator can act on the SAME verified objects. Internal init.
 public struct PreparedImport {
     public let importID: ImportID
-    /// Path to the prepared DB inside the published artifact
-    /// (`preparedRoot/import-<id>/sololedger.db`). DELETE-journal, no sidecars.
+    /// LOCATION HINT for the prepared DB inside the published artifact
+    /// (`preparedRoot/import-<id>/sololedger.db`), DELETE-journal, no sidecars. For display /
+    /// logging / locating ONLY — NEVER a trust input: it is a path and could be redirected by a
+    /// component swap. Every security-sensitive read MUST go through `artifactHandle` (the
+    /// bound inode). The runner only returns this URL after confirming it still resolves to the
+    /// same inode as `artifactHandle`.
     public let preparedDatabaseURL: URL
     public let preparedDBIdentity: String
     public let manifest: ImportManifest
@@ -116,7 +120,28 @@ struct RunnerHooks {
 /// publish. The staged original is never opened by SQLite; the DB (+ WAL) are copied through
 /// the gate's descriptor into a private working copy, migrated there, then copied through the
 /// bound descriptors into the artifact. The final integrity gate runs AFTER the adversary
-/// `beforePublish` window and re-verifies everything through the bound artifact descriptor.
+/// `beforePublish` window and re-verifies everything through the bound artifact descriptor —
+/// including a SCHEMA GATE (user_version == head, every `SchemaMigrator.requiredTables` NAME
+/// present, integrity_check ok, foreign_key_check empty) checked against the `SchemaMigrator`
+/// constants, which attacker-writable provenance cannot forge. The gate proves table-NAME
+/// presence, NOT full per-column DDL: a same-UID racer could substitute a DB with the right
+/// table names but wrong columns — that is left in the registered same-UID residual below
+/// (verifying byte-exact DDL would false-reject legitimate Electron-authored v23 imports, whose
+/// CREATE text need not match the Swift port's).
+///
+/// RESIDUAL (deliberately NOT called "fully" atomic): `renameatx_np` resolves its SOURCE by
+/// NAME relative to the bound root, and Darwin offers no rename-by-fd nor a way to re-link a
+/// directory by fd (`linkat` cannot hardlink directories), so the `fingerprint(artName) →
+/// rename` step has an irreducible window in which a same-UID process could swap `artName`.
+/// It is bounded on both sides — an early pre-rename fingerprint abort, and an AUTHORITATIVE
+/// post-publish check (`assertPublishedIsArt`) that the published entry resolves to the bound,
+/// validated artifact inode, else fail closed — and the artifact is carried forward as a BOUND
+/// descriptor so a coordinator never re-trusts the path. Cleanup of a failed attempt is keyed
+/// on that same bound handle (`removeBoundChildDir`), never on the re-resolved name, so a
+/// planted same-named replacement is never enumerated or deleted. Exploiting the rename gap
+/// requires code running as the SAME user inside the process-private 0700 container racing
+/// between two adjacent syscalls; such an attacker can already tamper with the data directly,
+/// so this window is defense-in-depth, not a privilege boundary.
 public struct PreparedImportRunner {
     public init() {}
 
@@ -178,7 +203,9 @@ public struct PreparedImportRunner {
         do { art = try root.makeChildDirectory(named: artName) }
         catch { throw PreparedRunFailure.publishFailed("artifact attempt create: \(error)") }
         var artPublished = false
-        defer { if !artPublished { root.removeChildDir(named: artName) } }
+        // Cleanup keyed on the BOUND `art` handle, never re-resolving `artName` (which could
+        // bind a swapped-in replacement). See DirectoryHandle.removeBoundChildDir.
+        defer { if !artPublished { root.removeBoundChildDir(art, named: artName) } }
 
         do {
             let workHandle = try DirectoryHandle.open(at: workAttempt)
@@ -205,7 +232,14 @@ public struct PreparedImportRunner {
         let validated = try Self.validateArtifact(art, gated: gated, expectedIdentity: identity,
                                                   expectedCount: migratedCount, workingDirectory: workingDirectory)
 
-        // 4. Re-verify the bindings are intact, then publish via the bound root fd.
+        // 4. Re-verify the bindings, then publish via the bound root fd. NOTE: renameatx_np
+        //    resolves its SOURCE by NAME (`artName`) relative to root — Darwin has no
+        //    rename-by-fd, and a directory cannot be re-linked by fd (linkat), so the
+        //    fingerprint→rename step is NOT atomic: a same-UID racer could swap `artName` in
+        //    that sub-microsecond gap. The pre-rename fingerprint is an early abort for swaps
+        //    that ALREADY happened; the AUTHORITATIVE guard is the POST-rename check below —
+        //    the published entry must resolve to the bound, validated artifact inode, else we
+        //    fail closed. See the type doc for the registered residual window.
         try Self.assertStillBound(root, path: preparedRoot)
         guard let artFP = try root.fingerprint(named: artName), artFP.isDirectory,
               artFP.device == art.device, artFP.inode == art.inode else {
@@ -218,8 +252,14 @@ public struct PreparedImportRunner {
         if published {
             artPublished = true; workDone = true
             try? fm.removeItem(at: workAttempt)
-            try Self.assertStillBound(root, path: preparedRoot)   // after: root path still the bound dir
+            // Authoritative post-publish verification (blockers B/D): the published entry MUST
+            // be the very inode we built and validated, and the root path MUST still be the
+            // bound root — else a source-name swap won the rename window; fail closed.
+            try Self.assertPublishedIsArt(root: root, importName: importName, art: art, preparedRoot: preparedRoot)
             try hooks.afterPublish?(finalURL)                      // crash-simulation window
+            // Re-verify AFTER the crash-sim window too, so a swap there can never let us return
+            // a PreparedImport whose public URL points at a different object than `art`.
+            try Self.assertPublishedIsArt(root: root, importName: importName, art: art, preparedRoot: preparedRoot)
             return PreparedImport(importID: gated.importID, preparedDatabaseURL: finalURL.appendingPathComponent(dbName),
                                   preparedDBIdentity: validated.preparedDBIdentity, manifest: gated.manifest, gated: gated,
                                   transactionsMigrated: validated.transactionsMigrated, reusedExisting: false, artifactHandle: art)
@@ -249,6 +289,12 @@ public struct PreparedImportRunner {
 
         let validated = try validateArtifact(art, gated: gated, expectedIdentity: nil, expectedCount: nil,
                                              workingDirectory: workingDirectory)
+        // Validation ran entirely through `art`'s fd; the PUBLIC URL, however, is rebuilt from
+        // the path. Before handing it back, confirm the root path still binds to `root` AND
+        // `importName` still resolves to the very inode we validated — so the returned URL
+        // cannot point at object B while `artifactHandle` is object A. (Security-sensitive
+        // reads must still use `artifactHandle`; the URL is a location hint only.)
+        try assertPublishedIsArt(root: root, importName: importName, art: art, preparedRoot: preparedRoot)
         let dbURL = preparedRoot.appendingPathComponent(importName, isDirectory: true).appendingPathComponent(AppPaths.databaseFileName)
         return PreparedImport(importID: gated.importID, preparedDatabaseURL: dbURL,
                               preparedDBIdentity: validated.preparedDBIdentity, manifest: gated.manifest, gated: gated,
@@ -303,12 +349,33 @@ public struct PreparedImportRunner {
         guard identity == prov.preparedDBIdentity else { throw conflict("prepared DB identity != provenance") }
         if let e = expectedIdentity, identity != e { throw conflict("prepared DB identity != freshly-migrated identity") }
 
+        // SCHEMA GATE — verified against the SchemaMigrator constants (an EXTERNAL invariant),
+        // NOT against attacker-writable provenance. A coordinated tamper that swaps in a
+        // valid-but-wrong-schema DB and rewrites provenance identity + count to match it still
+        // fails these head-schema invariants: user_version == head, every requiredTables NAME
+        // present, integrity_check ok, foreign_key_check empty. (Quiescence / DELETE journal
+        // mode is already enforced by PreparedDatabaseIdentity.compute above.) This proves table
+        // PRESENCE, not per-column DDL — a right-names/wrong-columns substitution is the
+        // registered same-UID residual (see the type doc); byte-exact DDL is deliberately NOT
+        // required so legitimate Electron-authored v23 imports are not false-rejected. Every
+        // check runs on the private verify copy taken no-follow THROUGH the bound artifact fd.
         let count: Int
         do {
             let db = try SQLiteDatabase(path: verifyDB.path, mode: .readOnly)
             defer { try? db.close() }
+            let uv = try db.userVersion()
+            guard uv == SchemaMigrator.schemaVersion else {
+                throw conflict("prepared DB user_version \(uv) != head \(SchemaMigrator.schemaVersion)")
+            }
+            guard try db.integrityCheck() else { throw conflict("prepared DB failed integrity_check") }
+            let fkRows = try db.query("PRAGMA foreign_key_check")
+            guard fkRows.isEmpty else { throw conflict("prepared DB has \(fkRows.count) foreign-key violation row(s)") }
+            let present = Set(try db.query("SELECT name FROM sqlite_master WHERE type = 'table'").compactMap { $0.string("name") })
+            let missing = SchemaMigrator.requiredTables.filter { !present.contains($0) }
+            guard missing.isEmpty else { throw conflict("prepared DB missing required tables: \(missing.sorted().joined(separator: ", "))") }
             count = try db.query("SELECT COUNT(*) AS c FROM transactions").first?.int("c") ?? -1
-        } catch { throw conflict("prepared DB transaction count unreadable: \(error)") }
+        } catch let e as PreparedRunFailure { throw e }
+        catch { throw conflict("prepared DB schema/verify unreadable: \(error)") }
         guard count == prov.transactionsMigrated else {
             throw conflict("actual transaction count \(count) != provenance \(prov.transactionsMigrated)")
         }
@@ -396,6 +463,21 @@ public struct PreparedImportRunner {
         guard let fp = try FileFingerprint.capture(at: path), fp.isDirectory,
               fp.device == root.device, fp.inode == root.inode else {
             throw PreparedRunFailure.publishFailed("preparedRoot path no longer refers to the bound directory (swapped)")
+        }
+    }
+
+    /// Authoritative post-publish / pre-return check: `importName` under the bound `root` MUST
+    /// resolve (device+inode) to the artifact handle we built and validated, AND the root PATH
+    /// must still be the bound root. This is what closes out the publish rename's non-atomic
+    /// source-name window and any post-publish swap: it verifies the ACTUAL OUTCOME against the
+    /// bound handle rather than re-checking a name before an action, so a swapped-in impostor
+    /// (or a redirected root path) fails closed instead of being returned as ours.
+    private static func assertPublishedIsArt(root: DirectoryHandle, importName: String,
+                                             art: DirectoryHandle, preparedRoot: URL) throws {
+        try assertStillBound(root, path: preparedRoot)
+        guard let fp = try root.fingerprint(named: importName), fp.isDirectory,
+              fp.device == art.device, fp.inode == art.inode else {
+            throw PreparedRunFailure.publishFailed("published artifact entry is not the validated artifact (swapped in the publish window)")
         }
     }
 }
