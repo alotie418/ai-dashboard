@@ -314,11 +314,14 @@ struct ActivationHooks {
 ///    activationRecordReadFailed, recordPublishFailed, recordWritebackMismatch,
 ///    recordNameSwapped, recordPublishedMismatch, recordUnboundDuringActivation,
 ///    candidateMaterializeFailed, candidateRehashMismatch, candidateNameSwapped,
-///    publishRaceLost, publishedActiveMismatch, sidecarAppeared, durabilitySyncFailed,
-///    durabilityNotConfirmed (re-run completes the barriers via the reuse path).
+///    publishRaceLost, publishedActiveMismatch, activePublishFailed, sidecarAppeared,
+///    durabilitySyncFailed, durabilityNotConfirmed (re-run completes the barriers via the
+///    reuse path).
 ///  - TERMINAL (needs a human / a future replace/reset operation; the slot and its record
 ///    are never touched): activeSlotOccupied, activationRecordConflict,
-///    activationRecordMalformed, activeIdentityMismatch.
+///    activationRecordMalformed, activeIdentityMismatch. `invalidActiveDestination` is also
+///    TERMINAL but is a caller/programming error (wrong destination path), not a disk-state
+///    conflict.
 enum ActivationError: Error, Equatable, CustomStringConvertible {
     case invalidActiveDestination(String)
     case activeParentUnreadable(String)
