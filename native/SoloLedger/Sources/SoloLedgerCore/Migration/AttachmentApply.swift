@@ -110,6 +110,12 @@ public struct AttachmentPlan: Equatable {
 
 // MARK: - Errors / results
 
+/// The completion sentinel's durability barriers, in publication order. Both also replay
+/// on every adopt of a pre-existing identical sentinel (repair-on-retry).
+public enum SentinelSyncPoint: String, Equatable {
+    case sentinelFile, sentinelDirEntry
+}
+
 public enum AttachmentApplyError: Error, CustomStringConvertible {
     case manifestUnreadable(String)
     case invalidImportID(String)
@@ -131,6 +137,8 @@ public enum AttachmentApplyError: Error, CustomStringConvertible {
     case referencedFileChangedSinceAudit(String)
     case stagedEntryNotRegularFile(String)
     case activeEntryNotRegularFile(String)
+    case sentinelDurabilityFailed(SentinelSyncPoint, String)
+    case sentinelPublishIncomplete(String)
 
     public var description: String {
         switch self {
@@ -154,6 +162,8 @@ public enum AttachmentApplyError: Error, CustomStringConvertible {
         case .referencedFileChangedSinceAudit(let n): return "Referenced attachment '\(n)' changed after the audit — re-run the reference audit before completing"
         case .stagedEntryNotRegularFile(let n): return "Staged attachment '\(n)' is not a regular file (symlink/directory/special) — refusing to apply"
         case .activeEntryNotRegularFile(let n): return "Active attachment entry '\(n)' is not a regular file (symlink/directory/special) — refusing to touch it"
+        case let .sentinelDurabilityFailed(point, m): return "Completion-sentinel durability barrier failed at \(point.rawValue) (retry — staging is kept): \(m)"
+        case .sentinelPublishIncomplete(let m): return "Completion-sentinel publication did not complete (retry): \(m)"
         }
     }
 }
@@ -206,16 +216,32 @@ struct ApplyHooks {
     var onBeforePublish: ((String) throws -> Void)?
     var onCompletionTempWrite: (() throws -> Void)?
     var onCompletionPublish: (() throws -> Void)?
+    /// Fires BEFORE the real sync syscall of each sentinel durability barrier; it may throw
+    /// (deterministic barrier-failure injection) or tamper the disk via the path — which is
+    /// exactly why every barrier is followed by a re-verification on the bound inode.
+    var onSentinelSync: ((SentinelSyncPoint) throws -> Void)?
+    /// Fires AFTER the sentinel's exclusive rename and BEFORE the directory barrier — the
+    /// crash-simulation / post-publish tamper window.
+    var afterSentinelPublished: ((URL) throws -> Void)?
+    /// Fires after the staging dir is bound and its entry verified, BEFORE the first unlink —
+    /// the adversarial window for a name swap (deletions must stay on the bound tree).
+    var beforeStagingRemoval: ((URL) throws -> Void)?
     var cleanup: ((URL) throws -> Void)?
     init(onAttachmentCopy: ((String) throws -> Void)? = nil,
          onBeforePublish: ((String) throws -> Void)? = nil,
          onCompletionTempWrite: (() throws -> Void)? = nil,
          onCompletionPublish: (() throws -> Void)? = nil,
+         onSentinelSync: ((SentinelSyncPoint) throws -> Void)? = nil,
+         afterSentinelPublished: ((URL) throws -> Void)? = nil,
+         beforeStagingRemoval: ((URL) throws -> Void)? = nil,
          cleanup: ((URL) throws -> Void)? = nil) {
         self.onAttachmentCopy = onAttachmentCopy
         self.onBeforePublish = onBeforePublish
         self.onCompletionTempWrite = onCompletionTempWrite
         self.onCompletionPublish = onCompletionPublish
+        self.onSentinelSync = onSentinelSync
+        self.afterSentinelPublished = afterSentinelPublished
+        self.beforeStagingRemoval = beforeStagingRemoval
         self.cleanup = cleanup
     }
 }
@@ -231,8 +257,11 @@ struct ApplyHooks {
 ///  - `complete` merges the DB reference audit, recomputes the prepared DB's identity from
 ///    the actual file (post-audit mutation fails closed), and only if there are no
 ///    unresolved items (or a matching acknowledgement) re-verifies every audited-resolved
-///    reference and every final active file hash, ATOMICALLY persists the completion
-///    sentinel, then cleans staging.
+///    reference and every final active file hash, publishes the completion sentinel
+///    descriptor-rooted and create-only (bound temp → file barrier → RENAME_EXCL →
+///    published-name + semantic read-back → directory barrier), and ONLY after both
+///    durability barriers cleans staging (descriptor-rooted, known-tree only) — so a
+///    power loss can never leave staging destroyed with the sentinel unpersisted.
 ///
 /// ROLLBACK NOTE: because attachment apply is strictly add-only (never overwrites), a DB-only
 /// backup is a LOGICAL LEDGER rollback point — the DB and every pre-existing attachment are
@@ -303,9 +332,22 @@ public struct AttachmentApply {
                                      fileUnresolved: Self.fileUnresolved(v))
     }
 
+    /// `prePublishGate` is the CALLER's completion-validity gate (e.g. C11's active-envelope
+    /// + bound-rehash bracket). It runs twice inside sentinel publication — once before the
+    /// manifests dir is touched, once immediately before the exclusive rename — so every
+    /// completion-validity check happens BEFORE the sentinel becomes durable; after publish
+    /// only publish-integrity is verified and restart semantics derive from disk alone.
+    ///
+    /// `trustedStagingRoot` is the caller's ALREADY-BOUND staging evidence (C11b passes
+    /// `GatedStagedSnapshot.root`). When supplied, the staging URL is never re-opened —
+    /// cleanup trusts exactly this handle, and a pre-swapped impostor at the URL is never
+    /// bound or deleted. When nil (the 2B-1 standalone path), the root is bound from
+    /// `report.stagingDir` at complete() entry — still strictly before sentinel publication.
     func complete(report: AttachmentApplyReport, referenceAudit: ReferenceAudit,
                   acknowledgement: Acknowledgement?, preparedDatabaseAt preparedDBURL: URL,
-                  manifestsDir: URL, hooks: ApplyHooks) throws -> CompleteOutcome {
+                  manifestsDir: URL, prePublishGate: (() throws -> Void)? = nil,
+                  trustedStagingRoot: DirectoryHandle? = nil,
+                  hooks: ApplyHooks) throws -> CompleteOutcome {
         // The audit evidence must belong to THIS exact import — reject cross-import / snapshot /
         // attachment-set / database audits field-by-field.
         guard referenceAudit.importID == report.importID.rawValue else { throw AttachmentApplyError.referenceAuditMismatch(field: "importID") }
@@ -389,10 +431,21 @@ public struct AttachmentApply {
         final.preparedDBIdentity = report.preparedDBIdentity
         final.report = Self.reportString(applied: report.applied, unresolved: unresolved)
 
-        let sentinelURL = try Self.persistCompletion(final, importID: report.importID, manifestsDir: manifestsDir, hooks: hooks)
+        // Bind everything staging cleanup will need BEFORE the sentinel becomes durable —
+        // after publish no staging path is re-opened by URL, so a tree swapped in during
+        // the publish window can never be entered or deleted. A caller-supplied trusted
+        // root (C11b: GatedStagedSnapshot.root) replaces even the entry-time URL bind.
+        let cleanupPlan = Self.bindStagingForCleanup(stagingDir: report.stagingDir,
+                                                     trustedRoot: trustedStagingRoot)
+
+        // Sentinel publication (descriptor-rooted, barriered) MUST fully succeed — including
+        // both durability barriers — before staging cleanup may destroy the ability to re-run.
+        let sentinelURL = try Self.persistCompletion(final, importID: report.importID, manifestsDir: manifestsDir,
+                                                     prePublishGate: prePublishGate, hooks: hooks)
 
         var cleanupError: String?
-        do { try Self.cleanStaging(report.stagingDir, hooks: hooks) } catch { cleanupError = "\(error)" }
+        do { try Self.cleanStaging(plan: cleanupPlan, stagingDir: report.stagingDir, manifest: final, hooks: hooks) }
+        catch { cleanupError = "\(error)" }
 
         return .completed(ApplyResult(importID: report.importID.rawValue, applied: report.applied,
                                       unresolved: unresolved, completionSentinelURL: sentinelURL,
@@ -561,63 +614,359 @@ public struct AttachmentApply {
         return s
     }
 
-    /// A pre-existing sentinel may be reused ONLY if it decodes to a manifest that is
-    /// SEMANTICALLY IDENTICAL to the completed manifest we would write — same importID,
-    /// formatVersion, status (.complete), referenceAuditPerformed, applied, unresolved,
-    /// acknowledgedReportHash, every identity hash, and all remaining fields. Anything else —
-    /// an `.ingested` manifest, a wrong importID, an old/unknown format, an unaudited or
-    /// differently-resolved completion, even with the same three identity hashes — is NOT a
-    /// match, so it is rejected and never overwritten.
-    private static func existingSentinelIsIdentical(_ url: URL, to manifest: ImportManifest) -> Bool {
-        guard let existing = try? JSONDecoder().decode(ImportManifest.self, from: Data(contentsOf: url)) else { return false }
-        return existing == manifest
+    /// Sentinel read ceiling. A completion sentinel lists every attachment, so it is larger
+    /// than the fixed-shape owner record but still bounded (thousands of entries fit well
+    /// under 8 MiB); a bigger file at the sentinel name is malformed/hostile and must never
+    /// be slurped unbounded — exceeding the cap fails closed, never a truncated success.
+    static let maxSentinelBytes = 8 << 20
+
+    /// Whole-sentinel decode through the BOUND fd (never by name), size-capped.
+    private static func decodeSentinel(_ file: BoundRegularFile) throws -> ImportManifest {
+        try JSONDecoder().decode(ImportManifest.self, from: try file.readAll(maxBytes: maxSentinelBytes))
     }
 
+    /// Run one sentinel durability barrier: the test seam fires FIRST (it may throw to
+    /// inject a failure, or tamper — post-sync gates re-verify), then the real barrier.
+    private static func sentinelSync(_ point: SentinelSyncPoint, hooks: ApplyHooks,
+                                     _ body: () throws -> Void) throws {
+        do {
+            try hooks.onSentinelSync?(point)
+            try body()
+        } catch { throw AttachmentApplyError.sentinelDurabilityFailed(point, "\(error)") }
+    }
+
+    /// Descriptor-rooted, barriered, create-only publication of the completion sentinel.
+    ///
+    /// Order (every step fd-relative to the BOUND manifests dir; barriers strictly BEFORE
+    /// the caller may clean staging):
+    ///   GX  caller's `prePublishGate` (completion-validity — before ANY side effect,
+    ///       including the ensure-exists createDirectory of the manifests dir)
+    ///   P0  bind ImportManifests AND its parent (O_NOFOLLOW|O_DIRECTORY, dev+inode) and
+    ///       verify the parent's entry resolves to the bound dir — publication is only
+    ///       meaningful while the CANONICAL ImportManifests name leads to this inode
+    ///   P1  pre-existing sentinel ⇒ adopt (reuse iff SEMANTICALLY IDENTICAL — same
+    ///       importID, formatVersion, status, referenceAuditPerformed, applied, unresolved,
+    ///       acknowledgedReportHash, every identity hash — with BOTH barriers replayed;
+    ///       anything else is rejected and never overwritten)
+    ///   P2  exclusive hidden temp via BoundRegularFile (openat O_EXCL|O_NOFOLLOW, no reopen)
+    ///   P3  bound write-back verify
+    ///   P4  file barrier (F_FULLFSYNC, fail closed)         ← durability barrier 1
+    ///   P5  post-sync re-verify (name still bound + bytes still exact)
+    ///   GX′ caller's `prePublishGate` again, immediately before publish
+    ///   P5′ FINAL temp re-verify directly before the rename (the gate ran arbitrary code):
+    ///       tempName still resolves to the bound inode AND bound decode == the manifest
+    ///   P6  same-directory RENAME_EXCL (create-only, never overwrites); losing the race
+    ///       falls back to the P1 adopt path
+    ///   P7  published name resolves to OUR bound inode + full semantic read-back
+    ///   P8  directory-entry barrier                          ← durability barrier 2
+    ///   P9  P7 re-verified after the barrier
+    ///   P10 canonical-path linkage: the parent's ImportManifests entry STILL resolves to
+    ///       the bound dir — a moved-aside dir would hold a sentinel no restart probe can
+    ///       find, so an unlinked dir is retriable `sentinelPublishIncomplete`, never
+    ///       completed (and staging stays, because cleanup runs only after this returns)
+    ///
+    /// A FINAL sentinel is never deleted or overwritten by any path here. Crash before P6
+    /// leaves only the hidden temp (reaper residue); crash after P6 leaves a published,
+    /// process-crash-safe sentinel whose durability is re-confirmed by the next run's adopt.
     private static func persistCompletion(_ manifest: ImportManifest, importID: ImportID,
-                                          manifestsDir: URL, hooks: ApplyHooks) throws -> URL {
-        let fm = FileManager.default
-        try fm.createDirectory(at: manifestsDir, withIntermediateDirectories: true)
-        let finalURL = manifestsDir.appendingPathComponent("\(importID.rawValue).json")
+                                          manifestsDir: URL, prePublishGate: (() throws -> Void)?,
+                                          hooks: ApplyHooks) throws -> URL {
+        try prePublishGate?()   // GX — strictly before ANY manifests-dir side effect
 
-        // A pre-existing sentinel is NEVER overwritten. Semantically identical ⇒ idempotent
-        // reuse (return as-is, no rewrite); anything else ⇒ reject.
-        if fm.fileExists(atPath: finalURL.path) {
-            guard existingSentinelIsIdentical(finalURL, to: manifest) else { throw AttachmentApplyError.sentinelIdentityMismatch(importID.rawValue) }
-            return finalURL
+        try FileManager.default.createDirectory(at: manifestsDir, withIntermediateDirectories: true)
+        let finalName = "\(importID.rawValue).json"
+        let finalURL = manifestsDir.appendingPathComponent(finalName)
+        let dirName = manifestsDir.lastPathComponent
+
+        // P0: bind the manifests dir AND its parent; the parent's entry must resolve to the
+        // bound dir now and STILL at P10 — a sentinel published into a moved-aside dir is
+        // not published at its canonical path and must never count as completed.
+        let dirParent: DirectoryHandle
+        do { dirParent = try DirectoryHandle.open(at: manifestsDir.deletingLastPathComponent()) }
+        catch { throw AttachmentApplyError.sentinelPublishIncomplete("manifests parent bind: \(error)") }
+        let dir: DirectoryHandle
+        do { dir = try DirectoryHandle.open(at: manifestsDir) }
+        catch { throw AttachmentApplyError.sentinelPublishIncomplete("manifests dir bind: \(error)") }
+        try assertManifestsDirStillLinked(dir, named: dirName, in: dirParent)
+
+        let existingFP: FileFingerprint?
+        do { existingFP = try dir.fingerprint(named: finalName) }
+        catch { throw AttachmentApplyError.sentinelPublishIncomplete("sentinel fingerprint: \(error)") }
+        if existingFP != nil {
+            return try adoptExistingSentinel(named: finalName, in: dir, dirName: dirName, dirParent: dirParent,
+                                             expected: manifest, importID: importID, finalURL: finalURL, hooks: hooks)
         }
-
-        let tmpURL = manifestsDir.appendingPathComponent(".tmp-\(importID.rawValue)-\(UUID().uuidString).json")
-        let enc = JSONEncoder()
-        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try enc.encode(manifest)
-
-        func dropTemp() { if fm.fileExists(atPath: tmpURL.path) { do { try fm.removeItem(at: tmpURL) } catch { /* orphan temp → reaper */ } } }
 
         try hooks.onCompletionTempWrite?()
-        try data.write(to: tmpURL)
+        let payload: Data
         do {
-            try hooks.onCompletionPublish?()
-            // EXCLUSIVE publish: moveItem THROWS if a sentinel appeared between our check and now
-            // — unlike replaceItemAt, it never overwrites.
-            try fm.moveItem(at: tmpURL, to: finalURL)
-        } catch let publishError {
-            // A sentinel may have appeared concurrently in the TOCTOU window. NEVER overwrite:
-            // reuse iff the full identity matches, else reject. Always drop our temp.
-            if fm.fileExists(atPath: finalURL.path) {
-                dropTemp()
-                if existingSentinelIsIdentical(finalURL, to: manifest) { return finalURL }
-                throw AttachmentApplyError.sentinelIdentityMismatch(importID.rawValue)
-            }
-            dropTemp()
-            throw publishError
+            let enc = JSONEncoder()
+            enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+            payload = try enc.encode(manifest)
+        } catch { throw AttachmentApplyError.sentinelPublishIncomplete("sentinel encode: \(error)") }
+
+        let tempName = ".tmp-\(importID.rawValue)-\(UUID().uuidString).json"
+        let tmp: BoundRegularFile
+        do { tmp = try BoundRegularFile.create(in: dir, named: tempName, contents: payload) }
+        catch { throw AttachmentApplyError.sentinelPublishIncomplete("sentinel temp create: \(error)") }
+        var published = false
+        // Cleanup may touch ONLY the unpublished temp, and only while the name still
+        // resolves to our bound inode. The FINAL sentinel is never deleted by any path.
+        defer { if !published { tmp.unlinkIfStillBound(named: tempName, in: dir) } }
+
+        guard (try? decodeSentinel(tmp)) == manifest else {                                    // P3
+            throw AttachmentApplyError.sentinelPublishIncomplete("sentinel write-back mismatch")
         }
+        try sentinelSync(.sentinelFile, hooks: hooks) { try tmp.syncToDisk() }                 // P4
+        guard (try? tmp.matchesChild(named: tempName, in: dir)) == true,                       // P5
+              (try? decodeSentinel(tmp)) == manifest else {
+            throw AttachmentApplyError.sentinelPublishIncomplete("sentinel temp changed after the file barrier")
+        }
+
+        try prePublishGate?()   // GX′
+
+        guard (try? tmp.matchesChild(named: tempName, in: dir)) == true else {                 // P5′ (name)
+            throw AttachmentApplyError.sentinelPublishIncomplete("sentinel temp name unbound before publish")
+        }
+        guard (try? decodeSentinel(tmp)) == manifest else {                                    // P5′ (bytes)
+            throw AttachmentApplyError.sentinelPublishIncomplete("sentinel temp content changed before publish")
+        }
+
+        try hooks.onCompletionPublish?()
+        let ok: Bool
+        do { ok = try dir.renameChildExclusively(from: tempName, to: finalName) }              // P6
+        catch { throw AttachmentApplyError.sentinelPublishIncomplete("sentinel publish rename: \(error)") }
+        guard ok else {
+            // Lost the publish race — a sentinel appeared concurrently. NEVER overwrite:
+            // adopt iff identical (with barrier replay), else reject. Temp cleaned by the defer.
+            return try adoptExistingSentinel(named: finalName, in: dir, dirName: dirName, dirParent: dirParent,
+                                             expected: manifest, importID: importID, finalURL: finalURL, hooks: hooks)
+        }
+        published = true
+
+        try assertSentinelStillPublished(tmp, named: finalName, in: dir, expected: manifest,   // P7
+                                         importID: importID, what: "immediately after publish")
+        try hooks.afterSentinelPublished?(finalURL)
+        try sentinelSync(.sentinelDirEntry, hooks: hooks) {                                    // P8
+            try fsyncDirectoryEntry(dir, pathHint: manifestsDir.path)
+        }
+        try assertSentinelStillPublished(tmp, named: finalName, in: dir, expected: manifest,   // P9
+                                         importID: importID, what: "after the directory barrier")
+        try assertManifestsDirStillLinked(dir, named: dirName, in: dirParent)                  // P10
         return finalURL
     }
 
-    private static func cleanStaging(_ stagingDir: URL, hooks: ApplyHooks) throws {
+    /// The CANONICAL manifests-dir name must still resolve (dir type, device+inode) to the
+    /// bound handle every fd-relative step ran inside. Verifying only names INSIDE the bound
+    /// dir is not enough: a whole-dir swap leaves those checks passing while the sentinel
+    /// sits in a moved-aside dir no restart probe can find. Unlinked ⇒ retriable
+    /// `sentinelPublishIncomplete` (the caller keeps staging; a re-run republishes at the
+    /// canonical path).
+    private static func assertManifestsDirStillLinked(_ dir: DirectoryHandle, named dirName: String,
+                                                      in parent: DirectoryHandle) throws {
+        guard let fp = try? parent.fingerprint(named: dirName), fp.isDirectory,
+              fp.device == dir.device, fp.inode == dir.inode else {
+            throw AttachmentApplyError.sentinelPublishIncomplete(
+                "'\(dirName)' no longer resolves to the bound manifests directory — the sentinel is not at its canonical path")
+        }
+    }
+
+    /// Adopt a pre-existing FINAL sentinel: bind it (openat no-follow — a symlink or a
+    /// directory at the name is a conflict, never followed), decode from the bound fd
+    /// (size-capped), require SEMANTIC full-field equality with the completion we would
+    /// write, then REPLAY both durability barriers with post-sync re-verification — a
+    /// barrier that failed (or a crash) in an earlier run is repaired before the sentinel
+    /// is trusted as durable. Anything non-identical is rejected and never overwritten.
+    /// Exits through the same P10 canonical-linkage gate as the fresh path.
+    private static func adoptExistingSentinel(named finalName: String, in dir: DirectoryHandle,
+                                              dirName: String, dirParent: DirectoryHandle,
+                                              expected: ImportManifest, importID: ImportID,
+                                              finalURL: URL, hooks: ApplyHooks) throws -> URL {
+        let existing: BoundRegularFile
+        do { existing = try BoundRegularFile.open(in: dir, named: finalName) }
+        catch let e as FileHashError {
+            if case .notARegularFile = e { throw AttachmentApplyError.sentinelIdentityMismatch(importID.rawValue) }
+            throw AttachmentApplyError.sentinelPublishIncomplete("existing sentinel open: \(e)")
+        }
+        catch { throw AttachmentApplyError.sentinelPublishIncomplete("existing sentinel open: \(error)") }
+        guard (try? decodeSentinel(existing)) == expected else {
+            throw AttachmentApplyError.sentinelIdentityMismatch(importID.rawValue)
+        }
+        try sentinelSync(.sentinelFile, hooks: hooks) { try existing.syncToDisk() }
+        guard (try? existing.matchesChild(named: finalName, in: dir)) == true,
+              (try? decodeSentinel(existing)) == expected else {
+            throw AttachmentApplyError.sentinelPublishIncomplete("existing sentinel changed after the file barrier")
+        }
+        try sentinelSync(.sentinelDirEntry, hooks: hooks) {
+            try fsyncDirectoryEntry(dir, pathHint: finalURL.deletingLastPathComponent().path)
+        }
+        guard (try? existing.matchesChild(named: finalName, in: dir)) == true,
+              (try? decodeSentinel(existing)) == expected else {
+            throw AttachmentApplyError.sentinelPublishIncomplete("existing sentinel changed after the directory barrier")
+        }
+        try assertManifestsDirStillLinked(dir, named: dirName, in: dirParent)                  // P10
+        return finalURL
+    }
+
+    /// Publish-integrity check on the just-published sentinel: the final name must still
+    /// resolve to OUR bound inode and read back semantically identical. On failure, decide
+    /// from what is at the name NOW — restart semantics derive from disk the same way:
+    ///  - vanished ⇒ retriable `sentinelPublishIncomplete` (a re-run republishes);
+    ///  - a semantically IDENTICAL object ⇒ functional convergence, success;
+    ///  - anything else (foreign/tampered) ⇒ terminal `sentinelIdentityMismatch`.
+    private static func assertSentinelStillPublished(_ tmp: BoundRegularFile, named finalName: String,
+                                                     in dir: DirectoryHandle, expected: ImportManifest,
+                                                     importID: ImportID, what: String) throws {
+        if (try? tmp.matchesChild(named: finalName, in: dir)) == true,
+           (try? decodeSentinel(tmp)) == expected { return }
+        let fp = try? dir.fingerprint(named: finalName)
+        guard fp != nil else {
+            throw AttachmentApplyError.sentinelPublishIncomplete("published sentinel vanished \(what)")
+        }
+        if let f = try? BoundRegularFile.open(in: dir, named: finalName),
+           (try? decodeSentinel(f)) == expected { return }
+        throw AttachmentApplyError.sentinelIdentityMismatch(importID.rawValue)
+    }
+
+    /// A staging-cleanup step that must leave everything untouched (replaced entry, unknown
+    /// entry, non-empty directory). Surfaced by `complete` as `stagingCleanupError` —
+    /// completion stays recorded; the residue is reaper territory.
+    struct StagingCleanupBlocked: Error, CustomStringConvertible { let description: String }
+
+    /// Everything staging cleanup needs, BOUND BEFORE the sentinel becomes durable. After
+    /// publish no staging path (nor any subdirectory) is ever re-opened by URL — cleanup
+    /// acts only through these pre-bound descriptors, so a post-publish swap of the staging
+    /// tree at ANY level can only produce residue, never deletions inside a replacement.
+    /// C11b's finalizer supplies `GatedStagedSnapshot.root` as `trustedStagingRoot` on the
+    /// internal `complete` overload — then the root is never derived from a URL at all.
+    struct StagingCleanupHandles {
+        let parent: DirectoryHandle      // the Staging root, holding the import-<id> entry
+        let entryName: String
+        let root: DirectoryHandle        // the staging dir itself
+        let attachments: DirectoryHandle?
+        let docs: DirectoryHandle?
+    }
+
+    enum StagingCleanupPlan {
+        case absent                      // nothing to clean (ENOENT at bind time)
+        case bound(StagingCleanupHandles)
+        case blocked(String)             // could not bind — surfaced post-completion, nothing touched
+    }
+
+    /// Acquire the cleanup evidence (pre-publish). Never throws: a staging tree that cannot
+    /// be bound (symlink at the path, non-dir levels, metadata errors) becomes `.blocked` —
+    /// completion proceeds and the problem is surfaced as `stagingCleanupError`.
+    ///
+    /// When the caller already HOLDS bound evidence (`trustedRoot`, e.g. C11b passing
+    /// `GatedStagedSnapshot.root`), that handle IS the root — the staging URL is never
+    /// re-opened; the parent is bound only to verify (and later remove) the entry, and the
+    /// attachments/docs handles are bound fd-relative FROM the trusted root. A staging URL
+    /// whose entry no longer resolves to the trusted root (a pre-swapped impostor) blocks
+    /// with the impostor never bound, never entered.
+    static func bindStagingForCleanup(stagingDir: URL, trustedRoot: DirectoryHandle? = nil) -> StagingCleanupPlan {
+        let root: DirectoryHandle
+        if let trustedRoot {
+            root = trustedRoot
+        } else {
+            do { root = try DirectoryHandle.open(at: stagingDir) }
+            catch let e as FileHashError where e.isFileMissing { return .absent }
+            catch { return .blocked("staging bind: \(error)") }
+        }
+        let parent: DirectoryHandle
+        do { parent = try DirectoryHandle.open(at: stagingDir.deletingLastPathComponent()) }
+        catch { return .blocked("staging parent bind: \(error)") }
+        let entryName = stagingDir.lastPathComponent
+        do {
+            guard let fp = try parent.fingerprint(named: entryName) else {
+                // Entry definitively absent: already cleaned (nothing at the canonical name).
+                return .absent
+            }
+            guard fp.isDirectory, fp.device == root.device, fp.inode == root.inode else {
+                return .blocked("staging entry '\(entryName)' does not resolve to the bound directory")
+            }
+        } catch { return .blocked("staging entry fingerprint: \(error)") }
+        var attachments: DirectoryHandle?
+        var docs: DirectoryHandle?
+        do {
+            if let afp = try root.fingerprint(named: "attachments") {
+                guard afp.isDirectory else { return .blocked("'attachments' is not a directory — left untouched") }
+                let a = try root.subdirectory(named: "attachments")
+                attachments = a
+                if let dfp = try a.fingerprint(named: "docs") {
+                    guard dfp.isDirectory else { return .blocked("'attachments/docs' is not a directory — left untouched") }
+                    docs = try a.subdirectory(named: "docs")
+                }
+            }
+        } catch { return .blocked("staging subtree bind: \(error)") }
+        return .bound(StagingCleanupHandles(parent: parent, entryName: entryName, root: root,
+                                            attachments: attachments, docs: docs))
+    }
+
+    /// Descriptor-rooted, known-tree staging cleanup over PRE-PUBLISH bound evidence. NEVER
+    /// `FileManager.removeItem` on the staging path, and NEVER a fresh URL bind after the
+    /// sentinel is durable: a path re-resolution at cleanup time would happily bind a
+    /// structurally identical impostor swapped in during the publish window and delete
+    /// inside it. Only entries this import's manifest declares are unlinked, strictly
+    /// fd-relative (`removeNonDirectoryChild` — unlinkat flag 0, can never remove or
+    /// recurse into a directory), with each directory level collapsed bottom-up via a
+    /// bound-inode-checked AT_REMOVEDIR. Unknown entries, a replaced entry, or a non-empty
+    /// directory are LEFT IN PLACE and surfaced as a cleanup error — never enumerated,
+    /// never recursed; a swapped entry blocks with NOTHING deleted. ENOENT anywhere is an
+    /// idempotent no-op, so a partially cleaned staging converges on re-run (which re-binds
+    /// at ITS OWN entry, before ITS publish). Point-in-time residual (same class as
+    /// `removeBoundChildDir`): the fingerprint→rmdir gap cannot be closed on Darwin — at
+    /// worst an EMPTY foreign dir renamed onto the name in that gap is removed, never data.
+    private static func cleanStaging(plan: StagingCleanupPlan, stagingDir: URL,
+                                     manifest: ImportManifest, hooks: ApplyHooks) throws {
         if let override = hooks.cleanup { try override(stagingDir); return }
-        if FileManager.default.fileExists(atPath: stagingDir.path) {
-            try FileManager.default.removeItem(at: stagingDir)   // NOT try? — surfaced by the caller
+        let h: StagingCleanupHandles
+        switch plan {
+        case .absent: return                                            // already cleaned
+        case .blocked(let why): throw StagingCleanupBlocked(description: why)
+        case .bound(let handles): h = handles
+        }
+
+        // The entry must STILL resolve to the pre-publish bound tree; a swap during the
+        // publish window leaves the replacement completely untouched (nothing deleted).
+        guard let fp = try h.parent.fingerprint(named: h.entryName), fp.isDirectory,
+              fp.device == h.root.device, fp.inode == h.root.inode else {
+            throw StagingCleanupBlocked(description: "staging entry '\(h.entryName)' no longer resolves to the bound directory — nothing deleted")
+        }
+
+        try hooks.beforeStagingRemoval?(stagingDir)
+
+        if let docs = h.docs {
+            for f in manifest.files where f.outcome == .ingested {
+                try docs.removeNonDirectoryChild(named: f.name)
+            }
+            guard let attachments = h.attachments else {
+                throw StagingCleanupBlocked(description: "internal: docs handle without attachments handle")
+            }
+            try removeBoundEmptyDir(docs, named: "docs", in: attachments)
+        }
+        if let attachments = h.attachments {
+            try removeBoundEmptyDir(attachments, named: "attachments", in: h.root)
+        }
+        try h.root.removeNonDirectoryChild(named: "manifest.json")
+        try h.root.removeNonDirectoryChild(named: AppPaths.databaseFileName)
+        try h.root.removeNonDirectoryChild(named: AppPaths.databaseFileName + "-wal")
+        try removeBoundEmptyDir(h.root, named: h.entryName, in: h.parent)
+    }
+
+    /// Remove a directory ENTRY only while `name` still resolves (dir type, device+inode)
+    /// to the BOUND handle the cleanup worked through. AT_REMOVEDIR refuses non-empty dirs
+    /// (ENOTEMPTY ⇒ unknown entries remain ⇒ residue) and cannot follow a substituted
+    /// symlink; a replaced entry is left untouched.
+    private static func removeBoundEmptyDir(_ child: DirectoryHandle, named name: String,
+                                            in parent: DirectoryHandle) throws {
+        guard let fp = try parent.fingerprint(named: name), fp.isDirectory,
+              fp.device == child.device, fp.inode == child.inode else {
+            throw StagingCleanupBlocked(description: "'\(name)' no longer resolves to the bound directory — left untouched")
+        }
+        guard unlinkat(parent.fd, name, AT_REMOVEDIR) == 0 else {
+            let e = errno
+            if e == ENOENT { return }
+            throw StagingCleanupBlocked(description: "rmdir '\(name)' failed (errno \(e)) — left for a reaper")
         }
     }
 

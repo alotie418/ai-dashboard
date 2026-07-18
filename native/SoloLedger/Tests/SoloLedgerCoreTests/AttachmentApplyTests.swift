@@ -737,4 +737,460 @@ final class AttachmentApplyTests: LedgerTestCase {
         let r2 = UnresolvedReport(items: [.init(name: "x", kind: .rejectedName), .init(name: "y", kind: .rejectedName)])
         XCTAssertNotEqual(r1.reportHash, r2.reportHash, "distinct reports must not hash-collide via separator injection")
     }
+
+    // MARK: - C11a. Descriptor-rooted, barriered sentinel publication (2B-3 C11a)
+
+    private func completeSimple(_ report: AttachmentApplyReport, manifests: URL,
+                                prePublishGate: (() throws -> Void)? = nil,
+                                hooks: ApplyHooks = ApplyHooks()) throws -> CompleteOutcome {
+        try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report), acknowledgement: nil,
+                                       preparedDatabaseAt: preparedDBURL, manifestsDir: manifests,
+                                       prePublishGate: prePublishGate, hooks: hooks)
+    }
+
+    /// Fresh publication runs BOTH barriers in order; an idempotent re-complete ADOPTS the
+    /// existing sentinel and REPLAYS both barriers (repair-on-retry), never rewriting it.
+    func testSentinelSyncSequenceFreshAndAdoptReplay() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        var fresh: [SentinelSyncPoint] = []
+        guard case .completed = try completeSimple(report, manifests: manifests,
+                                                   hooks: ApplyHooks(onSentinelSync: { fresh.append($0) })) else { return XCTFail() }
+        XCTAssertEqual(fresh, [.sentinelFile, .sentinelDirEntry])
+        let before = try Data(contentsOf: sentinelURL(manifests, id))
+
+        var adopt: [SentinelSyncPoint] = []
+        let o2 = try completeSimple(report, manifests: manifests,
+                                    hooks: ApplyHooks(onSentinelSync: { adopt.append($0) }))
+        guard case .completed(let r2) = o2 else { return XCTFail() }
+        XCTAssertEqual(adopt, [.sentinelFile, .sentinelDirEntry], "adopt replays both barriers")
+        XCTAssertTrue(r2.stagingCleaned, "staging already gone → idempotent clean")
+        XCTAssertEqual(try Data(contentsOf: sentinelURL(manifests, id)), before, "adopted sentinel never rewritten")
+    }
+
+    func testSentinelFileBarrierFailureNoFinalSentinel() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        XCTAssertThrowsError(try completeSimple(report, manifests: manifests,
+                                                hooks: ApplyHooks(onSentinelSync: { p in if p == .sentinelFile { throw TestError() } }))) { e in
+            guard case AttachmentApplyError.sentinelDurabilityFailed(.sentinelFile, _) = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertFalse(fm.fileExists(atPath: sentinelURL(manifests, id).path), "no half-published sentinel")
+        XCTAssertTrue(tempManifests(manifests).isEmpty, "own still-bound temp cleaned")
+        XCTAssertTrue(fm.fileExists(atPath: staging.path), "staging kept")
+    }
+
+    /// THE ordering guarantee this step exists for: a directory-barrier failure happens with
+    /// the sentinel already published (process-crash safe) but completion NOT returned — and
+    /// staging MUST still exist, because cleanup runs strictly after both barriers. The retry
+    /// adopts the sentinel, replays the barriers, and only then cleans staging.
+    func testSentinelDirBarrierFailureKeepsStagingThenRepairedOnRetry() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        XCTAssertThrowsError(try completeSimple(report, manifests: manifests,
+                                                hooks: ApplyHooks(onSentinelSync: { p in if p == .sentinelDirEntry { throw TestError() } }))) { e in
+            guard case AttachmentApplyError.sentinelDurabilityFailed(.sentinelDirEntry, _) = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertTrue(fm.fileExists(atPath: sentinelURL(manifests, id).path), "sentinel IS published (crash safe)")
+        XCTAssertTrue(fm.fileExists(atPath: staging.path), "staging MUST survive a barrier failure — cleanup is after the barriers")
+        let bytes = try Data(contentsOf: sentinelURL(manifests, id))
+
+        var seq: [SentinelSyncPoint] = []
+        let o2 = try completeSimple(report, manifests: manifests, hooks: ApplyHooks(onSentinelSync: { seq.append($0) }))
+        guard case .completed(let r2) = o2 else { return XCTFail() }
+        XCTAssertEqual(seq, [.sentinelFile, .sentinelDirEntry], "retry replays the full barrier set")
+        XCTAssertTrue(r2.stagingCleaned)
+        XCTAssertFalse(fm.fileExists(atPath: staging.path))
+        XCTAssertEqual(try Data(contentsOf: sentinelURL(manifests, id)), bytes, "sentinel bytes unchanged")
+    }
+
+    /// The onSentinelSync seam may tamper via the path (same inode) — the post-sync P5 gate
+    /// must stop the tampered temp BEFORE its rename; the final sentinel must never appear.
+    func testSentinelTempTamperAfterFileBarrierBlockedBeforeRename() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        XCTAssertThrowsError(try completeSimple(report, manifests: manifests,
+                                                hooks: ApplyHooks(onSentinelSync: { p in
+            guard p == .sentinelFile else { return }
+            let temp = try XCTUnwrap(self.tempManifests(manifests).first)
+            try Data("{\"tampered\":true}".utf8).write(to: manifests.appendingPathComponent(temp))   // same inode rewrite
+        }))) { e in
+            guard case AttachmentApplyError.sentinelPublishIncomplete = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertFalse(fm.fileExists(atPath: sentinelURL(manifests, id).path), "tampered temp must not be published")
+        XCTAssertTrue(tempManifests(manifests).isEmpty)
+        XCTAssertTrue(fm.fileExists(atPath: staging.path))
+    }
+
+    /// P5′ (name): the prePublishGate runs arbitrary code immediately before the rename —
+    /// swapping the temp NAME to a different inode there must fail closed BEFORE P6, with
+    /// the replacement untouched and no final sentinel.
+    func testSentinelTempNameSwappedAfterPrePublishGateBlockedBeforeRename() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        var calls = 0
+        var replaced: URL?
+        XCTAssertThrowsError(try completeSimple(report, manifests: manifests, prePublishGate: {
+            calls += 1
+            guard calls == 2 else { return }   // GX′ — the invocation directly before P6
+            let temp = try XCTUnwrap(self.tempManifests(manifests).first)
+            let url = manifests.appendingPathComponent(temp)
+            try self.fm.moveItem(at: url, to: manifests.appendingPathComponent("aside.json"))
+            try Data("IMPOSTOR".utf8).write(to: url)   // different inode at the temp name
+            replaced = url
+        })) { e in
+            guard case AttachmentApplyError.sentinelPublishIncomplete = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertEqual(calls, 2, "gate must run before the manifests dir is touched AND directly before publish")
+        XCTAssertFalse(fm.fileExists(atPath: sentinelURL(manifests, id).path), "no final sentinel")
+        XCTAssertEqual(try Data(contentsOf: XCTUnwrap(replaced)), Data("IMPOSTOR".utf8),
+                       "replacement untouched — cleanup only unlinks the still-bound temp")
+        XCTAssertTrue(fm.fileExists(atPath: staging.path))
+    }
+
+    /// P5′ (bytes): rewriting the temp's SAME inode inside the gate must be caught by the
+    /// final bound decode BEFORE P6 — no final sentinel.
+    func testSentinelTempContentRewrittenAfterPrePublishGateBlockedBeforeRename() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        var calls = 0
+        XCTAssertThrowsError(try completeSimple(report, manifests: manifests, prePublishGate: {
+            calls += 1
+            guard calls == 2 else { return }
+            let temp = try XCTUnwrap(self.tempManifests(manifests).first)
+            try Data("{\"late\":true}".utf8).write(to: manifests.appendingPathComponent(temp))   // same inode
+        })) { e in
+            guard case AttachmentApplyError.sentinelPublishIncomplete = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertEqual(calls, 2)
+        XCTAssertFalse(fm.fileExists(atPath: sentinelURL(manifests, id).path))
+        XCTAssertTrue(tempManifests(manifests).isEmpty, "still-bound tampered temp cleaned")
+        XCTAssertTrue(fm.fileExists(atPath: staging.path))
+    }
+
+    /// A DIRECTORY planted at the final sentinel name is a conflict: never adopted, never
+    /// recursed into, never overwritten (RENAME_EXCL cannot replace it either).
+    func testDirectoryAtFinalSentinelNameFailsClosed() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        let dirAtName = sentinelURL(manifests, id)
+        try fm.createDirectory(at: dirAtName, withIntermediateDirectories: false)
+        try Data("inner".utf8).write(to: dirAtName.appendingPathComponent("inner.txt"))
+        XCTAssertThrowsError(try completeSimple(report, manifests: manifests)) { e in
+            guard case AttachmentApplyError.sentinelIdentityMismatch = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertEqual(try Data(contentsOf: dirAtName.appendingPathComponent("inner.txt")), Data("inner".utf8),
+                       "planted directory contents untouched")
+        XCTAssertTrue(fm.fileExists(atPath: staging.path))
+    }
+
+    /// A SYMLINK planted at the final sentinel name is never followed — the no-follow bind
+    /// fails closed and the link target is untouched.
+    func testSymlinkAtFinalSentinelNameFailsClosed() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        let target = try trackedTempDir().appendingPathComponent("target.json")
+        try Data("keep".utf8).write(to: target)
+        try fm.createSymbolicLink(at: sentinelURL(manifests, id), withDestinationURL: target)
+        XCTAssertThrowsError(try completeSimple(report, manifests: manifests)) { e in
+            guard case AttachmentApplyError.sentinelIdentityMismatch = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertEqual(try Data(contentsOf: target), Data("keep".utf8), "symlink target untouched (never followed)")
+    }
+
+    /// Unlinking the published sentinel in the post-publish window (afterSentinelPublished,
+    /// before the dir barrier) is detected by P9 as retriable — and a re-run republishes.
+    func testPublishedSentinelUnlinkedBeforeDirBarrierRetriableThenRepublished() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        XCTAssertThrowsError(try completeSimple(report, manifests: manifests,
+                                                hooks: ApplyHooks(afterSentinelPublished: { url in try self.fm.removeItem(at: url) }))) { e in
+            guard case AttachmentApplyError.sentinelPublishIncomplete = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertTrue(fm.fileExists(atPath: staging.path), "staging kept — completion did not return")
+        guard case .completed = try completeSimple(report, manifests: manifests) else { return XCTFail() }
+        XCTAssertTrue(fm.fileExists(atPath: sentinelURL(manifests, id).path))
+    }
+
+    /// Replacing the published sentinel with a FOREIGN object in the post-publish window is
+    /// a terminal conflict; the foreign object is never overwritten or deleted.
+    func testPublishedSentinelSwappedToForeignConflicts() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        let foreign = Data("{\"foreign\":true}".utf8)
+        XCTAssertThrowsError(try completeSimple(report, manifests: manifests,
+                                                hooks: ApplyHooks(afterSentinelPublished: { url in
+            try self.fm.removeItem(at: url)
+            try foreign.write(to: url)   // different inode, foreign content
+        }))) { e in
+            guard case AttachmentApplyError.sentinelIdentityMismatch = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertEqual(try Data(contentsOf: sentinelURL(manifests, id)), foreign, "foreign object untouched")
+        XCTAssertTrue(fm.fileExists(atPath: staging.path))
+    }
+
+    /// Cleanup is descriptor-rooted: after the bound check, the staging NAME is swapped for
+    /// an impostor tree — every deletion stays on the BOUND (moved-aside) tree, the impostor
+    /// is never entered or deleted, and the blocked cleanup is surfaced (completion stands).
+    func testStagingCleanupDescriptorRootedImpostorUntouched() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        let aside = staging.deletingLastPathComponent().appendingPathComponent("aside-staging", isDirectory: true)
+        let hooks = ApplyHooks(beforeStagingRemoval: { url in
+            try self.fm.moveItem(at: url, to: aside)   // our bound tree moves aside…
+            let docs = url.appendingPathComponent("attachments", isDirectory: true)
+                          .appendingPathComponent("docs", isDirectory: true)
+            try self.fm.createDirectory(at: docs, withIntermediateDirectories: true)
+            try Data("VICTIM-A".utf8).write(to: docs.appendingPathComponent("a.pdf"))
+            try Data("VICTIM-M".utf8).write(to: url.appendingPathComponent("manifest.json"))
+        })
+        let outcome = try completeSimple(report, manifests: manifests, hooks: hooks)
+        guard case .completed(let r) = outcome else { return XCTFail() }
+        XCTAssertFalse(r.stagingCleaned); XCTAssertNotNil(r.stagingCleanupError)
+        XCTAssertTrue(fm.fileExists(atPath: sentinelURL(manifests, id).path), "completion stands")
+        // The impostor at the original name is COMPLETELY untouched.
+        XCTAssertEqual(try Data(contentsOf: staging.appendingPathComponent("attachments", isDirectory: true)
+                                                   .appendingPathComponent("docs", isDirectory: true)
+                                                   .appendingPathComponent("a.pdf")), Data("VICTIM-A".utf8))
+        XCTAssertEqual(try Data(contentsOf: staging.appendingPathComponent("manifest.json")), Data("VICTIM-M".utf8))
+        // Our own (moved-aside) tree was cleaned through the bound fds — its known entries are gone.
+        XCTAssertFalse(fm.fileExists(atPath: aside.appendingPathComponent("manifest.json").path),
+                       "deletions followed the bound inode, not the name")
+    }
+
+    /// Unknown entries are never enumerated or deleted: known files go, the non-empty dirs
+    /// stay as residue (surfaced), and removing the unknowns lets a re-run converge.
+    func testStagingCleanupLeavesUnknownEntriesAsResidueThenConverges() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let unknownDoc = stagedDoc(staging, "unknown.bin")
+        try Data("U".utf8).write(to: unknownDoc)
+        let unknownRoot = staging.appendingPathComponent("extra.txt")
+        try Data("X".utf8).write(to: unknownRoot)
+        let report = try apply(staging, active)
+
+        let o1 = try completeSimple(report, manifests: manifests)
+        guard case .completed(let r1) = o1 else { return XCTFail() }
+        XCTAssertFalse(r1.stagingCleaned); XCTAssertNotNil(r1.stagingCleanupError)
+        XCTAssertFalse(fm.fileExists(atPath: stagedDoc(staging, "a.pdf").path), "known file removed")
+        XCTAssertEqual(try Data(contentsOf: unknownDoc), Data("U".utf8), "unknown doc untouched")
+        XCTAssertEqual(try Data(contentsOf: unknownRoot), Data("X".utf8), "unknown root entry untouched")
+        XCTAssertTrue(fm.fileExists(atPath: sentinelURL(manifests, id).path))
+
+        try fm.removeItem(at: unknownDoc); try fm.removeItem(at: unknownRoot)
+        let o2 = try completeSimple(report, manifests: manifests)
+        guard case .completed(let r2) = o2 else { return XCTFail() }
+        XCTAssertTrue(r2.stagingCleaned, "re-run converges once the residue is resolved")
+        XCTAssertFalse(fm.fileExists(atPath: staging.path))
+    }
+
+    func testStagingAlreadyRemovedIsCleanNoop() throws {
+        let (staging, _) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        try fm.removeItem(at: staging)
+        let outcome = try completeSimple(report, manifests: manifests)
+        guard case .completed(let r) = outcome else { return XCTFail() }
+        XCTAssertTrue(r.stagingCleaned, "absent staging is an idempotent no-op")
+    }
+
+    /// A symlink swapped in at the staging PATH is never followed by cleanup: the no-follow
+    /// bind fails closed and the link target's contents survive.
+    func testStagingCleanupSymlinkAtStagingPathNotFollowed() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        let victim = try trackedTempDir().appendingPathComponent("victim", isDirectory: true)
+        try fm.createDirectory(at: victim, withIntermediateDirectories: true)
+        try Data("keep".utf8).write(to: victim.appendingPathComponent("manifest.json"))
+        try fm.removeItem(at: staging)
+        try fm.createSymbolicLink(at: staging, withDestinationURL: victim)
+
+        let outcome = try completeSimple(report, manifests: manifests)
+        guard case .completed(let r) = outcome else { return XCTFail() }
+        XCTAssertFalse(r.stagingCleaned); XCTAssertNotNil(r.stagingCleanupError)
+        XCTAssertEqual(try Data(contentsOf: victim.appendingPathComponent("manifest.json")), Data("keep".utf8),
+                       "symlink target untouched")
+        XCTAssertTrue(fm.fileExists(atPath: sentinelURL(manifests, id).path))
+    }
+
+    /// Swapping the WHOLE ImportManifests dir after publish (moved aside, fresh dir at the
+    /// canonical path) must NOT count as completed: every in-dir check passes inside the
+    /// bound (moved) dir, but the sentinel is no longer at its canonical path — no restart
+    /// probe could find it. P10 fails retriable, staging is kept, and a re-run publishes at
+    /// the canonical path.
+    func testManifestsDirReplacedAfterPublishNotCompleted() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        let aside = manifests.deletingLastPathComponent().appendingPathComponent("manifests-aside", isDirectory: true)
+        XCTAssertThrowsError(try completeSimple(report, manifests: manifests,
+                                                hooks: ApplyHooks(afterSentinelPublished: { _ in
+            try self.fm.moveItem(at: manifests, to: aside)
+            try self.fm.createDirectory(at: manifests, withIntermediateDirectories: false)
+        }))) { e in
+            guard case AttachmentApplyError.sentinelPublishIncomplete = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertTrue(fm.fileExists(atPath: staging.path), "staging must be kept — completion did not return")
+        XCTAssertFalse(fm.fileExists(atPath: sentinelURL(manifests, id).path), "no sentinel at the canonical path")
+        // A re-run publishes into the (new) canonical dir and completes.
+        guard case .completed(let r) = try completeSimple(report, manifests: manifests) else { return XCTFail() }
+        XCTAssertTrue(fm.fileExists(atPath: sentinelURL(manifests, id).path))
+        XCTAssertTrue(r.stagingCleaned)
+    }
+
+    /// Swapping the whole staging tree for a STRUCTURALLY IDENTICAL impostor in the
+    /// post-publish window: cleanup must act only on the PRE-PUBLISH bound evidence — the
+    /// swapped-in tree is never entered, nothing is deleted anywhere, and the failure is
+    /// surfaced (completion stands).
+    func testStagingReplacedAfterPublishImpostorUntouched() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        let aside = staging.deletingLastPathComponent().appendingPathComponent("real-staging-aside", isDirectory: true)
+        let impostorDocs = staging.appendingPathComponent("attachments", isDirectory: true)
+                                  .appendingPathComponent("docs", isDirectory: true)
+        let outcome = try completeSimple(report, manifests: manifests,
+                                         hooks: ApplyHooks(afterSentinelPublished: { _ in
+            try self.fm.moveItem(at: staging, to: aside)
+            try self.fm.createDirectory(at: impostorDocs, withIntermediateDirectories: true)
+            try Data("VICTIM-A".utf8).write(to: impostorDocs.appendingPathComponent("a.pdf"))
+            try Data("VICTIM-M".utf8).write(to: staging.appendingPathComponent("manifest.json"))
+        }))
+        guard case .completed(let r) = outcome else { return XCTFail() }
+        XCTAssertFalse(r.stagingCleaned, "cleanup must refuse the swapped-in tree")
+        XCTAssertNotNil(r.stagingCleanupError)
+        XCTAssertTrue(fm.fileExists(atPath: sentinelURL(manifests, id).path), "completion stands")
+        // The impostor — including its known-named files — is COMPLETELY untouched.
+        XCTAssertEqual(try Data(contentsOf: impostorDocs.appendingPathComponent("a.pdf")), Data("VICTIM-A".utf8))
+        XCTAssertEqual(try Data(contentsOf: staging.appendingPathComponent("manifest.json")), Data("VICTIM-M".utf8))
+        // And nothing was deleted from the real (moved-aside) tree either.
+        XCTAssertEqual(try Data(contentsOf: aside.appendingPathComponent("attachments", isDirectory: true)
+                                                 .appendingPathComponent("docs", isDirectory: true)
+                                                 .appendingPathComponent("a.pdf")), Data("A".utf8))
+        XCTAssertTrue(fm.fileExists(atPath: aside.appendingPathComponent("manifest.json").path))
+    }
+
+    /// Swapping only attachments/docs after publish: deletions follow the PRE-PUBLISH bound
+    /// docs inode (the moved-aside real dir), the replacement docs dir is never entered,
+    /// and the blocked collapse is surfaced.
+    func testStagedDocsReplacedAfterPublishReplacementUntouched() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        let docs = staging.appendingPathComponent("attachments", isDirectory: true)
+                          .appendingPathComponent("docs", isDirectory: true)
+        let docsAside = staging.appendingPathComponent("attachments", isDirectory: true)
+                               .appendingPathComponent("docs-aside", isDirectory: true)
+        let outcome = try completeSimple(report, manifests: manifests,
+                                         hooks: ApplyHooks(afterSentinelPublished: { _ in
+            try self.fm.moveItem(at: docs, to: docsAside)
+            try self.fm.createDirectory(at: docs, withIntermediateDirectories: false)
+            try Data("VICTIM-A".utf8).write(to: docs.appendingPathComponent("a.pdf"))
+        }))
+        guard case .completed(let r) = outcome else { return XCTFail() }
+        XCTAssertFalse(r.stagingCleaned); XCTAssertNotNil(r.stagingCleanupError)
+        // The replacement docs dir and its file are untouched.
+        XCTAssertEqual(try Data(contentsOf: docs.appendingPathComponent("a.pdf")), Data("VICTIM-A".utf8))
+        // Deletions followed the bound inode: the REAL docs (moved aside) lost its known file.
+        XCTAssertFalse(fm.fileExists(atPath: docsAside.appendingPathComponent("a.pdf").path))
+        XCTAssertTrue(fm.fileExists(atPath: sentinelURL(manifests, id).path))
+    }
+
+    // MARK: - C11a. Trusted staging root (the C11b hand-off: GatedStagedSnapshot.root)
+
+    /// Real gate evidence via the production chain: source dir (DB + one attachment) →
+    /// StagingIngest → StagedSnapshotGate. The caller must remove `gated.stagingDir`.
+    private func makeGatedStaging() throws -> GatedStagedSnapshot {
+        let src = try trackedTempDir().appendingPathComponent("SoloLedger", isDirectory: true)
+        let srcDocs = src.appendingPathComponent("attachments", isDirectory: true)
+                         .appendingPathComponent("docs", isDirectory: true)
+        try fm.createDirectory(at: srcDocs, withIntermediateDirectories: true)
+        try fm.copyItem(at: preparedDBURL, to: src.appendingPathComponent(AppPaths.databaseFileName))
+        try Data("A".utf8).write(to: srcDocs.appendingPathComponent("a.pdf"))
+        let id = try XCTUnwrap(ImportID("c11a-\(UUID().uuidString.lowercased())"))
+        let result = try StagingIngest().ingest(.userSelectedDataDir(src), importID: id, timestamp: "t")
+        return try StagedSnapshotGate().gate(result)
+    }
+
+    /// The C11b hand-off works end-to-end: `complete` with `trustedStagingRoot: gated.root`
+    /// cleans the real staged tree through the gate's bound descriptor.
+    func testTrustedStagingRootCleansViaGateEvidence() throws {
+        let gated = try makeGatedStaging()
+        defer { try? fm.removeItem(at: gated.stagingDir) }
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(gated.stagingDir, active)
+        let outcome = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report),
+                                                     acknowledgement: nil, preparedDatabaseAt: preparedDBURL,
+                                                     manifestsDir: manifests, trustedStagingRoot: gated.root,
+                                                     hooks: ApplyHooks())
+        guard case .completed(let r) = outcome else { return XCTFail() }
+        XCTAssertTrue(r.stagingCleaned, "cleanup through the gate's bound root must succeed")
+        XCTAssertFalse(fm.fileExists(atPath: gated.stagingDir.path))
+    }
+
+    /// The staging URL is swapped for a structurally identical impostor BEFORE complete()
+    /// even runs. With `trustedStagingRoot` (the gate's bound root) the impostor is NEVER
+    /// bound, never entered, never deleted — cleanup blocks with nothing touched anywhere.
+    func testTrustedStagingRootRefusesPreSwappedImpostor() throws {
+        let gated = try makeGatedStaging()
+        defer { try? fm.removeItem(at: gated.stagingDir) }
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(gated.stagingDir, active)
+
+        // Swap BEFORE complete: real tree moves aside, impostor with the same known names appears.
+        let aside = try trackedTempDir().appendingPathComponent("real-staging-aside", isDirectory: true)
+        try fm.moveItem(at: gated.stagingDir, to: aside)
+        let impostorDocs = gated.stagingDir.appendingPathComponent("attachments", isDirectory: true)
+                                           .appendingPathComponent("docs", isDirectory: true)
+        try fm.createDirectory(at: impostorDocs, withIntermediateDirectories: true)
+        try Data("VICTIM-A".utf8).write(to: impostorDocs.appendingPathComponent("a.pdf"))
+        try Data("VICTIM-M".utf8).write(to: gated.stagingDir.appendingPathComponent("manifest.json"))
+        try Data("VICTIM-DB".utf8).write(to: gated.stagingDir.appendingPathComponent(AppPaths.databaseFileName))
+
+        let outcome = try AttachmentApply().complete(report: report, referenceAudit: matchingAudit(report),
+                                                     acknowledgement: nil, preparedDatabaseAt: preparedDBURL,
+                                                     manifestsDir: manifests, trustedStagingRoot: gated.root,
+                                                     hooks: ApplyHooks())
+        guard case .completed(let r) = outcome else { return XCTFail() }
+        XCTAssertFalse(r.stagingCleaned, "cleanup must refuse the pre-swapped tree")
+        XCTAssertNotNil(r.stagingCleanupError)
+        // The impostor — including every known-named file — is COMPLETELY untouched.
+        XCTAssertEqual(try Data(contentsOf: impostorDocs.appendingPathComponent("a.pdf")), Data("VICTIM-A".utf8))
+        XCTAssertEqual(try Data(contentsOf: gated.stagingDir.appendingPathComponent("manifest.json")), Data("VICTIM-M".utf8))
+        XCTAssertEqual(try Data(contentsOf: gated.stagingDir.appendingPathComponent(AppPaths.databaseFileName)), Data("VICTIM-DB".utf8))
+        // And the REAL (moved-aside) tree is also untouched — nothing was deleted at all.
+        XCTAssertTrue(fm.fileExists(atPath: aside.appendingPathComponent("manifest.json").path))
+        XCTAssertEqual(try Data(contentsOf: aside.appendingPathComponent("attachments", isDirectory: true)
+                                                 .appendingPathComponent("docs", isDirectory: true)
+                                                 .appendingPathComponent("a.pdf")), Data("A".utf8))
+    }
+
+    /// An oversize file at the sentinel name is malformed/hostile: the size-capped bound
+    /// read refuses it (never a truncated success), classified as a conflict, left untouched.
+    func testOversizeExistingSentinelRejected() throws {
+        let (staging, id) = try makeStaging(ingested: [("a.pdf", "A")])
+        let active = try makeActive(); let manifests = try makeManifestsDir()
+        let report = try apply(staging, active)
+        var big = Data("{\"pad\":\"".utf8)
+        big.append(Data(repeating: 0x41, count: AttachmentApply.maxSentinelBytes + 1024))
+        big.append(Data("\"}".utf8))
+        try big.write(to: sentinelURL(manifests, id))
+        XCTAssertThrowsError(try completeSimple(report, manifests: manifests)) { e in
+            guard case AttachmentApplyError.sentinelIdentityMismatch = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertEqual(try Data(contentsOf: sentinelURL(manifests, id)).count, big.count, "oversize file untouched")
+        XCTAssertTrue(fm.fileExists(atPath: staging.path))
+    }
 }
