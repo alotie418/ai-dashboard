@@ -662,7 +662,7 @@ struct PreparedImportActivator {
         try Self.assertActiveStillBoundAndIdentical(
             active: cand, activeName: activeName, identityHex: identityHex,
             ownerRecord: boundRec, expected: expected, in: parent,
-            afterHash: { try hooks.afterFinalActiveHash?(activeDestination) })
+            afterHash: hooks.afterFinalActiveHash.map { hook in { try hook(activeDestination) } })
 
         return ActivatedDatabase(importID: prepared.importID, activeDatabaseURL: activeDestination,
                                  preparedDBIdentity: prepared.preparedDBIdentity,
@@ -709,7 +709,7 @@ struct PreparedImportActivator {
         try Self.assertActiveStillBoundAndIdentical(
             active: active, activeName: activeName, identityHex: identityHex,
             ownerRecord: boundRec, expected: expected, in: parent,
-            afterHash: { try hooks.afterFinalActiveHash?(activeDestination) })
+            afterHash: hooks.afterFinalActiveHash.map { hook in { try hook(activeDestination) } })
 
         return ActivatedDatabase(importID: prepared.importID, activeDatabaseURL: activeDestination,
                                  preparedDBIdentity: prepared.preparedDBIdentity,
@@ -734,21 +734,36 @@ struct PreparedImportActivator {
     }
 
     /// FINAL identity gate on the published active DB. Hashing is NOT an adjacent-syscall
-    /// window, so it is bracketed: envelope BEFORE the hash, a bound-fd re-hash that must equal
-    /// `identityHex`, then the envelope AGAIN AFTER the hash (so a name swap / sidecar plant /
-    /// owner-record change performed DURING or right after the hash is caught, not just one
-    /// staged before it). `afterHash` is a test seam fired between the hash and the after-hash
-    /// envelope.
+    /// window, so it is bracketed by envelopes (active name → bound inode, no sidecar, owner
+    /// record bound + matching).
+    ///
+    /// PRODUCTION (`afterHash == nil`): envelope → bound re-hash == identityHex → envelope.
+    /// Exactly one hash — no added cost on the default path.
+    ///
+    /// TEST SEAM (`afterHash != nil`, the internal `afterFinalActiveHash` hook, which may
+    /// tamper the SAME active inode's bytes as well as the name/sidecar/record):
+    /// envelope → hash1 → hook → envelope → hash2 → envelope. The post-hook envelope catches a
+    /// name/sidecar/owner-record change; the post-hook SECOND hash catches a same-inode byte
+    /// rewrite; hash2 is itself bracketed by envelopes before and after.
     private static func assertActiveStillBoundAndIdentical(
         active: BoundRegularFile, activeName: String, identityHex: String,
         ownerRecord: BoundRegularFile, expected: ActivationRecord, in parent: DirectoryHandle,
-        afterHash: () throws -> Void = {}) throws {
-        try assertActiveEnvelope(active: active, activeName: activeName, ownerRecord: ownerRecord, expected: expected, in: parent)
-        guard try active.rehashSHA256() == identityHex else {
-            throw ActivationError.activeIdentityMismatch(expected: "sha256:" + identityHex, actual: "sha256:(changed)")
+        afterHash: (() throws -> Void)? = nil) throws {
+        func envelope() throws {
+            try assertActiveEnvelope(active: active, activeName: activeName, ownerRecord: ownerRecord, expected: expected, in: parent)
         }
+        func hash() throws {
+            guard try active.rehashSHA256() == identityHex else {
+                throw ActivationError.activeIdentityMismatch(expected: "sha256:" + identityHex, actual: "sha256:(changed)")
+            }
+        }
+        try envelope()
+        try hash()
+        guard let afterHash else { try envelope(); return }   // production: one hash, bracketed
         try afterHash()
-        try assertActiveEnvelope(active: active, activeName: activeName, ownerRecord: ownerRecord, expected: expected, in: parent)
+        try envelope()   // catches a post-hook name/sidecar/owner-record change
+        try hash()       // catches a post-hook same-inode byte rewrite
+        try envelope()   // hash2 bracketed after
     }
 
     /// The owner record must STILL be ours: the final name resolves to the bound inode AND

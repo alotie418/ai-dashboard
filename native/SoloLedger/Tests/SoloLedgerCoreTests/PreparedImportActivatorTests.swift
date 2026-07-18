@@ -507,6 +507,39 @@ final class PreparedImportActivatorTests: LedgerTestCase {
         }
     }
 
+    /// Appending bytes to the SAME active inode AFTER the final hash must be caught by the
+    /// post-hook SECOND hash (hash2), not slip through the envelope (which only checks
+    /// name/sidecar/record, not bytes).
+    func testActiveBytesAppendedAfterFinalHashCaughtBySecondHash() throws {
+        let prepared = try preparedFixture()
+        let (_, active) = try freshSlot()
+        let hooks = ActivationHooks(afterFinalActiveHash: { url in
+            let h = try FileHandle(forWritingTo: url)   // same inode, same name — bytes only
+            try h.seekToEnd(); try h.write(contentsOf: Data([0x5A])); try h.close()
+        })
+        XCTAssertThrowsError(try PreparedImportActivator().activate(prepared, activeDestination: active, hooks: hooks)) { e in
+            guard case ActivationError.activeIdentityMismatch = e else { return XCTFail("got \(e)") }
+        }
+    }
+
+    /// Rewriting the owner record in place AFTER the final hash must be caught by the post-hook
+    /// envelope's owner-record content check.
+    func testOwnerRecordRewrittenAfterFinalHashCaughtByAfterHashGate() throws {
+        let prepared = try preparedFixture()
+        let (dir, active) = try freshSlot()
+        var tampered = ActivationRecord(binding: prepared)
+        tampered.importID = "someone-else"
+        let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let tamperedBytes = try enc.encode(tampered)
+        let hooks = ActivationHooks(afterFinalActiveHash: { _ in
+            let h = try FileHandle(forWritingTo: self.recordURL(dir))   // in-place, SAME inode
+            try h.truncate(atOffset: 0); try h.write(contentsOf: tamperedBytes); try h.close()
+        })
+        XCTAssertThrowsError(try PreparedImportActivator().activate(prepared, activeDestination: active, hooks: hooks)) { e in
+            guard case ActivationError.recordUnboundDuringActivation = e else { return XCTFail("got \(e)") }
+        }
+    }
+
     /// The same after-hash gate protects the REUSE path too.
     func testReuseActiveTamperedAfterFinalHashCaughtByAfterHashGate() throws {
         let prepared = try preparedFixture()
