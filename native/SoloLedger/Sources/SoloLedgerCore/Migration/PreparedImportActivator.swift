@@ -723,17 +723,13 @@ struct PreparedImportActivator {
 
     // MARK: Gates & helpers
 
-    /// The published active DB's WHOLE ENVELOPE is still ours: the active name resolves to the
-    /// bound active inode, none of the three sidecars exist, and the owner record is still
-    /// bound + content-matching.
+    /// The published active DB's WHOLE ENVELOPE is still ours. Delegates to the shared
+    /// `ActiveSlotGates` (2B-3 C11b extraction — identical body, zero behavior change).
     private static func assertActiveEnvelope(active: BoundRegularFile, activeName: String,
                                              ownerRecord: BoundRegularFile, expected: ActivationRecord,
                                              in parent: DirectoryHandle) throws {
-        guard (try? active.matchesChild(named: activeName, in: parent)) == true else {
-            throw ActivationError.publishedActiveMismatch("active name no longer resolves to the published inode")
-        }
-        try assertNoSidecars(activeName: activeName, in: parent)
-        try assertRecordStillBound(ownerRecord, expected: expected, named: recordName, in: parent)
+        try ActiveSlotGates.assertEnvelope(active: active, activeName: activeName,
+                                           ownerRecord: ownerRecord, expected: expected, in: parent)
     }
 
     /// FINAL identity gate on the published active DB. Hashing is NOT an adjacent-syscall
@@ -769,17 +765,11 @@ struct PreparedImportActivator {
         try envelope()   // hash2 bracketed after
     }
 
-    /// The owner record must STILL be ours: the final name resolves to the bound inode AND
-    /// the bound fd decodes to exactly the expected record. Point-in-time (registered
-    /// residual): it detects a swap/change that already happened, it cannot pin the name.
+    /// Owner-record binding gate. Delegates to the shared `ActiveSlotGates` (2B-3 C11b
+    /// extraction — identical body, zero behavior change).
     private static func assertRecordStillBound(_ rec: BoundRegularFile, expected: ActivationRecord,
                                                named name: String, in parent: DirectoryHandle) throws {
-        guard (try? rec.matchesChild(named: name, in: parent)) == true else {
-            throw ActivationError.recordUnboundDuringActivation("'\(name)' no longer resolves to the bound owner record")
-        }
-        guard (try? rec.decode(ActivationRecord.self)) == expected else {
-            throw ActivationError.recordUnboundDuringActivation("owner record content changed")
-        }
+        try ActiveSlotGates.assertRecordStillBound(rec, expected: expected, named: name, in: parent)
     }
 
     /// lstat-level slot probe: nil ⇔ definitively absent (ENOENT); ANY metadata error is
@@ -799,14 +789,10 @@ struct PreparedImportActivator {
         }
     }
 
+    /// Sidecar gate. Delegates to the shared `ActiveSlotGates` (2B-3 C11b extraction —
+    /// identical body, zero behavior change).
     private static func assertNoSidecars(activeName: String, in parent: DirectoryHandle) throws {
-        for s in sidecarSuffixes {
-            let name = activeName + s
-            let fp: FileFingerprint?
-            do { fp = try parent.fingerprint(named: name) }
-            catch { throw ActivationError.sidecarAppeared("\(name): metadata error (failing closed): \(error)") }
-            if fp != nil { throw ActivationError.sidecarAppeared(name) }
-        }
+        try ActiveSlotGates.assertNoSidecars(activeName: activeName, in: parent)
     }
 
     /// Run one durability barrier: the test seam fires FIRST (it may throw to inject a
