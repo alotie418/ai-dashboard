@@ -118,8 +118,14 @@ final class BoundRegularFile {
         return BoundRegularFile(fd: f, device: Int32(st.st_dev), inode: UInt64(st.st_ino), pathHint: pathHint)
     }
 
-    /// Whole-file read through the bound fd (never by name).
-    func readAll() throws -> Data {
+    /// Owner-record hard size ceiling. The record is a tiny fixed-shape JSON; a larger file
+    /// at that name is malformed/hostile and must never be slurped unbounded.
+    static let maxRecordBytes = 64 * 1024
+
+    /// Whole-file read through the bound fd (never by name), capped at `maxBytes`. The ceiling
+    /// is enforced CONTINUOUSLY during the read (a growing/streamed file cannot bypass it), and
+    /// exceeding it is fail-closed, never a truncated success.
+    func readAll(maxBytes: Int = BoundRegularFile.maxRecordBytes) throws -> Data {
         guard lseek(fd, 0, SEEK_SET) == 0 else { throw FileHashError.unreadable(path: pathHint, errno: errno) }
         var out = Data()
         var buf = [UInt8](repeating: 0, count: 1 << 16)
@@ -130,6 +136,9 @@ final class BoundRegularFile {
                 let e = errno
                 if e == EINTR { continue }
                 throw FileHashError.unreadable(path: pathHint, errno: e)
+            }
+            guard out.count + n <= maxBytes else {
+                throw FileHashError.unreadable(path: pathHint + " (exceeds \(maxBytes)-byte cap)", errno: EFBIG)
             }
             out.append(contentsOf: buf[0..<n])
         }
@@ -198,6 +207,8 @@ final class BoundRegularFile {
                     if e == EINTR { continue }
                     throw FileHashError.destinationUnwritable(path: pathHint, errno: e)
                 }
+                // A 0-byte write with bytes remaining is anomalous — fail closed rather than spin.
+                if n == 0 { throw FileHashError.destinationUnwritable(path: pathHint + " (write returned 0)", errno: EIO) }
                 off += n
             }
         }
@@ -280,14 +291,20 @@ struct ActivationHooks {
     var afterCandidateMaterialized: ((URL) throws -> Void)?  // candidate written, before C1 gate
     var afterActivateRename: ((URL) throws -> Void)?          // active published+synced (crash sim)
     var onSync: ((ActivationSyncPoint) throws -> Void)?
+    /// Fires INSIDE the final identity gate, between the post-publish re-hash and the after-hash
+    /// envelope re-check — lets a test tamper AFTER the hash to prove the after-hash gate (not
+    /// just the before-hash one) catches a name swap / sidecar / owner-record change.
+    var afterFinalActiveHash: ((URL) throws -> Void)?
     init(afterOwnerRecordPublished: ((URL) throws -> Void)? = nil,
          afterCandidateMaterialized: ((URL) throws -> Void)? = nil,
          afterActivateRename: ((URL) throws -> Void)? = nil,
-         onSync: ((ActivationSyncPoint) throws -> Void)? = nil) {
+         onSync: ((ActivationSyncPoint) throws -> Void)? = nil,
+         afterFinalActiveHash: ((URL) throws -> Void)? = nil) {
         self.afterOwnerRecordPublished = afterOwnerRecordPublished
         self.afterCandidateMaterialized = afterCandidateMaterialized
         self.afterActivateRename = afterActivateRename
         self.onSync = onSync
+        self.afterFinalActiveHash = afterFinalActiveHash
     }
 }
 
@@ -303,8 +320,10 @@ struct ActivationHooks {
 ///    are never touched): activeSlotOccupied, activationRecordConflict,
 ///    activationRecordMalformed, activeIdentityMismatch.
 enum ActivationError: Error, Equatable, CustomStringConvertible {
+    case invalidActiveDestination(String)
     case activeParentUnreadable(String)
     case activeSlotOccupied(String)
+    case activePublishFailed(String)
     case activationRecordConflict(String)
     case activationRecordReadFailed(String)
     case activationRecordMalformed(String)
@@ -325,8 +344,10 @@ enum ActivationError: Error, Equatable, CustomStringConvertible {
 
     var description: String {
         switch self {
+        case .invalidActiveDestination(let m): return "Invalid active destination (must be a direct child named \(AppPaths.databaseFileName)): \(m)"
         case .activeParentUnreadable(let m): return "Active parent directory is unreadable / not a directory: \(m)"
         case .activeSlotOccupied(let m): return "The active slot is occupied (create-only refuses to touch it): \(m)"
+        case .activePublishFailed(let m): return "Publishing the active database failed: \(m)"
         case .activationRecordConflict(let m): return "The active slot is owned by a different import (owner record mismatch): \(m)"
         case .activationRecordReadFailed(let m): return "Owner record could not be read (transient — retry): \(m)"
         case .activationRecordMalformed(let m): return "Owner record is malformed/unsupported (terminal — needs recovery): \(m)"
@@ -402,6 +423,13 @@ struct PreparedImportActivator {
                   hooks: ActivationHooks = ActivationHooks()) throws -> ActivatedDatabase {
         let parentURL = activeDestination.deletingLastPathComponent()
         let activeName = activeDestination.lastPathComponent
+        // The active DB must be a DIRECT child named exactly sololedger.db — reject "."/".."/
+        // empty / a name that does not round-trip as a direct child (defense in depth; the
+        // caller supplies this path).
+        guard activeName == AppPaths.databaseFileName,
+              parentURL.appendingPathComponent(activeName).standardizedFileURL == activeDestination.standardizedFileURL else {
+            throw ActivationError.invalidActiveDestination(activeDestination.path)
+        }
         guard prepared.preparedDBIdentity.hasPrefix("sha256:") else {
             throw ActivationError.candidateMaterializeFailed("unexpected preparedDBIdentity format")
         }
@@ -534,6 +562,14 @@ struct PreparedImportActivator {
     private static func decodeRecord(_ rec: BoundRegularFile) throws -> ActivationRecord {
         let data: Data
         do { data = try rec.readAll() }
+        catch let e as FileHashError {
+            // Exceeding the size cap is a MALFORMED/hostile record (terminal), not a transient
+            // read error — retrying would not help.
+            if case .unreadable(_, let errno) = e, errno == EFBIG {
+                throw ActivationError.activationRecordMalformed("owner record exceeds the \(BoundRegularFile.maxRecordBytes)-byte cap")
+            }
+            throw ActivationError.activationRecordReadFailed("\(e)")
+        }
         catch { throw ActivationError.activationRecordReadFailed("\(error)") }
         let decoded: ActivationRecord
         do { decoded = try JSONDecoder().decode(ActivationRecord.self, from: data) }
@@ -599,7 +635,7 @@ struct PreparedImportActivator {
         // Atomic create-only publish: same-directory RENAME_EXCL, never overwrites.
         let ok: Bool
         do { ok = try parent.renameChildExclusively(from: candName, to: activeName) }
-        catch { throw ActivationError.recordPublishFailed("active rename: \(error)") }
+        catch { throw ActivationError.activePublishFailed("active rename: \(error)") }
         guard ok else { throw ActivationError.publishRaceLost("an active database appeared during publish") }
         candPublished = true
 
@@ -619,12 +655,14 @@ struct PreparedImportActivator {
         try assertRecordStillBound(boundRec, expected: expected, named: recordName, in: parent)
 
         try hooks.afterActivateRename?(activeDestination)
-        // Final gate (post-hook).
-        guard (try? cand.matchesChild(named: activeName, in: parent)) == true else {
-            throw ActivationError.publishedActiveMismatch("after the activate hook")
-        }
-        try assertNoSidecars(activeName: activeName, in: parent)
-        try assertRecordStillBound(boundRec, expected: expected, named: recordName, in: parent)
+        // FINAL identity gate — AFTER the dir barrier AND the afterActivateRename hook, before
+        // return: the published active must (still) be the bound inode, sidecar-free, owner
+        // record intact, AND its bytes re-hash to preparedDBIdentity (a post-publish tamper of
+        // the very inode is caught here, not just a pre-hash name swap).
+        try Self.assertActiveStillBoundAndIdentical(
+            active: cand, activeName: activeName, identityHex: identityHex,
+            ownerRecord: boundRec, expected: expected, in: parent,
+            afterHash: { try hooks.afterFinalActiveHash?(activeDestination) })
 
         return ActivatedDatabase(importID: prepared.importID, activeDatabaseURL: activeDestination,
                                  preparedDBIdentity: prepared.preparedDBIdentity,
@@ -666,16 +704,12 @@ struct PreparedImportActivator {
         try assertRecordStillBound(boundRec, expected: expected, named: recordName, in: parent)
 
         try sync(.activeDirEntry, hooks: hooks) { try fsyncDirectoryEntry(parent, pathHint: parentURL.path) }
-        // Final gate: name binding, sidecars, owner record, and a bound re-hash — the sync
-        // hooks may have tampered with the very inode.
-        guard (try? active.matchesChild(named: activeName, in: parent)) == true else {
-            throw ActivationError.publishedActiveMismatch("after the directory barrier")
-        }
-        try assertNoSidecars(activeName: activeName, in: parent)
-        try assertRecordStillBound(boundRec, expected: expected, named: recordName, in: parent)
-        guard try active.rehashSHA256() == identityHex else {
-            throw ActivationError.activeIdentityMismatch(expected: expected.preparedDBIdentity, actual: "sha256:(changed)")
-        }
+        // FINAL identity gate (same bracketed helper as fresh): envelope → bound re-hash ==
+        // preparedDBIdentity → envelope, after the activeDirEntry barrier, before return.
+        try Self.assertActiveStillBoundAndIdentical(
+            active: active, activeName: activeName, identityHex: identityHex,
+            ownerRecord: boundRec, expected: expected, in: parent,
+            afterHash: { try hooks.afterFinalActiveHash?(activeDestination) })
 
         return ActivatedDatabase(importID: prepared.importID, activeDatabaseURL: activeDestination,
                                  preparedDBIdentity: prepared.preparedDBIdentity,
@@ -685,6 +719,37 @@ struct PreparedImportActivator {
     }
 
     // MARK: Gates & helpers
+
+    /// The published active DB's WHOLE ENVELOPE is still ours: the active name resolves to the
+    /// bound active inode, none of the three sidecars exist, and the owner record is still
+    /// bound + content-matching.
+    private static func assertActiveEnvelope(active: BoundRegularFile, activeName: String,
+                                             ownerRecord: BoundRegularFile, expected: ActivationRecord,
+                                             in parent: DirectoryHandle) throws {
+        guard (try? active.matchesChild(named: activeName, in: parent)) == true else {
+            throw ActivationError.publishedActiveMismatch("active name no longer resolves to the published inode")
+        }
+        try assertNoSidecars(activeName: activeName, in: parent)
+        try assertRecordStillBound(ownerRecord, expected: expected, named: recordName, in: parent)
+    }
+
+    /// FINAL identity gate on the published active DB. Hashing is NOT an adjacent-syscall
+    /// window, so it is bracketed: envelope BEFORE the hash, a bound-fd re-hash that must equal
+    /// `identityHex`, then the envelope AGAIN AFTER the hash (so a name swap / sidecar plant /
+    /// owner-record change performed DURING or right after the hash is caught, not just one
+    /// staged before it). `afterHash` is a test seam fired between the hash and the after-hash
+    /// envelope.
+    private static func assertActiveStillBoundAndIdentical(
+        active: BoundRegularFile, activeName: String, identityHex: String,
+        ownerRecord: BoundRegularFile, expected: ActivationRecord, in parent: DirectoryHandle,
+        afterHash: () throws -> Void = {}) throws {
+        try assertActiveEnvelope(active: active, activeName: activeName, ownerRecord: ownerRecord, expected: expected, in: parent)
+        guard try active.rehashSHA256() == identityHex else {
+            throw ActivationError.activeIdentityMismatch(expected: "sha256:" + identityHex, actual: "sha256:(changed)")
+        }
+        try afterHash()
+        try assertActiveEnvelope(active: active, activeName: activeName, ownerRecord: ownerRecord, expected: expected, in: parent)
+    }
 
     /// The owner record must STILL be ours: the final name resolves to the bound inode AND
     /// the bound fd decodes to exactly the expected record. Point-in-time (registered

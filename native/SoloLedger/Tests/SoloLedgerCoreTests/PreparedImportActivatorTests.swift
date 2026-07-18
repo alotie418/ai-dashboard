@@ -443,6 +443,115 @@ final class PreparedImportActivatorTests: LedgerTestCase {
                        "own still-bound candidate cleaned")
     }
 
+    // MARK: - Final active-identity gate (post-publish, C10 fix)
+
+    /// Tampering the published active file's SAME inode inside onSync(.activeDirEntry) — the
+    /// barrier itself succeeds (the hook does not throw), so this is NOT durabilityNotConfirmed:
+    /// the post-publish final hash gate must catch the changed bytes and fail closed, never
+    /// returning an ActivatedDatabase.
+    func testActiveTamperedDuringDirBarrierCaughtByFinalHash() throws {
+        let prepared = try preparedFixture()
+        let (dir, active) = try freshSlot()
+        let hooks = ActivationHooks(onSync: { p in
+            guard p == .activeDirEntry else { return }
+            let h = try FileHandle(forWritingTo: active)   // same inode, already published
+            try h.seekToEnd(); try h.write(contentsOf: Data([0x7F])); try h.close()
+        })
+        XCTAssertThrowsError(try PreparedImportActivator().activate(prepared, activeDestination: active, hooks: hooks)) { e in
+            guard case ActivationError.activeIdentityMismatch = e else { return XCTFail("got \(e)") }
+        }
+        // The active file exists (published) but activation did not complete; owner record stays.
+        XCTAssertTrue(fm.fileExists(atPath: recordURL(dir).path), "record retained")
+    }
+
+    /// Tampering the active main file inside afterActivateRename must be caught by the final
+    /// hash gate (activeIdentityMismatch), not silently returned.
+    func testActiveTamperedInAfterActivateRenameCaughtByFinalHash() throws {
+        let prepared = try preparedFixture()
+        let (_, active) = try freshSlot()
+        let hooks = ActivationHooks(afterActivateRename: { url in
+            let h = try FileHandle(forWritingTo: url)
+            try h.seekToEnd(); try h.write(contentsOf: Data([0x00])); try h.close()
+        })
+        XCTAssertThrowsError(try PreparedImportActivator().activate(prepared, activeDestination: active, hooks: hooks)) { e in
+            guard case ActivationError.activeIdentityMismatch = e else { return XCTFail("got \(e)") }
+        }
+    }
+
+    /// Replacing the active NAME with a different inode AFTER the final hash (via the
+    /// afterFinalActiveHash seam) must be caught by the after-hash envelope — proving the gate
+    /// re-checks the envelope AFTER the hash, not only before it.
+    func testActiveNameSwappedAfterFinalHashCaughtByAfterHashGate() throws {
+        let prepared = try preparedFixture()
+        let (_, active) = try freshSlot()
+        let hooks = ActivationHooks(afterFinalActiveHash: { url in
+            let aside = url.deletingLastPathComponent().appendingPathComponent("aside.db")
+            try self.fm.moveItem(at: url, to: aside)
+            try Data("impostor".utf8).write(to: url)   // different inode at the active name
+        })
+        XCTAssertThrowsError(try PreparedImportActivator().activate(prepared, activeDestination: active, hooks: hooks)) { e in
+            guard case ActivationError.publishedActiveMismatch = e else { return XCTFail("got \(e)") }
+        }
+    }
+
+    /// A sidecar planted AFTER the final hash (afterFinalActiveHash) must be caught by the
+    /// after-hash envelope.
+    func testSidecarPlantedAfterFinalHashCaughtByAfterHashGate() throws {
+        let prepared = try preparedFixture()
+        let (_, active) = try freshSlot()
+        let hooks = ActivationHooks(afterFinalActiveHash: { url in
+            try Data("late".utf8).write(to: URL(fileURLWithPath: url.path + "-wal"))
+        })
+        XCTAssertThrowsError(try PreparedImportActivator().activate(prepared, activeDestination: active, hooks: hooks)) { e in
+            guard case ActivationError.sidecarAppeared = e else { return XCTFail("got \(e)") }
+        }
+    }
+
+    /// The same after-hash gate protects the REUSE path too.
+    func testReuseActiveTamperedAfterFinalHashCaughtByAfterHashGate() throws {
+        let prepared = try preparedFixture()
+        let (_, active) = try freshSlot()
+        _ = try PreparedImportActivator().activate(prepared, activeDestination: active)
+        let hooks = ActivationHooks(afterFinalActiveHash: { url in
+            try Data("x".utf8).write(to: URL(fileURLWithPath: url.path + "-shm"))
+        })
+        XCTAssertThrowsError(try PreparedImportActivator().activate(prepared, activeDestination: active, hooks: hooks)) { e in
+            guard case ActivationError.sidecarAppeared = e else { return XCTFail("got \(e)") }
+        }
+    }
+
+    // MARK: - Primitive hardening (C10 fix)
+
+    func testInvalidActiveDestinationRejected() throws {
+        let prepared = try preparedFixture()
+        let (dir, _) = try freshSlot()
+        for bad in ["ledger.db", "notthedbname", ".."] {
+            XCTAssertThrowsError(try PreparedImportActivator().activate(
+                prepared, activeDestination: dir.appendingPathComponent(bad))) { e in
+                guard case ActivationError.invalidActiveDestination = e else { return XCTFail("\(bad): got \(e)") }
+            }
+        }
+        // The correct name is accepted.
+        XCTAssertNoThrow(try PreparedImportActivator().activate(
+            prepared, activeDestination: dir.appendingPathComponent(AppPaths.databaseFileName)))
+    }
+
+    func testOwnerRecordSizeCapRejectsOversizeRecord() throws {
+        let prepared = try preparedFixture()
+        let (dir, active) = try freshSlot()
+        // A well-formed-looking but oversized record file at the final name → fail closed
+        // (unbounded slurp is refused), classified terminal-malformed on read, never activated.
+        var big = Data("{\"pad\":\"".utf8)
+        big.append(Data(repeating: 0x41, count: BoundRegularFile.maxRecordBytes + 1024))
+        big.append(Data("\"}".utf8))
+        try big.write(to: recordURL(dir))
+        XCTAssertThrowsError(try PreparedImportActivator().activate(prepared, activeDestination: active)) { e in
+            guard case ActivationError.activationRecordMalformed = e else { return XCTFail("got \(e)") }
+        }
+        XCTAssertFalse(fm.fileExists(atPath: active.path), "nothing activated")
+        XCTAssertEqual(try Data(contentsOf: recordURL(dir)).count, big.count, "oversize record left untouched")
+    }
+
     // MARK: - Primitives
 
     func testBoundRegularFilePrimitive() throws {
