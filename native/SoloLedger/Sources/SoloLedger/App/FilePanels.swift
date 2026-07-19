@@ -38,4 +38,36 @@ extension AppModel {
             restore(fromBackupAt: url)
         }
     }
+
+    /// Export a privacy-bounded diagnostics report to a USER-CHOSEN file. Only structured,
+    /// allowlisted fields are written (see `MigrationPresenter.diagnosticsText`) — NEVER
+    /// transactions, attachment contents, database contents, or an `Error.description`; all
+    /// paths are home-directory redacted. A write failure surfaces only a localized action
+    /// error and leaves the ledger state untouched.
+    func exportDiagnosticsViaPanel() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.plainText]
+        panel.nameFieldStringValue = t("migration.diagnostics.filename")
+        panel.title = t("migration.diagnostics.title")
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let text = MigrationPresenter.diagnosticsText(
+            state: migrationUIState,
+            schemaVersion: schemaVersionText,
+            databasePath: databasePath,
+            appVersion: Self.appVersionString,
+            osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
+            homeDirectory: NSHomeDirectory())
+        do {
+            try text.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            actionError = t("migration.diagnostics.writeFailed")
+        }
+    }
+
+    private static var appVersionString: String {
+        let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let b = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        return "\(v) (\(b))"
+    }
 }
