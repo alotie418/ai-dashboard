@@ -536,9 +536,10 @@ struct PreparedImportFinalizer {
     /// `AttachmentApply`'s private cleanup, over handles bound from the GATE evidence
     /// (`trustedRoot: gated.root`) — never a URL re-bind; unknown/replaced/non-empty
     /// entries stay untouched as residue. Returns nil on success, else the surfaced
-    /// reason. REGISTERED FOLLOW-UP: dedup with AttachmentApply's private twin in a
-    /// commit that may touch that file.
-    private static func cleanupResidue(gated: GatedStagedSnapshot) -> String? {
+    /// reason. Internal: the C12 coordinator converges boot-time cleanup residue through
+    /// this same contract (re-gated evidence only). REGISTERED FOLLOW-UP: dedup with
+    /// AttachmentApply's private twin in a commit that may touch that file.
+    static func cleanupResidue(gated: GatedStagedSnapshot) -> String? {
         let h: AttachmentApply.StagingCleanupHandles
         switch AttachmentApply.bindStagingForCleanup(stagingDir: gated.stagingDir, trustedRoot: gated.root) {
         case .absent: return nil
