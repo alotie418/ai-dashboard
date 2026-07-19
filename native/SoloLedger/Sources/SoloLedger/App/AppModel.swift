@@ -87,19 +87,43 @@ final class AppModel: ObservableObject {
     /// Non-nil → an Electron database exists but the upgrade FAILED. The app is in a
     /// blocking recovery state and MUST NOT open/create an active database until the
     /// user chooses a recovery action. The original data is never modified.
+    ///
+    /// LEGACY (DatabaseUpgrade) recovery only — retained as a separate guarded flow; C12b-2
+    /// adds orchestration guards without changing DatabaseUpgrade internals. The C12 coordinator
+    /// production boot reports through `migrationUIState` instead, never through this.
     @Published var migrationFailure: String?
+
+    /// The C12 coordinator production-boot state. Distinct from the legacy `migrationFailure`
+    /// DatabaseUpgrade screen; the two are mutually exclusive sources (RootView wiring is C12b-3).
+    @Published private(set) var migrationUIState: MigrationUIState = .none
 
     // Editor sheet state (nil editingTransaction = creating a new one)
     @Published var showingEditor = false
     @Published var editingTransaction: Transaction?
 
     private var localizer: Localizer
-    private var store: LedgerStore?
+    private(set) var store: LedgerStore?
+
+    // C12b-2 boot orchestration. Internal (not private) so the hosted `@testable` unit tests
+    // can inspect single-flight / generation state; no PUBLIC App API is added.
+    var bootGeneration = 0
+    var inFlight = false
+    var currentBootTask: Task<Void, Never>?
+    private var runner: BootChainRunner?
 
     init() {
         let initial = Localizer.systemDefault()
         self.language = initial
         self.localizer = Localizer(language: initial)
+    }
+
+    /// Internal test seam: inject a scripted boot runner so tests can drive outcomes,
+    /// completion timing and Phase-B attempts deterministically. NOT public.
+    init(runner: BootChainRunner) {
+        let initial = Localizer.systemDefault()
+        self.language = initial
+        self.localizer = Localizer(language: initial)
+        self.runner = runner
     }
 
     // MARK: - Localization
@@ -120,32 +144,145 @@ final class AppModel: ObservableObject {
             return
         }
         #endif
-        do {
-            // Decide what to do about the active database. In the native RELEASE app
-            // (same Bundle ID → same MAS container) this discovers an Electron DB and
-            // migrates it via backup/integrity/atomic-swap; the original is only read
-            // and is never modified. In DEBUG (.dev, isolated container) there is no
-            // legacy data, so it creates a fresh DB — no extra entitlement to reach the
-            // production container is ever requested.
-            //
-            // CRITICAL: if a legacy DB exists but the upgrade FAILS, the decision is
-            // .blockedMigrationFailed and NO active database is created. We must never
-            // paper over a failed migration with an empty ledger — the user recovers
-            // from the blocking screen (retry / restore / explicit blank).
-            let decision = try DatabaseUpgrade.standard(timestamp: DateFormat.timestamp()).prepareActiveDatabase()
-            switch decision {
-            case .blockedMigrationFailed(let error):
-                migrationFailure = error   // ready stays false, store stays nil
+        // Production migration boot runs through the C12 coordinator chain: the heavy probe
+        // work executes OFF the main actor, then confirm→open run synchronously ON the main
+        // actor. Errors surface through `migrationUIState` (never a raw `bootError`). The
+        // legacy DatabaseUpgrade recovery (migrationFailure / restore / blank) below is
+        // retained as a separate guarded flow; C12b-2 adds orchestration guards without
+        // changing DatabaseUpgrade internals.
+        startChain(.boot)
+    }
+
+    // MARK: - C12 coordinator boot orchestration
+
+    /// Re-run the probe from a retriable/terminal state (never creates a store by itself).
+    func retryProbe() { guard store == nil else { return }; startChain(.boot) }
+    /// Consume a user acknowledgement and re-run the chain.
+    func submitAcknowledgement(_ ack: Acknowledgement) { guard store == nil else { return }; startChain(.acknowledgement(ack)) }
+    /// Consume a user import selection.
+    func resolveImportSelection(importID: String) { guard store == nil else { return }; startChain(.selection(importID)) }
+    /// Cancel an import selection — never opens, creates, or auto-picks; lands terminal-ish.
+    func cancelImportSelection() {
+        guard case .awaitingImportSelection = migrationUIState else { return }
+        migrationUIState = .terminal(MigrationBlock(code: .invalidSelection, classification: .terminal,
+                                                    params: ["reason": "userCancelled"]))
+    }
+
+    private func startChain(_ intent: BootIntent) {
+        guard !inFlight else { return }   // HARD single-flight FIRST — a rejected click changes nothing
+        // A new C12 chain SUPERSEDES any legacy DatabaseUpgrade recovery screen: clear it here
+        // (before the runner build) so the typed migration state is never masked by a stale
+        // `migrationFailure`, even if `makeProductionRunner` fails.
+        migrationFailure = nil
+        let activeRunner: BootChainRunner
+        if let runner {
+            activeRunner = runner
+        } else {
+            do { let built = try Self.makeProductionRunner(); runner = built; activeRunner = built }
+            catch {
+                migrationUIState = .retriable(MigrationBlock(code: .ioTransient, classification: .retriable,
+                                                             params: ["op": "bootConfig"]))
                 return
-            case let .adopted(_, migrated):
-                NSLog("[upgrade] adopted Electron database: \(migrated) transactions")
-            case .openExisting, .createFresh:
-                break
             }
-            try finishBoot(with: LedgerStore(databaseURL: AppPaths.databaseURL()))
-        } catch {
-            bootError = "\(error)"
         }
+        inFlight = true
+        bootGeneration += 1
+        let gen = bootGeneration
+        migrationUIState = .running(.resolving)
+        currentBootTask = Task { await runChain(intent, using: activeRunner, generation: gen) }
+    }
+
+    private func runChain(_ intent: BootIntent, using runner: BootChainRunner, generation gen: Int) async {
+        var reResolved = false
+        var currentIntent = intent
+        while true {
+            let outcome = await runner.resolveOutcome(currentIntent)       // Phase A — OFF the main actor
+            guard gen == bootGeneration else { return }   // stale: a superseded chain owns NOTHING — never touch inFlight/state  // resumed on the main actor
+            switch MigrationBootDriver.classifyOutcome(outcome) {
+            case .ui(let state):
+                finish(state, generation: gen); return
+            case .openStore(let authorization, let residual):
+                // Phase B — synchronous ON the main actor: confirm → open, no await between them.
+                switch runner.attempt(authorization, residual: residual) {
+                case .opened(let candidate, let candidateResidual):
+                    adopt(candidate, residual: candidateResidual, generation: gen); return
+                case .ui(let state):
+                    finish(state, generation: gen); return
+                case .needsReResolve:
+                    guard !reResolved else {
+                        finish(.retriable(MigrationBlock(code: .interference, classification: .retriable,
+                                                         params: ["op": "reResolve"])), generation: gen)
+                        return
+                    }
+                    reResolved = true
+                    currentIntent = .boot
+                    continue   // bounded to ONE re-resolve; loops back to Phase A off-main
+                }
+            }
+        }
+    }
+
+    /// Atomic adoption of the store-open authorization. The REQUIRED settings reads (ui
+    /// language, appearance, accounting locale) must ALL succeed on a LOCAL candidate before
+    /// anything is published; only then are `store`, `ready` and the state published together.
+    /// A required-read failure leaves `store == nil`, `ready == false`, a typed retriable state,
+    /// and NO `bootError`. NOTE: `onboardingDone` / `companyName` are OPTIONAL best-effort reads
+    /// (`try?` defaults), and `reloadAll` keeps its own `actionError` behavior — neither
+    /// participates in the store-open authorization. This does NOT atomically pre-read every
+    /// startup query; only the required settings gate publication.
+    private func adopt(_ candidate: LedgerStore, residual: MigrationResidual?, generation gen: Int) {
+        guard gen == bootGeneration else { return }   // stale: a superseded chain owns NOTHING — never touch inFlight/state
+        let savedLang: String?
+        let savedAppearance: String?
+        let loc: AccountingLocale
+        do {
+            savedLang = try candidate.settings.string(SettingsStore.Key.uiLanguage)
+            savedAppearance = try candidate.settings.string(SettingsStore.Key.appearance)
+            loc = try candidate.settings.accountingLocale()
+        } catch {
+            finish(.retriable(MigrationBlock(code: .storeOpenFailed, classification: .retriable,
+                                             params: ["op": "adopt"])), generation: gen)
+            return
+        }
+        let done = (try? candidate.settings.bool(SettingsStore.Key.onboardingDone)) ?? false
+        let co = (try? candidate.settings.string(SettingsStore.Key.companyName)) ?? ""
+        // Required reads passed; optional reads above are best-effort defaults. Publish now —
+        // `reloadAll` below may set `actionError` but never un-publishes the store.
+        store = candidate
+        if let savedLang { setLanguage(savedLang, persist: false) }
+        if let savedAppearance, let ap = Appearance(rawValue: savedAppearance) { appearance = ap }
+        accountingLocale = loc
+        onboardingDone = done
+        companyName = co
+        reloadAll()
+        migrationFailure = nil
+        ready = true
+        finish(residual.map(MigrationUIState.cleanupResidual) ?? .none, generation: gen)
+    }
+
+    private func finish(_ state: MigrationUIState, generation gen: Int) {
+        guard gen == bootGeneration else { return }   // stale: a superseded chain owns NOTHING — never touch inFlight/state
+        migrationUIState = state
+        inFlight = false
+    }
+
+    /// The production runner: wraps the coordinator and the real off-main / main-actor
+    /// boundaries. Built lazily so a fresh install never derives paths until boot.
+    private static func makeProductionRunner() throws -> BootChainRunner {
+        let config = try MigrationCoordinator.Config.standard()
+        let coordinator = MigrationCoordinator(config: config)
+        let auto: MigrationSource = .masContainer
+        let activeURL = config.activeDestination
+        return ProductionBootChainRunner(
+            resolveWork: { intent in
+                switch intent {
+                case .boot: return coordinator.bootResolve(autoSourceCandidate: auto)
+                case .acknowledgement(let ack): return coordinator.bootResolve(autoSourceCandidate: auto, acknowledgement: ack)
+                case .selection(let id): return coordinator.resolveSelectedImport(importID: id)
+                }
+            },
+            confirm: { coordinator.confirmOpenAuthorization($0, autoSourceCandidate: auto) },
+            openStore: { try LedgerStore(databaseURL: activeURL, open: $0) })
     }
 
     /// Open + load an active store and mark the app ready.
@@ -168,9 +305,15 @@ final class AppModel: ObservableObject {
 
     // MARK: - Migration recovery (blocking state)
 
+    /// Legacy DatabaseUpgrade recovery may run ONLY when no C12 chain is in flight and no
+    /// ledger is open. Otherwise a recovery button pressed while the async chain runs could
+    /// bypass C12 single-flight or replace a live active DB. Internal for `@testable` guards.
+    var legacyRecoveryAllowed: Bool { !inFlight && store == nil && !ready }
+
     /// Retry the migration. Since a failed upgrade never created an active DB, boot
     /// re-discovers the (still-absent) active DB and runs the upgrade again.
     func retryMigration() {
+        guard legacyRecoveryAllowed else { return }   // reject during a C12 chain / when a ledger is open
         migrationFailure = nil
         store = nil
         boot()
@@ -179,6 +322,7 @@ final class AppModel: ObservableObject {
     /// Adopt a user-picked backup / export database as the active DB, via the same
     /// safe upgrade path (integrity + backup + migrate + atomic swap).
     func restore(fromBackupAt fileURL: URL) {
+        guard legacyRecoveryAllowed else { return }   // reject during a C12 chain / when a ledger is open
         do {
             let paths = DatabaseUpgrade.Paths(
                 legacySource: fileURL,
@@ -190,8 +334,9 @@ final class AppModel: ObservableObject {
                 migrationFailure = "所选文件不是有效的账本数据库（\(outcome)）。"
                 return
             }
+            migrationFailure = nil   // clear the recovery screen before handing off to the async boot
             store = nil
-            boot()   // active DB now exists → opens it
+            boot()   // active DB now exists → the C12 chain opens it (store stays nil, ready false until adopted)
         } catch {
             migrationFailure = "从备份恢复失败：\(error)"
         }
@@ -201,6 +346,7 @@ final class AppModel: ObservableObject {
     /// call this after explicit user confirmation in the recovery UI. The original
     /// Electron database is still never modified.
     func createBlankLedgerConfirmed() {
+        guard legacyRecoveryAllowed else { return }   // reject during a C12 chain / when a ledger is open
         do {
             try finishBoot(with: LedgerStore(databaseURL: AppPaths.databaseURL()))
         } catch {

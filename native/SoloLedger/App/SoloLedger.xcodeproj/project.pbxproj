@@ -10,6 +10,7 @@
 		15A3EEB41D6BE4F941CD6AAA /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 588305D83F4594A1B09F7922 /* AppModel.swift */; };
 		21CA4755C217A17128658F82 /* CoreTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B16C5235D85C8A57104E169 /* CoreTypes.swift */; };
 		2E7C78002ABD0C01AA148373 /* TransactionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38F8C0CD70D660F6A69592BF /* TransactionListView.swift */; };
+		47AED20762FB91EC3DC2344F /* AppModelBootTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6830222C9FA6F31E6BE497E2 /* AppModelBootTests.swift */; };
 		53DDD42D8672616C8446F88C /* AppLaunchUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F9696FACAA53B62F93D9F79 /* AppLaunchUITests.swift */; };
 		59D0AE5F94FC8EFCC793ED61 /* SoloLedgerCore in Frameworks */ = {isa = PBXBuildFile; productRef = F78D967BE4643CB328B2FE25 /* SoloLedgerCore */; };
 		62D492187E0709CCDE35A2D3 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B5F727B2FCC9722A8ED0BA70 /* Localizable.strings */; };
@@ -20,6 +21,7 @@
 		9BA808EA5B2F89B63F49B30C /* Appearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = D82184B119B98CDA23C5BA52 /* Appearance.swift */; };
 		AE93A4CE4F06E66B0EAA0162 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D60ABA9FBFAC02C8A7872FA /* OnboardingView.swift */; };
 		B5F5E5DE256EDE0D66FBDE27 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47DEC23A50B83FEDEAD90103 /* RootView.swift */; };
+		B8124EB01349075F96F5F1EE /* BootChainRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3E1C14A7B1D4C96643BA5AF /* BootChainRunner.swift */; };
 		B90F7E6D70A9AE041B63EC09 /* AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CECAC57D1DFBD07FE47679B /* AppCommands.swift */; };
 		BF1219F711823B11ED0621F8 /* SoloLedgerCore in Frameworks */ = {isa = PBXBuildFile; productRef = 15DFCEE550ADE1113EBF1DC9 /* SoloLedgerCore */; };
 		BF672031431D49192F576757 /* ResourceCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB926A2FFE353E39A4E4CF9 /* ResourceCheck.swift */; };
@@ -34,6 +36,13 @@
 
 /* Begin PBXContainerItemProxy section */
 		364F61F6C33DF5D9CBB94792 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 37AB09DE22AB719F3366A8E7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 263ED08D0645221ADE794FDB;
+			remoteInfo = SoloLedger;
+		};
+		8D2999A087FE713A5DC8BE72 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 37AB09DE22AB719F3366A8E7 /* Project object */;
 			proxyType = 1;
@@ -58,6 +67,7 @@
 		52BEB2DA46EDB5F3166A8803 /* Formatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatters.swift; sourceTree = "<group>"; };
 		57643709AC4EFC756514CDFB /* Localizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localizer.swift; sourceTree = "<group>"; };
 		588305D83F4594A1B09F7922 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		6830222C9FA6F31E6BE497E2 /* AppModelBootTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelBootTests.swift; sourceTree = "<group>"; };
 		696F07DAFA605B5BDFA9D581 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6B16C5235D85C8A57104E169 /* CoreTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreTypes.swift; sourceTree = "<group>"; };
 		6BF43A0EE1B259565ADA5902 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -70,6 +80,7 @@
 		A8AEA06C0F0AE1B9F7F46A3C /* SoloLedger.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SoloLedger.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		ACB926A2FFE353E39A4E4CF9 /* ResourceCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourceCheck.swift; sourceTree = "<group>"; };
 		AE7D2A8E11270134F8559041 /* SoloLedgerUnitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SoloLedgerUnitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B3E1C14A7B1D4C96643BA5AF /* BootChainRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BootChainRunner.swift; sourceTree = "<group>"; };
 		C6E06B4A5CA57442D4A19219 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoriesView.swift; sourceTree = "<group>"; };
 		D82184B119B98CDA23C5BA52 /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
 		E802A306ACFF9A0EC2FC18C3 /* TransactionEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEditor.swift; sourceTree = "<group>"; };
@@ -158,6 +169,7 @@
 		868E3CD698EF32D9C4586DC2 /* SoloLedgerUnitTests */ = {
 			isa = PBXGroup;
 			children = (
+				6830222C9FA6F31E6BE497E2 /* AppModelBootTests.swift */,
 				8C26549A6E2C20DB2210C445 /* AppUnitTests.swift */,
 			);
 			path = SoloLedgerUnitTests;
@@ -177,6 +189,7 @@
 				9CECAC57D1DFBD07FE47679B /* AppCommands.swift */,
 				D82184B119B98CDA23C5BA52 /* Appearance.swift */,
 				588305D83F4594A1B09F7922 /* AppModel.swift */,
+				B3E1C14A7B1D4C96643BA5AF /* BootChainRunner.swift */,
 				6B16C5235D85C8A57104E169 /* CoreTypes.swift */,
 				3A72C1BBF0F2B3F19DC44767 /* FilePanels.swift */,
 				57643709AC4EFC756514CDFB /* Localizer.swift */,
@@ -274,6 +287,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				1BF01C20B737AD790F90820F /* PBXTargetDependency */,
 			);
 			name = SoloLedgerUnitTests;
 			packageProductDependencies = (
@@ -361,6 +375,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				47AED20762FB91EC3DC2344F /* AppModelBootTests.swift in Sources */,
 				821321D467EC23E204FF19DF /* AppUnitTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -372,6 +387,7 @@
 				B90F7E6D70A9AE041B63EC09 /* AppCommands.swift in Sources */,
 				15A3EEB41D6BE4F941CD6AAA /* AppModel.swift in Sources */,
 				9BA808EA5B2F89B63F49B30C /* Appearance.swift in Sources */,
+				B8124EB01349075F96F5F1EE /* BootChainRunner.swift in Sources */,
 				C7D6B96242F5F64CAD396B4A /* CategoriesView.swift in Sources */,
 				DA515674E040AB320C2A7360 /* Components.swift in Sources */,
 				21CA4755C217A17128658F82 /* CoreTypes.swift in Sources */,
@@ -392,6 +408,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		1BF01C20B737AD790F90820F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 263ED08D0645221ADE794FDB /* SoloLedger */;
+			targetProxy = 8D2999A087FE713A5DC8BE72 /* PBXContainerItemProxy */;
+		};
 		5AE668A1E441464B858F6D62 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 263ED08D0645221ADE794FDB /* SoloLedger */;
@@ -515,6 +536,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.alotie418.sololedger.UnitTests;
 				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SoloLedger.app/Contents/MacOS/SoloLedger";
 			};
 			name = Debug;
 		};
@@ -532,6 +554,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.alotie418.sololedger.UnitTests;
 				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SoloLedger.app/Contents/MacOS/SoloLedger";
 			};
 			name = Release;
 		};
@@ -542,6 +565,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Support/SoloLedger-Debug.entitlements";
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_TESTABILITY = YES;
 				INFOPLIST_FILE = Support/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

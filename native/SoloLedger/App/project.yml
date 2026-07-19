@@ -51,6 +51,8 @@ targets:
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
       configs:
+        Debug:
+          ENABLE_TESTABILITY: YES   # allow `@testable import SoloLedger` from the hosted unit tests
         Release:
           PRODUCT_BUNDLE_IDENTIFIER: com.alotie418.sololedger            # Release (production id)
           CODE_SIGN_ENTITLEMENTS: Support/SoloLedger.entitlements
@@ -62,6 +64,9 @@ targets:
     sources:
       - path: Tests/SoloLedgerUnitTests
     dependencies:
+      # Host the app so tests can `@testable import SoloLedger` (XcodeGen wires TEST_HOST +
+      # BUNDLE_LOADER from this application dependency).
+      - target: SoloLedger
       - package: SoloLedgerPackage
         product: SoloLedgerCore
     settings:
