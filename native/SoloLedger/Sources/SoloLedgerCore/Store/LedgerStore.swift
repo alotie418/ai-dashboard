@@ -11,6 +11,29 @@ public enum LedgerError: Error, CustomStringConvertible {
     }
 }
 
+/// Whether opening the active ledger may CREATE its file. The C12 boot coordinator
+/// authorizes exactly one origin to create (a fresh install); every other authorization
+/// opens an EXISTING database so that a VANISHED path fails to open rather than fabricating
+/// an empty ledger over it.
+public enum StoreOpenIntent: Equatable {
+    /// Fresh install: create the database file when absent.
+    case createIfMissing
+    /// The database must already exist: opens with SQLITE_OPEN_READWRITE WITHOUT
+    /// SQLITE_OPEN_CREATE, so a VANISHED path fails to open instead of fabricating an empty
+    /// ledger. This closes ONLY the "path gone → empty DB created" window; it does NOT close
+    /// the confirm→open path / inode / symlink-swap window, which remains a registered
+    /// residual (C12b design, decision #18).
+    case existingOnly
+
+    /// The SQLite open mode this intent maps to (exhaustive; no default).
+    var openMode: SQLiteDatabase.OpenMode {
+        switch self {
+        case .createIfMissing: return .readWriteCreate
+        case .existingOnly:    return .readWriteExisting
+        }
+    }
+}
+
 /// The prototype's data access layer over one SQLite connection. Opens the DB,
 /// applies the runtime PRAGMAs and full migration ladder, seeds categories, and
 /// exposes the Phase-1 CRUD/aggregation surface — a faithful port of the Electron
@@ -19,12 +42,20 @@ public final class LedgerStore {
     public let db: SQLiteDatabase
     public let settings: SettingsStore
 
-    /// Open (creating if needed) the DB at `url`, then migrate + seed.
-    public init(databaseURL: URL) throws {
-        self.db = try SQLiteDatabase(path: databaseURL.path)
+    /// Open the DB at `url` with an explicit open semantics, then migrate + seed. ONLY the
+    /// SQLite open mode is parameterized by `intent`; pragmas, the migration ladder and
+    /// category seeding are byte-for-byte identical to the historical path.
+    public init(databaseURL: URL, open intent: StoreOpenIntent) throws {
+        self.db = try SQLiteDatabase(path: databaseURL.path, mode: intent.openMode)
         self.settings = SettingsStore(db)
         try applyPragmas()
         try SchemaMigrator.migrate(db)
+    }
+
+    /// Open (creating if needed) the DB at `url`, then migrate + seed. Source-compatible
+    /// with the historical default; delegates to `.createIfMissing`.
+    public convenience init(databaseURL: URL) throws {
+        try self.init(databaseURL: databaseURL, open: .createIfMissing)
     }
 
     private func applyPragmas() throws {
