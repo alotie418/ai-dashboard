@@ -282,7 +282,22 @@ final class AppModel: ObservableObject {
                 }
             },
             confirm: { coordinator.confirmOpenAuthorization($0, autoSourceCandidate: auto) },
-            openStore: { try LedgerStore(databaseURL: activeURL, open: $0) })
+            openStore: { try Self.openStoreForPlan($0, activeURL: activeURL) })
+    }
+
+    /// The REAL production plan → store dispatch, extracted (internal, NOT an injected test double)
+    /// so a hosted test can drive the exact wiring `makeProductionRunner` ships: an `.existing`
+    /// plan MUST take the C12x hardened open, never a plain `existingOnly`. Reverting the
+    /// `.existing` branch to `LedgerStore(open: .existingOnly)` is what the production-wiring guard
+    /// test in `AppModelBootTests` catches.
+    static func openStoreForPlan(_ plan: ConfirmedOpenPlan, activeURL: URL) throws -> LedgerStore {
+        switch plan {
+        case .createFresh:
+            // createFresh hardening (O_EXCL) is a separately-scoped follow-up (C12x-A2); unchanged here.
+            return try LedgerStore(databaseURL: activeURL, open: .createIfMissing)
+        case .existing(let evidence):
+            return try LedgerStore.openActiveExistingHardened(databaseURL: activeURL, expect: evidence)
+        }
     }
 
     /// Open + load an active store and mark the app ready.

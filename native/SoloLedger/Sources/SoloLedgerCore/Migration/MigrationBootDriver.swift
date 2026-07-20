@@ -39,17 +39,6 @@ public enum MigrationBootDriver {
         case ui(MigrationUIState)
     }
 
-    /// Which open mode an authorization permits. `createFreshExpectedAbsent` is the ONLY
-    /// authorization that may create the database; both `openExisting*` authorizations must
-    /// refuse a vanished path. Exhaustive; no default.
-    public static func openIntent(for authorization: StoreOpenAuthorization) -> StoreOpenIntent {
-        switch authorization {
-        case .createFreshExpectedAbsent: return .createIfMissing
-        case .openExistingPlain:         return .existingOnly
-        case .openExistingCompleted:     return .existingOnly
-        }
-    }
-
     /// A blocking migration block → the retriable / terminal UI state, by its classification.
     /// Exhaustive; no default.
     public static func classify(_ block: MigrationBlock) -> MigrationUIState {
@@ -87,12 +76,28 @@ public enum MigrationBootDriver {
     public static func attemptOpen(authorization: StoreOpenAuthorization,
                                    residual: MigrationResidual?,
                                    confirm: (StoreOpenAuthorization) -> OpenPrecheck,
-                                   openStore: (StoreOpenIntent) throws -> LedgerStore) -> Attempt {
+                                   openStore: (ConfirmedOpenPlan) throws -> LedgerStore) -> Attempt {
         switch confirm(authorization) {
-        case .proceed:
+        case .proceed(let plan):
+            // Exhaustive authorization × plan cross-check. An impossible pairing (a confirm that
+            // minted a plan that does not match its authorization) maps to a typed internalError
+            // and NEVER opens — belt-and-suspenders over the coordinator minting the plan.
+            switch (authorization, plan) {
+            case (.createFreshExpectedAbsent, .createFresh),
+                 (.openExistingPlain, .existing),
+                 (.openExistingCompleted, .existing):
+                break   // valid pairing
+            case (.createFreshExpectedAbsent, .existing),
+                 (.openExistingPlain, .createFresh),
+                 (.openExistingCompleted, .createFresh):
+                return .ui(.terminal(MigrationBlock(code: .internalError, classification: .terminal,
+                                                    params: ["op": "attemptOpen", "reason": "planAuthorizationMismatch"])))
+            }
             do {
-                let store = try openStore(openIntent(for: authorization))
+                let store = try openStore(plan)
                 return .opened(store, residual)
+            } catch let e as HardenedOpenError {
+                return .ui(mapHardenedError(e))
             } catch {
                 return .ui(.retriable(MigrationBlock(code: .storeOpenFailed,
                                                      classification: .retriable,
@@ -102,6 +107,44 @@ public enum MigrationBootDriver {
             return .ui(classify(block))
         case .reResolve:
             return .needsReResolve
+        }
+    }
+
+    /// Map a C12x hardened-open failure to a typed UI state. Every mapping carries only stable
+    /// reason tags (and, for a generic sqlite failure, structured NUMERIC codes) — never
+    /// `Error.description`, a sqlite message, a path or `strerror`. Exhaustive; no default.
+    ///
+    /// Post-open identity findings (symlink / moved / mismatch / vanished) DELIBERATELY never
+    /// return `.needsReResolve`: an automatic re-resolve would re-adopt a persistently-swapped
+    /// file as `openExistingPlain`, or an absent one as `createFreshExpectedAbsent`. A symlinked
+    /// active path is PERMANENT, so it lands terminal (not a retriable transient).
+    static func mapHardenedError(_ e: HardenedOpenError) -> MigrationUIState {
+        switch e {
+        case .identity(let v):
+            switch v {
+            case .unsupportedSymlinkedActivePath:
+                return .terminal(MigrationBlock(code: .activeEntryInvalid, classification: .terminal,
+                                                params: ["op": "activeOpen", "reason": v.rawValue]))
+            case .moved, .vanished, .parentIdentityMismatch, .fingerprintMismatch, .zeroSizeActiveLeaf:
+                return .retriable(MigrationBlock(code: .interference, classification: .retriable,
+                                                 params: ["op": "activeOpen", "reason": v.rawValue]))
+            }
+        case .hasMovedUnavailable:
+            return .retriable(MigrationBlock(code: .storeOpenFailed, classification: .retriable,
+                                             params: ["op": "activeOpen", "reason": "hasMovedUnavailable"]))
+        case .hasMovedMisuse:
+            return .terminal(MigrationBlock(code: .internalError, classification: .terminal,
+                                            params: ["op": "activeOpen", "reason": "hasMovedMisuse"]))
+        case .hasMovedFailed:
+            // A HAS_MOVED file-control error (e.g. an IOERR when a WAL DB's file was swapped) —
+            // fail-closed, never reResolve. Structured codes stay in the typed error (Core tests).
+            return .retriable(MigrationBlock(code: .storeOpenFailed, classification: .retriable,
+                                             params: ["op": "activeOpen", "reason": "hasMovedFailed"]))
+        case .sqlite:
+            // Structured numeric codes stay in the typed error (asserted by Core tests); the UI
+            // block carries only a stable reason tag this round (diagnostics export deferred).
+            return .retriable(MigrationBlock(code: .storeOpenFailed, classification: .retriable,
+                                             params: ["op": "activeOpen", "reason": "sqliteOpen"]))
         }
     }
 }

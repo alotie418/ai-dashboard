@@ -58,6 +58,133 @@ public final class LedgerStore {
         try self.init(databaseURL: databaseURL, open: .createIfMissing)
     }
 
+    /// C12x-A1: adopt an ALREADY-OPEN connection (for the hardened active path, one that has
+    /// already passed the NOFOLLOW/HAS_MOVED/fingerprint checks) and run pragmas + migration on
+    /// the SAME connection — NO second open. A pragma/migration failure explicitly closes the
+    /// adopted connection before rethrowing, so no descriptor/lock leaks on the failure path.
+    init(adopting db: SQLiteDatabase) throws {
+        self.db = db
+        self.settings = SettingsStore(db)
+        do {
+            try applyPragmas()
+            try SchemaMigrator.migrate(db)
+        } catch {
+            try? db.close()
+            throw error
+        }
+    }
+
+    /// INTERNAL test seams for the hardened active-open. Nil in production (the SHIPPING public
+    /// entry passes an empty instance), so no hook is ever reachable from the App. `open` defaults
+    /// to the single real NOFOLLOW open; a test injects a counting/observing opener to prove the
+    /// single-open invariant without any global mutable state.
+    struct HardenedOpenHooks {
+        var open: (URL) throws -> SQLiteDatabase = {
+            try SQLiteDatabase(path: $0.path, mode: .activeExistingNoFollow)
+        }
+        /// Fired AFTER the size guard and BEFORE the open — swap/truncate the file here.
+        var beforeOpen: (() throws -> Void)? = nil
+        /// Fired AFTER the single open and BEFORE the identity checks — swap the file here.
+        var afterOpenBeforeChecks: (() throws -> Void)? = nil
+        /// Deterministically inject a `HAS_MOVED` result (e.g. `.notFound`) into the real flow.
+        var hasMovedOverride: (() -> HasMovedResult)? = nil
+        /// Observe the identity connection being closed on a failure path (`true` == close ok).
+        var observeClose: ((Bool) -> Void)? = nil
+    }
+
+    /// C12x-A1: open the coordinator-authorized EXISTING active store with layered path/inode
+    /// hardening, then adopt the SAME connection. EXACTLY ONE open; on ANY failure before adoption
+    /// the connection is DETERMINISTICALLY closed and NO application-layer SQL / PRAGMA / migration
+    /// / settings read runs — so on a SUPPORTED APFS active path a failed identity check performs
+    /// no application-layer write. (A zero-length open on a MSDOS/FAT volume MAY write one byte at
+    /// the VFS layer; that filesystem-support edge is a registered compatibility residual, not
+    /// closed here.)
+    ///
+    /// Layers: (1) refuse when the CONFIRM-TIME evidence leaf size is zero (a confirmed-empty
+    /// active is never valid) — this does NOT catch a LATE swap to a zero-length file after
+    /// confirm (evidence is still > 0), which reaches the open and is caught by the fingerprint
+    /// (size mismatch); (2) NOFOLLOW open (a symlink anywhere in the resolved path →
+    /// `CANTOPEN_SYMLINK`); (3) HAS_MOVED (open fd inode ≠ current path
+    /// inode — catches an opened-then-restored double-swap that a path re-stat would miss); (4)
+    /// parent (device,inode) + full no-follow leaf fingerprint vs the confirm-time evidence.
+    /// NONE proves the blessed inode was the one opened — a same-inode-at-both-ends race between
+    /// the checks remains residual R1; this is a CURRENT-PATH identity check, not a proof of the
+    /// opened inode. The SHIPPING entry takes ONLY `databaseURL` + `expect`; no test hook is exposed.
+    public static func openActiveExistingHardened(databaseURL url: URL,
+                                                  expect: ActiveOpenEvidence) throws -> LedgerStore {
+        try openActiveExistingHardened(databaseURL: url, expect: expect, hooks: HardenedOpenHooks())
+    }
+
+    /// INTERNAL overload carrying the test seams; not reachable from the App.
+    static func openActiveExistingHardened(databaseURL url: URL, expect: ActiveOpenEvidence,
+                                           hooks: HardenedOpenHooks) throws -> LedgerStore {
+        // (1) Refuse when the CONFIRM-TIME evidence leaf size is zero. This guards a
+        //     confirmed-empty active only; a LATE zero-length swap (evidence still > 0) is NOT
+        //     rejected here — it reaches the open and is caught downstream by the fingerprint.
+        guard expect.leaf.size > 0 else { throw HardenedOpenError.identity(.zeroSizeActiveLeaf) }
+
+        try hooks.beforeOpen?()
+
+        // (2) The SINGLE open — via the injected opener (default = the real NOFOLLOW open).
+        let db: SQLiteDatabase
+        do {
+            db = try hooks.open(url)
+        } catch let e as SQLiteError {
+            throw Self.mapHardenedOpenError(e)
+        }
+
+        // (3)+(4) identity checks BEFORE any SQL. On failure: DETERMINISTIC close, then rethrow
+        //         the ORIGINAL typed error (never the close error, so no close-failure text leaks).
+        do {
+            try hooks.afterOpenBeforeChecks?()
+            try Self.verifyActiveIdentity(db: db, url: url, expect: expect, hooks: hooks)
+        } catch {
+            var closed = false
+            do { try db.close(); closed = true } catch { closed = false }
+            hooks.observeClose?(closed)
+            throw error
+        }
+
+        // Adopt the SAME verified connection; only now do pragmas + migration (writes) run.
+        return try LedgerStore(adopting: db)
+    }
+
+    private static func mapHardenedOpenError(_ e: SQLiteError) -> HardenedOpenError {
+        if e.isCantOpenSymlink { return .identity(.unsupportedSymlinkedActivePath) }
+        guard case let .open(_, primary, extended, systemErrno) = e else {
+            return .sqlite(primary: 0, extended: 0, systemErrno: 0)
+        }
+        return .sqlite(primary: primary, extended: extended, systemErrno: systemErrno)
+    }
+
+    private static func verifyActiveIdentity(db: SQLiteDatabase, url: URL,
+                                             expect: ActiveOpenEvidence, hooks: HardenedOpenHooks) throws {
+        // (3) HAS_MOVED — the open connection's inode must still live at this path.
+        switch hooks.hasMovedOverride?() ?? db.hasMoved() {
+        case .ok(let moved): if moved { throw HardenedOpenError.identity(.moved) }
+        case .notFound:      throw HardenedOpenError.hasMovedUnavailable
+        case .misuse:        throw HardenedOpenError.hasMovedMisuse
+        case .fileControlFailed(let rc, let sys):
+            throw HardenedOpenError.hasMovedFailed(fileControlRC: rc, systemErrno: sys)
+        }
+        // (4) parent (device,inode) + full no-follow leaf fingerprint vs evidence. The metadata
+        //     read is descriptor-rooted (openat O_NOFOLLOW + fstatat AT_SYMLINK_NOFOLLOW).
+        let parentURL = url.deletingLastPathComponent()
+        let name = url.lastPathComponent
+        let parent: DirectoryHandle
+        do { parent = try DirectoryHandle.open(at: parentURL) }
+        catch let e as FileHashError where e.isFileMissing { throw HardenedOpenError.identity(.vanished) }
+        catch { throw HardenedOpenError.identity(.parentIdentityMismatch) }
+        guard parent.device == expect.parentDevice, parent.inode == expect.parentInode else {
+            throw HardenedOpenError.identity(.parentIdentityMismatch)
+        }
+        let fp: FileFingerprint?
+        do { fp = try parent.fingerprint(named: name) }
+        catch { throw HardenedOpenError.identity(.fingerprintMismatch) }
+        guard let fp else { throw HardenedOpenError.identity(.vanished) }
+        guard fp == expect.leaf else { throw HardenedOpenError.identity(.fingerprintMismatch) }
+    }
+
     private func applyPragmas() throws {
         // Same posture as electron/db/index.js.
         try db.execute("PRAGMA journal_mode = WAL")

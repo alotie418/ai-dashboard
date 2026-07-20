@@ -72,12 +72,70 @@ public enum StoreOpenAuthorization: Equatable {
     case openExistingCompleted(CompletionEvidence)
 }
 
+/// C12x-A1: from-disk identity evidence for the authorized ACTIVE existing-store, captured by
+/// the coordinator as the LAST disk step before it returns `.proceed(.existing)`. Value type
+/// with an INTERNAL initializer and INTERNAL fields, so only the coordinator (and in-module
+/// tests) can mint one — the App layer can pass it through but can neither forge nor read it.
+/// Carries the active file's PARENT (device,inode) and the full no-follow leaf `FileFingerprint`.
+public struct ActiveOpenEvidence: Equatable {
+    let parentDevice: Int32
+    let parentInode: UInt64
+    let leaf: FileFingerprint
+    init(parentDevice: Int32, parentInode: UInt64, leaf: FileFingerprint) {
+        self.parentDevice = parentDevice
+        self.parentInode = parentInode
+        self.leaf = leaf
+    }
+}
+
+/// What a passed `confirmOpenAuthorization` authorizes the single store-open site to do. There
+/// is deliberately NO optional evidence: a fresh create carries none, an existing open carries
+/// the MANDATORY `ActiveOpenEvidence`, so the two intents can never be conflated or downgraded.
+public enum ConfirmedOpenPlan: Equatable {
+    case createFresh
+    case existing(ActiveOpenEvidence)
+}
+
 public enum OpenPrecheck: Equatable {
-    case proceed
+    case proceed(ConfirmedOpenPlan)
     /// Disk changed since the authorization was minted — run one bounded `bootResolve`
     /// again; never construct the store, never create an empty file on this path.
     case reResolve
     case blocked(MigrationBlock)
+}
+
+/// C12x-A1 hardened active-open failure, thrown by `LedgerStore.openActiveExistingHardened` and
+/// mapped to a typed `MigrationUIState` by `MigrationBootDriver`. Every case is typed data —
+/// there is NO `Error.description`, sqlite message, path or `strerror` anywhere in it.
+public enum HardenedOpenError: Error, Equatable {
+    /// A path/inode identity check failed BEFORE any write; fail-closed, never auto-reResolve.
+    case identity(IdentityViolation)
+    /// `HAS_MOVED` returned `SQLITE_NOTFOUND` — cannot verify; treated as a store-open failure.
+    case hasMovedUnavailable
+    /// `HAS_MOVED` returned `SQLITE_MISUSE` — a programming error; treated as internal.
+    case hasMovedMisuse
+    /// `HAS_MOVED` returned any other non-OK rc (e.g. an IOERR when a WAL DB's file was swapped).
+    /// Carries the AUTHORITATIVE `file_control` rc (not the connection's extended errcode).
+    case hasMovedFailed(fileControlRC: Int32, systemErrno: Int32)
+    /// A failed `sqlite3_open_v2`, with STRUCTURED numeric codes only (primary/extended/errno).
+    case sqlite(primary: Int32, extended: Int32, systemErrno: Int32)
+}
+
+/// The specific identity check that failed on the hardened active-open path (stable tags).
+public enum IdentityViolation: String, Equatable {
+    /// Open refused with `SQLITE_CANTOPEN_SYMLINK` — a symlink in the resolved active path. A
+    /// PERMANENT signal (unsupported path / attack), NOT presented as a retriable transient.
+    case unsupportedSymlinkedActivePath
+    /// `HAS_MOVED` reported the open connection is bound to a file no longer at its path.
+    case moved
+    /// The active leaf (or its parent) is gone (ENOENT) at the post-open re-fingerprint.
+    case vanished
+    /// The active leaf's parent directory (device,inode) no longer matches the evidence.
+    case parentIdentityMismatch
+    /// The active leaf's full no-follow fingerprint no longer matches the evidence.
+    case fingerprintMismatch
+    /// The evidence leaf is zero-length — never a valid existing store; refused before open.
+    case zeroSizeActiveLeaf
 }
 
 /// Cleanup residue note carried alongside a store-open authorization (non-blocking).
@@ -254,7 +312,12 @@ public struct MigrationCoordinator {
             case .ok(let scan):
                 if !scan.canonicalFinalIDs.isEmpty || !scan.invalidEntries.isEmpty { return .reResolve }
             }
-            return .proceed
+            // Capture the active identity as the LAST disk step before authorizing the open.
+            switch Self.captureActiveEvidence(activeDestination: config.activeDestination) {
+            case .captured(let ev):    return .proceed(.existing(ev))
+            case .absentOrInvalidType: return .reResolve
+            case .metadataReadFailed:  return .blocked(.retriable(.ioTransient, ["op": "activeEvidence"]))
+            }
         case .openExistingCompleted(let evidence):
             // The CURRENT bound record must equal the authorization-time record full-field.
             switch Self.inspectRecord(activeDestination: config.activeDestination) {
@@ -276,10 +339,11 @@ public struct MigrationCoordinator {
             case .completed, .cleanupPending: break
             case .pending, .conflict: return .reResolve
             }
-            switch Self.inspectActiveEntry(activeDestination: config.activeDestination) {
-            case .boundRegularFile: return .proceed
-            case .absent, .invalidType: return .reResolve
-            case .metadataReadFailed(let m): return .blocked(.retriable(.ioTransient, ["op": "activeEntry", "detail": m]))
+            // Capture the active identity as the LAST disk step before authorizing the open.
+            switch Self.captureActiveEvidence(activeDestination: config.activeDestination) {
+            case .captured(let ev):    return .proceed(.existing(ev))
+            case .absentOrInvalidType: return .reResolve
+            case .metadataReadFailed:  return .blocked(.retriable(.ioTransient, ["op": "activeEvidence"]))
             }
         case .createFreshExpectedAbsent:
             switch Self.inspectActiveEntry(activeDestination: config.activeDestination) {
@@ -306,7 +370,7 @@ public struct MigrationCoordinator {
             switch Self.sourceState(autoSourceCandidate) {   // re-derived NOW, never cached
             case .available: return .reResolve
             case .unstable(let m): return .blocked(.retriable(.interference, ["op": "sourceState", "detail": m]))
-            case .unavailable: return .proceed
+            case .unavailable: return .proceed(.createFresh)
             }
         }
     }
@@ -702,6 +766,30 @@ public struct MigrationCoordinator {
             guard let fp = try parent.fingerprint(named: name) else { return .absent }
             return fp.isRegularFile ? .boundRegularFile : .invalidType("active entry is not a regular file")
         } catch { return .metadataReadFailed("active entry: \(error)") }
+    }
+
+    /// Outcome of the final-step `ActiveOpenEvidence` capture for an existing-store confirm.
+    enum ActiveEvidenceCapture {
+        case captured(ActiveOpenEvidence)
+        case absentOrInvalidType    // → confirm returns .reResolve (a pre-open semantic change)
+        case metadataReadFailed     // → confirm returns .blocked(.retriable(.ioTransient))
+    }
+
+    /// C12x-A1: capture the active leaf's identity (parent device+inode and the full no-follow
+    /// leaf fingerprint) — the LAST disk step before an existing-store confirm returns
+    /// `.proceed(.existing)`. No error text leaves this function.
+    static func captureActiveEvidence(activeDestination: URL) -> ActiveEvidenceCapture {
+        let parentURL = activeDestination.deletingLastPathComponent()
+        let name = activeDestination.lastPathComponent
+        let parent: DirectoryHandle
+        do { parent = try DirectoryHandle.open(at: parentURL) }
+        catch let e as FileHashError where e.isFileMissing { return .absentOrInvalidType }
+        catch { return .metadataReadFailed }
+        do {
+            guard let fp = try parent.fingerprint(named: name) else { return .absentOrInvalidType }
+            guard fp.isRegularFile else { return .absentOrInvalidType }
+            return .captured(ActiveOpenEvidence(parentDevice: parent.device, parentInode: parent.inode, leaf: fp))
+        } catch { return .metadataReadFailed }
     }
 
     enum SlotRecordState {

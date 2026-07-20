@@ -176,7 +176,7 @@ final class MigrationCoordinatorTests: LedgerTestCase {
         XCTAssertNil(residual)
         XCTAssertFalse(fm.fileExists(atPath: ctx.config.activeDestination.path), "C12a never creates the DB")
         XCTAssertEqual(coord(ctx).confirmOpenAuthorization(.createFreshExpectedAbsent, autoSourceCandidate: nil),
-                       .proceed)
+                       .proceed(.createFresh))
     }
 
     func testPlainActiveOpensViaPlainAuthorization() throws {
@@ -184,7 +184,9 @@ final class MigrationCoordinatorTests: LedgerTestCase {
         try Data("plain".utf8).write(to: ctx.config.activeDestination)
         guard case .openStore(let auth, _) = boot(ctx, nil) else { return XCTFail() }
         XCTAssertEqual(auth, .openExistingPlain, "B2 must mint the PLAIN authorization")
-        XCTAssertEqual(coord(ctx).confirmOpenAuthorization(auth, autoSourceCandidate: nil), .proceed)
+        guard case .proceed(.existing) = coord(ctx).confirmOpenAuthorization(auth, autoSourceCandidate: nil) else {
+            return XCTFail("plain confirm must proceed(.existing) with captured evidence")
+        }
     }
 
     func testPlainActiveSymlinkBlocked() throws {
@@ -738,11 +740,13 @@ final class MigrationCoordinatorTests: LedgerTestCase {
             try rewriteSameInode(recordURL(ctx), try enc.encode(t))
             XCTAssertEqual(coord(ctx).confirmOpenAuthorization(auth, autoSourceCandidate: nil), .reResolve)
         }
-        // (d) untouched → proceed
+        // (d) untouched → proceed(.existing)
         do {
             let ctx = try makeCtx()
             let auth = try completedAuth(ctx, source)
-            XCTAssertEqual(coord(ctx).confirmOpenAuthorization(auth, autoSourceCandidate: nil), .proceed)
+            guard case .proceed(.existing) = coord(ctx).confirmOpenAuthorization(auth, autoSourceCandidate: nil) else {
+                return XCTFail("untouched completed confirm must proceed(.existing)")
+            }
         }
     }
 
@@ -869,7 +873,9 @@ final class MigrationCoordinatorTests: LedgerTestCase {
             return XCTFail("completed boot must succeed without chain directories")
         }
         guard case .openExistingCompleted = auth else { return XCTFail() }
-        XCTAssertEqual(coordinator2.confirmOpenAuthorization(auth, autoSourceCandidate: nil), .proceed)
+        guard case .proceed(.existing) = coordinator2.confirmOpenAuthorization(auth, autoSourceCandidate: nil) else {
+            return XCTFail("completed confirm must proceed(.existing)")
+        }
         for ghost in [c2.activeAttachmentsDir, c2.workingDirectory, c2.preparedRoot, ghostStaging] {
             XCTAssertFalse(fm.fileExists(atPath: ghost.path), "\(ghost.lastPathComponent) must not be created")
         }

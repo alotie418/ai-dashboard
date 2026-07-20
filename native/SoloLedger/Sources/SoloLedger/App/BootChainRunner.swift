@@ -40,8 +40,10 @@ struct ProductionBootChainRunner: BootChainRunner {
     let resolveWork: @Sendable (BootIntent) -> BootOutcome
     /// Phase-B confirm — invoked only from `attempt` (main actor).
     let confirm: (StoreOpenAuthorization) -> OpenPrecheck
-    /// Phase-B store construction — invoked only from `attempt` (main actor).
-    let openStore: (StoreOpenIntent) throws -> LedgerStore
+    /// Phase-B store construction — invoked only from `attempt` (main actor). Receives the
+    /// confirmed plan (createFresh vs existing+evidence) so the existing path can take the C12x
+    /// hardened open.
+    let openStore: (ConfirmedOpenPlan) throws -> LedgerStore
 
     /// Called on the main actor; the heavy `resolveWork` is explicitly dispatched to a DETACHED
     /// background task so it never runs on the main actor. Removing this detach is what the

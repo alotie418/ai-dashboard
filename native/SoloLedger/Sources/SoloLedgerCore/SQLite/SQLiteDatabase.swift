@@ -40,19 +40,54 @@ public enum SQLiteValue: Equatable, Sendable {
 }
 
 public enum SQLiteError: Error, CustomStringConvertible {
-    case open(String)
+    /// A failed `sqlite3_open_v2`. Carries the STRUCTURED numeric codes (primary, extended and
+    /// the underlying `sqlite3_system_errno`), collected BEFORE the partial handle is closed, so
+    /// a caller (e.g. the C12x hardened active-open) can classify a symlink / IO failure by code
+    /// WITHOUT parsing the human `message`. The message is retained only for developer logs and
+    /// is NEVER surfaced into a `MigrationBlock.params`.
+    case open(message: String, primary: Int32, extended: Int32, systemErrno: Int32)
     case prepare(String)
     case step(String)
     case message(String)
 
     public var description: String {
         switch self {
-        case .open(let m): return "SQLite open failed: \(m)"
+        case let .open(m, primary, extended, sys):
+            return "SQLite open failed: \(m) (primary \(primary), extended \(extended), errno \(sys))"
         case .prepare(let m): return "SQLite prepare failed: \(m)"
         case .step(let m): return "SQLite step failed: \(m)"
         case .message(let m): return "SQLite error: \(m)"
         }
     }
+}
+
+public extension SQLiteError {
+    /// True iff this is an `.open` failure whose EXTENDED code is `SQLITE_CANTOPEN_SYMLINK`
+    /// (a symlink somewhere in the resolved path, rejected under `SQLITE_OPEN_NOFOLLOW`).
+    /// `SQLITE_CANTOPEN_SYMLINK` is an expression macro not imported to Swift, so it is computed.
+    var isCantOpenSymlink: Bool {
+        guard case let .open(_, _, extended, _) = self else { return false }
+        return extended == (SQLITE_CANTOPEN | (6 << 8))
+    }
+}
+
+/// Result of a post-open `SQLITE_FCNTL_HAS_MOVED` check on the "main" database file.
+/// The Unix VFS compares the OPEN descriptor's inode against the inode currently at the path
+/// (INODE ONLY — not device); see the C12x residual notes for cross-device / between-check gaps.
+public enum HasMovedResult: Equatable {
+    /// `rc == SQLITE_OK`; `moved` is true when the open fd's inode is no longer the path's inode
+    /// (replaced / unlinked / opened-then-restored), i.e. the connection is bound to a file that
+    /// no longer lives at this path.
+    case ok(moved: Bool)
+    /// `rc == SQLITE_NOTFOUND` — the VFS does not implement the opcode (e.g. an in-memory DB).
+    case notFound
+    /// `rc == SQLITE_MISUSE` — misuse (e.g. an unknown schema name); a programming error.
+    case misuse
+    /// Any other non-OK `rc` from `sqlite3_file_control`. Carries the AUTHORITATIVE per-call
+    /// `fileControlRC` (the file-control return value itself — NOT `sqlite3_extended_errcode`,
+    /// which reflects the connection's last statement, not this control call) plus the
+    /// `sqlite3_system_errno` snapshot. Numbers only; no message.
+    case fileControlFailed(fileControlRC: Int32, systemErrno: Int32)
 }
 
 /// A single result row keyed by column name, preserving column order.
@@ -96,12 +131,21 @@ public final class SQLiteDatabase {
         case readWriteExisting
         /// Read-only — used to inspect a source without ever modifying it.
         case readOnly
+        /// C12x-A1 active existing-store hardened open: READWRITE **without** CREATE, plus
+        /// `SQLITE_OPEN_NOFOLLOW` (the Unix VFS refuses a symlink ANYWHERE in the resolved path —
+        /// leaf or ancestor — with `SQLITE_CANTOPEN_SYMLINK`) and `SQLITE_OPEN_EXRESCODE` (so the
+        /// extended code is returned and a symlink is distinguishable from a generic CANTOPEN).
+        /// Used ONLY for opening the coordinator-authorized existing active database; it is
+        /// deliberately NOT a general-purpose mode (createFresh / restore / demo keep their modes).
+        case activeExistingNoFollow
 
         var flags: Int32 {
             switch self {
             case .readWriteCreate: return SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
             case .readWriteExisting: return SQLITE_OPEN_READWRITE
             case .readOnly: return SQLITE_OPEN_READONLY
+            case .activeExistingNoFollow:
+                return SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOFOLLOW | SQLITE_OPEN_EXRESCODE
             }
         }
     }
@@ -111,11 +155,38 @@ public final class SQLiteDatabase {
         var db: OpaquePointer?
         let rc = sqlite3_open_v2(path, &db, mode.flags, nil)
         guard rc == SQLITE_OK, let db else {
-            let msg = db.map { String(cString: sqlite3_errmsg($0)) } ?? "unknown"
+            // Collect the STRUCTURED codes from the partial handle BEFORE closing it; the path and
+            // message are kept only for developer logs and never reach a MigrationBlock.
+            let primary = rc & 0xFF
+            let extended = db.map { sqlite3_extended_errcode($0) } ?? rc
+            let sysErrno = db.map { sqlite3_system_errno($0) } ?? 0
+            let msg = db.map { String(cString: sqlite3_errmsg($0)) } ?? "open failed"
             if let db { sqlite3_close(db) }
-            throw SQLiteError.open("\(msg) (code \(rc), path \(path))")
+            throw SQLiteError.open(message: msg, primary: primary, extended: extended, systemErrno: sysErrno)
         }
         self.handle = db
+    }
+
+    /// Post-open identity probe (`SQLITE_FCNTL_HAS_MOVED`) on the "main" file — pure: no SQL, no
+    /// write, creates no `-wal`/`-shm`. Detects that the open connection's inode is no longer the
+    /// one living at its path (replaced / unlinked / opened-then-restored). This is NOT proof the
+    /// blessed inode was opened (a same-inode-at-both-ends race can still pass — residual R1);
+    /// it is one of the layered checks in the C12x hardened active-open.
+    func hasMoved() -> HasMovedResult {
+        guard let handle else { return .misuse }
+        var moved: Int32 = -1
+        let rc = withUnsafeMutablePointer(to: &moved) {
+            sqlite3_file_control(handle, "main", SQLITE_FCNTL_HAS_MOVED, UnsafeMutableRawPointer($0))
+        }
+        switch rc {
+        case SQLITE_OK:       return .ok(moved: moved != 0)
+        case SQLITE_NOTFOUND: return .notFound
+        case SQLITE_MISUSE:   return .misuse
+        default:
+            // `rc` is the AUTHORITATIVE per-call return of THIS file_control; do NOT substitute
+            // `sqlite3_extended_errcode`, which reflects the last statement on the connection.
+            return .fileControlFailed(fileControlRC: rc, systemErrno: sqlite3_system_errno(handle))
+        }
     }
 
     /// Compatibility convenience: `readOnly` selects `.readOnly`, otherwise `.readWriteCreate`.

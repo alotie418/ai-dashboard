@@ -21,10 +21,20 @@ final class MigrationBootDriverTests: LedgerTestCase {
 
     private final class Counters { var confirm = 0; var factory = 0 }
 
-    private func failingFactory(_ c: Counters) -> (StoreOpenIntent) throws -> LedgerStore {
+    private func failingFactory(_ c: Counters) -> (ConfirmedOpenPlan) throws -> LedgerStore {
         { _ in c.factory += 1; XCTFail("store factory must not be called"); throw Crash() }
     }
     private struct Crash: Error {}
+
+    /// A minimal `ConfirmedOpenPlan.existing` payload for driver tests whose MOCK openStore
+    /// ignores the evidence (the real fingerprint verification is covered by the hardened-open
+    /// tests). `@testable` grants access to the internal `ActiveOpenEvidence`/`FileFingerprint` inits.
+    private func dummyExisting() -> ConfirmedOpenPlan {
+        .existing(ActiveOpenEvidence(parentDevice: 0, parentInode: 0,
+                                     leaf: FileFingerprint(fileType: UInt16(S_IFREG), device: 0, inode: 0,
+                                                           size: 4096, mtimeSec: 0, mtimeNSec: 0,
+                                                           ctimeSec: 0, ctimeNSec: 0)))
+    }
 
     // MARK: - LedgerStore open-intent extension
 
@@ -61,12 +71,32 @@ final class MigrationBootDriverTests: LedgerTestCase {
                        "existingOnly must never fabricate an empty database at a vanished path")
     }
 
-    // MARK: - openIntent(for:) — authorization → open mode (no default)
+    // MARK: - authorization × plan cross-check (impossible pairing → internalError, never opens)
 
-    func testOpenIntentMapping() throws {
-        XCTAssertEqual(MigrationBootDriver.openIntent(for: .createFreshExpectedAbsent), .createIfMissing)
-        XCTAssertEqual(MigrationBootDriver.openIntent(for: .openExistingPlain), .existingOnly)
-        XCTAssertEqual(MigrationBootDriver.openIntent(for: try completedAuthorization()), .existingOnly)
+    func testAttemptOpenRejectsPlanAuthorizationMismatchWithoutOpening() {
+        let c = Counters()
+        // createFresh authorization but confirm mints an existing plan → impossible → internalError.
+        let result = MigrationBootDriver.attemptOpen(
+            authorization: .createFreshExpectedAbsent, residual: nil,
+            confirm: { _ in .proceed(self.dummyExisting()) },
+            openStore: failingFactory(c))
+        guard case .ui(.terminal(let b)) = result else { return XCTFail("expected ui(.terminal), got \(result)") }
+        XCTAssertEqual(b.code, .internalError)
+        XCTAssertEqual(b.params["reason"], "planAuthorizationMismatch")
+        XCTAssertEqual(c.factory, 0, "an impossible pairing must never construct a store")
+    }
+
+    func testAttemptOpenRejectsExistingAuthorizationWithCreateFreshPlan() throws {
+        let c = Counters()
+        // The REVERSE mismatch: an existing authorization but confirm mints a createFresh plan.
+        let result = MigrationBootDriver.attemptOpen(
+            authorization: .openExistingPlain, residual: nil,
+            confirm: { _ in .proceed(.createFresh) },
+            openStore: failingFactory(c))
+        guard case .ui(.terminal(let b)) = result else { return XCTFail("expected ui(.terminal), got \(result)") }
+        XCTAssertEqual(b.code, .internalError)
+        XCTAssertEqual(b.params["reason"], "planAuthorizationMismatch")
+        XCTAssertEqual(c.factory, 0, "an existing authorization + createFresh plan must never open a store")
     }
 
     // MARK: - classifyOutcome — ack / selection / blocked never reach an authorization
@@ -114,12 +144,12 @@ final class MigrationBootDriverTests: LedgerTestCase {
         let url = try trackedTempDir().appendingPathComponent("proceed.db")
         let result = MigrationBootDriver.attemptOpen(
             authorization: .createFreshExpectedAbsent, residual: nil,
-            confirm: { _ in c.confirm += 1; return .proceed },
-            openStore: { intent in
+            confirm: { _ in c.confirm += 1; return .proceed(.createFresh) },
+            openStore: { plan in
                 c.factory += 1
                 XCTAssertTrue(Thread.isMainThread, "LedgerStore must be constructed on the main thread")
-                XCTAssertEqual(intent, .createIfMissing)
-                return try LedgerStore(databaseURL: url, open: intent)
+                XCTAssertEqual(plan, .createFresh)
+                return try LedgerStore(databaseURL: url, open: .createIfMissing)
             })
         guard case .opened(let store, let residual) = result else { return XCTFail("expected opened, got \(result)") }
         XCTAssertNil(residual)
@@ -137,9 +167,9 @@ final class MigrationBootDriverTests: LedgerTestCase {
         let residualIn = MigrationResidual(importID: "leftover-1")
         let result = MigrationBootDriver.attemptOpen(
             authorization: try completedAuthorization(), residual: residualIn,
-            confirm: { _ in .proceed },
-            openStore: { intent in
-                XCTAssertEqual(intent, .existingOnly)
+            confirm: { _ in .proceed(self.dummyExisting()) },
+            openStore: { plan in
+                guard case .existing = plan else { XCTFail("expected existing plan"); throw Crash() }
                 return try LedgerStore(databaseURL: url, open: .existingOnly)
             })
         guard case .opened(_, let residualOut) = result else { return XCTFail() }
@@ -175,7 +205,7 @@ final class MigrationBootDriverTests: LedgerTestCase {
         let c = Counters()
         let result = MigrationBootDriver.attemptOpen(
             authorization: .createFreshExpectedAbsent, residual: nil,
-            confirm: { _ in .proceed },
+            confirm: { _ in .proceed(.createFresh) },
             openStore: { _ in c.factory += 1; throw SecretError() })
         guard case .ui(.retriable(let b)) = result else { return XCTFail("expected ui(.retriable), got \(result)") }
         XCTAssertEqual(b.code, .storeOpenFailed)
@@ -198,11 +228,11 @@ final class MigrationBootDriverTests: LedgerTestCase {
             confirm: { _ in
                 // The active database vanishes AFTER confirm decides .proceed, BEFORE the open.
                 try? self.fm.removeItem(at: url)
-                return .proceed
+                return .proceed(self.dummyExisting())
             },
-            openStore: { intent in
-                XCTAssertEqual(intent, .existingOnly)
-                return try LedgerStore(databaseURL: url, open: intent)     // existingOnly on a missing path → throws
+            openStore: { plan in
+                guard case .existing = plan else { XCTFail("expected existing plan"); throw Crash() }
+                return try LedgerStore(databaseURL: url, open: .existingOnly)  // existingOnly on a missing path → throws
             })
         guard case .ui(.retriable(let b)) = result else {
             return XCTFail("a vanished active must map to retriable(.storeOpenFailed), got \(result)")

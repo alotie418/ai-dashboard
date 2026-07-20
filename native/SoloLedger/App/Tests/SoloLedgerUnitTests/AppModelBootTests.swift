@@ -125,7 +125,7 @@ final class AppModelBootTests: XCTestCase {
         let runner = ProductionBootChainRunner(
             resolveWork: { _ in probe.wasMain = Thread.isMainThread
                                return .blocked(MigrationBlock(code: .ioTransient, classification: .retriable)) },
-            confirm: { _ in .proceed },
+            confirm: { _ in .proceed(.createFresh) },
             openStore: { _ in throw TestError.boom })
         _ = await runner.resolveOutcome(.boot)
         XCTAssertFalse(probe.wasMain, "Phase A resolveWork must run OFF the main thread")
@@ -136,9 +136,10 @@ final class AppModelBootTests: XCTestCase {
         let url = tempURL("pb.db")
         let runner = ProductionBootChainRunner(
             resolveWork: { _ in .blocked(MigrationBlock(code: .ioTransient, classification: .retriable)) },
-            confirm: { _ in .proceed },
-            openStore: { intent in probe.wasMain = Thread.isMainThread
-                                    return try LedgerStore(databaseURL: url, open: intent) })
+            confirm: { _ in .proceed(.createFresh) },
+            openStore: { plan in probe.wasMain = Thread.isMainThread
+                                  guard case .createFresh = plan else { throw TestError.boom }
+                                  return try LedgerStore(databaseURL: url, open: .createIfMissing) })
         let attempt = runner.attempt(.createFreshExpectedAbsent, residual: nil)
         guard case .opened = attempt else { return XCTFail("expected opened") }
         XCTAssertTrue(probe.wasMain, "Phase B store factory must run ON the main thread")
@@ -360,5 +361,43 @@ final class AppModelBootTests: XCTestCase {
         let model = AppModel(runner: fake)
         model.cancelImportSelection()   // migrationUIState is .none
         XCTAssertEqual(model.migrationUIState, .none, "cancel is a no-op outside awaitingImportSelection")
+    }
+
+    // MARK: - production wiring: an existing plan takes the C12x HARDENED open (not existingOnly)
+
+    /// Drives the REAL production dispatch `AppModel.openStoreForPlan` (the exact mapping
+    /// `makeProductionRunner` ships) against an isolated temp path: an `.existing` plan MUST use
+    /// the hardened NOFOLLOW open and refuse a leaf-symlink identity attack, leaving the decoy
+    /// target untouched. Reverting the `.existing` branch to `LedgerStore(open: .existingOnly)`
+    /// makes the open follow the symlink and NOT throw — which fails this test.
+    func testProductionExistingPlanUsesHardenedOpenAndRejectsSymlink() throws {
+        let fm = FileManager.default
+        // temporaryDirectory is under /var/folders (a /var symlink); canonicalize so whole-path
+        // NOFOLLOW is not tripped by an ancestor symlink (production active path is symlink-free).
+        var buf = [CChar](repeating: 0, count: Int(PATH_MAX))
+        _ = realpath(tempDir.path, &buf)
+        let dir = URL(fileURLWithPath: String(cString: buf), isDirectory: true)
+
+        let url = dir.appendingPathComponent("active.db")
+        let s = try LedgerStore(databaseURL: url, open: .createIfMissing)
+        try s.db.execute("PRAGMA wal_checkpoint(TRUNCATE)"); try s.db.close()
+        try? fm.removeItem(at: URL(fileURLWithPath: url.path + "-wal"))
+        try? fm.removeItem(at: URL(fileURLWithPath: url.path + "-shm"))
+        guard case .captured(let ev) = MigrationCoordinator.captureActiveEvidence(activeDestination: url) else {
+            return XCTFail("evidence capture failed")
+        }
+        // The decoy DB the attacker points the active leaf at.
+        let decoy = dir.appendingPathComponent("decoy.db")
+        let d = try LedgerStore(databaseURL: decoy, open: .createIfMissing); try d.db.close()
+        let decoyBefore = try Data(contentsOf: decoy)
+        try fm.removeItem(at: url)
+        try fm.createSymbolicLink(at: url, withDestinationURL: decoy)
+
+        XCTAssertThrowsError(try AppModel.openStoreForPlan(.existing(ev), activeURL: url)) { e in
+            guard case HardenedOpenError.identity(.unsupportedSymlinkedActivePath) = e else {
+                return XCTFail("production existing plan must take the hardened NOFOLLOW open, got \(e)")
+            }
+        }
+        XCTAssertEqual(try Data(contentsOf: decoy), decoyBefore, "the symlink target must never be opened or written")
     }
 }
