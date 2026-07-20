@@ -1,0 +1,16 @@
+# SwiftPM
+.build/
+.swiftpm/
+Package.resolved
+
+# Build output / assembled bundles
+build/
+*.app
+*.xcarchive
+
+# Xcode — commit the .xcodeproj + shared schemes, ignore per-user/derived data
+**/xcuserdata/
+DerivedData/
+
+# macOS
+.DS_Store

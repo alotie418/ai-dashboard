@@ -4,7 +4,10 @@
 // - app:*：应用级辅助（数据库导出/导入等）
 
 const { dispatch } = require('./router');
-const aiCore = require('../ai');
+const { IS_MAS } = require('../masBuild');
+// MAS build: the AI/BYOK subsystem (electron/ai/**) is excluded from the package and
+// never required. Guard the require so this file loads in a MAS bundle where ../ai is absent.
+const aiCore = IS_MAS ? null : require('../ai');
 const ecommerceCore = require('../ecommerce');
 const { isDemoMode } = require('../db');
 // §2A PR-1：把 SQLite/fs 写失败（磁盘满/IO/只读）归一化为稳定码，供备份·附件 catch 贴码。
@@ -28,42 +31,46 @@ function registerHandlers({ ipcMain, dialog }) {
   });
 
   // ====== AI Provider 管理 ======
-  ipcMain.handle('providers:list', async () => {
-    return aiCore.list();
-  });
+  // MAS build: no external-AI / BYOK-API-key entry point ships — these channels are not
+  // registered, so nothing in the Mac App Store binary can store/validate/use an API key.
+  if (!IS_MAS) {
+    ipcMain.handle('providers:list', async () => {
+      return aiCore.list();
+    });
 
-  ipcMain.handle('providers:hasAny', async () => {
-    return aiCore.hasAny();
-  });
+    ipcMain.handle('providers:hasAny', async () => {
+      return aiCore.hasAny();
+    });
 
-  ipcMain.handle('providers:save', async (_evt, payload) => {
-    return aiCore.save(payload || {});
-  });
+    ipcMain.handle('providers:save', async (_evt, payload) => {
+      return aiCore.save(payload || {});
+    });
 
-  ipcMain.handle('providers:remove', async (_evt, payload) => {
-    return aiCore.remove(payload || {});
-  });
+    ipcMain.handle('providers:remove', async (_evt, payload) => {
+      return aiCore.remove(payload || {});
+    });
 
-  ipcMain.handle('providers:setDefault', async (_evt, payload) => {
-    return aiCore.setDefault(payload || {});
-  });
+    ipcMain.handle('providers:setDefault', async (_evt, payload) => {
+      return aiCore.setDefault(payload || {});
+    });
 
-  ipcMain.handle('providers:test', async (_evt, payload) => {
-    try {
-      const result = await aiCore.test(payload || {});
-      return { ok: true, ...result };
-    } catch (err) {
-      // 回传【稳定 code】给 UI，由渲染端按 code 映射 i18n（aiError.*）；
-      // 不再回传本地化 friendly 中文（providerMessage 为英文原文，仅供调试展示）。
-      return {
-        ok: false,
-        code: err?.code || 'unknown',
-        status: err?.status,
-        providerMessage: err?.providerMessage,
-        rawMessage: err?.message,
-      };
-    }
-  });
+    ipcMain.handle('providers:test', async (_evt, payload) => {
+      try {
+        const result = await aiCore.test(payload || {});
+        return { ok: true, ...result };
+      } catch (err) {
+        // 回传【稳定 code】给 UI，由渲染端按 code 映射 i18n（aiError.*）；
+        // 不再回传本地化 friendly 中文（providerMessage 为英文原文，仅供调试展示）。
+        return {
+          ok: false,
+          code: err?.code || 'unknown',
+          status: err?.status,
+          providerMessage: err?.providerMessage,
+          rawMessage: err?.message,
+        };
+      }
+    });
+  }
 
   // ====== 电商平台连接管理（MVP：仅连接设置 + 凭证 safeStorage 加密 + 测试连接）======
   // 明文凭证绝不回传渲染端；解密只在主进程 test 时发生。此处不做拉单/暂存/同步/写账本。
@@ -431,26 +438,28 @@ function registerHandlers({ ipcMain, dialog }) {
     }
   });
 
-  console.log('[handlers] registered (api:request + providers:* + ecommerce:* + app:exportDb/importDb/relaunch/exportReportPdf + app:pickDocAttachment/openDocAttachment/discardDocAttachment)');
+  console.log(`[handlers] registered (api:request + ${IS_MAS ? '' : 'providers:* + '}ecommerce:* + app:exportDb/importDb/relaunch/exportReportPdf + app:pickDocAttachment/openDocAttachment/discardDocAttachment)${IS_MAS ? ' — MAS build: AI/BYOK subsystem excluded' : ''}`);
 
   // 启动横幅（仅开发/调试）：打印当前主进程加载的 provider META，便于确认实际使用的 defaultModel。
   // 不再做 STALE 比对 / 「旧版 main 进程」告警——provider 默认值一致性由 check:providers 在 lint 期保证；
   // 运行时比对既无法真正检出旧版 main（loaded metas 与常量同源），又会对国产 provider 误报。
-  try {
-    const { app } = require('electron');
-    if (!app.isPackaged) {
-      const aiCore = require('../ai');
-      const list = aiCore.list();
-      console.log('[providers] loaded:');
-      for (const p of list) {
-        const models = (p.availableModels || []).map(m =>
-          typeof m === 'string' ? `${m}(${m})` : `${m.label}(${m.value})`
-        ).join(', ');
-        console.log(`  - ${p.provider.padEnd(10)} default=${String(p.defaultModel).padEnd(24)} available=[${models}]`);
+  // MAS build: no AI subsystem to introspect — skip entirely.
+  if (!IS_MAS) {
+    try {
+      const { app } = require('electron');
+      if (!app.isPackaged) {
+        const list = aiCore.list();
+        console.log('[providers] loaded:');
+        for (const p of list) {
+          const models = (p.availableModels || []).map(m =>
+            typeof m === 'string' ? `${m}(${m})` : `${m.label}(${m.value})`
+          ).join(', ');
+          console.log(`  - ${p.provider.padEnd(10)} default=${String(p.defaultModel).padEnd(24)} available=[${models}]`);
+        }
       }
+    } catch (e) {
+      console.warn('[providers] preflight list failed:', e?.message || e);
     }
-  } catch (e) {
-    console.warn('[providers] preflight list failed:', e?.message || e);
   }
 }
 

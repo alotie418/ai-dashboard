@@ -1,0 +1,98 @@
+/* SoloLedger — Français (traduction partielle Phase-1 ; les clés manquantes retombent sur zh-Hans) */
+
+"app.name" = "SoloLedger";
+"common.ok" = "OK";
+"common.cancel" = "Annuler";
+"common.save" = "Enregistrer";
+"common.edit" = "Modifier";
+"common.delete" = "Supprimer";
+
+"nav.section" = "Navigation";
+"nav.overview" = "Aperçu";
+"nav.transactions" = "Transactions";
+"nav.categories" = "Catégories";
+
+"type.income" = "Recette";
+"type.expense" = "Dépense";
+"filter.all" = "Tout";
+"filter.income" = "Recettes";
+"filter.expense" = "Dépenses";
+
+"overview.income" = "Total recettes";
+"overview.expense" = "Total dépenses";
+"overview.net" = "Net";
+
+"cmd.newTransaction" = "Nouvelle transaction";
+"onboarding.tagline" = "Un livre de comptes local et privé pour indépendants";
+"onboarding.start" = "Commencer";
+
+"settings.language" = "Langue";
+"settings.appearance" = "Apparence";
+
+/* Amorçage de la migration (C12b-3) — interface de sécurité des données ; espaces réservés : {count}, {importID} */
+"migration.running.title" = "Préparation de votre comptabilité";
+"migration.running.message" = "Vérification et préparation de votre comptabilité…";
+"migration.retriable.title" = "Impossible d'ouvrir la comptabilité pour le moment";
+"migration.terminal.title" = "Impossible d'ouvrir la comptabilité";
+"migration.action.retry" = "Réessayer";
+"migration.action.exportDiagnostics" = "Exporter le diagnostic…";
+"migration.action.acknowledge" = "Confirmer et continuer";
+"migration.action.select" = "Sélectionner";
+"migration.action.cancel" = "Annuler";
+"migration.selection.title" = "Choisir un import à récupérer";
+"migration.selection.message" = "Plusieurs imports récupérables ont été trouvés. Choisissez-en un pour continuer.";
+"migration.acknowledgement.title" = "Certains éléments demandent une confirmation";
+"migration.acknowledgement.message" = "Certaines pièces jointes n'ont pas pu être traitées automatiquement. Confirmez pour terminer la migration.";
+"migration.acknowledgement.unresolvedCount" = "{count} élément(s) non résolu(s)";
+"migration.candidate.valid" = "Récupérable";
+"migration.candidate.unavailable" = "Momentanément indisponible";
+"migration.candidate.invalid" = "Endommagé — inutilisable";
+"migration.candidate.validHint" = "Récupérable — sélectionnez pour continuer.";
+"migration.candidate.unavailableHint" = "Momentanément indisponible ; réessayez l'analyse plus tard.";
+"migration.candidate.invalidHint" = "Cet import est endommagé et ne peut pas être utilisé.";
+"migration.residual.note" = "La migration est terminée, mais des données temporaires subsistent et peuvent être nettoyées (import {importID}).";
+"migration.residual.dismiss" = "J'ai compris";
+"migration.diagnostics.title" = "Exporter le diagnostic";
+"migration.diagnostics.filename" = "sololedger-diagnostics.txt";
+"migration.diagnostics.writeFailed" = "Impossible d'écrire le fichier de diagnostic. Veuillez choisir un autre emplacement.";
+"migration.msg.sourceBusy" = "L'application précédente utilise encore ses données. Veuillez quitter l'ancienne application SoloLedger, puis réessayer.";
+"migration.msg.invalidSource" = "La source sélectionnée n'est pas une comptabilité valide. Veuillez choisir un autre fichier.";
+"migration.msg.sourceCorrupt" = "La base de données source est endommagée et ne peut pas être migrée.";
+"migration.msg.schemaUnsupported" = "La base de données source utilise une version non prise en charge.";
+"migration.msg.migrationFailed" = "La migration n'a pas pu être menée à terme.";
+"migration.msg.stagingTampered" = "Les données de migration temporaires ne correspondent pas à leur enregistrement et ont peut-être été modifiées.";
+"migration.msg.sentinelOrphan" = "Un marqueur d'achèvement a été trouvé sans la base de données active correspondante.";
+"migration.msg.sentinelEntryInvalid" = "Un marqueur d'achèvement présente un type inattendu.";
+"migration.msg.recordMissingForCompletedImport" = "La comptabilité active existe, mais son enregistrement de propriété est manquant.";
+"migration.msg.importSlotOccupied" = "Cet emplacement de comptabilité est déjà occupé par un autre import.";
+"migration.msg.recordMalformed" = "L'enregistrement de propriété est mal formé.";
+"migration.msg.recordConflict" = "Un conflit d'import simultané a empêché de déterminer la propriété.";
+"migration.msg.identityMismatch" = "Une vérification d'identité des données a échoué.";
+"migration.msg.sentinelConflict" = "Un marqueur d'achèvement étranger occupe l'emplacement de cet import.";
+"migration.msg.attachmentConflict" = "Un conflit de pièce jointe nécessite une résolution manuelle.";
+"migration.msg.activeEntryInvalid" = "L'emplacement de la comptabilité active n'est pas un fichier ordinaire (il s'agit peut-être d'un lien symbolique).";
+"migration.msg.activeMissingAfterCompletion" = "La comptabilité active d'un import terminé est introuvable.";
+"migration.msg.activeDatabaseUnsupported" = "La base de données de la comptabilité active est dans un état non pris en charge ; elle a peut-être été ouverte par un autre programme ou est endommagée. Veuillez relancer l'analyse ou exporter le diagnostic.";
+"migration.msg.interference" = "Une interférence a été détectée pendant la vérification. Veuillez réessayer.";
+"migration.msg.ioTransient" = "Un problème de lecture/écriture temporaire s'est produit. Veuillez réessayer.";
+"migration.msg.importCannotComplete" = "Cet import ne peut pas être terminé car sa source n'est plus disponible.";
+"migration.msg.invalidSelection" = "L'import sélectionné n'est pas valide.";
+"migration.msg.storeOpenFailed" = "Impossible d'ouvrir la comptabilité. Veuillez réessayer.";
+"migration.msg.internalError" = "Un problème d'état interne s'est produit. Veuillez exporter le diagnostic.";
+
+/* Migration boot (C12b-3 round 2) — unresolved kinds, source kinds, cancel, candidate meta */
+"migration.unresolved.missingStagedFile" = "Fichier préparé manquant";
+"migration.unresolved.skippedSymlink" = "Lien symbolique ignoré";
+"migration.unresolved.skippedDirectory" = "Dossier ignoré";
+"migration.unresolved.skippedSpecial" = "Fichier spécial ignoré";
+"migration.unresolved.rejectedName" = "Nom de fichier invalide";
+"migration.unresolved.danglingReference" = "Fichier référencé introuvable";
+"migration.unresolved.invalidReference" = "Référence de fichier mal formée";
+"migration.source.masContainer" = "Application précédente (même conteneur)";
+"migration.source.userSelectedDataDir" = "Dossier de données sélectionné";
+"migration.source.exportBundle" = "Ensemble d'exportation";
+"migration.source.legacySingleDB" = "Fichier de base de données autonome";
+"migration.source.unknown" = "Source inconnue";
+"migration.msg.selectionCancelled" = "Sélection annulée — aucun import n'a été ouvert.";
+"migration.candidate.entries" = "{count} entrées";
+"migration.candidate.noMeta" = "Détails indisponibles";

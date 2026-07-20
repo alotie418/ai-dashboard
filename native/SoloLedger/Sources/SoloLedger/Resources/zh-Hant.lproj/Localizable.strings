@@ -1,0 +1,98 @@
+/* SoloLedger — 繁體中文（Phase-1 部分翻譯；缺項回退 zh-Hans） */
+
+"app.name" = "SoloLedger";
+"common.ok" = "好";
+"common.cancel" = "取消";
+"common.save" = "儲存";
+"common.edit" = "編輯";
+"common.delete" = "刪除";
+
+"nav.section" = "導覽";
+"nav.overview" = "概覽";
+"nav.transactions" = "收支流水";
+"nav.categories" = "會計類別";
+
+"type.income" = "收入";
+"type.expense" = "支出";
+"filter.all" = "全部";
+"filter.income" = "收入";
+"filter.expense" = "支出";
+
+"overview.income" = "收入合計";
+"overview.expense" = "支出合計";
+"overview.net" = "淨額";
+
+"cmd.newTransaction" = "新增流水";
+"onboarding.tagline" = "本地優先、私密的個體經營帳本";
+"onboarding.start" = "開始使用";
+
+"settings.language" = "介面語言";
+"settings.appearance" = "外觀";
+
+/* 遷移開機（C12b-3）— 資料安全介面；佔位符：{count}、{importID} */
+"migration.running.title" = "正在準備帳本";
+"migration.running.message" = "正在檢查並準備您的帳本…";
+"migration.retriable.title" = "目前暫時無法開啟帳本";
+"migration.terminal.title" = "無法開啟帳本";
+"migration.action.retry" = "重新探測";
+"migration.action.exportDiagnostics" = "匯出診斷資訊…";
+"migration.action.acknowledge" = "確認並繼續";
+"migration.action.select" = "選擇";
+"migration.action.cancel" = "取消";
+"migration.selection.title" = "選擇要復原的匯入項目";
+"migration.selection.message" = "偵測到多個可復原的匯入項目，請選擇其一以繼續。";
+"migration.acknowledgement.title" = "有項目需要您確認";
+"migration.acknowledgement.message" = "部分附件項目無法自動處理，確認後將繼續完成遷移。";
+"migration.acknowledgement.unresolvedCount" = "{count} 個未解決的項目";
+"migration.candidate.valid" = "可復原";
+"migration.candidate.unavailable" = "暫時無法使用";
+"migration.candidate.invalid" = "已損毀，無法使用";
+"migration.candidate.validHint" = "可復原——選擇即可繼續。";
+"migration.candidate.unavailableHint" = "目前暫時無法使用，稍後可再重新探測。";
+"migration.candidate.invalidHint" = "此匯入項目已損毀，無法使用。";
+"migration.residual.note" = "遷移已完成，但仍留有可清理的暫存資料（匯入項目 {importID}）。";
+"migration.residual.dismiss" = "我知道了";
+"migration.diagnostics.title" = "匯出診斷資訊";
+"migration.diagnostics.filename" = "sololedger-diagnostics.txt";
+"migration.diagnostics.writeFailed" = "無法寫入診斷檔案，請改用其他位置後再試一次。";
+"migration.msg.sourceBusy" = "舊版應用程式仍在使用其資料。請先結束舊版 SoloLedger，然後再試一次。";
+"migration.msg.invalidSource" = "所選來源不是有效的帳本，請改選其他檔案。";
+"migration.msg.sourceCorrupt" = "來源資料庫已損毀，無法遷移。";
+"migration.msg.schemaUnsupported" = "來源資料庫的版本不受支援。";
+"migration.msg.migrationFailed" = "遷移未能完成。";
+"migration.msg.stagingTampered" = "暫存的遷移資料與其記錄不符，可能已遭更動。";
+"migration.msg.sentinelOrphan" = "偵測到完成標記，卻找不到與之對應的使用中資料庫。";
+"migration.msg.sentinelEntryInvalid" = "完成標記的類型異常。";
+"migration.msg.recordMissingForCompletedImport" = "使用中的帳本存在，但其擁有權記錄遺失。";
+"migration.msg.importSlotOccupied" = "此帳本位置已被另一個匯入項目占用。";
+"migration.msg.recordMalformed" = "擁有權記錄格式錯誤。";
+"migration.msg.recordConflict" = "發生並行匯入衝突，無法判定歸屬。";
+"migration.msg.identityMismatch" = "資料識別驗證不相符。";
+"migration.msg.sentinelConflict" = "此匯入位置存在外來的完成標記。";
+"migration.msg.attachmentConflict" = "附件發生衝突，需要手動處理。";
+"migration.msg.activeEntryInvalid" = "使用中的帳本位置不是一般檔案（可能是符號連結）。";
+"migration.msg.activeMissingAfterCompletion" = "已完成匯入的使用中帳本遺失。";
+"migration.msg.activeDatabaseUnsupported" = "使用中的帳本資料庫處於不受支援的狀態，可能已被其他程式開啟或已損毀；請重新探測或匯出診斷資訊。";
+"migration.msg.interference" = "檢查過程中偵測到干擾，請再試一次。";
+"migration.msg.ioTransient" = "發生暫時性的讀寫問題，請再試一次。";
+"migration.msg.importCannotComplete" = "此匯入項目無法完成，因為其來源已不再可用。";
+"migration.msg.invalidSelection" = "所選的匯入項目無效。";
+"migration.msg.storeOpenFailed" = "開啟帳本失敗，請再試一次。";
+"migration.msg.internalError" = "發生內部狀態問題，請匯出診斷資訊。";
+
+/* Migration boot (C12b-3 round 2) — unresolved kinds, source kinds, cancel, candidate meta */
+"migration.unresolved.missingStagedFile" = "暫存檔案遺失";
+"migration.unresolved.skippedSymlink" = "已略過符號連結";
+"migration.unresolved.skippedDirectory" = "已略過資料夾";
+"migration.unresolved.skippedSpecial" = "已略過特殊檔案";
+"migration.unresolved.rejectedName" = "檔名無效";
+"migration.unresolved.danglingReference" = "找不到參照的檔案";
+"migration.unresolved.invalidReference" = "檔案參照格式錯誤";
+"migration.source.masContainer" = "舊版應用程式（同一容器）";
+"migration.source.userSelectedDataDir" = "所選資料夾";
+"migration.source.exportBundle" = "匯出套件";
+"migration.source.legacySingleDB" = "獨立資料庫檔案";
+"migration.source.unknown" = "未知來源";
+"migration.msg.selectionCancelled" = "已取消選擇，未開啟任何匯入項目。";
+"migration.candidate.entries" = "{count} 項";
+"migration.candidate.noMeta" = "詳情不可用";

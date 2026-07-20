@@ -1,0 +1,213 @@
+/* SoloLedger — 简体中文（source of truth，对应 JS 版 zh-CN） */
+
+"app.name" = "SoloLedger";
+
+"common.ok" = "好";
+"common.cancel" = "取消";
+"common.save" = "保存";
+"common.edit" = "编辑";
+"common.delete" = "删除";
+"common.loading" = "正在载入…";
+"common.error" = "出错了";
+
+"boot.error.title" = "无法打开数据库";
+
+"nav.section" = "导航";
+"nav.overview" = "概览";
+"nav.transactions" = "收支流水";
+"nav.categories" = "会计类别";
+
+"overview.income" = "收入合计";
+"overview.expense" = "支出合计";
+"overview.net" = "净额";
+"overview.count" = "笔数";
+"overview.monthlyTitle" = "按月收支";
+"overview.month" = "月份";
+"overview.empty.title" = "暂无数据";
+"overview.empty.message" = "新增第一笔收入或支出后，这里会显示按月图表。";
+"overview.dataSourceNote" = "数据来源：本页汇总由已录入的收支流水实时计算，仅供管理分析参考，并非正式财务报表或报税依据。";
+
+"cmd.newTransaction" = "新增流水";
+"cmd.exportCSV" = "导出 CSV";
+"cmd.importCSV" = "导入 CSV";
+
+"txn.empty.title" = "还没有流水记录";
+"txn.empty.message" = "点击「新增流水」或按 ⌘N 记录第一笔收入或支出。";
+"txn.col.date" = "日期";
+"txn.col.type" = "类型";
+"txn.col.category" = "类别";
+"txn.col.counterparty" = "往来对象";
+"txn.col.amount" = "金额";
+"txn.col.payment" = "收付";
+
+"type.income" = "收入";
+"type.expense" = "支出";
+
+"payment.paid" = "已结";
+"payment.partial" = "部分";
+"payment.unpaid" = "未结";
+
+"invoice.issued" = "已开票";
+"invoice.pending" = "待开票";
+"invoice.na" = "不适用";
+
+"filter.label" = "筛选";
+"filter.all" = "全部";
+"filter.income" = "收入";
+"filter.expense" = "支出";
+
+"editor.titleNew" = "新增流水";
+"editor.titleEdit" = "编辑流水";
+"editor.type" = "类型";
+"editor.date" = "日期";
+"editor.amount" = "金额";
+"editor.currency" = "货币";
+"editor.category" = "类别";
+"editor.uncategorized" = "未分类";
+"editor.counterparty" = "往来对象";
+"editor.payment" = "收付状态";
+"editor.note" = "备注";
+"editor.moreSection" = "更多（发票 / 税额）";
+"editor.invoice" = "发票状态";
+"editor.taxAmount" = "税额";
+"editor.taxRate" = "税率";
+
+"cat.col.label" = "名称";
+"cat.col.slug" = "标识";
+"cat.col.schedule" = "报表行";
+
+"settings.general" = "通用";
+"settings.accounting" = "会计";
+"settings.data" = "数据";
+"settings.about" = "关于";
+"settings.appearance" = "外观";
+"settings.appearance.system" = "跟随系统";
+"settings.appearance.light" = "浅色";
+"settings.appearance.dark" = "深色";
+"settings.language" = "界面语言";
+"settings.accountingLocale" = "会计制度";
+"settings.currency" = "默认货币";
+"settings.company" = "公司/字号名称";
+"settings.accountingNote" = "会计制度决定可选的收支类别与默认货币，独立于界面语言。此为管理分析用途，非法定申报配置。";
+"settings.schemaVersion" = "数据库版本";
+"settings.dbLocation" = "数据库位置";
+"settings.csv" = "CSV 导入 / 导出";
+
+"onboarding.tagline" = "本地优先、私密的个体经营账本";
+"onboarding.company" = "公司/字号名称（可选）";
+"onboarding.start" = "开始使用";
+"onboarding.privacy" = "所有数据仅保存在你的 Mac 本地。无需账号，不联网，不含 AI。";
+
+"about.name" = "名称";
+"about.version" = "版本";
+"about.minOS" = "系统要求";
+"about.positioning" = "SoloLedger 是面向个体经营者、一人公司与自由职业者的本地优先、私密账本。数据仅存于本机，无需账号，不含 AI、不联网、无付费解锁。它是经营记账与管理分析工具，不替代持牌会计师、税务师或法定申报系统。";
+
+"csv.import.partial" = "已导入 {imported} 条，跳过 {skipped} 条。";
+
+"recovery.title" = "数据升级未完成";
+"recovery.message" = "检测到旧版（Electron）账本数据，但迁移未成功。你的原始数据未被修改。请选择如何继续。";
+"recovery.retry" = "重试迁移";
+"recovery.restore" = "从备份 / 导出文件恢复…";
+"recovery.viewError" = "查看错误详情";
+"recovery.blank" = "创建空白账本…";
+"recovery.safeNote" = "原始数据库始终保持只读、未被修改，可随时重试。";
+"recovery.blankConfirmTitle" = "确认创建空白账本？";
+"recovery.blankConfirm" = "创建空白账本";
+"recovery.blankConfirmMessage" = "这将以空账本启动，不导入旧数据（原始数据仍保留在磁盘上、未删除）。仅在确认无需迁移旧数据时选择。";
+
+"common.duplicate" = "复制";
+
+"overview.period" = "时段";
+"period.month" = "本月";
+"period.year" = "本年";
+"period.all" = "全部";
+"overview.byCurrency" = "按币种";
+"overview.currency" = "币种";
+"overview.multiCurrencyNote" = "含多种货币，按币种分别列示，未做汇率换算，不可直接相加。";
+"overview.recent" = "最近交易";
+"overview.emptyPeriod.title" = "本期无数据";
+"overview.emptyPeriod.message" = "所选时段内没有流水。切换到「全部」或换一个时段查看。";
+"overview.loadDemo" = "载入示例数据";
+
+"txn.noResults.title" = "无匹配结果";
+"txn.noResults.message" = "没有符合当前搜索或筛选条件的流水。清除条件再试。";
+"txn.searchPrompt" = "搜索往来对象、备注、发票号";
+"date.all" = "全部日期";
+"date.thisMonth" = "本月";
+"date.thisYear" = "本年";
+"date.filtered" = "已筛选日期";
+
+"delete.confirmTitle" = "确认删除";
+"delete.confirmButton" = "删除 {count} 条";
+"delete.confirmMessage" = "确定删除选中的 {count} 条流水？删除后可撤销。";
+"delete.deleted" = "已删除 {count} 条";
+"delete.undo" = "撤销";
+
+/* Migration boot (C12b-3) — data-safety UI; placeholders: {count}, {importID} */
+"migration.running.title" = "正在准备账本";
+"migration.running.message" = "正在检查并准备账本…";
+"migration.retriable.title" = "暂时无法打开账本";
+"migration.terminal.title" = "无法打开账本";
+"migration.action.retry" = "重新探测";
+"migration.action.exportDiagnostics" = "导出诊断…";
+"migration.action.acknowledge" = "确认并继续";
+"migration.action.select" = "选择";
+"migration.action.cancel" = "取消";
+"migration.selection.title" = "选择要恢复的导入";
+"migration.selection.message" = "发现多个可恢复的导入，请选择其一以继续。";
+"migration.acknowledgement.title" = "有需要确认的项目";
+"migration.acknowledgement.message" = "部分附件项无法自动处理。确认后将继续完成迁移。";
+"migration.acknowledgement.unresolvedCount" = "{count} 个未解决项";
+"migration.candidate.valid" = "可恢复";
+"migration.candidate.unavailable" = "暂时不可用";
+"migration.candidate.invalid" = "已损坏，无法使用";
+"migration.candidate.validHint" = "可恢复——选择以继续。";
+"migration.candidate.unavailableHint" = "暂时不可用，可稍后重新探测。";
+"migration.candidate.invalidHint" = "此导入已损坏，无法使用。";
+"migration.residual.note" = "迁移已完成，但遗留了可清理的暂存数据（导入 {importID}）。";
+"migration.residual.dismiss" = "知道了";
+"migration.diagnostics.title" = "导出诊断信息";
+"migration.diagnostics.filename" = "sololedger-diagnostics.txt";
+"migration.diagnostics.writeFailed" = "无法写入诊断文件。请换一个位置重试。";
+"migration.msg.sourceBusy" = "旧版应用仍在使用其数据。请先退出旧版 SoloLedger，然后重试。";
+"migration.msg.invalidSource" = "所选来源不是有效的账本。请重新选择文件。";
+"migration.msg.sourceCorrupt" = "源数据库已损坏，无法迁移。";
+"migration.msg.schemaUnsupported" = "源数据库版本不受支持。";
+"migration.msg.migrationFailed" = "迁移未能完成。";
+"migration.msg.stagingTampered" = "暂存的迁移数据与其记录不一致，可能已被改动。";
+"migration.msg.sentinelOrphan" = "发现完成标记，但缺少与之对应的活动数据库。";
+"migration.msg.sentinelEntryInvalid" = "完成标记的类型异常。";
+"migration.msg.recordMissingForCompletedImport" = "活动账本存在，但所有权记录缺失。";
+"migration.msg.importSlotOccupied" = "该账本位置已被另一个导入占用。";
+"migration.msg.recordMalformed" = "所有权记录格式错误。";
+"migration.msg.recordConflict" = "并发导入冲突，无法确定归属。";
+"migration.msg.identityMismatch" = "数据身份校验不一致。";
+"migration.msg.sentinelConflict" = "该导入位置存在外来的完成标记。";
+"migration.msg.attachmentConflict" = "附件冲突，需要手动处理。";
+"migration.msg.activeEntryInvalid" = "活动账本位置不是常规文件（可能是符号链接）。";
+"migration.msg.activeMissingAfterCompletion" = "已完成导入的活动账本丢失。";
+"migration.msg.activeDatabaseUnsupported" = "活动账本数据库处于不受支持的状态，可能已被其他程序打开或损坏；请重试探测或导出诊断。";
+"migration.msg.interference" = "检测过程中检测到干扰。请重试。";
+"migration.msg.ioTransient" = "发生临时的读写问题。请重试。";
+"migration.msg.importCannotComplete" = "该导入无法完成，因为其来源已不可用。";
+"migration.msg.invalidSelection" = "所选导入无效。";
+"migration.msg.storeOpenFailed" = "打开账本失败。请重试。";
+"migration.msg.internalError" = "发生内部状态问题。请导出诊断。";
+
+/* Migration boot (C12b-3 round 2) — unresolved kinds, source kinds, cancel, candidate meta */
+"migration.unresolved.missingStagedFile" = "暂存文件缺失";
+"migration.unresolved.skippedSymlink" = "已跳过符号链接";
+"migration.unresolved.skippedDirectory" = "已跳过文件夹";
+"migration.unresolved.skippedSpecial" = "已跳过特殊文件";
+"migration.unresolved.rejectedName" = "文件名无效";
+"migration.unresolved.danglingReference" = "引用的文件未找到";
+"migration.unresolved.invalidReference" = "文件引用格式错误";
+"migration.source.masContainer" = "旧版应用（同一容器）";
+"migration.source.userSelectedDataDir" = "所选数据文件夹";
+"migration.source.exportBundle" = "导出包";
+"migration.source.legacySingleDB" = "独立数据库文件";
+"migration.source.unknown" = "未知来源";
+"migration.msg.selectionCancelled" = "已取消选择，未打开任何导入。";
+"migration.candidate.entries" = "{count} 项";
+"migration.candidate.noMeta" = "详情不可用";

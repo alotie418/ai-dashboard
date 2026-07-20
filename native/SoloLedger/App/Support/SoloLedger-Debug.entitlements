@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- Debug entitlements: same App Sandbox posture as Release, plus get-task-allow
+     so the debugger / XCUITest runner can attach to the sandboxed app locally.
+     get-task-allow is a debug-only signing entitlement (NOT an app capability)
+     and is absent from the Release entitlements. Still no network/AI/OCR/StoreKit. -->
+<dict>
+  <key>com.apple.security.app-sandbox</key><true/>
+  <key>com.apple.security.files.user-selected.read-write</key><true/>
+  <key>com.apple.security.get-task-allow</key><true/>
+</dict>
+</plist>

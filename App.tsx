@@ -31,7 +31,9 @@ import AlertCenter from './components/AlertCenter';
 import OnboardingWizard from './components/OnboardingWizard';
 import { AssistantProvider } from './components/assistant/AssistantProvider';
 import AssistantWidget from './components/assistant/AssistantWidget';
-const AssistantPage = lazy(() => import('./components/assistant/AssistantPage'));
+// MAS build: the AI assistant is excluded. null → the dynamic import() below is dead code,
+// so Rollup never emits the AssistantPage chunk into the Mac App Store bundle.
+const AssistantPage = __MAS_BUILD__ ? null : lazy(() => import('./components/assistant/AssistantPage'));
 
 // Suspense fallback while a lazy page chunk loads. Icon-only (no text) on purpose: chunks
 // load from local disk in ~tens of ms, and a textless flash never trips the locale audit.
@@ -283,6 +285,10 @@ const AppContent: React.FC = () => {
   }, [currentPage]);
 
   const performAnalysis = useCallback(async () => {
+    // MAS build: no external AI briefing. The header refresh button keeps working as a plain
+    // dashboard-data refresh; everything below (the AI analyze call, quota handling, provider
+    // hints) is dead-code-eliminated and its AI imports tree-shaken out of the MAS bundle.
+    if (__MAS_BUILD__) { await loadDashboardData(); return; }
     // 额度冷却中（上次 Gemini 429 后 5 分钟内）：直接显示友好提示，不再发请求，
     // 避免连点刷新或任何残留路径反复刷 429。
     if (Date.now() < aiQuotaCooldownRef.current) {
@@ -377,8 +383,8 @@ const AppContent: React.FC = () => {
           );
         }
         return (
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-            <div className="xl:col-span-3 space-y-8">
+          <div className={`grid grid-cols-1 gap-8 ${__MAS_BUILD__ ? '' : 'xl:grid-cols-4'}`}>
+            <div className={__MAS_BUILD__ ? 'space-y-8' : 'xl:col-span-3 space-y-8'}>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {data.metrics.map((m, i) => <MetricCard key={i} metric={m} />)}
               </div>
@@ -438,9 +444,11 @@ const AppContent: React.FC = () => {
                 )}
               </div>
             </div>
-            <div className="xl:col-span-1 h-full min-h-[600px] xl:sticky xl:top-0 xl:h-[calc(100vh-120px)]">
-              <AIInsights analysis={analysis} loading={loadingAI} error={aiError} onRefresh={performAnalysis} />
-            </div>
+            {!__MAS_BUILD__ && (
+              <div className="xl:col-span-1 h-full min-h-[600px] xl:sticky xl:top-0 xl:h-[calc(100vh-120px)]">
+                <AIInsights analysis={analysis} loading={loadingAI} error={aiError} onRefresh={performAnalysis} />
+              </div>
+            )}
           </div>
         );
       }
@@ -451,7 +459,7 @@ const AppContent: React.FC = () => {
       case 'finance': return <FinancePage data={data} selectedYear={selectedYear} selectedQuarter={selectedQuarter} selectedMonth={selectedMonth} />;
       case 'accounts': return <AccountsPage />;
       case 'documents': return <DocumentsPage />;
-      case 'assistant': return <AssistantPage />;
+      case 'assistant': return AssistantPage ? <AssistantPage /> : null;
       case 'transactions': return <TransactionsPage />;
       case 'ustax': return <USTaxToolsPage selectedYear={selectedYear} />;
       case 'settings': return <SettingsPage />;
@@ -459,13 +467,7 @@ const AppContent: React.FC = () => {
     }
   };
 
-  return (
-    <AssistantProvider
-      accountingLocale={assistantAccLocale}
-      uiLanguage={i18n.language}
-      selectedYear={selectedYear}
-      fallbackStatement={data.financialStatement}
-    >
+  const shell = (
     <div className="flex h-screen overflow-hidden bg-transparent text-[#191918] font-sans relative">
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} glass-bar border-r border-[#e0ddd5] transition-all duration-300 flex flex-col hidden md:flex z-20`}>
@@ -499,7 +501,9 @@ const AppContent: React.FC = () => {
           <NavItem icon="fa-wallet" label={t('nav.finance')} active={currentPage === 'finance'} expanded={sidebarOpen} onClick={() => setCurrentPage('finance')} />
 
           <NavItem icon="fa-chart-pie" label={t('nav.analysis')} active={currentPage === 'analysis'} expanded={sidebarOpen} onClick={() => setCurrentPage('analysis')} />
-          <NavItem icon="fa-comments" label={t('nav.assistant')} active={currentPage === 'assistant'} expanded={sidebarOpen} onClick={() => setCurrentPage('assistant')} />
+          {!__MAS_BUILD__ && (
+            <NavItem icon="fa-comments" label={t('nav.assistant')} active={currentPage === 'assistant'} expanded={sidebarOpen} onClick={() => setCurrentPage('assistant')} />
+          )}
           {assistantAccLocale === 'US' && (
             <NavItem icon="fa-flag-usa" label={t('nav.usTax')} active={currentPage === 'ustax'} expanded={sidebarOpen} onClick={() => setCurrentPage('ustax')} />
           )}
@@ -580,13 +584,26 @@ const AppContent: React.FC = () => {
       {/* AI Assistant 浮窗（R1 抽离），与各页共享同一 AssistantProvider 会话。独立「AI 助手」页
           （R2a）本身已是全屏聊天，且右下角浮窗圆钮会遮挡该页输入框的发送按钮，故在该页隐藏浮窗；
           其余页面保留右下角快捷入口。会话状态在 Provider 中，隐藏/重挂浮窗不丢消息。 */}
-      {currentPage !== 'assistant' && <AssistantWidget />}
+      {!__MAS_BUILD__ && currentPage !== 'assistant' && <AssistantWidget />}
 
       <style>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
+  );
+
+  // MAS build: no AI assistant session — render the shell bare (AssistantProvider and
+  // AssistantWidget are dead-code-eliminated). DMG build wraps it in the shared assistant
+  // session so the floating widget and the assistant page share one conversation.
+  return __MAS_BUILD__ ? shell : (
+    <AssistantProvider
+      accountingLocale={assistantAccLocale}
+      uiLanguage={i18n.language}
+      selectedYear={selectedYear}
+      fallbackStatement={data.financialStatement}
+    >
+      {shell}
     </AssistantProvider>
   );
 };
@@ -608,12 +625,16 @@ const markOnboardingDone = () => {
 
 const AuthWrapper: React.FC = () => {
   const { t } = useTranslation();
+  // MAS build: `providers:hasAny` is not registered (no AI/BYOK). First launch goes straight
+  // to the slimmed onboarding (welcome → language/accounting → company; the AI provider step is
+  // dead-code-eliminated inside OnboardingWizard). Non-MAS keeps the async provider check.
   const [onboardingState, setOnboardingState] = useState<'checking' | 'needed' | 'done'>(
-    !isElectronEnv || hasOnboardingDoneFlag() ? 'done' : 'checking'
+    !isElectronEnv || hasOnboardingDoneFlag() ? 'done' : (__MAS_BUILD__ ? 'needed' : 'checking')
   );
 
   useEffect(() => {
-    if (!isElectronEnv || hasOnboardingDoneFlag()) return;
+    // MAS: need decided synchronously above (no providers:hasAny channel).
+    if (__MAS_BUILD__ || !isElectronEnv || hasOnboardingDoneFlag()) return;
     const electronAPI = (window as any).electronAPI;
     electronAPI.invoke('providers:hasAny')
       .then((has: boolean) => {

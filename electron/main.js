@@ -1,7 +1,7 @@
 // Electron main process — SoloLedger 独账
 // 桌面壳入口：开发模式加载 vite dev server，生产模式加载本地 dist/index.html
 
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
@@ -64,6 +64,10 @@ function createMainWindow() {
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
 
+  // 关闭主窗口后清空引用，让 showMainWindow / activate 能可靠地重新创建（macOS 习惯：
+  // 关窗不退出）。配合应用菜单的「打开主窗口」项与 Dock 点击，保证窗口关闭后总能重开。
+  mainWindow.on('closed', () => { mainWindow = null; });
+
   if (loadDistForQa) {
     // CSP QA：加载构建产物（file:// + meta CSP 生效）；开 DevTools 便于观察 securitypolicyviolation
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
@@ -91,6 +95,49 @@ function createMainWindow() {
   });
 }
 
+// 打开/聚焦主窗口：已有窗口则恢复并聚焦，否则新建——始终只保留一个主窗口（防重复创建）。
+// 供应用菜单「打开主窗口」项、Dock 图标点击（activate）、以及第二实例唤起统一调用。
+function showMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  } else {
+    createMainWindow();
+  }
+}
+
+// 应用菜单（macOS）。默认 Electron 菜单没有「重新打开已关闭主窗口」的入口，导致关窗后
+// 只能靠 Dock；App Review Guideline 4 要求提供菜单项重开窗口。这里用标准角色（自动本地化：
+// 关于/隐藏/退出/复制粘贴/最小化等）重建标准菜单，并在「窗口」菜单加一个显式的
+// 「打开主窗口」项（⌘0 → showMainWindow）。角色项保证复制/粘贴/撤销等标准行为不丢失。
+function buildAppMenu() {
+  const isMac = process.platform === 'darwin';
+  const openMainWindowItem = {
+    label: 'SoloLedger',
+    accelerator: 'CmdOrCtrl+0',
+    click: () => showMainWindow(),
+  };
+  const template = [
+    ...(isMac ? [{ role: 'appMenu' }] : []),
+    { role: 'fileMenu' },
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        openMainWindowItem,
+        ...(isMac
+          ? [{ type: 'separator' }, { role: 'front' }, { type: 'separator' }, { role: 'close' }]
+          : [{ role: 'close' }]),
+      ],
+    },
+  ];
+  return Menu.buildFromTemplate(template);
+}
+
 // 单实例锁：防止第二个实例连到同一个 SQLite 库（WAL 并发写 / 恢复时可能损坏数据）。
 // 拿不到锁 = 已有实例在运行 → 退出本实例；已有实例收到 second-instance 后把窗口拉到前台。
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
@@ -99,10 +146,7 @@ if (!gotSingleInstanceLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    }
+    showMainWindow();
   });
 
   app.whenReady().then(async () => {
@@ -133,10 +177,14 @@ if (!gotSingleInstanceLock) {
       }
     }
 
+    // 应用菜单：提供「窗口 → 打开主窗口」(⌘0) 入口，关窗后可从菜单重开（Guideline 4）。
+    Menu.setApplicationMenu(buildAppMenu());
+
     createMainWindow();
 
+    // Dock 图标点击（或从菜单激活）时，没有窗口就重建、有则聚焦——始终单窗口。
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+      showMainWindow();
     });
   });
 }

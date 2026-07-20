@@ -43,6 +43,12 @@ jobs:
         run: npm run typecheck
       - name: Run all guards + migration test
         run: npm run check:all
+      # Native SwiftUI Core package: unit + guard tests. Includes the schema-version
+      # parity guard, which reads Electron's authoritative SCHEMA_VERSION via `node`
+      # (set up above) — so native/Electron schema drift fails the PR here. macos-latest
+      # ships Xcode, so `swift test` has XCTest without a DEVELOPER_DIR override.
+      - name: Native SwiftUI Core tests (swift test)
+        run: swift test --package-path native/SoloLedger
 
   e2e:
     name: Locale-matrix e2e (Playwright)

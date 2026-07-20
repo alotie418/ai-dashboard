@@ -37,7 +37,17 @@ const injectCspMeta = () => ({
 });
 
 export default defineConfig(({ mode }) => {
+    // Mac App Store build flag. `build:mas` sets SOLOLEDGER_MAS=1 before vite build, so
+    // `__MAS_BUILD__` becomes the literal `true` and every `if (!__MAS_BUILD__)` /
+    // `!__MAS_BUILD__ && …` branch guarding an AI / BYOK-API-key feature is dead-code
+    // eliminated; the now-unused AI imports (assistant, OCR, provider settings, AI briefing)
+    // are then tree-shaken out of dist. The normal `npm run build` (DMG line) leaves it false
+    // → AI stays fully bundled. Verified by grepping dist after `SOLOLEDGER_MAS=1 npm run build`.
+    const isMasBuild = process.env.SOLOLEDGER_MAS === '1';
     return {
+      define: {
+        __MAS_BUILD__: JSON.stringify(isMasBuild),
+      },
       // Electron 加载本地 dist/index.html 时必须用相对路径
       base: mode === 'production' ? './' : '/',
       build: {

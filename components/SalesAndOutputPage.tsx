@@ -266,6 +266,9 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
   });
 
   const processFile = async (file: File) => {
+    // MAS build: no external-AI OCR — dead-code-eliminated (analyzeInvoice / provider check /
+    // pdf rasterize below never run, and their imports tree-shake out of the MAS bundle).
+    if (__MAS_BUILD__) return;
     // OCR follows a configured OCR-capable provider (its own key); if none, guide the user.
     try {
       const providers = await listProviders();
@@ -420,13 +423,16 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-[1600px] mx-auto relative">
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        className="hidden"
-        accept="image/jpeg,image/png,image/webp,application/pdf"
-      />
+      {/* MAS build: invoice OCR needs an external AI provider key — excluded (App Review 3.1.1). */}
+      {!__MAS_BUILD__ && (
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          className="hidden"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+        />
+      )}
 
       {/* Header Section */}
       <div className="flex items-center justify-between">
@@ -441,14 +447,16 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
           >
             <i className="fas fa-file-csv mr-2"></i> {t('sales.batchImport')}
           </button>
-          <button
-            onClick={triggerUpload}
-            disabled={isScanning}
-            className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50" style={{ boxShadow: '0 4px 16px rgba(147,51,234,0.15)' }}
-          >
-            <i className={`fas ${isScanning ? 'fa-spinner animate-spin' : 'fa-camera'} mr-2`}></i>
-            {isScanning ? t('sales.scanning') : (accLocale === 'KR' ? taxLabel('scanDocButton') : t('sales.scanInvoice'))}
-          </button>
+          {!__MAS_BUILD__ && (
+            <button
+              onClick={triggerUpload}
+              disabled={isScanning}
+              className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50" style={{ boxShadow: '0 4px 16px rgba(147,51,234,0.15)' }}
+            >
+              <i className={`fas ${isScanning ? 'fa-spinner animate-spin' : 'fa-camera'} mr-2`}></i>
+              {isScanning ? t('sales.scanning') : (accLocale === 'KR' ? taxLabel('scanDocButton') : t('sales.scanInvoice'))}
+            </button>
+          )}
           <button
             onClick={openNewSale}
             className="flex items-center px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors text-sm font-medium" style={{ boxShadow: '0 4px 16px rgba(39,76,146,0.15)' }}
@@ -502,6 +510,8 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
         );
       })()}
 
+      {/* MAS build: no external-AI / OCR — the recognition toggle + upload dropzone are excluded (App Review 3.1.1). */}
+      {!__MAS_BUILD__ && (<>
       {/* Recognition Mode Selector */}
       <div className="flex items-center justify-between py-2">
         <div className="flex items-center space-x-4">
@@ -554,6 +564,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
           {isScanning ? (accLocale !== 'CN' ? taxLabel('scanningSubtitle') : t('sales.uploadExtracting')) : (accLocale !== 'CN' ? taxLabel('uploadSubtitleSales') : t('sales.uploadSubtitle'))}
         </p>
       </div>
+      </>)}
 
       {/* Phase C：业务单据生成成功提示 */}
       {docGenOk && (
@@ -1006,7 +1017,7 @@ const SalesAndOutputPage: React.FC<Props> = ({ data, selectedYear, selectedQuart
         </div>
       )}
 
-      {ocrPreview && (
+      {!__MAS_BUILD__ && ocrPreview && (
         <OcrPreviewModal
           extracted={ocrPreview}
           counterpartyLabel={t('tableHeaders.customer')}

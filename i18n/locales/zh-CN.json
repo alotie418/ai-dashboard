@@ -34,7 +34,7 @@
   },
   "app": {
     "name": "SoloLedger",
-    "subtitle": "独账 · 一人公司的智能账本",
+    "subtitle": "独账 · 一人公司的专业账本",
     "demoBanner": "演示模式 · 示例数据 · 非真实账本"
   },
   "nav": {
@@ -122,7 +122,7 @@
     "security": {
       "title": "账户与安全",
       "encryption": "数据加密",
-      "encryptionDesc": "账本数据全部保存在本机 SQLite 数据库（不上传、不经服务器）；AI 服务商 API Key 由系统安全存储（safeStorage，如 macOS 钥匙串）加密保存，全程不出本机。"
+      "encryptionDesc": "账本数据全部保存在本机 SQLite 数据库（不上传、不经服务器），全程不出本机。"
     },
     "saveButton": "保存更改",
     "savedToast": "设置已成功保存！",
@@ -460,7 +460,7 @@
   },
   "onboarding": {
     "welcomeTitle": "欢迎使用 SoloLedger",
-    "welcomeDescription": "SoloLedger 是为一人公司、个体户和 Solo SaaS 创始人打造的智能账本应用。所有数据存储在本地，AI 能力由你自带的 API Key 驱动 — 我们看不到你的任何数据。",
+    "welcomeDescription": "SoloLedger 是为一人公司、个体户和 Solo SaaS 创始人打造的账本与经营管理应用。所有数据存储在本地、离线可用 — 数据只保存在你的 Mac 上。",
     "feature1": "本地 SQLite 存储，所有数据存在你的 Mac 上",
     "feature2": "支持 Claude · ChatGPT · Gemini，可配置多个，按需切换默认",
     "feature3": "API Key 使用系统 Keychain 加密，永远不离开你的设备",
@@ -481,7 +481,7 @@
     "finishAndEnter": "完成并进入应用",
     "skipCompany": "暂时跳过公司信息，稍后在设置中填写",
     "localeDesc": "这两个设置互相独立。界面语言控制菜单和标签。记账口径控制税制、币种和报表。",
-    "brandTagline": "独账 · 一人公司的智能账本",
+    "brandTagline": "独账 · 一人公司的专业账本",
     "loadFailedTitle": "无法加载 AI 服务商配置",
     "loadFailedHint": "如果你刚刚升级了 SoloLedger，请完全退出应用（Cmd+Q）后重新启动。",
     "providersEmpty": "Provider 列表为空。请完全退出 SoloLedger（Cmd+Q）后重新启动。",

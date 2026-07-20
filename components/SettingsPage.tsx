@@ -109,7 +109,10 @@ const SettingsPage: React.FC = () => {
         <div className="w-full md:w-64 md:shrink-0 space-y-2">
           <SettingsNavLink active={activeSection === 'company'} onClick={() => setActiveSection('company')} icon="fa-building" label={t('settings.nav.company')} />
           <SettingsNavLink active={activeSection === 'tax'} onClick={() => setActiveSection('tax')} icon="fa-percent" label={t('settings.nav.tax')} />
-          <SettingsNavLink active={activeSection === 'ai'} onClick={() => setActiveSection('ai')} icon="fa-microchip" label={usLabel('setNavAi', 'settings.nav.ai')} />
+          {/* MAS build: no external-AI / API-key settings entry (App Review 3.1.1). */}
+          {!__MAS_BUILD__ && (
+            <SettingsNavLink active={activeSection === 'ai'} onClick={() => setActiveSection('ai')} icon="fa-microchip" label={usLabel('setNavAi', 'settings.nav.ai')} />
+          )}
           <SettingsNavLink active={activeSection === 'ecommerce'} onClick={() => setActiveSection('ecommerce')} icon="fa-store" label={t('settings.nav.ecommerce')} />
           <SettingsNavLink active={activeSection === 'language'} onClick={() => setActiveSection('language')} icon="fa-language" label={t('settings.nav.language')} />
           <SettingsNavLink active={activeSection === 'accounting'} onClick={() => setActiveSection('accounting')} icon="fa-balance-scale" label={t('settings.nav.accounting')} />
@@ -196,7 +199,8 @@ const SettingsPage: React.FC = () => {
                   <div className="flex items-center justify-between p-4 bg-[#f9f9f8]/40 rounded-xl border border-[#e0ddd5]">
                     <div>
                       <p className="text-sm font-bold text-[#191918]">{usLabel('setVatRateLabel', 'settings.tax.vatRate')}</p>
-                      <p className="text-xs text-[#5c5c5a]">{t('settings.tax.vatRateDesc')}</p>
+                      {/* MAS build: description mentions OCR — hidden. */}
+                      {!__MAS_BUILD__ && <p className="text-xs text-[#5c5c5a]">{t('settings.tax.vatRateDesc')}</p>}
                     </div>
                     <select value={vatRate} onChange={e => setVatRate(e.target.value)} className="bg-white border border-[#d1cdc4] rounded-lg px-3 py-1 text-sm outline-none">
                       <option value="13">{usLabel('setRateByState', 'settings.tax.rate13')}</option>
@@ -236,7 +240,7 @@ const SettingsPage: React.FC = () => {
               </section>
             )}
 
-            {!isLoading && !loadError && activeSection === 'ai' && (
+            {!__MAS_BUILD__ && !isLoading && !loadError && activeSection === 'ai' && (
               <div className="space-y-8">
                 <ProvidersSection />
               </div>

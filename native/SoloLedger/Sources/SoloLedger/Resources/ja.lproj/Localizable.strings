@@ -1,0 +1,98 @@
+/* SoloLedger — 日本語（Phase-1 部分翻訳；欠落は zh-Hans にフォールバック） */
+
+"app.name" = "SoloLedger";
+"common.ok" = "OK";
+"common.cancel" = "キャンセル";
+"common.save" = "保存";
+"common.edit" = "編集";
+"common.delete" = "削除";
+
+"nav.section" = "ナビゲーション";
+"nav.overview" = "概要";
+"nav.transactions" = "入出金";
+"nav.categories" = "勘定科目";
+
+"type.income" = "収入";
+"type.expense" = "支出";
+"filter.all" = "すべて";
+"filter.income" = "収入";
+"filter.expense" = "支出";
+
+"overview.income" = "収入合計";
+"overview.expense" = "支出合計";
+"overview.net" = "純額";
+
+"cmd.newTransaction" = "新規取引";
+"onboarding.tagline" = "ローカル優先・プライベートな個人事業の台帳";
+"onboarding.start" = "はじめる";
+
+"settings.language" = "表示言語";
+"settings.appearance" = "外観";
+
+/* 移行処理（C12b-3）— データ保護 UI。プレースホルダー: {count}, {importID} */
+"migration.running.title" = "台帳を準備しています";
+"migration.running.message" = "台帳を確認し、準備しています…";
+"migration.retriable.title" = "現在、台帳を開けません";
+"migration.terminal.title" = "台帳を開けません";
+"migration.action.retry" = "再検出";
+"migration.action.exportDiagnostics" = "診断情報を書き出す…";
+"migration.action.acknowledge" = "確認して続行";
+"migration.action.select" = "選択";
+"migration.action.cancel" = "キャンセル";
+"migration.selection.title" = "復元するインポートを選択";
+"migration.selection.message" = "復元可能なインポートが複数見つかりました。続行するには1つ選択してください。";
+"migration.acknowledgement.title" = "確認が必要な項目があります";
+"migration.acknowledgement.message" = "一部の添付ファイルは自動で処理できませんでした。確認すると移行処理を完了します。";
+"migration.acknowledgement.unresolvedCount" = "未解決の項目 {count} 件";
+"migration.candidate.valid" = "復元可能";
+"migration.candidate.unavailable" = "一時的に利用できません";
+"migration.candidate.invalid" = "破損 — 使用できません";
+"migration.candidate.validHint" = "復元できます。選択して続行してください。";
+"migration.candidate.unavailableHint" = "一時的に利用できません。しばらくしてから再検出してください。";
+"migration.candidate.invalidHint" = "このインポートは破損しており、使用できません。";
+"migration.residual.note" = "移行は完了しましたが、整理できる一時データが残っています（インポート {importID}）。";
+"migration.residual.dismiss" = "了解";
+"migration.diagnostics.title" = "診断情報の書き出し";
+"migration.diagnostics.filename" = "sololedger-diagnostics.txt";
+"migration.diagnostics.writeFailed" = "診断ファイルを書き込めませんでした。別の場所を指定してもう一度お試しください。";
+"migration.msg.sourceBusy" = "旧バージョンのアプリがまだデータを使用中です。旧版の SoloLedger を終了してから、もう一度お試しください。";
+"migration.msg.invalidSource" = "選択した移行元は有効な台帳ではありません。別のファイルを選択してください。";
+"migration.msg.sourceCorrupt" = "移行元のデータベースが破損しており、移行できません。";
+"migration.msg.schemaUnsupported" = "移行元のデータベースはサポートされていないバージョンです。";
+"migration.msg.migrationFailed" = "移行を完了できませんでした。";
+"migration.msg.stagingTampered" = "一時保存された移行データが記録と一致しません。改変された可能性があります。";
+"migration.msg.sentinelOrphan" = "完了マーカーが見つかりましたが、対応するアクティブなデータベースがありません。";
+"migration.msg.sentinelEntryInvalid" = "完了マーカーの種類が想定外です。";
+"migration.msg.recordMissingForCompletedImport" = "アクティブな台帳は存在しますが、所有権レコードが見つかりません。";
+"migration.msg.importSlotOccupied" = "この台帳の枠は、すでに別のインポートに使用されています。";
+"migration.msg.recordMalformed" = "所有権レコードの形式が不正です。";
+"migration.msg.recordConflict" = "インポートの競合が発生し、所有権を判定できませんでした。";
+"migration.msg.identityMismatch" = "データ同一性の照合が一致しませんでした。";
+"migration.msg.sentinelConflict" = "このインポートの枠に、別由来の完了マーカーが存在します。";
+"migration.msg.attachmentConflict" = "添付ファイルの競合があり、手動での対応が必要です。";
+"migration.msg.activeEntryInvalid" = "アクティブな台帳の場所が通常のファイルではありません（シンボリックリンクの可能性があります）。";
+"migration.msg.activeMissingAfterCompletion" = "完了したインポートのアクティブな台帳が見つかりません。";
+"migration.msg.activeDatabaseUnsupported" = "アクティブな台帳データベースがサポートされていない状態です。他のプログラムに開かれているか、破損している可能性があります。再検出するか、診断情報を書き出してください。";
+"migration.msg.interference" = "確認中に干渉が検出されました。もう一度お試しください。";
+"migration.msg.ioTransient" = "一時的な読み書きの問題が発生しました。もう一度お試しください。";
+"migration.msg.importCannotComplete" = "移行元がすでに利用できないため、このインポートは完了できません。";
+"migration.msg.invalidSelection" = "選択したインポートは無効です。";
+"migration.msg.storeOpenFailed" = "台帳を開けませんでした。もう一度お試しください。";
+"migration.msg.internalError" = "内部状態の問題が発生しました。診断情報を書き出してください。";
+
+/* Migration boot (C12b-3 round 2) — unresolved kinds, source kinds, cancel, candidate meta */
+"migration.unresolved.missingStagedFile" = "ステージされたファイルがありません";
+"migration.unresolved.skippedSymlink" = "シンボリックリンクをスキップしました";
+"migration.unresolved.skippedDirectory" = "フォルダをスキップしました";
+"migration.unresolved.skippedSpecial" = "特殊ファイルをスキップしました";
+"migration.unresolved.rejectedName" = "ファイル名が無効です";
+"migration.unresolved.danglingReference" = "参照先のファイルが見つかりません";
+"migration.unresolved.invalidReference" = "ファイル参照の形式が不正です";
+"migration.source.masContainer" = "以前のアプリ（同一コンテナ）";
+"migration.source.userSelectedDataDir" = "選択したデータフォルダ";
+"migration.source.exportBundle" = "エクスポートバンドル";
+"migration.source.legacySingleDB" = "単体データベースファイル";
+"migration.source.unknown" = "不明なソース";
+"migration.msg.selectionCancelled" = "選択をキャンセルしました。インポートは開いていません。";
+"migration.candidate.entries" = "{count} 件";
+"migration.candidate.noMeta" = "詳細は利用できません";
