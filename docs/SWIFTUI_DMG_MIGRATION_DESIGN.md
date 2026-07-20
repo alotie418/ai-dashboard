@@ -1,9 +1,37 @@
 # N7 设计分析:DMG(非沙箱)→ MAS(沙箱)用户数据迁移(来源选择 + createFresh 前置门)
 
-> **状态:设计分析(N7),不实现;须经用户确认后才进入实现。**
+> **状态(v3):设计定稿。全部设计决策已决、实施前设计阻断归零;N7.0 测试门禁已完成(PR #369 + #370,零生产行为变化);N7.1 尚未开始,本文档 PR 不实现任何代码。**
 > 本文档仅做设计与取舍分析,**不包含任何实现代码**(无 Swift 片段、无 diff),全部以文字、表格、状态/时序描述表达。所有涉及"实现时会改动"的内容均标注为**前瞻性、当前不改动**。
 >
-> 依据:基于对 `main`(`7d7101c`,已含 C12x-A2)生产代码的**只读**核查(启动状态机、open-plan/active-slot 守卫、`runImport` 管线、`MigrationSource`/预检/安全边界、UI/i18n/entitlements、测试与 fixture)。关联:`SWIFTUI_MIGRATION_PLAN.md` §0.2 / §0.3、`SWIFTUI_FEATURE_GAP.md` 第 4 节的 DMG P0。
+> 依据:初始调查基于 `main`(`7d7101c`,已含 C12x-A2)生产代码的**只读**核查(启动状态机、open-plan/active-slot 守卫、`runImport` 管线、`MigrationSource`/预检/安全边界、UI/i18n/entitlements、测试与 fixture);**v3 已针对 `main = 1c12fbb`(含 N7.0)逐点重新核对关键设计支点**(见 v3 修订记录),而非机械替换 hash。关联:`SWIFTUI_MIGRATION_PLAN.md` §0.2 / §0.3、`SWIFTUI_FEATURE_GAP.md` 第 4 节的 DMG P0。
+
+---
+
+## 修订记录(v3,2026-07-20)
+
+**审计依据更新(要求:不得只机械替换 hash)**——v3 针对 `main = 1c12fbb`(N7.0 门禁经 PR #369 合入、注释修正经 PR #370 合入)逐点重新核对了关键设计支点:
+
+- **BootChainRunner / AppModel 启动接线(未变)**:`BootIntent: Equatable` 仍为 `.boot/.acknowledgement/.selection`(`BootChainRunner.swift:18`);`resolveWork: @Sendable`(`:40`)与 detached Phase A 边界未变;`makeProductionRunner` 仍硬编码 `auto = .masContainer`(`AppModel.swift:274`);App 侧 reResolve 仍把意图塌回 `.boot`(`AppModel.swift:218`)——§7.1 不变量所针对的缺口**仍然存在**,实现时仍必须钉死;`openStoreForPlan` 生产分派(`AppModel.swift:293`)未变。
+- **MigrationCoordinator / MigrationSource(未变)**:`resolveB1` 的 `.unavailable → .openStore(.createFreshExpectedAbsent)` 分支(`MigrationCoordinator.swift:583-614`)**未翻转**,首启静默铸空行为仍在(N7.2 才翻转);`runImport`/`bootResolve`/`confirmOpenAuthorization` 签名未变;`MigrationSource` 仍无任何 conformance(`MigrationSource.swift:18`),§2.1 方案(合成 `Sendable, Equatable`)仍成立;`Package.swift` 仍为 Swift 5 语言模式、Swift 6 硬化后置。
+- **N7.0 新增测试(已在 main)**:Core 变体 `Tests/SoloLedgerCoreTests/ElectronFixtureMigrationChainTests.swift`(5 测试);App-hosted 变体 `App/Tests/SoloLedgerUnitTests/ElectronFixtureProductionOpenTests.swift`(3 测试)。
+- **App/project.yml 与 pbxproj(已变,仅测试资源)**:`project.yml` 已为 `SoloLedgerUnitTests` 增加同一份已提交 fixture 的**资源引用**(非复制,`project.yml:69`);`SoloLedger.xcodeproj/project.pbxproj` 已由 `xcodegen generate` 再生(仅新测试文件与 fixture 资源接线)。文件影响清单相应修正;**entitlement 接线不变**。
+- **entitlements(未变)**:Debug/Release 仍为 `app-sandbox` + `files.user-selected.read-write`(Debug 另有调试用 `get-task-allow`);全仓 grep 确认**仍无任何 bookmark entitlement**。
+
+**N7.0 状态:completed。** PR #369:Core `swift test` 466/466、App-hosted Unit 47/47,所有应运行 CI 检查通过,零生产行为变化;PR #370:纯注释修正(表述准确性,零语义变化)。§11.1 表已更新。
+
+**剩余 7 项未决全部关闭**(细节见文末"已决事项/实施入口"):
+
+1. `.confirmCreateFresh` 采用 **coordinator 新增独立强类型入口**;不给 `bootResolve` 加 `confirmed: Bool`;内部复用只能经**私有强类型 request/mode**(§1.3、§11.3)。
+2. **选源页完全独立于 onboarding**、发生在开库前;adopt 成功后原 onboarding 原样继续;"创建新账本"**二次确认文案已锁定**(§1.3)。
+3. `.migrateFromUserDir` 的 reResolve **取方案 (a)**:保留原 `MigrationSource`、不塌回 `.boot`、不重新注入 auto 来源;`autoSourceCandidate` **只用于 createFresh 授权确认**(§7.1)。
+4. `SelfImportRole` **收敛为 3 个 role**(`nativeDataRoot` / `activeDatabase` / `activeAttachments`);重叠方式归入独立的 **relationship 维度**,同样收敛为 3 值:`sameIdentity` / `sourceAncestorOfProtected` / `sourceDescendantOfProtected`——其中 `sameIdentity` 同时覆盖同目录身份、同 DB 文件与**硬链到 active DB**(仅凭 device+inode 无法区分原目录项与硬链别名,`st_nlink` 也只能证明链接数,**不声称可分开诊断**);不膨胀进 role;UI 只显示通用 `invalidSource`(§3.3)。
+5. N9 附件 fixture **采用已落地方案**:以已提交 `electron-v23.db` 为基底,测试运行时用固定 SQL + 固定附件字节确定性派生;不提交第二份二进制;运行不依赖 Node(§9)。
+6. **N7.1/N7.2 保持拆分**;N7.1 必须不可达(`resolveB1` 不翻转、零用户可见入口、守卫测试钉住);若实现时发现无法可靠隐藏,**必须停下并提议合并**,不得留下半成品(§11.1)。
+7. **completed-after-restart 深断言已由 PR #369 落地**:重建 coordinator → completed probe → `confirmOpenAuthorization` 返回 `.proceed(.existing(evidence))` → 硬化开库 → 数据复核(§9)。
+
+**独立后续观察项(明确不并入 N7.1 self-import guard,两者职责不同)**:`AttachmentReferenceAuditor` 对缺失文件的逃逸兜底使用 `standardizedFileURL` 字符串前缀比较;在 `/var` ↔ `/private/var` 双重拼写的临时目录环境下,悬空引用会被归为 `invalidReference` 而非 `danglingReference`(两种分类均 fail-closed、均要求确认);标准 Application Support 路径尚未复现。作为**路径身份硬化的独立观察项**保留。
+
+**设计阻断:归零。** 允许进入 N7.1;本文档 PR(docs-only)不实现。
 
 ---
 
@@ -89,6 +117,16 @@
 - **新增两个独立强类型 `BootIntent`**:`.confirmCreateFresh`(二次确认后创建新账本)与 `.migrateFromUserDir(MigrationSource)`(携带用户选定来源)。**不使用 `confirmed: Bool` 之类布尔旗标**——用专用意图保持 `BootIntent` 的 `Equatable` 语义清晰、可断言(现有 `FakeRunner.receivedIntents` 的 `XCTAssertEqual` 断言依赖它;见 §2.1)。二者都像现有意图一样:先 `guard store == nil`,受单飞门控,进入 `.running(.resolving)`。
 - **穷尽 switch 的连带更新(编译器强制)**:`MigrationPresenter.routeInput` / `route` / `stateTag` / `block(from:)`,以及 `MigrationBootDriver` 的 `classify/classifyOutcome`——新增状态会让 build 失败直到每处补齐,这是刻意的安全网。
 
+### 1.3 已决细化(v3)
+
+- **`.confirmCreateFresh` 的 coordinator 入口形态(已决)**:coordinator **新增一个独立的强类型入口**承接"已确认 createFresh"语义;**不给 `bootResolve` 增加 `confirmed: Bool` 之类布尔参数**。若内部需要与既有裁决路径复用实现,只能通过**私有的强类型 request/mode** 表达,不得以布尔旗标或公共参数扩散语义。该入口与其它路径一样,仍必须经 `confirmOpenAuthorization` 从磁盘复核全部前置,不绕门。
+- **选源页与 onboarding 的关系(已决)**:选源页**完全独立于**既有 onboarding(不是其一屏、不替代其首屏),发生在**开库之前**;成功 adopt store 后,原 onboarding(公司信息等)**原样继续**,顺序与内容不变。
+- **"创建新账本"二次确认文案(已锁定,zh-Hans 口径,逐字、含中文标点)**:
+  - 标题：**创建新的空账本？**
+  - 正文：**这不会删除或修改旧版 SoloLedger 的数据，但会跳过迁移并为当前 App 创建一个空账本。旧数据不会自动导入；如需迁移，请返回并选择“迁移旧数据”。**
+  - 按钮：**返回 / 创建空账本**
+  - 其余 5 语在 N7.2 随 `migration.chooseSource.*` 文案一并翻译,并注册进 parity 测试(§8)。
+
 ---
 
 ## 2. AppModel / BootChainRunner / MigrationCoordinator 职责分工
@@ -152,26 +190,30 @@
 
 **为什么不用字符串路径比较**:APFS firmlink / 同步 mount / `synthetic.conf` 会让同一 inode 出现在两个路径前缀下,字符串比较会漏判;反之用户把数据**复制**到另一卷再选中那个副本(不同 device+inode)是**合法独立来源**,字符串前缀又会误杀。规范化身份(device+inode)两头都对。
 
-**Core 已具备全部原语**(无需新增底层能力):`DirectoryHandle`(`openat O_NOFOLLOW|O_DIRECTORY`,`fstat` 绑定 `device`/`inode`;`subdirectory(named: "..")` 可沿真实父目录逐跳上行,`".."` 非符号链故 O_NOFOLLOW 不拒)、`FileFingerprint.capture`(no-follow 取 `device`/`inode`/类型,ENOENT 读作缺席、其余错误 fail-closed 抛出)、`AppPaths.dataDirectory()`(native 私有数据根,active DB / attachments / Staging / ImportManifests 全部嵌套其内)。
+**原语(v3 修正:复用现有 adopt/fstat 原语,新增一个窄的 parent wrapper)**:身份绑定复用 `DirectoryHandle`(`openat O_NOFOLLOW|O_DIRECTORY`,`fstat` 绑定 `device`/`inode`)、`FileFingerprint.capture`(no-follow 取 `device`/`inode`/类型,ENOENT 读作缺席、其余错误 fail-closed 抛出)、`AppPaths.dataDirectory()`(native 私有数据根,active DB / attachments / Staging / ImportManifests 全部嵌套其内)。**父目录上行不得借道 `subdirectory(named:)`**——该 API 的语义与注释是"打开直接子目录",即使 `openat` 技术上接受 `".."`,也不应把父目录遍历伪装成 child API。**N7.1 新增明确的 `DirectoryHandle.parentDirectory()` 内部原语**:固定使用 `openat(fd, "..", O_RDONLY|O_DIRECTORY|O_NOFOLLOW)`,再走现有 fstat/adopt 身份绑定;**不接受调用方提供任意路径字符串**。上行仍以 inode 不动点 + maxDepth 双重终止。
 
 **设计(全部在 Core,一处 chokepoint)**:在 `StagingIngest.ingest` 进入 `source.withAccess { … }` 后、任何 gate/复制**之前**,新增 `SelfImportGuard` 预检:
 
 1. 解析受保护身份一次:把 native 数据根(`AppPaths.dataDirectory()`,或等价的 `activeDestination` 的父目录)开成 `DirectoryHandle` → `(devRoot,inoRoot)`;若 active DB 存在,`FileFingerprint` 取其 `(devDB,inoDB)`。
 2. 解析来源:`userSelectedDataDir`/`exportBundle` 把所选目录开成 `DirectoryHandle` → `(devSrc,inoSrc)`;`legacySingleDB` 对所选**文件**取指纹 → `(devSrcFile,inoSrcFile)`。
-3. **按身份拒绝**(非字符串):
-   - **相等**:`(devSrc,inoSrc)==(devRoot,inoRoot)` ⇒ role `.nativeDataRoot`。
-   - **文件同一**:`legacySingleDB`(或源目录内的 DB)`(device,inode)==(devDB,inoDB)` ⇒ role `.sameAsActiveDatabaseFile`——捕获**硬链到 active DB**(目录/字符串检查抓不到)。
-   - **后代**:从源 handle 经 `".."` 逐跳上行,每跳比对 `(devRoot,inoRoot)`;命中 ⇒ `.descendantOfActive`(如用户选了 `<dataRoot>/Staging/...`)。
-   - **祖先**:从数据根 handle 上行比对 `(devSrc,inoSrc)`;命中 ⇒ `.ancestorOfActive`(如用户选了 Application Support)。
-   - 上行以 **`(device,inode)` 不动点**(`"/"` 的 `".."` 返回自身)**加固定 maxDepth**(如 64)双重终止;**不能靠 device 变化终止**(firmlink/mount 会中途换 device)。任何 open/stat 元数据错误一律 **fail-closed 视为拒绝**(绝不当"无重叠")。
-4. **强类型错误、零路径泄漏**:新增 `IngestError.sourceIsActiveData(role: SelfImportRole)`,其 `description` **只输出 role 标签、绝不含路径**(刻意区别于 `sourceDatabaseMissing` 等带路径的兄弟 case);`MigrationCoordinator.map` 把它映射为 `.terminal(.invalidSource, {reason, role})`,App 只显示既有通用键 `migration.msg.invalidSource`,**role/reason 均无路径**。
+3. **按身份拒绝**(非字符串)。**结果模型(v3 已决,决策 4):两个独立维度,role 不膨胀**——
+   - **role(命中的受保护对象,收敛为 3 值)**:`nativeDataRoot` / `activeDatabase` / `activeAttachments`;
+   - **relationship(重叠方式,独立维度,3 值)**:`sameIdentity` / `sourceAncestorOfProtected` / `sourceDescendantOfProtected`;
+   - **为什么没有独立的 hardLink 值(可实现性修正)**:仅凭 `(device,inode)` **无法区分"原目录项"与"指向同一 inode 的硬链接"**——二者在文件系统身份上就是同一对象;`st_nlink` 只能证明存在多个链接,**不能证明当前选中的是哪个别名**。因此 `sameIdentity` 同时覆盖:**同一目录身份、同一数据库文件、以及指向 active DB 的硬链接**;设计**不声称**能把 same-object 与 hard-link 分开诊断。**对应测试应断言:硬链接命中 `sameIdentity`。**
+   - 判定逻辑:
+     - **相等**:`(devSrc,inoSrc)==(devRoot,inoRoot)` ⇒ `(role: nativeDataRoot, relationship: sameIdentity)`(命中 attachments 根则 role 为 `activeAttachments`)。
+     - **文件同一**:`legacySingleDB`(或源目录内的 DB)`(device,inode)==(devDB,inoDB)` ⇒ `(role: activeDatabase, relationship: sameIdentity)`——**硬链到 active DB 同样落在这里**(目录/字符串检查抓不到)。
+     - **源在受保护对象之内**:从源 handle 经 `parentDirectory()` 逐跳上行,每跳比对受保护身份;命中 ⇒ `relationship: sourceDescendantOfProtected` + 命中对象的 role(如用户选了 `<dataRoot>/Staging/...` ⇒ `nativeDataRoot`/`sourceDescendantOfProtected`)。
+     - **源包含受保护对象**:从受保护根 handle 经 `parentDirectory()` 上行比对 `(devSrc,inoSrc)`;命中 ⇒ `relationship: sourceAncestorOfProtected`(如用户选了 Application Support ⇒ `nativeDataRoot`/`sourceAncestorOfProtected`)。
+   - 上行以 **`(device,inode)` 不动点**(根的父目录返回自身)**加固定 maxDepth**(如 64)双重终止;**不能靠 device 变化终止**(firmlink/mount 会中途换 device)。任何 open/stat 元数据错误一律 **fail-closed 视为拒绝**(绝不当"无重叠")。
+4. **强类型错误、零路径泄漏**:新增 `IngestError.sourceIsActiveData(role: SelfImportRole, relationship: SelfImportRelationship)`,其 `description` **只输出 role/relationship 标签、绝不含路径**(刻意区别于 `sourceDatabaseMissing` 等带路径的兄弟 case);`MigrationCoordinator.map` 把它映射为 `.terminal(.invalidSource, {reason, role, relationship})`,App 只显示既有通用键 `migration.msg.invalidSource`,**任何参数均无路径**。role/relationship 仅用于路径无关的诊断与测试断言。
 
 **边界与澄清**:
 - 该守卫是**fail-closed 预检 / UX 门**,**不是**写-覆盖-active 的安全边界——后者仍由 activator 的 `O_EXCL` 独占预留 + `ActiveOpenEvidence` 身份保证;守卫的 check→copy TOCTOU 只会退化到那些下游门,**不会**导致数据丢失。
 - 符号链叶子会先被 `DirectoryHandle.open`(O_NOFOLLOW)以 `notADirectory` 拒(仍 fail-closed,只是 error 不同);`NSOpenPanel` 通常回传解析后的真实路径。
 - **跨卷真实副本(不同 device+inode)必须放行**——这正是身份优于字符串的行为收益,需专门测试。
 - 首装时数据根尚不存在:根缺席时相等/后代判定按"无可保护"放行,祖先上行(Application Support 存在)仍适用;**勿把根 ENOENT 当硬失败**而误挡首次合法导入。
-- 守卫需可注入受保护根/active-DB 身份(仿既有 coordinator override),让单测把"active"指向隔离临时根、逐一断言各 role,而不碰真实容器。
+- 守卫需可注入受保护根/active-DB 身份(仿既有 coordinator override),让单测把"active"指向隔离临时根、逐一断言各 role 与 relationship 组合(**含:硬链接命中 `sameIdentity`**),而不碰真实容器。
 
 ---
 
@@ -240,7 +282,7 @@
 
 - **auto 源在 createFresh 前出现 → 重裁决并优先迁移**:`sourceState(auto)` **从磁盘、从不缓存**地在三处复核(`resolveB1`、`confirmOpenAuthorization(.createFreshExpectedAbsent)`、`resumeChain`)。"优先迁移"就是 `resolveB1` 里 `.available → fullChain`(自动导入)**排在** `.unavailable → createFresh` **之前**;且 createFresh 授权**可在最后一刻被撤销**——`confirmOpenAuthorization` 若发现 auto 此刻 `.available` 就返回 `.reResolve`,重跑后走 fullChain。createFresh 是**唯一**对 auto 源敏感的授权;existing-open 的两个 confirm 分支根本不看 `sourceState`。
 - **用户显式目录选择粘滞**:显式路径(`runImport` 用 `.explicitImport`、`recoverPublishedStaging` 用 `.selectedRecovery`)一律携带 **`autoSourceCandidate: nil`**,故其 `resumeChain`/重裁决分支**结构上不可达**——显式来源**永不会被重裁决回 auto 源**;槽冲突以 `.terminal(.importSlotOccupied)` **显式浮现**(带 `requestedImportID`/`existingImportID`),用户选择**既不静默改判也不丢弃**。
-- **⚠️ 实现前必须钉死的不变量(当前 App 有真实缺口)**:App 侧 `reResolve` 现在把意图**塌回 `.boot`**(`AppModel.swift:218`),而 `.boot` 会**重新注入 auto 候选**。若把显式目录导入接成会走 reResolve 的普通意图,用户选择可能在"pre-record 窗口"被重裁决回 auto MAS 源 —— **一次静默切源**。因此实现时**必须**二选一并加守卫测试:(a) `.migrateFromUserDir` 的 reResolve **保留所选 `MigrationSource`,绝不塌回 `.boot`**;或 (b) 形式化证明显式导入在任何 reResolve 可达前**已发布 record/active/staging**,从而 probe-first 的 record-dominance 阻止 auto 重裁决。默认取 (a)。相应地,建议 `confirm` **仅对 createFresh 派生的授权**接收 auto 候选,而非像今天这样无条件传 `auto`。
+- **⚠️ 实现前必须钉死的不变量(当前 App 有真实缺口;v3 复核 `main = 1c12fbb` 仍在)**:App 侧 `reResolve` 现在把意图**塌回 `.boot`**(`AppModel.swift:218`),而 `.boot` 会**重新注入 auto 候选**。若把显式目录导入接成会走 reResolve 的普通意图,用户选择可能在"pre-record 窗口"被重裁决回 auto MAS 源 —— **一次静默切源**。**已决(v3,决策 3):取方案 (a)**——`.migrateFromUserDir` 的 reResolve **保留原 `MigrationSource`,绝不塌回 `.boot`、绝不重新注入 auto 来源**,并加守卫测试钉住;方案 (b)(形式化证明 record-dominance)不采用。同时**已决**:`autoSourceCandidate` **只用于 createFresh 派生的授权确认**——`confirm` 不再像今天这样对所有授权无条件传 `auto`。
 
 ---
 
@@ -258,6 +300,11 @@
   - `migration.chooseSource.picker.prompt`(选择目录面板的提示/message)
   - `migration.chooseSource.picker.noData`(所选文件夹未找到账本数据——**通用措辞,不回显路径**)
   - `migration.chooseSource.importing`(导入进行中——如需进度提示)
+  - **二次确认对话框(v3 新增,zh-Hans 文本以 §1.3 锁定口径为准、逐字含中文标点,无占位符)**:
+    - `migration.chooseSource.confirm.title`(创建新的空账本？)
+    - `migration.chooseSource.confirm.body`(不删除/不修改旧数据、跳过迁移、可返回选“迁移旧数据”)
+    - `migration.chooseSource.confirm.back`(返回)
+    - `migration.chooseSource.confirm.create`(创建空账本)
 - **错误一律 Core 强类型(决策 6),复用既有键**:自选防护(§3.3)映射为 `.terminal(.invalidSource, {reason, role})` → 既有键 `migration.msg.invalidSource`(**无需新 key、role/reason 无路径**);`sourceDatabaseMissing`/`sourceNotRegularFile`/`importSlotOccupied` 等亦为既有 `migration.*` 键。App **不构造任何错误文案**,只 `model.t(Core 给的 key)`。
 - **占位符纪律**:上述新 key 若引入 `{count}`/`{importID}` 之类 token,必须在 `testExpectedPlaceholderKeysOnly` 里钉住;**推荐这些 key 全部无占位符**,避免额外 parity 负担。`importSlotOccupied` 等既有块文案已在 `migration.*` 内,复用即可(其 `{importID}` 已被现有 parity 覆盖)。
 - **六语言 parity 纪律**:新 key 必须**同时**加进 6 个 `.lproj/Localizable.strings`(zh-Hans/zh-Hant/en/ja/ko/fr)**并**注册进 `MigrationCopyParityTests.allMigrationKeys()`,否则 parity 测试红 / 4 语静默回退。
@@ -267,21 +314,21 @@
 
 ## 9. N9 真实 electron-v23.db 全链路测试作为实现前门禁
 
-**N9 是实现前门禁:必须先落地并变绿,才允许接 picker/runImport 生产接线。** UI 只能暴露一条已被证明的链。
+**N9 是实现前门禁:必须先落地并变绿,才允许接 picker/runImport 生产接线。** UI 只能暴露一条已被证明的链。**[v3:该门禁已满足——N7.0(PR #369)落地并全绿,注释修正经 PR #370。]**
 
-- **现状缺口**:已有真实 Electron 引擎产出的 `electron-v23.db`(`user_version=23`,78 分类,7 笔覆盖全枚举的交易,4 设置,全部 `attachment_path=null`),但**没有任何测试**把它跑通"`.userSelectedDataDir` → ingest → gate → prepare → activate → finalize → confirm → hardened open → 断言真实交易/设置/分类"。现有全链路测试都源自**空 v0 合成库**(`makeSQLiteDB`,0 交易),且开库用**朴素 `LedgerStore.init`** 而非生产 `confirmOpenAuthorization → openStoreForPlan → openActiveExistingHardened` 分派。
+- **现状缺口 [v3:已由 N7.0 关闭]**:v2 时已有真实 Electron 引擎产出的 `electron-v23.db`(`user_version=23`,78 分类,7 笔覆盖全枚举的交易,4 设置,全部 `attachment_path=null`),但没有任何测试把它跑通"`.userSelectedDataDir` → ingest → gate → prepare → activate → finalize → confirm → hardened open → 断言真实交易/设置/分类"(当时的全链路测试都源自空 v0 合成库,开库用朴素 `LedgerStore.init`)。**现状(1c12fbb)**:该链已由 `Tests/SoloLedgerCoreTests/ElectronFixtureMigrationChainTests.swift`(Core,5 测试)与 `App/Tests/SoloLedgerUnitTests/ElectronFixtureProductionOpenTests.swift`(App-hosted,3 测试)全量覆盖,开库走生产 `confirmOpenAuthorization → openStoreForPlan / openActiveExistingHardened` 分派。
 - **N9 必须覆盖的全链路(以真实 fixture 为源)**:
   1. 用 `electronFixtureCopy()` 把真实库放进一个临时 `.userSelectedDataDir` 源树;
   2. `coordinator.runImport(source: .userSelectedDataDir(dir))` 跑完整 ingest→gate→prepare→activate→finalize;
   3. **尊重 finalize-before-open 次序**:finalize(apply→audit→complete)在 quiescent DB 上完成后,才由 App 侧开库(开库切 WAL 会破坏 quiescence 门);
   4. 经 `confirmOpenAuthorization` → `openActiveExistingHardened` 开库(**不用**朴素 init);
   5. 断言(具体数值,强于现有 CN-子集检查):**7 笔交易(4 income + 3 expense)、income=4600.75 / expense=1750.74 / net=2850.01、4 设置(accounting_locale/currency/company_name/ui_language)、78 分类精确计数、全枚举(income/expense;paid/partial/unpaid;issued/pending/na)未损**。
-- **N9 必须覆盖的三个场景(决策 8)**:
-  1. **完整全库迁移**(上述链 + 数值断言);
-  2. **freshly-completed open**:finalize 返回 `.completed` 后**立即**经 confirm + hardened open,尊重 finalize-before-open quiescence 契约;
-  3. **completed-after-restart probe**:对同一磁盘 config **重建第二个 coordinator**,重跑 `bootResolve` 使 WAL-safe probe 返回 `.openExistingCompleted`,再开库复断言。
-- **两个变体**:**Core-target**(`SoloLedgerCoreTests`,`swift test`)直接调 `openActiveExistingHardened`;**App-hosted**(`SoloLedgerUnitTests`)驱动真实 `AppModel.openStoreForPlan` 生产分派。
-- **附件 apply 也是发布前门禁(决策 8,不得无限延期)**:committed fixture 全 `attachment_path=null` 且 `business_documents` 0 行,**finalize 的 apply-copy → 引用审计-resolve → complete 时 sha256 复验 → sentinel 路径当前零端到端覆盖**——而生产 `.masContainer` 首迁**必然**带真实附件与引用,正是该门禁要防的场景。须增补一个**含附件的 fixture 变体**(≥1 条非空 `transactions.attachment_path='attachments/docs/<name>'` + 匹配的真实文件;理想再加 1 条 `business_documents.tax_invoice_attachment_path`;并含 1 条**悬空引用**驱动 requiresAcknowledgement→acknowledge→收敛),由生成器 `make-electron-fixture.mjs`(或姊妹脚本)产出以保证 manifest 哈希自洽。**可作为独立 fixture-test PR,但必须在 N7 发布前成为门禁,不得无限推迟。**
+- **N9 必须覆盖的三个场景(决策 8)[v3:三个场景均已由 PR #369 落地]**:
+  1. **完整全库迁移**(上述链 + 数值断言)——已落地;
+  2. **freshly-completed open**:finalize 返回 `.completed` 后**立即**经 confirm + hardened open,尊重 finalize-before-open quiescence 契约——已落地;
+  3. **completed-after-restart probe(已决:深断言,决策 7)**:对同一磁盘 config **重建第二个 coordinator**,重跑 `bootResolve` 使 WAL-safe probe 返回 `.openExistingCompleted`;**深断言** `confirmOpenAuthorization(completed)` 本身返回 `.proceed(.existing(evidence))`(belt-and-suspenders,不只依赖 `attemptOpen` 内部),evidence.record 与磁盘 owner record 全等,再硬化开库并复跑数值断言——已按此口径落地。
+- **两个变体 [v3:均已落地]**:**Core-target**(`SoloLedgerCoreTests/ElectronFixtureMigrationChainTests.swift`,`swift test`)直接调 `openActiveExistingHardened`;**App-hosted**(`SoloLedgerUnitTests/ElectronFixtureProductionOpenTests.swift`)驱动真实 `AppModel.openStoreForPlan` 生产分派,并经显式构造的 `ProductionBootChainRunner` 驱动真实 `AppModel` 两阶段编排(closure 映射在测试中显式构造,`makeProductionRunner` 的接线漂移守卫仍由 `AppModelBootTests` 既有 production-wiring guard 承担)。
+- **附件 apply 也是发布前门禁(决策 8)[v3:已满足;fixture 方案已决(决策 5)并落地]**:生产 `.masContainer` 首迁**必然**带真实附件与引用,正是该门禁要防的场景。**已决方案(取代 v2 的 mjs 生成器设想——附件变体不再要求由 `make-electron-fixture.mjs` 或姊妹脚本产出)**:以**已提交的真实 `electron-v23.db` 为基底**,在**测试运行时**用**固定 SQL**(固定值 `UPDATE` + 一行完全显式、含显式时间戳的 `business_documents` `INSERT`,由真实 v23 CHECK 约束校验)与**固定附件字节**确定性派生;**不提交第二份二进制 fixture;测试运行不依赖 Node/Electron**;所有派生值都是测试源码字面量,git 可审计;manifest 哈希由 ingest 从真实字节现算,天然自洽。已落地覆盖:≥1 条非空 `transactions.attachment_path` + 匹配真实文件、1 条 `business_documents.tax_invoice_attachment_path`、1 条**悬空引用**驱动 requiresAcknowledgement→acknowledge→收敛(sentinel 绑定 `acknowledgedReportHash`)、落地文件到 sentinel manifest 的 **sha256 哈希链**断言、以及附件变体的 **completed-after-restart** 复核。
 - **MAS 沙箱安全作用域**:`withAccess/startAccessingSecurityScopedResource` 在无头 Core/Unit 测试里是 no-op,**无法 headless 证明**;需真实签名沙箱运行(见第 10 节手动门)。
 
 ---
@@ -297,10 +344,12 @@
 | **MAS 沙箱(手动,决策 10)** | 真实签名沙箱构建 → 用一份**复制的测试 fixture 数据文件夹**(**禁用真实用户数据**)→ 覆盖:**成功迁移**、**取消**、**错误目录/自选防护拒绝**、**完成后重启续跑**;确认 Powerbox 安全作用域读成功、无路径泄漏 | 手动:签名/构建 → 运行 → 选**复制的** fixture 目录 → 逐场景断言 | **无法 headless 自动化**;**正式列入发布前清单**;绝不拿真实用户账本试验 |
 
 > 说明:`swift test` 需 `DEVELOPER_DIR` 指向完整 Xcode(XCTest 只随完整 Xcode 分发),与 MEMORY 记录一致。
+>
+> **v3 落地状态**:Core 行与 Unit 行中的"N9 变体"已由 N7.0 落地(`ElectronFixtureMigrationChainTests.swift` / `ElectronFixtureProductionOpenTests.swift`,PR #369 时 Core 466/466、App-hosted Unit 47/47);两行中其余条目(`resolveB1` 改发 `.requiresSourceChoice`、新意图守卫、parity 新 key、UI `.chooseSource` 路由)仍属 N7.1/N7.2 前瞻。MAS 沙箱手动门(决策 10)不变,仍列发布前清单。
 
 ---
 
-## 11. 分阶段实施 PR 拆分、回滚条件、未决问题(实施纪律)
+## 11. 分阶段实施 PR 拆分、回滚条件、已决事项与实施纪律
 
 ### 11.1 PR 拆分(小而聚焦,遵守 `CLAUDE.md` PR 纪律)
 
@@ -308,25 +357,25 @@
 
 | PR | 范围 | 生产行为 | 门禁/依赖 |
 |---|---|---|---|
-| **N7.0(门禁)** | N9 真实 fixture 全链路测试(Core + App-hosted 变体):完整迁移 + freshly-completed open + completed-after-restart(§9)。**无生产行为变化。** | **不变** | 必须先绿;未绿不得进入后续 PR |
-| **N7.1(仅加类型/状态/协调 API + 测试,不启用)** | 新增 `BootOutcome.requiresSourceChoice`、`MigrationUIState.awaitingSourceChoice`、两个强类型 `BootIntent`、`MigrationSource: Sendable,Equatable`(§2.1)、Core 自选防护(§3.3)、`runImport(.migrateFromUserDir)` 接线与 `classifyOutcome` 映射、穷尽 switch 补齐;**但 `resolveB1` 仍走旧 `.createFreshExpectedAbsent`,不发 `.requiresSourceChoice`**;新能力仅被**测试**驱动。 | **不变**(生产仍旧行为) | 依赖 N7.0;此 PR **不翻转首启** |
+| **N7.0(门禁)——✅ completed** | N9 真实 fixture 全链路测试(Core + App-hosted 变体):完整迁移 + freshly-completed open + completed-after-restart 深断言 + 附件变体全链路(§9)。**无生产行为变化。** | **不变**(已验证:零生产 Swift 改动) | **已满足**:PR #369(Core 466/466、App-hosted Unit 47/47、所有应运行 CI 检查通过)+ PR #370(纯注释修正)。后续 PR 已解锁 |
+| **N7.1(仅加类型/状态/协调 API + 测试,不启用)** | 新增 `BootOutcome.requiresSourceChoice`、`MigrationUIState.awaitingSourceChoice`、两个强类型 `BootIntent`、`MigrationSource: Sendable,Equatable`(§2.1)、Core 自选防护(§3.3)、`runImport(.migrateFromUserDir)` 接线与 `classifyOutcome` 映射、穷尽 switch 补齐;**但 `resolveB1` 仍走旧 `.createFreshExpectedAbsent`,不发 `.requiresSourceChoice`**;新能力仅被**测试**驱动。**已决(v3,决策 6)硬性要求:N7.1 对用户必须不可达**——`resolveB1` 不翻转、**零用户可见入口**,并以**守卫测试**钉住不可达性。 | **不变**(生产仍旧行为) | 依赖 N7.0(已绿);此 PR **不翻转首启** |
 | **N7.2(原子启用闭环)** | 当选源 UI、目录 picker + 安全作用域、Core 错误映射、`migration.chooseSource.*` **六语文案**、以及 Core+Unit+UI 测试**全部就绪**后,**在同一 PR 内**把 `resolveB1` `.unavailable` 改发 `.requiresSourceChoice`,**原子启用**整条来源选择 + 迁移 + createFresh-二次确认闭环。 | **翻转点**:首启从"静默铸空"改为"选源页" | 依赖 N7.1 |
 | **N7.3(非阻断 UI polish)** | 视觉/文案打磨、DEBUG 预览增强、可选进度提示等,不改行为。 | 不变 | 依赖 N7.2 |
 
-> **若无法可靠隐藏未完成能力**(例如某处 switch 一旦补齐就会让部分入口对用户可见),则**把 N7.1 与 N7.2 合并为一个最小可用闭环 PR**——宁可一个稍大但**始终可用**的 PR,也不留不可用中间提交。
+> **已决(v3,决策 6):N7.1/N7.2 保持拆分。** 若实现时发现**无法可靠隐藏**未完成能力(例如某处 switch 一旦补齐就会让部分入口对用户可见),**必须停下并向用户提议合并 N7.1+N7.2 为一个最小可用闭环 PR**——不得自行继续、不得留下不可用的半成品中间提交;宁可一个稍大但**始终可用**的 PR。
 
 ### 11.2 回滚条件
 
-- **N9 未绿(含附件门禁)** → 停,绝不接 picker(硬门)。
+- **N9 未绿(含附件门禁)** → 停,绝不接 picker(硬门)。**[v3:该硬门已通过——N9 两变体(含附件门禁)全绿,PR #369。]**
 - **启用后(N7.2)首启 UX 有问题 / 穷尽 switch 或 parity 意外红** → 回退 N7.2 的启用(`resolveB1` 改回旧分支)。
   - ⚠️ **回滚基线澄清(阻断 C)**:回退后落回的"**静默创建空账本**"只能作为**开发期临时回滚**,**不是发布可接受的基线**——它正是本设计要消除的行为。**DMG 用户数据不可达仍是发布前 P0**;临时回滚后必须继续推进闭环,不得以"能静默铸空"当作已解决。
 - **N7.2 后 MAS 沙箱手动门失败(安全作用域未授予/读失败)** → 回退接线,保留 Core 能力(`runImport` 仍仅被测试驱动),排查后重启用。
 - 每个 PR 独立可回退;`confirmOpenAuthorization`/entitlements **不改**,天然不进回滚面(`MigrationSource` 仅新增 conformance,见 §2.1)。
 
-### 11.3 本节内的未决(完整清单见文末)
+### 11.3 本节历史未决(v3:已全部关闭)
 
-- `.confirmCreateFresh` 到底映射到哪种 coordinator 入口形态(新入口 vs 给 `bootResolve` 加"已确认"语义参数)——两者都仍经 `confirmOpenAuthorization` 从磁盘复核,不绕门。
-- N7.1/N7.2 是否能可靠隐藏未完成能力,还是需合并为一个 PR。
+- `.confirmCreateFresh` 入口形态——**已决**:coordinator 新增独立强类型入口,不给 `bootResolve` 加 `confirmed: Bool`;内部复用只经私有强类型 request/mode;仍经 `confirmOpenAuthorization` 从磁盘复核,不绕门(§1.3、文末第 1 条)。
+- N7.1/N7.2 拆分——**已决**:保持拆分;N7.1 必须不可达并有守卫测试;无法隐藏时必须停下并提议合并(§11.1、文末第 6 条)。
 
 ---
 
@@ -364,19 +413,19 @@
 | R8 | 穷尽 switch 漏更新 | 编译失败 | 实为**安全网**(无 default,build 强制补齐),风险低 |
 | R9 | MAS 沙箱 entitlement/安全作用域行为无 headless 覆盖 | 真机才暴露 | entitlement 已确认足够(user-selected.read-write);**必须**手动签名沙箱门(第 10 节) |
 | R10 | 首启行为从"静默铸空"翻转为"选择屏" | 既有首启 UX 变化 | 有意为之且更正确;由 N7.2 **原子启用**,可独立回退(但回退落回的"静默铸空"**仅开发期临时基线、非发布可接受**,DMG 不可达仍是 P0 —— 阻断 C);不触碰既有 onboarding 步骤 |
-| R11 | fixture 无附件,finalize 附件-apply 端到端零覆盖 | 生产首迁才首次跑附件 apply/audit/sha256 复验 | **已定(决策 8):附件-apply 是发布前门禁**——增补含附件+悬空引用的 fixture 变体驱动全链路(§9);可独立 PR 但不得无限延期 |
+| R11 | (历史,v2)fixture 无附件,finalize 附件-apply 端到端零覆盖 | 生产首迁才首次跑附件 apply/audit/sha256 复验 | **已关闭(v3)**:PR #369 的附件变体门禁(干净链/悬空引用+acknowledgement/完成后重启,§9)已端到端覆盖 apply→audit→complete 与 sha256 哈希链;相关测试**保留为回归门** |
 | R12 | 显式目录导入的 reResolve 塌回 `.boot` 可能被重裁决回 auto 源(静默切源) | 违反"显式选择粘滞" | **实现前必钉死不变量(§7.1)**:`.migrateFromUserDir` 的 reResolve 保留 `MigrationSource` 不塌回 `.boot`,并加守卫测试;`confirm` 仅对 createFresh 派生授权接收 auto 候选 |
 
 ---
 
 ## 文件影响清单(前瞻性 —— 实现时才会改动,当前一律不改)
 
-> **以下全部为"实现阶段将会改动"的预测清单,本设计阶段不做任何改动。** 路径均为仓库相对 `native/SoloLedger/…`。
+> **以下为"实现阶段将会改动"的预测清单;本文档 PR 不做任何代码改动。** 路径均为仓库相对 `native/SoloLedger/…`。**v3:N7.0 已落地的条目按事实标注为"已落地",其余仍为前瞻。**
 
 | 路径 | 变更类型 | 说明(前瞻) |
 |---|---|---|
-| `Sources/SoloLedgerCore/Migration/MigrationCoordinator.swift` | 修改 | `resolveB1` `.unavailable` 分支改发 `.requiresSourceChoice`(**N7.2 才启用**);新增 `.confirmCreateFresh` 入口语义;`runImport` 接 `.migrateFromUserDir`;`map` 增 `sourceIsActiveData→invalidSource`。`confirmOpenAuthorization` **不改**;建议 `confirm` 仅对 createFresh 授权收 auto 候选(§7.1) |
-| `Sources/SoloLedgerCore/Migration/StagingIngest.swift` | 修改 | 新增 Core 自选防护 `SelfImportGuard`(ingest 头部,§3.3)+ `IngestError.sourceIsActiveData(role:)`(description 仅 role、无路径) |
+| `Sources/SoloLedgerCore/Migration/MigrationCoordinator.swift` | 修改 | `resolveB1` `.unavailable` 分支改发 `.requiresSourceChoice`(**N7.2 才启用**);新增 `.confirmCreateFresh` 入口语义;`runImport` 接 `.migrateFromUserDir`;`map` 增 `sourceIsActiveData→invalidSource`。`confirmOpenAuthorization` **不改**;**必须**(v3 已决)`confirm` 仅对 createFresh 派生的授权收 auto 候选(§7.1) |
+| `Sources/SoloLedgerCore/Migration/StagingIngest.swift` | 修改 | 新增 Core 自选防护 `SelfImportGuard`(ingest 头部,§3.3)+ `IngestError.sourceIsActiveData(role:relationship:)`(description 仅 role/relationship 标签、无路径) |
 | `Sources/SoloLedgerCore/Migration/MigrationSource.swift` | 修改(仅加 conformance) | **加 `: Sendable, Equatable`**(全 URL 载荷,编译器合成,零 `@unchecked`/零手写 `==`,§2.1);行为不变 |
 | `Sources/SoloLedgerCore/Migration/MigrationUIState.swift` | 修改 | 新增 `.awaitingSourceChoice`(store==nil、ready==false)及不变量注释 |
 | `Sources/SoloLedger/App/BootChainRunner.swift` | 修改 | 新增 `BootIntent.confirmCreateFresh` / `.migrateFromUserDir(MigrationSource)`(保持 Equatable);Phase A 映射;`.migrateFromUserDir` 的 reResolve 保留 source 不塌回 `.boot`(§7.1) |
@@ -388,22 +437,25 @@
 | `Sources/SoloLedger/Resources/{zh-Hans,zh-Hant,en,ja,ko,fr}.lproj/Localizable.strings` | 修改(×6) | 新增 `migration.chooseSource.*`(建议无占位符) |
 | `App/Tests/SoloLedgerUnitTests/MigrationCopyParityTests.swift` | 修改 | `allMigrationKeys()` 注册新 key |
 | `App/Tests/SoloLedgerUnitTests/AppModelBootTests.swift` | 修改 | 新意图/新状态守卫(单飞、取消 no-op、选择态不构造 store、Phase A 离主、generation 陈旧不发布) |
-| `Tests/SoloLedgerCoreTests/`(新文件) | 新增 | N9 Core 变体:真实 `electron-v23.db` 全链路 + `openActiveExistingHardened` 数据存活断言 |
-| `App/Tests/SoloLedgerUnitTests/`(新文件) | 新增 | N9 App-hosted 变体:真实 `AppModel.openStoreForPlan` 生产分派断言 |
+| `Tests/SoloLedgerCoreTests/ElectronFixtureMigrationChainTests.swift` | **已落地(N7.0,PR #369)** | N9 Core 变体:真实 `electron-v23.db` 全链路 + `openActiveExistingHardened` 数据存活断言 + 附件变体(干净/悬空/重启)5 测试 |
+| `App/Tests/SoloLedgerUnitTests/ElectronFixtureProductionOpenTests.swift` | **已落地(N7.0,PR #369)** | N9 App-hosted 变体:真实 `AppModel.openStoreForPlan` 生产分派 + 显式构造的 `ProductionBootChainRunner` 驱动真实 `AppModel` 编排,3 测试 |
 | `App/Tests/SoloLedgerUITests/MigrationRecoveryUITests.swift` 或新文件 | 修改/新增 | `.chooseSource` 路由表层/无泄漏 UITests |
-| `App/Support/SoloLedger.entitlements` / `SoloLedger-Debug.entitlements` | **不改** | 已确认 `user-selected.read-write` 足够;**明确不新增 bookmarks.app-scope** |
-| `App/project.yml` | **不改** | entitlement 接线不变 |
+| `App/Support/SoloLedger.entitlements` / `SoloLedger-Debug.entitlements` | **不改** | 已确认 `user-selected.read-write` 足够;**明确不新增 bookmarks.app-scope**。**v3 复核(1c12fbb):仍未变化,全仓无任何 bookmark entitlement** |
+| `App/project.yml` | **已改(N7.0,仅测试资源)** | entitlement 接线**不变**;N7.0 已为 `SoloLedgerUnitTests` 增加同一份已提交 fixture 的**资源引用**(非复制) |
+| `App/SoloLedger.xcodeproj/project.pbxproj` | **已再生(N7.0)** | `xcodegen generate` 产物,仅新测试文件与 fixture 资源接线 |
 
 ---
 
-## 未决问题(待用户确认)
+## 已决事项/实施入口(v3)
 
-> 说明:v2 已把原 10 项未决中被本轮决策关闭的(状态归属、取消语义、自选防护是否要做、ingest 取消、MAS 手动门、App 预检、附件门禁是否纳入、intent 用不用 confirmed:Bool)全部**关闭并写入相应章节**。以下是**仍然开放、需你拍板才能进实现细节**的剩余项:
+> 说明:v2 已关闭原 10 项未决中的 8 项;v3 把剩余 7 项**全部关闭**。本节不再是开放问题清单,而是 N7.1 实施时的**入口索引**——每一条都已定稿,实现只需照此执行,不得重开。
 
-1. **`.confirmCreateFresh` 的 coordinator 入口形态**:用一个全新的"已确认 createFresh"入口,还是给 `bootResolve` 加一个"已确认"语义参数?二者都仍经 `confirmOpenAuthorization` 从磁盘复核、不绕门(§11.3)。
-2. **选源页与既有 onboarding 的确切关系**:已定"选源页先于开库、成功开库后进原 onboarding";需确认选源页是否**完全独立于** onboarding 首屏(而非替代它),以及"创建新账本"二次确认的确切文案口径。
-3. **`.migrateFromUserDir` 的 reResolve 落地方式(§7.1 不变量)**:取 (a) reResolve 保留 `MigrationSource` 不塌回 `.boot`,还是 (b) 形式化证明显式导入在任何 reResolve 可达前已发布 record/active/staging(默认 a)。是否同时把 `confirm` 改成仅对 createFresh 授权接收 auto 候选?
-4. **SelfImportRole 粒度**:App 只显示一个通用 `invalidSource`,role 仅用于路径无关的诊断——是否需要区分 `nativeDataRoot`/`activeStoreDir`/`activeAttachmentsDir`/`sameAsActiveDatabaseFile`/`ancestor`/`descendant`,还是收敛为更少的几个?
-5. **N9 附件 fixture 的落地形态**:含附件的变体 `.db` 是**提交进仓库**还是**测试时按需生成**;是否顺带 seed 一条 `business_documents` 行以覆盖 `tax_invoice_attachment_path`(该表当前 0 行)。
-6. **N7.1/N7.2 拆分 vs 合并**:能否可靠隐藏 N7.1 的未完成能力(不让任何半成品入口对用户可见);若不能,则按 §11.1 合并为一个最小可用闭环 PR。
-7. **completed-after-restart 断言深度**:是否额外断言 `confirmOpenAuthorization` 的 completed-probe 重跑返回 `.proceed(.existing(evidence))`(belt-and-suspenders),还是依赖 `attemptOpen` 内部完成。
+1. **`.confirmCreateFresh` 的 coordinator 入口形态(已决)**:coordinator **新增独立强类型入口**;**不给 `bootResolve` 加 `confirmed: Bool`**;内部复用只能经**私有强类型 request/mode**;仍经 `confirmOpenAuthorization` 从磁盘复核、不绕门(§1.3、§11.3)。
+2. **选源页与 onboarding(已决)**:选源页**完全独立于** onboarding(非其一屏、不替代其首屏),发生在开库前;成功 adopt store 后原 onboarding **原样继续**。二次确认文案已锁定(zh-Hans,逐字、含中文标点)——标题：**创建新的空账本？**；正文：**这不会删除或修改旧版 SoloLedger 的数据，但会跳过迁移并为当前 App 创建一个空账本。旧数据不会自动导入；如需迁移，请返回并选择“迁移旧数据”。**；按钮：**返回 / 创建空账本**(§1.3、§8)。
+3. **`.migrateFromUserDir` 的 reResolve(已决,方案 (a))**:reResolve **保留原 `MigrationSource`**,不塌回 `.boot`、不重新注入 auto 来源;`autoSourceCandidate` **只用于 createFresh 授权确认**;守卫测试钉住(§7.1)。
+4. **SelfImportRole 粒度(已决)**:role 收敛为 **`nativeDataRoot` / `activeDatabase` / `activeAttachments`** 三值;relationship 为**独立维度**,收敛为 **`sameIdentity` / `sourceAncestorOfProtected` / `sourceDescendantOfProtected`** 三值——`sameIdentity` 同时覆盖同目录身份、同 DB 文件与硬链到 active DB(device+inode 层面不可分,设计不声称可分开诊断;对应测试断言硬链接命中 `sameIdentity`);不膨胀进 role;UI 只显示通用 `invalidSource`,role/relationship 仅用于路径无关诊断(§3.3)。
+5. **N9 附件 fixture(已决并落地)**:以已提交 `electron-v23.db` 为基底,测试运行时用固定 SQL + 固定附件字节**确定性派生**;不提交第二份二进制;运行不依赖 Node。已覆盖 transaction attachment、`business_documents` tax invoice attachment、悬空引用、acknowledgement、hash chain 与 restart(§9,PR #369)。
+6. **N7.1/N7.2(已决:保持拆分)**:N7.1 必须**不可达**——`resolveB1` 不翻转、零用户可见入口、守卫测试钉住;若实现时发现无法可靠隐藏,**必须停下并提议合并 N7.1+N7.2**,不得留下半成品(§11.1)。
+7. **completed-after-restart 断言深度(已决:深断言,已落地)**:重建 coordinator → completed probe → **额外断言 `confirmOpenAuthorization` 返回 `.proceed(.existing(evidence))`**(不只依赖 `attemptOpen` 内部)→ 硬化开库 → 数据复核(§9,PR #369)。
+
+**结论:实施前设计阻断已归零(阻断 A/B/C 均已解除或落地,7 项未决全部已决)。下一步允许进入 N7.1(仅加类型/状态/协调 API + 测试,不启用生产行为,详见 §11.1);本文档 PR 为 docs-only,不实现 N7.1。**
