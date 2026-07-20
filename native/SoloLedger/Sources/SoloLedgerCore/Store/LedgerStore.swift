@@ -302,7 +302,7 @@ public final class LedgerStore {
 
         let parent: DirectoryHandle
         do { parent = try DirectoryHandle.open(at: parentURL) }   // immediate-parent symlink → ELOOP
-        catch { throw HardenedOpenError.reservationFailed(step: .parentBind, errno: Self.posixErrno(of: error)) }
+        catch { throw HardenedOpenError.reservationFailed(step: .parentBind, errno: Self.parentBindErrno(of: error, at: parentURL)) }
 
         let reservation = try FreshReservation.reserve(in: parent, named: name,
                                                        closeErrnoOverride: hooks.reservationCloseErrno,
@@ -391,9 +391,23 @@ public final class LedgerStore {
         }
     }
 
-    private static func posixErrno(of error: Error) -> Int32 {
+    /// Recover a meaningful POSIX errno for a parent-bind failure. `DirectoryHandle.open` maps an
+    /// immediate-parent symlink (ELOOP under O_NOFOLLOW) or a non-directory parent (ENOTDIR) to
+    /// `FileHashError.notADirectory`, which carries NO errno — so a raw read would report 0. Recover
+    /// it with a single no-follow `lstat` of the parent path: a symlink ⇒ ELOOP, any other
+    /// non-directory ⇒ ENOTDIR, a since-vanished path ⇒ the lstat errno (e.g. ENOENT). `.unreadable`
+    /// already carries its own errno and is passed through unchanged. This errno is DIAGNOSTIC ONLY —
+    /// the bind has already failed terminally — so a racy re-stat is acceptable here and never gates
+    /// a security decision.
+    private static func parentBindErrno(of error: Error, at parentURL: URL) -> Int32 {
         if let e = error as? FileHashError, case .unreadable(_, let n) = e { return n }
-        return 0
+        // .notADirectory (ELOOP / ENOTDIR): re-derive via a no-follow lstat of the parent path.
+        var st = stat()
+        guard lstat(parentURL.path, &st) == 0 else { return errno }
+        let type = st.st_mode & S_IFMT
+        if type == S_IFLNK { return ELOOP }
+        if type != S_IFDIR { return ENOTDIR }
+        return 0   // race: the path is a directory again; no specific errno is attributable
     }
 
     private func applyPragmas() throws {
