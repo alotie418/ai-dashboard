@@ -145,6 +145,17 @@ public enum MigrationBootDriver {
             // block carries only a stable reason tag this round (diagnostics export deferred).
             return .retriable(MigrationBlock(code: .storeOpenFailed, classification: .retriable,
                                              params: ["op": "activeOpen", "reason": "sqliteOpen"]))
+        case .freshCollision:
+            // A squatter occupied a supposed-fresh active path. Fail-closed; DELIBERATELY never
+            // reResolve — an automatic re-resolve could re-adopt the squatter as an existing plain
+            // store. Retriable so the user may act; a manual retry re-runs the whole chain.
+            return .retriable(MigrationBlock(code: .interference, classification: .retriable,
+                                             params: ["op": "createFresh", "reason": "freshCollision"]))
+        case .reservationFailed(let step, let sysErrno):
+            // A reservation step failed — stable tag + numeric errno only (no path/message/strerror).
+            return .retriable(MigrationBlock(code: .storeOpenFailed, classification: .retriable,
+                                             params: ["op": "createFresh", "reason": "reservationFailed",
+                                                      "step": step.rawValue, "errno": String(sysErrno)]))
         }
     }
 }

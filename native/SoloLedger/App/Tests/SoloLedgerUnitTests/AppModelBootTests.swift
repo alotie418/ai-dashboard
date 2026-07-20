@@ -400,4 +400,31 @@ final class AppModelBootTests: XCTestCase {
         }
         XCTAssertEqual(try Data(contentsOf: decoy), decoyBefore, "the symlink target must never be opened or written")
     }
+
+    // MARK: - production wiring: a createFresh plan takes the C12x-A2 exclusive reservation
+
+    /// Drives the REAL production dispatch for `.createFresh` against an isolated temp path with a
+    /// pre-placed regular-DB squatter: it MUST fail closed with `freshCollision` (the exclusive
+    /// reservation), never open+migrate the squatter. Reverting the `.createFresh` branch to
+    /// `LedgerStore(open: .createIfMissing)` opens the squatter and does NOT throw — failing this test.
+    func testProductionCreateFreshPlanUsesReservationAndRejectsSquatter() throws {
+        let fm = FileManager.default
+        var buf = [CChar](repeating: 0, count: Int(PATH_MAX))
+        _ = realpath(tempDir.path, &buf)
+        let dir = URL(fileURLWithPath: String(cString: buf), isDirectory: true)
+
+        let url = dir.appendingPathComponent("fresh-active.db")
+        let squatter = try LedgerStore(databaseURL: url, open: .createIfMissing)   // a valid DB squats the name
+        try squatter.db.execute("PRAGMA wal_checkpoint(TRUNCATE)"); try squatter.db.close()
+        try? fm.removeItem(at: URL(fileURLWithPath: url.path + "-wal"))
+        try? fm.removeItem(at: URL(fileURLWithPath: url.path + "-shm"))
+        let before = try Data(contentsOf: url)
+
+        XCTAssertThrowsError(try AppModel.openStoreForPlan(.createFresh, activeURL: url)) { e in
+            guard case HardenedOpenError.freshCollision = e else {
+                return XCTFail("production createFresh plan must take the exclusive reservation, got \(e)")
+            }
+        }
+        XCTAssertEqual(try Data(contentsOf: url), before, "the squatter DB must not be opened or migrated")
+    }
 }

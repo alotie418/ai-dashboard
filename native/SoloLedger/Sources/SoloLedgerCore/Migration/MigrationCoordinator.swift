@@ -119,6 +119,21 @@ public enum HardenedOpenError: Error, Equatable {
     case hasMovedFailed(fileControlRC: Int32, systemErrno: Int32)
     /// A failed `sqlite3_open_v2`, with STRUCTURED numeric codes only (primary/extended/errno).
     case sqlite(primary: Int32, extended: Int32, systemErrno: Int32)
+    /// C12x-A2 createFresh: the exclusive reservation `openat(O_CREAT|O_EXCL|O_NOFOLLOW)` hit an
+    /// existing entry (EEXIST) — a squatter occupied a supposed-fresh active path. Its OWN error
+    /// domain (not an `IdentityViolation`); must NOT auto-reResolve into adopting the squatter.
+    case freshCollision
+    /// C12x-A2 createFresh: a reservation step failed (parent bind / exclusive create / fstat /
+    /// the explicit fd close). Carries only a stable `step` tag and a numeric errno.
+    case reservationFailed(step: ReservationStep, errno: Int32)
+}
+
+/// Which step of the createFresh exclusive reservation failed (stable tags; no path/message).
+public enum ReservationStep: String, Equatable {
+    case parentBind    // DirectoryHandle.open(parent) failed (e.g. immediate-parent symlink)
+    case openExcl      // openat(O_CREAT|O_EXCL|O_NOFOLLOW) failed with a non-EEXIST errno
+    case fstat         // fstat on the freshly-reserved fd failed
+    case close         // the explicit, pre-SQL reservation fd close returned non-zero
 }
 
 /// The specific identity check that failed on the hardened active-open path (stable tags).

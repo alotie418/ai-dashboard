@@ -293,8 +293,8 @@ final class AppModel: ObservableObject {
     static func openStoreForPlan(_ plan: ConfirmedOpenPlan, activeURL: URL) throws -> LedgerStore {
         switch plan {
         case .createFresh:
-            // createFresh hardening (O_EXCL) is a separately-scoped follow-up (C12x-A2); unchanged here.
-            return try LedgerStore(databaseURL: activeURL, open: .createIfMissing)
+            // C12x-A2: exclusive descriptor reservation + NOFOLLOW/HAS_MOVED/fingerprint before adopt.
+            return try LedgerStore.createFreshReservedHardened(databaseURL: activeURL)
         case .existing(let evidence):
             return try LedgerStore.openActiveExistingHardened(databaseURL: activeURL, expect: evidence)
         }

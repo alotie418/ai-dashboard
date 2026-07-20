@@ -185,6 +185,217 @@ public final class LedgerStore {
         guard fp == expect.leaf else { throw HardenedOpenError.identity(.fingerprintMismatch) }
     }
 
+    // MARK: - C12x-A2: createFresh behind an exclusive descriptor reservation
+
+    /// Test seams for the hardened createFresh path. Default/empty in production (the shipping
+    /// entry passes an empty instance), so NO hook is reachable from the App and there is no
+    /// global mutable state — the opener/observers are per-call injected values.
+    struct FreshOpenHooks {
+        var open: (URL) throws -> SQLiteDatabase = { try SQLiteDatabase(path: $0.path, mode: .activeExistingNoFollow) }
+        /// STAGE 2 adoption — default is the real adopter; a test overrides it to inject an
+        /// adoption/migration failure WITHOUT entering STAGE 1's reservation cleanup.
+        var adopt: (SQLiteDatabase) throws -> LedgerStore = { try LedgerStore(adopting: $0) }
+        var afterReserveBeforeOpen: (() throws -> Void)? = nil     // window: swap after reserve, before open
+        var afterOpenBeforeChecks: (() throws -> Void)? = nil      // window: swap after open, before checks
+        var hasMovedOverride: (() -> HasMovedResult)? = nil
+        var reservationCloseErrno: (() -> Int32)? = nil            // inject a non-zero reservation-close errno
+        var observeReservationCleanup: (() -> Void)? = nil         // fires when cleanupIfStillOurs runs
+        var observeReservationOpenDuringChecks: ((Bool) -> Void)? = nil    // fd still open at identity checks?
+        var observeReservationClosedBeforeAdopt: ((Bool) -> Void)? = nil   // fd closed before adoption?
+        /// Observe the STAGE-1 SQLite connection being closed on a failure path (`true` == close
+        /// ok). Per-call injected value — NO global state; nil (unobserved) in production.
+        var observeSQLiteClose: ((Bool) -> Void)? = nil
+    }
+
+    /// A descriptor-bound exclusive reservation of the createFresh active name. Created via
+    /// `openat(O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW)` — atomically rejects ANY pre-existing entry
+    /// (regular / symlink / dangling symlink / directory → EEXIST; never follows, never opens a
+    /// target). The fd is HELD across the SQLite open and identity checks (so the leaf is re-verified
+    /// against the exact inode we created, and cleanup is descriptor-rooted), then EXPLICITLY closed
+    /// before the first SQL: POSIX advisory locks are per-process-per-inode, so a LATE close of this
+    /// second fd (e.g. via ARC/deinit) after SQLite starts locking would drop SQLite's own locks.
+    final class FreshReservation {
+        let device: Int32
+        let inode: UInt64
+        private let parent: DirectoryHandle
+        private let name: String
+        private var fd: Int32
+        private let closeErrnoOverride: (() -> Int32)?
+        private let observeCleanup: (() -> Void)?
+
+        private init(device: Int32, inode: UInt64, parent: DirectoryHandle, name: String, fd: Int32,
+                     closeErrnoOverride: (() -> Int32)?, observeCleanup: (() -> Void)?) {
+            self.device = device; self.inode = inode; self.parent = parent; self.name = name
+            self.fd = fd; self.closeErrnoOverride = closeErrnoOverride; self.observeCleanup = observeCleanup
+        }
+        /// Leak backstop ONLY — normal paths close explicitly before SQL; by the time SQLite could
+        /// take a lock this fd is already -1, so deinit never late-closes a live SQLite lock.
+        deinit { if fd >= 0 { close(fd) } }
+
+        var isOpen: Bool { fd >= 0 }
+
+        static func reserve(in parent: DirectoryHandle, named name: String,
+                            closeErrnoOverride: (() -> Int32)?, observeCleanup: (() -> Void)?) throws -> FreshReservation {
+            let f = openat(parent.fd, name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+            guard f >= 0 else {
+                let e = errno
+                if e == EEXIST { throw HardenedOpenError.freshCollision }
+                throw HardenedOpenError.reservationFailed(step: .openExcl, errno: e)
+            }
+            var st = stat()
+            guard fstat(f, &st) == 0 else { let e = errno; close(f); throw HardenedOpenError.reservationFailed(step: .fstat, errno: e) }
+            return FreshReservation(device: Int32(st.st_dev), inode: UInt64(st.st_ino), parent: parent, name: name,
+                                    fd: f, closeErrnoOverride: closeErrnoOverride, observeCleanup: observeCleanup)
+        }
+
+        /// Explicit, idempotent, FAILURE-REPORTING close. Closes the fd EXACTLY ONCE and NEVER
+        /// retries it; a non-zero raw close (or an injected errno) throws `reservationFailed(.close)`.
+        func closeReporting() throws {
+            guard fd >= 0 else { return }
+            let rc = close(fd); let realErrno = errno
+            fd = -1   // never retry, whatever the rc
+            if let injected = closeErrnoOverride?(), injected != 0 {
+                throw HardenedOpenError.reservationFailed(step: .close, errno: injected)
+            }
+            if rc != 0 { throw HardenedOpenError.reservationFailed(step: .close, errno: realErrno) }
+        }
+
+        /// Failure-path cleanup: unlink the main entry ONLY if the name STILL binds our (dev,ino)
+        /// AND is still a regular file — a foreign swapped-in entry (or any non-regular
+        /// type squatting a recycled inode number) is NEVER deleted. Runs against the ORIGINAL
+        /// held parent fd, so it removes OUR reservation even after the whole parent directory was
+        /// renamed away. Then best-effort close (no throw; already failing). Idempotent; the
+        /// fstatat→unlinkat sub-gap is a registered residual.
+        func cleanupIfStillOurs() {
+            observeCleanup?()
+            if let fp = try? parent.fingerprint(named: name),
+               fp.isRegularFile, fp.device == device, fp.inode == inode {
+                unlinkat(parent.fd, name, 0)
+            }
+            if fd >= 0 { _ = close(fd); fd = -1 }
+        }
+    }
+
+    /// C12x-A2: create a FRESH active store behind an exclusive descriptor reservation, then adopt
+    /// it. SHIPPING entry takes ONLY `databaseURL`; no test hook is exposed.
+    public static func createFreshReservedHardened(databaseURL url: URL) throws -> LedgerStore {
+        try createFreshReservedHardened(databaseURL: url, hooks: FreshOpenHooks())
+    }
+
+    /// INTERNAL overload with seams. STAGE 1 (`openAndVerifyFresh`: reserve → open → verify → close
+    /// the reservation fd) and STAGE 2 (adoption) are SEPARATE error domains: STAGE 1 owns the
+    /// entire reservation lifecycle + cleanup, and a STAGE-2 adoption/PRAGMA/migration failure can
+    /// NEVER enter reservation cleanup nor do a main-only unlink (the reservation fd is already
+    /// closed and STAGE 1 has returned). Keeping the adoption OUTSIDE STAGE 1's do/catch is exactly
+    /// what the "adoption-failure leaves the DB" guard test protects.
+    static func createFreshReservedHardened(databaseURL url: URL, hooks: FreshOpenHooks) throws -> LedgerStore {
+        let verifiedDB = try openAndVerifyFresh(databaseURL: url, hooks: hooks)   // STAGE 1
+        return try hooks.adopt(verifiedDB)                                        // STAGE 2 — outside STAGE 1
+    }
+
+    /// STAGE 1 only. Returns a verified, opened connection whose reservation fd is ALREADY explicitly
+    /// closed. Any failure here deterministically closes the SQLite connection (if opened),
+    /// descriptor-rooted-cleans the reservation, and rethrows the ORIGINAL typed error.
+    private static func openAndVerifyFresh(databaseURL url: URL, hooks: FreshOpenHooks) throws -> SQLiteDatabase {
+        let parentURL = url.deletingLastPathComponent()
+        let name = url.lastPathComponent
+
+        let parent: DirectoryHandle
+        do { parent = try DirectoryHandle.open(at: parentURL) }   // immediate-parent symlink → ELOOP
+        catch { throw HardenedOpenError.reservationFailed(step: .parentBind, errno: Self.posixErrno(of: error)) }
+
+        let reservation = try FreshReservation.reserve(in: parent, named: name,
+                                                       closeErrnoOverride: hooks.reservationCloseErrno,
+                                                       observeCleanup: hooks.observeReservationCleanup)
+
+        let db: SQLiteDatabase
+        do {
+            try hooks.afterReserveBeforeOpen?()
+            db = try hooks.open(url)                              // the SINGLE sqlite open (NOFOLLOW existing mode)
+        } catch let e as SQLiteError {
+            reservation.cleanupIfStillOurs()
+            throw Self.mapHardenedOpenError(e)                    // deeper-ancestor/window symlink → 1550; else sqlite
+        } catch {
+            reservation.cleanupIfStillOurs(); throw error
+        }
+
+        do {
+            try hooks.afterOpenBeforeChecks?()
+            hooks.observeReservationOpenDuringChecks?(reservation.isOpen)   // MUST be true (fd held during checks)
+            try verifyFreshIdentity(db: db, databaseURL: url, reservation: reservation,
+                                    heldParent: parent, name: name, hooks: hooks)
+        } catch {
+            closeSQLiteReporting(db, hooks: hooks)                // deterministic SQLite close
+            reservation.cleanupIfStillOurs()
+            throw error
+        }
+
+        // Identity OK → EXPLICIT idempotent reservation close BEFORE any SQL (POSIX-locks safe).
+        // A close FAILURE is still a STAGE-1 failure: the connection is closed AND the reservation
+        // is descriptor-rooted-cleaned (it is still OUR 0-byte file — no SQL ever ran), then the
+        // ORIGINAL typed error rethrows. Never adopt after a failed reservation close.
+        do {
+            try reservation.closeReporting()
+        } catch {
+            closeSQLiteReporting(db, hooks: hooks)   // close the connection; do NOT adopt, do NOT retry the fd
+            reservation.cleanupIfStillOurs()         // STAGE-1 contract: remove our own reservation
+            throw error                              // reservationFailed(.close, errno)
+        }
+        hooks.observeReservationClosedBeforeAdopt?(!reservation.isOpen)   // MUST be true (fd closed)
+        return db
+    }
+
+    /// Deterministic STAGE-1 SQLite close for failure paths: never throws, never overrides the
+    /// original typed error, leaks no text/path/strerror. Reports success/failure ONLY to the
+    /// per-call test observer (nil in production).
+    private static func closeSQLiteReporting(_ db: SQLiteDatabase, hooks: FreshOpenHooks) {
+        var closed = false
+        do { try db.close(); closed = true } catch { closed = false }
+        hooks.observeSQLiteClose?(closed)
+    }
+
+    private static func verifyFreshIdentity(db: SQLiteDatabase, databaseURL: URL, reservation: FreshReservation,
+                                            heldParent: DirectoryHandle, name: String, hooks: FreshOpenHooks) throws {
+        // HAS_MOVED — SQLite's opened inode must still live at the path (catches double-swap-back).
+        switch hooks.hasMovedOverride?() ?? db.hasMoved() {
+        case .ok(let moved): if moved { throw HardenedOpenError.identity(.moved) }
+        case .notFound:      throw HardenedOpenError.hasMovedUnavailable
+        case .misuse:        throw HardenedOpenError.hasMovedMisuse
+        case .fileControlFailed(let rc, let sys):
+            throw HardenedOpenError.hasMovedFailed(fileControlRC: rc, systemErrno: sys)
+        }
+        // CURRENT-PATH parent identity: SQLite re-resolved `databaseURL` through whatever directory
+        // NOW lives at the parent path — which is NOT necessarily the directory our reservation was
+        // created in (the whole parent can be renamed away and a decoy-bearing directory swapped in;
+        // the held fd would keep pointing at the moved-away original, so HAS_MOVED and a
+        // held-parent fingerprint would BOTH pass while SQLite holds a decoy). Re-open the parent
+        // path fd-rooted (O_NOFOLLOW|O_DIRECTORY) and require the SAME (device,inode) as the parent
+        // we reserved in. A URL/lstat/FileManager re-check would race; the handle is what we verify.
+        let parentURL = databaseURL.deletingLastPathComponent()
+        let currentParent: DirectoryHandle
+        do { currentParent = try DirectoryHandle.open(at: parentURL) }
+        catch let e as FileHashError where e.isFileMissing { throw HardenedOpenError.identity(.vanished) }
+        catch { throw HardenedOpenError.identity(.parentIdentityMismatch) }
+        guard currentParent.device == heldParent.device, currentParent.inode == heldParent.inode else {
+            throw HardenedOpenError.identity(.parentIdentityMismatch)
+        }
+        // Leaf fingerprint via the VERIFIED currentParent (== the held directory, just proven): the
+        // name must STILL bind the EXACT inode we reserved (dev,ino + regular). Size is NOT
+        // compared — a fresh reservation is 0 bytes and grows only at migration. fd-rooted read.
+        let fp: FileFingerprint?
+        do { fp = try currentParent.fingerprint(named: name) }
+        catch { throw HardenedOpenError.identity(.fingerprintMismatch) }
+        guard let fp else { throw HardenedOpenError.identity(.vanished) }
+        guard fp.isRegularFile, fp.device == reservation.device, fp.inode == reservation.inode else {
+            throw HardenedOpenError.identity(.fingerprintMismatch)
+        }
+    }
+
+    private static func posixErrno(of error: Error) -> Int32 {
+        if let e = error as? FileHashError, case .unreadable(_, let n) = e { return n }
+        return 0
+    }
+
     private func applyPragmas() throws {
         // Same posture as electron/db/index.js.
         try db.execute("PRAGMA journal_mode = WAL")
