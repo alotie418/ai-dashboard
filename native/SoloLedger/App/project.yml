@@ -63,6 +63,11 @@ targets:
     deploymentTarget: "13.0"
     sources:
       - path: Tests/SoloLedgerUnitTests
+      # The SAME committed real-Electron fixture the SwiftPM Core tests bundle (referenced,
+      # not copied) — the N7.0 App-hosted production-open tests read it from the test bundle
+      # because the sandboxed test host cannot read arbitrary repo paths.
+      - path: ../Tests/SoloLedgerCoreTests/Fixtures/electron-v23.db
+        buildPhase: resources
     dependencies:
       # Host the app so tests can `@testable import SoloLedger` (XcodeGen wires TEST_HOST +
       # BUNDLE_LOADER from this application dependency).

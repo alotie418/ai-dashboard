@@ -11,12 +11,14 @@
 		21CA4755C217A17128658F82 /* CoreTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B16C5235D85C8A57104E169 /* CoreTypes.swift */; };
 		2E23D9B87533B5497111ABB3 /* MigrationCopyParityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 831C1CE39028B1C1EF6BFB11 /* MigrationCopyParityTests.swift */; };
 		2E7C78002ABD0C01AA148373 /* TransactionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38F8C0CD70D660F6A69592BF /* TransactionListView.swift */; };
+		319B70CB0DBEC47627D1F71C /* ElectronFixtureProductionOpenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5592CBD647AF371A1D160A7C /* ElectronFixtureProductionOpenTests.swift */; };
 		47AED20762FB91EC3DC2344F /* AppModelBootTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6830222C9FA6F31E6BE497E2 /* AppModelBootTests.swift */; };
 		52F241D0515FB27BB56C9D20 /* MigrationRecoveryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38C0278D0D8E8AC923B2C6D9 /* MigrationRecoveryUITests.swift */; };
 		53DDD42D8672616C8446F88C /* AppLaunchUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F9696FACAA53B62F93D9F79 /* AppLaunchUITests.swift */; };
 		59D0AE5F94FC8EFCC793ED61 /* SoloLedgerCore in Frameworks */ = {isa = PBXBuildFile; productRef = F78D967BE4643CB328B2FE25 /* SoloLedgerCore */; };
 		5CF19061FD2C6CC044546D9D /* MigrationPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D726F1EA2EFB26D0EC1C8C /* MigrationPresenter.swift */; };
 		62D492187E0709CCDE35A2D3 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B5F727B2FCC9722A8ED0BA70 /* Localizable.strings */; };
+		63119B5E9FE1CED374DA19AA /* electron-v23.db in Resources */ = {isa = PBXBuildFile; fileRef = 27BD91B41FDD42EFA4279AEE /* electron-v23.db */; };
 		69565B6FA9364E0DAB27862D /* Localizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57643709AC4EFC756514CDFB /* Localizer.swift */; };
 		796BFA1219B88259D75D9BFB /* SoloLedgerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CF6B7860B1C57D6E8C83448 /* SoloLedgerApp.swift */; };
 		821321D467EC23E204FF19DF /* AppUnitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C26549A6E2C20DB2210C445 /* AppUnitTests.swift */; };
@@ -61,6 +63,7 @@
 		0D60ABA9FBFAC02C8A7872FA /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		11D726F1EA2EFB26D0EC1C8C /* MigrationPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationPresenter.swift; sourceTree = "<group>"; };
 		12B64B934345AAD8AFE2DAB1 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		27BD91B41FDD42EFA4279AEE /* electron-v23.db */ = {isa = PBXFileReference; path = "electron-v23.db"; sourceTree = "<group>"; };
 		2AD21BE4ACA9B11160FEA828 /* SoloLedger */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SoloLedger; path = ..; sourceTree = SOURCE_ROOT; };
 		2F9696FACAA53B62F93D9F79 /* AppLaunchUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchUITests.swift; sourceTree = "<group>"; };
 		38C0278D0D8E8AC923B2C6D9 /* MigrationRecoveryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationRecoveryUITests.swift; sourceTree = "<group>"; };
@@ -70,6 +73,7 @@
 		47DEC23A50B83FEDEAD90103 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		4F5403267C1309F9D795ECF1 /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/Localizable.strings; sourceTree = "<group>"; };
 		52BEB2DA46EDB5F3166A8803 /* Formatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatters.swift; sourceTree = "<group>"; };
+		5592CBD647AF371A1D160A7C /* ElectronFixtureProductionOpenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElectronFixtureProductionOpenTests.swift; sourceTree = "<group>"; };
 		57643709AC4EFC756514CDFB /* Localizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localizer.swift; sourceTree = "<group>"; };
 		588305D83F4594A1B09F7922 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		6830222C9FA6F31E6BE497E2 /* AppModelBootTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelBootTests.swift; sourceTree = "<group>"; };
@@ -130,10 +134,19 @@
 			name = Packages;
 			sourceTree = "<group>";
 		};
+		1DBE9EDDA27966F35A5D03B6 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				27BD91B41FDD42EFA4279AEE /* electron-v23.db */,
+			);
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
 		3C75F067392A95D03DB37F78 /* SoloLedger */ = {
 			isa = PBXGroup;
 			children = (
 				EA241AA4F3607BD11E7D8020 /* Sources */,
+				F307A488BAFFB3DA0DD4E566 /* Tests */,
 			);
 			name = SoloLedger;
 			path = ..;
@@ -145,6 +158,14 @@
 				B5F727B2FCC9722A8ED0BA70 /* Localizable.strings */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		5E443479E83B17DE45CA3174 /* SoloLedgerCoreTests */ = {
+			isa = PBXGroup;
+			children = (
+				1DBE9EDDA27966F35A5D03B6 /* Fixtures */,
+			);
+			path = SoloLedgerCoreTests;
 			sourceTree = "<group>";
 		};
 		6A92B9F9B27D2C22FB70D8D2 /* Views */ = {
@@ -177,6 +198,7 @@
 			children = (
 				6830222C9FA6F31E6BE497E2 /* AppModelBootTests.swift */,
 				8C26549A6E2C20DB2210C445 /* AppUnitTests.swift */,
+				5592CBD647AF371A1D160A7C /* ElectronFixtureProductionOpenTests.swift */,
 				831C1CE39028B1C1EF6BFB11 /* MigrationCopyParityTests.swift */,
 			);
 			path = SoloLedgerUnitTests;
@@ -232,6 +254,14 @@
 				D99F32EB029BD9BEF3BFAE0F /* SoloLedger */,
 			);
 			path = Sources;
+			sourceTree = "<group>";
+		};
+		F307A488BAFFB3DA0DD4E566 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				5E443479E83B17DE45CA3174 /* SoloLedgerCoreTests */,
+			);
+			path = Tests;
 			sourceTree = "<group>";
 		};
 		FAF742BE0C8FDCF1CD3CDBC7 = {
@@ -291,6 +321,7 @@
 			buildConfigurationList = 22C8BB6A4D815AA601691802 /* Build configuration list for PBXNativeTarget "SoloLedgerUnitTests" */;
 			buildPhases = (
 				98C1840E9172B62A6166E116 /* Sources */,
+				18085423B5B9588CC15BC032 /* Resources */,
 				994A367629F6D7F21A7FFEFB /* Frameworks */,
 			);
 			buildRules = (
@@ -360,6 +391,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		18085423B5B9588CC15BC032 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				63119B5E9FE1CED374DA19AA /* electron-v23.db in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		49CA1A9AD96488918B34702E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -387,6 +426,7 @@
 			files = (
 				47AED20762FB91EC3DC2344F /* AppModelBootTests.swift in Sources */,
 				821321D467EC23E204FF19DF /* AppUnitTests.swift in Sources */,
+				319B70CB0DBEC47627D1F71C /* ElectronFixtureProductionOpenTests.swift in Sources */,
 				2E23D9B87533B5497111ABB3 /* MigrationCopyParityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
