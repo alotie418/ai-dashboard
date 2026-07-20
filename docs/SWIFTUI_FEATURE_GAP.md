@@ -50,6 +50,7 @@
 | **legacy `sales`/`purchases` → `transactions` 二次数据迁移** | 🛑 **Release 前必须** | Electron 侧的旧表转换未在原生侧复现（只读保留） |
 | **旧进程检测硬化** | 🛑 **Release 前必须** | 现仅靠文件指纹变化；沙箱内无法枚举进程/取锁——需更强握手或"请退出旧版"引导 |
 | **Release 数据路径验证** | 🛑 **Release 前必须** | `SoloLedgerNative`（Release）已加路径隔离单测；需在**真实 Release 沙箱**端到端验证 |
+| **DMG（非沙箱）用户数据迁移入口** | 🛑 **Release 前必须（P0）** | `.masContainer` 只覆盖 Electron-MAS 容器；DMG 数据在容器外的 `~/Library/Application Support/SoloLedger/`，MAS 沙箱无授权够不到。`.userSelectedDataDir` 管道齐备但无目录选择入口。须在 createFresh **之前**加 single-grant-window 授权（不加 bookmark entitlement）；设计先行经确认（N7）。见 `SWIFTUI_MIGRATION_PLAN.md` §0.2 / §0.3 |
 | 加密列（`ai_providers`/`ecommerce_connections`，safeStorage 密文） | ❌ | 跨应用不可移植；原生无 AI/电商，不迁移 |
 
 ## 5. 打包 / 发布（Phase 4）
@@ -76,9 +77,10 @@
 2. 🛑 legacy `sales`/`purchases` → `transactions` 二次数据迁移。
 3. 🛑 旧进程检测硬化（超出文件指纹）。
 4. 🛑 真实 Release 沙箱下的数据路径 / 升级端到端验证。
-5. 🛑 用户可见的备份 / 恢复 UI。
-6. 🛑 完整 6 语言 + `.xcstrings` parity。
-7. 🛑 MAS 签名 / 打包 / App Store Connect（Phase 4）。
-8. 🟡（发布前应补）损益/税务/VAT 等敏感报表——**镜像** Electron，不重造。
+5. 🛑 **DMG（非沙箱）用户数据迁移入口**：MAS 沙箱当前够不到 DMG 数据目录（容器外的 `~/Library/Application Support/SoloLedger/`）；须在 createFresh 前加 single-grant-window 目录授权（不加 bookmark entitlement）。设计先行经确认（N7）。
+6. 🛑 用户可见的备份 / 恢复 UI。
+7. 🛑 完整 6 语言 + `.xcstrings` parity。
+8. 🛑 MAS 签名 / 打包 / App Store Connect（Phase 4）。
+9. 🟡（发布前应补）损益/税务/VAT 等敏感报表——**镜像** Electron，不重造。
 
-> 本表随每个阶段更新。Phase 2A 完成第一轮 UI 完善（第 1 节标 "Phase 2A" 的项）。
+> 本表随每个阶段更新。**截至 2026-07-20 已落地至 2B-3 / C12x-A2**：生产启动链（C12a / C12b）+ 恢复 UI + 两条 active-store hardened open（C12x-A1 existing / A2 createFresh）。当前发布前 P0 见第 4 节「DMG（非沙箱）用户数据迁移入口」及 `SWIFTUI_MIGRATION_PLAN.md` §0。
