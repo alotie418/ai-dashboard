@@ -24,7 +24,7 @@
 1. `.confirmCreateFresh` 采用 **coordinator 新增独立强类型入口**;不给 `bootResolve` 加 `confirmed: Bool`;内部复用只能经**私有强类型 request/mode**(§1.3、§11.3)。
 2. **选源页完全独立于 onboarding**、发生在开库前;adopt 成功后原 onboarding 原样继续;"创建新账本"**二次确认文案已锁定**(§1.3)。
 3. `.migrateFromUserDir` 的 reResolve **取方案 (a)**:保留原 `MigrationSource`、不塌回 `.boot`、不重新注入 auto 来源;`autoSourceCandidate` **只用于 createFresh 授权确认**(§7.1)。
-4. `SelfImportRole` **收敛为 3 个 role**(`nativeDataRoot` / `activeDatabase` / `activeAttachments`);same-object / ancestor / descendant / hard-link 归入独立的 **relationship 维度**,不膨胀进 role;UI 只显示通用 `invalidSource`(§3.3)。
+4. `SelfImportRole` **收敛为 3 个 role**(`nativeDataRoot` / `activeDatabase` / `activeAttachments`);重叠方式归入独立的 **relationship 维度**,同样收敛为 3 值:`sameIdentity` / `sourceAncestorOfProtected` / `sourceDescendantOfProtected`——其中 `sameIdentity` 同时覆盖同目录身份、同 DB 文件与**硬链到 active DB**(仅凭 device+inode 无法区分原目录项与硬链别名,`st_nlink` 也只能证明链接数,**不声称可分开诊断**);不膨胀进 role;UI 只显示通用 `invalidSource`(§3.3)。
 5. N9 附件 fixture **采用已落地方案**:以已提交 `electron-v23.db` 为基底,测试运行时用固定 SQL + 固定附件字节确定性派生;不提交第二份二进制;运行不依赖 Node(§9)。
 6. **N7.1/N7.2 保持拆分**;N7.1 必须不可达(`resolveB1` 不翻转、零用户可见入口、守卫测试钉住);若实现时发现无法可靠隐藏,**必须停下并提议合并**,不得留下半成品(§11.1)。
 7. **completed-after-restart 深断言已由 PR #369 落地**:重建 coordinator → completed probe → `confirmOpenAuthorization` 返回 `.proceed(.existing(evidence))` → 硬化开库 → 数据复核(§9)。
@@ -121,10 +121,10 @@
 
 - **`.confirmCreateFresh` 的 coordinator 入口形态(已决)**:coordinator **新增一个独立的强类型入口**承接"已确认 createFresh"语义;**不给 `bootResolve` 增加 `confirmed: Bool` 之类布尔参数**。若内部需要与既有裁决路径复用实现,只能通过**私有的强类型 request/mode** 表达,不得以布尔旗标或公共参数扩散语义。该入口与其它路径一样,仍必须经 `confirmOpenAuthorization` 从磁盘复核全部前置,不绕门。
 - **选源页与 onboarding 的关系(已决)**:选源页**完全独立于**既有 onboarding(不是其一屏、不替代其首屏),发生在**开库之前**;成功 adopt store 后,原 onboarding(公司信息等)**原样继续**,顺序与内容不变。
-- **"创建新账本"二次确认文案(已锁定,zh-Hans 口径)**:
-  - 标题:**创建新的空账本?**
-  - 正文:**这不会删除或修改旧版 SoloLedger 的数据,但会跳过迁移并为当前 App 创建一个空账本。旧数据不会自动导入;如需迁移,请返回并选择"迁移旧数据"。**
-  - 按钮:**返回** / **创建空账本**。
+- **"创建新账本"二次确认文案(已锁定,zh-Hans 口径,逐字、含中文标点)**:
+  - 标题：**创建新的空账本？**
+  - 正文：**这不会删除或修改旧版 SoloLedger 的数据，但会跳过迁移并为当前 App 创建一个空账本。旧数据不会自动导入；如需迁移，请返回并选择“迁移旧数据”。**
+  - 按钮：**返回 / 创建空账本**
   - 其余 5 语在 N7.2 随 `migration.chooseSource.*` 文案一并翻译,并注册进 parity 测试(§8)。
 
 ---
@@ -190,7 +190,7 @@
 
 **为什么不用字符串路径比较**:APFS firmlink / 同步 mount / `synthetic.conf` 会让同一 inode 出现在两个路径前缀下,字符串比较会漏判;反之用户把数据**复制**到另一卷再选中那个副本(不同 device+inode)是**合法独立来源**,字符串前缀又会误杀。规范化身份(device+inode)两头都对。
 
-**Core 已具备全部原语**(无需新增底层能力):`DirectoryHandle`(`openat O_NOFOLLOW|O_DIRECTORY`,`fstat` 绑定 `device`/`inode`;`subdirectory(named: "..")` 可沿真实父目录逐跳上行,`".."` 非符号链故 O_NOFOLLOW 不拒)、`FileFingerprint.capture`(no-follow 取 `device`/`inode`/类型,ENOENT 读作缺席、其余错误 fail-closed 抛出)、`AppPaths.dataDirectory()`(native 私有数据根,active DB / attachments / Staging / ImportManifests 全部嵌套其内)。
+**原语(v3 修正:复用现有 adopt/fstat 原语,新增一个窄的 parent wrapper)**:身份绑定复用 `DirectoryHandle`(`openat O_NOFOLLOW|O_DIRECTORY`,`fstat` 绑定 `device`/`inode`)、`FileFingerprint.capture`(no-follow 取 `device`/`inode`/类型,ENOENT 读作缺席、其余错误 fail-closed 抛出)、`AppPaths.dataDirectory()`(native 私有数据根,active DB / attachments / Staging / ImportManifests 全部嵌套其内)。**父目录上行不得借道 `subdirectory(named:)`**——该 API 的语义与注释是"打开直接子目录",即使 `openat` 技术上接受 `".."`,也不应把父目录遍历伪装成 child API。**N7.1 新增明确的 `DirectoryHandle.parentDirectory()` 内部原语**:固定使用 `openat(fd, "..", O_RDONLY|O_DIRECTORY|O_NOFOLLOW)`,再走现有 fstat/adopt 身份绑定;**不接受调用方提供任意路径字符串**。上行仍以 inode 不动点 + maxDepth 双重终止。
 
 **设计(全部在 Core,一处 chokepoint)**:在 `StagingIngest.ingest` 进入 `source.withAccess { … }` 后、任何 gate/复制**之前**,新增 `SelfImportGuard` 预检:
 
@@ -198,13 +198,14 @@
 2. 解析来源:`userSelectedDataDir`/`exportBundle` 把所选目录开成 `DirectoryHandle` → `(devSrc,inoSrc)`;`legacySingleDB` 对所选**文件**取指纹 → `(devSrcFile,inoSrcFile)`。
 3. **按身份拒绝**(非字符串)。**结果模型(v3 已决,决策 4):两个独立维度,role 不膨胀**——
    - **role(命中的受保护对象,收敛为 3 值)**:`nativeDataRoot` / `activeDatabase` / `activeAttachments`;
-   - **relationship(重叠方式,独立维度)**:`sameObject` / `ancestor` / `descendant` / `hardLink`;
-   - 判定逻辑不变:
-     - **相等**:`(devSrc,inoSrc)==(devRoot,inoRoot)` ⇒ `(role: nativeDataRoot, relationship: sameObject)`(命中 attachments 根则 role 为 `activeAttachments`)。
-     - **文件同一**:`legacySingleDB`(或源目录内的 DB)`(device,inode)==(devDB,inoDB)` ⇒ `(role: activeDatabase, relationship: sameObject)`;经硬链命中 ⇒ `relationship: hardLink`——捕获**硬链到 active DB**(目录/字符串检查抓不到)。
-     - **后代**:从源 handle 经 `".."` 逐跳上行,每跳比对受保护身份;命中 ⇒ `relationship: descendant` + 命中对象的 role(如用户选了 `<dataRoot>/Staging/...` ⇒ `nativeDataRoot`/`descendant`)。
-     - **祖先**:从受保护根 handle 上行比对 `(devSrc,inoSrc)`;命中 ⇒ `relationship: ancestor`(如用户选了 Application Support ⇒ `nativeDataRoot`/`ancestor`)。
-   - 上行以 **`(device,inode)` 不动点**(`"/"` 的 `".."` 返回自身)**加固定 maxDepth**(如 64)双重终止;**不能靠 device 变化终止**(firmlink/mount 会中途换 device)。任何 open/stat 元数据错误一律 **fail-closed 视为拒绝**(绝不当"无重叠")。
+   - **relationship(重叠方式,独立维度,3 值)**:`sameIdentity` / `sourceAncestorOfProtected` / `sourceDescendantOfProtected`;
+   - **为什么没有独立的 hardLink 值(可实现性修正)**:仅凭 `(device,inode)` **无法区分"原目录项"与"指向同一 inode 的硬链接"**——二者在文件系统身份上就是同一对象;`st_nlink` 只能证明存在多个链接,**不能证明当前选中的是哪个别名**。因此 `sameIdentity` 同时覆盖:**同一目录身份、同一数据库文件、以及指向 active DB 的硬链接**;设计**不声称**能把 same-object 与 hard-link 分开诊断。**对应测试应断言:硬链接命中 `sameIdentity`。**
+   - 判定逻辑:
+     - **相等**:`(devSrc,inoSrc)==(devRoot,inoRoot)` ⇒ `(role: nativeDataRoot, relationship: sameIdentity)`(命中 attachments 根则 role 为 `activeAttachments`)。
+     - **文件同一**:`legacySingleDB`(或源目录内的 DB)`(device,inode)==(devDB,inoDB)` ⇒ `(role: activeDatabase, relationship: sameIdentity)`——**硬链到 active DB 同样落在这里**(目录/字符串检查抓不到)。
+     - **源在受保护对象之内**:从源 handle 经 `parentDirectory()` 逐跳上行,每跳比对受保护身份;命中 ⇒ `relationship: sourceDescendantOfProtected` + 命中对象的 role(如用户选了 `<dataRoot>/Staging/...` ⇒ `nativeDataRoot`/`sourceDescendantOfProtected`)。
+     - **源包含受保护对象**:从受保护根 handle 经 `parentDirectory()` 上行比对 `(devSrc,inoSrc)`;命中 ⇒ `relationship: sourceAncestorOfProtected`(如用户选了 Application Support ⇒ `nativeDataRoot`/`sourceAncestorOfProtected`)。
+   - 上行以 **`(device,inode)` 不动点**(根的父目录返回自身)**加固定 maxDepth**(如 64)双重终止;**不能靠 device 变化终止**(firmlink/mount 会中途换 device)。任何 open/stat 元数据错误一律 **fail-closed 视为拒绝**(绝不当"无重叠")。
 4. **强类型错误、零路径泄漏**:新增 `IngestError.sourceIsActiveData(role: SelfImportRole, relationship: SelfImportRelationship)`,其 `description` **只输出 role/relationship 标签、绝不含路径**(刻意区别于 `sourceDatabaseMissing` 等带路径的兄弟 case);`MigrationCoordinator.map` 把它映射为 `.terminal(.invalidSource, {reason, role, relationship})`,App 只显示既有通用键 `migration.msg.invalidSource`,**任何参数均无路径**。role/relationship 仅用于路径无关的诊断与测试断言。
 
 **边界与澄清**:
@@ -212,7 +213,7 @@
 - 符号链叶子会先被 `DirectoryHandle.open`(O_NOFOLLOW)以 `notADirectory` 拒(仍 fail-closed,只是 error 不同);`NSOpenPanel` 通常回传解析后的真实路径。
 - **跨卷真实副本(不同 device+inode)必须放行**——这正是身份优于字符串的行为收益,需专门测试。
 - 首装时数据根尚不存在:根缺席时相等/后代判定按"无可保护"放行,祖先上行(Application Support 存在)仍适用;**勿把根 ENOENT 当硬失败**而误挡首次合法导入。
-- 守卫需可注入受保护根/active-DB 身份(仿既有 coordinator override),让单测把"active"指向隔离临时根、逐一断言各 role,而不碰真实容器。
+- 守卫需可注入受保护根/active-DB 身份(仿既有 coordinator override),让单测把"active"指向隔离临时根、逐一断言各 role 与 relationship 组合(**含:硬链接命中 `sameIdentity`**),而不碰真实容器。
 
 ---
 
@@ -299,9 +300,9 @@
   - `migration.chooseSource.picker.prompt`(选择目录面板的提示/message)
   - `migration.chooseSource.picker.noData`(所选文件夹未找到账本数据——**通用措辞,不回显路径**)
   - `migration.chooseSource.importing`(导入进行中——如需进度提示)
-  - **二次确认对话框(v3 新增,zh-Hans 文本以 §1.3 锁定口径为准,无占位符)**:
-    - `migration.chooseSource.confirm.title`(创建新的空账本?)
-    - `migration.chooseSource.confirm.body`(不删除/不修改旧数据、跳过迁移、可返回选"迁移旧数据")
+  - **二次确认对话框(v3 新增,zh-Hans 文本以 §1.3 锁定口径为准、逐字含中文标点,无占位符)**:
+    - `migration.chooseSource.confirm.title`(创建新的空账本？)
+    - `migration.chooseSource.confirm.body`(不删除/不修改旧数据、跳过迁移、可返回选“迁移旧数据”)
     - `migration.chooseSource.confirm.back`(返回)
     - `migration.chooseSource.confirm.create`(创建空账本)
 - **错误一律 Core 强类型(决策 6),复用既有键**:自选防护(§3.3)映射为 `.terminal(.invalidSource, {reason, role})` → 既有键 `migration.msg.invalidSource`(**无需新 key、role/reason 无路径**);`sourceDatabaseMissing`/`sourceNotRegularFile`/`importSlotOccupied` 等亦为既有 `migration.*` 键。App **不构造任何错误文案**,只 `model.t(Core 给的 key)`。
@@ -348,7 +349,7 @@
 
 ---
 
-## 11. 分阶段实施 PR 拆分、回滚条件、未决问题(实施纪律)
+## 11. 分阶段实施 PR 拆分、回滚条件、已决事项与实施纪律
 
 ### 11.1 PR 拆分(小而聚焦,遵守 `CLAUDE.md` PR 纪律)
 
@@ -371,7 +372,7 @@
 - **N7.2 后 MAS 沙箱手动门失败(安全作用域未授予/读失败)** → 回退接线,保留 Core 能力(`runImport` 仍仅被测试驱动),排查后重启用。
 - 每个 PR 独立可回退;`confirmOpenAuthorization`/entitlements **不改**,天然不进回滚面(`MigrationSource` 仅新增 conformance,见 §2.1)。
 
-### 11.3 本节内的未决(v3:已全部关闭)
+### 11.3 本节历史未决(v3:已全部关闭)
 
 - `.confirmCreateFresh` 入口形态——**已决**:coordinator 新增独立强类型入口,不给 `bootResolve` 加 `confirmed: Bool`;内部复用只经私有强类型 request/mode;仍经 `confirmOpenAuthorization` 从磁盘复核,不绕门(§1.3、文末第 1 条)。
 - N7.1/N7.2 拆分——**已决**:保持拆分;N7.1 必须不可达并有守卫测试;无法隐藏时必须停下并提议合并(§11.1、文末第 6 条)。
@@ -412,7 +413,7 @@
 | R8 | 穷尽 switch 漏更新 | 编译失败 | 实为**安全网**(无 default,build 强制补齐),风险低 |
 | R9 | MAS 沙箱 entitlement/安全作用域行为无 headless 覆盖 | 真机才暴露 | entitlement 已确认足够(user-selected.read-write);**必须**手动签名沙箱门(第 10 节) |
 | R10 | 首启行为从"静默铸空"翻转为"选择屏" | 既有首启 UX 变化 | 有意为之且更正确;由 N7.2 **原子启用**,可独立回退(但回退落回的"静默铸空"**仅开发期临时基线、非发布可接受**,DMG 不可达仍是 P0 —— 阻断 C);不触碰既有 onboarding 步骤 |
-| R11 | fixture 无附件,finalize 附件-apply 端到端零覆盖 | 生产首迁才首次跑附件 apply/audit/sha256 复验 | **已定(决策 8):附件-apply 是发布前门禁**——增补含附件+悬空引用的 fixture 变体驱动全链路(§9);可独立 PR 但不得无限延期 |
+| R11 | (历史,v2)fixture 无附件,finalize 附件-apply 端到端零覆盖 | 生产首迁才首次跑附件 apply/audit/sha256 复验 | **已关闭(v3)**:PR #369 的附件变体门禁(干净链/悬空引用+acknowledgement/完成后重启,§9)已端到端覆盖 apply→audit→complete 与 sha256 哈希链;相关测试**保留为回归门** |
 | R12 | 显式目录导入的 reResolve 塌回 `.boot` 可能被重裁决回 auto 源(静默切源) | 违反"显式选择粘滞" | **实现前必钉死不变量(§7.1)**:`.migrateFromUserDir` 的 reResolve 保留 `MigrationSource` 不塌回 `.boot`,并加守卫测试;`confirm` 仅对 createFresh 派生授权接收 auto 候选 |
 
 ---
@@ -423,7 +424,7 @@
 
 | 路径 | 变更类型 | 说明(前瞻) |
 |---|---|---|
-| `Sources/SoloLedgerCore/Migration/MigrationCoordinator.swift` | 修改 | `resolveB1` `.unavailable` 分支改发 `.requiresSourceChoice`(**N7.2 才启用**);新增 `.confirmCreateFresh` 入口语义;`runImport` 接 `.migrateFromUserDir`;`map` 增 `sourceIsActiveData→invalidSource`。`confirmOpenAuthorization` **不改**;建议 `confirm` 仅对 createFresh 授权收 auto 候选(§7.1) |
+| `Sources/SoloLedgerCore/Migration/MigrationCoordinator.swift` | 修改 | `resolveB1` `.unavailable` 分支改发 `.requiresSourceChoice`(**N7.2 才启用**);新增 `.confirmCreateFresh` 入口语义;`runImport` 接 `.migrateFromUserDir`;`map` 增 `sourceIsActiveData→invalidSource`。`confirmOpenAuthorization` **不改**;**必须**(v3 已决)`confirm` 仅对 createFresh 派生的授权收 auto 候选(§7.1) |
 | `Sources/SoloLedgerCore/Migration/StagingIngest.swift` | 修改 | 新增 Core 自选防护 `SelfImportGuard`(ingest 头部,§3.3)+ `IngestError.sourceIsActiveData(role:relationship:)`(description 仅 role/relationship 标签、无路径) |
 | `Sources/SoloLedgerCore/Migration/MigrationSource.swift` | 修改(仅加 conformance) | **加 `: Sendable, Equatable`**(全 URL 载荷,编译器合成,零 `@unchecked`/零手写 `==`,§2.1);行为不变 |
 | `Sources/SoloLedgerCore/Migration/MigrationUIState.swift` | 修改 | 新增 `.awaitingSourceChoice`(store==nil、ready==false)及不变量注释 |
@@ -450,9 +451,9 @@
 > 说明:v2 已关闭原 10 项未决中的 8 项;v3 把剩余 7 项**全部关闭**。本节不再是开放问题清单,而是 N7.1 实施时的**入口索引**——每一条都已定稿,实现只需照此执行,不得重开。
 
 1. **`.confirmCreateFresh` 的 coordinator 入口形态(已决)**:coordinator **新增独立强类型入口**;**不给 `bootResolve` 加 `confirmed: Bool`**;内部复用只能经**私有强类型 request/mode**;仍经 `confirmOpenAuthorization` 从磁盘复核、不绕门(§1.3、§11.3)。
-2. **选源页与 onboarding(已决)**:选源页**完全独立于** onboarding(非其一屏、不替代其首屏),发生在开库前;成功 adopt store 后原 onboarding **原样继续**。二次确认文案已锁定(zh-Hans):标题"**创建新的空账本?**";正文"**这不会删除或修改旧版 SoloLedger 的数据,但会跳过迁移并为当前 App 创建一个空账本。旧数据不会自动导入;如需迁移,请返回并选择"迁移旧数据"。**";按钮"**返回**/**创建空账本**"(§1.3、§8)。
+2. **选源页与 onboarding(已决)**:选源页**完全独立于** onboarding(非其一屏、不替代其首屏),发生在开库前;成功 adopt store 后原 onboarding **原样继续**。二次确认文案已锁定(zh-Hans,逐字、含中文标点)——标题：**创建新的空账本？**；正文：**这不会删除或修改旧版 SoloLedger 的数据，但会跳过迁移并为当前 App 创建一个空账本。旧数据不会自动导入；如需迁移，请返回并选择“迁移旧数据”。**；按钮：**返回 / 创建空账本**(§1.3、§8)。
 3. **`.migrateFromUserDir` 的 reResolve(已决,方案 (a))**:reResolve **保留原 `MigrationSource`**,不塌回 `.boot`、不重新注入 auto 来源;`autoSourceCandidate` **只用于 createFresh 授权确认**;守卫测试钉住(§7.1)。
-4. **SelfImportRole 粒度(已决)**:role 收敛为 **`nativeDataRoot` / `activeDatabase` / `activeAttachments`** 三值;same-object / ancestor / descendant / hard-link 属于**独立的 relationship 维度**,不膨胀进 role;UI 只显示通用 `invalidSource`,role/relationship 仅用于路径无关诊断(§3.3)。
+4. **SelfImportRole 粒度(已决)**:role 收敛为 **`nativeDataRoot` / `activeDatabase` / `activeAttachments`** 三值;relationship 为**独立维度**,收敛为 **`sameIdentity` / `sourceAncestorOfProtected` / `sourceDescendantOfProtected`** 三值——`sameIdentity` 同时覆盖同目录身份、同 DB 文件与硬链到 active DB(device+inode 层面不可分,设计不声称可分开诊断;对应测试断言硬链接命中 `sameIdentity`);不膨胀进 role;UI 只显示通用 `invalidSource`,role/relationship 仅用于路径无关诊断(§3.3)。
 5. **N9 附件 fixture(已决并落地)**:以已提交 `electron-v23.db` 为基底,测试运行时用固定 SQL + 固定附件字节**确定性派生**;不提交第二份二进制;运行不依赖 Node。已覆盖 transaction attachment、`business_documents` tax invoice attachment、悬空引用、acknowledgement、hash chain 与 restart(§9,PR #369)。
 6. **N7.1/N7.2(已决:保持拆分)**:N7.1 必须**不可达**——`resolveB1` 不翻转、零用户可见入口、守卫测试钉住;若实现时发现无法可靠隐藏,**必须停下并提议合并 N7.1+N7.2**,不得留下半成品(§11.1)。
 7. **completed-after-restart 断言深度(已决:深断言,已落地)**:重建 coordinator → completed probe → **额外断言 `confirmOpenAuthorization` 返回 `.proceed(.existing(evidence))`**(不只依赖 `attemptOpen` 内部)→ 硬化开库 → 数据复核(§9,PR #369)。
