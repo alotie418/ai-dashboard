@@ -63,11 +63,15 @@ final class ElectronFixtureMigrationChainTests: LedgerTestCase {
 
     /// Only the ACTIVE SLOT lives under the canonical (symlink-free) root — that is the one
     /// path the hardened NOFOLLOW open walks. Every other root deliberately stays on the
-    /// plain `/var/folders` spelling like production Application Support: giving the
-    /// attachments dir a `/private/var` spelling would make `standardizedFileURL` strip the
-    /// prefix for the (existing) root but not for a MISSING child, so the auditor's escape
-    /// backstop would misclassify a dangling reference as invalid — a test-environment
-    /// artifact production paths cannot hit.
+    /// plain `/var/folders` spelling: giving the attachments dir a `/private/var` spelling
+    /// makes `standardizedFileURL` strip the prefix for the (existing) root but not for a
+    /// MISSING child, so the auditor's escape backstop classifies a dangling reference as
+    /// invalid instead. So far this is reproduced ONLY under the `/var` ↔ `/private/var`
+    /// dual-spelling temp environment and has not been reproduced on a standard Application
+    /// Support path; both classifications stay fail-closed (each demands acknowledgement).
+    /// Kept as an independent `AttachmentReferenceAuditor` path-identity hardening
+    /// observation — deliberately NOT part of the N7.1 self-import guard, whose duty is
+    /// different.
     private func makeCtx() throws -> Ctx {
         func dir(_ name: String) throws -> URL {
             let d = try trackedTempDir().appendingPathComponent(name, isDirectory: true)
