@@ -180,6 +180,12 @@ public enum BootOutcome: Equatable {
     case openStore(authorization: StoreOpenAuthorization, residual: MigrationResidual?)
     case requiresAcknowledgement(request: AcknowledgementRequest, unresolved: UnresolvedReport)
     case requiresImportSelection([RecoverableImport])
+    /// N7.1 DORMANT (§1.1): "please choose a source" — a NON-openStore outcome (parallel to
+    /// `.requiresImportSelection`), so `classifyOutcome` can only route it to a UI state and
+    /// it can structurally never reach `attemptOpen` / construct a store. NOTHING in the
+    /// coordinator emits it yet: `resolveB1`'s `.unavailable` branch still returns the old
+    /// `.openStore(.createFreshExpectedAbsent)` until N7.2 flips it atomically with the UI.
+    case requiresSourceChoice
     case blocked(MigrationBlock)
 }
 
@@ -255,7 +261,15 @@ public struct MigrationCoordinator {
     private func runIngest(_ source: MigrationSource, importID: ImportID) throws -> IngestResult {
         if let ingestOverride { return try ingestOverride(source, importID) }
         return try source.withAccess {
-            try StagingIngest().ingest(source, importID: importID, timestamp: DateFormat.timestamp())
+            // N7.1 (§3.3): the self-import guard protects THIS coordinator's configured
+            // identity (production: the standard AppPaths layout; tests: their isolated
+            // config), so the guard and the chain always agree on what "own data" means.
+            try StagingIngest().ingest(source, importID: importID, timestamp: DateFormat.timestamp(),
+                                       maxAttempts: 3, hooks: IngestHooks(),
+                                       protecting: SelfImportGuard.ProtectedIdentity(
+                                           dataRootURL: config.activeDestination.deletingLastPathComponent(),
+                                           activeDatabaseURL: config.activeDestination,
+                                           activeAttachmentsRootURL: config.activeAttachmentsDir))
         }
     }
 
@@ -267,8 +281,43 @@ public struct MigrationCoordinator {
     /// call and never caches an earlier absence/presence conclusion.
     public func bootResolve(autoSourceCandidate: MigrationSource?,
                             acknowledgement: Acknowledgement? = nil) -> BootOutcome {
-        bootResolve(autoSourceCandidate: autoSourceCandidate, acknowledgement: acknowledgement,
-                    hooks: CoordinatorHooks())
+        resolve(.automaticBoot(autoSourceCandidate: autoSourceCandidate),
+                acknowledgement: acknowledgement, hooks: CoordinatorHooks())
+    }
+
+    /// N7.1 DORMANT (§1.3): the strong-typed "user confirmed create-fresh" resolution — the
+    /// entry the `.confirmCreateFresh` boot intent maps to. By construction it takes NO
+    /// auto-source candidate (a confirmed create-fresh never absorbs an auto migration
+    /// candidate), and it is NOT a `confirmed: Bool` on `bootResolve` — internal reuse goes
+    /// through the PRIVATE strong-typed `ResolutionRequest` only. Probe-first dominance is
+    /// unchanged: an existing record / active store / staging still wins (this entry can never
+    /// bypass them into a fresh ledger), and the final `confirmOpenAuthorization` re-check —
+    /// where the App DOES pass the auto candidate for a createFresh authorization — can still
+    /// revoke the authorization at the last moment (`.reResolve`, re-adjudication prefers
+    /// migration). No production caller until N7.2 wires the source-choice UI.
+    public func confirmCreateFresh(acknowledgement: Acknowledgement? = nil) -> BootOutcome {
+        resolve(.confirmedCreateFresh, acknowledgement: acknowledgement, hooks: CoordinatorHooks())
+    }
+
+    /// PRIVATE strong-typed resolution request (§1.3): the ONLY internal reuse channel between
+    /// the automatic boot and the confirmed create-fresh entry. Deliberately not a boolean —
+    /// each case names its exact semantics and payload.
+    private enum ResolutionRequest {
+        case automaticBoot(autoSourceCandidate: MigrationSource?)
+        case confirmedCreateFresh
+    }
+
+    private func resolve(_ request: ResolutionRequest, acknowledgement: Acknowledgement?,
+                         hooks: CoordinatorHooks) -> BootOutcome {
+        switch request {
+        case .automaticBoot(let auto):
+            return bootResolve(autoSourceCandidate: auto, acknowledgement: acknowledgement, hooks: hooks)
+        case .confirmedCreateFresh:
+            // A confirmed create-fresh consults NO auto candidate at resolution time; the
+            // auto-revocation window lives exclusively in
+            // `confirmOpenAuthorization(.createFreshExpectedAbsent, autoSourceCandidate:)`.
+            return bootResolve(autoSourceCandidate: nil, acknowledgement: acknowledgement, hooks: hooks)
+        }
     }
 
     /// Explicit user-driven import. Never mixes with `autoSourceCandidate`; slot conflicts
@@ -1043,6 +1092,12 @@ public struct MigrationCoordinator {
             return .retriable(.ioTransient, ["op": "ingest", "reason": "stagedContentInconsistent"])
         case .cleanupFailed:
             return .retriable(.ioTransient, ["op": "ingest", "reason": "cleanupFailed"])
+        case .sourceIsActiveData(let role, let relationship):
+            // Self-import is invalid in EVERY context (an auto candidate that turns out to be
+            // our own data must not retry-loop). Params carry ONLY stable labels — no path.
+            return .terminal(.invalidSource, ["reason": "sourceIsActiveData",
+                                              "role": role.rawValue,
+                                              "relationship": relationship.rawValue])
         }
     }
 

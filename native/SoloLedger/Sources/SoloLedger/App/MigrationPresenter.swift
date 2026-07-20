@@ -20,6 +20,9 @@ enum MigrationPresenter {
     /// the DEBUG preview feed the SAME `route`. Carries no Core-internal payload.
     enum RouteInput: Equatable {
         case none, running, acknowledgement, importSelection, retriable, terminal, cleanupResidual
+        /// N7.1 DORMANT: production cannot produce this input (`resolveB1` is unflipped and a
+        /// guard test pins it); it exists so the state → input mapping stays exhaustive.
+        case sourceChoice
     }
 
     /// The mutually-exclusive destination for the root view. Carries only value data.
@@ -44,6 +47,7 @@ enum MigrationPresenter {
         case .retriable:               return .retriable
         case .terminal:                return .terminal
         case .cleanupResidual:         return .cleanupResidual
+        case .awaitingSourceChoice:    return .sourceChoice
         }
     }
 
@@ -56,6 +60,10 @@ enum MigrationPresenter {
         if migrationFailure { return .legacyRecovery }
         switch input {
         case .running:          return .running
+        // N7.1 dormant placeholder: unreachable in production (resolveB1 unflipped; guard test
+        // pins it). Renders as the neutral progress screen — NO new route / view / copy until
+        // N7.2 ships the dedicated source-choice screen atomically with the flip.
+        case .sourceChoice:     return .running
         case .acknowledgement:  return .acknowledgement
         case .importSelection:  return .importSelection
         case .retriable:        return .chainRecovery(.retriable)
@@ -234,13 +242,15 @@ enum MigrationPresenter {
         case .retriable:                return "retriable"
         case .terminal:                 return "terminal"
         case .cleanupResidual:          return "cleanupResidual"
+        case .awaitingSourceChoice:     return "awaitingSourceChoice"
         }
     }
 
     static func block(from state: MigrationUIState) -> MigrationBlock? {
         switch state {
         case .retriable(let b), .terminal(let b): return b
-        case .none, .running, .awaitingAcknowledgement, .awaitingImportSelection, .cleanupResidual:
+        case .none, .running, .awaitingAcknowledgement, .awaitingImportSelection,
+             .awaitingSourceChoice, .cleanupResidual:
             return nil
         }
     }

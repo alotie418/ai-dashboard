@@ -161,6 +161,13 @@ final class AppModel: ObservableObject {
     func submitAcknowledgement(_ ack: Acknowledgement) { guard store == nil else { return }; startChain(.acknowledgement(ack)) }
     /// Consume a user import selection.
     func resolveImportSelection(importID: String) { guard store == nil else { return }; startChain(.selection(importID)) }
+    /// N7.1 DORMANT intent entry — NOT called by any UI until N7.2 ships the source-choice
+    /// screen; hosted tests drive it. Same discipline as every intent: only before a store
+    /// exists, hard single-flight inside `startChain`.
+    func confirmCreateFresh() { guard store == nil else { return }; startChain(.confirmCreateFresh) }
+    /// N7.1 DORMANT intent entry — NOT called by any UI until N7.2 ships the directory
+    /// picker; hosted tests drive it. The chosen source rides the intent as a value type.
+    func migrateFromUserDir(source: MigrationSource) { guard store == nil else { return }; startChain(.migrateFromUserDir(source)) }
     /// Cancel an import selection — never opens, creates, or auto-picks; lands terminal-ish.
     func cancelImportSelection() {
         guard case .awaitingImportSelection = migrationUIState else { return }
@@ -215,7 +222,21 @@ final class AppModel: ObservableObject {
                         return
                     }
                     reResolved = true
-                    currentIntent = .boot
+                    switch currentIntent {
+                    case .migrateFromUserDir:
+                        // §7.1 invariant (a): the explicit user-chosen source is STICKY. A
+                        // collapse to `.boot` would re-inject the auto candidate and could
+                        // silently re-adjudicate the user's selection back to the auto source
+                        // in the pre-record window — forbidden. Slot conflicts stay visible
+                        // as terminal `.importSlotOccupied`, never a silent source switch.
+                        break
+                    case .boot, .acknowledgement, .selection, .confirmCreateFresh:
+                        // Deliberate for `.confirmCreateFresh` too: a revoked create-fresh
+                        // authorization (e.g. an auto source appeared at confirm time) must
+                        // re-adjudicate via `.boot`, which PREFERS migration over minting an
+                        // empty ledger (§7.1 "re-adjudication prefers migration").
+                        currentIntent = .boot
+                    }
                     continue   // bounded to ONE re-resolve; loops back to Phase A off-main
                 }
             }
@@ -279,6 +300,12 @@ final class AppModel: ObservableObject {
                 case .boot: return coordinator.bootResolve(autoSourceCandidate: auto)
                 case .acknowledgement(let ack): return coordinator.bootResolve(autoSourceCandidate: auto, acknowledgement: ack)
                 case .selection(let id): return coordinator.resolveSelectedImport(importID: id)
+                // N7.1 DORMANT mappings — no UI emits these intents until N7.2. The confirmed
+                // create-fresh goes to the coordinator's dedicated strong-typed entry (which
+                // takes NO auto candidate by construction); an explicit user source goes 1:1
+                // to `runImport`, never mixed with the auto candidate.
+                case .confirmCreateFresh: return coordinator.confirmCreateFresh()
+                case .migrateFromUserDir(let source): return coordinator.runImport(source: source)
                 }
             },
             confirm: { coordinator.confirmOpenAuthorization($0, autoSourceCandidate: auto) },

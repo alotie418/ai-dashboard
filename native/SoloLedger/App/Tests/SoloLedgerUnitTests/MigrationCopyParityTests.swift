@@ -105,6 +105,17 @@ final class MigrationCopyParityTests: XCTestCase {
         let req = AcknowledgementRequest(importID: "i", snapshotIdentitySHA256: "s", attachmentManifestSHA256: "a",
                                          preparedDBIdentity: "sha256:p", unresolvedReportHash: "h")
         XCTAssertEqual(MigrationPresenter.routeInput(for: .awaitingAcknowledgement(req, UnresolvedReport(items: []))), .acknowledgement)
+        XCTAssertEqual(MigrationPresenter.routeInput(for: .awaitingSourceChoice), .sourceChoice)
+    }
+
+    func testDormantSourceChoiceInputRendersAsRunningPlaceholderWithNoBlock() {
+        // N7.1: the dormant state maps to the EXISTING neutral progress route (no new route,
+        // view, or copy until N7.2 ships the real source-choice screen) and carries no block.
+        XCTAssertEqual(MigrationPresenter.route(bootError: false, migrationFailure: false,
+                                                input: .sourceChoice, ready: false, onboardingDone: false),
+                       .running)
+        XCTAssertNil(MigrationPresenter.block(from: .awaitingSourceChoice))
+        XCTAssertEqual(MigrationPresenter.stateTag(.awaitingSourceChoice), "awaitingSourceChoice")
     }
 
     private func block(_ code: MigrationIssueCode, _ cls: MigrationBlock.Class) -> MigrationBlock {

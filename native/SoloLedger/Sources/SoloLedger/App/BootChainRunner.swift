@@ -19,6 +19,16 @@ enum BootIntent: Equatable {
     case boot
     case acknowledgement(Acknowledgement)
     case selection(String)
+    /// N7.1 DORMANT (§1.2/§1.3): the user confirmed "create a new empty ledger" on the
+    /// source-choice screen. No UI emits it until N7.2; the production runner maps it to the
+    /// coordinator's dedicated strong-typed `confirmCreateFresh` entry (never a
+    /// `confirmed: Bool` on `bootResolve`).
+    case confirmCreateFresh
+    /// N7.1 DORMANT (§1.2/§2.1): an explicit user-chosen migration source. The payload is the
+    /// synthesized-`Equatable`/`Sendable` `MigrationSource`, so `receivedIntents` assertions
+    /// stay exact and the value crosses the detached Phase-A boundary. No UI emits it until
+    /// N7.2 ships the directory picker.
+    case migrateFromUserDir(MigrationSource)
 }
 
 protocol BootChainRunner {

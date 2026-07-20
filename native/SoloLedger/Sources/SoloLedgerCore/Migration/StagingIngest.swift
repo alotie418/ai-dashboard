@@ -139,6 +139,25 @@ final class DirectoryHandle {
         return try Self.adopt(fd: child, pathHint: hint)
     }
 
+    /// N7.1 (§3.3): open THIS descriptor's PARENT directory. A deliberately NARROW wrapper —
+    /// the `".."` name is FIXED here and never caller-supplied, so parent traversal is an
+    /// explicit primitive rather than a path string smuggled through the child API above
+    /// (whose documented semantics are "direct child"). `".."` is a real directory entry
+    /// (never a symlink), so O_NOFOLLOW never rejects it; the opened fd goes through the same
+    /// `fstat`/`adopt` identity binding as every other handle. At the filesystem root the
+    /// parent is the root itself — callers walking upward MUST terminate on that
+    /// (device, inode) fixpoint plus a fixed maximum depth (see `SelfImportGuard`).
+    func parentDirectory() throws -> DirectoryHandle {
+        let hint = pathHint + "/.."
+        let parent = openat(fd, "..", O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+        guard parent >= 0 else {
+            let e = errno
+            if e == ELOOP || e == ENOTDIR { throw FileHashError.notADirectory(hint) }
+            throw FileHashError.unreadable(path: hint, errno: e)
+        }
+        return try Self.adopt(fd: parent, pathHint: hint)
+    }
+
     /// One step of a directory read. `readdir` distinguishes end-of-directory from an
     /// error ONLY through errno: on EOF it returns NULL and leaves errno unchanged; on an
     /// error (EIO, EBADF, …) it returns NULL and sets errno. Conflating the two would let
@@ -676,6 +695,12 @@ public enum IngestError: Error, CustomStringConvertible {
     /// A failing attempt could not be cleaned up. Surfaced (never swallowed) so a wedged
     /// staging dir is visible rather than silently leaked.
     case cleanupFailed(path: String, underlying: String, original: String)
+    /// N7.1 (§3.3): the selected source IS (or dangerously overlaps) this app's own
+    /// protected data — rejected fail-closed by `SelfImportGuard` on canonical
+    /// (device, inode) identity, never on path strings. Deliberately UNLIKE its siblings,
+    /// the payload and description carry ONLY the stable role/relationship labels and
+    /// NEVER a path (the coordinator maps it to the generic `invalidSource` block).
+    case sourceIsActiveData(role: SelfImportRole, relationship: SelfImportRelationship)
 
     public var description: String {
         switch self {
@@ -686,6 +711,212 @@ public enum IngestError: Error, CustomStringConvertible {
         case .importIDAlreadyExists(let id): return "An import with ID \(id) is already staged — reject or resume it, do not overwrite."
         case .stagedContentInconsistent(let what): return "Staged copy failed its consistency re-check (\(what)) — the attempt was discarded; retry the import."
         case let .cleanupFailed(path, underlying, original): return "Failed to clean up attempt \(path) after error [\(original)]: \(underlying)"
+        case let .sourceIsActiveData(role, relationship):
+            // Labels ONLY — never a path (see the case doc).
+            return "Selected source overlaps this app's own data (role: \(role.rawValue), relationship: \(relationship.rawValue)) — refusing to self-import."
+        }
+    }
+}
+
+// MARK: - Self-import guard (N7.1, design §3.3)
+
+/// WHICH protected object a rejected self-import hit. Converged to exactly three values
+/// (design decision 4) — overlap SHAPE lives in `SelfImportRelationship`, never here.
+public enum SelfImportRole: String, Sendable, Equatable {
+    case nativeDataRoot, activeDatabase, activeAttachments
+}
+
+/// HOW the source overlaps the protected object. Deliberately THREE values: with only
+/// canonical (device, inode) identity there is NO way to distinguish "the original
+/// directory entry" from "a hard link to the same inode" — they are the same filesystem
+/// object, and `st_nlink` only proves multiple links exist, not which alias was selected.
+/// `sameIdentity` therefore covers same-directory identity, same-database-file identity AND
+/// hard links to the active DB; no separate `hardLink` case is claimed (design §3.3).
+public enum SelfImportRelationship: String, Sendable, Equatable {
+    case sameIdentity, sourceAncestorOfProtected, sourceDescendantOfProtected
+}
+
+/// Fail-closed pre-check (§3.3): rejects importing this app's OWN data root / active store /
+/// their dangerous overlaps, judged on canonical (device, inode) identity — NEVER on path
+/// strings (firmlinks / mounts alias prefixes; a REAL cross-volume copy with a different
+/// identity must stay importable). It is a UX gate layered in front of the pipeline, not the
+/// write-safety boundary — that stays with the activator's `O_EXCL` reservation and the
+/// hardened opens. Any open/stat metadata error is fail-closed (the import is refused),
+/// never read as "no overlap".
+struct SelfImportGuard {
+
+    /// The identities this guard protects. Injectable (coordinator-config-derived in
+    /// production, isolated temp roots in tests) — mirroring the coordinator's existing
+    /// dependency seams so no test ever touches the real container.
+    struct ProtectedIdentity {
+        var dataRootURL: URL
+        var activeDatabaseURL: URL
+        var activeAttachmentsRootURL: URL
+
+        /// PURE path derivation of the production identity (creates nothing on disk).
+        static func standard() throws -> ProtectedIdentity {
+            let base = try FileManager.default.url(for: .applicationSupportDirectory,
+                                                   in: .userDomainMask, appropriateFor: nil, create: false)
+                .appendingPathComponent(AppPaths.nativeDataFolderName, isDirectory: true)
+            return ProtectedIdentity(
+                dataRootURL: base,
+                activeDatabaseURL: base.appendingPathComponent(AppPaths.databaseFileName),
+                activeAttachmentsRootURL: base.appendingPathComponent("attachments", isDirectory: true)
+                    .appendingPathComponent("docs", isDirectory: true))
+        }
+    }
+
+    /// Canonical filesystem identity — the ONLY thing ever compared.
+    struct Ident: Equatable {
+        let device: Int32
+        let inode: UInt64
+        init(_ h: DirectoryHandle) { device = h.device; inode = h.inode }
+        init(_ fp: FileFingerprint) { device = fp.device; inode = fp.inode }
+    }
+
+    /// Upward walks that neither reach the root fixpoint nor find the target within this
+    /// bound are refused fail-closed (never treated as "no overlap"). Carries no path.
+    struct AncestryUnverifiable: Error, CustomStringConvertible {
+        let depth: Int
+        var description: String { "Self-import guard could not verify directory ancestry within \(depth) hops — refusing to ingest." }
+    }
+
+    var identity: ProtectedIdentity
+    /// Fixed upward-walk bound (§3.3). Termination is DOUBLE: the (device, inode) fixpoint at
+    /// the filesystem root (its parent is itself) plus this depth cap — never a device change
+    /// (firmlinks / mounts switch devices mid-path).
+    var maxDepth: Int = 64
+
+    /// Throws `IngestError.sourceIsActiveData` on any protected overlap; returns silently
+    /// when the source is independent. An ABSENT source (ENOENT) is not an overlap — the
+    /// existing early gates (`sourceDatabaseMissing`, …) own that verdict; every OTHER
+    /// metadata failure propagates fail-closed.
+    func check(_ source: MigrationSource) throws {
+        let dbURL = try source.databaseURL()
+        let sourceDirURL = dbURL.deletingLastPathComponent()
+
+        // Protected side, resolved once. A missing data/attachments root reads as "nothing to
+        // protect" for equality/descendant (first-install allowance, §3.3); a missing active
+        // DB likewise. Any non-ENOENT failure here is fail-closed.
+        let rootHandle = try Self.openIfExists(identity.dataRootURL)
+        let attachmentsHandle = try Self.openIfExists(identity.activeAttachmentsRootURL)
+        let activeDBIdent = try FileFingerprint.capture(at: identity.activeDatabaseURL).map(Ident.init)
+
+        // Source side. A symlinked source directory fails `DirectoryHandle.open` with
+        // `notADirectory` (O_NOFOLLOW) and propagates — fail-closed, deliberately (§3.3).
+        let sourceDir = try Self.openIfExists(sourceDirURL)
+        let sourceDBIdent = try FileFingerprint.capture(at: dbURL).map(Ident.init)
+
+        // Same database-file identity — covers the user picking the active DB itself AND any
+        // hard link to it (indistinguishable by identity; both are `sameIdentity`).
+        if case .legacySingleDB = source {
+            if let db = sourceDBIdent, let active = activeDBIdent, db == active {
+                throw IngestError.sourceIsActiveData(role: .activeDatabase, relationship: .sameIdentity)
+            }
+            // A standalone file cannot CONTAIN a directory; only its containment matters.
+            if let parent = sourceDir {
+                try rejectDescendant(startingAt: parent, includeStart: true,
+                                     root: rootHandle, attachments: attachmentsHandle)
+            }
+            return
+        }
+
+        guard let sourceDir else { return }   // absent source dir → the early gates decide
+        let sourceIdent = Ident(sourceDir)
+
+        if let root = rootHandle, sourceIdent == Ident(root) {
+            throw IngestError.sourceIsActiveData(role: .nativeDataRoot, relationship: .sameIdentity)
+        }
+        if let att = attachmentsHandle, sourceIdent == Ident(att) {
+            throw IngestError.sourceIsActiveData(role: .activeAttachments, relationship: .sameIdentity)
+        }
+        if let db = sourceDBIdent, let active = activeDBIdent, db == active {
+            throw IngestError.sourceIsActiveData(role: .activeDatabase, relationship: .sameIdentity)
+        }
+
+        // Source INSIDE a protected object (nearest protected ancestor wins by hop order).
+        try rejectDescendant(startingAt: sourceDir, includeStart: false,
+                             root: rootHandle, attachments: attachmentsHandle)
+
+        // Source CONTAINS a protected object: walk up from each protected root (or, when the
+        // data root does not exist yet, from its deepest EXISTING ancestor — a first-install
+        // data root's future parents exist and must still be refusable, §3.3).
+        if let root = rootHandle {
+            try walkUp(from: root, includeStart: false) { hop in
+                if hop == sourceIdent {
+                    throw IngestError.sourceIsActiveData(role: .nativeDataRoot, relationship: .sourceAncestorOfProtected)
+                }
+            }
+        } else if let nearest = try Self.openDeepestExistingAncestor(of: identity.dataRootURL) {
+            try walkUp(from: nearest, includeStart: true) { hop in
+                if hop == sourceIdent {
+                    throw IngestError.sourceIsActiveData(role: .nativeDataRoot, relationship: .sourceAncestorOfProtected)
+                }
+            }
+        }
+        if let att = attachmentsHandle {
+            try walkUp(from: att, includeStart: false) { hop in
+                if hop == sourceIdent {
+                    throw IngestError.sourceIsActiveData(role: .activeAttachments, relationship: .sourceAncestorOfProtected)
+                }
+            }
+        }
+    }
+
+    // MARK: internals
+
+    private func rejectDescendant(startingAt handle: DirectoryHandle, includeStart: Bool,
+                                  root: DirectoryHandle?, attachments: DirectoryHandle?) throws {
+        let rootIdent = root.map(Ident.init)
+        let attIdent = attachments.map(Ident.init)
+        guard rootIdent != nil || attIdent != nil else { return }
+        try walkUp(from: handle, includeStart: includeStart) { hop in
+            // Attachments sit INSIDE the data root, so on a nested layout the deeper
+            // protected object is met first — report it, not the outer root.
+            if let a = attIdent, hop == a {
+                throw IngestError.sourceIsActiveData(role: .activeAttachments, relationship: .sourceDescendantOfProtected)
+            }
+            if let r = rootIdent, hop == r {
+                throw IngestError.sourceIsActiveData(role: .nativeDataRoot, relationship: .sourceDescendantOfProtected)
+            }
+        }
+    }
+
+    /// Upward identity walk over `parentDirectory()`. Visits each hop's identity; terminates
+    /// on the root fixpoint (parent identity == current identity, visited once) or throws
+    /// `AncestryUnverifiable` when `maxDepth` is exhausted first (fail-closed).
+    private func walkUp(from start: DirectoryHandle, includeStart: Bool,
+                        visit: (Ident) throws -> Void) throws {
+        var current = start
+        if includeStart { try visit(Ident(current)) }
+        var depth = 0
+        while true {
+            depth += 1
+            if depth > maxDepth { throw AncestryUnverifiable(depth: maxDepth) }
+            let parent = try current.parentDirectory()
+            let parentIdent = Ident(parent)
+            try visit(parentIdent)
+            if parentIdent == Ident(current) { return }   // filesystem root: parent is itself
+            current = parent
+        }
+    }
+
+    /// nil ⇔ the directory is definitively absent (ENOENT); a symlink or non-directory
+    /// throws `notADirectory` (fail-closed); every other error propagates.
+    private static func openIfExists(_ url: URL) throws -> DirectoryHandle? {
+        do { return try DirectoryHandle.open(at: url) }
+        catch let e as FileHashError where e.isFileMissing { return nil }
+    }
+
+    /// The deepest EXISTING ancestor of `url` (nil only if even "/" cannot be opened, which
+    /// propagates as an error instead). Trusted-path input only (our own derived layout).
+    private static func openDeepestExistingAncestor(of url: URL) throws -> DirectoryHandle? {
+        var current = url.deletingLastPathComponent()
+        while true {
+            if let handle = try openIfExists(current) { return handle }
+            let parent = current.deletingLastPathComponent()
+            if parent.path == current.path { return try openIfExists(current) }
+            current = parent
         }
     }
 }
@@ -752,10 +983,14 @@ public struct StagingIngest {
         try ingest(source, importID: importID, timestamp: timestamp, maxAttempts: 3, hooks: IngestHooks())
     }
 
-    /// Internal entry point with an attempt bound + fault seams (test-only).
+    /// Internal entry point with an attempt bound + fault seams (test-only). `protecting`
+    /// is the self-import guard's identity seam: nil derives the standard production
+    /// identity (pure path derivation); the coordinator injects its config-derived identity;
+    /// tests inject isolated temp roots.
     @discardableResult
     func ingest(_ source: MigrationSource, importID: ImportID, timestamp: String,
-                maxAttempts: Int, hooks: IngestHooks) throws -> IngestResult {
+                maxAttempts: Int, hooks: IngestHooks,
+                protecting: SelfImportGuard.ProtectedIdentity? = nil) throws -> IngestResult {
         let dbURL = try source.databaseURL()
         let finalDir = try AppPaths.stagedImportDirectory(importID: importID)
         // lstat semantics: ANY entry at the final path — including a dangling symlink —
@@ -764,6 +999,9 @@ public struct StagingIngest {
             throw IngestError.importIDAlreadyExists(importID.rawValue)
         }
         return try source.withAccess {
+            // N7.1 (§3.3): the self-import guard runs FIRST — inside the access grant, before
+            // any gate or copy — and rejects a source that IS this app's own protected data.
+            try SelfImportGuard(identity: protecting ?? .standard()).check(source)
             // Early, clear gates (lstat, no-follow). The copy primitive re-enforces both
             // on the open fd at copy time, so these are UX, not the security boundary.
             guard let dbFP = try FileFingerprint.capture(at: dbURL) else {
