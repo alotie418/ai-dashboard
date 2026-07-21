@@ -39,12 +39,31 @@ extension AppModel {
         return panel
     }
 
+    #if DEBUG
+    /// TEST-ONLY (DEBUG) panel-runner seam: hosted unit tests inject a deterministic
+    /// response so `chooseMigrationSourceViaPanel` never blocks on a modal panel. The
+    /// production entry STILL builds the real single-directory panel (handed to the
+    /// override so tests can assert its configuration) and STILL consumes the result
+    /// through `handleMigrationSourcePanelResult` — the override replaces ONLY the
+    /// blocking `runModal()` call, never the preflight-free flow or the security-scope
+    /// lifecycle. Compiled out of Release; nil outside tests.
+    static var migrationSourcePanelRunnerOverride:
+        ((NSOpenPanel) -> (response: NSApplication.ModalResponse, url: URL?))?
+    #endif
+
     /// Source-choice "migrate old data": run the Powerbox directory picker for the previous
     /// (e.g. DMG-build) SoloLedger data folder. The security scope on the returned URL is
     /// consumed later inside the single `MigrationSource.withAccess` grant window (Core);
     /// the App neither preflights nor re-checks the selection.
     func chooseMigrationSourceViaPanel() {
         let panel = Self.makeMigrationSourceDirectoryPanel(message: t("migration.chooseSource.picker.prompt"))
+        #if DEBUG
+        if let run = Self.migrationSourcePanelRunnerOverride {
+            let r = run(panel)
+            handleMigrationSourcePanelResult(r.response, url: r.url)
+            return
+        }
+        #endif
         handleMigrationSourcePanelResult(panel.runModal(), url: panel.url)
     }
 

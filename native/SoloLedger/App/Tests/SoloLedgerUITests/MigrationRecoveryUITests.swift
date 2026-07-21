@@ -128,16 +128,21 @@ final class MigrationRecoveryUITests: XCTestCase {
                        "the dialog must be dismissed after going back")
     }
 
-    /// N7.2 follow-up: ACTION WITNESSES for the real SwiftUI button → closure seams.
-    /// Rendering alone cannot catch an emptied button action, so this clicks the REAL
-    /// `MigrationSourceChoiceView` buttons and reads the DEBUG-only witness counters:
+    /// N7.2 follow-up: ACTION WITNESSES for the SwiftUI button → SUPPLIED-closure seam —
+    /// this layer ONLY. (The preview supplies witness closures, so this proves the real
+    /// `MigrationSourceChoiceView` buttons invoke whatever closures they are handed; the
+    /// production closure supplier — `MigrationViewData.production` → AppModel — is guarded
+    /// separately by the hosted productionData-mapping tests, and AppModel → BootIntent →
+    /// runner/coordinator by the existing intent guards.) Rendering alone cannot catch an
+    /// emptied button action, so this clicks the real buttons and reads the DEBUG-only
+    /// witness counters:
     ///  - clicking migrate invokes `onMigrate` exactly once (kills `Button { onMigrate() }`
     ///    → `Button { }`);
     ///  - clicking createNew alone invokes NOTHING (the dialog gate stands);
     ///  - clicking the dialog's back invokes NOTHING and stays on the choice screen;
     ///  - clicking the dialog's create invokes `onCreateFresh` exactly once (kills
     ///    `Button(confirm.create) { onCreateFresh() }` → `Button(confirm.create) { }`).
-    func testChooseSourceButtonsDriveTheirClosuresThroughTheRealWiring() {
+    func testChooseSourceButtonsDriveTheirSuppliedClosures() {
         var app = launch("chooseSource")
         var migrate = app.buttons["migration.chooseSource.migrate"]
         if !migrate.waitForExistence(timeout: 10) {

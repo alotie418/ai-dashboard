@@ -315,6 +315,78 @@ final class DormantSourceChoiceBootTests: XCTestCase {
                        "the confirmed create action must emit exactly .confirmCreateFresh — no other intent, no boolean side channel")
     }
 
+    // MARK: - productionData mapping guards (the REAL RootView state → action seam)
+    //
+    // LAYERING: the UI action-witness test proves SwiftUI Button → SUPPLIED closure; the
+    // guards below prove the production closure SUPPLIER — `MigrationViewData.production`,
+    // the exact seam `RootView.productionData` consumes (no hand-copied switch, no preview
+    // synthetics) — reaches the right AppModel entries; the intent guards above prove
+    // AppModel → BootIntent → production runner/coordinator. Together: the full chain.
+    // The DEBUG panel-runner override replaces ONLY the blocking `runModal()`; the real
+    // single-directory panel is still built and the result still flows through
+    // `handleMigrationSourcePanelResult`.
+
+    func testProductionDataMigrateClosureRunsThePanelEntryWithExactIntent() async {
+        let fake = FakeRunner()
+        let model = await makeAwaitingChoiceModel(fake)
+        let chosen = sourceURL("ProductionPanelGrant")
+        var panelRuns = 0
+        var handedPanel: NSOpenPanel?
+        AppModel.migrationSourcePanelRunnerOverride = { panel in
+            panelRuns += 1
+            handedPanel = panel
+            return (.OK, chosen)
+        }
+        defer { AppModel.migrationSourcePanelRunnerOverride = nil }
+
+        let data = MigrationViewData.production(for: model.migrationUIState, model: model)
+        data.onChooseMigrate()
+        await model.currentBootTask?.value
+
+        XCTAssertEqual(panelRuns, 1,
+                       "onChooseMigrate must invoke AppModel.chooseMigrationSourceViaPanel exactly ONCE — an emptied or swapped production mapping never runs the panel")
+        XCTAssertEqual(handedPanel?.canChooseDirectories, true,
+                       "the production entry must still build the REAL single-directory panel")
+        XCTAssertEqual(handedPanel?.canChooseFiles, false)
+        XCTAssertEqual(handedPanel?.allowsMultipleSelection, false)
+        XCTAssertEqual(fake.receivedIntents, [.boot, .migrateFromUserDir(.userSelectedDataDir(chosen))],
+                       "the granted directory must flow through handleMigrationSourcePanelResult into exactly ONE .migrateFromUserDir intent — and NEVER .confirmCreateFresh (mappings are not interchangeable)")
+    }
+
+    func testProductionDataMigrateClosureHonorsPanelCancelAsPureNoOp() async {
+        let fake = FakeRunner()
+        let model = await makeAwaitingChoiceModel(fake)
+        var panelRuns = 0
+        AppModel.migrationSourcePanelRunnerOverride = { _ in panelRuns += 1; return (.cancel, nil) }
+        defer { AppModel.migrationSourcePanelRunnerOverride = nil }
+
+        let data = MigrationViewData.production(for: model.migrationUIState, model: model)
+        data.onChooseMigrate()
+        XCTAssertEqual(panelRuns, 1, "the panel entry must have run")
+        XCTAssertEqual(fake.receivedIntents, [.boot],
+                       "a cancelled panel reached through the PRODUCTION closure must fire zero intents")
+        guard case .awaitingSourceChoice = model.migrationUIState else {
+            return XCTFail("cancel must stay on the source choice, got \(model.migrationUIState)")
+        }
+    }
+
+    func testProductionDataCreateFreshClosureSendsExactlyTheConfirmIntentAndNoPanel() async {
+        let fake = FakeRunner()
+        let model = await makeAwaitingChoiceModel(fake)
+        var panelRuns = 0
+        AppModel.migrationSourcePanelRunnerOverride = { _ in panelRuns += 1; return (.cancel, nil) }
+        defer { AppModel.migrationSourcePanelRunnerOverride = nil }
+
+        let data = MigrationViewData.production(for: model.migrationUIState, model: model)
+        data.onConfirmCreateFresh()
+        await model.currentBootTask?.value
+
+        XCTAssertEqual(fake.receivedIntents, [.boot, .confirmCreateFresh],
+                       "onConfirmCreateFresh must call AppModel.confirmCreateFresh — exactly ONE .confirmCreateFresh intent; an emptied production mapping sends nothing")
+        XCTAssertEqual(panelRuns, 0,
+                       "onConfirmCreateFresh must NOT open the directory panel (mappings are not interchangeable)")
+    }
+
     // MARK: - Production mapping guards (the REAL makeBootChainRunner, no hand-copied switch)
 
     func testProductionMappingMigrateFromUserDirRunsExplicitImportWithChosenSource() async throws {

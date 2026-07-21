@@ -54,27 +54,10 @@ struct RootView: View {
     }
 
     /// The render inputs extracted from the real model state (public data + intent closures).
+    /// A one-liner over the SINGLE production mapping seam (`MigrationViewData.production`),
+    /// which the hosted productionData-mapping guards consume too — no second switch exists.
     private var productionData: MigrationViewData {
-        var d = MigrationViewData()
-        switch model.migrationUIState {
-        case .awaitingAcknowledgement(let request, let unresolved):
-            d.unresolved = unresolved
-            d.onAcknowledge = { model.submitAcknowledgement(request.acknowledge()) }
-        case .awaitingImportSelection(let candidates):
-            d.candidates = candidates.map { MigrationCandidateVM($0) }
-            d.onSelect = { model.resolveImportSelection(importID: $0) }
-            d.onCancel = { model.cancelImportSelection() }
-        case .retriable(let block), .terminal(let block):
-            d.chainMessageKey = MigrationPresenter.messageKey(for: block)
-        case .cleanupResidual(let residual):
-            d.residualImportID = residual.importID
-        case .awaitingSourceChoice:
-            d.onChooseMigrate = { model.chooseMigrationSourceViaPanel() }
-            d.onConfirmCreateFresh = { model.confirmCreateFresh() }
-        case .none, .running:
-            break
-        }
-        return d
+        .production(for: model.migrationUIState, model: model)
     }
 
     @ViewBuilder private func render(_ route: MigrationPresenter.MigrationRoute, _ data: MigrationViewData) -> some View {
@@ -123,6 +106,38 @@ struct MigrationViewData {
     /// `onConfirmCreateFresh` is called ONLY by the confirmation dialog's confirm button.
     var onChooseMigrate: () -> Void = {}
     var onConfirmCreateFresh: () -> Void = {}
+}
+
+extension MigrationViewData {
+    /// The ONE production `MigrationUIState` → render-data / intent-closure mapping the app
+    /// ships — `RootView.productionData` is only "this seam + the environment model", and the
+    /// hosted productionData-mapping guards in `DormantSourceChoiceBootTests` consume this
+    /// SAME function (no hand-copied switch), so an emptied or swapped production closure
+    /// (e.g. `onChooseMigrate = {}`) fails those tests instead of surviving unseen behind
+    /// the preview's synthetic closures.
+    @MainActor
+    static func production(for state: MigrationUIState, model: AppModel) -> MigrationViewData {
+        var d = MigrationViewData()
+        switch state {
+        case .awaitingAcknowledgement(let request, let unresolved):
+            d.unresolved = unresolved
+            d.onAcknowledge = { model.submitAcknowledgement(request.acknowledge()) }
+        case .awaitingImportSelection(let candidates):
+            d.candidates = candidates.map { MigrationCandidateVM($0) }
+            d.onSelect = { model.resolveImportSelection(importID: $0) }
+            d.onCancel = { model.cancelImportSelection() }
+        case .retriable(let block), .terminal(let block):
+            d.chainMessageKey = MigrationPresenter.messageKey(for: block)
+        case .cleanupResidual(let residual):
+            d.residualImportID = residual.importID
+        case .awaitingSourceChoice:
+            d.onChooseMigrate = { model.chooseMigrationSourceViaPanel() }
+            d.onConfirmCreateFresh = { model.confirmCreateFresh() }
+        case .none, .running:
+            break
+        }
+        return d
+    }
 }
 
 /// Blocking recovery shown when an Electron database exists but its upgrade failed.
@@ -536,8 +551,11 @@ private struct ResidualBanner: View {
 
 #if DEBUG
 /// TEST-ONLY (DEBUG) action witness: counts how often the preview's source-choice closures
-/// fire, so UI tests can prove the REAL SwiftUI button → closure wiring in
+/// fire, so UI tests can prove the SwiftUI button → SUPPLIED-closure wiring in
 /// `MigrationSourceChoiceView` (rendering alone cannot catch an emptied button action).
+/// This witnesses ONLY that layer — the production closure supplier
+/// (`MigrationViewData.production` → AppModel) is guarded by the hosted
+/// productionData-mapping tests, which never touch these synthetic closures.
 /// Only the `--migration-ui-preview chooseSource` closures record into it and only that
 /// preview renders it; production (non-preview) boots never touch it, and none of this is
 /// compiled into Release. Mutated exclusively from button actions / read from rendering,
