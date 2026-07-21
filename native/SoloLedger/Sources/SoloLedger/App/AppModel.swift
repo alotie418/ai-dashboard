@@ -291,10 +291,22 @@ final class AppModel: ObservableObject {
     /// boundaries. Built lazily so a fresh install never derives paths until boot.
     private static func makeProductionRunner() throws -> BootChainRunner {
         let config = try MigrationCoordinator.Config.standard()
-        let coordinator = MigrationCoordinator(config: config)
-        let auto: MigrationSource = .masContainer
-        let activeURL = config.activeDestination
-        return ProductionBootChainRunner(
+        return makeBootChainRunner(coordinator: MigrationCoordinator(config: config),
+                                   autoSourceCandidate: .masContainer,
+                                   activeURL: config.activeDestination)
+    }
+
+    /// The ONE intent → coordinator mapping the app ships — `makeProductionRunner` above is
+    /// only "this factory + the production config". Internal (NOT private, NOT public) so the
+    /// hosted `@testable` tests drive the EXACT shipped wiring against an isolated
+    /// coordinator/auto-source/activeURL instead of hand-copying the switch (a copy could
+    /// stay green while the real mapping drifts — e.g. `.migrateFromUserDir` silently rerouted
+    /// to `bootResolve`, losing the user's source). The production-mapping guard tests in
+    /// `DormantSourceChoiceBootTests` pin each arm behaviorally.
+    static func makeBootChainRunner(coordinator: MigrationCoordinator,
+                                    autoSourceCandidate auto: MigrationSource?,
+                                    activeURL: URL) -> ProductionBootChainRunner {
+        ProductionBootChainRunner(
             resolveWork: { intent in
                 switch intent {
                 case .boot: return coordinator.bootResolve(autoSourceCandidate: auto)
@@ -308,6 +320,8 @@ final class AppModel: ObservableObject {
                 case .migrateFromUserDir(let source): return coordinator.runImport(source: source)
                 }
             },
+            // The auto candidate is handed to EVERY confirm; the coordinator itself only
+            // consults it for a createFresh authorization (where it can revoke → reResolve).
             confirm: { coordinator.confirmOpenAuthorization($0, autoSourceCandidate: auto) },
             openStore: { try Self.openStoreForPlan($0, activeURL: activeURL) })
     }

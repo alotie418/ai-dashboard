@@ -2,10 +2,14 @@ import XCTest
 @testable import SoloLedgerCore
 
 /// N7.1 (§3.3): the Core self-import guard — canonical (device, inode) identity judgment,
-/// three roles × three relationships, hard links folded into `sameIdentity`, the narrow
-/// `DirectoryHandle.parentDirectory()` primitive, fail-closed metadata errors, and the
-/// coordinator's no-path `invalidSource` mapping. Every test injects an ISOLATED protected
-/// identity (temp roots) — the real container is never consulted.
+/// the narrow `DirectoryHandle.parentDirectory()` primitive, fail-closed metadata errors,
+/// and the coordinator's no-path `invalidSource` mapping. Coverage is the REACHABLE
+/// role × relationship combinations (not the full 3×3 matrix): `nativeDataRoot` and
+/// `activeAttachments` each pin sameIdentity / sourceAncestorOfProtected /
+/// sourceDescendantOfProtected; `activeDatabase` pins sameIdentity (including hard links —
+/// a lone file cannot be an ancestor, and "descendant of a file" does not exist). Every
+/// test injects an ISOLATED protected identity (temp roots) — the real container is never
+/// consulted.
 final class SelfImportGuardTests: LedgerTestCase {
 
     private let fm = FileManager.default

@@ -4,9 +4,11 @@ import XCTest
 
 /// N7.1 App-hosted guards (design §1.2/§7.1/§11.1): the two DORMANT boot intents
 /// (`.confirmCreateFresh`, `.migrateFromUserDir`), the `.awaitingSourceChoice` waiting state's
-/// store-free invariants, the §7.1(a) reResolve stickiness of an explicit user source, and the
-/// end-to-end UNREACHABILITY pin — a production-shaped boot over a clean slot still lands in
-/// the old create-fresh behavior, never the source-choice state.
+/// store-free invariants, the §7.1(a) reResolve stickiness of an explicit user source, the
+/// end-to-end UNREACHABILITY pin, and the PRODUCTION-MAPPING guards: every runner here comes
+/// from the real `AppModel.makeBootChainRunner` factory (the single shipped
+/// intent→coordinator switch, no hand-copied mapping), so wiring drift in the production
+/// factory fails these tests.
 @MainActor
 final class DormantSourceChoiceBootTests: XCTestCase {
 
@@ -158,35 +160,120 @@ final class DormantSourceChoiceBootTests: XCTestCase {
                 try dir("Staging"))
     }
 
+    /// A REAL coordinator whose ingest is the genuine `StagingIngest` relocated into the
+    /// test's isolated staging root (the established seam pattern).
+    private func makeCoordinator(_ config: MigrationCoordinator.Config, staging: URL) -> MigrationCoordinator {
+        MigrationCoordinator(config: config, stagingRootOverride: staging,
+                             ingestOverride: { source, id in
+            let r = try StagingIngest().ingest(source, importID: id, timestamp: "t")
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+            let dst = staging.appendingPathComponent("import-\(id.rawValue)", isDirectory: true)
+            try FileManager.default.moveItem(at: r.stagingDir, to: dst)
+            let docs = dst.appendingPathComponent("attachments", isDirectory: true)
+                          .appendingPathComponent("docs", isDirectory: true)
+            return IngestResult(importID: r.importID, stagingDir: dst,
+                                stagedDatabaseURL: dst.appendingPathComponent(AppPaths.databaseFileName),
+                                stagedWALURL: r.stagedWALURL.map { _ in URL(fileURLWithPath: dst.path + "/" + AppPaths.databaseFileName + "-wal") },
+                                stagedAttachmentsDir: r.stagedAttachmentsDir.map { _ in docs },
+                                manifest: r.manifest)
+        })
+    }
+
+    /// An AVAILABLE v0 source tree carrying a distinguishing marker attachment, so tests can
+    /// prove WHICH source a chain actually ingested.
+    private func makeMarkedSource(_ name: String, marker: String) throws -> MigrationSource {
+        let src = tempRoot.appendingPathComponent(name, isDirectory: true)
+        let docs = src.appendingPathComponent("attachments", isDirectory: true)
+            .appendingPathComponent("docs", isDirectory: true)
+        try fm.createDirectory(at: docs, withIntermediateDirectories: true)
+        let db = try SQLiteDatabase(path: src.appendingPathComponent(AppPaths.databaseFileName).path,
+                                    mode: .readWriteCreate)
+        try db.execute("PRAGMA journal_mode = DELETE")
+        try db.execute("PRAGMA user_version = 0")
+        try db.close()
+        try Data(marker.utf8).write(to: docs.appendingPathComponent("\(marker).pdf"))
+        return .userSelectedDataDir(src)
+    }
+
     func testProductionShapedBootOverCleanSlotStillCreatesFreshNeverSourceChoice() async throws {
         let (config, staging) = try makeCtx()
-        let coordinator = MigrationCoordinator(config: config, stagingRootOverride: staging,
-                                               ingestOverride: nil)
         // An auto candidate that is UNAVAILABLE — the exact precondition N7.2 will one day
         // flip into the source-choice screen. Today it MUST still mint a fresh ledger.
-        let auto = MigrationSource.userSelectedDataDir(tempRoot.appendingPathComponent("no-electron-here"))
-        let activeURL = config.activeDestination
-        let runner = ProductionBootChainRunner(
-            resolveWork: { intent in
-                switch intent {
-                case .boot: return coordinator.bootResolve(autoSourceCandidate: auto)
-                case .acknowledgement(let ack): return coordinator.bootResolve(autoSourceCandidate: auto, acknowledgement: ack)
-                case .selection(let id): return coordinator.resolveSelectedImport(importID: id)
-                case .confirmCreateFresh: return coordinator.confirmCreateFresh()
-                case .migrateFromUserDir(let source): return coordinator.runImport(source: source)
-                }
-            },
-            confirm: { coordinator.confirmOpenAuthorization($0, autoSourceCandidate: auto) },
-            openStore: { try AppModel.openStoreForPlan($0, activeURL: activeURL) })
+        let runner = AppModel.makeBootChainRunner(
+            coordinator: MigrationCoordinator(config: config, stagingRootOverride: staging,
+                                              ingestOverride: nil),
+            autoSourceCandidate: .userSelectedDataDir(tempRoot.appendingPathComponent("no-electron-here")),
+            activeURL: config.activeDestination)
         let model = AppModel(runner: runner)
         model.boot()
         await model.currentBootTask?.value
 
         if case .awaitingSourceChoice = model.migrationUIState {
-            return XCTFail("N7.1 REGRESSION: a production-shaped clean-slot boot reached the source-choice state — resolveB1 must stay unflipped until N7.2")
+            return XCTFail("N7.1 REGRESSION: a production-wired clean-slot boot reached the source-choice state — resolveB1 must stay unflipped until N7.2")
         }
         XCTAssertTrue(model.ready, "the OLD behavior must hold: a clean slot boots into a fresh ledger")
         XCTAssertNotNil(model.store)
         XCTAssertEqual(try model.store?.schemaVersion(), SchemaMigrator.schemaVersion)
+    }
+
+    // MARK: - Production mapping guards (the REAL makeBootChainRunner, no hand-copied switch)
+
+    func testProductionMappingMigrateFromUserDirRunsExplicitImportWithChosenSource() async throws {
+        let (config, staging) = try makeCtx()
+        let chosen = try makeMarkedSource("Chosen", marker: "chosen-marker")
+        let autoTrap = try makeMarkedSource("AutoTrap", marker: "auto-trap")
+        let runner = AppModel.makeBootChainRunner(
+            coordinator: makeCoordinator(config, staging: staging),
+            autoSourceCandidate: autoTrap,   // a live decoy: any silent reroute would import THIS
+            activeURL: config.activeDestination)
+
+        let outcome = await runner.resolveOutcome(.migrateFromUserDir(chosen))
+        guard case .openStore(let auth, _) = outcome, case .openExistingCompleted = auth else {
+            return XCTFail("the shipped mapping must run the explicit import to completion, got \(outcome)")
+        }
+        let applied = config.activeAttachmentsDir
+        XCTAssertEqual(try Data(contentsOf: applied.appendingPathComponent("chosen-marker.pdf")),
+                       Data("chosen-marker".utf8),
+                       "the CHOSEN source must be the one ingested — the user's selection may never be lost")
+        XCTAssertFalse(fm.fileExists(atPath: applied.appendingPathComponent("auto-trap.pdf").path),
+                       "the auto candidate must NOT be imported: .migrateFromUserDir goes to runImport(source:), never bootResolve/auto")
+    }
+
+    func testProductionMappingConfirmCreateFreshDoesNotAbsorbAutoCandidate() async throws {
+        let (config, staging) = try makeCtx()
+        let availableAuto = try makeMarkedSource("AvailableAuto", marker: "auto-live")
+        let runner = AppModel.makeBootChainRunner(
+            coordinator: makeCoordinator(config, staging: staging),
+            autoSourceCandidate: availableAuto,
+            activeURL: config.activeDestination)
+
+        // Divergence pin: with an AVAILABLE auto candidate on a clean disk, `bootResolve(auto)`
+        // would run the WHOLE import (→ .openExistingCompleted). The strong-typed
+        // confirmCreateFresh entry consults no candidate → the createFresh authorization.
+        let outcome = await runner.resolveOutcome(.confirmCreateFresh)
+        guard case .openStore(let auth, nil) = outcome, case .createFreshExpectedAbsent = auth else {
+            return XCTFail(".confirmCreateFresh must map to the strong-typed confirmCreateFresh entry (createFresh authorization) — got \(outcome), which means the mapping absorbed the auto candidate (bootResolve wiring)")
+        }
+        XCTAssertFalse(fm.fileExists(atPath: config.activeDestination.path),
+                       "resolution must not have imported or created anything")
+    }
+
+    func testProductionMappingConfirmStageStillPassesAutoCandidateForRevocation() throws {
+        let (config, staging) = try makeCtx()
+        let availableAuto = try makeMarkedSource("AvailableAuto", marker: "auto-live")
+        let runner = AppModel.makeBootChainRunner(
+            coordinator: makeCoordinator(config, staging: staging),
+            autoSourceCandidate: availableAuto,
+            activeURL: config.activeDestination)
+
+        // Phase B of a createFresh authorization: the shipped confirm closure must hand the
+        // auto candidate to confirmOpenAuthorization, which revokes createFresh when the
+        // candidate is available (re-adjudication prefers migration, §7.1 decision 5).
+        let attempt = runner.attempt(.createFreshExpectedAbsent, residual: nil)
+        guard case .needsReResolve = attempt else {
+            return XCTFail("an AVAILABLE auto candidate must revoke the createFresh authorization at confirm (needsReResolve); got \(attempt) — the confirm closure dropped the auto candidate")
+        }
+        XCTAssertFalse(fm.fileExists(atPath: config.activeDestination.path),
+                       "a revoked authorization must not create the fresh store")
     }
 }
