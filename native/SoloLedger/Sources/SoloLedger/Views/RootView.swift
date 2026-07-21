@@ -550,16 +550,20 @@ private struct ResidualBanner: View {
 }
 
 #if DEBUG
-/// TEST-ONLY (DEBUG) action witness: counts how often the preview's source-choice closures
-/// fire, so UI tests can prove the SwiftUI button → SUPPLIED-closure wiring in
-/// `MigrationSourceChoiceView` (rendering alone cannot catch an emptied button action).
-/// This witnesses ONLY that layer — the production closure supplier
-/// (`MigrationViewData.production` → AppModel) is guarded by the hosted
-/// productionData-mapping tests, which never touch these synthetic closures.
-/// Only the `--migration-ui-preview chooseSource` closures record into it and only that
-/// preview renders it; production (non-preview) boots never touch it, and none of this is
-/// compiled into Release. Mutated exclusively from button actions / read from rendering,
-/// both on the main thread.
+/// TEST-ONLY (DEBUG) action witness: identifier-encoded invocation counters read by the
+/// UI-test guards (rendering alone cannot catch an emptied action). TWO recording modes
+/// share it, each guarding a different layer:
+///  - `--migration-ui-preview chooseSource`: the preview's synthetic closures record
+///    `onMigrate` / `onCreateFresh` — the SwiftUI Button → SUPPLIED-closure guard for
+///    `MigrationSourceChoiceView`;
+///  - `--migration-boot-harness chooseSource`: the scripted runner and the panel-runner
+///    override record the panel/intent keys (`DebugBootHarness.witnessKeys`) — the guard
+///    for RootView's NON-preview `productionData` production path.
+/// (The supplier itself — `MigrationViewData.production` → AppModel — is guarded by the
+/// hosted productionData-mapping tests, which never touch these counters.) An ordinary
+/// production boot with neither argument records nothing and renders nothing, and none of
+/// this is compiled into Release. Mutated exclusively from main-thread actions / read from
+/// rendering, both on the main thread.
 final class DebugActionWitness: ObservableObject {
     static let shared = DebugActionWitness()
     @Published private(set) var counts: [String: Int] = [:]
