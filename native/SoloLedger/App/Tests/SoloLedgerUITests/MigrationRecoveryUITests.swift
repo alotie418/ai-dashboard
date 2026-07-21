@@ -93,6 +93,41 @@ final class MigrationRecoveryUITests: XCTestCase {
         XCTAssertTrue(app.buttons["migration.action.cancel"].exists, "selection must offer cancel")
     }
 
+    /// N7.2: the source-choice screen renders BOTH actions; "create new ledger" NEVER fires
+    /// directly — it must raise the confirmation dialog first, and "go back" returns to the
+    /// still-rendered choice screen (zero intents; the preview's closures are inert, so any
+    /// visible route change here would mean the view bypassed the dialog gate).
+    func testChooseSourceShowsBothActionsAndConfirmationGate() {
+        var app = launch("chooseSource")
+        var migrate = app.buttons["migration.chooseSource.migrate"]
+        if !migrate.waitForExistence(timeout: 10) {
+            // ONE relaunch guard against post-teardown window-activation contention (the same
+            // sequential-launch contention terminateAllAndWait/Zzz-ordering mitigate). The
+            // assertions below stay strict — a genuinely missing button still fails.
+            app.terminate()
+            terminateAllAndWait()
+            app = launch("chooseSource")
+            migrate = app.buttons["migration.chooseSource.migrate"]
+        }
+        let createNew = app.buttons["migration.chooseSource.createNew"]
+        XCTAssertTrue(migrate.waitForExistence(timeout: 10), "the migrate action must render")
+        XCTAssertTrue(createNew.exists, "the create-new action must render")
+
+        createNew.click()
+        let confirm = app.buttons["migration.chooseSource.confirm.create"].firstMatch
+        let back = app.buttons["migration.chooseSource.confirm.back"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10),
+                      "create-new must FIRST raise the confirmation dialog — never create directly")
+        XCTAssertTrue(back.exists, "the confirmation dialog must offer a way back")
+
+        back.click()
+        XCTAssertTrue(createNew.waitForExistence(timeout: 10),
+                      "going back must stay on the source-choice screen")
+        XCTAssertTrue(migrate.exists)
+        XCTAssertFalse(app.buttons["migration.chooseSource.confirm.create"].exists,
+                       "the dialog must be dismissed after going back")
+    }
+
     func testCleanupResidualKeepsMainUIUsable() {
         let app = launch("residual")
         // The MAIN UI renders (sidebar present) — cleanupResidual does NOT block it with a
@@ -108,7 +143,7 @@ final class MigrationRecoveryUITests: XCTestCase {
     // MARK: - Process-based smoke (headless-safe; sorts last)
 
     func testZzzEachPreviewStateRendersWithoutCrashing() throws {
-        let states = ["running", "retriable", "terminal", "ack", "selection", "residual", "none"]
+        let states = ["running", "retriable", "terminal", "ack", "selection", "residual", "chooseSource", "none"]
         let appURL = try builtAppURL()
         for state in states {
             terminateAll()

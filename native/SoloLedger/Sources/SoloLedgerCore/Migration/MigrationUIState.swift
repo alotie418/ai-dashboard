@@ -28,10 +28,10 @@ public enum MigrationUIState: Equatable {
     case running(MigrationStep)
     case awaitingAcknowledgement(AcknowledgementRequest, UnresolvedReport)
     case awaitingImportSelection([RecoverableImport])
-    /// N7.1 DORMANT (§1.2): the source-choice waiting state (`store == nil`, `ready == false`,
-    /// never publishes a store). Production cannot reach it until N7.2 flips `resolveB1`'s
-    /// `.unavailable` branch to emit `.requiresSourceChoice`; until then only tests drive it,
-    /// and a guard test pins the production boot path to the old behavior.
+    /// N7.2 (§1.2): the source-choice waiting state (`store == nil`, `ready == false`,
+    /// never publishes a store). Reached when an AUTOMATIC boot finds a clean disk and no
+    /// usable auto source (`resolveB1` emits `.requiresSourceChoice`); the user chooses
+    /// "migrate old data" or "create a new ledger" from here.
     case awaitingSourceChoice
     /// Fail-closed but re-probeable (retriable classification).
     case retriable(MigrationBlock)

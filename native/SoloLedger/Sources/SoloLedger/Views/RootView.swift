@@ -63,10 +63,10 @@ struct RootView: View {
             d.chainMessageKey = MigrationPresenter.messageKey(for: block)
         case .cleanupResidual(let residual):
             d.residualImportID = residual.importID
-        case .none, .running, .awaitingSourceChoice:
-            // `.awaitingSourceChoice` is N7.1-dormant: production cannot reach it (resolveB1
-            // unflipped, guard-tested) and it deliberately extracts NO data and wires NO
-            // intent closures — the real source-choice screen arrives only in N7.2.
+        case .awaitingSourceChoice:
+            d.onChooseMigrate = { model.chooseMigrationSourceViaPanel() }
+            d.onConfirmCreateFresh = { model.confirmCreateFresh() }
+        case .none, .running:
             break
         }
         return d
@@ -84,6 +84,8 @@ struct RootView: View {
             MigrationAckView(unresolved: data.unresolved, onAcknowledge: data.onAcknowledge)
         case .importSelection:
             MigrationSelectionView(candidates: data.candidates, onSelect: data.onSelect, onCancel: data.onCancel)
+        case .chooseSource:
+            MigrationSourceChoiceView(onMigrate: data.onChooseMigrate, onCreateFresh: data.onConfirmCreateFresh)
         case .chainRecovery(let severity):
             MigrationChainRecoveryView(messageKey: data.chainMessageKey, severity: severity)
         case .loading:
@@ -112,6 +114,10 @@ struct MigrationViewData {
     var onAcknowledge: () -> Void = {}
     var onSelect: (String) -> Void = { _ in }
     var onCancel: () -> Void = {}
+    /// Source-choice intents (N7.2). `onChooseMigrate` opens the directory picker;
+    /// `onConfirmCreateFresh` is called ONLY by the confirmation dialog's confirm button.
+    var onChooseMigrate: () -> Void = {}
+    var onConfirmCreateFresh: () -> Void = {}
 }
 
 /// Blocking recovery shown when an Electron database exists but its upgrade failed.
@@ -359,6 +365,60 @@ private struct MigrationAckView: View {
     }
 }
 
+/// N7.2 (§1): the pre-open source-choice screen — fully independent of onboarding (which
+/// continues unchanged after a store is adopted). Two actions only: "migrate old data" opens
+/// the directory picker (cancel = pure no-op, stays here); "create new ledger" NEVER creates
+/// directly — it first raises the confirmation dialog, whose confirm button alone fires
+/// `onCreateFresh` (the `.confirmCreateFresh` intent). "Go back" dismisses the dialog and
+/// stays on this screen without any intent. All copy goes through `model.t(key)` — never a
+/// raw enum, path, or error string.
+private struct MigrationSourceChoiceView: View {
+    @EnvironmentObject var model: AppModel
+    let onMigrate: () -> Void
+    let onCreateFresh: () -> Void
+    @State private var confirmingCreateFresh = false
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "tray.and.arrow.down")
+                .font(.system(size: 40))
+                .foregroundStyle(.secondary)
+            Text(model.t("migration.chooseSource.title")).font(.title2).fontWeight(.semibold)
+            Text(model.t("migration.chooseSource.body"))
+                .multilineTextAlignment(.center).foregroundStyle(.secondary).frame(maxWidth: 460)
+            VStack(spacing: 10) {
+                Button { onMigrate() } label: {
+                    Label(model.t("migration.chooseSource.migrate.button"),
+                          systemImage: "arrow.down.doc").frame(maxWidth: 320)
+                }
+                .buttonStyle(.borderedProminent).controlSize(.large)
+                .accessibilityIdentifier("migration.chooseSource.migrate")
+                .accessibilityLabel(model.t("migration.chooseSource.migrate.button"))
+                Text(model.t("migration.chooseSource.migrate.hint"))
+                    .font(.caption).foregroundStyle(.secondary)
+                Button { confirmingCreateFresh = true } label: {
+                    Label(model.t("migration.chooseSource.createNew.button"),
+                          systemImage: "doc.badge.plus").frame(maxWidth: 320)
+                }
+                .accessibilityIdentifier("migration.chooseSource.createNew")
+                .accessibilityLabel(model.t("migration.chooseSource.createNew.button"))
+                Text(model.t("migration.chooseSource.createNew.hint"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(40).frame(maxWidth: .infinity, maxHeight: .infinity)
+        .confirmationDialog(model.t("migration.chooseSource.confirm.title"),
+                            isPresented: $confirmingCreateFresh, titleVisibility: .visible) {
+            Button(model.t("migration.chooseSource.confirm.create")) { onCreateFresh() }
+                .accessibilityIdentifier("migration.chooseSource.confirm.create")
+            Button(model.t("migration.chooseSource.confirm.back"), role: .cancel) {}
+                .accessibilityIdentifier("migration.chooseSource.confirm.back")
+        } message: {
+            Text(model.t("migration.chooseSource.confirm.body"))
+        }
+    }
+}
+
 /// App-side view model for a recoverable-import candidate — reads only PUBLIC properties, so it
 /// can be built from a real `RecoverableImport` or synthesized in the DEBUG preview.
 struct MigrationCandidateVM: Identifiable {
@@ -515,6 +575,10 @@ enum DebugMigrationPreview {
         case "residual":
             var d = MigrationViewData(); d.residualImportID = "import-residual-1"
             return Preview(input: .cleanupResidual, ready: true, onboardingDone: true, data: d)
+        case "chooseSource":
+            // Synthetic no-op intents: the preview renders the REAL source-choice screen and
+            // its confirmation dialog (view-local state) without a model or a live chain.
+            return Preview(input: .sourceChoice, ready: false, onboardingDone: false, data: MigrationViewData())
         case "none":
             // Deterministic neutral state: .none + ready==false ⇒ loading (NOT a real boot).
             return Preview(input: .none, ready: false, onboardingDone: false, data: MigrationViewData())

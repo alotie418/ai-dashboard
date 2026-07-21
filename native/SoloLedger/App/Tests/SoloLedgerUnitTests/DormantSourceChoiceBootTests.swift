@@ -2,13 +2,15 @@ import XCTest
 @testable import SoloLedger
 @testable import SoloLedgerCore
 
-/// N7.1 App-hosted guards (design §1.2/§7.1/§11.1): the two DORMANT boot intents
+/// N7.2 App-hosted guards (design §1.2/§6/§7.1/§11.1): the two source-choice boot intents
 /// (`.confirmCreateFresh`, `.migrateFromUserDir`), the `.awaitingSourceChoice` waiting state's
 /// store-free invariants, the §7.1(a) reResolve stickiness of an explicit user source, the
-/// end-to-end UNREACHABILITY pin, and the PRODUCTION-MAPPING guards: every runner here comes
-/// from the real `AppModel.makeBootChainRunner` factory (the single shipped
-/// intent→coordinator switch, no hand-copied mapping), so wiring drift in the production
-/// factory fails these tests.
+/// directory-picker contract (single-directory config; cancel = ZERO intents; OK = exactly
+/// `.migrateFromUserDir(.userSelectedDataDir)`), the end-to-end FLIP pin (a production-shaped
+/// clean-slot boot lands in the source choice, and both choices complete), and the
+/// PRODUCTION-MAPPING guards: every production-shaped runner here comes from the real
+/// `AppModel.makeBootChainRunner` factory (the single shipped intent→coordinator switch, no
+/// hand-copied mapping), so wiring drift in the production factory fails these tests.
 @MainActor
 final class DormantSourceChoiceBootTests: XCTestCase {
 
@@ -195,25 +197,122 @@ final class DormantSourceChoiceBootTests: XCTestCase {
         return .userSelectedDataDir(src)
     }
 
-    func testProductionShapedBootOverCleanSlotStillCreatesFreshNeverSourceChoice() async throws {
-        let (config, staging) = try makeCtx()
-        // An auto candidate that is UNAVAILABLE — the exact precondition N7.2 will one day
-        // flip into the source-choice screen. Today it MUST still mint a fresh ledger.
-        let runner = AppModel.makeBootChainRunner(
+    /// A production-shaped model whose auto candidate is UNAVAILABLE — a first launch with no
+    /// discoverable Electron data. N7.2: it must land in the source choice, not a fresh ledger.
+    private func makeCleanSlotModel(_ config: MigrationCoordinator.Config, staging: URL) -> AppModel {
+        AppModel(runner: AppModel.makeBootChainRunner(
             coordinator: MigrationCoordinator(config: config, stagingRootOverride: staging,
                                               ingestOverride: nil),
             autoSourceCandidate: .userSelectedDataDir(tempRoot.appendingPathComponent("no-electron-here")),
-            activeURL: config.activeDestination)
-        let model = AppModel(runner: runner)
+            activeURL: config.activeDestination))
+    }
+
+    func testProductionShapedBootOverCleanSlotLandsInSourceChoiceNeverAFreshLedger() async throws {
+        let (config, staging) = try makeCtx()
+        let model = makeCleanSlotModel(config, staging: staging)
         model.boot()
         await model.currentBootTask?.value
 
-        if case .awaitingSourceChoice = model.migrationUIState {
-            return XCTFail("N7.1 REGRESSION: a production-wired clean-slot boot reached the source-choice state — resolveB1 must stay unflipped until N7.2")
+        guard case .awaitingSourceChoice = model.migrationUIState else {
+            return XCTFail("N7.2 REGRESSION: a production-wired clean-slot boot must land in the source choice, got \(model.migrationUIState)")
         }
-        XCTAssertTrue(model.ready, "the OLD behavior must hold: a clean slot boots into a fresh ledger")
+        XCTAssertNil(model.store, "no ledger may be silently minted before the user chooses a source")
+        XCTAssertFalse(model.ready)
+        XCTAssertFalse(model.inFlight, "the chain must finish so the user's choice can start cleanly")
+        XCTAssertFalse(fm.fileExists(atPath: config.activeDestination.path),
+                       "nothing may be created at the active path while awaiting the choice")
+    }
+
+    // MARK: - The atomic loop completes: BOTH choices lead out of the source-choice state
+
+    func testConfirmCreateFreshFromSourceChoiceBootsAFreshLedger() async throws {
+        let (config, staging) = try makeCtx()
+        let model = makeCleanSlotModel(config, staging: staging)
+        model.boot()
+        await model.currentBootTask?.value
+        guard case .awaitingSourceChoice = model.migrationUIState else { return XCTFail("precondition") }
+
+        model.confirmCreateFresh()
+        await model.currentBootTask?.value
+        XCTAssertTrue(model.ready, "the confirmed create-fresh must complete into a usable empty ledger")
         XCTAssertNotNil(model.store)
         XCTAssertEqual(try model.store?.schemaVersion(), SchemaMigrator.schemaVersion)
+        XCTAssertEqual(model.migrationUIState, .none)
+    }
+
+    func testMigrateFromUserDirFromSourceChoiceImportsTheChosenSource() async throws {
+        // Drives the REAL production runner mapping end-to-end from the source-choice state:
+        // the chosen directory (as `.userSelectedDataDir`) is imported by `runImport`, never
+        // the auto candidate, and the app becomes ready on the migrated store.
+        let (config, staging) = try makeCtx()
+        let chosen = try makeMarkedSource("Chosen", marker: "chosen-marker")
+        let model = AppModel(runner: AppModel.makeBootChainRunner(
+            coordinator: makeCoordinator(config, staging: staging),
+            autoSourceCandidate: .userSelectedDataDir(tempRoot.appendingPathComponent("no-electron-here")),
+            activeURL: config.activeDestination))
+        model.boot()
+        await model.currentBootTask?.value
+        guard case .awaitingSourceChoice = model.migrationUIState else { return XCTFail("precondition") }
+
+        model.migrateFromUserDir(source: chosen)
+        await model.currentBootTask?.value
+        XCTAssertTrue(model.ready, "the explicit migration must complete into a usable migrated ledger")
+        XCTAssertNotNil(model.store)
+        XCTAssertEqual(try Data(contentsOf: config.activeAttachmentsDir.appendingPathComponent("chosen-marker.pdf")),
+                       Data("chosen-marker".utf8),
+                       "the CHOSEN source must be the one imported")
+    }
+
+    // MARK: - Directory-picker contract (§3.1/§6)
+
+    func testMigrationSourcePanelConfiguredForSingleDirectoryChoice() {
+        let panel = AppModel.makeMigrationSourceDirectoryPanel(message: "prompt-copy")
+        XCTAssertTrue(panel.canChooseDirectories, "the migration-source picker must choose DIRECTORIES")
+        XCTAssertFalse(panel.canChooseFiles, "the migration-source picker must never choose files")
+        XCTAssertFalse(panel.allowsMultipleSelection, "exactly one directory may be granted")
+        XCTAssertEqual(panel.message, "prompt-copy")
+    }
+
+    /// Boot a FakeRunner model into `.awaitingSourceChoice` (one `.boot` intent consumed).
+    private func makeAwaitingChoiceModel(_ fake: FakeRunner) async -> AppModel {
+        fake.outcomes = [.requiresSourceChoice]
+        let model = AppModel(runner: fake)
+        model.boot()
+        await model.currentBootTask?.value
+        return model
+    }
+
+    func testMigrationSourcePanelCancelFiresNoIntentAndStaysOnChoice() async {
+        let fake = FakeRunner()
+        let model = await makeAwaitingChoiceModel(fake)
+        model.handleMigrationSourcePanelResult(.cancel, url: nil)
+        model.handleMigrationSourcePanelResult(.abort, url: nil)
+        model.handleMigrationSourcePanelResult(.OK, url: nil)   // OK without a URL is also a no-op
+        XCTAssertEqual(fake.receivedIntents, [.boot],
+                       "cancelling the directory panel must fire ZERO intents — a pure no-op")
+        guard case .awaitingSourceChoice = model.migrationUIState else {
+            return XCTFail("cancel must stay on the source-choice screen, got \(model.migrationUIState)")
+        }
+        XCTAssertFalse(model.inFlight)
+    }
+
+    func testMigrationSourcePanelOKEmitsExactlyMigrateFromUserDir() async {
+        let fake = FakeRunner()
+        let model = await makeAwaitingChoiceModel(fake)
+        let chosen = sourceURL("GrantedDir")
+        model.handleMigrationSourcePanelResult(.OK, url: chosen)
+        await model.currentBootTask?.value
+        XCTAssertEqual(fake.receivedIntents, [.boot, .migrateFromUserDir(.userSelectedDataDir(chosen))],
+                       "a confirmed directory must emit exactly .migrateFromUserDir(.userSelectedDataDir) — never a plain boot (which would re-inject the auto candidate) and never a bare URL")
+    }
+
+    func testConfirmCreateFreshEmitsExactlyTheConfirmIntent() async {
+        let fake = FakeRunner()
+        let model = await makeAwaitingChoiceModel(fake)
+        model.confirmCreateFresh()
+        await model.currentBootTask?.value
+        XCTAssertEqual(fake.receivedIntents, [.boot, .confirmCreateFresh],
+                       "the confirmed create action must emit exactly .confirmCreateFresh — no other intent, no boolean side channel")
     }
 
     // MARK: - Production mapping guards (the REAL makeBootChainRunner, no hand-copied switch)

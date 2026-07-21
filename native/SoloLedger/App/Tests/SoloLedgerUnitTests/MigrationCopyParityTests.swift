@@ -31,7 +31,17 @@ final class MigrationCopyParityTests: XCTestCase {
             "migration.diagnostics.title", "migration.diagnostics.filename", "migration.diagnostics.writeFailed",
             "migration.msg.selectionCancelled",
         ]
-        return codeKeys + kindKeys + sourceKeys + chrome
+        // N7.2 source-choice copy (design §8) — deliberately ALL placeholder-free.
+        let chooseSource = [
+            "migration.chooseSource.title", "migration.chooseSource.body",
+            "migration.chooseSource.migrate.button", "migration.chooseSource.migrate.hint",
+            "migration.chooseSource.createNew.button", "migration.chooseSource.createNew.hint",
+            "migration.chooseSource.picker.prompt", "migration.chooseSource.picker.noData",
+            "migration.chooseSource.importing",
+            "migration.chooseSource.confirm.title", "migration.chooseSource.confirm.body",
+            "migration.chooseSource.confirm.back", "migration.chooseSource.confirm.create",
+        ]
+        return codeKeys + kindKeys + sourceKeys + chrome + chooseSource
     }
 
     private func rawValue(_ lang: String, _ key: String) -> String? {
@@ -108,14 +118,25 @@ final class MigrationCopyParityTests: XCTestCase {
         XCTAssertEqual(MigrationPresenter.routeInput(for: .awaitingSourceChoice), .sourceChoice)
     }
 
-    func testDormantSourceChoiceInputRendersAsRunningPlaceholderWithNoBlock() {
-        // N7.1: the dormant state maps to the EXISTING neutral progress route (no new route,
-        // view, or copy until N7.2 ships the real source-choice screen) and carries no block.
+    func testSourceChoiceInputRoutesToTheDedicatedChooseSourceScreen() {
+        // N7.2: the source-choice state routes to its OWN pre-open screen (independent of
+        // onboarding — `.onboarding` is only reachable after ready==true) and carries no block.
         XCTAssertEqual(MigrationPresenter.route(bootError: false, migrationFailure: false,
                                                 input: .sourceChoice, ready: false, onboardingDone: false),
-                       .running)
+                       .chooseSource)
         XCTAssertNil(MigrationPresenter.block(from: .awaitingSourceChoice))
         XCTAssertEqual(MigrationPresenter.stateTag(.awaitingSourceChoice), "awaitingSourceChoice")
+    }
+
+    func testCreateFreshConfirmZhHansCopyIsLockedVerbatim() {
+        // Design §1.3/§8: the zh-Hans second-confirmation copy is LOCKED — byte-for-byte,
+        // including CJK punctuation and the quoted button reference. Any drift is a red test.
+        XCTAssertEqual(rawValue("zh-Hans", "migration.chooseSource.confirm.title"),
+                       "创建新的空账本？")
+        XCTAssertEqual(rawValue("zh-Hans", "migration.chooseSource.confirm.body"),
+                       "这不会删除或修改旧版 SoloLedger 的数据，但会跳过迁移并为当前 App 创建一个空账本。旧数据不会自动导入；如需迁移，请返回并选择“迁移旧数据”。")
+        XCTAssertEqual(rawValue("zh-Hans", "migration.chooseSource.confirm.back"), "返回")
+        XCTAssertEqual(rawValue("zh-Hans", "migration.chooseSource.confirm.create"), "创建空账本")
     }
 
     private func block(_ code: MigrationIssueCode, _ cls: MigrationBlock.Class) -> MigrationBlock {

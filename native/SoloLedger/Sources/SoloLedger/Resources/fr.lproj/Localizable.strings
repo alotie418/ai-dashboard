@@ -96,3 +96,18 @@
 "migration.msg.selectionCancelled" = "Sélection annulée — aucun import n'a été ouvert.";
 "migration.candidate.entries" = "{count} entrées";
 "migration.candidate.noMeta" = "Détails indisponibles";
+
+/* N7.2 source choice */
+"migration.chooseSource.title" = "Vous avez peut-être des données de livre existantes";
+"migration.chooseSource.body" = "Vous pouvez migrer les données d’une version précédente de SoloLedger ou créer un nouveau livre.";
+"migration.chooseSource.migrate.button" = "Migrer les anciennes données";
+"migration.chooseSource.migrate.hint" = "Importer depuis le dossier de données d’une version précédente.";
+"migration.chooseSource.createNew.button" = "Créer un nouveau livre";
+"migration.chooseSource.createNew.hint" = "Partir de zéro.";
+"migration.chooseSource.picker.prompt" = "Choisissez le dossier de données de l’ancien SoloLedger";
+"migration.chooseSource.picker.noData" = "Aucune donnée de livre n’a été trouvée dans le dossier sélectionné.";
+"migration.chooseSource.importing" = "Importation des anciennes données…";
+"migration.chooseSource.confirm.title" = "Créer un nouveau livre vide ?";
+"migration.chooseSource.confirm.body" = "Cela ne supprimera ni ne modifiera les données de l’ancien SoloLedger, mais la migration sera ignorée et un livre vide sera créé pour cette app. Les anciennes données ne seront pas importées automatiquement ; pour migrer, revenez en arrière et choisissez « Migrer les anciennes données ».";
+"migration.chooseSource.confirm.back" = "Retour";
+"migration.chooseSource.confirm.create" = "Créer un livre vide";

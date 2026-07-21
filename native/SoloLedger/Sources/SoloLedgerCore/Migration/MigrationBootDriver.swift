@@ -60,7 +60,7 @@ public enum MigrationBootDriver {
         case .requiresImportSelection(let candidates):
             return .ui(.awaitingImportSelection(candidates))
         case .requiresSourceChoice:
-            // N7.1 dormant: a NON-openStore outcome — it can only become a UI state, never an
+            // A NON-openStore outcome — it can only become a UI state, never an
             // authorization, so the source-choice state can never construct a LedgerStore.
             return .ui(.awaitingSourceChoice)
         case .blocked(let block):

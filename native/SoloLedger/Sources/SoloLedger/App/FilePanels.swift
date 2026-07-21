@@ -27,6 +27,36 @@ extension AppModel {
         }
     }
 
+    /// N7.2 (§3.1): the ONE directory picker — the migration-source data-folder chooser.
+    /// Extracted so tests can assert the exact panel configuration (single DIRECTORY,
+    /// never files, never multi-select) without running a modal panel.
+    static func makeMigrationSourceDirectoryPanel(message: String) -> NSOpenPanel {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.message = message
+        return panel
+    }
+
+    /// Source-choice "migrate old data": run the Powerbox directory picker for the previous
+    /// (e.g. DMG-build) SoloLedger data folder. The security scope on the returned URL is
+    /// consumed later inside the single `MigrationSource.withAccess` grant window (Core);
+    /// the App neither preflights nor re-checks the selection.
+    func chooseMigrationSourceViaPanel() {
+        let panel = Self.makeMigrationSourceDirectoryPanel(message: t("migration.chooseSource.picker.prompt"))
+        handleMigrationSourcePanelResult(panel.runModal(), url: panel.url)
+    }
+
+    /// N7.2 (§6): consume the panel result. Only an explicit OK with a URL emits the
+    /// strong-typed `.migrateFromUserDir(.userSelectedDataDir(url))` intent — 1:1, never
+    /// mixed with the auto candidate, never collapsed to a plain boot. Cancel (or a missing
+    /// URL) is a PURE no-op: no intent fires and the app stays on the source-choice screen.
+    func handleMigrationSourcePanelResult(_ response: NSApplication.ModalResponse, url: URL?) {
+        guard response == .OK, let url else { return }
+        migrateFromUserDir(source: .userSelectedDataDir(url))
+    }
+
     /// Recovery: pick a backup / export SoloLedger database (`.db`) to adopt.
     func restoreFromBackupViaPanel() {
         let panel = NSOpenPanel()

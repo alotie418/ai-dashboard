@@ -161,12 +161,13 @@ final class AppModel: ObservableObject {
     func submitAcknowledgement(_ ack: Acknowledgement) { guard store == nil else { return }; startChain(.acknowledgement(ack)) }
     /// Consume a user import selection.
     func resolveImportSelection(importID: String) { guard store == nil else { return }; startChain(.selection(importID)) }
-    /// N7.1 DORMANT intent entry — NOT called by any UI until N7.2 ships the source-choice
-    /// screen; hosted tests drive it. Same discipline as every intent: only before a store
-    /// exists, hard single-flight inside `startChain`.
+    /// N7.2: emitted by the source-choice screen's confirmed "create empty ledger" action
+    /// (the confirmation dialog is view-local; only its confirm button calls this). Same
+    /// discipline as every intent: only before a store exists, hard single-flight inside
+    /// `startChain`.
     func confirmCreateFresh() { guard store == nil else { return }; startChain(.confirmCreateFresh) }
-    /// N7.1 DORMANT intent entry — NOT called by any UI until N7.2 ships the directory
-    /// picker; hosted tests drive it. The chosen source rides the intent as a value type.
+    /// N7.2: emitted after the user confirms a directory in the migration-source picker
+    /// (`handleMigrationSourcePanelResult`). The chosen source rides the intent as a value type.
     func migrateFromUserDir(source: MigrationSource) { guard store == nil else { return }; startChain(.migrateFromUserDir(source)) }
     /// Cancel an import selection — never opens, creates, or auto-picks; lands terminal-ish.
     func cancelImportSelection() {

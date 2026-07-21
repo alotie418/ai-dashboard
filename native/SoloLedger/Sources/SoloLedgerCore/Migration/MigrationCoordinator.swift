@@ -180,11 +180,12 @@ public enum BootOutcome: Equatable {
     case openStore(authorization: StoreOpenAuthorization, residual: MigrationResidual?)
     case requiresAcknowledgement(request: AcknowledgementRequest, unresolved: UnresolvedReport)
     case requiresImportSelection([RecoverableImport])
-    /// N7.1 DORMANT (§1.1): "please choose a source" — a NON-openStore outcome (parallel to
+    /// N7.2 (§1.1): "please choose a source" — a NON-openStore outcome (parallel to
     /// `.requiresImportSelection`), so `classifyOutcome` can only route it to a UI state and
-    /// it can structurally never reach `attemptOpen` / construct a store. NOTHING in the
-    /// coordinator emits it yet: `resolveB1`'s `.unavailable` branch still returns the old
-    /// `.openStore(.createFreshExpectedAbsent)` until N7.2 flips it atomically with the UI.
+    /// it can structurally never reach `attemptOpen` / construct a store. Emitted by
+    /// `resolveB1`'s `.unavailable` branch for an AUTOMATIC boot (a first launch with no
+    /// discoverable auto source no longer silently mints an empty ledger); the confirmed
+    /// create-fresh entry still mints `.openStore(.createFreshExpectedAbsent)`.
     case requiresSourceChoice
     case blocked(MigrationBlock)
 }
@@ -285,8 +286,9 @@ public struct MigrationCoordinator {
                 acknowledgement: acknowledgement, hooks: CoordinatorHooks())
     }
 
-    /// N7.1 DORMANT (§1.3): the strong-typed "user confirmed create-fresh" resolution — the
-    /// entry the `.confirmCreateFresh` boot intent maps to. By construction it takes NO
+    /// N7.2 (§1.3): the strong-typed "user confirmed create-fresh" resolution — the
+    /// entry the `.confirmCreateFresh` boot intent maps to (emitted by the source-choice
+    /// screen's confirmed "create empty ledger" action). By construction it takes NO
     /// auto-source candidate (a confirmed create-fresh never absorbs an auto migration
     /// candidate), and it is NOT a `confirmed: Bool` on `bootResolve` — internal reuse goes
     /// through the PRIVATE strong-typed `ResolutionRequest` only. Probe-first dominance is
@@ -294,29 +296,44 @@ public struct MigrationCoordinator {
     /// bypass them into a fresh ledger), and the final `confirmOpenAuthorization` re-check —
     /// where the App DOES pass the auto candidate for a createFresh authorization — can still
     /// revoke the authorization at the last moment (`.reResolve`, re-adjudication prefers
-    /// migration). No production caller until N7.2 wires the source-choice UI.
+    /// migration).
     public func confirmCreateFresh(acknowledgement: Acknowledgement? = nil) -> BootOutcome {
         resolve(.confirmedCreateFresh, acknowledgement: acknowledgement, hooks: CoordinatorHooks())
     }
 
     /// PRIVATE strong-typed resolution request (§1.3): the ONLY internal reuse channel between
     /// the automatic boot and the confirmed create-fresh entry. Deliberately not a boolean —
-    /// each case names its exact semantics and payload.
+    /// each case names its exact semantics and payload. Threaded down to `resolveB1`, whose
+    /// no-source branch is the ONE place the two requests diverge (source choice vs createFresh).
     private enum ResolutionRequest {
         case automaticBoot(autoSourceCandidate: MigrationSource?)
         case confirmedCreateFresh
+
+        /// A confirmed create-fresh consults NO auto candidate at resolution time; the
+        /// auto-revocation window lives exclusively in
+        /// `confirmOpenAuthorization(.createFreshExpectedAbsent, autoSourceCandidate:)`.
+        var autoSourceCandidate: MigrationSource? {
+            switch self {
+            case .automaticBoot(let auto): return auto
+            case .confirmedCreateFresh:    return nil
+            }
+        }
     }
 
     private func resolve(_ request: ResolutionRequest, acknowledgement: Acknowledgement?,
                          hooks: CoordinatorHooks) -> BootOutcome {
-        switch request {
-        case .automaticBoot(let auto):
-            return bootResolve(autoSourceCandidate: auto, acknowledgement: acknowledgement, hooks: hooks)
-        case .confirmedCreateFresh:
-            // A confirmed create-fresh consults NO auto candidate at resolution time; the
-            // auto-revocation window lives exclusively in
-            // `confirmOpenAuthorization(.createFreshExpectedAbsent, autoSourceCandidate:)`.
-            return bootResolve(autoSourceCandidate: nil, acknowledgement: acknowledgement, hooks: hooks)
+        switch Self.inspectRecord(activeDestination: config.activeDestination) {
+        case .malformed(let m):
+            return .blocked(.terminal(.recordMalformed, ["detail": m]))
+        case .unreadableRetriable(let m):
+            return .blocked(.retriable(.ioTransient, ["op": "record", "detail": m]))
+        case .record(let record):
+            return resolveWithRecord(record, acknowledgement: acknowledgement,
+                                     autoSourceCandidate: request.autoSourceCandidate,
+                                     adjudicated: false, hooks: hooks)
+        case .none:
+            return resolveWithoutRecord(acknowledgement: acknowledgement,
+                                        request: request, hooks: hooks)
         }
     }
 
@@ -450,19 +467,8 @@ public struct MigrationCoordinator {
 
     func bootResolve(autoSourceCandidate: MigrationSource?, acknowledgement: Acknowledgement?,
                      hooks: CoordinatorHooks) -> BootOutcome {
-        switch Self.inspectRecord(activeDestination: config.activeDestination) {
-        case .malformed(let m):
-            return .blocked(.terminal(.recordMalformed, ["detail": m]))
-        case .unreadableRetriable(let m):
-            return .blocked(.retriable(.ioTransient, ["op": "record", "detail": m]))
-        case .record(let record):
-            return resolveWithRecord(record, acknowledgement: acknowledgement,
-                                     autoSourceCandidate: autoSourceCandidate,
-                                     adjudicated: false, hooks: hooks)
-        case .none:
-            return resolveWithoutRecord(acknowledgement: acknowledgement,
-                                        autoSourceCandidate: autoSourceCandidate, hooks: hooks)
-        }
+        resolve(.automaticBoot(autoSourceCandidate: autoSourceCandidate),
+                acknowledgement: acknowledgement, hooks: hooks)
     }
 
     // MARK: - R present: probe-first (B3/B4)
@@ -588,7 +594,7 @@ public struct MigrationCoordinator {
     // MARK: - R absent: exhaustive Sent × ActiveEntry table, then B2/B1
 
     private func resolveWithoutRecord(acknowledgement: Acknowledgement?,
-                                      autoSourceCandidate: MigrationSource?,
+                                      request: ResolutionRequest,
                                       hooks: CoordinatorHooks) -> BootOutcome {
         let active = Self.inspectActiveEntry(activeDestination: config.activeDestination)
         // P1: a violated active slot is reported before ANY sentinel interpretation.
@@ -622,14 +628,13 @@ public struct MigrationCoordinator {
         case .boundRegularFile:
             return .openStore(authorization: .openExistingPlain, residual: nil)             // B2
         case .absent:
-            return resolveB1(acknowledgement: acknowledgement,
-                             autoSourceCandidate: autoSourceCandidate, hooks: hooks)
+            return resolveB1(acknowledgement: acknowledgement, request: request, hooks: hooks)
         case .invalidType, .metadataReadFailed:
             return .blocked(.terminal(.internalError, ["detail": "unreachable: P1/P4 precede P6"]))
         }
     }
 
-    private func resolveB1(acknowledgement: Acknowledgement?, autoSourceCandidate: MigrationSource?,
+    private func resolveB1(acknowledgement: Acknowledgement?, request: ResolutionRequest,
                            hooks: CoordinatorHooks) -> BootOutcome {
         let stagingScan = scanStaging()
         let scan: StagingScan
@@ -641,6 +646,7 @@ public struct MigrationCoordinator {
         if let bad = scan.suspiciousTerminal.first {
             return .blocked(.terminal(.stagingTampered, ["entry": bad]))
         }
+        let autoSourceCandidate = request.autoSourceCandidate
         switch scan.publishedImportIDs.count {
         case 0:
             switch Self.sourceState(autoSourceCandidate) {
@@ -650,7 +656,15 @@ public struct MigrationCoordinator {
             case .unstable(let m):
                 return .blocked(.retriable(.interference, ["op": "sourceState", "detail": m]))
             case .unavailable:
-                return .openStore(authorization: .createFreshExpectedAbsent, residual: nil)
+                // N7.2 FLIP (§1.1): a clean disk with no usable auto source no longer silently
+                // mints an empty ledger on an AUTOMATIC boot — the user must choose a source
+                // first. Only the strong-typed confirmed create-fresh request (the source-choice
+                // screen's confirmed "create empty ledger") still mints the createFresh
+                // authorization, and even that stays revocable at `confirmOpenAuthorization`.
+                switch request {
+                case .automaticBoot:        return .requiresSourceChoice
+                case .confirmedCreateFresh: return .openStore(authorization: .createFreshExpectedAbsent, residual: nil)
+                }
             }
         case 1:
             let id = scan.publishedImportIDs[0]
