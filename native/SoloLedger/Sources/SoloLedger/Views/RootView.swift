@@ -26,7 +26,12 @@ struct RootView: View {
     // so no path bypasses routing.
     @ViewBuilder private var content: some View {
         let resolved = resolvedRouteAndData
+        #if DEBUG
         render(resolved.0, resolved.1)
+            .safeAreaInset(edge: .bottom) { DebugActionWitnessBar() }
+        #else
+        render(resolved.0, resolved.1)
+        #endif
     }
 
     /// (route, view-data). Production feeds the real model through `route`; the DEBUG preview
@@ -530,6 +535,41 @@ private struct ResidualBanner: View {
 }
 
 #if DEBUG
+/// TEST-ONLY (DEBUG) action witness: counts how often the preview's source-choice closures
+/// fire, so UI tests can prove the REAL SwiftUI button → closure wiring in
+/// `MigrationSourceChoiceView` (rendering alone cannot catch an emptied button action).
+/// Only the `--migration-ui-preview chooseSource` closures record into it and only that
+/// preview renders it; production (non-preview) boots never touch it, and none of this is
+/// compiled into Release. Mutated exclusively from button actions / read from rendering,
+/// both on the main thread.
+final class DebugActionWitness: ObservableObject {
+    static let shared = DebugActionWitness()
+    @Published private(set) var counts: [String: Int] = [:]
+    func record(_ action: String) { counts[action, default: 0] += 1 }
+}
+
+/// The witness read-out (DEBUG): two stable-identifier labels the UI tests assert on.
+/// Renders ONLY under the `chooseSource` preview — every other route (and every production
+/// boot) contributes an empty inset.
+private struct DebugActionWitnessBar: View {
+    @ObservedObject private var witness = DebugActionWitness.shared
+    var body: some View {
+        if DebugMigrationPreview.current?.input == .sourceChoice {
+            // The COUNT is encoded in the accessibility IDENTIFIER (identifier queries are
+            // the one AX surface that proved reliable for this inset on macOS SwiftUI): the
+            // tests assert existence of `…witness.<action>.<count>` — a missed or doubled
+            // invocation makes the expected identifier never exist.
+            HStack(spacing: 12) {
+                Text("onMigrate=\(witness.counts["onMigrate", default: 0])")
+                    .accessibilityIdentifier("migration.debug.witness.onMigrate.\(witness.counts["onMigrate", default: 0])")
+                Text("onCreateFresh=\(witness.counts["onCreateFresh", default: 0])")
+                    .accessibilityIdentifier("migration.debug.witness.onCreateFresh.\(witness.counts["onCreateFresh", default: 0])")
+            }
+            .font(.caption2).foregroundStyle(.secondary).padding(4)
+        }
+    }
+}
+
 /// DEBUG/TEST-ONLY preview seam for the migration states, driven by the
 /// `--migration-ui-preview <state>` launch argument (or `MIGRATION_UI_PREVIEW` env var). It is
 /// compiled ONLY in DEBUG, so no arbitrary state-injection entry point exists in Release.
@@ -576,9 +616,14 @@ enum DebugMigrationPreview {
             var d = MigrationViewData(); d.residualImportID = "import-residual-1"
             return Preview(input: .cleanupResidual, ready: true, onboardingDone: true, data: d)
         case "chooseSource":
-            // Synthetic no-op intents: the preview renders the REAL source-choice screen and
-            // its confirmation dialog (view-local state) without a model or a live chain.
-            return Preview(input: .sourceChoice, ready: false, onboardingDone: false, data: MigrationViewData())
+            // Synthetic intents that record into the TEST-ONLY witness: the preview renders
+            // the REAL source-choice screen and its confirmation dialog (view-local state)
+            // without a model or a live chain, and UI tests click the real buttons and read
+            // the witness counts to prove the button → closure wiring.
+            var d = MigrationViewData()
+            d.onChooseMigrate = { DebugActionWitness.shared.record("onMigrate") }
+            d.onConfirmCreateFresh = { DebugActionWitness.shared.record("onCreateFresh") }
+            return Preview(input: .sourceChoice, ready: false, onboardingDone: false, data: d)
         case "none":
             // Deterministic neutral state: .none + ready==false ⇒ loading (NOT a real boot).
             return Preview(input: .none, ready: false, onboardingDone: false, data: MigrationViewData())

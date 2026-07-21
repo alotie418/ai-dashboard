@@ -128,6 +128,65 @@ final class MigrationRecoveryUITests: XCTestCase {
                        "the dialog must be dismissed after going back")
     }
 
+    /// N7.2 follow-up: ACTION WITNESSES for the real SwiftUI button → closure seams.
+    /// Rendering alone cannot catch an emptied button action, so this clicks the REAL
+    /// `MigrationSourceChoiceView` buttons and reads the DEBUG-only witness counters:
+    ///  - clicking migrate invokes `onMigrate` exactly once (kills `Button { onMigrate() }`
+    ///    → `Button { }`);
+    ///  - clicking createNew alone invokes NOTHING (the dialog gate stands);
+    ///  - clicking the dialog's back invokes NOTHING and stays on the choice screen;
+    ///  - clicking the dialog's create invokes `onCreateFresh` exactly once (kills
+    ///    `Button(confirm.create) { onCreateFresh() }` → `Button(confirm.create) { }`).
+    func testChooseSourceButtonsDriveTheirClosuresThroughTheRealWiring() {
+        var app = launch("chooseSource")
+        var migrate = app.buttons["migration.chooseSource.migrate"]
+        if !migrate.waitForExistence(timeout: 10) {
+            // Same ONE relaunch guard against sequential-launch contention as the gate test.
+            app.terminate()
+            terminateAllAndWait()
+            app = launch("chooseSource")
+            migrate = app.buttons["migration.chooseSource.migrate"]
+        }
+        XCTAssertTrue(migrate.waitForExistence(timeout: 10), "the migrate action must render")
+        XCTAssertTrue(witness(app, "onMigrate", 0).waitForExistence(timeout: 10),
+                      "the witness bar must render in the chooseSource preview")
+        XCTAssertTrue(witness(app, "onCreateFresh", 0).exists)
+
+        migrate.click()
+        XCTAssertTrue(witness(app, "onMigrate", 1).waitForExistence(timeout: 10),
+                      "clicking migrate must invoke onMigrate exactly once")
+        XCTAssertFalse(witness(app, "onMigrate", 2).exists, "onMigrate must fire exactly ONCE per click")
+        XCTAssertTrue(witness(app, "onCreateFresh", 0).exists, "migrate must not touch onCreateFresh")
+
+        let createNew = app.buttons["migration.chooseSource.createNew"]
+        createNew.click()
+        let back = app.buttons["migration.chooseSource.confirm.back"].firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 10), "createNew must raise the dialog")
+        XCTAssertTrue(witness(app, "onCreateFresh", 0).exists,
+                      "createNew ITSELF must not invoke onCreateFresh — only the dialog's create button may")
+
+        back.click()
+        XCTAssertTrue(createNew.waitForExistence(timeout: 10), "back must stay on the choice screen")
+        XCTAssertTrue(witness(app, "onMigrate", 1).exists, "back must fire ZERO callbacks")
+        XCTAssertTrue(witness(app, "onCreateFresh", 0).exists, "back must fire ZERO callbacks")
+
+        createNew.click()
+        let confirm = app.buttons["migration.chooseSource.confirm.create"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10), "createNew must raise the dialog again")
+        confirm.click()
+        XCTAssertTrue(witness(app, "onCreateFresh", 1).waitForExistence(timeout: 10),
+                      "clicking the dialog's create must invoke onCreateFresh exactly once")
+        XCTAssertFalse(witness(app, "onCreateFresh", 2).exists, "onCreateFresh must fire exactly ONCE per confirm")
+        XCTAssertTrue(witness(app, "onMigrate", 1).exists, "the create confirmation must not touch onMigrate")
+    }
+
+    /// The witness read-out element: the invocation COUNT is encoded in the accessibility
+    /// identifier (`…witness.<action>.<count>`), so a missed invocation leaves the expected
+    /// identifier non-existent and a double invocation skips it entirely — both fail.
+    private func witness(_ app: XCUIApplication, _ action: String, _ count: Int) -> XCUIElement {
+        app.staticTexts["migration.debug.witness.\(action).\(count)"]
+    }
+
     func testCleanupResidualKeepsMainUIUsable() {
         let app = launch("residual")
         // The MAIN UI renders (sidebar present) — cleanupResidual does NOT block it with a
