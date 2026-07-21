@@ -158,6 +158,20 @@ final class DirectoryHandle {
         return try Self.adopt(fd: parent, pathHint: hint)
     }
 
+    /// The kernel's CURRENT canonical path for this open descriptor (`fcntl(F_GETPATH)`).
+    /// fd-based: it needs no path authority and resolves no caller-supplied strings, so a
+    /// sandboxed process may call it on any handle it legitimately holds (a Powerbox grant
+    /// included). The result only ever NOMINATES containment candidates (`SelfImportGuard`);
+    /// every verdict is re-proven by descriptor (device, inode) identity, never by this
+    /// string.
+    func canonicalPath() throws -> String {
+        var buf = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        guard fcntl(fd, F_GETPATH, &buf) != -1 else {
+            throw FileHashError.unreadable(path: pathHint, errno: errno)
+        }
+        return String(cString: buf)
+    }
+
     /// One step of a directory read. `readdir` distinguishes end-of-directory from an
     /// error ONLY through errno: on EOF it returns NULL and leaves errno unchanged; on an
     /// error (EIO, EBADF, …) it returns NULL and sets errno. Conflating the two would let
@@ -737,12 +751,21 @@ public enum SelfImportRelationship: String, Sendable, Equatable {
 }
 
 /// Fail-closed pre-check (§3.3): rejects importing this app's OWN data root / active store /
-/// their dangerous overlaps, judged on canonical (device, inode) identity — NEVER on path
-/// strings (firmlinks / mounts alias prefixes; a REAL cross-volume copy with a different
-/// identity must stay importable). It is a UX gate layered in front of the pipeline, not the
-/// write-safety boundary — that stays with the activator's `O_EXCL` reservation and the
-/// hardened opens. Any open/stat metadata error is fail-closed (the import is refused),
-/// never read as "no overlap".
+/// their dangerous overlaps. Every VERDICT rests on canonical (device, inode) identity —
+/// never on a path string alone (firmlinks / mounts alias prefixes; a REAL cross-volume
+/// copy with a different identity must stay importable). Containment (ancestor/descendant)
+/// is decided sandbox-compatibly: no upward `openat(fd, "..")` walk exists — a sandboxed
+/// process holding only the Powerbox grant for the source CANNOT open the source's parents
+/// and must not need to. Instead the kernel's canonical path of each LIVE descriptor
+/// (`DirectoryHandle.canonicalPath()`, fd-based) NOMINATES containment candidates by
+/// component-boundary prefix, and each candidate is PROVEN by a bounded, no-follow,
+/// componentwise descent from the OUTER descriptor whose final (device, inode) must match.
+/// Descents only ever go DOWN — from the source (inside its own grant) or from a protected
+/// handle (inside the container) — so no operation needs authority the process doesn't
+/// already hold. It is a UX gate layered in front of the pipeline, not the write-safety
+/// boundary — that stays with the activator's `O_EXCL` reservation and the hardened opens.
+/// Any open/stat metadata error — a sandbox/permission denial included — is fail-closed
+/// (the import is refused), never read as "no overlap".
 struct SelfImportGuard {
 
     /// The identities this guard protects. Injectable (coordinator-config-derived in
@@ -774,17 +797,17 @@ struct SelfImportGuard {
         init(_ fp: FileFingerprint) { device = fp.device; inode = fp.inode }
     }
 
-    /// Upward walks that neither reach the root fixpoint nor find the target within this
-    /// bound are refused fail-closed (never treated as "no overlap"). Carries no path.
+    /// Ancestry judgments that exceed the fixed bound — or whose nominated containment
+    /// cannot be re-proven by descriptor identity — are refused fail-closed (never treated
+    /// as "no overlap"). Carries no path.
     struct AncestryUnverifiable: Error, CustomStringConvertible {
         let depth: Int
         var description: String { "Self-import guard could not verify directory ancestry within \(depth) hops — refusing to ingest." }
     }
 
     var identity: ProtectedIdentity
-    /// Fixed upward-walk bound (§3.3). Termination is DOUBLE: the (device, inode) fixpoint at
-    /// the filesystem root (its parent is itself) plus this depth cap — never a device change
-    /// (firmlinks / mounts switch devices mid-path).
+    /// Fixed bound (§3.3) on every ancestry judgment: a canonical location deeper than this,
+    /// or a containment descent longer than this, is refused fail-closed rather than trusted.
     var maxDepth: Int = 64
 
     /// Throws `IngestError.sourceIsActiveData` on any protected overlap; returns silently
@@ -815,8 +838,7 @@ struct SelfImportGuard {
             }
             // A standalone file cannot CONTAIN a directory; only its containment matters.
             if let parent = sourceDir {
-                try rejectDescendant(startingAt: parent, includeStart: true,
-                                     root: rootHandle, attachments: attachmentsHandle)
+                try rejectParentContainment(parent, root: rootHandle, attachments: attachmentsHandle)
             }
             return
         }
@@ -834,70 +856,131 @@ struct SelfImportGuard {
             throw IngestError.sourceIsActiveData(role: .activeDatabase, relationship: .sameIdentity)
         }
 
-        // Source INSIDE a protected object (nearest protected ancestor wins by hop order).
-        try rejectDescendant(startingAt: sourceDir, includeStart: false,
-                             root: rootHandle, attachments: attachmentsHandle)
+        let src = try Located(sourceDir, bound: maxDepth)
+        let att = try attachmentsHandle.map { try Located($0, bound: maxDepth) }
+        let root = try rootHandle.map { try Located($0, bound: maxDepth) }
 
-        // Source CONTAINS a protected object: walk up from each protected root (or, when the
-        // data root does not exist yet, from its deepest EXISTING ancestor — a first-install
-        // data root's future parents exist and must still be refusable, §3.3).
-        if let root = rootHandle {
-            try walkUp(from: root, includeStart: false) { hop in
-                if hop == sourceIdent {
-                    throw IngestError.sourceIsActiveData(role: .nativeDataRoot, relationship: .sourceAncestorOfProtected)
-                }
+        // Source INSIDE a protected object. Attachments sit INSIDE the data root, so the
+        // deeper protected object is tested first — report it, not the outer root.
+        if let a = att, try verifiedStrictDescent(outer: a, to: src) {
+            throw IngestError.sourceIsActiveData(role: .activeAttachments, relationship: .sourceDescendantOfProtected)
+        }
+        if let r = root, try verifiedStrictDescent(outer: r, to: src) {
+            throw IngestError.sourceIsActiveData(role: .nativeDataRoot, relationship: .sourceDescendantOfProtected)
+        }
+
+        // Source CONTAINS a protected object: the data root (or, when it does not exist yet,
+        // its deepest EXISTING ancestor — a first-install data root's future parents exist
+        // and must still be refusable, §3.3), then the attachments root. The mount-point
+        // branch covers the one containment shape canonical prefixes cannot see (§ the
+        // `containsMountPoint` doc).
+        if let r = root {
+            if try verifiedStrictDescent(outer: src, to: r) || containsMountPoint(of: r.handle, source: src) {
+                throw IngestError.sourceIsActiveData(role: .nativeDataRoot, relationship: .sourceAncestorOfProtected)
             }
-        } else if let nearest = try Self.openDeepestExistingAncestor(of: identity.dataRootURL) {
-            try walkUp(from: nearest, includeStart: true) { hop in
-                if hop == sourceIdent {
-                    throw IngestError.sourceIsActiveData(role: .nativeDataRoot, relationship: .sourceAncestorOfProtected)
-                }
+        } else if let nearestHandle = try Self.openDeepestExistingAncestor(of: identity.dataRootURL) {
+            let nearest = try Located(nearestHandle, bound: maxDepth)
+            if try src.ident == nearest.ident || verifiedStrictDescent(outer: src, to: nearest) {
+                throw IngestError.sourceIsActiveData(role: .nativeDataRoot, relationship: .sourceAncestorOfProtected)
             }
         }
-        if let att = attachmentsHandle {
-            try walkUp(from: att, includeStart: false) { hop in
-                if hop == sourceIdent {
-                    throw IngestError.sourceIsActiveData(role: .activeAttachments, relationship: .sourceAncestorOfProtected)
-                }
+        if let a = att {
+            if try verifiedStrictDescent(outer: src, to: a) || containsMountPoint(of: a.handle, source: src) {
+                throw IngestError.sourceIsActiveData(role: .activeAttachments, relationship: .sourceAncestorOfProtected)
             }
         }
     }
 
     // MARK: internals
 
-    private func rejectDescendant(startingAt handle: DirectoryHandle, includeStart: Bool,
-                                  root: DirectoryHandle?, attachments: DirectoryHandle?) throws {
-        let rootIdent = root.map(Ident.init)
-        let attIdent = attachments.map(Ident.init)
-        guard rootIdent != nil || attIdent != nil else { return }
-        try walkUp(from: handle, includeStart: includeStart) { hop in
-            // Attachments sit INSIDE the data root, so on a nested layout the deeper
-            // protected object is met first — report it, not the outer root.
-            if let a = attIdent, hop == a {
-                throw IngestError.sourceIsActiveData(role: .activeAttachments, relationship: .sourceDescendantOfProtected)
-            }
-            if let r = rootIdent, hop == r {
-                throw IngestError.sourceIsActiveData(role: .nativeDataRoot, relationship: .sourceDescendantOfProtected)
-            }
+    /// A live directory descriptor together with its kernel-canonical path components,
+    /// bounded at construction (fail-closed beyond the bound).
+    private struct Located {
+        let handle: DirectoryHandle
+        let ident: Ident
+        let components: [String]
+
+        init(_ handle: DirectoryHandle, bound maxDepth: Int) throws {
+            self.handle = handle
+            self.ident = Ident(handle)
+            let comps = Located.split(try handle.canonicalPath())
+            guard comps.count <= maxDepth else { throw AncestryUnverifiable(depth: maxDepth) }
+            self.components = comps
+        }
+
+        static func split(_ path: String) -> [String] { path.split(separator: "/").map(String.init) }
+    }
+
+    /// TRUE iff `inner` sits STRICTLY inside `outer`. The canonical-component prefix only
+    /// NOMINATES the candidate; the verdict is a bounded, no-follow, componentwise descent
+    /// from `outer`'s own descriptor whose final (device, inode) must equal `inner`'s. The
+    /// descent never leaves `outer`'s subtree, so a Powerbox-granted outer needs nothing
+    /// beyond its grant and a container-side outer never leaves the container. A nominated
+    /// descent that cannot complete — racing rename, permission denial — or that lands on a
+    /// different identity is fail-closed, never "independent".
+    private func verifiedStrictDescent(outer: Located, to inner: Located) throws -> Bool {
+        guard inner.components.count > outer.components.count,
+              inner.components.starts(with: outer.components) else { return false }
+        let relative = inner.components.dropFirst(outer.components.count)
+        guard relative.count <= maxDepth else { throw AncestryUnverifiable(depth: maxDepth) }
+        var cursor = outer.handle
+        for name in relative { cursor = try cursor.subdirectory(named: name) }
+        guard Ident(cursor) == inner.ident else { throw AncestryUnverifiable(depth: maxDepth) }
+        return true
+    }
+
+    /// Firmlink / mount alias coverage: canonical spellings break EXACTLY at a volume
+    /// junction (macOS spells the data volume "/System/Volumes/Data" while everything ON it
+    /// is spelled from "/"), so a source that IS — or textually contains — the mount point
+    /// of the protected object's volume contains the protected object physically with no
+    /// shared canonical prefix. `fstatfs` (fd-based, public API) names that mount point; the
+    /// verdict still ends in descriptor evidence: the descended-to directory must be that
+    /// very volume root (same fsid AND canonical path equal to the mount point).
+    private func containsMountPoint(of protected: DirectoryHandle, source: Located) throws -> Bool {
+        var pfs = statfs()
+        guard fstatfs(protected.fd, &pfs) == 0 else { throw AncestryUnverifiable(depth: maxDepth) }
+        let mnt = Located.split(Self.mountPath(of: &pfs))
+        guard mnt.count <= maxDepth else { throw AncestryUnverifiable(depth: maxDepth) }
+        guard mnt.count >= source.components.count,
+              mnt.starts(with: source.components) else { return false }
+        var cursor = source.handle
+        for name in mnt.dropFirst(source.components.count) {
+            cursor = try cursor.subdirectory(named: name)
+        }
+        var cfs = statfs()
+        guard fstatfs(cursor.fd, &cfs) == 0 else { throw AncestryUnverifiable(depth: maxDepth) }
+        guard cfs.f_fsid.val.0 == pfs.f_fsid.val.0, cfs.f_fsid.val.1 == pfs.f_fsid.val.1 else { return false }
+        return Located.split(try cursor.canonicalPath()) == mnt
+    }
+
+    private static func mountPath(of fs: inout statfs) -> String {
+        withUnsafeBytes(of: &fs.f_mntonname) { raw in
+            String(cString: raw.baseAddress!.assumingMemoryBound(to: CChar.self))
         }
     }
 
-    /// Upward identity walk over `parentDirectory()`. Visits each hop's identity; terminates
-    /// on the root fixpoint (parent identity == current identity, visited once) or throws
-    /// `AncestryUnverifiable` when `maxDepth` is exhausted first (fail-closed).
-    private func walkUp(from start: DirectoryHandle, includeStart: Bool,
-                        visit: (Ident) throws -> Void) throws {
-        var current = start
-        if includeStart { try visit(Ident(current)) }
-        var depth = 0
-        while true {
-            depth += 1
-            if depth > maxDepth { throw AncestryUnverifiable(depth: maxDepth) }
-            let parent = try current.parentDirectory()
-            let parentIdent = Ident(parent)
-            try visit(parentIdent)
-            if parentIdent == Ident(current) { return }   // filesystem root: parent is itself
-            current = parent
+    /// legacySingleDB containment: the DB's parent directory BEING root/attachments or
+    /// sitting INSIDE either. Attachments (the deeper object on the nested layout) reports
+    /// first — identical report order to the N7.1 upward walk this replaces, and identical
+    /// labels: both shapes are `sourceDescendantOfProtected`.
+    private func rejectParentContainment(_ parent: DirectoryHandle,
+                                         root: DirectoryHandle?, attachments: DirectoryHandle?) throws {
+        guard root != nil || attachments != nil else { return }
+        let parentIdent = Ident(parent)
+        if let att = attachments, parentIdent == Ident(att) {
+            throw IngestError.sourceIsActiveData(role: .activeAttachments, relationship: .sourceDescendantOfProtected)
+        }
+        if let r = root, parentIdent == Ident(r) {
+            throw IngestError.sourceIsActiveData(role: .nativeDataRoot, relationship: .sourceDescendantOfProtected)
+        }
+        let par = try Located(parent, bound: maxDepth)
+        if let att = try attachments.map({ try Located($0, bound: maxDepth) }),
+           try verifiedStrictDescent(outer: att, to: par) {
+            throw IngestError.sourceIsActiveData(role: .activeAttachments, relationship: .sourceDescendantOfProtected)
+        }
+        if let r = try root.map({ try Located($0, bound: maxDepth) }),
+           try verifiedStrictDescent(outer: r, to: par) {
+            throw IngestError.sourceIsActiveData(role: .nativeDataRoot, relationship: .sourceDescendantOfProtected)
         }
     }
 
