@@ -566,22 +566,30 @@ final class DebugActionWitness: ObservableObject {
     func record(_ action: String) { counts[action, default: 0] += 1 }
 }
 
-/// The witness read-out (DEBUG): two stable-identifier labels the UI tests assert on.
-/// Renders ONLY under the `chooseSource` preview — every other route (and every production
-/// boot) contributes an empty inset.
+/// The witness read-out (DEBUG): stable-identifier labels the UI tests assert on. Renders
+/// ONLY under the `chooseSource` preview (supplied-closure witnesses) or the boot harness
+/// (production-path witnesses, see `DebugBootHarness`) — every other route and every
+/// production boot contributes an empty inset.
 private struct DebugActionWitnessBar: View {
     @ObservedObject private var witness = DebugActionWitness.shared
+
+    private var keys: [String]? {
+        if DebugBootHarness.isActive { return DebugBootHarness.witnessKeys }
+        if DebugMigrationPreview.current?.input == .sourceChoice { return ["onMigrate", "onCreateFresh"] }
+        return nil
+    }
+
     var body: some View {
-        if DebugMigrationPreview.current?.input == .sourceChoice {
+        if let keys {
             // The COUNT is encoded in the accessibility IDENTIFIER (identifier queries are
             // the one AX surface that proved reliable for this inset on macOS SwiftUI): the
-            // tests assert existence of `…witness.<action>.<count>` — a missed or doubled
+            // tests assert existence of `…witness.<key>.<count>` — a missed or doubled
             // invocation makes the expected identifier never exist.
             HStack(spacing: 12) {
-                Text("onMigrate=\(witness.counts["onMigrate", default: 0])")
-                    .accessibilityIdentifier("migration.debug.witness.onMigrate.\(witness.counts["onMigrate", default: 0])")
-                Text("onCreateFresh=\(witness.counts["onCreateFresh", default: 0])")
-                    .accessibilityIdentifier("migration.debug.witness.onCreateFresh.\(witness.counts["onCreateFresh", default: 0])")
+                ForEach(keys, id: \.self) { key in
+                    Text("\(key)=\(witness.counts[key, default: 0])")
+                        .accessibilityIdentifier("migration.debug.witness.\(key).\(witness.counts[key, default: 0])")
+                }
             }
             .font(.caption2).foregroundStyle(.secondary).padding(4)
         }

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import SoloLedgerCore
 
@@ -142,6 +143,23 @@ final class AppModel: ObservableObject {
                 ?? FileManager.default.temporaryDirectory.appendingPathComponent("demo.db")
             bootDemo(databaseURL: url)
             return
+        }
+        // DEBUG UI-test boot harness (`--migration-boot-harness chooseSource`): UI tests drive
+        // the REAL production chain RootView.resolvedRouteAndData → productionData →
+        // MigrationViewData.production → render(.chooseSource) → MigrationSourceChoiceView →
+        // AppModel. NO preview is active and NO synthetic action closures are supplied — the
+        // harness fakes ONLY the BootChainRunner seam (each resolution records the received
+        // intent into the witness and parks back in `.requiresSourceChoice`) and the modal
+        // `runModal()` call (deterministic OK + fixed URL). Compiled out of Release.
+        if DebugBootHarness.isActive {
+            runner = DebugBootHarness.Runner()
+            Self.migrationSourcePanelRunnerOverride = { panel in
+                DebugActionWitness.shared.record("panel.run")
+                if panel.canChooseDirectories && !panel.canChooseFiles && !panel.allowsMultipleSelection {
+                    DebugActionWitness.shared.record("panel.singleDirectory")
+                }
+                return (.OK, DebugBootHarness.grantURL)
+            }
         }
         #endif
         // Production migration boot runs through the C12 coordinator chain: the heavy probe
@@ -621,3 +639,57 @@ final class AppModel: ObservableObject {
         (try? AppPaths.databaseURL().path) ?? "—"
     }
 }
+
+#if DEBUG
+/// DEBUG-only UI-test boot harness, activated by `--migration-boot-harness chooseSource`.
+/// It lets UI tests exercise the REAL production consumption point — RootView's non-preview
+/// `productionData` supplying `MigrationSourceChoiceView`'s closures — by faking ONLY the
+/// `BootChainRunner` seam (the same seam every hosted intent guard fakes) plus the blocking
+/// panel `runModal()` (see `boot()`). Nothing here touches the DEBUG preview or supplies
+/// synthetic action closures; none of it is compiled into Release, and it is inert without
+/// the launch argument.
+enum DebugBootHarness {
+    /// The deterministic "granted" directory the panel override returns. Never touched on
+    /// disk — the harness runner is scripted, so no ingest ever runs.
+    static var grantURL: URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("HarnessGrantedDir", isDirectory: true)
+    }
+
+    /// Witness keys the read-out bar renders in harness mode (all seeded at 0 by default).
+    static let witnessKeys = ["panel.run", "panel.singleDirectory",
+                              "intent.migrateFromUserDir", "intent.migrateFromUserDir.grantMatched",
+                              "intent.confirmCreateFresh"]
+
+    static var isActive: Bool {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "--migration-boot-harness"), i + 1 < args.count else { return false }
+        return args[i + 1] == "chooseSource"
+    }
+
+    /// Scripted runner: records each received intent into the witness and parks EVERY
+    /// resolution back in `.requiresSourceChoice` — no store is ever constructed and the
+    /// choice screen returns after each action, so a single launch can exercise both actions.
+    struct Runner: BootChainRunner {
+        @MainActor func resolveOutcome(_ intent: BootIntent) async -> BootOutcome {
+            switch intent {
+            case .migrateFromUserDir(let source):
+                DebugActionWitness.shared.record("intent.migrateFromUserDir")
+                if case .userSelectedDataDir(let url) = source, url == DebugBootHarness.grantURL {
+                    DebugActionWitness.shared.record("intent.migrateFromUserDir.grantMatched")
+                }
+            case .confirmCreateFresh:
+                DebugActionWitness.shared.record("intent.confirmCreateFresh")
+            case .boot, .acknowledgement, .selection:
+                break
+            }
+            return .requiresSourceChoice
+        }
+
+        @MainActor func attempt(_ authorization: StoreOpenAuthorization,
+                                residual: MigrationResidual?) -> MigrationBootDriver.Attempt {
+            // Unreachable: the harness never authorizes an open. Park harmlessly.
+            .ui(.awaitingSourceChoice)
+        }
+    }
+}
+#endif

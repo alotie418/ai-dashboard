@@ -192,6 +192,79 @@ final class MigrationRecoveryUITests: XCTestCase {
         app.staticTexts["migration.debug.witness.\(action).\(count)"]
     }
 
+    // MARK: - REAL production consumption point (boot harness — NO preview, NO synthetic closures)
+    //
+    // These launch with `--migration-boot-harness chooseSource` (NOT the preview): the app
+    // boots the REAL AppModel whose Phase-A runner is scripted to park in
+    // `.requiresSourceChoice`, so the rendered screen's closures come from RootView's
+    // NON-preview productionData → MigrationViewData.production. Clicking therefore drives
+    // RootView.resolvedRouteAndData → productionData → MigrationViewData.production →
+    // render(.chooseSource) → MigrationSourceChoiceView → AppModel — only the runner seam and
+    // the modal `runModal()` are faked. A `productionData` that stops consuming the seam
+    // (e.g. returning `MigrationViewData()`) leaves every witness at 0 and fails BOTH guards.
+
+    private func launchHarness() -> XCUIApplication {
+        let a = XCUIApplication()
+        a.launchArguments += ["--migration-boot-harness", "chooseSource"]
+        a.launch()
+        app = a
+        return a
+    }
+
+    /// Launch the harness and wait out sequential-launch contention (same ONE-relaunch guard
+    /// as the preview-based tests).
+    private func launchHarnessOnChoiceScreen() -> (XCUIApplication, XCUIElement) {
+        var app = launchHarness()
+        var migrate = app.buttons["migration.chooseSource.migrate"]
+        if !migrate.waitForExistence(timeout: 10) {
+            app.terminate()
+            terminateAllAndWait()
+            app = launchHarness()
+            migrate = app.buttons["migration.chooseSource.migrate"]
+        }
+        XCTAssertTrue(migrate.waitForExistence(timeout: 10), "the harness boot must land on the REAL choice screen")
+        return (app, migrate)
+    }
+
+    func testRealProductionPathMigrateClickRunsPanelAndSendsExactIntent() {
+        let (app, migrate) = launchHarnessOnChoiceScreen()
+        XCTAssertTrue(witness(app, "panel.run", 0).waitForExistence(timeout: 10), "witness bar must render at 0")
+        XCTAssertTrue(witness(app, "intent.migrateFromUserDir", 0).exists)
+        XCTAssertTrue(witness(app, "intent.confirmCreateFresh", 0).exists)
+
+        migrate.click()
+        XCTAssertTrue(witness(app, "panel.run", 1).waitForExistence(timeout: 10),
+                      "the REAL production onChooseMigrate must run the panel entry exactly once")
+        XCTAssertFalse(witness(app, "panel.run", 2).exists, "panel entry must run exactly ONCE")
+        XCTAssertTrue(witness(app, "panel.singleDirectory", 1).exists,
+                      "the production entry must have built the real single-directory panel")
+        XCTAssertTrue(witness(app, "intent.migrateFromUserDir", 1).waitForExistence(timeout: 10),
+                      "exactly one .migrateFromUserDir must reach the runner seam")
+        XCTAssertFalse(witness(app, "intent.migrateFromUserDir", 2).exists)
+        XCTAssertTrue(witness(app, "intent.migrateFromUserDir.grantMatched", 1).exists,
+                      "the granted URL must ride the intent unchanged")
+        XCTAssertTrue(witness(app, "intent.confirmCreateFresh", 0).exists,
+                      "migrate must NOT send .confirmCreateFresh")
+    }
+
+    func testRealProductionPathCreateFreshConfirmSendsExactIntentWithoutPanel() {
+        let (app, _) = launchHarnessOnChoiceScreen()
+        XCTAssertTrue(witness(app, "intent.confirmCreateFresh", 0).waitForExistence(timeout: 10),
+                      "witness bar must render at 0")
+
+        let createNew = app.buttons["migration.chooseSource.createNew"]
+        createNew.click()
+        let confirm = app.buttons["migration.chooseSource.confirm.create"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10), "createNew must raise the REAL dialog")
+        confirm.click()
+        XCTAssertTrue(witness(app, "intent.confirmCreateFresh", 1).waitForExistence(timeout: 10),
+                      "the REAL production onConfirmCreateFresh must send exactly one .confirmCreateFresh")
+        XCTAssertFalse(witness(app, "intent.confirmCreateFresh", 2).exists)
+        XCTAssertTrue(witness(app, "panel.run", 0).exists, "confirm-create must NOT open the panel")
+        XCTAssertTrue(witness(app, "intent.migrateFromUserDir", 0).exists,
+                      "confirm-create must NOT send .migrateFromUserDir")
+    }
+
     func testCleanupResidualKeepsMainUIUsable() {
         let app = launch("residual")
         // The MAIN UI renders (sidebar present) — cleanupResidual does NOT block it with a
