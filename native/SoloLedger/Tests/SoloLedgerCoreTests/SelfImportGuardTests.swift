@@ -433,4 +433,93 @@ final class SelfImportGuardTests: LedgerTestCase {
         assertRejected(.userSelectedDataDir(URL(fileURLWithPath: mnt, isDirectory: true)), p,
                        role: .nativeDataRoot, relationship: .sourceAncestorOfProtected)
     }
+
+    // MARK: - Firmlink / data-volume alias containment (P1 follow-up, PR #374)
+    //
+    // A source may be SELECTED through the physical `/System/Volumes/Data/...` spelling of a
+    // path whose primary (firmlink-normalized) name is `/Users/...` or `/private/var/...`.
+    // The concern: such an alias defeats the canonical-prefix containment check and lets a
+    // protected ancestor/descendant slip through as "independent". These tests reproduce the
+    // exact selection through the alias spelling and assert the verdict — proving whether the
+    // guard's identity resolution already collapses the alias (fcntl(F_GETPATH) is
+    // firmlink-normalizing) or a dedicated alias step is required.
+
+    /// The `/System/Volumes/Data`-prefixed physical spelling of `url`, but ONLY when it
+    /// resolves to the very same filesystem object here (else nil → the caller skips: the
+    /// machine isn't the standard split-volume layout). The path is realpath-canonicalized
+    /// first (`/var/…` → `/private/var/…`) so the alias is anchored on a real firmlink root.
+    private func dataVolumeAlias(of url: URL) -> URL? {
+        var buf = [CChar](repeating: 0, count: Int(PATH_MAX))
+        guard realpath(url.path, &buf) != nil else { return nil }
+        let canonical = String(cString: buf)
+        let alias = URL(fileURLWithPath: "/System/Volumes/Data" + canonical, isDirectory: true)
+        func rid(_ u: URL) -> (NSCopying & NSSecureCoding & NSObjectProtocol)? {
+            (try? u.resourceValues(forKeys: [.fileResourceIdentifierKey]))?.fileResourceIdentifier
+        }
+        guard let a = rid(alias), let o = rid(url), a.isEqual(o) else { return nil }
+        // The alias must be a genuinely different STRING (else the test is vacuous).
+        guard alias.path != canonical, alias.path.hasPrefix("/System/Volumes/Data/") else { return nil }
+        return alias
+    }
+
+    func testDescendantSelectedViaDataVolumeAliasIsRejected() throws {
+        let p = try makeProtected()
+        let inside = p.rootURL.appendingPathComponent("Staging", isDirectory: true)
+            .appendingPathComponent("import-x", isDirectory: true)
+        try fm.createDirectory(at: inside, withIntermediateDirectories: true)
+        guard let alias = dataVolumeAlias(of: inside) else {
+            throw XCTSkip("temp tree not reachable via /System/Volumes/Data alias")
+        }
+        assertRejected(.userSelectedDataDir(alias), p,
+                       role: .nativeDataRoot, relationship: .sourceDescendantOfProtected)
+    }
+
+    func testAliasAncestorBelowMountContainingProtectedIsRejected() throws {
+        // The tracked temp dir CONTAINS DataRoot; selecting it through the below-mount alias
+        // spelling must still be refused as an ancestor overlap.
+        let p = try makeProtected()
+        guard let alias = dataVolumeAlias(of: p.rootURL.deletingLastPathComponent()) else {
+            throw XCTSkip("temp tree not reachable via /System/Volumes/Data alias")
+        }
+        assertRejected(.userSelectedDataDir(alias), p,
+                       role: .nativeDataRoot, relationship: .sourceAncestorOfProtected)
+    }
+
+    func testIndependentSameVolumeSourceViaAliasStillPasses() throws {
+        // Same filesystem (identical fsid) is NOT sufficient to refuse: a genuinely
+        // independent source, even selected through the data-volume alias, must import.
+        let p = try makeProtected()
+        let src = try makeIndependentSource()
+        guard let alias = dataVolumeAlias(of: src) else {
+            throw XCTSkip("temp tree not reachable via /System/Volumes/Data alias")
+        }
+        XCTAssertNoThrow(try check(.userSelectedDataDir(alias), p))
+    }
+
+    /// The mount junction is the ONE spelling F_GETPATH does NOT normalize away
+    /// (`/System/Volumes/Data`, and its parents `/System/Volumes`, `/System`, `/`, live on
+    /// the system volume and keep their literal path), so an ancestor selected there has a
+    /// canonical path that shares no firmlink-normalized prefix with the protected root.
+    /// These pin that `containsMountPoint` refuses every above-junction ancestor, not just
+    /// the mount point itself.
+    private func assertAboveMountAncestorRefused(_ path: String) throws {
+        let p = try makeProtected()
+        var fs = statfs()
+        guard statfs(p.rootURL.path, &fs) == 0 else { return XCTFail("statfs failed") }
+        let mnt = withUnsafeBytes(of: &fs.f_mntonname) { raw in
+            String(cString: raw.baseAddress!.assumingMemoryBound(to: CChar.self))
+        }
+        try XCTSkipUnless(mnt == "/System/Volumes/Data",
+                          "temp tree is not on the standard data volume (mount: \(mnt))")
+        assertRejected(.userSelectedDataDir(URL(fileURLWithPath: path, isDirectory: true)), p,
+                       role: .nativeDataRoot, relationship: .sourceAncestorOfProtected)
+    }
+
+    func testDataVolumeParentDirRefusedAsAncestor() throws {
+        try assertAboveMountAncestorRefused("/System/Volumes")
+    }
+
+    func testSystemDirAboveMountRefusedAsAncestor() throws {
+        try assertAboveMountAncestorRefused("/System")
+    }
 }
