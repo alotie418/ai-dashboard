@@ -96,3 +96,18 @@
 "migration.msg.selectionCancelled" = "已取消選擇，未開啟任何匯入項目。";
 "migration.candidate.entries" = "{count} 項";
 "migration.candidate.noMeta" = "詳情不可用";
+
+/* N7.2 source choice */
+"migration.chooseSource.title" = "發現你可能有舊帳本資料";
+"migration.chooseSource.body" = "你可以遷移舊版 SoloLedger 的資料，或建立一個新帳本。";
+"migration.chooseSource.migrate.button" = "遷移舊資料";
+"migration.chooseSource.migrate.hint" = "從舊版資料夾匯入。";
+"migration.chooseSource.createNew.button" = "建立新帳本";
+"migration.chooseSource.createNew.hint" = "從空白開始。";
+"migration.chooseSource.picker.prompt" = "選擇舊版 SoloLedger 的資料夾";
+"migration.chooseSource.picker.noData" = "所選資料夾中找不到帳本資料。";
+"migration.chooseSource.importing" = "正在匯入舊資料…";
+"migration.chooseSource.confirm.title" = "建立新的空帳本？";
+"migration.chooseSource.confirm.body" = "這不會刪除或修改舊版 SoloLedger 的資料，但會跳過遷移並為目前 App 建立一個空帳本。舊資料不會自動匯入；如需遷移，請返回並選擇「遷移舊資料」。";
+"migration.chooseSource.confirm.back" = "返回";
+"migration.chooseSource.confirm.create" = "建立空帳本";

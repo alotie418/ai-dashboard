@@ -96,3 +96,18 @@
 "migration.msg.selectionCancelled" = "選択をキャンセルしました。インポートは開いていません。";
 "migration.candidate.entries" = "{count} 件";
 "migration.candidate.noMeta" = "詳細は利用できません";
+
+/* N7.2 source choice */
+"migration.chooseSource.title" = "以前の帳簿データがある可能性があります";
+"migration.chooseSource.body" = "以前のバージョンの SoloLedger からデータを移行するか、新しい帳簿を作成できます。";
+"migration.chooseSource.migrate.button" = "以前のデータを移行";
+"migration.chooseSource.migrate.hint" = "以前のバージョンのデータフォルダから読み込みます。";
+"migration.chooseSource.createNew.button" = "新しい帳簿を作成";
+"migration.chooseSource.createNew.hint" = "空の状態から始めます。";
+"migration.chooseSource.picker.prompt" = "以前の SoloLedger のデータフォルダを選択";
+"migration.chooseSource.picker.noData" = "選択したフォルダに帳簿データが見つかりませんでした。";
+"migration.chooseSource.importing" = "以前のデータを読み込んでいます…";
+"migration.chooseSource.confirm.title" = "新しい空の帳簿を作成しますか？";
+"migration.chooseSource.confirm.body" = "以前の SoloLedger のデータが削除・変更されることはありませんが、移行をスキップしてこの App 用の空の帳簿を作成します。以前のデータは自動的には読み込まれません。移行する場合は、戻って「以前のデータを移行」を選択してください。";
+"migration.chooseSource.confirm.back" = "戻る";
+"migration.chooseSource.confirm.create" = "空の帳簿を作成";

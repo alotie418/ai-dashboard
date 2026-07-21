@@ -96,3 +96,18 @@
 "migration.msg.selectionCancelled" = "선택을 취소했습니다. 가져오기가 열리지 않았습니다.";
 "migration.candidate.entries" = "{count}개 항목";
 "migration.candidate.noMeta" = "세부 정보 없음";
+
+/* N7.2 source choice */
+"migration.chooseSource.title" = "이전 장부 데이터가 있을 수 있습니다";
+"migration.chooseSource.body" = "이전 버전 SoloLedger의 데이터를 마이그레이션하거나 새 장부를 만들 수 있습니다.";
+"migration.chooseSource.migrate.button" = "이전 데이터 마이그레이션";
+"migration.chooseSource.migrate.hint" = "이전 버전의 데이터 폴더에서 가져옵니다.";
+"migration.chooseSource.createNew.button" = "새 장부 만들기";
+"migration.chooseSource.createNew.hint" = "빈 상태에서 시작합니다.";
+"migration.chooseSource.picker.prompt" = "이전 SoloLedger 데이터 폴더 선택";
+"migration.chooseSource.picker.noData" = "선택한 폴더에서 장부 데이터를 찾을 수 없습니다.";
+"migration.chooseSource.importing" = "이전 데이터를 가져오는 중…";
+"migration.chooseSource.confirm.title" = "새 빈 장부를 만들까요?";
+"migration.chooseSource.confirm.body" = "이전 SoloLedger 데이터를 삭제하거나 수정하지 않지만, 마이그레이션을 건너뛰고 이 앱용 빈 장부를 만듭니다. 이전 데이터는 자동으로 가져오지 않습니다. 마이그레이션하려면 돌아가서 “이전 데이터 마이그레이션”을 선택하세요.";
+"migration.chooseSource.confirm.back" = "돌아가기";
+"migration.chooseSource.confirm.create" = "빈 장부 만들기";

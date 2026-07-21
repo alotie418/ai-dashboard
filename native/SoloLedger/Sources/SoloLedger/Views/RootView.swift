@@ -26,7 +26,12 @@ struct RootView: View {
     // so no path bypasses routing.
     @ViewBuilder private var content: some View {
         let resolved = resolvedRouteAndData
+        #if DEBUG
         render(resolved.0, resolved.1)
+            .safeAreaInset(edge: .bottom) { DebugActionWitnessBar() }
+        #else
+        render(resolved.0, resolved.1)
+        #endif
     }
 
     /// (route, view-data). Production feeds the real model through `route`; the DEBUG preview
@@ -49,27 +54,10 @@ struct RootView: View {
     }
 
     /// The render inputs extracted from the real model state (public data + intent closures).
+    /// A one-liner over the SINGLE production mapping seam (`MigrationViewData.production`),
+    /// which the hosted productionData-mapping guards consume too — no second switch exists.
     private var productionData: MigrationViewData {
-        var d = MigrationViewData()
-        switch model.migrationUIState {
-        case .awaitingAcknowledgement(let request, let unresolved):
-            d.unresolved = unresolved
-            d.onAcknowledge = { model.submitAcknowledgement(request.acknowledge()) }
-        case .awaitingImportSelection(let candidates):
-            d.candidates = candidates.map { MigrationCandidateVM($0) }
-            d.onSelect = { model.resolveImportSelection(importID: $0) }
-            d.onCancel = { model.cancelImportSelection() }
-        case .retriable(let block), .terminal(let block):
-            d.chainMessageKey = MigrationPresenter.messageKey(for: block)
-        case .cleanupResidual(let residual):
-            d.residualImportID = residual.importID
-        case .none, .running, .awaitingSourceChoice:
-            // `.awaitingSourceChoice` is N7.1-dormant: production cannot reach it (resolveB1
-            // unflipped, guard-tested) and it deliberately extracts NO data and wires NO
-            // intent closures — the real source-choice screen arrives only in N7.2.
-            break
-        }
-        return d
+        .production(for: model.migrationUIState, model: model)
     }
 
     @ViewBuilder private func render(_ route: MigrationPresenter.MigrationRoute, _ data: MigrationViewData) -> some View {
@@ -84,6 +72,8 @@ struct RootView: View {
             MigrationAckView(unresolved: data.unresolved, onAcknowledge: data.onAcknowledge)
         case .importSelection:
             MigrationSelectionView(candidates: data.candidates, onSelect: data.onSelect, onCancel: data.onCancel)
+        case .chooseSource:
+            MigrationSourceChoiceView(onMigrate: data.onChooseMigrate, onCreateFresh: data.onConfirmCreateFresh)
         case .chainRecovery(let severity):
             MigrationChainRecoveryView(messageKey: data.chainMessageKey, severity: severity)
         case .loading:
@@ -112,6 +102,42 @@ struct MigrationViewData {
     var onAcknowledge: () -> Void = {}
     var onSelect: (String) -> Void = { _ in }
     var onCancel: () -> Void = {}
+    /// Source-choice intents (N7.2). `onChooseMigrate` opens the directory picker;
+    /// `onConfirmCreateFresh` is called ONLY by the confirmation dialog's confirm button.
+    var onChooseMigrate: () -> Void = {}
+    var onConfirmCreateFresh: () -> Void = {}
+}
+
+extension MigrationViewData {
+    /// The ONE production `MigrationUIState` → render-data / intent-closure mapping the app
+    /// ships — `RootView.productionData` is only "this seam + the environment model", and the
+    /// hosted productionData-mapping guards in `DormantSourceChoiceBootTests` consume this
+    /// SAME function (no hand-copied switch), so an emptied or swapped production closure
+    /// (e.g. `onChooseMigrate = {}`) fails those tests instead of surviving unseen behind
+    /// the preview's synthetic closures.
+    @MainActor
+    static func production(for state: MigrationUIState, model: AppModel) -> MigrationViewData {
+        var d = MigrationViewData()
+        switch state {
+        case .awaitingAcknowledgement(let request, let unresolved):
+            d.unresolved = unresolved
+            d.onAcknowledge = { model.submitAcknowledgement(request.acknowledge()) }
+        case .awaitingImportSelection(let candidates):
+            d.candidates = candidates.map { MigrationCandidateVM($0) }
+            d.onSelect = { model.resolveImportSelection(importID: $0) }
+            d.onCancel = { model.cancelImportSelection() }
+        case .retriable(let block), .terminal(let block):
+            d.chainMessageKey = MigrationPresenter.messageKey(for: block)
+        case .cleanupResidual(let residual):
+            d.residualImportID = residual.importID
+        case .awaitingSourceChoice:
+            d.onChooseMigrate = { model.chooseMigrationSourceViaPanel() }
+            d.onConfirmCreateFresh = { model.confirmCreateFresh() }
+        case .none, .running:
+            break
+        }
+        return d
+    }
 }
 
 /// Blocking recovery shown when an Electron database exists but its upgrade failed.
@@ -359,6 +385,60 @@ private struct MigrationAckView: View {
     }
 }
 
+/// N7.2 (§1): the pre-open source-choice screen — fully independent of onboarding (which
+/// continues unchanged after a store is adopted). Two actions only: "migrate old data" opens
+/// the directory picker (cancel = pure no-op, stays here); "create new ledger" NEVER creates
+/// directly — it first raises the confirmation dialog, whose confirm button alone fires
+/// `onCreateFresh` (the `.confirmCreateFresh` intent). "Go back" dismisses the dialog and
+/// stays on this screen without any intent. All copy goes through `model.t(key)` — never a
+/// raw enum, path, or error string.
+private struct MigrationSourceChoiceView: View {
+    @EnvironmentObject var model: AppModel
+    let onMigrate: () -> Void
+    let onCreateFresh: () -> Void
+    @State private var confirmingCreateFresh = false
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "tray.and.arrow.down")
+                .font(.system(size: 40))
+                .foregroundStyle(.secondary)
+            Text(model.t("migration.chooseSource.title")).font(.title2).fontWeight(.semibold)
+            Text(model.t("migration.chooseSource.body"))
+                .multilineTextAlignment(.center).foregroundStyle(.secondary).frame(maxWidth: 460)
+            VStack(spacing: 10) {
+                Button { onMigrate() } label: {
+                    Label(model.t("migration.chooseSource.migrate.button"),
+                          systemImage: "arrow.down.doc").frame(maxWidth: 320)
+                }
+                .buttonStyle(.borderedProminent).controlSize(.large)
+                .accessibilityIdentifier("migration.chooseSource.migrate")
+                .accessibilityLabel(model.t("migration.chooseSource.migrate.button"))
+                Text(model.t("migration.chooseSource.migrate.hint"))
+                    .font(.caption).foregroundStyle(.secondary)
+                Button { confirmingCreateFresh = true } label: {
+                    Label(model.t("migration.chooseSource.createNew.button"),
+                          systemImage: "doc.badge.plus").frame(maxWidth: 320)
+                }
+                .accessibilityIdentifier("migration.chooseSource.createNew")
+                .accessibilityLabel(model.t("migration.chooseSource.createNew.button"))
+                Text(model.t("migration.chooseSource.createNew.hint"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(40).frame(maxWidth: .infinity, maxHeight: .infinity)
+        .confirmationDialog(model.t("migration.chooseSource.confirm.title"),
+                            isPresented: $confirmingCreateFresh, titleVisibility: .visible) {
+            Button(model.t("migration.chooseSource.confirm.create")) { onCreateFresh() }
+                .accessibilityIdentifier("migration.chooseSource.confirm.create")
+            Button(model.t("migration.chooseSource.confirm.back"), role: .cancel) {}
+                .accessibilityIdentifier("migration.chooseSource.confirm.back")
+        } message: {
+            Text(model.t("migration.chooseSource.confirm.body"))
+        }
+    }
+}
+
 /// App-side view model for a recoverable-import candidate — reads only PUBLIC properties, so it
 /// can be built from a real `RecoverableImport` or synthesized in the DEBUG preview.
 struct MigrationCandidateVM: Identifiable {
@@ -470,6 +550,56 @@ private struct ResidualBanner: View {
 }
 
 #if DEBUG
+/// TEST-ONLY (DEBUG) action witness: identifier-encoded invocation counters read by the
+/// UI-test guards (rendering alone cannot catch an emptied action). TWO recording modes
+/// share it, each guarding a different layer:
+///  - `--migration-ui-preview chooseSource`: the preview's synthetic closures record
+///    `onMigrate` / `onCreateFresh` — the SwiftUI Button → SUPPLIED-closure guard for
+///    `MigrationSourceChoiceView`;
+///  - `--migration-boot-harness chooseSource`: the scripted runner and the panel-runner
+///    override record the panel/intent keys (`DebugBootHarness.witnessKeys`) — the guard
+///    for RootView's NON-preview `productionData` production path.
+/// (The supplier itself — `MigrationViewData.production` → AppModel — is guarded by the
+/// hosted productionData-mapping tests, which never touch these counters.) An ordinary
+/// production boot with neither argument records nothing and renders nothing, and none of
+/// this is compiled into Release. Mutated exclusively from main-thread actions / read from
+/// rendering, both on the main thread.
+final class DebugActionWitness: ObservableObject {
+    static let shared = DebugActionWitness()
+    @Published private(set) var counts: [String: Int] = [:]
+    func record(_ action: String) { counts[action, default: 0] += 1 }
+}
+
+/// The witness read-out (DEBUG): stable-identifier labels the UI tests assert on. Renders
+/// ONLY under the `chooseSource` preview (supplied-closure witnesses) or the boot harness
+/// (production-path witnesses, see `DebugBootHarness`) — every other route and every
+/// production boot contributes an empty inset.
+private struct DebugActionWitnessBar: View {
+    @ObservedObject private var witness = DebugActionWitness.shared
+
+    private var keys: [String]? {
+        if DebugBootHarness.isActive { return DebugBootHarness.witnessKeys }
+        if DebugMigrationPreview.current?.input == .sourceChoice { return ["onMigrate", "onCreateFresh"] }
+        return nil
+    }
+
+    var body: some View {
+        if let keys {
+            // The COUNT is encoded in the accessibility IDENTIFIER (identifier queries are
+            // the one AX surface that proved reliable for this inset on macOS SwiftUI): the
+            // tests assert existence of `…witness.<key>.<count>` — a missed or doubled
+            // invocation makes the expected identifier never exist.
+            HStack(spacing: 12) {
+                ForEach(keys, id: \.self) { key in
+                    Text("\(key)=\(witness.counts[key, default: 0])")
+                        .accessibilityIdentifier("migration.debug.witness.\(key).\(witness.counts[key, default: 0])")
+                }
+            }
+            .font(.caption2).foregroundStyle(.secondary).padding(4)
+        }
+    }
+}
+
 /// DEBUG/TEST-ONLY preview seam for the migration states, driven by the
 /// `--migration-ui-preview <state>` launch argument (or `MIGRATION_UI_PREVIEW` env var). It is
 /// compiled ONLY in DEBUG, so no arbitrary state-injection entry point exists in Release.
@@ -515,6 +645,15 @@ enum DebugMigrationPreview {
         case "residual":
             var d = MigrationViewData(); d.residualImportID = "import-residual-1"
             return Preview(input: .cleanupResidual, ready: true, onboardingDone: true, data: d)
+        case "chooseSource":
+            // Synthetic intents that record into the TEST-ONLY witness: the preview renders
+            // the REAL source-choice screen and its confirmation dialog (view-local state)
+            // without a model or a live chain, and UI tests click the real buttons and read
+            // the witness counts to prove the button → closure wiring.
+            var d = MigrationViewData()
+            d.onChooseMigrate = { DebugActionWitness.shared.record("onMigrate") }
+            d.onConfirmCreateFresh = { DebugActionWitness.shared.record("onCreateFresh") }
+            return Preview(input: .sourceChoice, ready: false, onboardingDone: false, data: d)
         case "none":
             // Deterministic neutral state: .none + ready==false ⇒ loading (NOT a real boot).
             return Preview(input: .none, ready: false, onboardingDone: false, data: MigrationViewData())

@@ -20,8 +20,8 @@ enum MigrationPresenter {
     /// the DEBUG preview feed the SAME `route`. Carries no Core-internal payload.
     enum RouteInput: Equatable {
         case none, running, acknowledgement, importSelection, retriable, terminal, cleanupResidual
-        /// N7.1 DORMANT: production cannot produce this input (`resolveB1` is unflipped and a
-        /// guard test pins it); it exists so the state → input mapping stays exhaustive.
+        /// N7.2: a first boot found a clean disk and no usable auto source — the user must
+        /// choose "migrate old data" or "create a new ledger" before any store exists.
         case sourceChoice
     }
 
@@ -32,6 +32,9 @@ enum MigrationPresenter {
         case running
         case acknowledgement
         case importSelection
+        /// N7.2: the pre-open source-choice screen — fully independent of onboarding, which
+        /// continues unchanged only after a store is adopted.
+        case chooseSource
         case chainRecovery(ChainSeverity)
         case loading
         case onboarding
@@ -60,10 +63,7 @@ enum MigrationPresenter {
         if migrationFailure { return .legacyRecovery }
         switch input {
         case .running:          return .running
-        // N7.1 dormant placeholder: unreachable in production (resolveB1 unflipped; guard test
-        // pins it). Renders as the neutral progress screen — NO new route / view / copy until
-        // N7.2 ships the dedicated source-choice screen atomically with the flip.
-        case .sourceChoice:     return .running
+        case .sourceChoice:     return .chooseSource
         case .acknowledgement:  return .acknowledgement
         case .importSelection:  return .importSelection
         case .retriable:        return .chainRecovery(.retriable)

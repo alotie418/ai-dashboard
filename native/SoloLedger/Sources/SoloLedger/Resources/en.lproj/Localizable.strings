@@ -211,3 +211,18 @@
 "migration.msg.selectionCancelled" = "Selection cancelled — no import was opened.";
 "migration.candidate.entries" = "{count} entries";
 "migration.candidate.noMeta" = "Details unavailable";
+
+/* N7.2 source choice */
+"migration.chooseSource.title" = "You may have existing ledger data";
+"migration.chooseSource.body" = "You can migrate data from a previous version of SoloLedger, or create a new ledger.";
+"migration.chooseSource.migrate.button" = "Migrate Old Data";
+"migration.chooseSource.migrate.hint" = "Import from a previous version’s data folder.";
+"migration.chooseSource.createNew.button" = "Create New Ledger";
+"migration.chooseSource.createNew.hint" = "Start from scratch.";
+"migration.chooseSource.picker.prompt" = "Choose the previous SoloLedger data folder";
+"migration.chooseSource.picker.noData" = "No ledger data was found in the selected folder.";
+"migration.chooseSource.importing" = "Importing old data…";
+"migration.chooseSource.confirm.title" = "Create a new empty ledger?";
+"migration.chooseSource.confirm.body" = "This will not delete or modify your previous SoloLedger data, but it will skip migration and create an empty ledger for this app. Old data will not be imported automatically; to migrate, go back and choose “Migrate Old Data”.";
+"migration.chooseSource.confirm.back" = "Go Back";
+"migration.chooseSource.confirm.create" = "Create Empty Ledger";

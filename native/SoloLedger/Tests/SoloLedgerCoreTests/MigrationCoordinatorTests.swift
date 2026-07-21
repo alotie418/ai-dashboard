@@ -169,9 +169,13 @@ final class MigrationCoordinatorTests: LedgerTestCase {
 
     // MARK: - B1/B2 and the exhaustive Sent × ActiveEntry table
 
-    func testFreshInstallCreateFreshAuthorization() throws {
+    func testFreshInstallBootRequiresSourceChoiceAndConfirmedEntryMintsCreateFresh() throws {
+        // N7.2: an AUTOMATIC clean-disk boot no longer silently mints an empty ledger — it
+        // asks for a source choice. The createFresh authorization is now mintable only via
+        // the strong-typed confirmed entry.
         let ctx = try makeCtx()
-        guard case .openStore(let auth, let residual) = boot(ctx, nil) else { return XCTFail() }
+        XCTAssertEqual(boot(ctx, nil), .requiresSourceChoice)
+        guard case .openStore(let auth, let residual) = coord(ctx).confirmCreateFresh() else { return XCTFail() }
         XCTAssertEqual(auth, .createFreshExpectedAbsent)
         XCTAssertNil(residual)
         XCTAssertFalse(fm.fileExists(atPath: ctx.config.activeDestination.path), "C12a never creates the DB")
@@ -202,7 +206,9 @@ final class MigrationCoordinatorTests: LedgerTestCase {
         let ctx = try makeCtx()
         try Data("x".utf8).write(to: ctx.config.manifestsDir.appendingPathComponent(".tmp-orphan.json"))
         try Data("y".utf8).write(to: ctx.config.manifestsDir.appendingPathComponent("stray.txt"))
-        guard case .openStore(.createFreshExpectedAbsent, _) = boot(ctx, nil) else {
+        XCTAssertEqual(boot(ctx, nil), .requiresSourceChoice,
+                       "tmp/unknown residue must not block the clean-disk adjudication")
+        guard case .openStore(.createFreshExpectedAbsent, _) = coord(ctx).confirmCreateFresh() else {
             return XCTFail("tmp/unknown residue must not block createFresh")
         }
         XCTAssertEqual(try Data(contentsOf: ctx.config.manifestsDir.appendingPathComponent(".tmp-orphan.json")), Data("x".utf8))
@@ -269,7 +275,9 @@ final class MigrationCoordinatorTests: LedgerTestCase {
             try fm.createDirectory(at: ctx.stagingRoot.appendingPathComponent(".attempt-orphan"),
                                    withIntermediateDirectories: true)
             try Data("j".utf8).write(to: ctx.stagingRoot.appendingPathComponent("stray.txt"))
-            guard case .openStore(.createFreshExpectedAbsent, _) = boot(ctx, nil) else {
+            XCTAssertEqual(boot(ctx, nil), .requiresSourceChoice,
+                           "attempt/unknown residue must not block the clean-disk adjudication")
+            guard case .openStore(.createFreshExpectedAbsent, _) = coord(ctx).confirmCreateFresh() else {
                 return XCTFail("attempt/unknown residue must not block createFresh")
             }
         }
@@ -798,7 +806,7 @@ final class MigrationCoordinatorTests: LedgerTestCase {
 
     func testConfirmCreateFreshDetectsLateRecord() throws {
         let ctx = try makeCtx()
-        guard case .openStore(.createFreshExpectedAbsent, _) = boot(ctx, nil) else { return XCTFail() }
+        guard case .openStore(.createFreshExpectedAbsent, _) = coord(ctx).confirmCreateFresh() else { return XCTFail() }
         try writeFakeRecord(ctx)
         XCTAssertEqual(coord(ctx).confirmOpenAuthorization(.createFreshExpectedAbsent, autoSourceCandidate: nil),
                        .reResolve)
@@ -808,7 +816,7 @@ final class MigrationCoordinatorTests: LedgerTestCase {
     func testConfirmCreateFreshDetectsLateStagingSentinelAndActive() throws {
         do {
             let ctx = try makeCtx()
-            guard case .openStore(.createFreshExpectedAbsent, _) = boot(ctx, nil) else { return XCTFail() }
+            guard case .openStore(.createFreshExpectedAbsent, _) = coord(ctx).confirmCreateFresh() else { return XCTFail() }
             let (_, source) = try makeSource()
             _ = try stageImport(ctx, from: source)
             XCTAssertEqual(coord(ctx).confirmOpenAuthorization(.createFreshExpectedAbsent, autoSourceCandidate: nil),
@@ -816,14 +824,14 @@ final class MigrationCoordinatorTests: LedgerTestCase {
         }
         do {
             let ctx = try makeCtx()
-            guard case .openStore(.createFreshExpectedAbsent, _) = boot(ctx, nil) else { return XCTFail() }
+            guard case .openStore(.createFreshExpectedAbsent, _) = coord(ctx).confirmCreateFresh() else { return XCTFail() }
             try Data("GARBAGE".utf8).write(to: ctx.config.manifestsDir.appendingPathComponent(validSentinelName()))
             XCTAssertEqual(coord(ctx).confirmOpenAuthorization(.createFreshExpectedAbsent, autoSourceCandidate: nil),
                            .reResolve)
         }
         for kind in ["regular", "symlink", "directory"] {
             let ctx = try makeCtx()
-            guard case .openStore(.createFreshExpectedAbsent, _) = boot(ctx, nil) else { return XCTFail(kind) }
+            guard case .openStore(.createFreshExpectedAbsent, _) = coord(ctx).confirmCreateFresh() else { return XCTFail(kind) }
             let target = try trackedTempDir().appendingPathComponent("victim.db")
             try Data("keep".utf8).write(to: target)
             switch kind {
@@ -842,7 +850,9 @@ final class MigrationCoordinatorTests: LedgerTestCase {
         let srcDir = try trackedTempDir().appendingPathComponent("SoloLedger", isDirectory: true)
         try fm.createDirectory(at: srcDir, withIntermediateDirectories: true)
         let candidate = MigrationSource.userSelectedDataDir(srcDir)
-        guard case .openStore(.createFreshExpectedAbsent, _) = boot(ctx, candidate) else { return XCTFail() }
+        XCTAssertEqual(boot(ctx, candidate), .requiresSourceChoice,
+                       "an unavailable auto candidate on a clean disk asks for a source choice")
+        guard case .openStore(.createFreshExpectedAbsent, _) = coord(ctx).confirmCreateFresh() else { return XCTFail() }
         try fm.copyItem(at: try makeSQLiteDB(), to: srcDir.appendingPathComponent(AppPaths.databaseFileName))
         XCTAssertEqual(coord(ctx).confirmOpenAuthorization(.createFreshExpectedAbsent, autoSourceCandidate: candidate),
                        .reResolve)
