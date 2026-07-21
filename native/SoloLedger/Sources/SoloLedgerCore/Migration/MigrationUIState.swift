@@ -15,11 +15,11 @@ public enum MigrationStep: Equatable {
     case resolving
 }
 
-/// The seven-state UI vocabulary. Invariants (enforced by the App layer, see C12b-2):
+/// The eight-state UI vocabulary. Invariants (enforced by the App layer, see C12b-2):
 ///  - `ready == (store != nil)`;
 ///  - `.cleanupResidual` ⇒ ready == true ∧ store != nil (store opened; residue is non-blocking);
-///  - `.running` / `.awaitingAcknowledgement` / `.awaitingImportSelection` / `.retriable` /
-///    `.terminal` ⇒ ready == false ∧ store == nil;
+///  - `.running` / `.awaitingAcknowledgement` / `.awaitingImportSelection` /
+///    `.awaitingSourceChoice` / `.retriable` / `.terminal` ⇒ ready == false ∧ store == nil;
 ///  - `.none` is NEUTRAL: before boot it coexists with ready == false; after a successful
 ///    open with no residue it coexists with ready == true. `.none` alone never means
 ///    "authorized to open".
@@ -28,6 +28,11 @@ public enum MigrationUIState: Equatable {
     case running(MigrationStep)
     case awaitingAcknowledgement(AcknowledgementRequest, UnresolvedReport)
     case awaitingImportSelection([RecoverableImport])
+    /// N7.1 DORMANT (§1.2): the source-choice waiting state (`store == nil`, `ready == false`,
+    /// never publishes a store). Production cannot reach it until N7.2 flips `resolveB1`'s
+    /// `.unavailable` branch to emit `.requiresSourceChoice`; until then only tests drive it,
+    /// and a guard test pins the production boot path to the old behavior.
+    case awaitingSourceChoice
     /// Fail-closed but re-probeable (retriable classification).
     case retriable(MigrationBlock)
     /// Fail-closed and not re-adjudicable by retry alone (terminal classification).

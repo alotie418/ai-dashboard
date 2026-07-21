@@ -63,7 +63,10 @@ struct RootView: View {
             d.chainMessageKey = MigrationPresenter.messageKey(for: block)
         case .cleanupResidual(let residual):
             d.residualImportID = residual.importID
-        case .none, .running:
+        case .none, .running, .awaitingSourceChoice:
+            // `.awaitingSourceChoice` is N7.1-dormant: production cannot reach it (resolveB1
+            // unflipped, guard-tested) and it deliberately extracts NO data and wires NO
+            // intent closures — the real source-choice screen arrives only in N7.2.
             break
         }
         return d

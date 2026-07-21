@@ -15,7 +15,13 @@ import Foundation
 /// the staging-first design: the entire ingest happens within one grant window, so no
 /// cross-launch security-scoped bookmark (and no `bookmarks.app-scope` entitlement) is
 /// needed.
-public enum MigrationSource {
+/// N7.1 (§2.1): `Sendable` + `Equatable` are COMPILER-SYNTHESIZED — every payload is a
+/// `URL` (itself Sendable and Equatable), so there is deliberately no `@unchecked` and no
+/// hand-written `==`. This is the minimal input-side conformance that lets the value cross
+/// the production runner's `@Sendable` Phase-A boundary and keeps `BootIntent`'s synthesized
+/// `Equatable` intact; the full `BootOutcome`-side Sendable pass stays a separate Swift 6
+/// hardening task (see Package.swift).
+public enum MigrationSource: Sendable, Equatable {
     /// Auto-discovered Electron data inside the app's OWN sandbox container. Only
     /// meaningful when the prior Electron was the MAS build sharing this container.
     case masContainer
