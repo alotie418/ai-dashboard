@@ -308,4 +308,142 @@ final class MigrationCopyParityTests: XCTestCase {
         XCTAssertTrue(text.contains("state: none"))
         XCTAssertFalse(text.contains("code:"))
     }
+
+    // MARK: - Full-app locale parity (precise ratchet toward six-locale key equality)
+    //
+    // Unlike the migration-only guards above, these cover the ENTIRE key universe. The four
+    // partially-translated locales (zh-Hant/ja/ko/fr) are being filled batch by batch; until they
+    // are complete, each one's missing-key set must EXACTLY equal a single shared debt set. The
+    // `==` (not `⊆`) is the ratchet: a NEW missing key, a locale that prematurely fills a debt key
+    // out of lockstep, an unexpected extra key, or any single-locale drift all fail. Each batch
+    // removes its keys from `knownLocalizationDebt` in the SAME change that adds the translations.
+    // When the set is emptied, delete it and assert `missing.isEmpty` for strict six-locale parity.
+
+    /// The remaining app-UI keys not yet translated in zh-Hant/ja/ko/fr (identical across all four).
+    /// B1 filled `editor.*` (15 keys); this is the residual 84. Shrinks one batch at a time.
+    private static let knownLocalizationDebt: Set<String> = [
+        "about.minOS", "about.name", "about.positioning", "about.version", "boot.error.title",
+        "cat.col.label", "cat.col.schedule", "cat.col.slug", "cmd.exportCSV", "cmd.importCSV",
+        "common.duplicate", "common.error", "common.loading", "csv.import.partial", "date.all",
+        "date.filtered", "date.thisMonth", "date.thisYear", "delete.confirmButton",
+        "delete.confirmMessage", "delete.confirmTitle", "delete.deleted", "delete.undo", "filter.label",
+        "invoice.issued", "invoice.na", "invoice.pending", "onboarding.company", "onboarding.privacy",
+        "overview.byCurrency", "overview.count", "overview.currency", "overview.dataSourceNote",
+        "overview.empty.message", "overview.empty.title", "overview.emptyPeriod.message",
+        "overview.emptyPeriod.title", "overview.loadDemo", "overview.month", "overview.monthlyTitle",
+        "overview.multiCurrencyNote", "overview.period", "overview.recent", "payment.paid",
+        "payment.partial", "payment.unpaid", "period.all", "period.month", "period.year", "recovery.blank",
+        "recovery.blankConfirm", "recovery.blankConfirmMessage", "recovery.blankConfirmTitle",
+        "recovery.message", "recovery.restore", "recovery.retry", "recovery.safeNote", "recovery.title",
+        "recovery.viewError", "settings.about", "settings.accounting", "settings.accountingLocale",
+        "settings.accountingNote", "settings.appearance.dark", "settings.appearance.light",
+        "settings.appearance.system", "settings.company", "settings.csv", "settings.currency",
+        "settings.data", "settings.dbLocation", "settings.general", "settings.schemaVersion",
+        "txn.col.amount", "txn.col.category", "txn.col.counterparty", "txn.col.date", "txn.col.payment",
+        "txn.col.type", "txn.empty.message", "txn.empty.title", "txn.noResults.message",
+        "txn.noResults.title", "txn.searchPrompt",
+    ]
+
+    /// URL of a locale's `Localizable.strings` (resolves the SwiftPM-lowercased `.lproj` too).
+    private func localeStringsURL(_ lang: String) -> URL? {
+        let path = Localizer.resourceBundle.path(forResource: lang, ofType: "lproj")
+            ?? Localizer.resourceBundle.path(forResource: lang.lowercased(), ofType: "lproj")
+        guard let path, let bundle = Bundle(path: path) else { return nil }
+        return bundle.url(forResource: "Localizable", withExtension: "strings")
+    }
+
+    /// The KEY SET of a locale, parsed with `PropertyListSerialization` (a `.strings` file is an
+    /// old-style property list). Deduplicates by nature — see `rawKeyOccurrences` for dup detection.
+    private func localeKeySet(_ lang: String) -> Set<String> {
+        guard let url = localeStringsURL(lang),
+              let data = try? Data(contentsOf: url),
+              let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
+              let dict = plist as? [String: String] else {
+            XCTFail("\(lang): could not load Localizable.strings as a property list"); return []
+        }
+        return Set(dict.keys)
+    }
+
+    /// The SOURCE `Localizable.strings` URL. Xcode compiles the BUNDLED `.strings` to a binary
+    /// property list, so raw-text duplicate detection must read the committed source, located
+    /// relative to this test file (…/App/Tests/SoloLedgerUnitTests/<this>.swift → …/native/SoloLedger).
+    private func sourceStringsURL(_ lang: String) -> URL {
+        var dir = URL(fileURLWithPath: #filePath)
+        for _ in 0..<4 { dir.deleteLastPathComponent() }
+        return dir.appendingPathComponent("Sources/SoloLedger/Resources/\(lang).lproj/Localizable.strings")
+    }
+
+    /// Per-key line occurrence counts by reading the RAW SOURCE text and matching anchored key lines
+    /// (`"<key>" =` at line start) in Swift — no external tools, and it sees duplicates that the
+    /// property-list parser would silently collapse.
+    private func rawKeyOccurrences(_ lang: String) -> [String: Int] {
+        let url = sourceStringsURL(lang)
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+            XCTFail("\(lang): could not read source Localizable.strings as text at \(url.path)"); return [:]
+        }
+        let re = try! NSRegularExpression(pattern: "^\\s*\"([^\"]+)\"\\s*=")
+        var counts: [String: Int] = [:]
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let s = String(line); let ns = s as NSString
+            guard let m = re.firstMatch(in: s, range: NSRange(location: 0, length: ns.length)) else { continue }
+            counts[ns.substring(with: m.range(at: 1)), default: 0] += 1
+        }
+        return counts
+    }
+
+    /// zh-Hans is the source of truth (`Localizer.defaultCode`); en must match it exactly; each
+    /// partial locale's missing set must EXACTLY equal `knownLocalizationDebt`, with no extra keys.
+    func testFullLocaleKeyUniverseRatchet() {
+        let universe = localeKeySet("zh-Hans")
+        XCTAssertFalse(universe.isEmpty, "zh-Hans universe must load")
+        XCTAssertEqual(localeKeySet("en"), universe,
+                       "en key set must exactly equal the zh-Hans source-of-truth universe")
+        for lang in ["zh-Hant", "ja", "ko", "fr"] {
+            let ks = localeKeySet(lang)
+            let extra = ks.subtracting(universe)
+            XCTAssertTrue(extra.isEmpty, "\(lang) has keys outside the universe: \(extra.sorted())")
+            let missing = universe.subtracting(ks)
+            XCTAssertEqual(missing, Self.knownLocalizationDebt,
+                "\(lang) missing-key set must EXACTLY equal knownLocalizationDebt — " +
+                "newly-missing=\(missing.subtracting(Self.knownLocalizationDebt).sorted()) " +
+                "prematurely-filled=\(Self.knownLocalizationDebt.subtracting(missing).sorted())")
+        }
+    }
+
+    /// Placeholder-set parity over the FULL universe: for every key, all locales that CONTAIN it
+    /// must share the same `{name}` token set (debt keys exist only in en+zh-Hans and match there).
+    func testFullLocalePlaceholderParityForSharedKeys() {
+        let universe = localeKeySet("zh-Hans")
+        let sets = Dictionary(uniqueKeysWithValues: locales.map { ($0, localeKeySet($0)) })
+        for key in universe {
+            var reference: Set<String>? = nil
+            var referenceLang = ""
+            for lang in locales where sets[lang]?.contains(key) == true {
+                let ph = placeholders(rawValue(lang, key) ?? "")
+                if let reference {
+                    XCTAssertEqual(ph, reference, "\(lang) placeholder set for \(key) differs from \(referenceLang)")
+                } else { reference = ph; referenceLang = lang }
+            }
+        }
+    }
+
+    /// No locale file may define the same key twice (the property-list parser would hide this).
+    func testNoDuplicateKeysInAnyLocaleFile() {
+        for lang in locales {
+            let dups = rawKeyOccurrences(lang).filter { $0.value > 1 }.keys.sorted()
+            XCTAssertTrue(dups.isEmpty, "\(lang) defines duplicate keys: \(dups)")
+        }
+    }
+
+    /// The Localizer must never surface a raw key for ANY universe key in ANY locale — debt keys
+    /// resolve through the zh-Hans fallback, so this also proves the fallback path stays intact.
+    func testLocalizerNeverReturnsRawKeyForAnyUniverseKey() {
+        let universe = localeKeySet("zh-Hans")
+        for lang in locales {
+            let loc = Localizer(language: lang)
+            for key in universe {
+                XCTAssertNotEqual(loc.t(key), key, "\(lang) Localizer returned the raw key \(key)")
+            }
+        }
+    }
 }

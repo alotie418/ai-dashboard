@@ -1,6 +1,24 @@
 /* SoloLedger — 日本語（Phase-1 部分翻訳；欠落は zh-Hans にフォールバック） */
 
 "app.name" = "SoloLedger";
+
+/* Transaction editor (B1) — added; remaining app-UI keys still fall back to zh-Hans */
+"editor.titleNew" = "新規取引";
+"editor.titleEdit" = "取引を編集";
+"editor.type" = "種類";
+"editor.date" = "日付";
+"editor.amount" = "金額";
+"editor.currency" = "通貨";
+"editor.category" = "カテゴリ";
+"editor.uncategorized" = "未分類";
+"editor.counterparty" = "取引先";
+"editor.payment" = "決済状況";
+"editor.note" = "メモ";
+"editor.moreSection" = "その他（請求書・税金）";
+"editor.invoice" = "請求書ステータス";
+"editor.taxAmount" = "税額";
+"editor.taxRate" = "税率";
+
 "common.ok" = "OK";
 "common.cancel" = "キャンセル";
 "common.save" = "保存";

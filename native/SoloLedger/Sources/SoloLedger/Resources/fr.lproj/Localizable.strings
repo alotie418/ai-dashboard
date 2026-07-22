@@ -1,6 +1,24 @@
 /* SoloLedger — Français (traduction partielle Phase-1 ; les clés manquantes retombent sur zh-Hans) */
 
 "app.name" = "SoloLedger";
+
+/* Transaction editor (B1) — added; remaining app-UI keys still fall back to zh-Hans */
+"editor.titleNew" = "Nouvelle opération";
+"editor.titleEdit" = "Modifier l’opération";
+"editor.type" = "Type";
+"editor.date" = "Date";
+"editor.amount" = "Montant";
+"editor.currency" = "Devise";
+"editor.category" = "Catégorie";
+"editor.uncategorized" = "Sans catégorie";
+"editor.counterparty" = "Tiers";
+"editor.payment" = "Statut du règlement";
+"editor.note" = "Note";
+"editor.moreSection" = "Autres informations (facture et taxes)";
+"editor.invoice" = "Statut de la facture";
+"editor.taxAmount" = "Montant de la taxe";
+"editor.taxRate" = "Taux de taxe";
+
 "common.ok" = "OK";
 "common.cancel" = "Annuler";
 "common.save" = "Enregistrer";
