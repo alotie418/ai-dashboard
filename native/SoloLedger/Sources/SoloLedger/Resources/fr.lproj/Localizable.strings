@@ -19,6 +19,38 @@
 "editor.taxAmount" = "Montant de la taxe";
 "editor.taxRate" = "Taux de taxe";
 
+/* Transaction list, filters & status (B2) — added */
+"txn.col.amount" = "Montant";
+"txn.col.category" = "Catégorie";
+"txn.col.counterparty" = "Tiers";
+"txn.col.date" = "Date";
+"txn.col.type" = "Type";
+"txn.col.payment" = "Règlement";
+"txn.empty.title" = "Aucune opération pour l’instant";
+"txn.empty.message" = "Cliquez sur « Nouvelle opération » ou appuyez sur ⌘N pour enregistrer votre première recette ou dépense.";
+"txn.noResults.title" = "Aucun résultat";
+"txn.noResults.message" = "Aucune opération ne correspond à la recherche ou aux filtres actuels. Essayez de les effacer.";
+"txn.searchPrompt" = "Rechercher tiers, note, n° de facture";
+"delete.confirmTitle" = "Confirmer la suppression";
+"delete.confirmButton" = "Supprimer ({count})";
+"delete.confirmMessage" = "Supprimer la sélection ({count}) ? Cette action pourra être annulée.";
+"delete.deleted" = "Suppression effectuée : {count}";
+"delete.undo" = "Annuler";
+"filter.label" = "Filtre";
+"date.all" = "Toutes les dates";
+"date.filtered" = "Dates filtrées";
+"date.thisMonth" = "Ce mois-ci";
+"date.thisYear" = "Cette année";
+"period.all" = "Tout";
+"period.month" = "Ce mois-ci";
+"period.year" = "Cette année";
+"payment.paid" = "Réglé";
+"payment.partial" = "Partiel";
+"payment.unpaid" = "Non réglé";
+"invoice.issued" = "Émise";
+"invoice.na" = "S.O.";
+"invoice.pending" = "À émettre";
+
 "common.ok" = "OK";
 "common.cancel" = "Annuler";
 "common.save" = "Enregistrer";

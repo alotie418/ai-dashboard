@@ -19,6 +19,38 @@
 "editor.taxAmount" = "税額";
 "editor.taxRate" = "税率";
 
+/* Transaction list, filters & status (B2) — added */
+"txn.col.amount" = "金額";
+"txn.col.category" = "カテゴリ";
+"txn.col.counterparty" = "取引先";
+"txn.col.date" = "日付";
+"txn.col.type" = "種類";
+"txn.col.payment" = "決済";
+"txn.empty.title" = "取引がまだありません";
+"txn.empty.message" = "「新規取引」をクリックするか ⌘N を押して、最初の収入または支出を記録しましょう。";
+"txn.noResults.title" = "一致する結果なし";
+"txn.noResults.message" = "現在の検索または絞り込み条件に一致する取引はありません。条件をクリアしてお試しください。";
+"txn.searchPrompt" = "取引先・メモ・請求書番号で検索";
+"delete.confirmTitle" = "削除の確認";
+"delete.confirmButton" = "{count} 件を削除";
+"delete.confirmMessage" = "選択した {count} 件の取引を削除しますか？この操作は取り消せます。";
+"delete.deleted" = "{count} 件を削除しました";
+"delete.undo" = "取り消す";
+"filter.label" = "フィルタ";
+"date.all" = "すべての日付";
+"date.filtered" = "日付で絞り込み中";
+"date.thisMonth" = "今月";
+"date.thisYear" = "今年";
+"period.all" = "全期間";
+"period.month" = "今月";
+"period.year" = "今年";
+"payment.paid" = "決済済み";
+"payment.partial" = "一部決済";
+"payment.unpaid" = "未決済";
+"invoice.issued" = "発行済み";
+"invoice.na" = "該当なし";
+"invoice.pending" = "発行待ち";
+
 "common.ok" = "OK";
 "common.cancel" = "キャンセル";
 "common.save" = "保存";
