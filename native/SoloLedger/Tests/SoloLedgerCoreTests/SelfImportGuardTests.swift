@@ -301,4 +301,225 @@ final class SelfImportGuardTests: LedgerTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: config.activeDestination.path),
                        "a rejected self-import must not create anything in the active slot")
     }
+
+    // MARK: - Capability boundary (N7.2 sandbox fix)
+    //
+    // A sandboxed process holding a Powerbox grant can open the granted directory and its
+    // DESCENDANTS but nothing above it. The POSIX equivalent — a parent directory with
+    // execute-only permissions (0o311: traversable, not readable/openable) — makes the old
+    // upward `openat(fd, "..")` walk fail with EACCES exactly like the seatbelt denial did
+    // in a real sandbox, so these tests pin the sandbox contract WITHOUT needing a sandbox:
+    // the guard must never require authority above the source, protected-side judgments
+    // must never require authority above the protected root, and a permission failure
+    // inside a nominated verification must stay fail-closed.
+
+    /// Restores permissions in teardown so the tracked temp tree can be reaped.
+    private func restrict(_ url: URL, to mode: Int16) throws {
+        try fm.setAttributes([.posixPermissions: NSNumber(value: mode)], ofItemAtPath: url.path)
+        addTeardownBlock { [fm] in
+            try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        }
+    }
+
+    func testIndependentSourcePassesWithUnreadableParent() throws {
+        // THE sandbox regression pin: an independent source whose PARENT cannot be opened
+        // (only traversed) must pass the guard — the old upward walk failed here with
+        // EACCES and surfaced as a bogus retriable "I/O problem".
+        let p = try makeProtected()
+        let boundary = try trackedTempDir().appendingPathComponent("boundary", isDirectory: true)
+        let src = boundary.appendingPathComponent("Source", isDirectory: true)
+        try fm.createDirectory(at: src, withIntermediateDirectories: true)
+        try Data("independent-db".utf8).write(to: src.appendingPathComponent(AppPaths.databaseFileName))
+        try restrict(boundary, to: 0o311)
+        XCTAssertNoThrow(try check(.userSelectedDataDir(src), p))
+    }
+
+    func testEmptySourceWithUnreadableParentReachesSourceDatabaseMissing() throws {
+        // Invariant: after the guard confirms independence, an EMPTY directory must land in
+        // `sourceDatabaseMissing` (→ terminal invalidSource), not in a wrapped I/O error.
+        let p = try makeProtected()
+        let boundary = try trackedTempDir().appendingPathComponent("boundary", isDirectory: true)
+        let src = boundary.appendingPathComponent("Empty", isDirectory: true)
+        try fm.createDirectory(at: src, withIntermediateDirectories: true)
+        try restrict(boundary, to: 0o311)
+        let id = ImportID("test-\(UUID().uuidString)")!
+        XCTAssertThrowsError(try StagingIngest().ingest(
+            .userSelectedDataDir(src), importID: id, timestamp: "t",
+            maxAttempts: 3, hooks: IngestHooks(), protecting: p.identity)) { error in
+            guard case IngestError.sourceDatabaseMissing = error else {
+                return XCTFail("empty independent dir must be sourceDatabaseMissing, got \(error)")
+            }
+        }
+    }
+
+    func testProtectedRootWithUnreadableParentStillRejectsDescendant() throws {
+        // Protected-side symmetry: judging "source is INSIDE the data root" must need no
+        // authority above the data root itself.
+        let boundary = try trackedTempDir().appendingPathComponent("boundary", isDirectory: true)
+        let root = boundary.appendingPathComponent("DataRoot", isDirectory: true)
+        let inside = root.appendingPathComponent("Staging", isDirectory: true)
+            .appendingPathComponent("import-x", isDirectory: true)
+        try fm.createDirectory(at: inside, withIntermediateDirectories: true)
+        let p = Protected(identity: .init(dataRootURL: root,
+                                          activeDatabaseURL: root.appendingPathComponent(AppPaths.databaseFileName),
+                                          activeAttachmentsRootURL: root.appendingPathComponent("attachments", isDirectory: true)
+                                              .appendingPathComponent("docs", isDirectory: true)),
+                          rootURL: root,
+                          activeDBURL: root.appendingPathComponent(AppPaths.databaseFileName),
+                          attachmentsURL: root.appendingPathComponent("attachments", isDirectory: true)
+                              .appendingPathComponent("docs", isDirectory: true))
+        try restrict(boundary, to: 0o311)
+        assertRejected(.userSelectedDataDir(inside), p,
+                       role: .nativeDataRoot, relationship: .sourceDescendantOfProtected)
+    }
+
+    func testSourceContainingProtectedRejectedWithUnreadableGrandparent() throws {
+        // Ancestor direction under the boundary: a source CONTAINING the data root is still
+        // refused even when the source's own parent is unreadable.
+        let boundary = try trackedTempDir().appendingPathComponent("boundary", isDirectory: true)
+        let outer = boundary.appendingPathComponent("outer", isDirectory: true)
+        let root = outer.appendingPathComponent("DataRoot", isDirectory: true)
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        let p = Protected(identity: .init(dataRootURL: root,
+                                          activeDatabaseURL: root.appendingPathComponent(AppPaths.databaseFileName),
+                                          activeAttachmentsRootURL: root.appendingPathComponent("attachments", isDirectory: true)
+                                              .appendingPathComponent("docs", isDirectory: true)),
+                          rootURL: root,
+                          activeDBURL: root.appendingPathComponent(AppPaths.databaseFileName),
+                          attachmentsURL: root.appendingPathComponent("attachments", isDirectory: true)
+                              .appendingPathComponent("docs", isDirectory: true))
+        try restrict(boundary, to: 0o311)
+        assertRejected(.userSelectedDataDir(outer), p,
+                       role: .nativeDataRoot, relationship: .sourceAncestorOfProtected)
+    }
+
+    func testPermissionDeniedMidVerificationFailsClosed() throws {
+        // A NOMINATED containment whose verification descent hits a permission denial must
+        // fail closed — EACCES/EPERM is never read as "no overlap" (and never as overlap
+        // either: the import is refused with an error, not silently classified).
+        let top = try trackedTempDir().appendingPathComponent("top", isDirectory: true)
+        let mid = top.appendingPathComponent("mid", isDirectory: true)
+        let root = mid.appendingPathComponent("DataRoot", isDirectory: true)
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        let p = Protected(identity: .init(dataRootURL: root,
+                                          activeDatabaseURL: root.appendingPathComponent(AppPaths.databaseFileName),
+                                          activeAttachmentsRootURL: root.appendingPathComponent("attachments", isDirectory: true)
+                                              .appendingPathComponent("docs", isDirectory: true)),
+                          rootURL: root,
+                          activeDBURL: root.appendingPathComponent(AppPaths.databaseFileName),
+                          attachmentsURL: root.appendingPathComponent("attachments", isDirectory: true)
+                              .appendingPathComponent("docs", isDirectory: true))
+        try restrict(mid, to: 0o111)   // traversable, but not openable for reading
+        XCTAssertThrowsError(try check(.userSelectedDataDir(top), p)) { error in
+            guard case FileHashError.unreadable = error else {
+                return XCTFail("denied verification descent must fail closed as unreadable, got \(error)")
+            }
+        }
+    }
+
+    func testDataVolumeMountPointSourceRefusedAsAncestor() throws {
+        // Firmlink/mount-junction coverage: "/System/Volumes/Data" physically contains the
+        // protected root (which canonicalizes under "/") with no shared string prefix. The
+        // mount-point branch must still refuse it — the one containment shape the canonical
+        // prefix cannot see.
+        let p = try makeProtected()
+        var fs = statfs()
+        guard statfs(p.rootURL.path, &fs) == 0 else { return XCTFail("statfs failed") }
+        let mnt = withUnsafeBytes(of: &fs.f_mntonname) { raw in
+            String(cString: raw.baseAddress!.assumingMemoryBound(to: CChar.self))
+        }
+        try XCTSkipUnless(mnt == "/System/Volumes/Data",
+                          "temp tree is not on the standard data volume (mount: \(mnt))")
+        assertRejected(.userSelectedDataDir(URL(fileURLWithPath: mnt, isDirectory: true)), p,
+                       role: .nativeDataRoot, relationship: .sourceAncestorOfProtected)
+    }
+
+    // MARK: - Firmlink / data-volume alias containment (P1 follow-up, PR #374)
+    //
+    // A source may be SELECTED through the physical `/System/Volumes/Data/...` spelling of a
+    // path whose primary (firmlink-normalized) name is `/Users/...` or `/private/var/...`.
+    // The concern: such an alias defeats the canonical-prefix containment check and lets a
+    // protected ancestor/descendant slip through as "independent". These tests reproduce the
+    // exact selection through the alias spelling and assert the verdict — proving whether the
+    // guard's identity resolution already collapses the alias (fcntl(F_GETPATH) is
+    // firmlink-normalizing) or a dedicated alias step is required.
+
+    /// The `/System/Volumes/Data`-prefixed physical spelling of `url`, but ONLY when it
+    /// resolves to the very same filesystem object here (else nil → the caller skips: the
+    /// machine isn't the standard split-volume layout). The path is realpath-canonicalized
+    /// first (`/var/…` → `/private/var/…`) so the alias is anchored on a real firmlink root.
+    private func dataVolumeAlias(of url: URL) -> URL? {
+        var buf = [CChar](repeating: 0, count: Int(PATH_MAX))
+        guard realpath(url.path, &buf) != nil else { return nil }
+        let canonical = String(cString: buf)
+        let alias = URL(fileURLWithPath: "/System/Volumes/Data" + canonical, isDirectory: true)
+        func rid(_ u: URL) -> (NSCopying & NSSecureCoding & NSObjectProtocol)? {
+            (try? u.resourceValues(forKeys: [.fileResourceIdentifierKey]))?.fileResourceIdentifier
+        }
+        guard let a = rid(alias), let o = rid(url), a.isEqual(o) else { return nil }
+        // The alias must be a genuinely different STRING (else the test is vacuous).
+        guard alias.path != canonical, alias.path.hasPrefix("/System/Volumes/Data/") else { return nil }
+        return alias
+    }
+
+    func testDescendantSelectedViaDataVolumeAliasIsRejected() throws {
+        let p = try makeProtected()
+        let inside = p.rootURL.appendingPathComponent("Staging", isDirectory: true)
+            .appendingPathComponent("import-x", isDirectory: true)
+        try fm.createDirectory(at: inside, withIntermediateDirectories: true)
+        guard let alias = dataVolumeAlias(of: inside) else {
+            throw XCTSkip("temp tree not reachable via /System/Volumes/Data alias")
+        }
+        assertRejected(.userSelectedDataDir(alias), p,
+                       role: .nativeDataRoot, relationship: .sourceDescendantOfProtected)
+    }
+
+    func testAliasAncestorBelowMountContainingProtectedIsRejected() throws {
+        // The tracked temp dir CONTAINS DataRoot; selecting it through the below-mount alias
+        // spelling must still be refused as an ancestor overlap.
+        let p = try makeProtected()
+        guard let alias = dataVolumeAlias(of: p.rootURL.deletingLastPathComponent()) else {
+            throw XCTSkip("temp tree not reachable via /System/Volumes/Data alias")
+        }
+        assertRejected(.userSelectedDataDir(alias), p,
+                       role: .nativeDataRoot, relationship: .sourceAncestorOfProtected)
+    }
+
+    func testIndependentSameVolumeSourceViaAliasStillPasses() throws {
+        // Same filesystem (identical fsid) is NOT sufficient to refuse: a genuinely
+        // independent source, even selected through the data-volume alias, must import.
+        let p = try makeProtected()
+        let src = try makeIndependentSource()
+        guard let alias = dataVolumeAlias(of: src) else {
+            throw XCTSkip("temp tree not reachable via /System/Volumes/Data alias")
+        }
+        XCTAssertNoThrow(try check(.userSelectedDataDir(alias), p))
+    }
+
+    /// The mount junction is the ONE spelling F_GETPATH does NOT normalize away
+    /// (`/System/Volumes/Data`, and its parents `/System/Volumes`, `/System`, `/`, live on
+    /// the system volume and keep their literal path), so an ancestor selected there has a
+    /// canonical path that shares no firmlink-normalized prefix with the protected root.
+    /// These pin that `containsMountPoint` refuses every above-junction ancestor, not just
+    /// the mount point itself.
+    private func assertAboveMountAncestorRefused(_ path: String) throws {
+        let p = try makeProtected()
+        var fs = statfs()
+        guard statfs(p.rootURL.path, &fs) == 0 else { return XCTFail("statfs failed") }
+        let mnt = withUnsafeBytes(of: &fs.f_mntonname) { raw in
+            String(cString: raw.baseAddress!.assumingMemoryBound(to: CChar.self))
+        }
+        try XCTSkipUnless(mnt == "/System/Volumes/Data",
+                          "temp tree is not on the standard data volume (mount: \(mnt))")
+        assertRejected(.userSelectedDataDir(URL(fileURLWithPath: path, isDirectory: true)), p,
+                       role: .nativeDataRoot, relationship: .sourceAncestorOfProtected)
+    }
+
+    func testDataVolumeParentDirRefusedAsAncestor() throws {
+        try assertAboveMountAncestorRefused("/System/Volumes")
+    }
+
+    func testSystemDirAboveMountRefusedAsAncestor() throws {
+        try assertAboveMountAncestorRefused("/System")
+    }
 }
