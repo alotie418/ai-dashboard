@@ -51,6 +51,17 @@
 "invoice.na" = "該当なし";
 "invoice.pending" = "発行待ち";
 
+/* Categories, common chrome, onboarding & boot error (B5) — added */
+"cat.col.label" = "名称";
+"cat.col.slug" = "識別子";
+"cat.col.schedule" = "報告書の行";
+"common.duplicate" = "複製";
+"common.error" = "問題が発生しました";
+"common.loading" = "読み込み中…";
+"onboarding.company" = "会社名／屋号（任意）";
+"onboarding.privacy" = "すべてのデータはお使いの Mac 内にのみ保存されます。アカウント不要、ネットワーク接続なし、AI なし。";
+"boot.error.title" = "データベースを開けませんでした";
+
 "common.ok" = "OK";
 "common.cancel" = "キャンセル";
 "common.save" = "保存";

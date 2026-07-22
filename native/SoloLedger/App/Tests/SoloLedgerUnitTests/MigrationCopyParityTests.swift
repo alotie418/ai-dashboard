@@ -320,14 +320,12 @@ final class MigrationCopyParityTests: XCTestCase {
     // When the set is emptied, delete it and assert `missing.isEmpty` for strict six-locale parity.
 
     /// The remaining app-UI keys not yet translated in zh-Hant/ja/ko/fr (identical across all four).
-    /// B1 filled `editor.*` (15); B2 filled the transaction list / filters / status (30); this is the
-    /// residual 54. Shrinks one batch at a time.
+    /// B1 filled `editor.*` (15); B2 the transaction list / filters / status (30); B5 the categories /
+    /// common chrome / onboarding / boot error (9); this is the residual 45. Shrinks one batch at a time.
     private static let knownLocalizationDebt: Set<String> = [
-        "about.minOS", "about.name", "about.positioning", "about.version", "boot.error.title",
-        "cat.col.label", "cat.col.schedule", "cat.col.slug", "cmd.exportCSV", "cmd.importCSV",
-        "common.duplicate", "common.error", "common.loading", "csv.import.partial", "onboarding.company",
-        "onboarding.privacy", "overview.byCurrency", "overview.count", "overview.currency",
-        "overview.dataSourceNote", "overview.empty.message", "overview.empty.title",
+        "about.minOS", "about.name", "about.positioning", "about.version", "cmd.exportCSV",
+        "cmd.importCSV", "csv.import.partial", "overview.byCurrency", "overview.count",
+        "overview.currency", "overview.dataSourceNote", "overview.empty.message", "overview.empty.title",
         "overview.emptyPeriod.message", "overview.emptyPeriod.title", "overview.loadDemo",
         "overview.month", "overview.monthlyTitle", "overview.multiCurrencyNote", "overview.period",
         "overview.recent", "recovery.blank", "recovery.blankConfirm", "recovery.blankConfirmMessage",

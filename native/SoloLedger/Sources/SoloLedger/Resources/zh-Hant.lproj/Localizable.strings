@@ -51,6 +51,17 @@
 "invoice.na" = "不適用";
 "invoice.pending" = "待開票";
 
+/* Categories, common chrome, onboarding & boot error (B5) — added */
+"cat.col.label" = "名稱";
+"cat.col.slug" = "識別碼";
+"cat.col.schedule" = "報表行";
+"common.duplicate" = "複製";
+"common.error" = "發生錯誤";
+"common.loading" = "載入中…";
+"onboarding.company" = "公司／字號名稱（可選）";
+"onboarding.privacy" = "所有資料僅儲存在你的 Mac 本機。無需帳號，不連網，不含 AI。";
+"boot.error.title" = "無法開啟資料庫";
+
 "common.ok" = "好";
 "common.cancel" = "取消";
 "common.save" = "儲存";

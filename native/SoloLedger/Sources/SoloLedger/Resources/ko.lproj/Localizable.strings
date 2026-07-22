@@ -51,6 +51,17 @@
 "invoice.na" = "해당 없음";
 "invoice.pending" = "발행 대기";
 
+/* Categories, common chrome, onboarding & boot error (B5) — added */
+"cat.col.label" = "이름";
+"cat.col.slug" = "식별자";
+"cat.col.schedule" = "보고서 행";
+"common.duplicate" = "복제";
+"common.error" = "문제가 발생했습니다";
+"common.loading" = "불러오는 중…";
+"onboarding.company" = "회사/상호명(선택)";
+"onboarding.privacy" = "모든 데이터는 사용자의 Mac에만 저장됩니다. 계정 불필요, 네트워크 연결 없음, AI 없음.";
+"boot.error.title" = "데이터베이스를 열 수 없습니다";
+
 "common.ok" = "확인";
 "common.cancel" = "취소";
 "common.save" = "저장";
