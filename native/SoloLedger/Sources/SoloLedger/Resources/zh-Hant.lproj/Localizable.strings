@@ -1,6 +1,24 @@
 /* SoloLedger — 繁體中文（Phase-1 部分翻譯；缺項回退 zh-Hans） */
 
 "app.name" = "SoloLedger";
+
+/* Transaction editor (B1) — added; remaining app-UI keys still fall back to zh-Hans */
+"editor.titleNew" = "新增流水";
+"editor.titleEdit" = "編輯流水";
+"editor.type" = "類型";
+"editor.date" = "日期";
+"editor.amount" = "金額";
+"editor.currency" = "幣別";
+"editor.category" = "類別";
+"editor.uncategorized" = "未分類";
+"editor.counterparty" = "往來對象";
+"editor.payment" = "收付狀態";
+"editor.note" = "備註";
+"editor.moreSection" = "更多資訊（發票／稅務）";
+"editor.invoice" = "發票狀態";
+"editor.taxAmount" = "稅額";
+"editor.taxRate" = "稅率";
+
 "common.ok" = "好";
 "common.cancel" = "取消";
 "common.save" = "儲存";

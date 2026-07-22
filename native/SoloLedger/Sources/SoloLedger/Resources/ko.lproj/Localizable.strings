@@ -1,6 +1,24 @@
 /* SoloLedger — 한국어 (Phase-1 부분 번역; 누락 항목은 zh-Hans로 대체) */
 
 "app.name" = "SoloLedger";
+
+/* Transaction editor (B1) — added; remaining app-UI keys still fall back to zh-Hans */
+"editor.titleNew" = "새 거래";
+"editor.titleEdit" = "거래 수정";
+"editor.type" = "유형";
+"editor.date" = "날짜";
+"editor.amount" = "금액";
+"editor.currency" = "통화";
+"editor.category" = "카테고리";
+"editor.uncategorized" = "미분류";
+"editor.counterparty" = "거래처";
+"editor.payment" = "결제 상태";
+"editor.note" = "메모";
+"editor.moreSection" = "추가 정보(청구서/세금)";
+"editor.invoice" = "청구서 상태";
+"editor.taxAmount" = "세액";
+"editor.taxRate" = "세율";
+
 "common.ok" = "확인";
 "common.cancel" = "취소";
 "common.save" = "저장";
