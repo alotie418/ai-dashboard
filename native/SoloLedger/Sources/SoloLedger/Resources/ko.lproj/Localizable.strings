@@ -19,6 +19,38 @@
 "editor.taxAmount" = "세액";
 "editor.taxRate" = "세율";
 
+/* Transaction list, filters & status (B2) — added */
+"txn.col.amount" = "금액";
+"txn.col.category" = "카테고리";
+"txn.col.counterparty" = "거래처";
+"txn.col.date" = "날짜";
+"txn.col.type" = "유형";
+"txn.col.payment" = "결제";
+"txn.empty.title" = "아직 거래가 없습니다";
+"txn.empty.message" = "‘새 거래’를 클릭하거나 ⌘N을 눌러 첫 수입 또는 지출을 기록하세요.";
+"txn.noResults.title" = "일치하는 결과 없음";
+"txn.noResults.message" = "현재 검색 또는 필터 조건에 맞는 거래가 없습니다. 조건을 지우고 다시 시도하세요.";
+"txn.searchPrompt" = "거래처, 메모, 청구서 번호 검색";
+"delete.confirmTitle" = "삭제 확인";
+"delete.confirmButton" = "{count}개 삭제";
+"delete.confirmMessage" = "선택한 {count}개 거래를 삭제할까요? 실행 취소할 수 있습니다.";
+"delete.deleted" = "{count}개 삭제됨";
+"delete.undo" = "실행 취소";
+"filter.label" = "필터";
+"date.all" = "모든 날짜";
+"date.filtered" = "날짜 필터 적용됨";
+"date.thisMonth" = "이번 달";
+"date.thisYear" = "올해";
+"period.all" = "전체 기간";
+"period.month" = "이번 달";
+"period.year" = "올해";
+"payment.paid" = "결제 완료";
+"payment.partial" = "부분 결제";
+"payment.unpaid" = "미결제";
+"invoice.issued" = "발행 완료";
+"invoice.na" = "해당 없음";
+"invoice.pending" = "발행 대기";
+
 "common.ok" = "확인";
 "common.cancel" = "취소";
 "common.save" = "저장";

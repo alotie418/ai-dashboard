@@ -19,6 +19,38 @@
 "editor.taxAmount" = "稅額";
 "editor.taxRate" = "稅率";
 
+/* Transaction list, filters & status (B2) — added */
+"txn.col.amount" = "金額";
+"txn.col.category" = "類別";
+"txn.col.counterparty" = "往來對象";
+"txn.col.date" = "日期";
+"txn.col.type" = "類型";
+"txn.col.payment" = "收付";
+"txn.empty.title" = "尚無流水記錄";
+"txn.empty.message" = "點按「新增流水」或按 ⌘N 記錄第一筆收入或支出。";
+"txn.noResults.title" = "無相符結果";
+"txn.noResults.message" = "沒有符合目前搜尋或篩選條件的流水。請清除條件後再試。";
+"txn.searchPrompt" = "搜尋往來對象、備註、發票號";
+"delete.confirmTitle" = "確認刪除";
+"delete.confirmButton" = "刪除 {count} 筆";
+"delete.confirmMessage" = "確定刪除選取的 {count} 筆流水？刪除後可復原。";
+"delete.deleted" = "已刪除 {count} 筆";
+"delete.undo" = "還原";
+"filter.label" = "篩選";
+"date.all" = "全部日期";
+"date.filtered" = "已篩選日期";
+"date.thisMonth" = "本月";
+"date.thisYear" = "今年";
+"period.all" = "全部";
+"period.month" = "本月";
+"period.year" = "今年";
+"payment.paid" = "已結";
+"payment.partial" = "部分";
+"payment.unpaid" = "未結";
+"invoice.issued" = "已開票";
+"invoice.na" = "不適用";
+"invoice.pending" = "待開票";
+
 "common.ok" = "好";
 "common.cancel" = "取消";
 "common.save" = "儲存";

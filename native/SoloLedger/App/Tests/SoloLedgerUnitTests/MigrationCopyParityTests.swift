@@ -320,28 +320,23 @@ final class MigrationCopyParityTests: XCTestCase {
     // When the set is emptied, delete it and assert `missing.isEmpty` for strict six-locale parity.
 
     /// The remaining app-UI keys not yet translated in zh-Hant/ja/ko/fr (identical across all four).
-    /// B1 filled `editor.*` (15 keys); this is the residual 84. Shrinks one batch at a time.
+    /// B1 filled `editor.*` (15); B2 filled the transaction list / filters / status (30); this is the
+    /// residual 54. Shrinks one batch at a time.
     private static let knownLocalizationDebt: Set<String> = [
         "about.minOS", "about.name", "about.positioning", "about.version", "boot.error.title",
         "cat.col.label", "cat.col.schedule", "cat.col.slug", "cmd.exportCSV", "cmd.importCSV",
-        "common.duplicate", "common.error", "common.loading", "csv.import.partial", "date.all",
-        "date.filtered", "date.thisMonth", "date.thisYear", "delete.confirmButton",
-        "delete.confirmMessage", "delete.confirmTitle", "delete.deleted", "delete.undo", "filter.label",
-        "invoice.issued", "invoice.na", "invoice.pending", "onboarding.company", "onboarding.privacy",
-        "overview.byCurrency", "overview.count", "overview.currency", "overview.dataSourceNote",
-        "overview.empty.message", "overview.empty.title", "overview.emptyPeriod.message",
-        "overview.emptyPeriod.title", "overview.loadDemo", "overview.month", "overview.monthlyTitle",
-        "overview.multiCurrencyNote", "overview.period", "overview.recent", "payment.paid",
-        "payment.partial", "payment.unpaid", "period.all", "period.month", "period.year", "recovery.blank",
-        "recovery.blankConfirm", "recovery.blankConfirmMessage", "recovery.blankConfirmTitle",
-        "recovery.message", "recovery.restore", "recovery.retry", "recovery.safeNote", "recovery.title",
-        "recovery.viewError", "settings.about", "settings.accounting", "settings.accountingLocale",
-        "settings.accountingNote", "settings.appearance.dark", "settings.appearance.light",
-        "settings.appearance.system", "settings.company", "settings.csv", "settings.currency",
-        "settings.data", "settings.dbLocation", "settings.general", "settings.schemaVersion",
-        "txn.col.amount", "txn.col.category", "txn.col.counterparty", "txn.col.date", "txn.col.payment",
-        "txn.col.type", "txn.empty.message", "txn.empty.title", "txn.noResults.message",
-        "txn.noResults.title", "txn.searchPrompt",
+        "common.duplicate", "common.error", "common.loading", "csv.import.partial", "onboarding.company",
+        "onboarding.privacy", "overview.byCurrency", "overview.count", "overview.currency",
+        "overview.dataSourceNote", "overview.empty.message", "overview.empty.title",
+        "overview.emptyPeriod.message", "overview.emptyPeriod.title", "overview.loadDemo",
+        "overview.month", "overview.monthlyTitle", "overview.multiCurrencyNote", "overview.period",
+        "overview.recent", "recovery.blank", "recovery.blankConfirm", "recovery.blankConfirmMessage",
+        "recovery.blankConfirmTitle", "recovery.message", "recovery.restore", "recovery.retry",
+        "recovery.safeNote", "recovery.title", "recovery.viewError", "settings.about",
+        "settings.accounting", "settings.accountingLocale", "settings.accountingNote",
+        "settings.appearance.dark", "settings.appearance.light", "settings.appearance.system",
+        "settings.company", "settings.csv", "settings.currency", "settings.data", "settings.dbLocation",
+        "settings.general", "settings.schemaVersion",
     ]
 
     /// URL of a locale's `Localizable.strings` (resolves the SwiftPM-lowercased `.lproj` too).
