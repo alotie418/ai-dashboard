@@ -51,6 +51,17 @@
 "invoice.na" = "S.O.";
 "invoice.pending" = "À émettre";
 
+/* Categories, common chrome, onboarding & boot error (B5) — added */
+"cat.col.label" = "Nom";
+"cat.col.slug" = "Identifiant";
+"cat.col.schedule" = "Ligne du rapport";
+"common.duplicate" = "Dupliquer";
+"common.error" = "Une erreur s'est produite";
+"common.loading" = "Chargement…";
+"onboarding.company" = "Nom de l'entreprise (facultatif)";
+"onboarding.privacy" = "Toutes les données restent sur votre Mac. Aucun compte, aucune connexion réseau, aucune IA.";
+"boot.error.title" = "Impossible d'ouvrir la base de données";
+
 "common.ok" = "OK";
 "common.cancel" = "Annuler";
 "common.save" = "Enregistrer";
