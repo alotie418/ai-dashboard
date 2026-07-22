@@ -56,7 +56,7 @@
 "migration.diagnostics.filename" = "sololedger-diagnostics.txt";
 "migration.diagnostics.writeFailed" = "無法寫入診斷檔案，請改用其他位置後再試一次。";
 "migration.msg.sourceBusy" = "舊版應用程式仍在使用其資料。請先結束舊版 SoloLedger，然後再試一次。";
-"migration.msg.invalidSource" = "所選來源不是有效的帳本，請改選其他檔案。";
+"migration.msg.invalidSource" = "所選來源不是有效的 SoloLedger 帳本。請重新探測，或匯出診斷資訊。";
 "migration.msg.sourceCorrupt" = "來源資料庫已損毀，無法遷移。";
 "migration.msg.schemaUnsupported" = "來源資料庫的版本不受支援。";
 "migration.msg.migrationFailed" = "遷移未能完成。";

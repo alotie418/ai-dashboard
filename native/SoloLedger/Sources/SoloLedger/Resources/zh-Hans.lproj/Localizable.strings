@@ -171,7 +171,7 @@
 "migration.diagnostics.filename" = "sololedger-diagnostics.txt";
 "migration.diagnostics.writeFailed" = "无法写入诊断文件。请换一个位置重试。";
 "migration.msg.sourceBusy" = "旧版应用仍在使用其数据。请先退出旧版 SoloLedger，然后重试。";
-"migration.msg.invalidSource" = "所选来源不是有效的账本。请重新选择文件。";
+"migration.msg.invalidSource" = "所选来源不是有效的 SoloLedger 账本。请重新探测，或导出诊断信息。";
 "migration.msg.sourceCorrupt" = "源数据库已损坏，无法迁移。";
 "migration.msg.schemaUnsupported" = "源数据库版本不受支持。";
 "migration.msg.migrationFailed" = "迁移未能完成。";

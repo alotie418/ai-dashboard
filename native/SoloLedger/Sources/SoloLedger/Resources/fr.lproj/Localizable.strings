@@ -56,7 +56,7 @@
 "migration.diagnostics.filename" = "sololedger-diagnostics.txt";
 "migration.diagnostics.writeFailed" = "Impossible d'écrire le fichier de diagnostic. Veuillez choisir un autre emplacement.";
 "migration.msg.sourceBusy" = "L'application précédente utilise encore ses données. Veuillez quitter l'ancienne application SoloLedger, puis réessayer.";
-"migration.msg.invalidSource" = "La source sélectionnée n'est pas une comptabilité valide. Veuillez choisir un autre fichier.";
+"migration.msg.invalidSource" = "La source sélectionnée n'est pas une comptabilité SoloLedger valide. Réessayez ou exportez le diagnostic.";
 "migration.msg.sourceCorrupt" = "La base de données source est endommagée et ne peut pas être migrée.";
 "migration.msg.schemaUnsupported" = "La base de données source utilise une version non prise en charge.";
 "migration.msg.migrationFailed" = "La migration n'a pas pu être menée à terme.";
