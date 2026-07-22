@@ -171,7 +171,7 @@
 "migration.diagnostics.filename" = "sololedger-diagnostics.txt";
 "migration.diagnostics.writeFailed" = "Couldn't write the diagnostics file. Please try a different location.";
 "migration.msg.sourceBusy" = "The previous app is still using its data. Please quit the old SoloLedger app, then try again.";
-"migration.msg.invalidSource" = "The selected source isn't a valid ledger. Please choose a different file.";
+"migration.msg.invalidSource" = "The selected source isn't a valid SoloLedger ledger. Retry the scan or export diagnostics.";
 "migration.msg.sourceCorrupt" = "The source database is damaged and can't be migrated.";
 "migration.msg.schemaUnsupported" = "The source database uses an unsupported version.";
 "migration.msg.migrationFailed" = "The migration couldn't be completed.";

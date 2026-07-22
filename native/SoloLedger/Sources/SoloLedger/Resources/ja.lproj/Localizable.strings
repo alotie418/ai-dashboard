@@ -56,7 +56,7 @@
 "migration.diagnostics.filename" = "sololedger-diagnostics.txt";
 "migration.diagnostics.writeFailed" = "診断ファイルを書き込めませんでした。別の場所を指定してもう一度お試しください。";
 "migration.msg.sourceBusy" = "旧バージョンのアプリがまだデータを使用中です。旧版の SoloLedger を終了してから、もう一度お試しください。";
-"migration.msg.invalidSource" = "選択した移行元は有効な台帳ではありません。別のファイルを選択してください。";
+"migration.msg.invalidSource" = "選択した移行元は有効な SoloLedger 台帳ではありません。再検出するか、診断情報を書き出してください。";
 "migration.msg.sourceCorrupt" = "移行元のデータベースが破損しており、移行できません。";
 "migration.msg.schemaUnsupported" = "移行元のデータベースはサポートされていないバージョンです。";
 "migration.msg.migrationFailed" = "移行を完了できませんでした。";
