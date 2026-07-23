@@ -127,6 +127,33 @@ final class DirectoryHandle {
         return try adopt(fd: fd, pathHint: url.path)
     }
 
+    /// Open a directory with EVERY path component required to be symlink-free
+    /// (`O_NOFOLLOW_ANY`): the kernel rejects a symbolic link ANYWHERE in the resolution
+    /// (ELOOP), not only at the last component like `open(at:)` above (firmlinks are not
+    /// symlinks and resolve normally). This is the anchor for the ONE call site that must
+    /// WRITE below a path before SQLite's whole-path-NOFOLLOW backstop can fire
+    /// (`LedgerStore` createFresh STAGE 0) — verification instead of trusting any
+    /// containermanagerd-created ancestor.
+    ///
+    /// INPUT CONTRACT: `url` must be an ABSOLUTE file URL; its `.path` is handed to the
+    /// kernel as-is — no `resolvingSymlinksInPath`, `realpath` or FileManager
+    /// pre-processing (those would launder exactly the symlinks this open exists to
+    /// reject). A non-file or relative URL fails closed as EINVAL without touching the
+    /// filesystem. UNLIKE `open(at:)`, every open failure preserves the ORIGINAL kernel
+    /// errno (ELOOP / ENOTDIR / ENOENT / EACCES / …) in `FileHashError.unreadable` —
+    /// there is deliberately no errno-dropping `notADirectory` mapping and no lstat
+    /// re-derivation here.
+    static func openNoFollowAny(at url: URL) throws -> DirectoryHandle {
+        guard url.isFileURL, url.path.hasPrefix("/") else {
+            throw FileHashError.unreadable(path: url.absoluteString, errno: EINVAL)
+        }
+        let fd = Darwin.open(url.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW_ANY)
+        guard fd >= 0 else {
+            throw FileHashError.unreadable(path: url.path, errno: errno)
+        }
+        return try adopt(fd: fd, pathHint: url.path)
+    }
+
     /// Open a DIRECT child directory of this descriptor, no-follow.
     func subdirectory(named name: String) throws -> DirectoryHandle {
         let hint = pathHint + "/" + name
@@ -351,6 +378,95 @@ final class DirectoryHandle {
             // fstatat→openat gap. Do not touch `name` (not observably ours); fail closed.
             // `child` closes on deinit.
             throw FileHashError.destinationUnwritable(path: pathHint + "/" + name, errno: EEXIST)
+        }
+        return child
+    }
+
+    /// Ensure a DIRECT child directory exists and return a bound handle to it — the
+    /// EEXIST-tolerant sibling of `makeChildDirectory` for the confirmed-createFresh data
+    /// root (`LedgerStore` STAGE 0). The CONTRACT DIFFERENCES are deliberate — do NOT
+    /// "unify" the two:
+    ///  • an existing REAL directory at `name` is SUCCESS (bound and returned; its mode,
+    ///    ownership and timestamps are NEVER touched), not a failure;
+    ///  • there is NO cleanup branch of any kind: a directory this call created is never
+    ///    removed, even when a later step fails — the caller's contract is "exists", and
+    ///    removal could pull a live concurrent creator's bound directory out from under
+    ///    it (`makeChildDirectory`'s rollback serves the OPPOSITE ingest contract, which
+    ///    requires a brand-new directory).
+    /// The mkdirat→fstatat first-observed-inode limit documented on `makeChildDirectory`
+    /// applies identically here (registered same-UID residual).
+    ///
+    /// `name` must be a SINGLE direct child component: empty, ".", "..", anything
+    /// containing "/" or an EMBEDDED NUL fails closed (EINVAL) before any filesystem
+    /// access — Darwin's C-string bridging TRUNCATES at a NUL, so an unvalidated
+    /// "prefix\0suffix" would silently mkdir "prefix". Every
+    /// filesystem failure preserves the ORIGINAL kernel errno in
+    /// `FileHashError.destinationUnwritable`: a squatting/swapped-in symlink fails as
+    /// ELOOP, a non-directory as ENOTDIR, a vanished entry as ENOENT — the squatter is
+    /// never resolved, modified or deleted. The two window closures are TEST-ONLY seams
+    /// (nil in production): `afterCreateBeforeFirstStat` opens the mkdirat→fstatat
+    /// sub-gap, `afterFirstStatBeforeBind` the fstatat→openat gap.
+    func ensureChildDirectory(named name: String,
+                              afterCreateBeforeFirstStat: (() throws -> Void)? = nil,
+                              afterFirstStatBeforeBind: (() throws -> Void)? = nil) throws -> DirectoryHandle {
+        let hint = pathHint + "/" + name
+        guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains("\0") else {
+            throw FileHashError.destinationUnwritable(path: hint, errno: EINVAL)
+        }
+        // First-observed identity when WE created the entry; nil when EEXIST said the name
+        // is already owned (then there is deliberately NO identity expectation — the
+        // downstream O_EXCL reservation and identity chain anchor on the bound fd).
+        var firstObserved: FileFingerprint? = nil
+        if mkdirat(fd, name, 0o700) == 0 {
+            try afterCreateBeforeFirstStat?()
+            let observed: FileFingerprint?
+            do { observed = try fingerprint(named: name) }
+            catch let e as FileHashError {
+                // fstatat failed after our mkdirat: whatever is (or is not) at the name is
+                // not observably ours — fail closed with the RAW errno, touch nothing.
+                if case .unreadable(_, let n) = e { throw FileHashError.destinationUnwritable(path: hint, errno: n) }
+                throw e
+            }
+            guard let observed else {
+                // Vanished in the sub-gap (fstatat ENOENT): nothing observably ours remains;
+                // fail closed, delete nothing (a racer may already own a successor entry).
+                throw FileHashError.destinationUnwritable(path: hint, errno: ENOENT)
+            }
+            firstObserved = observed
+        } else {
+            let e = errno
+            guard e == EEXIST else { throw FileHashError.destinationUnwritable(path: hint, errno: e) }
+        }
+        try afterFirstStatBeforeBind?()
+        // NO-FOLLOW CLASSIFICATION before the bind. Necessary because under
+        // O_DIRECTORY|O_NOFOLLOW the kernel reports a squatting SYMLINK as ENOTDIR —
+        // indistinguishable from a plain file — while this primitive's contract reports
+        // the NOFOLLOW-semantic ELOOP for a link and ENOTDIR for a non-directory. The
+        // fstatat is raw (its own failures keep their kernel errno); the classify→bind
+        // gap is a residual race that still FAILS CLOSED at the bind below with the
+        // kernel's raw errno — classification only refines the reported errno, never
+        // gates a write. Nothing is deleted on any failure.
+        let now: FileFingerprint?
+        do { now = try fingerprint(named: name) }
+        catch let e as FileHashError {
+            if case .unreadable(_, let n) = e { throw FileHashError.destinationUnwritable(path: hint, errno: n) }
+            throw e
+        }
+        guard let now else { throw FileHashError.destinationUnwritable(path: hint, errno: ENOENT) }
+        if now.isSymbolicLink { throw FileHashError.destinationUnwritable(path: hint, errno: ELOOP) }
+        guard now.isDirectory else { throw FileHashError.destinationUnwritable(path: hint, errno: ENOTDIR) }
+        // Bind fd-rooted, no-follow.
+        let cfd = openat(fd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+        guard cfd >= 0 else {
+            throw FileHashError.destinationUnwritable(path: hint, errno: errno)
+        }
+        let child = try Self.adopt(fd: cfd, pathHint: hint)
+        if let firstObserved,
+           child.device != firstObserved.device || child.inode != firstObserved.inode {
+            // OUR freshly created directory was swapped for another directory in the
+            // fstatat→openat gap: not observably ours — fail closed (EEXIST, mirroring
+            // makeChildDirectory), touch nothing; `child` closes on deinit.
+            throw FileHashError.destinationUnwritable(path: hint, errno: EEXIST)
         }
         return child
     }
