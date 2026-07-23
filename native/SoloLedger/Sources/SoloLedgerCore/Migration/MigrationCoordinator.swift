@@ -131,6 +131,9 @@ public enum HardenedOpenError: Error, Equatable {
 /// Which step of the createFresh exclusive reservation failed (stable tags; no path/message).
 public enum ReservationStep: String, Equatable {
     case parentBind    // DirectoryHandle.open(parent) failed (e.g. immediate-parent symlink)
+    // STAGE 0 (parent missing on a fresh container; fires ONLY for the sanctioned data-root name):
+    case ancestorBind  // full-path no-follow bind (O_NOFOLLOW_ANY) of the data root's parent failed
+    case parentCreate  // creating/binding the missing data-root directory failed (squatter/ELOOP/ENOTDIR/…)
     case openExcl      // openat(O_CREAT|O_EXCL|O_NOFOLLOW) failed with a non-EEXIST errno
     case fstat         // fstat on the freshly-reserved fd failed
     case close         // the explicit, pre-SQL reservation fd close returned non-zero

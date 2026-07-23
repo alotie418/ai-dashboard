@@ -197,6 +197,9 @@ public final class LedgerStore {
         var adopt: (SQLiteDatabase) throws -> LedgerStore = { try LedgerStore(adopting: $0) }
         var afterReserveBeforeOpen: (() throws -> Void)? = nil     // window: swap after reserve, before open
         var afterOpenBeforeChecks: (() throws -> Void)? = nil      // window: swap after open, before checks
+        /// STAGE-0 window: fires after the parent bind returned ENOENT and before the
+        /// ensure (anchor-bind + mkdirat) runs — tests plant a concurrent winner/squatter here.
+        var afterParentMissingBeforeEnsure: (() throws -> Void)? = nil
         var hasMovedOverride: (() -> HasMovedResult)? = nil
         var reservationCloseErrno: (() -> Int32)? = nil            // inject a non-zero reservation-close errno
         var observeReservationCleanup: (() -> Void)? = nil         // fires when cleanupIfStillOurs runs
@@ -302,6 +305,14 @@ public final class LedgerStore {
 
         let parent: DirectoryHandle
         do { parent = try DirectoryHandle.open(at: parentURL) }   // immediate-parent symlink → ELOOP
+        catch let e as FileHashError where e.isFileMissing {
+            // STAGE 0 — the data-root parent does not exist yet (first confirmed createFresh
+            // in a brand-new sandbox container). Reachable ONLY through the user-confirmed
+            // createFresh plan (probe/boot paths create nothing), and gated to the ONE
+            // sanctioned directory name, so this can never become a generic mkdir capability.
+            try hooks.afterParentMissingBeforeEnsure?()
+            parent = try Self.ensureFreshParent(parentURL: parentURL)
+        }
         catch { throw HardenedOpenError.reservationFailed(step: .parentBind, errno: Self.parentBindErrno(of: error, at: parentURL)) }
 
         let reservation = try FreshReservation.reserve(in: parent, named: name,
@@ -408,6 +419,54 @@ public final class LedgerStore {
         if type == S_IFLNK { return ELOOP }
         if type != S_IFDIR { return ENOTDIR }
         return 0   // race: the path is a directory again; no specific errno is attributable
+    }
+
+    /// STAGE 0 of the confirmed-createFresh path: the parent (data-root) directory is
+    /// missing — create exactly ONE level, behind a FULL-PATH no-follow anchor.
+    ///
+    /// This is the one write permitted before SQLite's whole-path-NOFOLLOW backstop can
+    /// fire, so its anchor must be stronger than the last-component `open(at:)`:
+    /// `openNoFollowAny` has the KERNEL reject a symlink in ANY ancestor component
+    /// (verification, never trust in containermanagerd-created skeletons). A missing
+    /// grandparent is an abnormal container and fails closed (ENOENT) — never recursive.
+    ///
+    /// NAME GATE — a ROUTING constraint, not a path authorization: it checks ONLY the
+    /// FINAL path component against the app's data-root folder name
+    /// (`AppPaths.nativeDataFolderName`, a compile-time literal). It does NOT verify
+    /// that the full path is the production `Config.standard()` data root — path
+    /// authority stays with the caller (`openStoreForPlan` receives the coordinator's
+    /// `activeDestination`). The gate exists solely so this branch cannot generalize
+    /// into a mkdir-for-arbitrary-names capability; any other missing parent keeps
+    /// today's behavior (`reservationFailed(.parentBind, ENOENT)`).
+    ///
+    /// KEEP-ON-FAILURE CONTRACT: a directory this step created is NEVER removed by any
+    /// later failure (reservation, open, identity checks, close, adoption). An empty data
+    /// root is semantically identical to ENOENT for every probe (guarded by tests), and
+    /// removal could pull a concurrent creator's bound directory out from under it.
+    private static func ensureFreshParent(parentURL: URL) throws -> DirectoryHandle {
+        guard parentURL.lastPathComponent == AppPaths.nativeDataFolderName else {
+            throw HardenedOpenError.reservationFailed(step: .parentBind, errno: ENOENT)
+        }
+        let gp: DirectoryHandle
+        do { gp = try DirectoryHandle.openNoFollowAny(at: parentURL.deletingLastPathComponent()) }
+        catch { throw HardenedOpenError.reservationFailed(step: .ancestorBind, errno: Self.primitiveErrno(of: error)) }
+        do { return try gp.ensureChildDirectory(named: parentURL.lastPathComponent) }
+        catch { throw HardenedOpenError.reservationFailed(step: .parentCreate, errno: Self.primitiveErrno(of: error)) }
+    }
+
+    /// The RAW errno carried by the STAGE-0 primitives' errno-bearing cases
+    /// (`unreadable` / `destinationUnwritable`) is passed through unchanged. Anything
+    /// else — the errno-less `FileHashError` cases or a foreign error type — cannot
+    /// claim an original errno and FAILS CLOSED as EIO; never 0, which would read as
+    /// "no error" in the typed params.
+    private static func primitiveErrno(of error: Error) -> Int32 {
+        if let e = error as? FileHashError {
+            switch e {
+            case .unreadable(_, let n), .destinationUnwritable(_, let n): return n
+            case .notARegularFile, .notADirectory: return EIO
+            }
+        }
+        return EIO
     }
 
     private func applyPragmas() throws {
