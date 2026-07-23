@@ -188,3 +188,12 @@
 "migration.chooseSource.confirm.body" = "以前の SoloLedger のデータが削除・変更されることはありませんが、移行をスキップしてこの App 用の空の帳簿を作成します。以前のデータは自動的には読み込まれません。移行する場合は、戻って「以前のデータを移行」を選択してください。";
 "migration.chooseSource.confirm.back" = "戻る";
 "migration.chooseSource.confirm.create" = "空の帳簿を作成";
+
+/* About, CSV commands & partial-import result (B4) — added */
+"cmd.exportCSV" = "CSV を書き出す";
+"cmd.importCSV" = "CSV を読み込む";
+"about.name" = "名称";
+"about.version" = "バージョン";
+"about.minOS" = "動作環境";
+"about.positioning" = "SoloLedger は、個人事業主・一人会社・フリーランスのための、ローカル優先でプライベートな台帳です。データはお使いのデバイス内にのみ保存されます。アカウント不要、AI なし、ネットワーク接続なし、有料アンロックなし。経営記帳と管理分析のためのツールであり、公認会計士・税理士・法定申告システムの代わりになるものではありません。";
+"csv.import.partial" = "{imported} 件を読み込み、{skipped} 件をスキップしました。";

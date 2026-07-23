@@ -188,3 +188,12 @@
 "migration.chooseSource.confirm.body" = "이전 SoloLedger 데이터를 삭제하거나 수정하지 않지만, 마이그레이션을 건너뛰고 이 앱용 빈 장부를 만듭니다. 이전 데이터는 자동으로 가져오지 않습니다. 마이그레이션하려면 돌아가서 “이전 데이터 마이그레이션”을 선택하세요.";
 "migration.chooseSource.confirm.back" = "돌아가기";
 "migration.chooseSource.confirm.create" = "빈 장부 만들기";
+
+/* About, CSV commands & partial-import result (B4) — added */
+"cmd.exportCSV" = "CSV 내보내기";
+"cmd.importCSV" = "CSV 가져오기";
+"about.name" = "이름";
+"about.version" = "버전";
+"about.minOS" = "시스템 요구 사항";
+"about.positioning" = "SoloLedger는 1인 사업자, 1인 법인, 프리랜서를 위한 로컬 우선의 프라이빗한 장부입니다. 데이터는 사용자의 기기에만 저장됩니다. 계정 불필요, AI 없음, 네트워크 연결 없음, 유료 잠금 해제 없음. 사업 기장과 경영 분석을 위한 도구이며, 공인회계사, 세무사 또는 법정 신고 시스템을 대체하지 않습니다.";
+"csv.import.partial" = "{imported}개를 가져오고 {skipped}개를 건너뛰었습니다.";
