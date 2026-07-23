@@ -62,6 +62,22 @@
 "onboarding.privacy" = "すべてのデータはお使いの Mac 内にのみ保存されます。アカウント不要、ネットワーク接続なし、AI なし。";
 "boot.error.title" = "データベースを開けませんでした";
 
+/* Overview dashboard (B3) — added */
+"overview.period" = "期間";
+"overview.count" = "件数";
+"overview.currency" = "通貨";
+"overview.byCurrency" = "通貨別";
+"overview.month" = "月";
+"overview.monthlyTitle" = "月別収支";
+"overview.recent" = "最近の取引";
+"overview.loadDemo" = "サンプルデータを読み込む";
+"overview.empty.title" = "データなし";
+"overview.empty.message" = "最初の収入または支出を追加すると、ここに月別グラフが表示されます。";
+"overview.emptyPeriod.title" = "この期間はデータなし";
+"overview.emptyPeriod.message" = "選択した期間に取引がありません。「全期間」に切り替えるか、別の期間を選択してください。";
+"overview.dataSourceNote" = "データ出典：本ページの集計は入力済みの収支取引からリアルタイムに計算され、経営分析の参考用です。正式な財務諸表でも、税務申告の根拠でもありません。";
+"overview.multiCurrencyNote" = "複数の通貨を含みます。通貨別に分けて表示し、為替換算は行っていないため、単純に合算できません。";
+
 "common.ok" = "OK";
 "common.cancel" = "キャンセル";
 "common.save" = "保存";

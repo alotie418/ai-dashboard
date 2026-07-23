@@ -62,6 +62,22 @@
 "onboarding.privacy" = "모든 데이터는 사용자의 Mac에만 저장됩니다. 계정 불필요, 네트워크 연결 없음, AI 없음.";
 "boot.error.title" = "데이터베이스를 열 수 없습니다";
 
+/* Overview dashboard (B3) — added */
+"overview.period" = "기간";
+"overview.count" = "건수";
+"overview.currency" = "통화";
+"overview.byCurrency" = "통화별";
+"overview.month" = "월";
+"overview.monthlyTitle" = "월별 수입·지출";
+"overview.recent" = "최근 거래";
+"overview.loadDemo" = "샘플 데이터 불러오기";
+"overview.empty.title" = "데이터 없음";
+"overview.empty.message" = "첫 수입 또는 지출을 추가하면 여기에 월별 차트가 표시됩니다.";
+"overview.emptyPeriod.title" = "이 기간에는 데이터 없음";
+"overview.emptyPeriod.message" = "선택한 기간에 거래가 없습니다. '전체 기간'으로 전환하거나 다른 기간을 선택하세요.";
+"overview.dataSourceNote" = "데이터 출처: 이 페이지의 합계는 입력된 수입·지출 거래에서 실시간으로 계산되며, 경영 분석 참고용입니다. 공식 재무제표가 아니며 세무 신고의 근거도 아닙니다.";
+"overview.multiCurrencyNote" = "여러 통화가 포함되어 있습니다. 통화별로 구분해 표시하며 환율 환산을 하지 않으므로 단순히 합산할 수 없습니다.";
+
 "common.ok" = "확인";
 "common.cancel" = "취소";
 "common.save" = "저장";
