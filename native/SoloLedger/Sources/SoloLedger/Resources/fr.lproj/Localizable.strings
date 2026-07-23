@@ -188,3 +188,12 @@
 "migration.chooseSource.confirm.body" = "Cela ne supprimera ni ne modifiera les données de l’ancien SoloLedger, mais la migration sera ignorée et un livre vide sera créé pour cette app. Les anciennes données ne seront pas importées automatiquement ; pour migrer, revenez en arrière et choisissez « Migrer les anciennes données ».";
 "migration.chooseSource.confirm.back" = "Retour";
 "migration.chooseSource.confirm.create" = "Créer un livre vide";
+
+/* About, CSV commands & partial-import result (B4) — added */
+"cmd.exportCSV" = "Exporter en CSV";
+"cmd.importCSV" = "Importer un CSV";
+"about.name" = "Nom";
+"about.version" = "Version";
+"about.minOS" = "Configuration requise";
+"about.positioning" = "SoloLedger est un livre de comptes local et privé, conçu pour les indépendants, les sociétés unipersonnelles et les freelances. Les données restent sur votre appareil : aucun compte, aucune IA, aucune connexion réseau, aucun déverrouillage payant. C'est un outil de tenue de comptes et d'analyse de gestion, et non un substitut à un expert-comptable, à un conseiller fiscal ou à un système de déclaration réglementaire.";
+"csv.import.partial" = "Lignes importées : {imported}, lignes ignorées : {skipped}.";

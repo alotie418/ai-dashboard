@@ -188,3 +188,12 @@
 "migration.chooseSource.confirm.body" = "這不會刪除或修改舊版 SoloLedger 的資料，但會跳過遷移並為目前 App 建立一個空帳本。舊資料不會自動匯入；如需遷移，請返回並選擇「遷移舊資料」。";
 "migration.chooseSource.confirm.back" = "返回";
 "migration.chooseSource.confirm.create" = "建立空帳本";
+
+/* About, CSV commands & partial-import result (B4) — added */
+"cmd.exportCSV" = "匯出 CSV";
+"cmd.importCSV" = "匯入 CSV";
+"about.name" = "名稱";
+"about.version" = "版本";
+"about.minOS" = "系統需求";
+"about.positioning" = "SoloLedger 是面向個體經營者、一人公司與自由工作者的本地優先、私密帳本。資料僅儲存於本機，無需帳號，不含 AI、不連網、無付費解鎖。它是經營記帳與管理分析工具，不替代持牌會計師、稅務顧問或法定申報系統。";
+"csv.import.partial" = "已匯入 {imported} 筆，略過 {skipped} 筆。";
