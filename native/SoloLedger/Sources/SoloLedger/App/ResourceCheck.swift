@@ -34,10 +34,10 @@ enum ResourceCheck {
         let ja = Localizer(language: "ja")
         check("ja nav.overview", ja.t("nav.overview") == "概要", ja.t("nav.overview"))
 
-        // Untranslated key falls back to the source language (zh-Hans).
+        // Verify a representative French overview string is packaged and localized.
         let fr = Localizer(language: "fr")
-        check("fr untranslated key falls back to zh-Hans source",
-              fr.t("overview.dataSourceNote").hasPrefix("数据来源"), fr.t("overview.dataSourceNote"))
+        check("fr overview.dataSourceNote",
+              fr.t("overview.dataSourceNote").hasPrefix("Source des données"), fr.t("overview.dataSourceNote"))
 
         lines.append(ok ? "\nRESOURCE-CHECK RESULT: PASS ✅" : "\nRESOURCE-CHECK RESULT: FAIL ❌")
         return Report(passed: ok, lines: lines)

@@ -62,6 +62,22 @@
 "onboarding.privacy" = "Toutes les données restent sur votre Mac. Aucun compte, aucune connexion réseau, aucune IA.";
 "boot.error.title" = "Impossible d'ouvrir la base de données";
 
+/* Overview dashboard (B3) — added */
+"overview.period" = "Période";
+"overview.count" = "Opérations";
+"overview.currency" = "Devise";
+"overview.byCurrency" = "Par devise";
+"overview.month" = "Mois";
+"overview.monthlyTitle" = "Recettes et dépenses par mois";
+"overview.recent" = "Opérations récentes";
+"overview.loadDemo" = "Charger des données d'exemple";
+"overview.empty.title" = "Aucune donnée";
+"overview.empty.message" = "Ajoutez votre première recette ou dépense pour afficher le graphique mensuel ici.";
+"overview.emptyPeriod.title" = "Aucune donnée pour cette période";
+"overview.emptyPeriod.message" = "Aucune opération sur la période sélectionnée. Passez à « Tout » ou choisissez une autre période.";
+"overview.dataSourceNote" = "Source des données : ces totaux sont calculés en temps réel à partir de vos opérations enregistrées, uniquement à titre de référence pour la gestion. Ils ne constituent ni des états financiers officiels ni une base pour une déclaration fiscale.";
+"overview.multiCurrencyNote" = "Plusieurs devises : les montants sont présentés séparément par devise, sans conversion de devises, et ne peuvent pas être additionnés directement.";
+
 "common.ok" = "OK";
 "common.cancel" = "Annuler";
 "common.save" = "Enregistrer";

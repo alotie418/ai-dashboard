@@ -321,17 +321,14 @@ final class MigrationCopyParityTests: XCTestCase {
 
     /// The remaining app-UI keys not yet translated in zh-Hant/ja/ko/fr (identical across all four).
     /// B1 filled `editor.*` (15); B2 the transaction list / filters / status (30); B5 the categories /
-    /// common chrome / onboarding / boot error (9); this is the residual 45. Shrinks one batch at a time.
+    /// common chrome / onboarding / boot error (9); B3 the overview dashboard (14); this is the
+    /// residual 31. Shrinks one batch at a time.
     private static let knownLocalizationDebt: Set<String> = [
         "about.minOS", "about.name", "about.positioning", "about.version", "cmd.exportCSV",
-        "cmd.importCSV", "csv.import.partial", "overview.byCurrency", "overview.count",
-        "overview.currency", "overview.dataSourceNote", "overview.empty.message", "overview.empty.title",
-        "overview.emptyPeriod.message", "overview.emptyPeriod.title", "overview.loadDemo",
-        "overview.month", "overview.monthlyTitle", "overview.multiCurrencyNote", "overview.period",
-        "overview.recent", "recovery.blank", "recovery.blankConfirm", "recovery.blankConfirmMessage",
-        "recovery.blankConfirmTitle", "recovery.message", "recovery.restore", "recovery.retry",
-        "recovery.safeNote", "recovery.title", "recovery.viewError", "settings.about",
-        "settings.accounting", "settings.accountingLocale", "settings.accountingNote",
+        "cmd.importCSV", "csv.import.partial", "recovery.blank", "recovery.blankConfirm",
+        "recovery.blankConfirmMessage", "recovery.blankConfirmTitle", "recovery.message",
+        "recovery.restore", "recovery.retry", "recovery.safeNote", "recovery.title", "recovery.viewError",
+        "settings.about", "settings.accounting", "settings.accountingLocale", "settings.accountingNote",
         "settings.appearance.dark", "settings.appearance.light", "settings.appearance.system",
         "settings.company", "settings.csv", "settings.currency", "settings.data", "settings.dbLocation",
         "settings.general", "settings.schemaVersion",

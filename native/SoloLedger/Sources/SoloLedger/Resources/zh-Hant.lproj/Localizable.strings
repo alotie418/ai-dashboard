@@ -62,6 +62,22 @@
 "onboarding.privacy" = "所有資料僅儲存在你的 Mac 本機。無需帳號，不連網，不含 AI。";
 "boot.error.title" = "無法開啟資料庫";
 
+/* Overview dashboard (B3) — added */
+"overview.period" = "時段";
+"overview.count" = "筆數";
+"overview.currency" = "幣別";
+"overview.byCurrency" = "按幣別";
+"overview.month" = "月份";
+"overview.monthlyTitle" = "每月收支";
+"overview.recent" = "最近交易";
+"overview.loadDemo" = "載入範例資料";
+"overview.empty.title" = "暫無資料";
+"overview.empty.message" = "新增第一筆收入或支出後，這裡會顯示每月圖表。";
+"overview.emptyPeriod.title" = "本期無資料";
+"overview.emptyPeriod.message" = "所選時段內沒有流水。切換到「全部」或改選其他時段。";
+"overview.dataSourceNote" = "資料來源：本頁彙總根據已記錄的收支流水即時計算，僅供管理分析參考，並非正式財務報表或報稅依據。";
+"overview.multiCurrencyNote" = "含多種貨幣，按幣別分別列示，未做匯率換算，不可直接相加。";
+
 "common.ok" = "好";
 "common.cancel" = "取消";
 "common.save" = "儲存";
