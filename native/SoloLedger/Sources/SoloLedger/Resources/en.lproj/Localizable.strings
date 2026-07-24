@@ -213,7 +213,7 @@
 "migration.candidate.noMeta" = "Details unavailable";
 
 /* N7.2 source choice */
-"migration.chooseSource.title" = "You may have existing ledger data";
+"migration.chooseSource.title" = "Choose how to start";
 "migration.chooseSource.body" = "You can migrate data from a previous version of SoloLedger, or create a new ledger.";
 "migration.chooseSource.migrate.button" = "Migrate Old Data";
 "migration.chooseSource.migrate.hint" = "Import from a previous version’s data folder.";

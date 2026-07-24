@@ -175,7 +175,7 @@
 "migration.candidate.noMeta" = "Détails indisponibles";
 
 /* N7.2 source choice */
-"migration.chooseSource.title" = "Vous avez peut-être des données de livre existantes";
+"migration.chooseSource.title" = "Choisissez comment commencer";
 "migration.chooseSource.body" = "Vous pouvez migrer les données d’une version précédente de SoloLedger ou créer un nouveau livre.";
 "migration.chooseSource.migrate.button" = "Migrer les anciennes données";
 "migration.chooseSource.migrate.hint" = "Importer depuis le dossier de données d’une version précédente.";

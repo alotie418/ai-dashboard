@@ -139,6 +139,42 @@ final class MigrationCopyParityTests: XCTestCase {
         XCTAssertEqual(rawValue("zh-Hans", "migration.chooseSource.confirm.create"), "创建空账本")
     }
 
+    /// Issue #382: the source-choice title is action-oriented, NOT a detection claim. On a
+    /// truly-empty first launch (`.requiresSourceChoice`) the screen has discovered nothing, so
+    /// the title must not assert found data. Six locales are LOCKED byte-for-byte to the approved
+    /// action-oriented copy, and the two Chinese locales are additionally asserted to be free of
+    /// the detection verbs "发现"/"發現" (the specific misleading wording this change removes).
+    func testSourceChoiceTitleIsActionOrientedAndLockedVerbatim() {
+        let expected: [String: String] = [
+            "zh-Hans": "选择开始方式",
+            "zh-Hant": "選擇開始方式",
+            "en":      "Choose how to start",
+            "ja":      "開始方法を選んでください",
+            "ko":      "시작 방법을 선택하세요",
+            "fr":      "Choisissez comment commencer",
+        ]
+        for (lang, text) in expected {
+            XCTAssertEqual(rawValue(lang, "migration.chooseSource.title"), text,
+                           "\(lang) chooseSource.title must equal the approved action-oriented copy")
+        }
+        // The detection verb the old copy used must be gone from both Chinese titles.
+        XCTAssertFalse(rawValue("zh-Hans", "migration.chooseSource.title")?.contains("发现") ?? true,
+                       "zh-Hans title must not use the detection verb 发现")
+        XCTAssertFalse(rawValue("zh-Hant", "migration.chooseSource.title")?.contains("發現") ?? true,
+                       "zh-Hant title must not use the detection verb 發現")
+        // The dedicated import-selection screen keeps its OWN, unrelated title in every locale.
+        for lang in locales {
+            XCTAssertNotEqual(rawValue(lang, "migration.chooseSource.title"),
+                              rawValue(lang, "migration.selection.title"),
+                              "\(lang): chooseSource.title and selection.title must stay distinct")
+            // The body still exists and differs from the title (title-only change; body untouched).
+            let body = rawValue(lang, "migration.chooseSource.body")
+            XCTAssertNotNil(body, "\(lang) chooseSource.body must exist")
+            XCTAssertNotEqual(body, rawValue(lang, "migration.chooseSource.title"),
+                              "\(lang): body and title must differ")
+        }
+    }
+
     private func block(_ code: MigrationIssueCode, _ cls: MigrationBlock.Class) -> MigrationBlock {
         MigrationBlock(code: code, classification: cls)
     }

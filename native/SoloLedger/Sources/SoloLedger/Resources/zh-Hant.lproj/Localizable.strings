@@ -175,7 +175,7 @@
 "migration.candidate.noMeta" = "詳情不可用";
 
 /* N7.2 source choice */
-"migration.chooseSource.title" = "發現你可能有舊帳本資料";
+"migration.chooseSource.title" = "選擇開始方式";
 "migration.chooseSource.body" = "你可以遷移舊版 SoloLedger 的資料，或建立一個新帳本。";
 "migration.chooseSource.migrate.button" = "遷移舊資料";
 "migration.chooseSource.migrate.hint" = "從舊版資料夾匯入。";
