@@ -175,7 +175,7 @@
 "migration.candidate.noMeta" = "詳細は利用できません";
 
 /* N7.2 source choice */
-"migration.chooseSource.title" = "以前の帳簿データがある可能性があります";
+"migration.chooseSource.title" = "開始方法を選んでください";
 "migration.chooseSource.body" = "以前のバージョンの SoloLedger からデータを移行するか、新しい帳簿を作成できます。";
 "migration.chooseSource.migrate.button" = "以前のデータを移行";
 "migration.chooseSource.migrate.hint" = "以前のバージョンのデータフォルダから読み込みます。";
