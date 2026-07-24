@@ -345,6 +345,246 @@ final class MigrationCopyParityTests: XCTestCase {
         XCTAssertFalse(text.contains("code:"))
     }
 
+    // MARK: - Issue #383: createFresh step/errno structured diagnostics (contract-gated, pair-atomic)
+    //
+    // SYNTHETIC FIXTURES ONLY: every errno number below is a hand-picked test input, NOT a value
+    // observed from any run — the B1 experiment never directly observed an errno. These guards
+    // prove the value-level contract (code+reason+known-step+canonical-positive-Int32-errno), the
+    // pair-atomic omission of BOTH fields off-contract, canonical re-serialization (never raw
+    // input, never `sanitize`), the untouched 8-key generic allowlist, and no path/strerror leak.
+
+    private func diagText(_ block: MigrationBlock) -> String {
+        MigrationPresenter.diagnosticsText(
+            state: .retriable(block), schemaVersion: "9",
+            databasePath: "/Users/x/Library/Application Support/db.sqlite",
+            appVersion: "1.0 (1)", osVersion: "Version 14.0", homeDirectory: "/Users/x")
+    }
+
+    /// A createFresh reservation-failure block. `nil` step/errno/reason are simply absent params.
+    private func reservationBlock(step: String?, errno: String?,
+                                  code: MigrationIssueCode = .storeOpenFailed,
+                                  reason: String? = "reservationFailed",
+                                  op: String = "createFresh") -> MigrationBlock {
+        var p: [String: String] = ["op": op]
+        if let reason { p["reason"] = reason }
+        if let step { p["step"] = step }
+        if let errno { p["errno"] = errno }
+        return MigrationBlock(code: code, classification: .retriable, params: p)
+    }
+
+    /// The six known ReservationStep raw values (kept in sync by hand — ReservationStep is not
+    /// CaseIterable and lives in Core, which this change must not touch).
+    private let knownReservationSteps = ["parentBind", "ancestorBind", "parentCreate",
+                                         "openExcl", "fstat", "close"]
+
+    // (1) legal contract → both fields emitted, canonical.
+    func testReservationDiagnosticsEmitsCanonicalStepErrnoWhenContractHolds() {
+        for step in knownReservationSteps {
+            let text = diagText(reservationBlock(step: step, errno: "2"))   // 2 is a synthetic fixture
+            XCTAssertTrue(text.contains("param.step: \(step)"), "step \(step) must be emitted")
+            XCTAssertTrue(text.contains("param.errno: 2"), "errno must be emitted for step \(step)")
+        }
+        // Int32.max boundary accepted and echoed canonically.
+        XCTAssertTrue(diagText(reservationBlock(step: "parentBind", errno: "2147483647"))
+                        .contains("param.errno: 2147483647"))
+    }
+
+    // (2) code or reason mismatch → neither field.
+    func testReservationDiagnosticsSuppressedOnCodeOrReasonMismatch() {
+        for text in [
+            diagText(reservationBlock(step: "parentBind", errno: "2", code: .ioTransient)),   // wrong code
+            diagText(reservationBlock(step: "parentBind", errno: "2", reason: "somethingElse")), // wrong reason
+            diagText(reservationBlock(step: "parentBind", errno: "2", reason: nil)),           // missing reason
+        ] {
+            XCTAssertFalse(text.contains("param.step"))
+            XCTAssertFalse(text.contains("param.errno"))
+        }
+    }
+
+    // (3) step forgery matrix (errno held legal) → pair-atomic omission, no leak.
+    func testReservationDiagnosticsRejectsForgedStepPairAtomically() {
+        let forgedSteps = [
+            "notastep",                    // unknown enum value
+            "/etc/passwd",                 // path
+            "No such file or directory",   // strerror / system text
+            "parent\nBind",                // embedded newline
+            "parentBind ",                 // trailing space (not a raw value)
+            "PARENTBIND",                  // wrong case
+        ]
+        for forged in forgedSteps {
+            let text = diagText(reservationBlock(step: forged, errno: "2"))
+            XCTAssertFalse(text.contains("param.step"), "forged step emitted: \(forged.debugDescription)")
+            XCTAssertFalse(text.contains("param.errno"), "pair-atomic errno not suppressed: \(forged.debugDescription)")
+            XCTAssertFalse(text.contains(forged), "forged step text leaked: \(forged.debugDescription)")
+        }
+    }
+
+    // (4) errno forgery matrix (step held legal) → pair-atomic omission.
+    func testReservationDiagnosticsRejectsForgedErrnoPairAtomically() {
+        let forgedErrnos = [
+            "",                          // empty
+            "0",                         // zero
+            "-1",                        // negative
+            "+1",                        // leading plus
+            "abc",                       // non-numeric
+            " 2",                        // leading whitespace
+            "2 ",                        // trailing whitespace
+            "2\n",                       // trailing newline
+            "/tmp/x",                    // path
+            "No such file or directory", // strerror / system text
+            "2147483648",                // Int32 overflow (max + 1)
+            "9999999999",                // far overflow
+            "01",                        // non-canonical leading zero
+            "0x10",                      // hex
+            "\u{FF11}",                  // full-width digit ONE (not ASCII)
+        ]
+        for forged in forgedErrnos {
+            let text = diagText(reservationBlock(step: "parentBind", errno: forged))
+            XCTAssertFalse(text.contains("param.errno"), "forged errno emitted: \(forged.debugDescription)")
+            XCTAssertFalse(text.contains("param.step"), "pair-atomic step not suppressed: \(forged.debugDescription)")
+        }
+    }
+
+    // (5) missing / partial fields → pair-atomic omission.
+    func testReservationDiagnosticsPairAtomicityOnMissingOrPartialFields() {
+        for text in [
+            diagText(reservationBlock(step: nil, errno: "2")),        // missing step
+            diagText(reservationBlock(step: "parentBind", errno: nil)), // missing errno
+            diagText(reservationBlock(step: "parentBind", errno: "0")), // legal step, illegal errno
+            diagText(reservationBlock(step: "bogus", errno: "2")),      // illegal step, legal errno
+        ] {
+            XCTAssertFalse(text.contains("param.step"))
+            XCTAssertFalse(text.contains("param.errno"))
+        }
+    }
+
+    // (6) generic 8-key allowlist unchanged; step/errno never surface via it.
+    func testGenericAllowlistUnchangedAndExcludesStepErrno() {
+        XCTAssertEqual(MigrationPresenter.diagnosticsAllowedParamKeys,
+                       ["op", "reason", "field", "importID", "requestedImportID", "existingImportID",
+                        "attempts", "userVersion"],
+                       "the 8 generic allowlist keys (and order) must not change")
+        XCTAssertFalse(MigrationPresenter.diagnosticsAllowedParamKeys.contains("step"))
+        XCTAssertFalse(MigrationPresenter.diagnosticsAllowedParamKeys.contains("errno"))
+        // A NON-reservation block carrying step/errno params must not surface them.
+        let text = diagText(MigrationBlock(code: .ioTransient, classification: .retriable,
+                                           params: ["op": "record", "importID": "imp-9",
+                                                    "step": "parentBind", "errno": "2"]))
+        XCTAssertTrue(text.contains("param.op: record"))
+        XCTAssertTrue(text.contains("param.importID: imp-9"))
+        XCTAssertFalse(text.contains("param.step"), "step must never leak via the generic allowlist")
+        XCTAssertFalse(text.contains("param.errno"), "errno must never leak via the generic allowlist")
+    }
+
+    // (7) no path / strerror leak; a legal pair adds EXACTLY two lines (no injection).
+    func testReservationDiagnosticsNeverLeaksPathsOrErrorTextAndAddsExactlyTwoLines() {
+        let forged = diagText(reservationBlock(step: "/Users/a/secret", errno: "No such file or directory"))
+        XCTAssertFalse(forged.contains("param.step"))
+        XCTAssertFalse(forged.contains("param.errno"))
+        XCTAssertFalse(forged.contains("secret"))
+        XCTAssertFalse(forged.contains("No such file"))
+
+        let legal = diagText(reservationBlock(step: "parentBind", errno: "2"))
+        let baseline = diagText(reservationBlock(step: nil, errno: nil))
+        XCTAssertEqual(legal.split(separator: "\n", omittingEmptySubsequences: false).count,
+                       baseline.split(separator: "\n", omittingEmptySubsequences: false).count + 2,
+                       "a legal pair adds exactly two lines, nothing injected")
+        XCTAssertTrue(legal.contains("param.step: parentBind"))
+        XCTAssertTrue(legal.contains("param.errno: 2"))
+    }
+
+    // (8) main storeOpenFailed copy + six locales unchanged. The user-facing copy is the SAME as
+    // before #383 (this change only surfaces step/errno in the exported diagnostics, never the
+    // message). Pin all six verbatim so a reword — which the mapping/non-nil/≠-raw-key checks would
+    // all silently pass — is a red test.
+    func testStoreOpenFailedMainCopyUnchangedAcrossLocales() {
+        XCTAssertEqual(MigrationPresenter.messageKey(for: .storeOpenFailed), "migration.msg.storeOpenFailed")
+        let expected: [String: String] = [
+            "zh-Hans": "打开账本失败。请重试。",
+            "zh-Hant": "開啟帳本失敗，請再試一次。",
+            "en":      "Couldn't open the ledger. Please try again.",
+            "ja":      "台帳を開けませんでした。もう一度お試しください。",
+            "ko":      "장부를 열지 못했습니다. 다시 시도하세요.",
+            "fr":      "Impossible d'ouvrir la comptabilité. Veuillez réessayer.",
+        ]
+        for lang in locales {
+            XCTAssertEqual(rawValue(lang, "migration.msg.storeOpenFailed"), expected[lang],
+                           "\(lang) storeOpenFailed copy must be unchanged by #383")
+        }
+    }
+
+    // Direct helper edge coverage (belt-and-suspenders over the end-to-end guards above).
+    func testCanonicalPositiveInt32AcceptsOnlyCanonicalDecimals() {
+        XCTAssertEqual(MigrationPresenter.canonicalPositiveInt32("1"), 1)
+        XCTAssertEqual(MigrationPresenter.canonicalPositiveInt32("13"), 13)
+        XCTAssertEqual(MigrationPresenter.canonicalPositiveInt32("2147483647"), Int32.max)
+        for bad in ["", "0", "00", "01", "-1", "+1", " 1", "1 ", "1\n", "\n1", "abc",
+                    "1a", "0x1", "/1", "2147483648", "9999999999", "\u{FF11}", "\u{0661}", "1_000"] {
+            XCTAssertNil(MigrationPresenter.canonicalPositiveInt32(bad), "\(bad.debugDescription) must be rejected")
+        }
+    }
+
+    func testReservationDiagnosticsHelperReturnsNilOffContractAndValuesOnContract() {
+        XCTAssertNil(MigrationPresenter.reservationDiagnostics(
+            MigrationBlock(code: .ioTransient, classification: .retriable,
+                           params: ["reason": "reservationFailed", "step": "parentBind", "errno": "2"])))
+        let ok = MigrationPresenter.reservationDiagnostics(
+            MigrationBlock(code: .storeOpenFailed, classification: .retriable,
+                           params: ["reason": "reservationFailed", "step": "parentBind", "errno": "2"]))
+        XCTAssertEqual(ok?.step, "parentBind")
+        XCTAssertEqual(ok?.errno, "2")
+    }
+
+    // (9) I2: precise-gating persistence — near-miss reason/step/errno (trailing space, embedded
+    // NUL, CR, empty) all suppress BOTH fields pair-atomically, and forged raw step/errno never
+    // surface via the dedicated fields. The reason cases pair a near-miss reason with a VALID
+    // step+errno so the reason gate is the ONLY rejector — this is what kills a
+    // reason `== "reservationFailed"` → `hasPrefix("reservationFailed")` degradation. Per #383
+    // scope, `reason` is a generic-allowlist key, so its raw value is NOT asserted absent.
+    func testReservationDiagnosticsPreciseGatingRejectsNearMisses() {
+        for reason in ["reservationFailed ", "reservationFailed\u{0}suffix", "reservationFailed\r"] {
+            let text = diagText(reservationBlock(step: "parentBind", errno: "2", reason: reason))
+            XCTAssertFalse(text.contains("param.step"), "near-miss reason must suppress step: \(reason.debugDescription)")
+            XCTAssertFalse(text.contains("param.errno"), "near-miss reason must suppress errno: \(reason.debugDescription)")
+        }
+        for step in ["", "parentBind\u{0}suffix", "parent\rBind"] {
+            let text = diagText(reservationBlock(step: step, errno: "2"))
+            XCTAssertFalse(text.contains("param.step"), "near-miss step must suppress step: \(step.debugDescription)")
+            XCTAssertFalse(text.contains("param.errno"), "pair-atomic: errno suppressed: \(step.debugDescription)")
+            if !step.isEmpty { XCTAssertFalse(text.contains(step), "forged step text leaked: \(step.debugDescription)") }
+        }
+        for errno in ["2\u{0}suffix", "2\r", "\r2"] {
+            let text = diagText(reservationBlock(step: "parentBind", errno: errno))
+            XCTAssertFalse(text.contains("param.errno"), "near-miss errno must suppress errno: \(errno.debugDescription)")
+            XCTAssertFalse(text.contains("param.step"), "pair-atomic: step suppressed: \(errno.debugDescription)")
+            XCTAssertFalse(text.contains(errno), "forged errno text leaked: \(errno.debugDescription)")
+        }
+    }
+
+    // (10) I2: all 8 generic allowlist keys survive END-TO-END — each emitted exactly once as a
+    // full `param.<key>: <value>` line — and step/errno never ride the generic path. Kills an
+    // output loop that silently drops one allowlisted key (e.g. skipping `attempts`) while the
+    // array literal stays intact.
+    func testAllEightGenericAllowlistKeysSurviveEndToEnd() {
+        let values: [String: String] = [
+            "op": "OP1", "reason": "RSN1", "field": "FLD1", "importID": "IMP1",
+            "requestedImportID": "REQ1", "existingImportID": "EXI1", "attempts": "ATT1", "userVersion": "UV1",
+        ]
+        var params = values
+        params["step"] = "parentBind"   // present but must NOT surface (code is not storeOpenFailed)
+        params["errno"] = "2"
+        let block = MigrationBlock(code: .ioTransient, classification: .retriable, params: params)
+        let lines = diagText(block).split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        for key in ["op", "reason", "field", "importID", "requestedImportID",
+                    "existingImportID", "attempts", "userVersion"] {
+            let expected = "param.\(key): \(values[key]!)"
+            XCTAssertEqual(lines.filter { $0 == expected }.count, 1, "\(expected) must appear exactly once")
+        }
+        let joined = lines.joined(separator: "\n")
+        XCTAssertFalse(joined.contains("param.step"), "step must not ride the generic path")
+        XCTAssertFalse(joined.contains("param.errno"), "errno must not ride the generic path")
+    }
+
     // MARK: - Full-app locale parity (precise ratchet toward six-locale key equality)
     //
     // Unlike the migration-only guards above, these cover the ENTIRE key universe. The four

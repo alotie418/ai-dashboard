@@ -188,6 +188,9 @@ enum MigrationPresenter {
 
     // MARK: Diagnostics (structured allowlist; aggressive path redaction; never Error text)
 
+    /// The generic params that pass through `sanitize` into the report. `step`/`errno` are
+    /// deliberately NOT here — they take the contract-gated `reservationDiagnostics` path
+    /// (Issue #383), which re-serializes canonical values instead of sanitizing raw input.
     static let diagnosticsAllowedParamKeys: [String] = [
         "op", "reason", "field", "importID", "requestedImportID", "existingImportID",
         "attempts", "userVersion",
@@ -195,8 +198,11 @@ enum MigrationPresenter {
 
     /// A user-savable, privacy-bounded diagnostics report. PURE. Contains NO transactions,
     /// attachments or database contents, NEVER an `Error.description`; the database path is
-    /// reduced to its FILENAME only, and every other value is sanitized (newlines collapsed,
-    /// absolute paths — home / container / /private / /var — reduced to `<redacted>/<name>`).
+    /// reduced to its FILENAME only. Two distinct value paths: GENERIC allowlisted params pass
+    /// through `sanitize` (newlines collapsed, absolute paths — home / container / /private /
+    /// /var — reduced to `<redacted>/<name>`); the CONTRACT-GATED `step`/`errno` (Issue #383) are
+    /// instead PARSED and emitted as canonical RE-SERIALIZED values (enum rawValue / `String(Int32)`),
+    /// never routed through the generic allowlist and never through `sanitize`.
     static func diagnosticsText(state: MigrationUIState, schemaVersion: String, databasePath: String,
                                 appVersion: String, osVersion: String, homeDirectory: String) -> String {
         var lines: [String] = []
@@ -212,9 +218,54 @@ enum MigrationPresenter {
             for key in diagnosticsAllowedParamKeys where block.params[key] != nil {
                 lines.append("param.\(key): \(sanitize(block.params[key]!, home: homeDirectory))")
             }
+            // Issue #383: createFresh reservation step/errno — emitted ONLY when the full typed
+            // contract holds, as canonical RE-SERIALIZED values (never routed through the generic
+            // allowlist above, never through `sanitize`), and PAIR-ATOMICALLY (both or neither).
+            if let rd = reservationDiagnostics(block) {
+                lines.append("param.step: \(rd.step)")
+                lines.append("param.errno: \(rd.errno)")
+            }
         }
         lines.append("note: no transactions, attachments, or database contents are included.")
         return lines.joined(separator: "\n")
+    }
+
+    /// Issue #383: the structured step/errno for a createFresh reservation failure, or nil.
+    /// PAIR-ATOMIC and CONTRACT-GATED — returns a value ONLY when EVERY condition holds:
+    ///  - the block is a `storeOpenFailed` whose `reason` param is exactly `reservationFailed`;
+    ///  - `step` strictly parses to a known `ReservationStep` case;
+    ///  - `errno` is a CANONICAL positive `Int32` decimal (see `canonicalPositiveInt32`).
+    /// The returned pair is RE-SERIALIZED from the parsed enum/integer, never the raw input, so no
+    /// path / strerror / `Error.description` / injected newline can survive — the caller emits it
+    /// WITHOUT `sanitize`. Any missing or non-conforming field yields nil (BOTH fields then
+    /// omitted), so a partial or forged pair can never reach the report. `step`/`errno` are
+    /// deliberately absent from `diagnosticsAllowedParamKeys`: this contract is their ONLY path.
+    static func reservationDiagnostics(_ block: MigrationBlock) -> (step: String, errno: String)? {
+        guard block.code == .storeOpenFailed,
+              block.params["reason"] == "reservationFailed",
+              let rawStep = block.params["step"],
+              let step = ReservationStep(rawValue: rawStep),
+              let rawErrno = block.params["errno"],
+              let errno = canonicalPositiveInt32(rawErrno)
+        else { return nil }
+        return (step.rawValue, String(errno))
+    }
+
+    /// A CANONICAL positive `Int32` decimal, or nil. Accepts ONLY ASCII digits — no sign, no
+    /// whitespace/newline, no leading zero, strictly positive, in `Int32` range. It deliberately
+    /// does NOT rely on `Int32(_:)` alone: on the current Xcode Swift toolchain that init
+    /// empirically accepts a leading `+` (`Int32("+1") == 1`) and leading zeros (`Int32("01") == 1`),
+    /// which must be rejected here. The explicit ASCII-scalar validation defines an INDEPENDENT,
+    /// closed input grammar whose accept set never depends on the underlying parser's; `Int32(_:)`
+    /// then supplies only the overflow bound. The parsed value is re-serialized by the caller so
+    /// only this canonical form is ever emitted.
+    static func canonicalPositiveInt32(_ s: String) -> Int32? {
+        guard !s.isEmpty else { return nil }
+        let scalars = s.unicodeScalars
+        guard scalars.first != "0" else { return nil }                 // no leading zero (also rejects "0")
+        for u in scalars where !(u >= "0" && u <= "9") { return nil }   // ASCII digits only: rejects sign/ws/nl/unicode
+        guard let v = Int32(s), v > 0 else { return nil }               // range/overflow; positivity belt-and-suspenders
+        return v
     }
 
     /// Collapse newlines (no diagnostic-line injection) and reduce any absolute path token
