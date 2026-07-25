@@ -585,29 +585,14 @@ final class MigrationCopyParityTests: XCTestCase {
         XCTAssertFalse(joined.contains("param.errno"), "errno must not ride the generic path")
     }
 
-    // MARK: - Full-app locale parity (precise ratchet toward six-locale key equality)
+    // MARK: - Full-app locale parity (STRICT six-locale key equality)
     //
-    // Unlike the migration-only guards above, these cover the ENTIRE key universe. The four
-    // partially-translated locales (zh-Hant/ja/ko/fr) are being filled batch by batch; until they
-    // are complete, each one's missing-key set must EXACTLY equal a single shared debt set. The
-    // `==` (not `⊆`) is the ratchet: a NEW missing key, a locale that prematurely fills a debt key
-    // out of lockstep, an unexpected extra key, or any single-locale drift all fail. Each batch
-    // removes its keys from `knownLocalizationDebt` in the SAME change that adds the translations.
-    // When the set is emptied, delete it and assert `missing.isEmpty` for strict six-locale parity.
-
-    /// The remaining app-UI keys not yet translated in zh-Hant/ja/ko/fr (identical across all four).
-    /// B1 filled `editor.*` (15); B2 the transaction list / filters / status (30); B5 the categories /
-    /// common chrome / onboarding / boot error (9); B3 the overview dashboard (14); B4 the about pane /
-    /// CSV commands / partial-import result (7); this is the residual 24. Shrinks one batch at a time.
-    private static let knownLocalizationDebt: Set<String> = [
-        "recovery.blank", "recovery.blankConfirm",
-        "recovery.blankConfirmMessage", "recovery.blankConfirmTitle", "recovery.message",
-        "recovery.restore", "recovery.retry", "recovery.safeNote", "recovery.title", "recovery.viewError",
-        "settings.about", "settings.accounting", "settings.accountingLocale", "settings.accountingNote",
-        "settings.appearance.dark", "settings.appearance.light", "settings.appearance.system",
-        "settings.company", "settings.csv", "settings.currency", "settings.data", "settings.dbLocation",
-        "settings.general", "settings.schemaVersion",
-    ]
+    // These cover the ENTIRE key universe (unlike the migration-only guards above). All six locales
+    // must define EXACTLY the zh-Hans source-of-truth key set — no missing key, no extra key, no
+    // single-locale drift. zh-Hant/ja/ko/fr were historically filled batch by batch (B1 editor.* 15;
+    // B2 list/filters/status 30; B5 categories/chrome/onboarding/boot 9; B3 overview 14; B4 about/CSV
+    // 7; B6 settings/recovery 24) against a shared `knownLocalizationDebt` set; that debt is now EMPTY,
+    // so the guard is strict parity (`missing.isEmpty`). Any new untranslated key fails immediately.
 
     /// URL of a locale's `Localizable.strings` (resolves the SwiftPM-lowercased `.lproj` too).
     private func localeStringsURL(_ lang: String) -> URL? {
@@ -656,8 +641,8 @@ final class MigrationCopyParityTests: XCTestCase {
         return counts
     }
 
-    /// zh-Hans is the source of truth (`Localizer.defaultCode`); en must match it exactly; each
-    /// partial locale's missing set must EXACTLY equal `knownLocalizationDebt`, with no extra keys.
+    /// zh-Hans is the source of truth (`Localizer.defaultCode`); en and every partial locale
+    /// (zh-Hant/ja/ko/fr) must match it EXACTLY — strict six-locale key parity, no missing/extra keys.
     func testFullLocaleKeyUniverseRatchet() {
         let universe = localeKeySet("zh-Hans")
         XCTAssertFalse(universe.isEmpty, "zh-Hans universe must load")
@@ -668,10 +653,8 @@ final class MigrationCopyParityTests: XCTestCase {
             let extra = ks.subtracting(universe)
             XCTAssertTrue(extra.isEmpty, "\(lang) has keys outside the universe: \(extra.sorted())")
             let missing = universe.subtracting(ks)
-            XCTAssertEqual(missing, Self.knownLocalizationDebt,
-                "\(lang) missing-key set must EXACTLY equal knownLocalizationDebt — " +
-                "newly-missing=\(missing.subtracting(Self.knownLocalizationDebt).sorted()) " +
-                "prematurely-filled=\(Self.knownLocalizationDebt.subtracting(missing).sorted())")
+            XCTAssertTrue(missing.isEmpty,
+                "\(lang) must have STRICT six-locale key parity — missing: \(missing.sorted())")
         }
     }
 

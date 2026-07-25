@@ -197,3 +197,29 @@
 "about.minOS" = "動作環境";
 "about.positioning" = "SoloLedger は、個人事業主・一人会社・フリーランスのための、ローカル優先でプライベートな台帳です。データはお使いのデバイス内にのみ保存されます。アカウント不要、AI なし、ネットワーク接続なし、有料アンロックなし。経営記帳と管理分析のためのツールであり、公認会計士・税理士・法定申告システムの代わりになるものではありません。";
 "csv.import.partial" = "{imported} 件を読み込み、{skipped} 件をスキップしました。";
+
+/* Settings & recovery (B6) — added; full parity with zh-Hans */
+"recovery.title" = "データのアップグレードが完了しませんでした";
+"recovery.message" = "以前の（Electron 版）帳簿データが見つかりましたが、移行に失敗しました。元のデータは変更されていません。続行方法を選択してください。";
+"recovery.retry" = "移行を再試行";
+"recovery.restore" = "バックアップ／エクスポートファイルから復元…";
+"recovery.blank" = "空の帳簿を作成…";
+"recovery.blankConfirmTitle" = "空の帳簿で開始しますか？";
+"recovery.blankConfirmMessage" = "空の帳簿で開始し、以前のデータは取り込みません（元のデータはディスク上に削除されず残ります）。旧データの移行が不要と確信できる場合のみ選択してください。";
+"recovery.blankConfirm" = "空の帳簿を作成";
+"recovery.safeNote" = "元のデータベースは読み取り専用のまま変更されていないため、いつでも再試行できます。";
+"recovery.viewError" = "エラーの詳細を表示";
+"settings.general" = "一般";
+"settings.accounting" = "会計";
+"settings.data" = "データ";
+"settings.about" = "情報";
+"settings.company" = "会社／屋号名";
+"settings.accountingLocale" = "会計方式";
+"settings.currency" = "既定の通貨";
+"settings.accountingNote" = "会計方式は、選択できる収支カテゴリと既定の通貨を決定します。UI 言語とは独立しており、管理分析のための設定で、法定申告の設定ではありません。";
+"settings.appearance.system" = "システムに合わせる";
+"settings.appearance.light" = "ライト";
+"settings.appearance.dark" = "ダーク";
+"settings.csv" = "CSV インポート／エクスポート";
+"settings.dbLocation" = "データベースの場所";
+"settings.schemaVersion" = "データベースバージョン";

@@ -197,3 +197,29 @@
 "about.minOS" = "Configuration requise";
 "about.positioning" = "SoloLedger est un livre de comptes local et privé, conçu pour les indépendants, les sociétés unipersonnelles et les freelances. Les données restent sur votre appareil : aucun compte, aucune IA, aucune connexion réseau, aucun déverrouillage payant. C'est un outil de tenue de comptes et d'analyse de gestion, et non un substitut à un expert-comptable, à un conseiller fiscal ou à un système de déclaration réglementaire.";
 "csv.import.partial" = "Lignes importées : {imported}, lignes ignorées : {skipped}.";
+
+/* Settings & recovery (B6) — added; full parity with zh-Hans */
+"recovery.title" = "La mise à niveau des données ne s'est pas terminée";
+"recovery.message" = "Un livre antérieur (Electron) a été trouvé, mais sa migration n'a pas abouti. Vos données d'origine n'ont pas été modifiées. Choisissez comment continuer.";
+"recovery.retry" = "Réessayer la migration";
+"recovery.restore" = "Restaurer depuis une sauvegarde / un export…";
+"recovery.blank" = "Créer un livre vierge…";
+"recovery.blankConfirmTitle" = "Démarrer avec un livre vierge ?";
+"recovery.blankConfirmMessage" = "Ceci démarre un livre vide et n'importe PAS vos données antérieures (l'original reste sur le disque, non supprimé). Ne choisissez cette option que si vous êtes sûr de ne pas avoir besoin des anciennes données.";
+"recovery.blankConfirm" = "Créer un livre vierge";
+"recovery.safeNote" = "La base de données d'origine reste en lecture seule et non modifiée — vous pouvez réessayer à tout moment.";
+"recovery.viewError" = "Voir les détails de l'erreur";
+"settings.general" = "Général";
+"settings.accounting" = "Comptabilité";
+"settings.data" = "Données";
+"settings.about" = "À propos";
+"settings.company" = "Nom de l'entreprise / raison sociale";
+"settings.accountingLocale" = "Régime comptable";
+"settings.currency" = "Devise par défaut";
+"settings.accountingNote" = "Le régime comptable détermine les catégories de recettes/dépenses disponibles et la devise par défaut. Il est indépendant de la langue de l'interface et sert à l'analyse de gestion — ce n'est pas une configuration de déclaration légale.";
+"settings.appearance.system" = "Système";
+"settings.appearance.light" = "Clair";
+"settings.appearance.dark" = "Sombre";
+"settings.csv" = "Import / export CSV";
+"settings.dbLocation" = "Emplacement de la base de données";
+"settings.schemaVersion" = "Version de la base de données";
