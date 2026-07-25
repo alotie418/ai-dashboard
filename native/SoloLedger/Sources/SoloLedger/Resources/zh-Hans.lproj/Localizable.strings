@@ -71,6 +71,12 @@
 "editor.invoice" = "发票状态";
 "editor.taxAmount" = "税额";
 "editor.taxRate" = "税率";
+"editor.paymentSection" = "收付明细";
+"editor.paidAmount" = "已收/付金额";
+"editor.paymentDate" = "收/付款日期";
+"editor.dueDate" = "到期日";
+"editor.invoiceNo" = "发票号码";
+"editor.amountNet" = "不含税金额";
 
 "cat.col.label" = "名称";
 "cat.col.slug" = "标识";

@@ -18,6 +18,12 @@
 "editor.invoice" = "청구서 상태";
 "editor.taxAmount" = "세액";
 "editor.taxRate" = "세율";
+"editor.paymentSection" = "수금/지급 내역";
+"editor.paidAmount" = "수금/지급 금액";
+"editor.paymentDate" = "수금/지급일";
+"editor.dueDate" = "만기일";
+"editor.invoiceNo" = "청구서 번호";
+"editor.amountNet" = "세전 금액";
 
 /* Transaction list, filters & status (B2) — added */
 "txn.col.amount" = "금액";

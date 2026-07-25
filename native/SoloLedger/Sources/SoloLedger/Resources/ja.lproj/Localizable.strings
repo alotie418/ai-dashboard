@@ -18,6 +18,12 @@
 "editor.invoice" = "請求書ステータス";
 "editor.taxAmount" = "税額";
 "editor.taxRate" = "税率";
+"editor.paymentSection" = "入出金情報";
+"editor.paidAmount" = "受取/支払済み金額";
+"editor.paymentDate" = "入出金日";
+"editor.dueDate" = "支払期日";
+"editor.invoiceNo" = "請求書番号";
+"editor.amountNet" = "税抜金額";
 
 /* Transaction list, filters & status (B2) — added */
 "txn.col.amount" = "金額";

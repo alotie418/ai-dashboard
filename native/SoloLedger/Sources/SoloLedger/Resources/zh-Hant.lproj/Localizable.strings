@@ -18,6 +18,12 @@
 "editor.invoice" = "發票狀態";
 "editor.taxAmount" = "稅額";
 "editor.taxRate" = "稅率";
+"editor.paymentSection" = "收付明細";
+"editor.paidAmount" = "已收/付金額";
+"editor.paymentDate" = "收/付款日期";
+"editor.dueDate" = "到期日";
+"editor.invoiceNo" = "發票號碼";
+"editor.amountNet" = "不含稅金額";
 
 /* Transaction list, filters & status (B2) — added */
 "txn.col.amount" = "金額";
