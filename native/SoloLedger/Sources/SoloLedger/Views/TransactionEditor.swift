@@ -18,6 +18,13 @@ struct TransactionEditor: View {
     @State private var note = ""
     @State private var taxAmount: Double = 0
     @State private var taxRate: Double = 0
+    @State private var invoiceNo = ""
+    @State private var amountNet: Double?
+    @State private var paidAmount: Double?
+    @State private var paymentDate: Date?
+    @State private var dueDate: Date?
+    @State private var initialPaymentDate: Date?
+    @State private var initialDueDate: Date?
     @State private var didInit = false
 
     private var isNew: Bool { existing == nil }
@@ -62,12 +69,28 @@ struct TransactionEditor: View {
                 TextField(model.t("editor.note"), text: $note, axis: .vertical)
                     .lineLimit(2...4)
 
+                // Optional factual inputs the schema already carries (mirrors
+                // transactions.js normalize): recorded verbatim, never derived
+                // from amount/status. Empty dates/amount_net persist NULL; an
+                // empty paid amount persists Electron's normalize default of 0.
+                Section(model.t("editor.paymentSection")) {
+                    TextField(model.t("editor.paidAmount"), value: $paidAmount, format: .number)
+                        .multilineTextAlignment(.trailing)
+                    OptionalDateRow(label: model.t("editor.paymentDate"), date: $paymentDate,
+                                    unparsedValue: OptionalDateEdit.unparsedFallback(original: existing?.paymentDate, initial: initialPaymentDate, current: paymentDate))
+                    OptionalDateRow(label: model.t("editor.dueDate"), date: $dueDate,
+                                    unparsedValue: OptionalDateEdit.unparsedFallback(original: existing?.dueDate, initial: initialDueDate, current: dueDate))
+                }
+
                 Section(model.t("editor.moreSection")) {
                     Picker(model.t("editor.invoice"), selection: $invoiceStatus) {
                         ForEach(InvoiceStatus.allCases) { s in
                             Text(model.t("invoice.\(invoiceKey(s))")).tag(s)
                         }
                     }
+                    TextField(model.t("editor.invoiceNo"), text: $invoiceNo)
+                    TextField(model.t("editor.amountNet"), value: $amountNet, format: .number)
+                        .multilineTextAlignment(.trailing)
                     TextField(model.t("editor.taxAmount"), value: $taxAmount, format: .number)
                         .multilineTextAlignment(.trailing)
                     TextField(model.t("editor.taxRate"), value: $taxRate, format: .number)
@@ -87,7 +110,7 @@ struct TransactionEditor: View {
             }
             .padding(16)
         }
-        .frame(width: 460, height: 560)
+        .frame(width: 460, height: 640)
         .onChange(of: type) { _ in reconcileCategory() }
         .onAppear(perform: initializeIfNeeded)
     }
@@ -115,6 +138,13 @@ struct TransactionEditor: View {
             note = t.description
             taxAmount = t.taxAmount
             taxRate = t.taxRate
+            invoiceNo = t.invoiceNo
+            amountNet = t.amountNet
+            paidAmount = t.paidAmount == 0 ? nil : t.paidAmount
+            paymentDate = t.paymentDate.flatMap { DateFormat.date(from: $0) }
+            dueDate = t.dueDate.flatMap { DateFormat.date(from: $0) }
+            initialPaymentDate = paymentDate
+            initialDueDate = dueDate
         } else {
             currency = model.defaultCurrency
             reconcileCategory()
@@ -141,7 +171,49 @@ struct TransactionEditor: View {
         t.description = note
         t.taxAmount = taxAmount
         t.taxRate = taxRate
+        t.invoiceNo = invoiceNo
+        t.amountNet = amountNet
+        t.paidAmount = paidAmount ?? 0
+        t.paymentDate = OptionalDateEdit.persisted(original: existing?.paymentDate, initial: initialPaymentDate, edited: paymentDate)
+        t.dueDate = OptionalDateEdit.persisted(original: existing?.dueDate, initial: initialDueDate, edited: dueDate)
         model.save(t, isNew: isNew)
         dismiss()
+    }
+}
+
+/// A nullable date row: the checkbox records whether the date exists at all —
+/// unchecked persists NULL (an unrecorded fact), never a default date. When the
+/// stored value exists but is unparseable, it is shown verbatim instead of a
+/// picker so the recorded fact never disappears from view.
+private struct OptionalDateRow: View {
+    let label: String
+    @Binding var date: Date?
+    var unparsedValue: String? = nil
+
+    var body: some View {
+        HStack {
+            Toggle(label, isOn: Binding(
+                get: { date != nil },
+                set: { on in date = on ? (date ?? Date()) : nil }
+            ))
+            .toggleStyle(.checkbox)
+            Spacer()
+            if date != nil {
+                // Manual binding (no force-unwrap): a stale end-editing commit
+                // arriving after the checkbox cleared the date is dropped
+                // instead of crashing or resurrecting the value.
+                DatePicker("", selection: Binding(
+                    get: { date ?? Date() },
+                    set: { newValue in if date != nil { date = newValue } }
+                ), displayedComponents: .date)
+                .labelsHidden()
+            } else if let unparsedValue {
+                Text(unparsedValue)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(unparsedValue)
+            }
+        }
     }
 }

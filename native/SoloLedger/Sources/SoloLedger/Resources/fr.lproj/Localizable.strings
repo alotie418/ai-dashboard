@@ -18,6 +18,12 @@
 "editor.invoice" = "Statut de la facture";
 "editor.taxAmount" = "Montant de la taxe";
 "editor.taxRate" = "Taux de taxe";
+"editor.paymentSection" = "Détails du règlement";
+"editor.paidAmount" = "Montant réglé";
+"editor.paymentDate" = "Date de règlement";
+"editor.dueDate" = "Date d'échéance";
+"editor.invoiceNo" = "N° de facture";
+"editor.amountNet" = "Montant HT";
 
 /* Transaction list, filters & status (B2) — added */
 "txn.col.amount" = "Montant";

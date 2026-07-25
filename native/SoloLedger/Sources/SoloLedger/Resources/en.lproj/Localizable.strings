@@ -71,6 +71,12 @@
 "editor.invoice" = "Invoice status";
 "editor.taxAmount" = "Tax amount";
 "editor.taxRate" = "Tax rate";
+"editor.paymentSection" = "Payment details";
+"editor.paidAmount" = "Amount paid/received";
+"editor.paymentDate" = "Payment date";
+"editor.dueDate" = "Due date";
+"editor.invoiceNo" = "Invoice No.";
+"editor.amountNet" = "Amount (excl. tax)";
 
 "cat.col.label" = "Name";
 "cat.col.slug" = "Slug";
