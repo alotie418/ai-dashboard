@@ -197,3 +197,29 @@
 "about.minOS" = "系統需求";
 "about.positioning" = "SoloLedger 是面向個體經營者、一人公司與自由工作者的本地優先、私密帳本。資料僅儲存於本機，無需帳號，不含 AI、不連網、無付費解鎖。它是經營記帳與管理分析工具，不替代持牌會計師、稅務顧問或法定申報系統。";
 "csv.import.partial" = "已匯入 {imported} 筆，略過 {skipped} 筆。";
+
+/* Settings & recovery (B6) — added; full parity with zh-Hans */
+"recovery.title" = "資料升級未完成";
+"recovery.message" = "偵測到舊版（Electron）帳本資料，但遷移未成功。你的原始資料未被修改。請選擇如何繼續。";
+"recovery.retry" = "重試遷移";
+"recovery.restore" = "從備份／匯出檔案還原…";
+"recovery.blank" = "建立空白帳本…";
+"recovery.blankConfirmTitle" = "確認建立空白帳本？";
+"recovery.blankConfirmMessage" = "這將以空帳本啟動，不匯入舊資料（原始資料仍保留在磁碟上、未刪除）。僅在確認無需遷移舊資料時選擇。";
+"recovery.blankConfirm" = "建立空白帳本";
+"recovery.safeNote" = "原始資料庫始終保持唯讀、未被修改，可隨時重試。";
+"recovery.viewError" = "檢視錯誤詳情";
+"settings.general" = "一般";
+"settings.accounting" = "會計";
+"settings.data" = "資料";
+"settings.about" = "關於";
+"settings.company" = "公司／商號名稱";
+"settings.accountingLocale" = "會計制度";
+"settings.currency" = "預設貨幣";
+"settings.accountingNote" = "會計制度決定可選的收支類別與預設貨幣，獨立於介面語言。此為管理分析用途，非法定申報設定。";
+"settings.appearance.system" = "跟隨系統";
+"settings.appearance.light" = "淺色";
+"settings.appearance.dark" = "深色";
+"settings.csv" = "CSV 匯入／匯出";
+"settings.dbLocation" = "資料庫位置";
+"settings.schemaVersion" = "資料庫版本";
