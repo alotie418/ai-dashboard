@@ -223,3 +223,6 @@
 "settings.csv" = "CSV 匯入／匯出";
 "settings.dbLocation" = "資料庫位置";
 "settings.schemaVersion" = "資料庫版本";
+"settings.backup" = "備份";
+"settings.backup.export" = "匯出備份…";
+"settings.backup.exportFailed" = "備份匯出失敗。";

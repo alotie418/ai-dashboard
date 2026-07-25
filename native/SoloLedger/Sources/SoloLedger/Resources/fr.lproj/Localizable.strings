@@ -223,3 +223,6 @@
 "settings.csv" = "Import / export CSV";
 "settings.dbLocation" = "Emplacement de la base de données";
 "settings.schemaVersion" = "Version de la base de données";
+"settings.backup" = "Sauvegarde";
+"settings.backup.export" = "Exporter la sauvegarde…";
+"settings.backup.exportFailed" = "Échec de l'export de la sauvegarde.";

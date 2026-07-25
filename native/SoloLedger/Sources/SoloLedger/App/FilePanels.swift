@@ -1,5 +1,6 @@
 import AppKit
 import UniformTypeIdentifiers
+import SoloLedgerCore
 
 /// System open/save panels for CSV. In an App-Sandbox build these are the
 /// Powerbox-brokered pickers that the `user-selected.read-write` entitlement
@@ -118,5 +119,43 @@ extension AppModel {
         let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
         let b = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
         return "\(v) (\(b))"
+    }
+
+    // MARK: - Backup export (Settings → Data)
+
+    /// Suggested bundle name for the backup save panel — timestamped so exports never collide.
+    /// ASCII / filesystem-safe and deliberately NOT localized (it is a filename, not UI chrome).
+    static func defaultBackupBundleName(now: Date = Date()) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd-HHmmss"
+        return "SoloLedger-Backup-\(f.string(from: now))"
+    }
+
+    /// Settings → Data → "Export backup…": choose a destination, then write a restorable backup
+    /// bundle (`sololedger.db` + `attachments/docs/`) there through the Powerbox save grant.
+    func exportBackupViaPanel() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = Self.defaultBackupBundleName()
+        panel.canCreateDirectories = true
+        panel.title = t("settings.backup.export")
+        if panel.runModal() == .OK, let url = panel.url {
+            exportBackup(to: url)
+        }
+    }
+
+    /// Write the backup bundle at the chosen destination. The consistent DB snapshot + attachment
+    /// copy are done by Core (`BackupExport.writeBundle`); the live active store is never touched.
+    /// On any failure only a localized action error surfaces.
+    func exportBackup(to destinationDir: URL) {
+        guard let store else { return }
+        let scoped = destinationDir.startAccessingSecurityScopedResource()
+        defer { if scoped { destinationDir.stopAccessingSecurityScopedResource() } }
+        do {
+            let attachments = try AppPaths.nativeAttachmentsDirectory()
+            try BackupExport.writeBundle(database: store.db, attachmentsDir: attachments, to: destinationDir)
+        } catch {
+            actionError = t("settings.backup.exportFailed")
+        }
     }
 }

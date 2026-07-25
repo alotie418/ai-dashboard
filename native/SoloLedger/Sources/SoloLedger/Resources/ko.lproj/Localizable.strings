@@ -223,3 +223,6 @@
 "settings.csv" = "CSV 가져오기/내보내기";
 "settings.dbLocation" = "데이터베이스 위치";
 "settings.schemaVersion" = "데이터베이스 버전";
+"settings.backup" = "백업";
+"settings.backup.export" = "백업 내보내기…";
+"settings.backup.exportFailed" = "백업 내보내기에 실패했습니다.";
