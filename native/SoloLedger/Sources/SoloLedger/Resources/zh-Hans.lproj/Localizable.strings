@@ -95,6 +95,12 @@
 "settings.currency" = "默认货币";
 "settings.company" = "公司/字号名称";
 "settings.accountingNote" = "会计制度决定可选的收支类别与默认货币，独立于界面语言。此为管理分析用途，非法定申报配置。";
+"settings.reportParams" = "报表计算参数";
+"settings.surchargeRate" = "附加税率";
+"settings.incomeTaxRate" = "所得税率";
+"settings.adminExpenseAnnual" = "年度管理费用";
+"settings.reportParamsPending" = "本 App 尚未提供财务报表功能。这些参数会保存在账本中，供报表计算使用；留空表示未设置，报表功能会按其内置默认值计算。";
+"settings.reportParamsNote" = "切换「会计制度」会把三项税率重置为该制度的预设值（年度管理费用不变），已有记录不会重新计算。预设税率仅为参考值，可能随政策调整，请核对最新官方税率。";
 "settings.schemaVersion" = "数据库版本";
 "settings.backup" = "备份";
 "settings.backup.export" = "导出备份…";

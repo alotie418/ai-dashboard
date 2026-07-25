@@ -223,6 +223,12 @@
 "settings.accountingLocale" = "会計方式";
 "settings.currency" = "既定の通貨";
 "settings.accountingNote" = "会計方式は、選択できる収支カテゴリと既定の通貨を決定します。UI 言語とは独立しており、管理分析のための設定で、法定申告の設定ではありません。";
+"settings.reportParams" = "帳票計算パラメータ";
+"settings.surchargeRate" = "附加税率";
+"settings.incomeTaxRate" = "所得税率";
+"settings.adminExpenseAnnual" = "年間管理費用";
+"settings.reportParamsPending" = "本アプリはまだ財務帳票を提供していません。これらのパラメータは帳票計算のために台帳へ保存されます。空欄は未設定を意味し、帳票機能は独自の既定値で計算します。";
+"settings.reportParamsNote" = "「会計方式」を切り替えると、3 つの税率がその方式のプリセット値に戻ります（年間管理費用はそのまま）。既存の記録が再計算されることはありません。プリセット税率は参考値であり変更される場合があります。最新の公式税率をご確認ください。";
 "settings.appearance.system" = "システムに合わせる";
 "settings.appearance.light" = "ライト";
 "settings.appearance.dark" = "ダーク";

@@ -95,6 +95,12 @@
 "settings.currency" = "Default currency";
 "settings.company" = "Company / business name";
 "settings.accountingNote" = "The accounting profile selects the available income/expense categories and default currency. It is separate from the UI language, and is for management analysis — not a statutory filing configuration.";
+"settings.reportParams" = "Report calculation parameters";
+"settings.surchargeRate" = "Surcharge rate";
+"settings.incomeTaxRate" = "Income tax rate";
+"settings.adminExpenseAnnual" = "Annual admin expense";
+"settings.reportParamsPending" = "This app does not provide financial reports yet. These parameters are stored in the ledger for report calculations; leave one empty to store nothing, and the report features apply their own built-in default.";
+"settings.reportParamsNote" = "Changing “Accounting profile” resets the three tax rates to that profile's presets (the annual admin expense is left alone); existing records are never recalculated. Preset rates are reference values and may change — verify against current official rates.";
 "settings.schemaVersion" = "Database version";
 "settings.backup" = "Backup";
 "settings.backup.export" = "Export backup…";

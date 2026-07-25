@@ -1,13 +1,18 @@
 import SwiftUI
 import SoloLedgerCore
 
-/// Read-only view of the seeded accounting categories for the active regime.
-/// Safe to browse; switching the accounting locale changes which set is shown.
+/// Read-only view of the seeded accounting categories. The regime picker here is a
+/// VIEW filter — it changes which seeded set is listed and writes nothing. Switching
+/// the ledger's own accounting regime (which also rewrites that regime's preset tax
+/// rates) belongs to Settings.
 struct CategoriesView: View {
     @EnvironmentObject var model: AppModel
+    @State private var browsing: AccountingLocale?
+
+    private var shown: AccountingLocale { browsing ?? model.accountingLocale }
 
     var body: some View {
-        Table(model.categories) {
+        Table(model.categories(browsing: shown)) {
             TableColumn(model.t("txn.col.type")) { c in
                 Text(model.t("type.\(c.type.rawValue)"))
                     .foregroundStyle(c.type == .income ? Color.green : Color.red)
@@ -35,8 +40,8 @@ struct CategoriesView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Picker(model.t("settings.accountingLocale"), selection: Binding(
-                    get: { model.accountingLocale },
-                    set: { model.setAccountingLocale($0) }
+                    get: { shown },
+                    set: { browsing = $0 }
                 )) {
                     ForEach(AccountingLocale.allCases) { locale in
                         Text(locale.displayName).tag(locale)
