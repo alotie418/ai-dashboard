@@ -93,6 +93,14 @@
 "settings.backup" = "备份";
 "settings.backup.export" = "导出备份…";
 "settings.backup.exportFailed" = "备份导出失败。";
+"settings.restore" = "从备份恢复…";
+"settings.restore.pickPrompt" = "选择一个 SoloLedger 备份 bundle 文件夹";
+"settings.restore.confirmTitle" = "用备份替换当前账本？";
+"settings.restore.confirmMessage" = "将先自动备份当前账本，再用所选备份替换它。此操作无法在应用内撤销。";
+"settings.restore.confirmAction" = "选择备份并替换";
+"restore.error.invalidBundle" = "所选备份无效或已损坏，未做任何更改。";
+"restore.error.safetyBackupFailed" = "无法备份当前账本，已中止恢复；当前数据未改动。";
+"restore.error.failed" = "恢复失败。你的自动备份保存在“备份”文件夹中。";
 "settings.dbLocation" = "数据库位置";
 "settings.csv" = "CSV 导入 / 导出";
 

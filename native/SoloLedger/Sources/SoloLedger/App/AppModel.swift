@@ -631,6 +631,54 @@ final class AppModel: ObservableObject {
         } catch { actionError = "\(error)" }
     }
 
+    // MARK: - Restore from backup (replace the active ledger)
+
+    /// Replace the current ledger with the backup bundle at `bundleURL`, using production paths.
+    func restoreFromBackup(bundleURL: URL) {
+        let config: MigrationCoordinator.Config
+        let backups: URL
+        let attachments: URL
+        do {
+            config = try MigrationCoordinator.Config.standard()
+            backups = try AppPaths.backupsDirectory()
+            attachments = try AppPaths.nativeAttachmentsDirectory()
+        } catch { actionError = t("restore.error.failed"); return }
+        restoreFromBackup(bundleURL: bundleURL, config: config, backupsDir: backups, currentAttachmentsDir: attachments)
+    }
+
+    /// Restore orchestration (internal seam so tests drive it with an isolated config/paths).
+    /// Safety-first ORDER: validate the incoming bundle (read-only) → snapshot the CURRENT ledger to
+    /// `Backups/` (BackupExport) → close the live store → clear the active slot → re-import the bundle
+    /// through the hardened chain (rebuilds DB + attachments, closing G1). Any failure BEFORE the store
+    /// closes aborts with the current ledger untouched; after that, the `Backups/` snapshot is the net.
+    func restoreFromBackup(bundleURL: URL, config: MigrationCoordinator.Config,
+                           backupsDir: URL, currentAttachmentsDir: URL) {
+        guard let store else { return }
+        let scoped = bundleURL.startAccessingSecurityScopedResource()
+        defer { if scoped { bundleURL.stopAccessingSecurityScopedResource() } }
+
+        do { try BackupRestore.validateBundle(bundleURL) }
+        catch { actionError = t("restore.error.invalidBundle"); return }
+
+        // Safety net: snapshot the CURRENT ledger to Backups BEFORE any destruction.
+        do {
+            let safety = backupsDir.appendingPathComponent("pre-restore-\(Self.fileTimestamp())", isDirectory: true)
+            try BackupExport.writeBundle(database: store.db, attachmentsDir: currentAttachmentsDir, to: safety)
+        } catch { actionError = t("restore.error.safetyBackupFailed"); return }
+
+        // Close the live store (must succeed before replacing the slot), then reset app state.
+        do { try store.db.close() } catch { actionError = t("restore.error.failed"); return }
+        self.store = nil
+        ready = false
+
+        do { try BackupRestore.clearActiveSlot(config: config) }
+        catch { actionError = t("restore.error.failed"); boot(); return }
+
+        // Rebuild the active slot from the bundle through the hardened import chain (finalizer
+        // re-applies attachments, closing G1).
+        migrateFromUserDir(source: .exportBundle(bundleURL))
+    }
+
     var schemaVersionText: String {
         (try? store?.schemaVersion()).flatMap { $0 }.map(String.init) ?? "—"
     }
