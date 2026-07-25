@@ -123,13 +123,18 @@ extension AppModel {
 
     // MARK: - Backup export (Settings → Data)
 
-    /// Suggested bundle name for the backup save panel — timestamped so exports never collide.
-    /// ASCII / filesystem-safe and deliberately NOT localized (it is a filename, not UI chrome).
-    static func defaultBackupBundleName(now: Date = Date()) -> String {
+    /// Timestamp for backup file/dir names — ASCII, filesystem-safe, POSIX-stable.
+    static func fileTimestamp(now: Date = Date()) -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd-HHmmss"
-        return "SoloLedger-Backup-\(f.string(from: now))"
+        return f.string(from: now)
+    }
+
+    /// Suggested bundle name for the backup save panel — timestamped so exports never collide.
+    /// ASCII / filesystem-safe and deliberately NOT localized (it is a filename, not UI chrome).
+    static func defaultBackupBundleName(now: Date = Date()) -> String {
+        "SoloLedger-Backup-\(fileTimestamp(now: now))"
     }
 
     /// Settings → Data → "Export backup…": choose a destination, then write a restorable backup
@@ -156,6 +161,21 @@ extension AppModel {
             try BackupExport.writeBundle(database: store.db, attachmentsDir: attachments, to: destinationDir)
         } catch {
             actionError = t("settings.backup.exportFailed")
+        }
+    }
+
+    /// Settings → Data → "Restore from backup…": pick a backup BUNDLE folder, then replace the
+    /// current ledger with it (`restoreFromBackup` in AppModel). The destructive confirmation is
+    /// view-local (SettingsView) and runs BEFORE this — the panel appears only after the user confirms.
+    func restoreFromBackupBundleViaPanel() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.title = t("settings.restore")
+        panel.message = t("settings.restore.pickPrompt")
+        if panel.runModal() == .OK, let url = panel.url {
+            restoreFromBackup(bundleURL: url)
         }
     }
 }

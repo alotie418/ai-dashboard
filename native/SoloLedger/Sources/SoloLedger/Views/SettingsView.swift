@@ -71,6 +71,7 @@ private struct AccountingSettingsTab: View {
 
 private struct DataSettingsTab: View {
     @EnvironmentObject var model: AppModel
+    @State private var showRestoreConfirm = false
 
     var body: some View {
         Form {
@@ -90,6 +91,7 @@ private struct DataSettingsTab: View {
             }
             Section(model.t("settings.backup")) {
                 Button(model.t("settings.backup.export")) { model.exportBackupViaPanel() }
+                Button(model.t("settings.restore"), role: .destructive) { showRestoreConfirm = true }
             }
             #if DEBUG
             Section("Debug") {
@@ -98,6 +100,15 @@ private struct DataSettingsTab: View {
             #endif
         }
         .formStyle(.grouped)
+        .confirmationDialog(model.t("settings.restore.confirmTitle"),
+                            isPresented: $showRestoreConfirm, titleVisibility: .visible) {
+            Button(model.t("settings.restore.confirmAction"), role: .destructive) {
+                model.restoreFromBackupBundleViaPanel()
+            }
+            Button(model.t("common.cancel"), role: .cancel) {}
+        } message: {
+            Text(model.t("settings.restore.confirmMessage"))
+        }
     }
 }
 

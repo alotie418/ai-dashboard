@@ -226,3 +226,11 @@
 "settings.backup" = "백업";
 "settings.backup.export" = "백업 내보내기…";
 "settings.backup.exportFailed" = "백업 내보내기에 실패했습니다.";
+"settings.restore" = "백업에서 복원…";
+"settings.restore.pickPrompt" = "SoloLedger 백업 번들 폴더를 선택하세요";
+"settings.restore.confirmTitle" = "현재 장부를 백업으로 교체할까요?";
+"settings.restore.confirmMessage" = "현재 장부를 먼저 자동으로 백업한 다음 선택한 백업으로 교체합니다. 이 작업은 앱 내에서 취소할 수 없습니다.";
+"settings.restore.confirmAction" = "백업 선택 후 교체";
+"restore.error.invalidBundle" = "선택한 백업이 잘못되었거나 손상되었습니다. 아무것도 변경되지 않았습니다.";
+"restore.error.safetyBackupFailed" = "현재 장부를 백업할 수 없어 복원을 중단했습니다. 데이터는 변경되지 않았습니다.";
+"restore.error.failed" = "복원에 실패했습니다. 안전 백업은 Backups 폴더에 보관되어 있습니다.";

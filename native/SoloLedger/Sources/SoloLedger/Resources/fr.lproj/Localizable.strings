@@ -226,3 +226,11 @@
 "settings.backup" = "Sauvegarde";
 "settings.backup.export" = "Exporter la sauvegarde…";
 "settings.backup.exportFailed" = "Échec de l'export de la sauvegarde.";
+"settings.restore" = "Restaurer depuis une sauvegarde…";
+"settings.restore.pickPrompt" = "Choisissez un dossier de sauvegarde SoloLedger";
+"settings.restore.confirmTitle" = "Remplacer le livre actuel par une sauvegarde ?";
+"settings.restore.confirmMessage" = "Votre livre actuel est d'abord sauvegardé, puis remplacé par la sauvegarde choisie. Cette action est irréversible depuis l'application.";
+"settings.restore.confirmAction" = "Choisir et remplacer";
+"restore.error.invalidBundle" = "La sauvegarde choisie est invalide ou endommagée. Rien n'a été modifié.";
+"restore.error.safetyBackupFailed" = "Impossible de sauvegarder le livre actuel ; la restauration a été annulée. Vos données sont intactes.";
+"restore.error.failed" = "Échec de la restauration. Votre sauvegarde de sécurité est conservée dans le dossier Backups.";

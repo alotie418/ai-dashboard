@@ -226,3 +226,11 @@
 "settings.backup" = "バックアップ";
 "settings.backup.export" = "バックアップを書き出す…";
 "settings.backup.exportFailed" = "バックアップの書き出しに失敗しました。";
+"settings.restore" = "バックアップから復元…";
+"settings.restore.pickPrompt" = "SoloLedger のバックアップバンドルフォルダを選択";
+"settings.restore.confirmTitle" = "現在の帳簿をバックアップで置き換えますか？";
+"settings.restore.confirmMessage" = "現在の帳簿を先に自動バックアップしてから、選択したバックアップで置き換えます。この操作はアプリ内では取り消せません。";
+"settings.restore.confirmAction" = "バックアップを選んで置き換える";
+"restore.error.invalidBundle" = "選択したバックアップは無効または破損しています。変更は行われていません。";
+"restore.error.safetyBackupFailed" = "現在の帳簿をバックアップできなかったため、復元を中止しました。データは変更されていません。";
+"restore.error.failed" = "復元に失敗しました。自動バックアップは Backups フォルダに保存されています。";

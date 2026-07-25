@@ -93,6 +93,14 @@
 "settings.backup" = "Backup";
 "settings.backup.export" = "Export backup…";
 "settings.backup.exportFailed" = "Backup export failed.";
+"settings.restore" = "Restore from backup…";
+"settings.restore.pickPrompt" = "Choose a SoloLedger backup bundle folder";
+"settings.restore.confirmTitle" = "Replace current ledger with a backup?";
+"settings.restore.confirmMessage" = "Your current ledger is backed up first, then replaced by the chosen backup. This cannot be undone from within the app.";
+"settings.restore.confirmAction" = "Choose backup & replace";
+"restore.error.invalidBundle" = "The chosen backup is invalid or damaged. Nothing was changed.";
+"restore.error.safetyBackupFailed" = "Couldn't back up the current ledger, so the restore was aborted. Your data is unchanged.";
+"restore.error.failed" = "Restore failed. Your safety backup is kept in the Backups folder.";
 "settings.dbLocation" = "Database location";
 "settings.csv" = "CSV import / export";
 
