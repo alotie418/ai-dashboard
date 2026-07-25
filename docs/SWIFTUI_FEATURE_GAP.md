@@ -48,7 +48,7 @@
 | 用户可见备份 / 恢复 UI | 🟡 | 升级已自动备份；面向用户的备份/恢复入口未做 |
 | **附件文件迁移**（`attachment_path` 指向的本地文件 + 备份 bundle 的 `attachments/`） | ✅ 主迁移路径 ／ 🟡 restore 恢复路径 | 主/自动 `.masContainer` + 用户选目录导入链**已迁附件**（`AttachmentApply` → `PreparedImportFinalizer`：逐字保留 `attachment_path`、SHA-256 校验、add-only 不覆盖）；Core 链测试 + **App 层端到端**（`ElectronFixtureProductionOpenTests`，本次新增）均覆盖。原"只迁 DB 不迁附件"实为已停用的 `DatabaseUpgrade`（非生产启动路径）。**仅 restore-from-backup 恢复路径尚不迁附件（G1，单列残留，非本次范围）** |
 | **legacy `sales`/`purchases` → `transactions` 二次数据迁移** | 🛑 **Release 前必须** | Electron 侧的旧表转换未在原生侧复现（只读保留） |
-| **旧进程检测硬化** | 🛑 **Release 前必须** | 现仅靠文件指纹变化；沙箱内无法枚举进程/取锁——需更强握手或"请退出旧版"引导 |
+| **旧进程检测硬化** | ✅（沙箱内正解已达成） | 生产 ingest 用**强指纹稳定性**检测（前后指纹 + 3 次尝试，`StagingIngest`）——旧版仍在写则拒，映射为**可重试态** `.retriable(.sourceBusy)`（`MigrationCoordinator.swift:1104`）并显示引导消息 `migration.msg.sourceBusy`（"请退出旧版 SoloLedger 后重试"，6 语齐全）+ Retry 动作。**App Sandbox 内无法枚举进程 / 取跨进程锁**，指纹 + 引导退出即该环境下的正解。原 🛑 标记已过时 |
 | **Release 数据路径验证** | 🛑 **Release 前必须** | `SoloLedgerNative`（Release）已加路径隔离单测；需在**真实 Release 沙箱**端到端验证 |
 | **DMG（非沙箱）用户数据迁移入口** | ✅（N7.2 已闭合） | 源选择入口已全链路接线并测试：coordinator `.requiresSourceChoice`（`MigrationCoordinator.swift:668`）→ `.awaitingSourceChoice` → RootView `.chooseSource`（`RootView.swift:76`）→ 目录面板（`FilePanels.swift:58`）→ `.migrateFromUserDir(.userSelectedDataDir)`（`AppModel.swift:189,339`）。single-grant-window、无 bookmark entitlement（`MigrationSource.withAccess`）。测试：`DormantSourceChoiceBootTests`、`ElectronFixtureProductionOpenTests`。**原 🛑 P0 标记已过时** |
 | 加密列（`ai_providers`/`ecommerce_connections`，safeStorage 密文） | ❌ | 跨应用不可移植；原生无 AI/电商，不迁移 |
@@ -75,7 +75,7 @@
 
 1. ✅ 附件文件迁移（DB 之外的 `attachments/`）——主/自动 `.masContainer` + 用户选目录导入链已实现，Core + **App 层端到端**测试均覆盖；**仅 restore-from-backup 恢复路径尚不迁附件（G1，单列残留，非本次 PR 范围）**。
 2. 🛑 legacy `sales`/`purchases` → `transactions` 二次数据迁移。
-3. 🛑 旧进程检测硬化（超出文件指纹）。
+3. ✅ 旧进程检测硬化：强指纹稳定性检测（前后指纹 + 3 次尝试）+ 可重试引导态"请退出旧版并重试"（`migration.msg.sourceBusy`，6 语）；App Sandbox 内进程枚举 / 取锁不可行，此为该环境下的正解。原 🛑 已过时。
 4. 🛑 真实 Release 沙箱下的数据路径 / 升级端到端验证。
 5. ✅ **DMG（非沙箱）用户数据迁移入口**：N7.2 源选择入口已全链路接线（RootView → FilePanels → AppModel → coordinator `.requiresSourceChoice` / `.migrateFromUserDir` / `.userSelectedDataDir`）、single-grant-window 无 bookmark，Core + App-hosted 测试覆盖。**原 P0 已闭合**。
 6. 🛑 用户可见的备份 / 恢复 UI。
