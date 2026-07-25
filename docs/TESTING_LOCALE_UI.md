@@ -2,6 +2,8 @@
 
 > 文档日期：2026-06-26 ｜ 基线：main HEAD `17b1705`（🟢×16）
 > 本文件为只读分析记录与运行指引，**不改变任何测试行为**。当前 `test:locale-ui` 结构未变。
+>
+> ⚠️ **范围**：本文档只讲 **Electron** 的 Playwright `test:locale-ui`。**原生 SwiftUI 版**的 i18n / raw-key-leak 守卫在 `native/SoloLedger/App/Tests/SoloLedgerUnitTests/MigrationCopyParityTests.swift`，经 `xcodebuild test`（不是 `npm run test:locale-ui`）运行。跑原生 i18n 验证请勿套用本文命令。
 
 固化一次针对 `test:locale-ui`（Playwright 多语言/多会计口径界面验收）的只读分析：当前结构、耗时来源、「卡住」假象的真因、推荐运行纪律，以及后续优化路线（PR-2 / PR-3，**均暂未实施**）。
 

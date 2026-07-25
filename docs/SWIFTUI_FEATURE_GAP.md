@@ -17,7 +17,7 @@
 | 会计类别浏览（78 预置） | ✅（只读） | `CategoriesView`，可切会计制度 |
 | CSV 导入 / 导出（交易） | ✅ | RFC-4180 + BOM + 注入防护；导入纯追加 |
 | Electron → SwiftUI 数据升级 | ✅ | `DatabaseUpgrade`（备份/完整性/原子切换/回滚/阻塞恢复） |
-| 6 语言 UI | 🟡（架构就绪） | zh-Hans + en 完整；zh-Hant/ja/ko/fr 部分槽位 |
+| 6 语言 UI | 🟡（架构就绪） | zh-Hans + en 完整（各 199 键）；zh-Hant/ja/ko/fr 各缺同一批 **24 键**（`settings.*` 14 + `recovery.*` 10），缺失时回退 **zh-Hans**（非 en）；仍为 `.strings`（无 `.xcstrings`）。locale guard 现只强制 `migration.*` 全 6 语齐 |
 | 深色模式 | ✅ | 原生新增（Electron 仅浅色） |
 | 类别管理（增删改） | 🟡 | 目前只读浏览 |
 
@@ -50,7 +50,7 @@
 | **legacy `sales`/`purchases` → `transactions` 二次数据迁移** | 🛑 **Release 前必须** | Electron 侧的旧表转换未在原生侧复现（只读保留） |
 | **旧进程检测硬化** | 🛑 **Release 前必须** | 现仅靠文件指纹变化；沙箱内无法枚举进程/取锁——需更强握手或"请退出旧版"引导 |
 | **Release 数据路径验证** | 🛑 **Release 前必须** | `SoloLedgerNative`（Release）已加路径隔离单测；需在**真实 Release 沙箱**端到端验证 |
-| **DMG（非沙箱）用户数据迁移入口** | 🛑 **Release 前必须（P0）** | `.masContainer` 只覆盖 Electron-MAS 容器；DMG 数据在容器外的 `~/Library/Application Support/SoloLedger/`，MAS 沙箱无授权够不到。`.userSelectedDataDir` 管道齐备但无目录选择入口。须在 createFresh **之前**加 single-grant-window 授权（不加 bookmark entitlement）；设计先行经确认（N7）。见 `SWIFTUI_MIGRATION_PLAN.md` §0.2 / §0.3 |
+| **DMG（非沙箱）用户数据迁移入口** | ✅（N7.2 已闭合） | 源选择入口已全链路接线并测试：coordinator `.requiresSourceChoice`（`MigrationCoordinator.swift:668`）→ `.awaitingSourceChoice` → RootView `.chooseSource`（`RootView.swift:76`）→ 目录面板（`FilePanels.swift:58`）→ `.migrateFromUserDir(.userSelectedDataDir)`（`AppModel.swift:189,339`）。single-grant-window、无 bookmark entitlement（`MigrationSource.withAccess`）。测试：`DormantSourceChoiceBootTests`、`ElectronFixtureProductionOpenTests`。**原 🛑 P0 标记已过时** |
 | 加密列（`ai_providers`/`ecommerce_connections`，safeStorage 密文） | ❌ | 跨应用不可移植；原生无 AI/电商，不迁移 |
 
 ## 5. 打包 / 发布（Phase 4）
@@ -77,10 +77,10 @@
 2. 🛑 legacy `sales`/`purchases` → `transactions` 二次数据迁移。
 3. 🛑 旧进程检测硬化（超出文件指纹）。
 4. 🛑 真实 Release 沙箱下的数据路径 / 升级端到端验证。
-5. 🛑 **DMG（非沙箱）用户数据迁移入口**：MAS 沙箱当前够不到 DMG 数据目录（容器外的 `~/Library/Application Support/SoloLedger/`）；须在 createFresh 前加 single-grant-window 目录授权（不加 bookmark entitlement）。设计先行经确认（N7）。
+5. ✅ **DMG（非沙箱）用户数据迁移入口**：N7.2 源选择入口已全链路接线（RootView → FilePanels → AppModel → coordinator `.requiresSourceChoice` / `.migrateFromUserDir` / `.userSelectedDataDir`）、single-grant-window 无 bookmark，Core + App-hosted 测试覆盖。**原 P0 已闭合**。
 6. 🛑 用户可见的备份 / 恢复 UI。
-7. 🛑 完整 6 语言 + `.xcstrings` parity。
+7. 🛑 完整 6 语言（zh-Hant/ja/ko/fr 各缺 24 键 `settings.*`+`recovery.*`，缺失回退 zh-Hans）。`.xcstrings` parity 推迟（`.strings` 对 MAS 可用，非阻塞）。
 8. 🛑 MAS 签名 / 打包 / App Store Connect（Phase 4）。
 9. 🟡（发布前应补）损益/税务/VAT 等敏感报表——**镜像** Electron，不重造。
 
-> 本表随每个阶段更新。**截至 2026-07-20 已落地至 2B-3 / C12x-A2**：生产启动链（C12a / C12b）+ 恢复 UI + 两条 active-store hardened open（C12x-A1 existing / A2 createFresh）。当前发布前 P0 见第 4 节「DMG（非沙箱）用户数据迁移入口」及 `SWIFTUI_MIGRATION_PLAN.md` §0。
+> 本表随每个阶段更新。**截至 2026-07-25**：生产启动链（C12a / C12b）+ 两条 active-store hardened open（C12x-A1 existing / A2 createFresh）+ **DMG 源选择入口（N7.2，原 P0 已闭合）** + **附件文件迁移（主/自动 + 用户选目录，含 App 层端到端）** 均已落地。**当前推进目标：MAS 可提交，只清发布阻塞项；报表引擎（P&L/VAT/所得税/现金流/COGS，808 行敏感逻辑）本轮推迟——须逐字镜像 `electron/reports/*` + 专业复核，单独一条线做，不阻塞发布主线。**
