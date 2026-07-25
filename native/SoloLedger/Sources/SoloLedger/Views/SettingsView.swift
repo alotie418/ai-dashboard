@@ -88,6 +88,9 @@ private struct DataSettingsTab: View {
                     Button(model.t("cmd.importCSV")) { model.importCSVViaPanel() }
                 }
             }
+            Section(model.t("settings.backup")) {
+                Button(model.t("settings.backup.export")) { model.exportBackupViaPanel() }
+            }
             #if DEBUG
             Section("Debug") {
                 Button(model.t("overview.loadDemo")) { model.loadDemoData() }

@@ -223,3 +223,6 @@
 "settings.csv" = "CSV インポート／エクスポート";
 "settings.dbLocation" = "データベースの場所";
 "settings.schemaVersion" = "データベースバージョン";
+"settings.backup" = "バックアップ";
+"settings.backup.export" = "バックアップを書き出す…";
+"settings.backup.exportFailed" = "バックアップの書き出しに失敗しました。";

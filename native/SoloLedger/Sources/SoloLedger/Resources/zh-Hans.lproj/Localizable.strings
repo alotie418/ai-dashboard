@@ -90,6 +90,9 @@
 "settings.company" = "公司/字号名称";
 "settings.accountingNote" = "会计制度决定可选的收支类别与默认货币，独立于界面语言。此为管理分析用途，非法定申报配置。";
 "settings.schemaVersion" = "数据库版本";
+"settings.backup" = "备份";
+"settings.backup.export" = "导出备份…";
+"settings.backup.exportFailed" = "备份导出失败。";
 "settings.dbLocation" = "数据库位置";
 "settings.csv" = "CSV 导入 / 导出";
 

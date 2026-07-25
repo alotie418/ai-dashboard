@@ -90,6 +90,9 @@
 "settings.company" = "Company / business name";
 "settings.accountingNote" = "The accounting profile selects the available income/expense categories and default currency. It is separate from the UI language, and is for management analysis — not a statutory filing configuration.";
 "settings.schemaVersion" = "Database version";
+"settings.backup" = "Backup";
+"settings.backup.export" = "Export backup…";
+"settings.backup.exportFailed" = "Backup export failed.";
 "settings.dbLocation" = "Database location";
 "settings.csv" = "CSV import / export";
 
