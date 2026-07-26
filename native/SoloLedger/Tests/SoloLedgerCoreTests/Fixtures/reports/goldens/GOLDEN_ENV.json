@@ -1,10 +1,15 @@
 {
   "note": "Regenerating with a different runtime may change the goldens. CI re-runs the generator and byte-diffs the output; a non-empty diff is a failure.",
   "generator": "native/SoloLedger/Tests/Fixtures/make-report-goldens.mjs",
-  "fixture": "native/SoloLedger/Tests/SoloLedgerCoreTests/Fixtures/reports/reports-base.db",
+  "fixture": {
+    "path": "native/SoloLedger/Tests/SoloLedgerCoreTests/Fixtures/reports/reports-base.db",
+    "sha256": "b4d5bfd8e623391df47c89957e088e734de5f7a60c1146d6eace289e2668a365"
+  },
   "electron": "42.6.0",
   "node": "24.18.0",
   "icu": "78.2",
+  "betterSqlite3": "12.11.1",
+  "sqlite": "3.53.2",
   "resolvedIntlLocale": "en-US",
   "env": {
     "LC_ALL": "C",

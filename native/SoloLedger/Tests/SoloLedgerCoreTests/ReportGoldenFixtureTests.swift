@@ -33,11 +33,25 @@ final class ReportGoldenFixtureTests: LedgerTestCase {
 
     // MARK: - The matrix exists and is complete
 
-    func testFixtureDatabaseShipsInTheTestBundle() throws {
-        let url = try XCTUnwrap(Bundle.module.url(forResource: "reports", withExtension: nil))
+    /// URL of the bundled fixture. NEVER open it read-write: `LedgerStore` runs the
+    /// migrator and switches journal mode on open, which rewrites the file in place
+    /// and would make the content hash below drift depending on test order.
+    private func bundledFixtureURL() throws -> URL {
+        try XCTUnwrap(Bundle.module.url(forResource: "reports", withExtension: nil))
             .appendingPathComponent("reports-base.db")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path), "reports-base.db must ship")
-        let store = try LedgerStore(databaseURL: url)
+    }
+
+    /// A writable copy, for anything that needs to open the ledger.
+    private func fixtureCopy() throws -> URL {
+        let dst = try trackedTempDir().appendingPathComponent("reports-base.db")
+        try FileManager.default.copyItem(at: try bundledFixtureURL(), to: dst)
+        return dst
+    }
+
+    func testFixtureDatabaseShipsInTheTestBundle() throws {
+        XCTAssertTrue(FileManager.default.fileExists(atPath: try bundledFixtureURL().path),
+                      "reports-base.db must ship")
+        let store = try LedgerStore(databaseURL: try fixtureCopy())
         XCTAssertEqual(try store.schemaVersion(), 23)
     }
 
@@ -71,15 +85,40 @@ final class ReportGoldenFixtureTests: LedgerTestCase {
         XCTAssertNotNil(try golden("base-US-2025")["scheduleC"], "US produces a Schedule C, not a P&L")
     }
 
-    func testEnvironmentRecordPinsTheGeneratingRuntime() throws {
+    private func environmentRecord() throws -> [String: Any] {
         let url = try goldensDirectory().appendingPathComponent("GOLDEN_ENV.json")
-        let env = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        return try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+    }
+
+    func testEnvironmentRecordPinsTheGeneratingRuntime() throws {
+        let env = try environmentRecord()
         XCTAssertEqual(env["resolvedIntlLocale"] as? String, "en-US",
                        "us.js formats with toLocaleString(); a different Intl locale moves the numbers")
         let required = try XCTUnwrap(env["env"] as? [String: String])
         XCTAssertEqual(required["LC_ALL"], "C")
         XCTAssertEqual(required["TZ"], "UTC")
-        XCTAssertNotNil(env["electron"], "the generating Electron version must be recorded")
+        for key in ["electron", "node", "icu", "betterSqlite3", "sqlite"] {
+            XCTAssertNotNil(env[key], "the generating \(key) version must be recorded")
+        }
+    }
+
+    /// The goldens are only meaningful for the exact fixture they were generated
+    /// from. A rebuilt or hand-edited database with stale goldens would otherwise
+    /// pass every parity test while measuring the wrong ledger.
+    func testGoldensWereGeneratedFromTheShippedFixture() throws {
+        let record = try XCTUnwrap(try environmentRecord()["fixture"] as? [String: Any])
+        let recorded = try XCTUnwrap(record["sha256"] as? String)
+        // Hash the COMMITTED file, not the bundle copy: the generator hashed the
+        // committed one, and a bundled resource can be mutated in place by a test
+        // that opens it. Same technique MigrationCopyParityTests uses for .strings.
+        var dir = URL(fileURLWithPath: #filePath)
+        dir.deleteLastPathComponent()                                  // …/SoloLedgerCoreTests
+        let source = dir.appendingPathComponent("Fixtures/reports/reports-base.db")
+        let actual = try FileHash.sha256HexOfRegularFile(at: source)
+        XCTAssertEqual(actual, recorded,
+                       "reports-base.db changed without regenerating the goldens — rerun make-report-goldens.mjs")
+        XCTAssertEqual(record["path"] as? String,
+                       "native/SoloLedger/Tests/SoloLedgerCoreTests/Fixtures/reports/reports-base.db")
     }
 
     // MARK: - The cases are DISCRIMINATING (this is why they exist)

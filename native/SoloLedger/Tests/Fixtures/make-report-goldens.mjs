@@ -23,7 +23,8 @@
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { existsSync, rmSync, mkdirSync, writeFileSync, copyFileSync, readdirSync } from 'node:fs';
+import { existsSync, rmSync, mkdirSync, writeFileSync, copyFileSync, readdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 const require = createRequire(import.meta.url);
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -58,6 +59,15 @@ if (!existsSync(BASE_DB)) {
 }
 
 const reportEngine = require(join(ROOT, 'electron/reports/index.js'));
+
+// SQLite's own version matters: the engines run SQL aggregates, and a different
+// library build could in principle order or round differently.
+const sqliteVersion = (() => {
+  const probe = new Database(':memory:');
+  const v = probe.prepare('SELECT sqlite_version() AS v').get().v;
+  probe.close();
+  return v;
+})();
 
 // --- rate variants ----------------------------------------------------------
 // Derived from the ONE committed fixture so the pair differs ONLY in whether the
@@ -145,10 +155,17 @@ writeFileSync(join(OUT_DIR, 'GOLDEN_ENV.json'), JSON.stringify({
   note: 'Regenerating with a different runtime may change the goldens. CI re-runs ' +
         'the generator and byte-diffs the output; a non-empty diff is a failure.',
   generator: 'native/SoloLedger/Tests/Fixtures/make-report-goldens.mjs',
-  fixture: 'native/SoloLedger/Tests/SoloLedgerCoreTests/Fixtures/reports/reports-base.db',
+  // Content hash, not just a path: the goldens are only meaningful for THIS
+  // fixture, so a rebuilt or edited database has to be visible in the diff.
+  fixture: {
+    path: 'native/SoloLedger/Tests/SoloLedgerCoreTests/Fixtures/reports/reports-base.db',
+    sha256: createHash('sha256').update(readFileSync(BASE_DB)).digest('hex'),
+  },
   electron: process.versions.electron ?? null,
   node: process.versions.node,
   icu: process.versions.icu ?? null,
+  betterSqlite3: require(join(ROOT, 'node_modules/better-sqlite3/package.json')).version,
+  sqlite: sqliteVersion,
   resolvedIntlLocale: new Intl.NumberFormat().resolvedOptions().locale,
   env: REQUIRED_ENV,
   rateKeys: RATE_KEYS,
