@@ -40,6 +40,7 @@
     "check:recategorize": "node scripts/test-recategorize.mjs",
     "check:report-source": "node scripts/test-report-source.mjs",
     "check:cashflow": "node scripts/test-cashflow.mjs",
+    "check:swift-warnings": "node scripts/check-swift-warnings.mjs",
     "check:auto-backup": "node scripts/test-auto-backup.mjs",
     "check:backup-bundle": "node scripts/test-backup-bundle.mjs",
     "check:csv-export": "node scripts/test-csv-export.mjs",

@@ -848,7 +848,7 @@ final class MigrationSourceIngestTests: LedgerTestCase {
         for n in ["a.pdf", "b.pdf"] { try Data("x".utf8).write(to: dir.appendingPathComponent(n)) }
         let handle = try DirectoryHandle.open(at: dir)
         let devnull = open("/dev/null", O_RDONLY)
-        try XCTUnwrap(devnull >= 0 ? devnull : nil, "open /dev/null")
+        guard devnull >= 0 else { return XCTFail("open /dev/null") }
         XCTAssertEqual(dup2(devnull, handle.fd), handle.fd, "poison the handle fd -> /dev/null")
         close(devnull)   // handle.fd remains valid (a non-directory); deinit closes it exactly once
         XCTAssertThrowsError(try StagingIngest.classifyAttachments(in: handle, root: dir)) { e in

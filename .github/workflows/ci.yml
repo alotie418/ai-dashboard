@@ -47,6 +47,12 @@ jobs:
       # parity guard, which reads Electron's authoritative SCHEMA_VERSION via `node`
       # (set up above) — so native/Electron schema drift fails the PR here. macos-latest
       # ships Xcode, so `swift test` has XCTest without a DEVELOPER_DIR override.
+      # Warning gate BEFORE the test run: baseline 0 by fingerprint, so a new
+      # warning is a signal and a baselined one that disappears forces its entry
+      # to be removed. It builds from a throwaway scratch path, because an
+      # incremental build does not re-emit warnings for files it did not compile.
+      - name: Native Swift warning gate
+        run: npm run check:swift-warnings
       - name: Native SwiftUI Core tests (swift test)
         run: swift test --package-path native/SoloLedger
 
