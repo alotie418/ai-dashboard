@@ -1,0 +1,23 @@
+{
+  "note": "Baseline of Swift compiler warnings that are ACCEPTED, each with the evidence for accepting it. Enforced by scripts/check-swift-warnings.mjs. Entries match on file + message pattern, deliberately NOT on line number, so ordinary edits above a warning do not invalidate the baseline. Any warning outside this list fails the build; an entry that matches nothing ALSO fails, so a warning that disappears (a toolchain fix, a rewrite) forces the entry to be removed rather than silently lingering.",
+  "verifiedWith": "Apple Swift version 6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101), swift-driver 1.148.6, target arm64-apple-macosx26.0",
+  "entries": [
+    {
+      "id": "migration-coordinator-boundDecode-unreachable-catch",
+      "file": "Sources/SoloLedgerCore/Migration/MigrationCoordinator.swift",
+      "symbol": "MigrationCoordinator.inspectRecord / boundDecode(_:)",
+      "messagePattern": "'catch' block is unreachable because no errors are thrown in 'do' block",
+      "verdict": "compiler false positive — the catch is live and load-bearing",
+      "sourceCommit": "0fa72b0",
+      "uniqueLiteral": "owner record exceeds the size cap",
+      "evidence": [
+        "BoundRegularFile.readAll DOES throw: PreparedImportActivator.swift:140-141 throws FileHashError.unreadable(errno: EFBIG) as soon as the running total would exceed the 64 KiB cap.",
+        "There is exactly one readAll declaration in the whole module (PreparedImportActivator.swift:128) — no shadowing overload, no protocol extension, no conditional compilation around it.",
+        "A minimal reproduction of the same shape (throwing method on a final class, local enum, nested non-throwing function, typed catch) compiles with NO warning, so the construct itself is not what triggers it.",
+        "The identical call shape at PreparedImportActivator.swift:567 (`do { data = try rec.readAll() }`) produces no warning in the same build.",
+        "DYNAMIC PROOF: MigrationCoordinatorTests.testOversizedOwnerRecordIsClassifiedMalformedNotRetriable drives a 64 KiB+1 owner record through inspectRecord and asserts the exact string 'owner record exceeds the size cap', which is produced at exactly one place — inside the catch in question. A catch a passing test walks through is not unreachable."
+      ],
+      "whyNotSilenced": "Deleting the catch to reach a zero-warning build would delete the EFBIG classification that turns an oversized owner record into .malformed instead of a retriable error — real handling in migration-safety code."
+    }
+  ]
+}
