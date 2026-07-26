@@ -182,8 +182,6 @@ committed 的 `native/SoloLedger/Tests/SoloLedgerCoreTests/Fixtures/electron-v23
 
 > **保留不动**:现有 txn-4 的 USD 行。多币种未换算直接相加是真实现状,**必须钉住而不是修掉**。
 
-> **保留不动**:现有 txn-4 的 USD 行。多币种未换算直接相加是真实现状,**必须钉住而不是修掉**。
-
 ### 5.3 生成器落位
 
 `native/SoloLedger/Tests/Fixtures/make-report-goldens.mjs`,沿用 `make-electron-fixture.mjs` 的头注释惯例(写明 `ELECTRON_RUN_AS_NODE` 的原因)。输出到 `Tests/SoloLedgerCoreTests/Fixtures/goldens/<LOCALE>-<YEAR>.json`,并在 `Package.swift:48` 的 `resources:` 数组追加 `.copy("Fixtures/goldens")`。
