@@ -41,6 +41,8 @@
     "check:report-source": "node scripts/test-report-source.mjs",
     "check:cashflow": "node scripts/test-cashflow.mjs",
     "check:swift-warnings": "node scripts/check-swift-warnings.mjs",
+    "check:golden-changes": "node scripts/check-golden-changes.mjs",
+    "test:golden-changes": "node scripts/test-golden-changes.mjs",
     "check:auto-backup": "node scripts/test-auto-backup.mjs",
     "check:backup-bundle": "node scripts/test-backup-bundle.mjs",
     "check:csv-export": "node scripts/test-csv-export.mjs",

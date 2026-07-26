@@ -139,9 +139,18 @@ vatSummary, taxInclusiveSummary, monthlyBreakdown, warnings, cashflowStatement
 
 **由此提炼的通则已写入 CLAUDE.md**:一个检查进入 required 列表的前提是**它的 workflow 已经在 main 上**。
 
-### 3.2 黄金变更清单机制(设计已定,尚未实现)
+#### CI 上的已知不稳定测试
+
+原生测试在 CI 上有一个已知的偶发失败,台账与处置原则记在 **[issue #400](https://github.com/alotie418/ai-dashboard/issues/400)**:
+`HardenedActiveOpenTests.testPostOpenUnlinkCaughtByHasMoved` —— `SQLITE_FCNTL_HAS_MOVED` 偶发返回 `SQLITE_IOERR_VNODE`(rc 6922)。
+
+**复发时必须在该 issue 的台账追加一行**(日期、runner 镜像版本、rc)。现阶段该测试留在必需检查内,只记账不降级;**不留痕的自动重跑一律不允许**。从症状反查:红灯里出现上面那个测试名,就去 #400。
+
+### 3.2 黄金变更清单机制(已实现)
 
 R0 之后、R6/R7 之前必须先落地的一道闸。**在它落地之前,黄金全冻结。**
+
+> **实现**:`scripts/check-golden-changes.mjs`(校验)+ `scripts/test-golden-changes.mjs`(三条语义的守护),接在 `Report goldens reproducible` job 内部,检查名未变、分支保护未动。
 
 #### 声明载体:提交尾注
 

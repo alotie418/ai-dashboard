@@ -96,11 +96,17 @@ jobs:
     # complete as the repo changes is not — so the job always does the full work.
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the allowlist step needs the merge base with the target branch
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts
+      # Semantics of the allowlist, pinned without git or a network — cheap, and it
+      # runs before the expensive steps so a broken rule fails fast.
+      - name: Golden-allowlist semantics
+        run: node scripts/test-golden-changes.mjs
       - name: Install Electron binary
         run: npm rebuild electron
       - name: Rebuild better-sqlite3 for Electron ABI
@@ -113,6 +119,13 @@ jobs:
         run: |
           git diff --exit-code -- native/SoloLedger/Tests/SoloLedgerCoreTests/Fixtures/reports/goldens \
             || { echo '::error::report goldens are not reproducible — see the diff above'; exit 1; }
+      # A mirroring PR must not move the goldens at all; a deliberate correction may
+      # move only the series it declares in a commit trailer. No trailer = nothing
+      # may change, which is exactly today's behaviour for every existing PR.
+      - name: Golden changes must be declared
+        env:
+          GOLDEN_BASE_REF: origin/${{ github.base_ref || github.ref_name }}
+        run: node scripts/check-golden-changes.mjs
 
   # 真 Electron e2e（PR-1 #176 documents fs 分支 + PR-2 #177 attachment IPC）。
   # 仅 workflow_dispatch 手动触发：push/PR 一律不跑、永不作为 merge 门、不入 required checks。
