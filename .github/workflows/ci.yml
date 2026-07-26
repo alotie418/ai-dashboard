@@ -74,22 +74,50 @@ jobs:
   report-goldens:
     name: Report goldens reproducible
     runs-on: macos-latest
+    # NO workflow-level `paths:` filter on purpose. A required check that never
+    # reports sits as "Expected" forever and permanently blocks the merge, so the
+    # job always runs and decides internally whether there is work to do — an
+    # unrelated PR still reports success, just quickly.
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # need the merge base to diff against
+      - name: Does this change touch the report goldens?
+        id: filter
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="origin/${{ github.base_ref }}"
+            git fetch --no-tags --depth=0 origin "${{ github.base_ref }}" >/dev/null 2>&1 || true
+            changed=$(git diff --name-only "$(git merge-base HEAD $base)" HEAD)
+          else
+            changed=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git ls-files)
+          fi
+          if echo "$changed" | grep -qE '^(native/SoloLedger/Tests/(Fixtures|SoloLedgerCoreTests/Fixtures)/|electron/reports/|\.github/workflows/ci\.yml$)'; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+            echo "no report fixture / engine / workflow changes — nothing to verify"
+          fi
       - uses: actions/setup-node@v4
+        if: steps.filter.outputs.relevant == 'true'
         with:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts
+        if: steps.filter.outputs.relevant == 'true'
       - name: Install Electron binary
+        if: steps.filter.outputs.relevant == 'true'
         run: npm rebuild electron
       - name: Rebuild better-sqlite3 for Electron ABI
+        if: steps.filter.outputs.relevant == 'true'
         run: npm run electron:rebuild
       - name: Regenerate report goldens
+        if: steps.filter.outputs.relevant == 'true'
         run: |
           LC_ALL=C LANG=C TZ=UTC ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron \
             native/SoloLedger/Tests/Fixtures/make-report-goldens.mjs
       - name: Goldens must be byte-identical
+        if: steps.filter.outputs.relevant == 'true'
         run: |
           git diff --exit-code -- native/SoloLedger/Tests/SoloLedgerCoreTests/Fixtures/reports/goldens \
             || { echo '::error::report goldens are not reproducible — see the diff above'; exit 1; }
