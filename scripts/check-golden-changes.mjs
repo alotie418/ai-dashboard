@@ -33,17 +33,33 @@ import { fileURLToPath } from 'node:url';
 export const TRAILER = 'Allowed-Golden-Changes';
 export const GOLDENS_DIR = 'native/SoloLedger/Tests/SoloLedgerCoreTests/Fixtures/reports/goldens';
 
-/// Every pattern declared by the trailers in `commitMessages`, unioned. Values may be
-/// comma- or whitespace-separated; an empty declaration contributes nothing.
-export function declaredPatterns(commitMessages) {
+/// Trailer VALUES for our key, extracted by git itself.
+///
+/// Parsing must not be a full-text grep. A commit message that merely writes the
+/// trailer syntax — documentation, a PR description quoted into the body, this very
+/// file's own commit — would otherwise become a live declaration. `git
+/// interpret-trailers` applies the real rule (a trailer lives in the message's final
+/// trailer block), so git is the parser rather than a regex approximating it.
+export function trailerValues(message) {
+  const parsed = execFileSync('git', ['interpret-trailers', '--parse'],
+                              { input: message, encoding: 'utf8' });
+  const out = [];
+  const re = new RegExp(`^${TRAILER}\\s*:\\s*(.+)$`, 'i');
+  for (const line of parsed.split('\n')) {
+    const m = line.match(re);
+    if (m) out.push(m[1]);
+  }
+  return out;
+}
+
+/// Every pattern in the given trailer VALUES, unioned. Values may be comma- or
+/// whitespace-separated; an empty declaration contributes nothing.
+export function declaredPatterns(values) {
   const out = new Set();
-  const re = new RegExp(`^\\s*${TRAILER}\\s*:\\s*(.+)$`, 'gim');
-  for (const message of commitMessages) {
-    for (const m of message.matchAll(re)) {
-      for (const token of m[1].split(/[,\s]+/)) {
-        const t = token.trim();
-        if (t) out.add(t);
-      }
+  for (const value of values) {
+    for (const token of value.split(/[,\s]+/)) {
+      const t = token.trim();
+      if (t) out.add(t);
     }
   }
   return out;
@@ -66,9 +82,10 @@ export function goldenNames(changedPaths) {
     .map((p) => p.slice(GOLDENS_DIR.length + 1, -'.json'.length));
 }
 
-/// The verdict, as pure data so the semantics can be tested without git.
-export function evaluate({ changedPaths, commitMessages }) {
-  const patterns = [...declaredPatterns(commitMessages)];
+/// The verdict, as pure data. Takes already-extracted trailer VALUES so the
+/// union / upper-bound / matching semantics can be tested without git.
+export function evaluate({ changedPaths, trailerValues: values = [] }) {
+  const patterns = [...declaredPatterns(values)];
   const touched = goldenNames(changedPaths);
   const undeclared = touched.filter((n) => !patterns.some((p) => matchesPattern(n, p)));
   return { patterns, touched, undeclared, ok: undeclared.length === 0 };
@@ -85,6 +102,19 @@ if (isMain) {
   // The base to compare against. On a PR, GitHub gives us the target branch; locally,
   // origin/main is the sane default.
   const baseRef = process.env.GOLDEN_BASE_REF || 'origin/main';
+
+  // A push to the base branch itself has nothing to compare against — HEAD IS the
+  // base. Said explicitly rather than left to merge-base returning HEAD, so that a
+  // correction whose declared golden changes have just been merged cannot turn main
+  // red on the very next run.
+  const headSha = git(['rev-parse', 'HEAD']);
+  let baseSha = null;
+  try { baseSha = git(['rev-parse', baseRef]); } catch { /* reported below */ }
+  if (baseSha === headSha) {
+    console.log(`✓ golden changes: none (HEAD is ${baseRef})`);
+    process.exit(0);
+  }
+
   let range;
   try {
     const mergeBase = git(['merge-base', baseRef, 'HEAD']);
@@ -97,10 +127,12 @@ if (isMain) {
 
   const changedPaths = git(['diff', '--name-only', range]).split('\n').filter(Boolean);
   // NUL-separated: commit messages contain blank lines, so nothing else is a safe
-  // record separator.
-  const commitMessages = git(['log', '--format=%B%x00', range])
+  // record separator. Each message is then handed to git's own trailer parser.
+  const messages = git(['log', '--format=%B%x00', range])
     .split(String.fromCharCode(0)).filter((s) => s.trim());
-  const { patterns, touched, undeclared, ok } = evaluate({ changedPaths, commitMessages });
+  const values = messages.flatMap(trailerValues);
+  const { patterns, touched, undeclared, ok } =
+    evaluate({ changedPaths, trailerValues: values });
 
   if (!touched.length) {
     console.log('✓ golden changes: none');
