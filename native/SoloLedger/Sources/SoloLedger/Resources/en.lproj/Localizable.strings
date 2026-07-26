@@ -33,6 +33,11 @@
 
 "txn.empty.title" = "No transactions yet";
 "txn.empty.message" = "Click “New Transaction” or press ⌘N to record your first income or expense.";
+"legacy.notice.title" = "Legacy sales / purchase records in this ledger: {count}";
+"legacy.notice.message" = "They are stored intact in the ledger file — nothing was lost. This app currently shows only transactions and does not convert legacy records yet, so they are not listed here.";
+"legacy.banner" = "Legacy sales / purchase records not shown here: {count}";
+"legacy.other.title" = "This ledger holds records this app does not show yet";
+"legacy.other.message" = "The file contains records such as invoices, products and fixed assets. They are stored intact — nothing was lost. This app currently shows only transactions.";
 "txn.col.date" = "Date";
 "txn.col.type" = "Type";
 "txn.col.category" = "Category";

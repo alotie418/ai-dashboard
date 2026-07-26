@@ -25,6 +25,52 @@ struct StatView: View {
     }
 }
 
+/// Says plainly that the ledger holds legacy sales/purchase records this app cannot
+/// display. Shown INSTEAD of a plain "no records" empty state, which would otherwise
+/// tell a migrated user their data is gone when it is sitting in the file untouched.
+struct LegacyLedgerNotice: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "archivebox")
+                .font(.system(size: 34))
+                .foregroundStyle(.secondary)
+            Text(model.legacyLedger.hasUnconverted
+                 ? model.t("legacy.notice.title", ["count": "\(model.legacyLedger.unconverted)"])
+                 : model.t("legacy.other.title"))
+                .font(.headline)
+                .multilineTextAlignment(.center)
+            Text(model.legacyLedger.hasUnconverted
+                 ? model.t("legacy.notice.message")
+                 : model.t("legacy.other.message"))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: 420)
+        .padding(40)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// One-line counterpart of `LegacyLedgerNotice` for a ledger that DOES have
+/// transactions to show: the list is real but incomplete, and saying so beats letting
+/// the user conclude records went missing.
+struct LegacyLedgerBanner: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        if model.legacyLedger.hasUnconverted && !model.isLedgerEmpty {
+            Label(model.t("legacy.banner", ["count": "\(model.legacyLedger.unconverted)"]),
+                  systemImage: "archivebox")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
 /// A plain empty-state (ContentUnavailableView is macOS 14+, so this is a
 /// deployment-target-13 stand-in).
 struct EmptyStateView: View {
