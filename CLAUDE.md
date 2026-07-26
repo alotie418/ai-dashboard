@@ -273,6 +273,17 @@ ahead", or "looks good" is NOT authorization — ask again with the three facts
 above. If the head SHA changed after authorization was given (a new push, a
 rebase, a force-push), the authorization is void; request it again.
 
+Re-confirm before merging — even when the head SHA has not moved — if either of
+these happened after the authorization was given:
+
+* a required check went red, or
+* anything material came to light about the change.
+
+A green re-run does not restore the original picture. What was authorized was a
+merge of a PR believed to be clean; a failure in between means the authorizer was
+deciding on facts that no longer hold, and they get to weigh the new ones. State
+what changed when asking again.
+
 When finishing a task, report:
 
 * Branch name
