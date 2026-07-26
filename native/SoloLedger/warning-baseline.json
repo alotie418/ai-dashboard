@@ -9,6 +9,7 @@
       "messagePattern": "'catch' block is unreachable because no errors are thrown in 'do' block",
       "verdict": "compiler false positive — the catch is live and load-bearing",
       "sourceCommit": "0fa72b0",
+      "uniqueLiteral": "owner record exceeds the size cap",
       "evidence": [
         "BoundRegularFile.readAll DOES throw: PreparedImportActivator.swift:140-141 throws FileHashError.unreadable(errno: EFBIG) as soon as the running total would exceed the 64 KiB cap.",
         "There is exactly one readAll declaration in the whole module (PreparedImportActivator.swift:128) — no shadowing overload, no protocol extension, no conditional compilation around it.",

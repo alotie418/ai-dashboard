@@ -52,9 +52,13 @@ jobs:
       # to be removed. It builds from a throwaway scratch path, because an
       # incremental build does not re-emit warnings for files it did not compile.
       - name: Native Swift warning gate
+        env:
+          SWIFT_WARNING_SCRATCH_PATH: .swift-gate-build
         run: npm run check:swift-warnings
+      # Reuses the gate's build directory, so the full compile above is paid for
+      # once rather than twice.
       - name: Native SwiftUI Core tests (swift test)
-        run: swift test --package-path native/SoloLedger
+        run: swift test --package-path native/SoloLedger --scratch-path .swift-gate-build
 
   e2e:
     name: Locale-matrix e2e (Playwright)

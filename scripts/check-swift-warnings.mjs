@@ -46,20 +46,26 @@ function build(scratch) {
   return out;
 }
 
-// ALWAYS build from a throwaway scratch path. An incremental build only
-// recompiles what changed, so warnings from untouched files are simply not
-// re-emitted — which this gate would read as "the warning is gone" and, thanks to
-// the stale-entry check, report as a spurious failure. (That is exactly how this
-// line got written: the first version reused the existing build directory and
-// declared a live baseline entry stale.) A full build is the only reading that
-// does not depend on what happened to be compiled last.
-const scratch = join(tmpdir(), `swift-warning-gate-${process.pid}`);
+// ALWAYS build from a FRESH scratch path. An incremental build only recompiles
+// what changed, so warnings from untouched files are simply not re-emitted —
+// which this gate would read as "the warning is gone" and, thanks to the
+// stale-entry check, report as a spurious failure. (That is exactly how this line
+// got written: the first version reused the existing build directory and declared
+// a live baseline entry stale.) A full build is the only reading that does not
+// depend on what happened to be compiled last.
+//
+// SWIFT_WARNING_SCRATCH_PATH lets a caller name that path and KEEP it, so the
+// test run right after can point `swift test --scratch-path` at the same
+// directory and reuse this compile instead of paying for a second full one. The
+// directory is still wiped BEFORE building, so the reading stays a full one.
+const reusable = process.env.SWIFT_WARNING_SCRATCH_PATH;
+const scratch = reusable || join(tmpdir(), `swift-warning-gate-${process.pid}`);
 rmSync(scratch, { recursive: true, force: true });
 let output;
 try {
   output = build(scratch);
 } finally {
-  rmSync(scratch, { recursive: true, force: true });
+  if (!reusable) rmSync(scratch, { recursive: true, force: true });
 }
 
 // /abs/path/File.swift:914:13: warning: message text [#category]
@@ -77,6 +83,22 @@ const matches = (w, e) => w.file === e.file && w.message.includes(e.messagePatte
 const unexpected = found.filter((w) => !entries.some((e) => matches(w, e)));
 const stale = entries.filter((e) => !found.some((w) => matches(w, e)));
 
+// An entry may prove itself with a test that asserts an exact string literal. That
+// proof only holds while the literal is produced at ONE place — a second producer
+// would let the test pass without the code path under scrutiny ever running. So a
+// declared `uniqueLiteral` is counted across the package sources and must be 1.
+const literalProblems = [];
+for (const e of entries) {
+  if (!e.uniqueLiteral) continue;
+  const r = spawnSync('grep', ['-rc', '--include=*.swift', '-F', e.uniqueLiteral, join(PKG, 'Sources')],
+                      { encoding: 'utf8' });
+  const count = (r.stdout ?? '').split('\n').filter(Boolean)
+    .reduce((n, line) => n + Number(line.split(':').pop() || 0), 0);
+  if (count !== 1) {
+    literalProblems.push({ id: e.id, literal: e.uniqueLiteral, count });
+  }
+}
+
 let failed = false;
 if (unexpected.length) {
   failed = true;
@@ -90,6 +112,15 @@ if (stale.length) {
   console.error(`\n✗ ${stale.length} baseline entr(y|ies) matched nothing and must be removed:`);
   for (const e of stale) console.error(`    ${e.id} (${e.file}: ${e.messagePattern})`);
   console.error('  The warning is gone — delete the entry so the baseline stays honest.');
+}
+if (literalProblems.length) {
+  failed = true;
+  console.error(`\n✗ ${literalProblems.length} baseline entr(y|ies) rely on a literal that is no longer unique:`);
+  for (const p of literalProblems) {
+    console.error(`    ${p.id}: "${p.literal}" occurs ${p.count}× in Sources (must be exactly 1)`);
+  }
+  console.error('  The test that proves this entry asserts that exact string; a second');
+  console.error('  producer would let it pass without exercising the path in question.');
 }
 if (failed) process.exit(1);
 
