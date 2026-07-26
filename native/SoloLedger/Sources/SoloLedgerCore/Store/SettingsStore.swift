@@ -17,6 +17,11 @@ public struct SettingsStore {
         public static let onboardingDone = "onboarding_done"
         public static let companyName = "company_name"
         public static let currency = "currency"
+        // Report calculation parameters, shared with the Electron report engines.
+        public static let vatRate = "vat_rate"
+        public static let surchargeRate = "surcharge_rate"
+        public static let incomeTaxRate = "income_tax_rate"
+        public static let adminExpenseAnnual = "admin_expense_annual"
     }
 
     // MARK: - Raw JSON get/set
@@ -52,12 +57,67 @@ public struct SettingsStore {
         try writeRaw(key, value ? "true" : "false")
     }
 
+    /// A numeric setting. Electron persists these inconsistently — its accounting
+    /// section and onboarding wizard write JSON numbers (`13`) while its tax settings
+    /// screen writes a JSON string (`"13"`) — so BOTH encodings are accepted here.
+    /// Returns nil when the row is absent or the value is not a number.
+    public func number(_ key: String) throws -> Double? {
+        guard let raw = try rawValue(key) else { return nil }
+        return JSONFragment.decodeNumber(raw)
+    }
+
+    /// Writes a JSON number, matching `JSON.stringify` (13 → `13`, 23.2 → `23.2`) —
+    /// the encoding the report engines' `JSON.parse` + `Number()` path expects.
+    public func setNumber(_ value: Double, for key: String) throws {
+        guard value.isFinite else { throw SettingsStoreError.nonFiniteNumber(key: key) }
+        try writeRaw(key, JSONFragment.encodeNumber(value))
+    }
+
+    /// Delete a setting. An absent row is a real, supported state: the report engines
+    /// fall back to their own defaults for a key that is not there, so "unset" must be
+    /// reachable rather than being approximated with a 0 the user never chose.
+    public func remove(_ key: String) throws {
+        try db.run("DELETE FROM settings WHERE key = ?", [.text(key)])
+    }
+
     // MARK: - Convenience
 
     public func accountingLocale() throws -> AccountingLocale {
         guard let raw = try string(Key.accountingLocale), let loc = AccountingLocale(rawValue: raw) else { return .CN }
         return loc
     }
+
+    /// Commit an accounting-regime switch: the regime itself plus that regime's preset
+    /// rates and currency, in ONE transaction. Mirrors `applyProfile` in
+    /// components/AccountingSection.tsx, which saves the same five keys in a single
+    /// request — a half-applied switch would leave the ledger claiming one regime while
+    /// holding another's rates, and the report engines read the two independently.
+    public func applyRegimeSwitch(_ profile: AccountingProfile) throws {
+        try db.transaction {
+            try setString(profile.locale.rawValue, for: Key.accountingLocale)
+            try setNumber(profile.vatRate, for: Key.vatRate)
+            try setNumber(profile.surchargeRate, for: Key.surchargeRate)
+            try setNumber(profile.incomeTaxRate, for: Key.incomeTaxRate)
+            try setString(profile.currency, for: Key.currency)
+        }
+    }
+
+    /// The four report calculation parameters exactly as stored (absent stays absent —
+    /// an absent row is what the report engines' own fallbacks are for).
+    public func reportParameters() throws -> ReportParametersStored {
+        ReportParametersStored(
+            vatRate: try number(Key.vatRate),
+            surchargeRate: try number(Key.surchargeRate),
+            incomeTaxRate: try number(Key.incomeTaxRate),
+            adminExpenseAnnual: try number(Key.adminExpenseAnnual)
+        )
+    }
+}
+
+public enum SettingsStoreError: Error, Equatable {
+    /// A NaN/infinite value was never written — it would poison the report engines,
+    /// whose `Number()` coercion has no finiteness guard.
+    case nonFiniteNumber(key: String)
 }
 
 /// Minimal JSON-fragment (top-level scalar) encode/decode, matching JSON.stringify.
@@ -77,6 +137,31 @@ enum JSONFragment {
            let obj = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) {
             if let s = obj as? String { return s }
             return nil
+        }
+        return nil
+    }
+
+    /// `JSON.stringify` for a finite Double: integral values lose the `.0` Swift adds
+    /// (13.0 → "13"), everything else uses Swift's shortest round-trip form, which
+    /// agrees with JS for the values a settings field can produce (23.2 → "23.2").
+    static func encodeNumber(_ value: Double) -> String {
+        if value == value.rounded(), abs(value) < 1e15 { return String(Int64(value)) }
+        return String(value)
+    }
+
+    /// Accepts a JSON number (`13`) or a JSON string holding one (`"13"`); rejects
+    /// booleans, which `JSONSerialization` would otherwise hand back as 1/0.
+    static func decodeNumber(_ json: String) -> Double? {
+        let trimmed = json.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed == "true" || trimmed == "false" { return nil }
+        guard let data = trimmed.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else { return nil }
+        if let n = obj as? NSNumber, CFGetTypeID(n) != CFBooleanGetTypeID() {
+            return n.doubleValue.isFinite ? n.doubleValue : nil
+        }
+        if let s = obj as? String {
+            guard let d = Double(s.trimmingCharacters(in: .whitespaces)), d.isFinite else { return nil }
+            return d
         }
         return nil
     }

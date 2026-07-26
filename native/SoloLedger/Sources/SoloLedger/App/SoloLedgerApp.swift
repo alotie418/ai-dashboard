@@ -41,7 +41,7 @@ struct SoloLedgerApp: App {
                 .environmentObject(model)
                 .preferredColorScheme(model.appearance.colorScheme)
                 .environment(\.locale, Locale(identifier: model.language))
-                .frame(width: 480, height: 420)
+                .frame(width: 480, height: 560)
         }
     }
 }

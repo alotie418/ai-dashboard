@@ -79,6 +79,12 @@ final class AppModel: ObservableObject {
     @Published var appearance: Appearance = .system
     @Published var accountingLocale: AccountingLocale = .CN
     @Published var companyName: String = ""
+    /// Report calculation parameters (rates in whole percent + the annual admin
+    /// expense) EXACTLY as stored — an absent value stays absent rather than being
+    /// resolved to a preset, so the Settings tab can never show a rate the report
+    /// engines would not use. Nothing in this app consumes them yet; they are stored
+    /// in the ledger for the report features that read them.
+    @Published private(set) var reportParameters = ReportParametersStored()
 
     // Lifecycle / errors
     @Published var onboardingDone = false
@@ -286,6 +292,7 @@ final class AppModel: ObservableObject {
         }
         let done = (try? candidate.settings.bool(SettingsStore.Key.onboardingDone)) ?? false
         let co = (try? candidate.settings.string(SettingsStore.Key.companyName)) ?? ""
+        let params = (try? candidate.settings.reportParameters()) ?? ReportParametersStored()
         // Required reads passed; optional reads above are best-effort defaults. Publish now —
         // `reloadAll` below may set `actionError` but never un-publishes the store.
         store = candidate
@@ -294,6 +301,7 @@ final class AppModel: ObservableObject {
         accountingLocale = loc
         onboardingDone = done
         companyName = co
+        reportParameters = params
         reloadAll()
         migrationFailure = nil
         ready = true
@@ -373,6 +381,7 @@ final class AppModel: ObservableObject {
         accountingLocale = try store.settings.accountingLocale()
         companyName = (try? store.settings.string(SettingsStore.Key.companyName)) ?? ""
         onboardingDone = (try? store.settings.bool(SettingsStore.Key.onboardingDone)) ?? false
+        reportParameters = (try? store.settings.reportParameters()) ?? ReportParametersStored()
         reloadAll()
         migrationFailure = nil
         ready = true
@@ -486,6 +495,14 @@ final class AppModel: ObservableObject {
         categories.filter { $0.type == type }
     }
 
+    /// The seeded categories of ANY regime, for read-only browsing. Looking at another
+    /// regime's set must not switch the ledger's regime, so this never touches settings
+    /// and never disturbs the published `categories` the editor uses.
+    func categories(browsing locale: AccountingLocale) -> [Category] {
+        guard locale != accountingLocale else { return categories }
+        return (try? store?.categories(locale: locale)) ?? []
+    }
+
     // MARK: - Demo data (DEBUG / .dev only — never touches production data)
 
     var isLedgerEmpty: Bool { transactions.isEmpty && currencySummaries.isEmpty }
@@ -592,10 +609,65 @@ final class AppModel: ObservableObject {
         try? store?.settings.setString(appearance.rawValue, for: SettingsStore.Key.appearance)
     }
 
-    func setAccountingLocale(_ locale: AccountingLocale) {
+    /// Switch the accounting regime.
+    ///
+    /// `applyPresets` opts a call site into the regime rate cascade, which only the
+    /// Settings/onboarding regime pickers do — and even then only when the regime
+    /// ACTUALLY changes. Both guards matter: onboarding re-commits the unchanged
+    /// regime on every first launch (including every ledger migrated from Electron,
+    /// which carries no `onboarding_done`), and a cascade there would silently
+    /// overwrite rates the user configured in the other app.
+    func setAccountingLocale(_ locale: AccountingLocale, applyPresets: Bool = true) {
+        let cascade = AccountingProfile.shouldApplyPresets(from: accountingLocale, to: locale,
+                                                           requested: applyPresets)
         accountingLocale = locale
-        try? store?.settings.setString(locale.rawValue, for: SettingsStore.Key.accountingLocale)
+        do {
+            if cascade {
+                // Regime + its preset rates + its currency, atomically: a half-applied
+                // switch would leave the ledger claiming one regime while holding
+                // another's rates, and the report engines read the two independently.
+                try store?.settings.applyRegimeSwitch(AccountingProfile.profile(for: locale))
+            } else {
+                try store?.settings.setString(locale.rawValue, for: SettingsStore.Key.accountingLocale)
+            }
+        } catch {
+            actionError = "\(error)"
+        }
+        reloadReportParameters()
         reloadAll()
+    }
+
+    /// Persist one report calculation parameter exactly as typed — no derivation from
+    /// another parameter, no rounding, no range policy. Passing nil clears the setting,
+    /// which is a real state (the report features fall back to their own default), and
+    /// a non-finite value is refused rather than written, because the report engines
+    /// coerce with a bare `Number()`.
+    func setReportParameter(_ field: ReportParameterField, to value: Double?) {
+        do {
+            guard let settings = store?.settings else { return }
+            if let value {
+                guard value.isFinite else { return }
+                try settings.setNumber(value, for: field.settingsKey)
+            } else {
+                try settings.remove(field.settingsKey)
+            }
+        } catch {
+            actionError = "\(error)"
+        }
+        reloadReportParameters()
+    }
+
+    /// Re-publish the parameters straight from the ledger, so what the Settings tab
+    /// shows is exactly what the report engines would read — never a resolved,
+    /// clamped, or optimistic value. With no ledger open the last known values stay
+    /// put: blanking them would read as "unset", which is a different claim.
+    private func reloadReportParameters() {
+        guard let settings = store?.settings else { return }
+        do {
+            reportParameters = try settings.reportParameters()
+        } catch {
+            actionError = "\(error)"
+        }
     }
 
     func setCompanyName(_ name: String) {

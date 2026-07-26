@@ -64,8 +64,46 @@ private struct AccountingSettingsTab: View {
             Text(model.t("settings.accountingNote"))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+
+            Section(model.t("settings.reportParams")) {
+                // The turnover-tax label travels with the regime (VAT / Sales Tax /
+                // 消費税 / 營業稅) — a fixed string here would mislabel four of six.
+                parameterField(.vatRate, label: profile.taxName(language: model.language))
+                parameterField(.surchargeRate,
+                               label: profile.surchargeName(language: model.language)
+                                   ?? model.t("settings.surchargeRate"))
+                parameterField(.incomeTaxRate, label: model.t("settings.incomeTaxRate"))
+                parameterField(.adminExpenseAnnual, label: model.t("settings.adminExpenseAnnual"))
+
+                Text(model.t("settings.reportParamsPending"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Text(model.t("settings.reportParamsNote"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
+    }
+
+    private var profile: AccountingProfile {
+        AccountingProfile.profile(for: model.accountingLocale)
+    }
+
+    /// One parameter row. The unit is appended to the label so the number stays a
+    /// bare number: "%" for the rates, the regime currency for the annual expense.
+    ///
+    /// The binding is optional on purpose: an empty field means the ledger has no
+    /// value for that key, which is a real state (the report features apply their own
+    /// built-in fallback). Clearing a field leaves the stored value alone rather than
+    /// writing a 0 the user never chose.
+    private func parameterField(_ field: ReportParameterField, label: String) -> some View {
+        let unit = field.isPercentage ? "%" : model.accountingLocale.defaultCurrency
+        return TextField("\(label) (\(unit))", value: Binding(
+            get: { model.reportParameters[field] },
+            set: { model.setReportParameter(field, to: $0) }
+        ), format: .number.precision(.fractionLength(0...6)))
+        .multilineTextAlignment(.trailing)
     }
 }
 

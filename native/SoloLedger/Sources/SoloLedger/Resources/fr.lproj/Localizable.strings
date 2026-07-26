@@ -223,6 +223,12 @@
 "settings.accountingLocale" = "Régime comptable";
 "settings.currency" = "Devise par défaut";
 "settings.accountingNote" = "Le régime comptable détermine les catégories de recettes/dépenses disponibles et la devise par défaut. Il est indépendant de la langue de l'interface et sert à l'analyse de gestion — ce n'est pas une configuration de déclaration légale.";
+"settings.reportParams" = "Paramètres de calcul des rapports";
+"settings.surchargeRate" = "Taux additionnel";
+"settings.incomeTaxRate" = "Taux d'impôt sur les bénéfices";
+"settings.adminExpenseAnnual" = "Frais administratifs annuels";
+"settings.reportParamsPending" = "Cette app ne propose pas encore de rapports financiers. Ces paramètres sont enregistrés dans la comptabilité pour les calculs de rapports ; laissez un champ vide pour ne rien enregistrer, les fonctions de rapport appliquent alors leur propre valeur par défaut.";
+"settings.reportParamsNote" = "Changer le « Régime comptable » réinitialise les trois taux aux valeurs préréglées de ce régime (les frais administratifs annuels ne changent pas) ; les enregistrements existants ne sont jamais recalculés. Les taux préréglés sont des valeurs de référence et peuvent évoluer — vérifiez les taux officiels en vigueur.";
 "settings.appearance.system" = "Système";
 "settings.appearance.light" = "Clair";
 "settings.appearance.dark" = "Sombre";
