@@ -1,0 +1,164 @@
+{
+  "locale": "US",
+  "period": {
+    "from": "2024-01-01",
+    "to": "2024-12-31",
+    "year": "2024"
+  },
+  "currency": "CNY",
+  "reportTypes": [
+    {
+      "id": "schedule-c",
+      "name": {
+        "zh-CN": "Schedule C（个体经营损益）",
+        "en": "Schedule C (Profit or Loss)"
+      }
+    },
+    {
+      "id": "se-tax",
+      "name": {
+        "zh-CN": "Self-Employment Tax 估算",
+        "en": "Self-Employment Tax Estimate"
+      }
+    }
+  ],
+  "scheduleC": {
+    "line1_grossReceipts": 13334,
+    "line2_returns": 0,
+    "line6_otherIncome": 0,
+    "line7_grossIncome": 13334,
+    "line8_advertising": 0,
+    "line9_car": 0,
+    "line10_commissions": 0,
+    "line11_contract": 0,
+    "line13_depreciation": 0,
+    "line15_insurance": 0,
+    "line16b_interest": 0,
+    "line17_legal": 0,
+    "line18_office": 0,
+    "line20_rent": 0,
+    "line21_repairs": 0,
+    "line22_supplies": 0,
+    "line23_taxes": 0,
+    "line24a_travel": 0,
+    "line24b_meals": 0,
+    "line25_utilities": 0,
+    "line26_wages": 0,
+    "line27a_other": 8814,
+    "line30_homeOffice": 0,
+    "line28_totalExpenses": 8814,
+    "line31_netProfit": 4520
+  },
+  "selfEmploymentTax": {
+    "netEarnings": 4520,
+    "seEarnings": 4174.22,
+    "socialSecurityTax": 517.6,
+    "medicareTax": 121.05,
+    "additionalMedicare": 0,
+    "totalSETax": 638.66,
+    "paramYear": 2024
+  },
+  "estimatedTax": {
+    "annualIncomeTax": 904,
+    "annualSETax": 638.66,
+    "totalAnnual": 1542.6599999999999,
+    "quarterlyPayment": 385.67,
+    "dueDates": [
+      "2024-04-15",
+      "2024-06-15",
+      "2024-09-15",
+      "2025-01-15"
+    ]
+  },
+  "monthlyBreakdown": [
+    {
+      "month": 1,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 2,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 3,
+      "revenue": 9040,
+      "cost": 6780,
+      "profit": 2260
+    },
+    {
+      "month": 4,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 5,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 6,
+      "revenue": 4294,
+      "cost": 0,
+      "profit": 4294
+    },
+    {
+      "month": 7,
+      "revenue": 0,
+      "cost": 2034,
+      "profit": -2034
+    },
+    {
+      "month": 8,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 9,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 10,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 11,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 12,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    }
+  ],
+  "warnings": [
+    "Estimated quarterly tax payment: $385.67"
+  ],
+  "cashflowStatement": {
+    "basis": "cash",
+    "statutory": false,
+    "source": "legacy",
+    "operating": {
+      "inflow": 9040,
+      "outflow": 7780,
+      "net": 1260
+    },
+    "investing": null,
+    "financing": null,
+    "beginningCash": null,
+    "endingCash": null
+  }
+}

@@ -1,0 +1,165 @@
+{
+  "locale": "US",
+  "period": {
+    "from": "2026-01-01",
+    "to": "2026-12-31",
+    "year": "2026"
+  },
+  "currency": "CNY",
+  "reportTypes": [
+    {
+      "id": "schedule-c",
+      "name": {
+        "zh-CN": "Schedule C（个体经营损益）",
+        "en": "Schedule C (Profit or Loss)"
+      }
+    },
+    {
+      "id": "se-tax",
+      "name": {
+        "zh-CN": "Self-Employment Tax 估算",
+        "en": "Self-Employment Tax Estimate"
+      }
+    }
+  ],
+  "scheduleC": {
+    "line1_grossReceipts": 52400,
+    "line2_returns": 1500,
+    "line6_otherIncome": 900,
+    "line7_grossIncome": 51800,
+    "line8_advertising": 3200,
+    "line9_car": 0,
+    "line10_commissions": 0,
+    "line11_contract": 0,
+    "line13_depreciation": 0,
+    "line15_insurance": 0,
+    "line16b_interest": 0,
+    "line17_legal": 0,
+    "line18_office": 0,
+    "line20_rent": 0,
+    "line21_repairs": 0,
+    "line22_supplies": 0,
+    "line23_taxes": 0,
+    "line24a_travel": 0,
+    "line24b_meals": 500,
+    "line25_utilities": 0,
+    "line26_wages": 0,
+    "line27a_other": 2850,
+    "line30_homeOffice": 2500,
+    "line28_totalExpenses": 9050,
+    "line31_netProfit": 42750
+  },
+  "selfEmploymentTax": {
+    "netEarnings": 42750,
+    "seEarnings": 39479.63,
+    "socialSecurityTax": 4895.47,
+    "medicareTax": 1144.91,
+    "additionalMedicare": 0,
+    "totalSETax": 6040.38,
+    "paramYear": 2026
+  },
+  "estimatedTax": {
+    "annualIncomeTax": 8550,
+    "annualSETax": 6040.38,
+    "totalAnnual": 14590.380000000001,
+    "quarterlyPayment": 3647.6,
+    "dueDates": [
+      "2026-04-15",
+      "2026-06-15",
+      "2026-09-15",
+      "2027-01-15"
+    ]
+  },
+  "monthlyBreakdown": [
+    {
+      "month": 1,
+      "revenue": 51500,
+      "cost": 0,
+      "profit": 51500
+    },
+    {
+      "month": 2,
+      "revenue": 900,
+      "cost": 3200,
+      "profit": -2300
+    },
+    {
+      "month": 3,
+      "revenue": 0,
+      "cost": 3500,
+      "profit": -3500
+    },
+    {
+      "month": 4,
+      "revenue": 0,
+      "cost": 2440,
+      "profit": -2440
+    },
+    {
+      "month": 5,
+      "revenue": 0,
+      "cost": 410,
+      "profit": -410
+    },
+    {
+      "month": 6,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 7,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 8,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 9,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 10,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 11,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 12,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    }
+  ],
+  "warnings": [
+    "Estimated quarterly tax payment: $3,647.6",
+    "Meals expense is automatically limited to 50% deductible (Line 24b)"
+  ],
+  "cashflowStatement": {
+    "basis": "cash",
+    "statutory": false,
+    "source": "transactions",
+    "operating": {
+      "inflow": 52400,
+      "outflow": 9140,
+      "net": 43260
+    },
+    "investing": null,
+    "financing": null,
+    "beginningCash": null,
+    "endingCash": null
+  }
+}

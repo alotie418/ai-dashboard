@@ -45,7 +45,12 @@ let package = Package(
         .testTarget(
             name: "SoloLedgerCoreTests",
             dependencies: ["SoloLedgerCore"],
-            resources: [.copy("Fixtures/electron-v23.db")]
+            resources: [
+                .copy("Fixtures/electron-v23.db"),
+                // Report-parity fixture + golden engine outputs, built by
+                // Tests/Fixtures/make-report-fixture.mjs and make-report-goldens.mjs.
+                .copy("Fixtures/reports"),
+            ]
         ),
     ]
 )
