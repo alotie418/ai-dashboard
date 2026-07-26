@@ -212,6 +212,28 @@ Recommended workflow:
 8. Create a PR.
 9. Do not merge unless explicitly instructed.
 
+## Merge authorization
+
+`main` is protected with required status checks and `enforce_admins` on, but
+review approval is deliberately NOT required — otherwise a merge executed by the
+agent would deadlock waiting for an approval on its own PR. This section is the
+compensating control for that gap. It is a hard rule, not a preference.
+
+**Every merge requires an explicit authorization phrase given in the current
+session.** Authorization never carries over from an earlier session, from a
+previous PR, or from general approval of a plan.
+
+When requesting authorization, state:
+
+* the PR number,
+* its base branch,
+* its head SHA.
+
+**The authorizing phrase must name the PR number.** A bare "merge it", "go
+ahead", or "looks good" is NOT authorization — ask again with the three facts
+above. If the head SHA changed after authorization was given (a new push, a
+rebase, a force-push), the authorization is void; request it again.
+
 When finishing a task, report:
 
 * Branch name
