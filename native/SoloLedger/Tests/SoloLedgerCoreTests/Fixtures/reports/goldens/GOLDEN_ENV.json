@@ -1,0 +1,84 @@
+{
+  "note": "Regenerating with a different runtime may change the goldens. CI re-runs the generator and byte-diffs the output; a non-empty diff is a failure.",
+  "generator": "native/SoloLedger/Tests/Fixtures/make-report-goldens.mjs",
+  "fixture": "native/SoloLedger/Tests/SoloLedgerCoreTests/Fixtures/reports/reports-base.db",
+  "electron": "42.6.0",
+  "node": "24.18.0",
+  "icu": "78.2",
+  "resolvedIntlLocale": "en-US",
+  "env": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC"
+  },
+  "rateKeys": [
+    "vat_rate",
+    "surcharge_rate",
+    "income_tax_rate",
+    "admin_expense_annual"
+  ],
+  "variants": {
+    "base": "the fixture as committed — every rate row present",
+    "unset": "DELETE FROM settings WHERE key IN (vat_rate, surcharge_rate, income_tax_rate, admin_expense_annual)",
+    "zero": "every rate key set to the JSON number 0",
+    "malformed": "surcharge_rate and income_tax_rate set to the JSON strings '12%' / '25%'"
+  },
+  "locales": [
+    "CN",
+    "US",
+    "JP",
+    "EU",
+    "KR",
+    "TW"
+  ],
+  "periods": [
+    {
+      "id": "2024",
+      "year": "2024",
+      "from": "2024-01-01",
+      "to": "2024-12-31"
+    },
+    {
+      "id": "2025",
+      "year": "2025",
+      "from": "2025-01-01",
+      "to": "2025-12-31"
+    },
+    {
+      "id": "2026",
+      "year": "2026",
+      "from": "2026-01-01",
+      "to": "2026-12-31"
+    },
+    {
+      "id": "2025Q2",
+      "year": "2025",
+      "from": "2025-04-01",
+      "to": "2025-06-30"
+    },
+    {
+      "id": "2025-06",
+      "year": "2025",
+      "from": "2025-06-01",
+      "to": "2025-06-30"
+    }
+  ],
+  "variantPeriods": {
+    "base": [
+      "2024",
+      "2025",
+      "2026",
+      "2025Q2",
+      "2025-06"
+    ],
+    "unset": [
+      "2025"
+    ],
+    "zero": [
+      "2025"
+    ],
+    "malformed": [
+      "2025"
+    ]
+  }
+}

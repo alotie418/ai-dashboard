@@ -1,0 +1,139 @@
+{
+  "locale": "EU",
+  "period": {
+    "from": "2024-01-01",
+    "to": "2024-12-31",
+    "year": "2024"
+  },
+  "currency": "CNY",
+  "reportTypes": [
+    {
+      "id": "profit-loss",
+      "name": {
+        "zh-CN": "损益表",
+        "en": "Profit & Loss",
+        "fr": "Compte de résultat"
+      }
+    },
+    {
+      "id": "vat-return",
+      "name": {
+        "zh-CN": "VAT 申报概要",
+        "en": "VAT Return Summary",
+        "fr": "Déclaration TVA"
+      }
+    }
+  ],
+  "profitLoss": {
+    "revenue": 11800,
+    "costOfSales": 0,
+    "costOfGoodsSold": 0,
+    "operatingExpenses": 7800,
+    "grossProfit": 11800,
+    "grossMargin": 100,
+    "adminExpense": 12000,
+    "operatingProfit": -8000,
+    "incomeTax": 0,
+    "netProfit": -8000,
+    "netMargin": -67.8
+  },
+  "vatReturn": {
+    "outputVAT": 1534,
+    "inputVAT": 1014,
+    "vatPayable": 520
+  },
+  "taxInclusiveSummary": {
+    "purchaseTotal": 8814,
+    "salesTotal": 13334,
+    "difference": 4520
+  },
+  "monthlyBreakdown": [
+    {
+      "month": 1,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 2,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 3,
+      "revenue": 8000,
+      "cost": 6000,
+      "profit": 2000
+    },
+    {
+      "month": 4,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 5,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 6,
+      "revenue": 3800,
+      "cost": 0,
+      "profit": 3800
+    },
+    {
+      "month": 7,
+      "revenue": 0,
+      "cost": 1800,
+      "profit": -1800
+    },
+    {
+      "month": 8,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 9,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 10,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 11,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 12,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    }
+  ],
+  "warnings": [],
+  "cashflowStatement": {
+    "basis": "cash",
+    "statutory": false,
+    "source": "legacy",
+    "operating": {
+      "inflow": 9040,
+      "outflow": 7780,
+      "net": 1260
+    },
+    "investing": null,
+    "financing": null,
+    "beginningCash": null,
+    "endingCash": null
+  }
+}

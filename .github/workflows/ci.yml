@@ -65,6 +65,35 @@ jobs:
       - name: Build + e2e
         run: npm run test:locale-ui
 
+  # 报表黄金可复现性。原生报表镜像逐字段对照这些黄金，所以黄金本身必须可复现：
+  # 用 package.json 锁定的同一 Electron 二进制重跑生成器，产物必须与提交的字节一致。
+  #   - 必须走 ELECTRON ABI（与 checks job 的 node ABI 互斥，故独立 job）。
+  #     electron/reports/us.js 用 toLocaleString() 产出可见字符串（如 "$3,647.6"），
+  #     换个运行时的 ICU 就可能改数字，所以运行时家族必须与本地生成时一致。
+  #   - 非空 diff 意味着:要么引擎变了（镜像 PR 不允许），要么环境没锁住。
+  report-goldens:
+    name: Report goldens reproducible
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Install Electron binary
+        run: npm rebuild electron
+      - name: Rebuild better-sqlite3 for Electron ABI
+        run: npm run electron:rebuild
+      - name: Regenerate report goldens
+        run: |
+          LC_ALL=C LANG=C TZ=UTC ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron \
+            native/SoloLedger/Tests/Fixtures/make-report-goldens.mjs
+      - name: Goldens must be byte-identical
+        run: |
+          git diff --exit-code -- native/SoloLedger/Tests/SoloLedgerCoreTests/Fixtures/reports/goldens \
+            || { echo '::error::report goldens are not reproducible — see the diff above'; exit 1; }
+
   # 真 Electron e2e（PR-1 #176 documents fs 分支 + PR-2 #177 attachment IPC）。
   # 仅 workflow_dispatch 手动触发：push/PR 一律不跑、永不作为 merge 门、不入 required checks。
   #   - 与 checks/e2e 两 job 不同，这里要 Electron 二进制 + better-sqlite3 的 ELECTRON ABI

@@ -1,0 +1,148 @@
+{
+  "locale": "CN",
+  "period": {
+    "from": "2025-01-01",
+    "to": "2025-12-31",
+    "year": "2025"
+  },
+  "currency": "CNY",
+  "reportTypes": [
+    {
+      "id": "income-statement",
+      "name": {
+        "zh-CN": "损益表（利润表）",
+        "en": "Income Statement (P&L)"
+      }
+    },
+    {
+      "id": "vat-summary",
+      "name": {
+        "zh-CN": "增值税统计",
+        "en": "VAT Summary"
+      }
+    },
+    {
+      "id": "tax-inclusive",
+      "name": {
+        "zh-CN": "含税金额汇总",
+        "en": "Tax-Inclusive Summary"
+      }
+    }
+  ],
+  "incomeStatement": {
+    "salesRevenue": 12233.96,
+    "costOfSales": 3773.58,
+    "costOfGoodsSold": 3773.58,
+    "operatingExpenses": 4264.15,
+    "operatingProfit": -7824.15,
+    "grossProfit": 8460.38,
+    "grossMargin": 69.15,
+    "taxSurcharge": 20.38,
+    "shippingFee": 0,
+    "adminExpense": 12000,
+    "incomeTax": 0,
+    "netProfit": -7824.15,
+    "netMargin": -63.95
+  },
+  "vatSummary": {
+    "cumulativeInput": 362.27,
+    "cumulativeOutput": 566.04,
+    "certifiedInput": 362.27,
+    "invoicedOutput": 566.04,
+    "estimatedPayable": 203.77
+  },
+  "taxInclusiveSummary": {
+    "purchaseTotal": 8400,
+    "salesTotal": 12800,
+    "difference": 4400
+  },
+  "monthlyBreakdown": [
+    {
+      "month": 1,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 2,
+      "revenue": 9433.96,
+      "cost": 3773.58,
+      "profit": 5660.38
+    },
+    {
+      "month": 3,
+      "revenue": 2000,
+      "cost": 0,
+      "profit": 2000
+    },
+    {
+      "month": 4,
+      "revenue": 0,
+      "cost": 750,
+      "profit": -750
+    },
+    {
+      "month": 5,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 6,
+      "revenue": 800,
+      "cost": 3514.15,
+      "profit": -2714.15
+    },
+    {
+      "month": 7,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 8,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 9,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 10,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 11,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 12,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    }
+  ],
+  "warnings": [],
+  "cashflowStatement": {
+    "basis": "cash",
+    "statutory": false,
+    "source": "transactions",
+    "operating": {
+      "inflow": 12500,
+      "outflow": 5650,
+      "net": 6850
+    },
+    "investing": null,
+    "financing": null,
+    "beginningCash": null,
+    "endingCash": null
+  }
+}

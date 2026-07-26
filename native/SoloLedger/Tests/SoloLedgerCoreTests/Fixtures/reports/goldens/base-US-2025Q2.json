@@ -1,0 +1,162 @@
+{
+  "locale": "US",
+  "period": {
+    "from": "2025-04-01",
+    "to": "2025-06-30",
+    "year": "2025"
+  },
+  "currency": "CNY",
+  "reportTypes": [
+    {
+      "id": "schedule-c",
+      "name": {
+        "zh-CN": "Schedule C（个体经营损益）",
+        "en": "Schedule C (Profit or Loss)"
+      }
+    },
+    {
+      "id": "se-tax",
+      "name": {
+        "zh-CN": "Self-Employment Tax 估算",
+        "en": "Self-Employment Tax Estimate"
+      }
+    }
+  ],
+  "scheduleC": {
+    "line1_grossReceipts": 800,
+    "line2_returns": 0,
+    "line6_otherIncome": 0,
+    "line7_grossIncome": 800,
+    "line8_advertising": 0,
+    "line9_car": 0,
+    "line10_commissions": 0,
+    "line11_contract": 0,
+    "line13_depreciation": 0,
+    "line15_insurance": 0,
+    "line16b_interest": 0,
+    "line17_legal": 0,
+    "line18_office": 0,
+    "line20_rent": 0,
+    "line21_repairs": 0,
+    "line22_supplies": 0,
+    "line23_taxes": 0,
+    "line24a_travel": 0,
+    "line24b_meals": 0,
+    "line25_utilities": 0,
+    "line26_wages": 0,
+    "line27a_other": 4400,
+    "line30_homeOffice": 0,
+    "line28_totalExpenses": 4400,
+    "line31_netProfit": -3600
+  },
+  "selfEmploymentTax": {
+    "netEarnings": -3600,
+    "seEarnings": -3324.6,
+    "socialSecurityTax": -412.25,
+    "medicareTax": -96.41,
+    "additionalMedicare": 0,
+    "totalSETax": -508.66,
+    "paramYear": 2025
+  },
+  "estimatedTax": {
+    "annualIncomeTax": -720,
+    "annualSETax": -508.66,
+    "totalAnnual": -1228.66,
+    "quarterlyPayment": -307.17,
+    "dueDates": [
+      "2025-04-15",
+      "2025-06-15",
+      "2025-09-15",
+      "2026-01-15"
+    ]
+  },
+  "monthlyBreakdown": [
+    {
+      "month": 1,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 2,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 3,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 4,
+      "revenue": 0,
+      "cost": 750,
+      "profit": -750
+    },
+    {
+      "month": 5,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 6,
+      "revenue": 800,
+      "cost": 3650,
+      "profit": -2850
+    },
+    {
+      "month": 7,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 8,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 9,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 10,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 11,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    },
+    {
+      "month": 12,
+      "revenue": 0,
+      "cost": 0,
+      "profit": 0
+    }
+  ],
+  "warnings": [],
+  "cashflowStatement": {
+    "basis": "cash",
+    "statutory": false,
+    "source": "transactions",
+    "operating": {
+      "inflow": 500,
+      "outflow": 1650,
+      "net": -1150
+    },
+    "investing": null,
+    "financing": null,
+    "beginningCash": null,
+    "endingCash": null
+  }
+}
