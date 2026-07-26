@@ -212,6 +212,30 @@ Recommended workflow:
 8. Create a PR.
 9. Do not merge unless explicitly instructed.
 
+## Branch creation
+
+Create every branch from the remote main, in one command, without going through
+the local main:
+
+```
+git fetch origin && git switch -c <branch-name> origin/main
+```
+
+Never branch off whatever happens to be checked out. Doing so silently stacks the
+new work on an unmerged PR — the resulting PR carries someone else's commits, its
+diff mixes unrelated changes, and it cannot merge until the other one does. The
+form above makes the base explicit and atomic, so that whole class of mistake
+cannot happen rather than having to be noticed afterwards.
+
+Before opening a PR, verify the scope:
+
+```
+git diff --name-only origin/main...HEAD
+```
+
+Everything listed must belong to the one problem the PR solves. If not, split the
+branch before opening it.
+
 ## Merge authorization
 
 `main` is protected with required status checks and `enforce_admins` on, but
