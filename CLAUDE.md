@@ -212,6 +212,67 @@ Recommended workflow:
 8. Create a PR.
 9. Do not merge unless explicitly instructed.
 
+## Branch creation
+
+Create every branch from the remote main, in one command, without going through
+the local main:
+
+```
+git fetch origin && git switch -c <branch-name> origin/main
+```
+
+Never branch off whatever happens to be checked out. Doing so silently stacks the
+new work on an unmerged PR — the resulting PR carries someone else's commits, its
+diff mixes unrelated changes, and it cannot merge until the other one does. The
+form above makes the base explicit and atomic, so that whole class of mistake
+cannot happen rather than having to be noticed afterwards.
+
+Before opening a PR, verify the scope:
+
+```
+git diff --name-only origin/main...HEAD
+```
+
+Everything listed must belong to the one problem the PR solves. If not, split the
+branch before opening it.
+
+## Required status checks
+
+A check may enter the required list only once its workflow definition is already
+on main.
+
+A required check whose job does not exist on the base branch never reports. It
+sits as "Expected" and blocks every pull request permanently — including the one
+that would have added the job. Merge the workflow first, then require the check.
+
+The reverse shortcut is worse: landing the workflow before the code it verifies
+makes the job run and FAIL on every PR, which turns the whole queue red instead
+of blocking one merge. When a check and the thing it checks must land together,
+take the check out of the required list for the duration and put it back
+immediately afterwards, verifying its first run on main.
+
+## Merge authorization
+
+`main` is protected with required status checks and `enforce_admins` on, but
+review approval is deliberately NOT required — otherwise a merge executed by the
+agent would deadlock waiting for an approval on its own PR. This section is the
+compensating control for that gap. It is a hard rule, not a preference.
+
+**Every merge requires an explicit authorization phrase given in the current
+session.** Authorization never carries over from an earlier session, from a
+previous PR, or from general approval of a plan.
+
+When requesting authorization, state:
+
+* the PR number,
+* its base branch,
+* its head SHA.
+
+**The authorizing phrase must name the PR number.** A bare "merge it", "go
+ahead", or "looks good" is NOT authorization — ask again with the three facts
+above. If the head SHA changed after authorization was given (a new push, a
+rebase, a force-push), the authorization is void; request it again.
+
 When finishing a task, report:
 
 * Branch name

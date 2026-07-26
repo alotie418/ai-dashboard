@@ -709,6 +709,36 @@ final class MigrationCoordinatorTests: LedgerTestCase {
         guard case .unreadableRetriable = state else { return XCTFail("name swap mid-inspection must fail closed, got \(state)") }
     }
 
+    /// An owner record larger than the 64 KiB cap must be classified `.malformed`,
+    /// not retriable — a giant file is not a transient condition.
+    ///
+    /// This test also exists as EVIDENCE. The compiler reports the `catch` that
+    /// produces this classification (MigrationCoordinator, inspectRecord/boundDecode)
+    /// as "unreachable because no errors are thrown in the 'do' block", which is
+    /// wrong: `BoundRegularFile.readAll` throws `FileHashError.unreadable(errno:
+    /// EFBIG)` once the cap is exceeded. A catch that a test provably walks through
+    /// is not unreachable. See native/SoloLedger/warning-baseline.json.
+    func testOversizedOwnerRecordIsClassifiedMalformedNotRetriable() throws {
+        let ctx = try makeCtx()
+        let slot = ctx.config.activeDestination.deletingLastPathComponent()
+        try fm.createDirectory(at: slot, withIntermediateDirectories: true)
+        // One byte over the cap is enough; the reader throws as soon as the running
+        // total would exceed it.
+        let oversized = Data(repeating: UInt8(ascii: "{"), count: BoundRegularFile.maxRecordBytes + 1)
+        try oversized.write(to: recordURL(ctx))
+
+        let state = MigrationCoordinator.inspectRecord(activeDestination: ctx.config.activeDestination)
+        guard case .malformed(let reason) = state else {
+            return XCTFail("an oversized owner record must be malformed, got \(state)")
+        }
+        // Exact string on purpose: this literal is produced at exactly ONE place —
+        // inside the catch the compiler calls unreachable. Matching it loosely would
+        // weaken the evidence, since the activator has its own, differently-worded
+        // cap message ("exceeds the 65536-byte cap").
+        XCTAssertEqual(reason, "owner record exceeds the size cap",
+                       "the oversized path must come from the EFBIG catch in boundDecode")
+    }
+
     // MARK: - confirmOpenAuthorization (final re-check before LedgerStore.init)
 
     private func completedAuth(_ ctx: Ctx, _ source: MigrationSource?) throws -> StoreOpenAuthorization {
