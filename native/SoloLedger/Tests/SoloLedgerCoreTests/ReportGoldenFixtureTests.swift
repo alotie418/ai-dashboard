@@ -12,7 +12,7 @@ final class ReportGoldenFixtureTests: LedgerTestCase {
 
     private let variants = ["base", "unset", "zero", "malformed"]
     private let locales = ["CN", "US", "JP", "EU", "KR", "TW"]
-    private let basePeriods = ["2024", "2025", "2026", "2025Q2", "2025-06"]
+    private let basePeriods = ["2024", "2025", "2026", "2025Q2", "2025-06", "2024H2-2025H1"]
 
     private func goldensDirectory() throws -> URL {
         guard let url = Bundle.module.url(forResource: "reports", withExtension: nil)?
@@ -132,6 +132,41 @@ final class ReportGoldenFixtureTests: LedgerTestCase {
     /// the mirror must reproduce rather than fix: the legacy rows carry no
     /// category_id so COGS is structurally 0 there, and shippingCost exists ONLY on
     /// the legacy table so CN's shipping deduction is always 0 on the transactions path.
+    /// A period holding BOTH transactions and legacy rows reports only the
+    /// transactions — the legacy rows inside that same window are silently dropped.
+    /// That is an UNDER-count, and it is the reason the native app must say how many
+    /// legacy records a period excludes rather than printing a total as if complete.
+    ///
+    /// The fixture makes this observable: it carries a legacy sale dated 2025-09-15
+    /// and a legacy purchase dated 2025-09-20 — inside a year whose report is driven
+    /// entirely by transactions — plus a legacy purchase dated 2024-07-05 that falls
+    /// inside the spanning period. Neither contributes a cent.
+    func testLegacyRowsInsideATransactionsPeriodAreSilentlyExcluded() throws {
+        let url = try XCTUnwrap(Bundle.module.url(forResource: "reports", withExtension: nil))
+            .appendingPathComponent("reports-base.db")
+        let store = try LedgerStore(databaseURL: url)
+        let sales2025 = try store.db.query(
+            "SELECT COUNT(*) AS c FROM sales WHERE date >= '2025-01-01' AND date <= '2025-12-31'")
+            .first?.int("c")
+        let purchases2025 = try store.db.query(
+            "SELECT COUNT(*) AS c FROM purchases WHERE date >= '2025-01-01' AND date <= '2025-12-31'")
+            .first?.int("c")
+        XCTAssertEqual(sales2025, 1, "fixture assumption: a legacy sale sits inside 2025")
+        XCTAssertEqual(purchases2025, 1, "fixture assumption: a legacy purchase sits inside 2025")
+
+        // 2025 revenue is exactly the transactions figure; the 5000/5650 legacy sale
+        // in the same year appears nowhere.
+        let mixed = try XCTUnwrap(try golden("base-CN-2025")["incomeStatement"] as? [String: Any])
+        XCTAssertEqual(mixed["salesRevenue"] as? Double, 12233.96,
+                       "the same-period legacy sale must not be added in")
+
+        // Same story for a window that straddles the boundary.
+        let spanning = try XCTUnwrap(try golden("base-CN-2024H2-2025H1")["incomeStatement"] as? [String: Any])
+        XCTAssertEqual(spanning["salesRevenue"] as? Double, 12233.96)
+        XCTAssertEqual(spanning["shippingFee"] as? Double, 0,
+                       "the in-window legacy purchase contributes nothing, shipping included")
+    }
+
     func testAdjacentPeriodsUseDifferentSourcesAndPinTheirQuirks() throws {
         let legacy = try XCTUnwrap(try golden("base-CN-2024")["incomeStatement"] as? [String: Any])
         let txns = try XCTUnwrap(try golden("base-CN-2025")["incomeStatement"] as? [String: Any])

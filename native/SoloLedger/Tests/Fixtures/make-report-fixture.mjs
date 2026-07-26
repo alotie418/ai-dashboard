@@ -217,6 +217,20 @@ db.transaction(() => {
     totalAmount: 2034, invoiceNumber: null, invoiceStatus: '待收',
     payment_status: 'partial', paid_amount: 1000, due_date: '2024-08-05',
     payment_date: '2024-07-20' });
+
+  // MIXED PERIOD: these sit inside 2025, which also holds transactions. Because
+  // selectReportSource picks 'transactions' for any period with >=1 transaction,
+  // these two rows are SILENTLY EXCLUDED from every 2025 report — an under-count,
+  // not a double count. The goldens prove it: adding these rows leaves every
+  // 2025 golden byte-identical.
+  insertSale.run({ id: 'lg-sale-3', date: '2025-09-15', customer: '混排客户', tons: 5,
+    pricePerTon: 1000, amountWithoutTax: 5000, taxRate: 13, taxAmount: 650,
+    shippingCost: 120, totalAmount: 5650, invoiceNumber: 'MIX-001', invoiceStatus: '已开',
+    payment_status: 'paid', paid_amount: 5650, due_date: null, payment_date: '2025-09-16' });
+  insertPurchase.run({ id: 'lg-purch-3', date: '2025-09-20', supplier: '混排供应商', tons: 2,
+    pricePerTon: 700, amountWithoutTax: 1400, taxRate: 13, taxAmount: 182,
+    totalAmount: 1582, invoiceNumber: 'MIX-P1', invoiceStatus: '已收',
+    payment_status: 'paid', paid_amount: 1582, due_date: null, payment_date: '2025-09-21' });
 })();
 
 // --- settings: a FULLY CONFIGURED ledger ------------------------------------

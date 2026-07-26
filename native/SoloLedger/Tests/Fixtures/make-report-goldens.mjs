@@ -100,6 +100,10 @@ const PERIODS = [
   { id: '2026', year: '2026', from: '2026-01-01', to: '2026-12-31' },   // US Schedule C data
   { id: '2025Q2', year: '2025', from: '2025-04-01', to: '2025-06-30' }, // quarter granularity
   { id: '2025-06', year: '2025', from: '2025-06-01', to: '2025-06-30' },// month granularity
+  // Spans the source boundary: legacy rows from 2024-H2 AND transactions from
+  // 2025-H1 fall inside it, so the period has >=1 transaction and reports ONLY
+  // the transactions — the 2024 legacy rows inside the same window are dropped.
+  { id: '2024H2-2025H1', year: '2025', from: '2024-07-01', to: '2025-06-30' },
 ];
 // The directed rate pair only needs a period that actually produces a tax line.
 const VARIANT_PERIODS = {
