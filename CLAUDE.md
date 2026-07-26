@@ -236,6 +236,21 @@ git diff --name-only origin/main...HEAD
 Everything listed must belong to the one problem the PR solves. If not, split the
 branch before opening it.
 
+## Required status checks
+
+A check may enter the required list only once its workflow definition is already
+on main.
+
+A required check whose job does not exist on the base branch never reports. It
+sits as "Expected" and blocks every pull request permanently — including the one
+that would have added the job. Merge the workflow first, then require the check.
+
+The reverse shortcut is worse: landing the workflow before the code it verifies
+makes the job run and FAIL on every PR, which turns the whole queue red instead
+of blocking one merge. When a check and the thing it checks must land together,
+take the check out of the required list for the duration and put it back
+immediately afterwards, verifying its first run on main.
+
 ## Merge authorization
 
 `main` is protected with required status checks and `enforce_admins` on, but
