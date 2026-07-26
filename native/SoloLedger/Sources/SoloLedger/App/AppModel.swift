@@ -79,6 +79,12 @@ final class AppModel: ObservableObject {
     @Published var appearance: Appearance = .system
     @Published var accountingLocale: AccountingLocale = .CN
     @Published var companyName: String = ""
+    /// Records still held in the legacy `sales` / `purchases` tables. Read-only: the
+    /// app never converts them, it only says they are there.
+    @Published private(set) var legacyLedger = LegacyLedgerSummary()
+    /// The probe could not read the ledger, so "this ledger is empty" is unproven.
+    /// Anything that would write into a supposedly-empty ledger stays disabled.
+    @Published private(set) var legacyProbeFailed = false
     /// Report calculation parameters (rates in whole percent + the annual admin
     /// expense) EXACTLY as stored — an absent value stays absent rather than being
     /// resolved to a preset, so the Settings tab can never show a rate the report
@@ -473,6 +479,21 @@ final class AppModel: ObservableObject {
         } catch {
             actionError = "\(error)"
         }
+        reloadLegacySummary()
+    }
+
+    /// Read-only count of the records this app cannot display, so an empty ledger is
+    /// never presented as "you have no records". Advisory, and therefore kept OFF the
+    /// critical path: it runs after the real data load and swallows its own failure —
+    /// a probe error must never blank the transaction list, and must never silently
+    /// restore the misleading empty state by leaving a zeroed summary behind.
+    private func reloadLegacySummary() {
+        guard let store else { return }
+        do {
+            legacyLedger = try store.legacyLedgerSummary()
+        } catch {
+            legacyProbeFailed = true
+        }
     }
 
     func reloadTransactions() {
@@ -508,10 +529,16 @@ final class AppModel: ObservableObject {
     var isLedgerEmpty: Bool { transactions.isEmpty && currencySummaries.isEmpty }
 
     #if DEBUG
+    /// Whether seeding demo data is safe. `DemoData.seed`'s own guard only inspects
+    /// `transactions`, which is exactly the blind spot here: a ledger migrated from the
+    /// Electron app can hold real records this app does not read and still look empty.
+    /// Also refuses when the probe failed, since emptiness is then unproven.
+    var canLoadDemoData: Bool { !legacyLedger.holdsHiddenRecords && !legacyProbeFailed }
+
     /// Seed anonymized demo data. Idempotent: `DemoData.seed` is a no-op on a
     /// non-empty ledger, so repeated taps never duplicate.
     func loadDemoData() {
-        guard let store else { return }
+        guard let store, canLoadDemoData else { return }
         do {
             try DemoData.seed(into: store, locale: accountingLocale)
             reloadAll()

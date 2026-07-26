@@ -14,6 +14,7 @@ struct OverviewView: View {
                 chartSection
                 Divider()
                 recentSection
+                LegacyLedgerBanner()
                 Text(model.t("overview.dataSourceNote"))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -98,15 +99,21 @@ struct OverviewView: View {
     }
 
     @ViewBuilder private var emptyState: some View {
-        if model.overviewPeriod == .all {
-            // Whole ledger is empty.
+        if model.legacyLedger.holdsHiddenRecords {
+            // Not an empty ledger at all — the records are in tables this app does not
+            // read. Checked before the period branch: "no data this period" would be
+            // just as misleading for a ledger whose every record is hidden.
+            LegacyLedgerNotice().frame(maxWidth: .infinity)
+        } else if model.overviewPeriod == .all {
             VStack(spacing: 12) {
                 EmptyStateView(systemImage: "chart.pie",
                                title: model.t("overview.empty.title"),
                                message: model.t("overview.empty.message"))
                 #if DEBUG
-                Button(model.t("overview.loadDemo")) { model.loadDemoData() }
-                    .buttonStyle(.bordered)
+                if model.canLoadDemoData {
+                    Button(model.t("overview.loadDemo")) { model.loadDemoData() }
+                        .buttonStyle(.bordered)
+                }
                 #endif
             }
             .frame(maxWidth: .infinity)

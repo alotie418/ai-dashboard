@@ -34,6 +34,11 @@
 "txn.col.payment" = "결제";
 "txn.empty.title" = "아직 거래가 없습니다";
 "txn.empty.message" = "‘새 거래’를 클릭하거나 ⌘N을 눌러 첫 수입 또는 지출을 기록하세요.";
+"legacy.notice.title" = "이 장부에는 이전 버전의 매출·매입 기록이 {count}건 있습니다";
+"legacy.notice.message" = "해당 기록은 장부 파일에 그대로 저장되어 있으며 사라지지 않았습니다. 이 앱은 현재 ‘거래’만 표시하고 이전 기록을 거래로 변환하는 기능은 아직 제공하지 않으므로 여기에는 나타나지 않습니다.";
+"legacy.banner" = "이전 버전의 매출·매입 기록 {count}건은 여기에 표시되지 않습니다.";
+"legacy.other.title" = "이 장부에는 이 앱이 아직 표시하지 않는 기록이 있습니다";
+"legacy.other.message" = "장부 파일에는 청구서·상품·고정자산 등의 기록이 저장되어 있습니다. 그대로 보관되어 있으며 사라지지 않았습니다. 이 앱은 현재 '거래'만 표시합니다.";
 "txn.noResults.title" = "일치하는 결과 없음";
 "txn.noResults.message" = "현재 검색 또는 필터 조건에 맞는 거래가 없습니다. 조건을 지우고 다시 시도하세요.";
 "txn.searchPrompt" = "거래처, 메모, 청구서 번호 검색";

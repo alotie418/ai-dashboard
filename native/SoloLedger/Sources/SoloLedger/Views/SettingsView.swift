@@ -132,8 +132,10 @@ private struct DataSettingsTab: View {
                 Button(model.t("settings.restore"), role: .destructive) { showRestoreConfirm = true }
             }
             #if DEBUG
-            Section("Debug") {
-                Button(model.t("overview.loadDemo")) { model.loadDemoData() }
+            if model.canLoadDemoData {
+                Section("Debug") {
+                    Button(model.t("overview.loadDemo")) { model.loadDemoData() }
+                }
             }
             #endif
         }

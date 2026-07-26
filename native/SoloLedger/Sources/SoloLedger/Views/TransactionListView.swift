@@ -21,7 +21,14 @@ struct TransactionListView: View {
                     emptyLedger
                 }
             } else {
-                table
+                VStack(spacing: 0) {
+                    table
+                    // The list is real but incomplete — this is the screen a user opens
+                    // when hunting for a record they believe went missing.
+                    LegacyLedgerBanner()
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                }
             }
         }
         .navigationTitle(model.t("nav.transactions"))
@@ -122,14 +129,21 @@ struct TransactionListView: View {
         }
     }
 
-    private var emptyLedger: some View {
-        VStack(spacing: 12) {
-            EmptyStateView(systemImage: "tray",
-                           title: model.t("txn.empty.title"),
-                           message: model.t("txn.empty.message"))
-            #if DEBUG
-            Button(model.t("overview.loadDemo")) { model.loadDemoData() }.buttonStyle(.bordered)
-            #endif
+    @ViewBuilder private var emptyLedger: some View {
+        if model.legacyLedger.holdsHiddenRecords {
+            // The ledger is not empty; its records live in tables this app cannot read.
+            LegacyLedgerNotice()
+        } else {
+            VStack(spacing: 12) {
+                EmptyStateView(systemImage: "tray",
+                               title: model.t("txn.empty.title"),
+                               message: model.t("txn.empty.message"))
+                #if DEBUG
+                if model.canLoadDemoData {
+                    Button(model.t("overview.loadDemo")) { model.loadDemoData() }.buttonStyle(.bordered)
+                }
+                #endif
+            }
         }
     }
 

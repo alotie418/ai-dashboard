@@ -47,7 +47,8 @@
 | --- | --- | --- |
 | 用户可见备份 / 恢复 UI | 🟡 | 升级已自动备份；面向用户的备份/恢复入口未做 |
 | **附件文件迁移**（`attachment_path` 指向的本地文件 + 备份 bundle 的 `attachments/`） | ✅ 主迁移路径 ／ 🟡 restore 恢复路径 | 主/自动 `.masContainer` + 用户选目录导入链**已迁附件**（`AttachmentApply` → `PreparedImportFinalizer`：逐字保留 `attachment_path`、SHA-256 校验、add-only 不覆盖）；Core 链测试 + **App 层端到端**（`ElectronFixtureProductionOpenTests`，本次新增）均覆盖。原"只迁 DB 不迁附件"实为已停用的 `DatabaseUpgrade`（非生产启动路径）。**仅 restore-from-backup 恢复路径尚不迁附件（G1，单列残留，非本次范围）** |
-| **legacy `sales`/`purchases` → `transactions` 二次数据迁移** | 🛑 **Release 前必须** | Electron 侧的旧表转换未在原生侧复现（只读保留） |
+| **legacy `sales`/`purchases` 数据的可见性** | ✅（诚实提示已上线） | 只读探针 `LegacyLedgerProbe` 用与 Electron 转换器相同的反连接（`LEFT JOIN legacy_migrations … WHERE m.id IS NULL`）统计未转换行，空态改为如实告知"账本有 N 条旧版销售/采购记录、数据完好、本 App 尚未提供转换"。**零写入**。同时覆盖其他原生不读的记录表（发票/产品/固定资产等），并据此关闭"看似空账本"时的 DEBUG 演示数据入口 |
+| **legacy `sales`/`purchases` → `transactions` 转换器** | 🛑 **需会计确认后再做**（非 Release 阻塞，已降级） | 逐字移植 `electron/handlers/migrations.js` 会**实质改变已有期间的报表呈现**：报表引擎按期间在 transactions/legacy 间二选一，转换后 CN 运费归 0、COGS/毛利拆分翻转、US 采购全部落到 Schedule C line 8（美国类别无 `cogs` slug）。另有三处口径需确认，用户已定调为**保守修正**：①旧表 `payment_status` 为空时保留列默认 `unpaid`（不照抄 Electron 写死 `paid`）②默认收/支类别改为转换前由用户显式选择（Electron API 本就支持 `defaultIncomeCategoryId`/`defaultExpenseCategoryId`）③多行明细（`sales_items`/`purchase_items`）塌缩为单条流水的损失必须在转换前明示。移植时还须修掉 Electron 侧的已知缺陷：先写映射再写流水（避免孤儿行导致重复迁移）、rollback 分批删除（>32766 行会触发 SQLite 变量上限）、转换前自动备份 |
 | **旧进程检测硬化** | ✅（沙箱内正解已达成） | 生产 ingest 用**强指纹稳定性**检测（前后指纹 + 3 次尝试，`StagingIngest`）——旧版仍在写则拒，映射为**可重试态** `.retriable(.sourceBusy)`（`MigrationCoordinator.swift:1104`）并显示引导消息 `migration.msg.sourceBusy`（"请退出旧版 SoloLedger 后重试"，6 语齐全）+ Retry 动作。**App Sandbox 内无法枚举进程 / 取跨进程锁**，指纹 + 引导退出即该环境下的正解。原 🛑 标记已过时 |
 | **Release 数据路径验证** | 🛑 **Release 前必须** | `SoloLedgerNative`（Release）已加路径隔离单测；需在**真实 Release 沙箱**端到端验证 |
 | **DMG（非沙箱）用户数据迁移入口** | ✅（N7.2 已闭合） | 源选择入口已全链路接线并测试：coordinator `.requiresSourceChoice`（`MigrationCoordinator.swift:668`）→ `.awaitingSourceChoice` → RootView `.chooseSource`（`RootView.swift:76`）→ 目录面板（`FilePanels.swift:58`）→ `.migrateFromUserDir(.userSelectedDataDir)`（`AppModel.swift:189,339`）。single-grant-window、无 bookmark entitlement（`MigrationSource.withAccess`）。测试：`DormantSourceChoiceBootTests`、`ElectronFixtureProductionOpenTests`。**原 🛑 P0 标记已过时** |
@@ -74,7 +75,7 @@
 ## Release 前阻塞项清单（汇总）
 
 1. ✅ 附件文件迁移（DB 之外的 `attachments/`）——主/自动 `.masContainer` + 用户选目录导入链已实现，Core + **App 层端到端**测试均覆盖；**仅 restore-from-backup 恢复路径尚不迁附件（G1，单列残留，非本次 PR 范围）**。
-2. 🛑 legacy `sales`/`purchases` → `transactions` 二次数据迁移。
+2. ✅ legacy `sales`/`purchases` 数据不再被呈现为"空账本"——只读探针 + 诚实提示已上线（零写入）。**转换器本身降级为非 Release 阻塞**：它会改变已有期间的报表呈现，且有三处口径待会计确认（见 §4 该行）。
 3. ✅ 旧进程检测硬化：强指纹稳定性检测（前后指纹 + 3 次尝试）+ 可重试引导态"请退出旧版并重试"（`migration.msg.sourceBusy`，6 语）；App Sandbox 内进程枚举 / 取锁不可行，此为该环境下的正解。原 🛑 已过时。
 4. 🛑 真实 Release 沙箱下的数据路径 / 升级端到端验证。
 5. ✅ **DMG（非沙箱）用户数据迁移入口**：N7.2 源选择入口已全链路接线（RootView → FilePanels → AppModel → coordinator `.requiresSourceChoice` / `.migrateFromUserDir` / `.userSelectedDataDir`）、single-grant-window 无 bookmark，Core + App-hosted 测试覆盖。**原 P0 已闭合**。
