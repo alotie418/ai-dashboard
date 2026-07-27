@@ -271,7 +271,42 @@ When requesting authorization, state:
 **The authorizing phrase must name the PR number.** A bare "merge it", "go
 ahead", or "looks good" is NOT authorization — ask again with the three facts
 above. If the head SHA changed after authorization was given (a new push, a
-rebase, a force-push), the authorization is void; request it again.
+rebase, a force-push), the authorization is void; request it again — with the
+single exception below.
+
+### Exception: a sync that only absorbs already-merged `main`
+
+Branch protection requires branches to be up to date, so authorizing a batch of
+PRs and merging them in order makes every later branch fall BEHIND. Bringing it
+forward changes the head SHA and would void an authorization the user has
+already given, for a change that adds none of their content.
+
+**An authorization survives a head-SHA change caused solely by absorbing
+already-merged `main`, and only when the criteria below all hold.** Anything
+else — a new commit, an amend, a rebase that reorders or edits — voids it.
+
+The criteria, all four, measured against the OLD and NEW heads relative to
+**their own** merge-bases:
+
+1. `git range-diff <oldBase>..<oldHead> <newBase>..<newHead>` reports every
+   commit as equivalent (`=`), with no additions or removals.
+2. `git patch-id --stable` over each range gives the same id.
+3. **Every file the PR touches is byte-identical** — compare blob hashes at the
+   two heads, do not infer it from the two checks above. `patch-id` normalizes
+   whitespace, so on its own it would pass a change that alters indentation in a
+   YAML workflow, a Makefile, or a Python file, where whitespace is the meaning.
+4. No `Allowed-Golden-Changes` trailer appeared that was not already authorized.
+
+**The criteria output must be posted in the session before merging** — the
+actual command output, not a claim that it passed. It is the record that the
+merged bits are the authorized bits. Then merge and report the new SHA.
+
+If any criterion fails, the authorization is void: say which one and request
+again.
+
+> Do not weaken this into "the change looked mechanical". The point of the
+> control is that the agent does not get to decide when its own SHA change is
+> harmless; the criteria decide, and their output is filed.
 
 Re-confirm before merging — even when the head SHA has not moved — if either of
 these happened after the authorization was given:
