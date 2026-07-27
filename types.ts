@@ -31,8 +31,10 @@ export interface FinancialStatementData {
 export interface VATData {
   cumulativeInput: number;
   cumulativeOutput: number;
-  certifiedInput: number;
-  invoicedOutput: number;
+  /** 中国专属（cn.js:72-73）。其余四个引擎的块没有这两个数，此时为 undefined，
+   *  卡片不渲染那一段 —— 不得以 0 冒充。 */
+  certifiedInput?: number;
+  invoicedOutput?: number;
   estimatedPayable: number;
 }
 

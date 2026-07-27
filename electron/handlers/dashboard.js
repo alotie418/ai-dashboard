@@ -189,8 +189,14 @@ async function summary({ query }) {
     metrics,
     monthlyPerformance,
     financialStatement,
-    // 保留旧结构兼容（CN 用）
-    vatStatistics: report?.vatSummary || report?.consumptionTax || report?.vatReturn || report?.businessTax || { cumulativeInput: 0, cumulativeOutput: 0, certifiedInput: 0, invoicedOutput: 0, estimatedPayable: 0 },
+    // 流转税卡片的数据。每个地区引擎的块 **字段名不同**，所以这里必须按制度
+    // 映射，不能靠 `a || b || c` 挑一个出来就交给一个只认中国字段名的组件。
+    //
+    // 之前正是那样：日本/欧盟/韩国/台湾拿到的是形状正确、字段名不同的块，
+    // 组件读 `data.cumulativeInput` 得到 undefined，`fmt(val || 0)` 打印
+    // 0.00 —— 四种制度的税额卡片显示五个凭空捏造的零，下面还挂着让人以为
+    // 这些零是真数的免责声明。同一条链还喂给 ai.js 的 [Dashboard] 段落。
+    vatStatistics: normalizeTurnoverTax(report),
     taxInclusiveSummary: report?.taxInclusiveSummary || { purchaseTotal: 0, salesTotal: 0, difference: 0 },
     // 新增：完整报表引擎结果 + US 附加数据
     report,
@@ -201,4 +207,35 @@ async function summary({ query }) {
   };
 }
 
-module.exports = { summary };
+/// 把五个地区引擎各自的流转税块映射成卡片使用的统一形状。
+///
+/// **只有中国有 `certifiedInput` / `invoicedOutput`**（cn.js:69-75 的五字段块）。
+/// 其余四个引擎的块只有三个数，所以那两行在它们下面 **没有对应数据** —— 返回
+/// `undefined` 而不是 0，让组件不渲染那一段，而不是编造两个零。
+/// CLAUDE.md：不得把占位值当作官方财务指标展示。
+function normalizeTurnoverTax(report) {
+  if (!report) return null;
+  // 中国：cn.js:69-75，原样。
+  if (report.vatSummary && report.vatSummary.cumulativeInput !== undefined) {
+    return report.vatSummary;
+  }
+  // 韩国：kr.js:41-43 —— 与欧盟同形，但块名是 vatSummary。
+  if (report.vatSummary) {
+    const b = report.vatSummary;
+    return { cumulativeInput: b.inputVAT, cumulativeOutput: b.outputVAT, estimatedPayable: b.vatPayable };
+  }
+  // 欧盟：eu.js:44-46。
+  if (report.vatReturn) {
+    const b = report.vatReturn;
+    return { cumulativeInput: b.inputVAT, cumulativeOutput: b.outputVAT, estimatedPayable: b.vatPayable };
+  }
+  // 日本：jp.js:46-49；台湾：tw.js:41-43 —— 同形，collected/paid/payable。
+  const b = report.consumptionTax || report.businessTax;
+  if (b) {
+    return { cumulativeInput: b.paid, cumulativeOutput: b.collected, estimatedPayable: b.payable };
+  }
+  // 美国没有流转税块；卡片本来也不对美国渲染（App.tsx 的 sections 判断）。
+  return null;
+}
+
+module.exports = { summary, normalizeTurnoverTax };
