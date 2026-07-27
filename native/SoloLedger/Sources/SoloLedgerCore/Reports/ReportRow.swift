@@ -75,9 +75,53 @@ public struct ReportCategory: Equatable, Sendable {
     /// engine sees.
     public let isCogs: SQLiteValue
 
-    public init(id: String, isCogs: SQLiteValue) {
+    /// `slug`, also in its RAW storage class and for the same reason: `index.js:70`
+    /// is `SELECT *`, so the value reaching `us.js`'s category lookups is whatever
+    /// the cell holds, not a decoded `String`.
+    ///
+    /// Batch 3 uses it in TWO different ways, and they are not the same rule:
+    /// the income side compares it with `===` against a literal
+    /// (`us.js:121`), while the expense side uses it as an OBJECT KEY
+    /// (`us.js:29-30`) after a `|| 'other'` fallback. See ``slugKeyOrOther`` and
+    /// ``slugEquals(_:)``.
+    public let slug: SQLiteValue
+
+    public init(id: String, isCogs: SQLiteValue, slug: SQLiteValue = .null) {
         self.id = id
         self.isCogs = isCogs
+        self.slug = slug
+    }
+
+    /// `cat.slug === literal` — the INCOME side (`us.js:121`).
+    ///
+    /// Strict equality against a string literal, so only a TEXT cell can ever
+    /// match: a numeric or null slug is simply not equal to `"returns"`.
+    public func slugEquals(_ literal: String) -> Bool {
+        if case .text(let s) = slug { return s == literal }
+        return false
+    }
+
+    /// `findCategorySlug(row, categories) || 'other'` — the EXPENSE side
+    /// (`us.js:29`), as the object key it becomes at `us.js:30`.
+    ///
+    /// The `|| 'other'` is JS truthiness on the slug value, so an empty string and
+    /// a null slug BOTH fall to `other` and land on line 27a — the same bucket as a
+    /// row with no category at all. Three different situations, one line.
+    ///
+    /// A slug that is a real string but not one Schedule C maps (say `cogs`, from
+    /// another regime's category table) becomes a key nothing reads, and the money
+    /// **disappears from the report entirely** — it is in no line, so it is also
+    /// not in line 28. That is the source's behaviour, mirrored, and it is pinned
+    /// by a test rather than left to be discovered.
+    ///
+    /// Non-TEXT slugs are unreachable in practice (the column is TEXT) and are
+    /// mapped to a key nothing reads, which is what a stringified number would do
+    /// anyway.
+    public var slugKeyOrOther: String {
+        if case .text(let s) = slug, !s.isEmpty { return s }
+        if case .integer(let i) = slug, i != 0 { return String(i) }
+        if case .real(let d) = slug, !(d == 0 || d.isNaN) { return String(d) }
+        return "other"
     }
 
     /// JS `!!value` over a SQLite storage class — the `!!(cat && cat.is_cogs)`

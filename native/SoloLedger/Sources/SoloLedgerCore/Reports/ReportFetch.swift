@@ -112,7 +112,7 @@ public enum ReportFetch {
     public static func categories(_ db: SQLiteDatabase, locale: String) throws -> [ReportCategory] {
         try db.query("SELECT * FROM categories WHERE locale = ? ORDER BY type, sort_order",
                      [.text(locale)]).map {
-            ReportCategory(id: $0.string("id") ?? "", isCogs: $0["is_cogs"])
+            ReportCategory(id: $0.string("id") ?? "", isCogs: $0["is_cogs"], slug: $0["slug"])
         }
     }
 }
