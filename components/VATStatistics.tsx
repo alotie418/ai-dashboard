@@ -15,6 +15,9 @@ const VATStatistics: React.FC<Props> = ({ data, accountingLocale = 'CN' }) => {
   const uiLang = i18n.language;
   const label = (key: string) => getTaxLabel(accountingLocale, uiLang, key);
   const fmt = (val: number) => formatMoney(val || 0, accountingLocale, uiLang);
+  // 两个都存在才渲染那一段；`!= null` 而不是真值判断 —— 一个真实的 0 是数据，
+  // 缺失才不是。
+  const hasCertificationPair = data.certifiedInput != null && data.invoicedOutput != null;
 
   return (
     <div className="bg-[#f9f9f8] border border-[#e0ddd5] rounded-xl overflow-hidden flex flex-col h-full" style={{boxShadow: '0 4px 24px rgba(0,0,0,0.06)'}}>
@@ -33,16 +36,21 @@ const VATStatistics: React.FC<Props> = ({ data, accountingLocale = 'CN' }) => {
             <span className="text-base font-semibold text-[#191918]">{fmt(data.cumulativeOutput)}</span>
           </div>
         </div>
-        <div className="px-6 py-5 border-t border-dashed border-[#e0ddd5] space-y-4 bg-primary/5">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-primary/80">{label('certifiedInput')}</span>
-            <span className="text-base font-semibold text-primary">{fmt(data.certifiedInput)}</span>
+        {/* 中国专属：cn.js 的五字段块才有认证进项/已开票销项。其余四个引擎的块
+            只有三个数，这一段整体不渲染 —— 显示两个 0.00 会把「没有这项数据」
+            伪装成「这项数据是零」。CLAUDE.md：不得把占位值当官方财务指标。 */}
+        {hasCertificationPair && (
+          <div className="px-6 py-5 border-t border-dashed border-[#e0ddd5] space-y-4 bg-primary/5">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-primary/80">{label('certifiedInput')}</span>
+              <span className="text-base font-semibold text-primary">{fmt(data.certifiedInput!)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-primary/80">{label('invoicedOutput')}</span>
+              <span className="text-base font-semibold text-primary">{fmt(data.invoicedOutput!)}</span>
+            </div>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-primary/80">{label('invoicedOutput')}</span>
-            <span className="text-base font-semibold text-primary">{fmt(data.invoicedOutput)}</span>
-          </div>
-        </div>
+        )}
         <div className="mt-auto px-6 py-6 border-t border-[#e0ddd5] bg-orange-500/5">
           <div className="flex justify-between items-center">
             <span className="text-base font-bold text-[#191918]">{label('estimatedTax')}</span>
