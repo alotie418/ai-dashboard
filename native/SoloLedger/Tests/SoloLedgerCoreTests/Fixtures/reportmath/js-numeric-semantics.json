@@ -8,10 +8,7 @@
       "nullValue": "JSON null in an argument means JS null/undefined and SQL NULL alike — all three reach Swift as nil.",
       "case": "[op, args[], result, tag, repr] — repr is documentation, never ground truth."
     },
-    "generatedWith": {
-      "node": "24.18.0",
-      "v8": "13.6.233.17-node.50"
-    },
+    "seedNote": "Fixed seed + no runtime field = byte-identical regeneration anywhere.",
     "seed": "0x5010ED6E",
     "ops": {
       "round": {
