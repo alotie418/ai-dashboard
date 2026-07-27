@@ -494,13 +494,25 @@ public final class LedgerStore {
 
     // MARK: - Transactions CRUD (mirrors electron/handlers/transactions.js)
 
+    /// - Parameter limit: the row cap, or `nil` for NO cap.
+    ///
+    ///   A non-nil value is clamped to 5000 and applied SILENTLY — the caller gets
+    ///   no signal that it truncated. That is tolerable for a screen the user is
+    ///   scrolling and is NOT tolerable for anything that produces a total or a
+    ///   file, because a silently short answer is indistinguishable from a correct
+    ///   one. Passing `nil` is how a caller says "this must be complete".
+    ///
+    ///   The default stays 500 deliberately: the transaction LIST still truncates
+    ///   at 500 without telling the user, and fixing that means designing the
+    ///   "showing N of M" affordance, which belongs with the report UI work. It is
+    ///   a known, recorded defect — not an oversight.
     public func listTransactions(type: TransactionType? = nil,
                                  from: String? = nil,
                                  to: String? = nil,
                                  categoryID: String? = nil,
                                  search: String? = nil,
                                  sort: TransactionSort = .dateDescending,
-                                 limit: Int = 500) throws -> [Transaction] {
+                                 limit: Int? = 500) throws -> [Transaction] {
         var clauses: [String] = []
         var params: [SQLiteValue] = []
         if let type { clauses.append("type = ?"); params.append(.text(type.rawValue)) }
@@ -516,8 +528,7 @@ public final class LedgerStore {
         var sql = "SELECT * FROM transactions"
         if !clauses.isEmpty { sql += " WHERE " + clauses.joined(separator: " AND ") }
         sql += " ORDER BY \(sort.orderBy)"
-        let clamped = min(max(limit, 1), 5000)
-        sql += " LIMIT \(clamped)"
+        if let limit { sql += " LIMIT \(min(max(limit, 1), 5000))" }
         return try db.query(sql, params).compactMap(Transaction.from)
     }
 

@@ -128,8 +128,24 @@ public enum TransactionCSV {
 
 public extension LedgerStore {
     /// Convenience: export the current (filtered) transactions to a CSV string.
+    ///
+    /// **Uncapped, and that is the point.** This used to pass `limit: 5000` — which
+    /// is exactly the ceiling `listTransactions` clamps to — so a ledger with more
+    /// rows than that exported a file that looked complete and was not. Nothing
+    /// warned, nothing logged, and the file carried no marker: the user got a
+    /// plausible CSV missing an arbitrary tail of their own records.
+    ///
+    /// An export is where that failure costs most, because it is the data-portability
+    /// and hand-it-to-my-accountant path. A truncated screen is an inconvenience; a
+    /// truncated export is a wrong record that outlives the app.
+    ///
+    /// Cost, stated rather than waved away: this materializes every matching row and
+    /// then a string, so a very large ledger will use memory proportional to its
+    /// size. That is accepted — the export is user-initiated, one-shot, and its
+    /// whole purpose is completeness. If it ever needs streaming, the answer is to
+    /// stream, never to silently drop the tail.
     func exportTransactionsCSV(type: TransactionType? = nil, from: String? = nil, to: String? = nil) throws -> String {
-        let txns = try listTransactions(type: type, from: from, to: to, limit: 5000)
+        let txns = try listTransactions(type: type, from: from, to: to, limit: nil)
         return TransactionCSV.export(txns)
     }
 
