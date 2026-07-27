@@ -77,3 +77,56 @@ public enum CNReportEngine {
         )
     }
 }
+
+// MARK: - Batch 2
+
+public extension CNReportEngine {
+
+    /// `cn.js:78-82` — 含税金额汇总.
+    ///
+    /// TAX-INCLUSIVE sums (`cn.js:18`, `:21`), not the net ones the P&L uses.
+    ///
+    /// China's rounder is `round2`, the one WITHOUT `|| 0` (`cn.js:43`). Stated
+    /// honestly: here that is a FIDELITY choice and not a behavioural one, because
+    /// the sums cannot reach the rounder as NaN — `cn.js:18` already guards each
+    /// term with `(r.amount || 0)`, so a NaN amount contributes 0 and never
+    /// survives to be rounded. Verified in node: a NaN `amount` yields
+    /// `{0, 0, 0}` under China AND Japan alike. The functions differ only where a
+    /// falsy total can arise, and no batch-2 input produces one. `round2` is used
+    /// because that is what the source says, not because a test can tell.
+    static func taxInclusiveSummary(_ ctx: ReportContext) -> TaxInclusiveSummary {
+        var totalIncome = 0.0
+        for row in ctx.incomeRows { totalIncome += ReportMath.orZero(row.amount) }   // cn.js:18
+        var totalExpense = 0.0
+        for row in ctx.expenseRows { totalExpense += ReportMath.orZero(row.amount) } // cn.js:21
+        return TaxInclusiveSummary(
+            purchaseTotal: ReportMath.round2(totalExpense),                 // cn.js:79
+            salesTotal: ReportMath.round2(totalIncome),                     // cn.js:80
+            // cn.js:81 — the SUBTRACTION happens first and is rounded ONCE.
+            // `r(a) - r(b)` would round twice and can differ by a cent.
+            difference: ReportMath.round2(totalIncome - totalExpense))
+    }
+
+    /// `cn.js:91-108` — 月度明细.
+    ///
+    /// China rounds INLINE here (`cn.js:102-104`) rather than through `r`, but the
+    /// expression is the same `Math.round(x * 100) / 100`, so it is still the
+    /// unguarded rounder. And it uses the `r.date && r.date.startsWith(...)`
+    /// spelling, not optional chaining.
+    static func monthlyBreakdown(_ ctx: ReportContext) -> [ReportMonth] {
+        ReportMonth.prefixes(year: ctx.year).enumerated().map { index, prefix in
+            var revenue = 0.0
+            for row in ctx.incomeRows where MonthMatch.cn(row.date, prefix) {
+                revenue += ReportMath.netAmount(row.amountNet, row.amount)   // cn.js:98
+            }
+            var cost = 0.0
+            for row in ctx.expenseRows where MonthMatch.cn(row.date, prefix) {
+                cost += ReportMath.netAmount(row.amountNet, row.amount)      // cn.js:99
+            }
+            return ReportMonth(month: index + 1,
+                               revenue: ReportMath.round2(revenue),          // cn.js:102
+                               cost: ReportMath.round2(cost),                // cn.js:103
+                               profit: ReportMath.round2(revenue - cost))    // cn.js:104
+        }
+    }
+}

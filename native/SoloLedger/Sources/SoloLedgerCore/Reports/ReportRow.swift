@@ -8,9 +8,15 @@ import Foundation
 /// treats them when they are absent. Reusing the app model would quietly supply
 /// defaults the engines never had.
 ///
-/// Only batch-1 columns are carried. `date` is not here because the period filter
-/// happens in SQL (`index.js:47-52`), and `tax_amount` is not here because the
-/// turnover-tax blocks are batch 4.
+/// Only the columns batch 1 and batch 2 read are carried. `tax_amount` is still
+/// absent because the turnover-tax blocks are batch 4.
+///
+/// `date` was absent in batch 1 — the period filter happens in SQL
+/// (`index.js:47-52`), so the engines never needed it. Batch 2 changed that:
+/// `monthlyBreakdown` re-filters the SAME rows by month IN SWIFT (`cn.js:96`,
+/// `jp.js:64`, `us.js:135`), against a prefix built from `ctx.year`. So the column
+/// is now read twice for two different purposes, and the second one is the reason
+/// Appendix A9 exists — see ``ReportMonth``.
 public struct ReportRow: Equatable, Sendable {
     /// `amount_net` — the pre-tax amount. Optional because SQL NULL is a real
     /// value here, and because `ReportMath.netAmount` needs to see the difference
@@ -36,13 +42,22 @@ public struct ReportRow: Equatable, Sendable {
     /// shipping deduction at `cn.js:24` is structurally 0. Mirrored, not fixed —
     /// plan Appendix A4 records the correction as needing a schema decision.
     public let shippingCost: Double?
+    /// `date`, as STORED — never parsed.
+    ///
+    /// `monthlyBreakdown` matches it with a string prefix (`"\(year)-\(mm)"`), not
+    /// with a date comparison, so a row stamped `2025-06-15T00:00:00` matches
+    /// `2025-06` for exactly the reason a lexicographic prefix does. Parsing it
+    /// into a `Date` here would introduce a time zone the engines do not have.
+    public let date: String?
 
     public init(amountNet: Double? = nil, amount: Double? = nil,
-                categoryID: String? = nil, shippingCost: Double? = nil) {
+                categoryID: String? = nil, shippingCost: Double? = nil,
+                date: String? = nil) {
         self.amountNet = amountNet
         self.amount = amount
         self.categoryID = categoryID
         self.shippingCost = shippingCost
+        self.date = date
     }
 }
 
