@@ -36,10 +36,14 @@
 // are exactly the values these shims exist to get right. A decimal `repr` rides
 // along for human readability; it is documentation, never the ground truth.
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+// Repo root — same relative hop as make-report-goldens.mjs, used to read the
+// engines for the anchor check and to run `git diff` from a stable cwd.
+const ROOT = join(HERE, '../../../..');
 const OUT_DIR = join(HERE, '../SoloLedgerCoreTests/Fixtures/reportmath');
 const OUT_FILE = join(OUT_DIR, 'js-numeric-semantics.json');
 
@@ -96,6 +100,51 @@ const OPS = {
   // cn.js:32,39 and the VAT/income-tax clamp in every other engine; us.js:70.
   max: { arity: 2, out: 'num', js: (a, b) => Math.max(a, b) },
   min: { arity: 2, out: 'num', js: (a, b) => Math.min(a, b) },
+};
+
+// --- engine anchors ----------------------------------------------------------
+//
+// The literal that must still exist in the engine, for each expression above.
+// Checked by --verify.
+//
+// WHY: `OPS[].js` is a COPY of engine source. A copy has no way of knowing the
+// original moved — and both other checks in --verify evaluate that copy, so
+// editing it would leave the whole gate green. The goldens do not have this
+// problem, because they are regenerated from electron/reports/* itself and the
+// allowlist rejects any resulting change. These anchors are the corpus's version
+// of that tie.
+//
+// Read each row as: "`op` claims to mirror THIS text, which lives HERE." The
+// pairing itself is maintained by review — that is why the expression and its
+// anchor sit next to each other rather than in separate files. What the machine
+// checks is that the anchored text has not moved or changed.
+//
+// A literal is deliberately a SUBSTRING and not a whole line: `percent2` and the
+// clamps are written inline at their call sites with expression arguments, so
+// there is no self-contained line to match.
+const ENGINE_ANCHORS = {
+  round2: [{ file: 'electron/reports/cn.js', literal: 'Math.round(v * 100) / 100' }],
+  round2OrZero: [
+    { file: 'electron/reports/us.js', literal: 'Math.round((v || 0) * 100) / 100' },
+    { file: 'electron/reports/jp.js', literal: 'Math.round((v || 0) * 100) / 100' },
+    { file: 'electron/reports/eu.js', literal: 'Math.round((v || 0) * 100) / 100' },
+    { file: 'electron/reports/kr.js', literal: 'Math.round((v || 0) * 100) / 100' },
+    { file: 'electron/reports/tw.js', literal: 'Math.round((v || 0) * 100) / 100' },
+  ],
+  // cn.js:30 and cn.js:41 — the margins, scaled by 10000 rather than by 100.
+  percent2: [{ file: 'electron/reports/cn.js', literal: '* 10000) / 100' }],
+  // The net-amount convention, in the shared helper and in every engine.
+  netAmount: [
+    { file: 'electron/reports/_expenseSplit.js', literal: 'row.amount_net || row.amount || 0' },
+    { file: 'electron/reports/cn.js', literal: 'r.amount_net || r.amount || 0' },
+    { file: 'electron/reports/jp.js', literal: 'row.amount_net || row.amount || 0' },
+  ],
+  // The `|| 0` guard that cn.js alone does NOT have — the asymmetry that makes
+  // malformed-CN-2025.json serialize nulls where malformed-US-2025.json has zeros.
+  orZero: [{ file: 'electron/reports/us.js', literal: '(v || 0)' }],
+  // cn.js:32/39 and the VAT clamp in every engine; us.js:70 for the cap.
+  max: [{ file: 'electron/reports/cn.js', literal: 'Math.max(0, ' }],
+  min: [{ file: 'electron/reports/us.js', literal: 'Math.min(seEarnings, ssTaxCap)' }],
 };
 
 // --- fixed-seed PRNG ---------------------------------------------------------
@@ -443,14 +492,19 @@ const serialize = () => {
         'all three reach Swift as nil.',
       case: '[op, args[], result, tag, repr] — repr is documentation, never ground truth.',
     },
-    // Provenance only, and DELIBERATELY excluded from the --verify byte
-    // comparison: CI runs a different node major than most dev machines, and
-    // failing on that would be a version check wearing a correctness check's
-    // clothes. What actually guards against a V8 that behaves differently is
-    // step 2 of --verify, which re-executes every committed case and names the
-    // operation and input that moved. That check is stronger AND
-    // runtime-independent, so the version here is a record, not a gate.
-    generatedWith: { node: process.versions.node, v8: process.versions.v8 },
+    // NO runtime version is recorded in the file, deliberately.
+    //
+    // It used to be, and it forced --verify to compare "bytes EXCEPT this field"
+    // — because CI runs a different node major than most dev machines. A
+    // comparison with a carve-out is a comparison the script gets to define, and
+    // the whole point of this gate is that the script should not be the judge.
+    // With the field gone the artefact is byte-identical under any V8, so `git
+    // diff --exit-code` can decide, exactly as it does for the goldens.
+    //
+    // Nothing is lost: the runtime is printed on every run, and a V8 that
+    // actually behaves differently is caught by the re-execution step with the
+    // operation and input named.
+    seedNote: 'Fixed seed + no runtime field = byte-identical regeneration anywhere.',
     seed: `0x${SEED.toString(16).toUpperCase()}`,
     ops: Object.fromEntries(Object.entries(OPS).map(([k, v]) =>
       [k, { arity: v.arity, result: v.out, js: v.js.toString() }])),
@@ -486,25 +540,75 @@ if (process.argv.includes('--verify')) {
   }
   const committed = readFileSync(OUT_FILE, 'utf8');
 
-  // 1. Regeneration must be byte-identical MODULO the provenance line — see the
-  //    `generatedWith` comment above. Catches an edited corpus, a changed seed,
-  //    a dropped case, and a generator changed without regenerating.
-  const stripProvenance = (s) =>
-    s.replace(/"generatedWith": \{[^}]*\}/, '"generatedWith": {}');
-  if (stripProvenance(committed) !== stripProvenance(text)) {
-    console.error('✗ reportmath corpus does not match what the generator produces.');
-    console.error('  Either the corpus was hand-edited, or the generator changed without');
-    console.error('  regenerating. Run the generator and commit the result:');
-    console.error('    node native/SoloLedger/Tests/Fixtures/make-reportmath-corpus.mjs');
+  // 1. ENGINE ANCHORS — the corpus's root of trust.
+  //
+  //    Steps 2 and 3 both evaluate `OPS[op].js`, so they answer "is the corpus
+  //    what this generator produces", never "is this generator what the ENGINES
+  //    do". Editing an expression here would sail through both. The goldens have
+  //    no such hole: they are regenerated from electron/reports/* itself, so a
+  //    changed engine moves them and the allowlist rejects it. This step is the
+  //    corpus's equivalent — every mirrored expression must still be present,
+  //    character for character, at the call site it claims to mirror.
+  let anchored = 0;
+  for (const [op, sites] of Object.entries(ENGINE_ANCHORS)) {
+    for (const { file, literal } of sites) {
+      if (!readFileSync(join(ROOT, file), 'utf8').includes(literal)) {
+        console.error(`✗ ${op}: ${file} no longer contains the expression this corpus mirrors:`);
+        console.error(`    ${literal}`);
+        console.error('  Either the engine changed — which a mirroring PR must not do — or the');
+        console.error('  anchor is stale. Work out WHICH before touching either side.');
+        process.exit(1);
+      }
+      anchored++;
+    }
+  }
+  console.log(`✓ engine anchors: ${anchored} expression(s) still present in electron/reports/*`);
+
+  // 2. Regeneration must be byte-identical, and GIT is what says so — not this
+  //    script comparing a string to itself. The file is rewritten from the fixed
+  //    seed and `git diff --exit-code` decides, exactly as the goldens job does.
+  //    (It used to be an in-memory compare with a carve-out for the recorded
+  //    runtime version; a comparison whose exceptions the script defines is a
+  //    weaker thing than one it cannot influence.)
+  // Two questions, and they are NOT the same one — which is why regeneration
+  // happens between them rather than before both:
+  //
+  //   onDiskDrifted  what was on disk vs what the generator makes. This is the
+  //                  hand-edit detector, and it must be read BEFORE the file is
+  //                  rewritten, because rewriting destroys the evidence.
+  //   git diff       the regenerated file vs what is COMMITTED. This catches the
+  //                  case the first cannot see: a working tree that happens to be
+  //                  right while the staged/committed bytes are not.
+  //
+  // Only the second is decided by git, and that is the point — the goldens job
+  // hands the verdict to `git diff --exit-code` rather than to the script that
+  // produced the file, and this now does the same.
+  const onDiskDrifted = committed !== text;
+  writeFileSync(OUT_FILE, text, 'utf8');
+  const rel = 'native/SoloLedger/Tests/SoloLedgerCoreTests/Fixtures/reportmath/js-numeric-semantics.json';
+  // Against the INDEX, not HEAD — the same comparison the goldens job makes. On
+  // CI the two are identical (a fresh checkout), so a hand-edited corpus that was
+  // COMMITTED is caught either way; locally, comparing against HEAD would mean a
+  // legitimate regeneration failed its own check until it was committed.
+  const diff = spawnSync('git', ['diff', '--exit-code', '--stat', '--', rel],
+                         { cwd: ROOT, encoding: 'utf8' });
+  const committedDrifted = diff.status !== 0;
+  if (onDiskDrifted || committedDrifted) {
+    console.error('✗ reportmath corpus is not what the generator produces.');
+    if (onDiskDrifted) {
+      console.error('  The file ON DISK differed from the fixed-seed regeneration — it was');
+      console.error('  hand-edited, or the generator changed without regenerating.');
+    }
+    if (committedDrifted) {
+      console.error('  The COMMITTED bytes differ from the regeneration:');
+      console.error((diff.stdout || diff.stderr).trimEnd());
+    }
+    console.error('\n  The regenerated file is now on disk. Inspect and commit it if intended:');
+    console.error(`    git diff -- ${rel}`);
     process.exit(1);
   }
-  const wasBuiltBy = JSON.parse(committed).header.generatedWith;
-  if (wasBuiltBy.v8 !== process.versions.v8) {
-    console.log(`  note: corpus was generated under v8=${wasBuiltBy.v8}, verifying under ` +
-                `v8=${process.versions.v8} — every case is re-executed below.`);
-  }
 
-  // 2. Re-evaluate every COMMITTED case against live JS. Strictly redundant with
+  // 3. Re-evaluate every COMMITTED case against live JS. Strictly redundant with
   //    the byte diff, and kept because the failure message is the useful one: it
   //    names the operation and the input rather than saying "a file differs".
   const parsed = JSON.parse(committed);
