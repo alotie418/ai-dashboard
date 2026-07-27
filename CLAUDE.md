@@ -291,10 +291,24 @@ The criteria, all four, measured against the OLD and NEW heads relative to
 1. `git range-diff <oldBase>..<oldHead> <newBase>..<newHead>` reports every
    commit as equivalent (`=`), with no additions or removals.
 2. `git patch-id --stable` over each range gives the same id.
-3. **Every file the PR touches is byte-identical** — compare blob hashes at the
-   two heads, do not infer it from the two checks above. `patch-id` normalizes
-   whitespace, so on its own it would pass a change that alters indentation in a
-   YAML workflow, a Makefile, or a Python file, where whitespace is the meaning.
+3. **The PR's own bytes are unchanged**, checked directly rather than inferred
+   from the two above. `patch-id` normalizes whitespace, so on its own it would
+   pass a change that alters indentation in a YAML workflow, a Makefile, or a
+   Python file, where whitespace IS the meaning. How to check depends on whether
+   `main` also touched the file:
+
+   * **Files only the PR touched** — compare blob hashes at the two heads. They
+     must be identical.
+   * **Files `main` touched too** — a blob comparison is the wrong instrument
+     here and WILL report a false failure: absorbing `main` legitimately changes
+     the file, so the blob differs even when the PR contributed nothing new.
+     Compare **the PR's own diff hunks** instead, byte for byte, with no
+     normalization. (Found the first time this rule was invoked: a doc edited by
+     both the PR and the branch it absorbed failed criterion 3 on content that
+     belonged to the already-merged PR.)
+
+   Do not substitute `patch-id` for the hunk comparison. It is criterion 2, it
+   already passed, and it is exactly the check that cannot see whitespace.
 4. No `Allowed-Golden-Changes` trailer appeared that was not already authorized.
 
 **The criteria output must be posted in the session before merging** — the
