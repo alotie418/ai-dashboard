@@ -24,10 +24,20 @@ final class ReportMathTests: XCTestCase {
         let numberCases: [[Any]]
     }
 
+    /// Loads the corpus, or FAILS.
+    ///
+    /// Deliberately not `XCTSkip`. A skip is the wrong failure mode for the only
+    /// thing in the repository that checks Swift against V8: dropping one line
+    /// from `Package.swift`'s `resources:` would delete the entire differential
+    /// replay and `swift test` would still exit 0, with `check:reportmath` none
+    /// the wiser because it re-executes the corpus in node and never looks at
+    /// Swift. A suite that reports success while checking nothing is worse than a
+    /// red one, so a missing resource is an error.
     private func loadCorpus() throws -> Corpus {
-        guard let dir = Bundle.module.url(forResource: "reportmath", withExtension: nil) else {
-            throw XCTSkip("reportmath corpus missing from the test bundle")
-        }
+        let dir = try XCTUnwrap(Bundle.module.url(forResource: "reportmath", withExtension: nil),
+                                "reportmath corpus is not in the test bundle — check the " +
+                                "resources: list in Package.swift. This must FAIL, never skip: " +
+                                "without the corpus nothing here is verified against V8.")
         let data = try Data(contentsOf: dir.appendingPathComponent("js-numeric-semantics.json"))
         let root = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         return Corpus(
@@ -202,15 +212,26 @@ final class ReportMathTests: XCTestCase {
 
         // Per-op floor. A single case per op would satisfy the set equality above
         // while testing essentially nothing.
-        let counts = try XCTUnwrap(corpus.header["counts"] as? [String: Any])
-        let byOp = try XCTUnwrap(counts["byOp"] as? [String: Int])
+        //
+        // Counted from `corpus.cases` itself, NOT from the header's self-reported
+        // `counts` — a floor that trusts the artefact's own summary of itself is
+        // only as good as whatever keeps the summary honest, and that is a second
+        // gate (`check:reportmath`) in a different language. Count what is there.
+        var byOp: [String: Int] = [:]
+        for row in corpus.cases { byOp[(row[0] as? String) ?? "", default: 0] += 1 }
         for op in dispatchableOps {
             XCTAssertGreaterThan(byOp[op] ?? 0, 100, "\(op) is barely covered")
         }
+        // `Number()` is the shim's largest function and its own half of the corpus,
+        // reached by a different code path entirely — without its own floor it could
+        // shrink to a single case and every assertion here would still hold.
+        XCTAssertGreaterThan(corpus.numberCases.count, 150,
+                             "the Number() half of the corpus shrank")
         // Both halves of the corpus must be present: the named adversarial cases
         // AND the fixed-seed random draw (plan constraint 4 — random never reaches
         // the spec edges, and the named set never covers a whole region).
-        let byTag = try XCTUnwrap(counts["byTag"] as? [String: Int])
+        var byTag: [String: Int] = [:]
+        for row in corpus.cases { byTag[(row[3] as? String) ?? "", default: 0] += 1 }
         for tag in ["boundary", "currency", "extreme", "preimage",
                     "truthiness", "clamp", "callsite", "random"] {
             XCTAssertGreaterThan(byTag[tag] ?? 0, 0, "the '\(tag)' case family vanished")
@@ -400,6 +421,62 @@ final class ReportMathTests: XCTestCase {
         XCTAssertEqual(Double("0x1p4"), 16, "the stdlib answer this shim exists to avoid")
         XCTAssertTrue(ReportMath.number(.string("1_000")).isNaN, "separators are source-only")
         XCTAssertEqual(ReportMath.number(.string("017")), 17, "no legacy octal in Number()")
+    }
+
+    /// `ReportMath` keeps a HAND-WRITTEN copy of ECMA-262's `StrWhiteSpace`, and a
+    /// hand-written set is exactly the kind of thing that goes quietly wrong. Every
+    /// one of the 25 members is asserted individually here, in both roles
+    /// (whitespace-only trims to `+0`; a prefix/suffix trims away), because a
+    /// corpus that samples the set cannot distinguish a complete set from one
+    /// missing an entry — an adversarial review deleted U+2001 from the shim and
+    /// the whole suite stayed green.
+    ///
+    /// The negative half matters just as much: `CharacterSet.whitespacesAndNewlines`
+    /// would be the obvious Foundation shortcut, its membership is an ICU decision
+    /// that can move between OS releases, and it does NOT agree with this set.
+    func testTheWhiteSpaceSetMatchesEcma262MemberForMember() {
+        let members: [Unicode.Scalar] = [
+            "\u{0009}", "\u{000A}", "\u{000B}", "\u{000C}", "\u{000D}", "\u{0020}",
+            "\u{00A0}", "\u{1680}", "\u{2000}", "\u{2001}", "\u{2002}", "\u{2003}",
+            "\u{2004}", "\u{2005}", "\u{2006}", "\u{2007}", "\u{2008}", "\u{2009}",
+            "\u{200A}", "\u{2028}", "\u{2029}", "\u{202F}", "\u{205F}", "\u{3000}",
+            "\u{FEFF}",
+        ]
+        XCTAssertEqual(members.count, 25, "StrWhiteSpace has 25 members")
+        for w in members {
+            let s = String(w)
+            XCTAssertEqual(ReportMath.number(.string(s)), 0,
+                           "U+\(String(w.value, radix: 16, uppercase: true)) alone must be +0")
+            XCTAssertEqual(ReportMath.number(.string(s + "12")), 12,
+                           "U+\(String(w.value, radix: 16, uppercase: true)) must trim as a prefix")
+            XCTAssertEqual(ReportMath.number(.string("12" + s)), 12,
+                           "U+\(String(w.value, radix: 16, uppercase: true)) must trim as a suffix")
+        }
+        // Scalars that LOOK blank and are NOT members. U+0085 (NEL) is the sharp
+        // one: Foundation counts it as a newline, ECMA-262 does not.
+        for other: Unicode.Scalar in ["\u{0085}", "\u{200B}", "\u{00AD}", "\u{180E}",
+                                      "\u{2060}", "\u{00B7}"] {
+            XCTAssertTrue(ReportMath.number(.string(String(other))).isNaN,
+                          "U+\(String(other.value, radix: 16, uppercase: true)) is not StrWhiteSpace")
+            XCTAssertTrue(ReportMath.number(.string(String(other) + "12")).isNaN,
+                          "U+\(String(other.value, radix: 16, uppercase: true)) must not be trimmed")
+        }
+    }
+
+    /// The shortest string the radix path accepts. `"0x1"` is three characters, so
+    /// the length gate that decides whether a string is a radix literal at all sits
+    /// exactly on it — and an off-by-one there would make every single-digit
+    /// literal fall through to the decimal parser and answer NaN.
+    func testSingleDigitRadixLiteralsAreAccepted() {
+        XCTAssertEqual(ReportMath.number(.string("0x1")), 1)
+        XCTAssertEqual(ReportMath.number(.string("0xF")), 15)
+        XCTAssertEqual(ReportMath.number(.string("0b1")), 1)
+        XCTAssertEqual(ReportMath.number(.string("0o7")), 7)
+        XCTAssertEqual(ReportMath.number(.string("0x0")), 0)
+        // …and the two-character prefixes with NO digit are still NaN.
+        for empty in ["0x", "0X", "0b", "0o"] {
+            XCTAssertTrue(ReportMath.number(.string(empty)).isNaN, "\(empty) has no digits")
+        }
     }
 
     /// JS's numeric grammar is ASCII-only. Swift's character properties are not:

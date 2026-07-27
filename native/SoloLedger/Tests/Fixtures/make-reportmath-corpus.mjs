@@ -214,17 +214,33 @@ const NUMBER_CASES = [
   ...['25%', '12%', '13%', '0.13', '13'].map((v) => ({ t: 'str', v })),
   // Empty and whitespace-only are +0, which is the most surprising row in the
   // table and the reason Number() cannot be replaced by Double(String).
-  ...['', ' ', '   ', '\t', '\n', '\r', '\u{b}', '\u{c}', '\u{a0}', '\u{feff}',
-    '\u{2028}', '\u{2029}', '\u{3000}', '\u{1680}', '\u{2000}', '\u{200a}',
-    '\u{2007}', '\u{202f}', '\u{205f}'].map((v) => ({ t: 'str', v })),
-  // Trimming: JS trims, Swift's Double(String) does not.
-  ...[' 12 ', '\t12\n', '\u{a0}12\u{feff}', '\u{3000}12', '12\u{b}\u{c}',
-    // Negative controls. U+200B ZWSP and U+00AD SHY LOOK blank but are NOT in
-    // StrWhiteSpace, so these stay NaN — a shim that trimmed by 'looks blank'
-    // instead of by the enumerated set passes everything above and still fails here.
-    '\u{200b}12', '12\u{ad}'].map((v) => ({ t: 'str', v })),
+  // EVERY member of StrWhiteSpace, alone (→ +0) and as a prefix (→ trimmed).
+  // Enumerated exhaustively rather than sampled: the shim carries its own
+  // hand-written copy of this set, and a corpus that exercises only some members
+  // cannot tell a complete set from one missing an entry. (An adversarial review
+  // deleted U+2001 from the shim and the whole suite stayed green — this list is
+  // the fix.) ECMA-262 StrWhiteSpace = WhiteSpace (TAB VT FF ZWNBSP + Zs) +
+  // LineTerminator (LF CR LS PS). Escaped, never literal: an invisible character
+  // in source is unreviewable and editors normalize it away.
+  ...[
+    '\u{9}', '\u{a}', '\u{b}', '\u{c}', '\u{d}', '\u{20}', '\u{a0}', '\u{1680}',
+    '\u{2000}', '\u{2001}', '\u{2002}', '\u{2003}', '\u{2004}', '\u{2005}',
+    '\u{2006}', '\u{2007}', '\u{2008}', '\u{2009}', '\u{200a}', '\u{2028}',
+    '\u{2029}', '\u{202f}', '\u{205f}', '\u{3000}', '\u{feff}',
+  ].flatMap((w) => [{ t: 'str', v: w }, { t: 'str', v: `${w}12` }, { t: 'str', v: `12${w}` }]),
+  ...['', ' ', '   ', '\t\n\r'].map((v) => ({ t: 'str', v })),
+  // Negative controls: scalars that LOOK blank and are NOT in StrWhiteSpace, so
+  // they must stay NaN. A shim that trimmed by "looks blank" — or by
+  // CharacterSet.whitespacesAndNewlines, whose membership is an ICU decision that
+  // can move between OS versions — passes every case above and fails these.
+  ...['\u{85}', '\u{200b}', '\u{ad}', '\u{180e}', '\u{2060}', '\u{b7}']
+    .flatMap((c) => [{ t: 'str', v: c }, { t: 'str', v: `${c}12` }]),
   // Radix literals: JS takes 0b/0o and rejects hex FLOATS; Swift is the reverse.
-  ...['0x10', '0X10', '0xff', '0xFF', '0o17', '0O17', '0b101', '0B101',
+  // Single-digit radix literals FIRST: they are the shortest string the radix
+  // path accepts, so they pin the length gate that decides whether "0x1" is a
+  // radix literal at all. Without one, an off-by-one there is invisible.
+  ...['0x1', '0xF', '0b1', '0o7', '0x0', '0b0',
+    '0x10', '0X10', '0xff', '0xFF', '0o17', '0O17', '0b101', '0B101',
     '0x1p4', '0x', '0b', '0o', '0b2', '0o8', '0xg', '-0x10', '+0x10',
     '0x1fffffffffffff', '0x20000000000000', '0x20000000000001',
     '0x20000000000003', '0xFFFFFFFFFFFFFFFFFFFFFFFF', '0x1p1024', ' 0x10 ',
