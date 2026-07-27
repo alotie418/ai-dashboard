@@ -105,7 +105,11 @@ vatSummary, taxInclusiveSummary, monthlyBreakdown, warnings, cashflowStatement
 
 ### 第 5 批(最后)—— 估算层
 
-唯一读取税率的一批:中国 `taxSurcharge` → `operatingProfit`(税前利润);六地区的 `incomeTax` / `netProfit` / `netMargin`;美国 `selfEmploymentTax` + `estimatedTax` + `warnings[0]`。
+唯一读取税率的一批:中国 `taxSurcharge` → `operatingProfit`(税前利润);六地区的 `incomeTax` / `netProfit` / `netMargin`;美国 `selfEmploymentTax` + `estimatedTax` + **`warnings`(整个数组)**。
+
+> **`warnings` 归属已确认(2026-07-27)**:整个数组归第 5 批,而不只是 `warnings[0]`。理由是索引本身依赖估算层——该数组是一个 `.filter(Boolean)` 字面量(`us.js:111-114`),**净利 ≤ 0 时餐费提示会从 index 1 滑到 index 0**,所以两条提示无法分批发出。
+>
+> R4 因此不发 `warnings`,但在 `ScheduleC` 上带出 `rawMealsTotal`,让第 5 批不必重新镜像整个映射就能求值餐费谓词——该谓词测的是**原始 slug 合计**而非 `line24b_meals`:合计 0.004 会触发提示,而它的 Line 24b 取整为 0。
 
 兜底口径、"未配置"空态、一次性参数确认提示(约束 3)**全部随本批落地**——因为这正好是"设置值一变、数字就变"的字段全集,爆炸半径统一。
 
@@ -431,7 +435,7 @@ R0 的实测把这条从"值判断有风险"升级为**"值判断不可行"**:
 | R1 `ReportMath` | ✅ #404 已合并 |
 | R2 无税率损益核心 | ✅ #407 已合并 |
 | R3 含税汇总 / 月度分解 / 经营现金流 | ✅ #409 已合并 |
-| R4 美国 Schedule C 映射 | 🔨 施工中 |
+| R4 美国 Schedule C 映射 | ✅ #412 已合并 |
 | R5–R8 | ⬜ 未开工 |
 
 **贯穿全阶段的红线**:黄金全冻结。镜像 PR 里出现 `Allowed-Golden-Changes` 尾注即越界——该尾注只属于单独标注的有意修正 PR,且声明是上界不是义务(§3.2)。
@@ -451,6 +455,9 @@ R0 的实测把这条从"值判断有风险"升级为**"值判断不可行"**:
 | A7 | 欧盟用 `profitLoss` 命名 | 与其余引擎的 `incomeStatement` 不一致,已导致 Electron 侧两个下游处理器读到 0 | Electron 侧既有缺陷,单独 PR |
 | A8 | 日元/韩元仍按 2 位小数取整 | 零小数币种也走 `Math.round(v*100)/100` | 显示与取整策略,单独评估 |
 | A9 | `monthlyBreakdown` 恒输出 12 个自然月 | 即使传入的是季度/月度区间,仍按 `ctx.year` 铺满 12 个月 | 与期间选择器的语义一起处理 |
+| A10 | **美国 `other-income` 被计两次** ⚠️ | `line1_grossReceipts` 汇总**全部**收入行,`line6_otherIncome` 再把 `other-income` 子集汇总一次,而 `line7_grossIncome = line1 − line2 + line6` 是**加**回去(`us.js:24`)。实测:一行 900 的 other-income → line1 900 / line6 900 / **line7 1800**。重复**已烘进 `base-US-2026`**(52400 − 1500 + 900 = 51800) | **会计判断,需会计确认**。修正会改动已有期间的毛收入金额,因此必须单独 PR、单独标注,并声明 `Allowed-Golden-Changes` |
+| A11 | **美国 `line30_homeOffice` 被并入 `line28_totalExpenses`** | 真实表格上家庭办公室走 **Form 8829**,Schedule C 的 Line 28 只含 8–27a。`us.js:61-63` 的键过滤把 `line30` 也算了进去。**fixture 自己的 `categories.schedule_line` 列对该 slug 写的正是 "Form 8829"**——账本与引擎对这笔钱的归属意见不一致 | **会计判断,需会计确认**。同上 |
+| A12 | **美国负数 `returns` 行抬高毛收入** | `line7 = line1 − line2 + line6`,而 line2 为负时相当于加。实测:50000 + 一行 −1500 的 returns → line1 48500 / line2 −1500 / **line7 50000**。fixture 不可达,**没有任何黄金约束这个符号** | 需先确定负数 returns 行是否为合法录入;若是,则属会计判断 |
 
 ## 11. 同期跟进(不属本阶段,归 #394 跟进)
 
