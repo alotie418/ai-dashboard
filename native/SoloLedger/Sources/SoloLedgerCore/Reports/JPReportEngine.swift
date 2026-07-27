@@ -54,3 +54,47 @@ public enum JPReportEngine {
         )
     }
 }
+
+// MARK: - Batch 2
+
+public extension JPReportEngine {
+
+    /// `jp.js:50-53` — the tax-inclusive summary.
+    ///
+    /// TAX-INCLUSIVE sums, not the net ones the P&L uses. This engine's rounder
+    /// HAS the `|| 0` guard (`jp.js:14`), unlike China's — so a NaN becomes 0 here
+    /// and `null` there.
+    static func taxInclusiveSummary(_ ctx: ReportContext) -> TaxInclusiveSummary {
+        let r = ReportMath.round2OrZero
+        var totalIncome = 0.0
+        for row in ctx.incomeRows { totalIncome += ReportMath.orZero(row.amount) }
+        var totalExpense = 0.0
+        for row in ctx.expenseRows { totalExpense += ReportMath.orZero(row.amount) }
+        return TaxInclusiveSummary(
+            purchaseTotal: r(totalExpense),
+            salesTotal: r(totalIncome),
+            // The subtraction is rounded ONCE; `r(a) - r(b)` can differ by a cent.
+            difference: r(totalIncome - totalExpense))
+    }
+
+    /// `jp.js:59-69` — the monthly breakdown.
+    ///
+    /// Twelve entries keyed on `ctx.year`, never on the reporting period
+    /// (Appendix A9). Uses the optional-chained date spelling and the guarded
+    /// rounder.
+    static func monthlyBreakdown(_ ctx: ReportContext) -> [ReportMonth] {
+        let r = ReportMath.round2OrZero
+        return ReportMonth.prefixes(year: ctx.year).enumerated().map { index, prefix in
+            var revenue = 0.0
+            for row in ctx.incomeRows where MonthMatch.optionalChained(row.date, prefix) {
+                revenue += ReportMath.netAmount(row.amountNet, row.amount)
+            }
+            var cost = 0.0
+            for row in ctx.expenseRows where MonthMatch.optionalChained(row.date, prefix) {
+                cost += ReportMath.netAmount(row.amountNet, row.amount)
+            }
+            return ReportMonth(month: index + 1, revenue: r(revenue), cost: r(cost),
+                               profit: r(revenue - cost))
+        }
+    }
+}
