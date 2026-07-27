@@ -50,6 +50,12 @@ let package = Package(
                 // Report-parity fixture + golden engine outputs, built by
                 // Tests/Fixtures/make-report-fixture.mjs and make-report-goldens.mjs.
                 .copy("Fixtures/reports"),
+                // V8 numeric-semantics corpus for ReportMath, built by
+                // Tests/Fixtures/make-reportmath-corpus.mjs. Deliberately NOT under
+                // Fixtures/reports/goldens — the golden-change allowlist
+                // (scripts/check-golden-changes.mjs) guards that directory, and this
+                // corpus is not a golden: it records JS arithmetic, not engine output.
+                .copy("Fixtures/reportmath"),
             ]
         ),
     ]
