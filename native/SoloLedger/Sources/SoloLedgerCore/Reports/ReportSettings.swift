@@ -41,6 +41,63 @@ public enum ReportSettings {
         return rows.first?.string("value")
     }
 
+    /// `settingRowExists` — mirror of `electron/reports/index.js:23-33` (the function itself is `:29-33`).
+    ///
+    /// ```js
+    /// function settingRowExists(db, key) {
+    ///   try {
+    ///     return !!db.prepare('SELECT 1 AS present FROM settings WHERE key = ?').get(key);
+    ///   } catch { return false; }
+    /// }
+    /// ```
+    ///
+    /// A SEPARATE query, not `rawValue(...) != nil`. The two agree today —
+    /// `settings.value` is `TEXT NOT NULL` in both schemas — so this is not a bug
+    /// fix; it is the question being asked in the form it is meant. `rawValue`
+    /// reads the VALUE and would report a row with a SQL NULL value as no row at
+    /// all, which is the one confusion A-3 cannot afford. Asking about the row
+    /// stays correct if that column ever loosens.
+    ///
+    /// The `catch` is load-bearing for the same reason it is in ``rawValue``: on an
+    /// early-schema database the `settings` table may not exist, and `index.js:31`
+    /// swallows that too. "Cannot ask" answers false, which for a non-Chinese
+    /// regime means not-configured — the honest reading, since a ledger with no
+    /// settings table has certainly not configured a tax rate.
+    static func rowExists(_ db: SQLiteDatabase, _ key: String) -> Bool {
+        guard let rows = try? db.query("SELECT 1 AS present FROM settings WHERE key = ?",
+                                       [.text(key)])
+        else { return false }
+        return !rows.isEmpty
+    }
+
+    /// `index.js:88-99` — the income-tax rate, as the three states of plan §6.2.
+    ///
+    /// ```js
+    /// const incomeTaxRate = (locale === 'CN' || settingRowExists(db, 'income_tax_rate'))
+    ///   ? Number(readSetting(db, 'income_tax_rate', 25))
+    ///   : null;
+    /// ```
+    ///
+    /// The order of the two conditions is the mirror's, and it matters: China never
+    /// asks about the row, so a Chinese ledger's behaviour is byte-for-byte what it
+    /// was before scheme A landed.
+    ///
+    /// - Parameter locale: the ALREADY-RESOLVED accounting locale — the one the
+    ///   dispatcher will route on (`index.js:27`), not whatever is in `settings`.
+    ///   Passing the stored value where an explicit `opts.locale` overrode it would
+    ///   gate on one regime and compute under another.
+    public static func incomeTaxRate(_ db: SQLiteDatabase, locale: String) -> IncomeTaxRateSetting {
+        if locale == "CN" {
+            // A-2: China keeps the fallback. Whether the row exists still decides
+            // WHICH case, because "the app applied 25" and "the user stored 25" are
+            // different facts even when they are the same number.
+            guard rowExists(db, "income_tax_rate") else { return .chinaFallback(25) }
+            return .configured(number(db, "income_tax_rate", fallback: 25))
+        }
+        guard rowExists(db, "income_tax_rate") else { return .notConfigured }
+        return .configured(number(db, "income_tax_rate", fallback: 25))
+    }
+
     /// `readSetting(db, key, fallback)` for a STRING-valued setting
     /// (`accounting_locale`, `currency`).
     public static func string(_ db: SQLiteDatabase, _ key: String, fallback: String) -> String {

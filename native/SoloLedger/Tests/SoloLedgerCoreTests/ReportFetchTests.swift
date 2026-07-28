@@ -66,7 +66,8 @@ final class ReportFetchTests: LedgerTestCase {
             "SELECT SUM(amount_net) AS s FROM transactions WHERE date >= ? AND date <= ?",
             [.text("2025-01-01"), .text("2025-12-31")]).first?.double("s"))
         let ctx = ReportContext(incomeRows: rows, expenseRows: [], categories: [],
-                                adminExpense: 0, currency: "CNY",
+                                adminExpense: 0, incomeTaxRate: .notConfigured,
+                                currency: "CNY",
                                 year: "2025", from: "2025-01-01", to: "2025-12-31")
         XCTAssertEqual(CNReportEngine.taxInclusiveSummary(ctx).salesTotal,
                        ReportMath.round2(sqlSum), accuracy: 0.011,

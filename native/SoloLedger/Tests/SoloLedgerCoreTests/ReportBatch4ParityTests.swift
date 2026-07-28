@@ -137,6 +137,7 @@ final class ReportBatch4ParityTests: LedgerTestCase {
             incomeRows: income, expenseRows: expense,
             categories: (try? ReportFetch.categories(db, locale: locale)) ?? [],
             adminExpense: ReportSettings.number(db, "admin_expense_annual", fallback: 0),
+            incomeTaxRate: ReportSettings.incomeTaxRate(db, locale: locale),
             currency: ReportSettings.string(db, "currency", fallback: "CNY"),
             year: p.year, from: p.from, to: p.to)
     }
@@ -291,7 +292,8 @@ final class ReportBatch4ParityTests: LedgerTestCase {
     /// `nil` means no Swift type exists for that report type yet.
     private func mirroredFieldNames(locale: String, reportTypeID: String) -> Set<String>? {
         let ctx = ReportContext(incomeRows: [], expenseRows: [], categories: [],
-                                adminExpense: 0, currency: "CNY", year: "2026",
+                                adminExpense: 0, incomeTaxRate: .notConfigured,
+                                currency: "CNY", year: "2026",
                                 from: "2026-01-01", to: "2026-12-31")
         let block: Any?
         switch (locale, reportTypeID) {
