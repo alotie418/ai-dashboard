@@ -141,6 +141,7 @@ final class ReportBatch2ParityTests: LedgerTestCase {
             expenseRows: try legacyRows(db, table: "purchases", from: from, to: to),
             categories: (try? ReportFetch.categories(db, locale: locale)) ?? [],
             adminExpense: ReportSettings.number(db, "admin_expense_annual", fallback: 0),
+            incomeTaxRate: ReportSettings.incomeTaxRate(db, locale: locale),
             currency: ReportSettings.string(db, "currency", fallback: "CNY"),
             year: year, from: from, to: to)
     }
@@ -186,6 +187,7 @@ final class ReportBatch2ParityTests: LedgerTestCase {
                             expenseRows: try ReportFetch.rows(db, type: "expense", from: p.from, to: p.to),
                             categories: (try? ReportFetch.categories(db, locale: locale)) ?? [],
                             adminExpense: ReportSettings.number(db, "admin_expense_annual", fallback: 0),
+                            incomeTaxRate: ReportSettings.incomeTaxRate(db, locale: locale),
                             currency: ReportSettings.string(db, "currency", fallback: "CNY"),
                             year: p.year, from: p.from, to: p.to)
                     } else {

@@ -236,8 +236,12 @@ final class ReportBatch2BlindSpotTests: XCTestCase {
 
     private func ctx(income: [ReportRow], expense: [ReportRow], year: String = "2025",
                      from: String = "2025-01-01", to: String = "2025-12-31") -> ReportContext {
+        // Batch 2 reads no tax rate (plan §2); `.notConfigured` is the strictest
+        // filler — a batch that started reading one would produce nothing rather
+        // than quietly pricing at some default.
         ReportContext(incomeRows: income, expenseRows: expense, categories: [],
-                      adminExpense: 0, currency: "X", year: year, from: from, to: to)
+                      adminExpense: 0, incomeTaxRate: .notConfigured,
+                      currency: "X", year: year, from: from, to: to)
     }
 
     /// `difference` is `r(income - expense)`, rounded ONCE.

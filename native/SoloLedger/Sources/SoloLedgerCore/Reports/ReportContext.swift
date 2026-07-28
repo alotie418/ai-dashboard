@@ -1,26 +1,48 @@
 import Foundation
 
-/// The inputs the batch-1 engines read.
+/// The inputs the engines read.
 ///
-/// This is a DELIBERATELY SMALL subset of the dispatcher's context
-/// (`index.js:80-84`). The plan's batching seam is "does this field read a
-/// `settings` value" (§2), and batch 1 is the largest set that reads none — so the
-/// three tax rates are absent from this type, not merely unused by it. Adding them
-/// "for later" would erase the seam the batch exists to draw.
+/// A DELIBERATELY SMALL subset of the dispatcher's context (`index.js:80-84`). The
+/// plan's batching seam is "does this field read a `settings` value" (§2), and
+/// batch 1 was the largest set that reads none — which is why this type carried no
+/// tax rate at all through R2–R5, and why adding one "for later" would have erased
+/// the seam those batches existed to draw.
+///
+/// **R6 is the batch where that stops being true**, for exactly one field.
+/// ``incomeTaxRate`` is here because R6's whole subject is the parameter's three
+/// states and getting them to the engines intact; the estimate layer that READS the
+/// rate is R7. So the field arrives one batch before its first consumer, on purpose
+/// and once — the alternative was for R7 to introduce both the state model and the
+/// arithmetic that depends on it in a single diff, where a mistake in the former
+/// would be reviewed as if it were part of the latter.
+///
+/// The other two rates stay absent:
+///
+/// * `surchargeRate` — read by China alone (`cn.js:33`), and it has no missing
+///   state to model: China keeps its 12 fallback (A-2) and no other engine reads
+///   it, so a three-state type for it would describe a situation that cannot
+///   occur. It arrives with R7, as a plain `Double`, next to the arithmetic.
+/// * `vatRate` — the dispatcher loads it (`index.js:74`, `:83`) and NO engine reads
+///   it (plan Appendix A6). Porting it as a live parameter would mirror a bug.
 ///
 /// `adminExpense` is here and is not an exception: `admin_expense_annual` falls
-/// back to 0 regardless of regime (`index.js:77`), so it needs no fallback policy,
-/// no empty state and no confirmation prompt.
-///
-/// `vatRate` is absent for a different reason — the dispatcher loads it
-/// (`index.js:74`, `:83`) and NO engine reads it (plan Appendix A6). Porting it as
-/// a live parameter would mirror a bug.
+/// back to 0 regardless of regime (`index.js:100`), so it needs no fallback policy,
+/// no empty state and no confirmation prompt. It is **not** a tax rate and scheme A
+/// deliberately does not gate on it — a missing admin-expense row still means 0,
+/// and operating profit is therefore unaffected by everything above.
 public struct ReportContext: Equatable, Sendable {
     public let incomeRows: [ReportRow]
     public let expenseRows: [ReportRow]
     public let categories: [ReportCategory]
     /// `admin_expense_annual`, already coerced the way the dispatcher coerces it.
     public let adminExpense: Double
+    /// `income_tax_rate` as the three states of plan §6.2 — resolved from whether
+    /// the settings ROW exists, never from a computed figure (A-3).
+    ///
+    /// Every engine in R7 must branch on this. There is no `Double` spelling of it
+    /// for the same reason `index.js` hands the engines `null`: a rate that is not
+    /// there must be impossible to multiply by.
+    public let incomeTaxRate: IncomeTaxRateSetting
     public let currency: String
     public let year: String
     public let from: String
@@ -28,11 +50,13 @@ public struct ReportContext: Equatable, Sendable {
 
     public init(incomeRows: [ReportRow], expenseRows: [ReportRow],
                 categories: [ReportCategory], adminExpense: Double,
+                incomeTaxRate: IncomeTaxRateSetting,
                 currency: String, year: String, from: String, to: String) {
         self.incomeRows = incomeRows
         self.expenseRows = expenseRows
         self.categories = categories
         self.adminExpense = adminExpense
+        self.incomeTaxRate = incomeTaxRate
         self.currency = currency
         self.year = year
         self.from = from

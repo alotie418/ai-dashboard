@@ -128,6 +128,7 @@ final class ReportBatch3ParityTests: LedgerTestCase {
             incomeRows: income, expenseRows: expense,
             categories: (try? ReportFetch.categories(db, locale: "US")) ?? [],
             adminExpense: ReportSettings.number(db, "admin_expense_annual", fallback: 0),
+            incomeTaxRate: ReportSettings.incomeTaxRate(db, locale: "US"),
             currency: ReportSettings.string(db, "currency", fallback: "CNY"),
             year: p.year, from: p.from, to: p.to)
     }

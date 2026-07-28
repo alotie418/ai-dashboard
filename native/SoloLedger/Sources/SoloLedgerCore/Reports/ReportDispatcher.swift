@@ -66,15 +66,7 @@ public enum ReportDispatcher {
                                 to explicitTo: String? = nil) throws -> BatchTwo {
 
         // index.js:27 — the opts value wins, else the stored setting, else 'CN'.
-        let locale = explicitLocale
-            ?? ReportSettings.string(db, "accounting_locale", fallback: "CN")
-        // index.js:29-31 — an unknown locale THROWS. Note this is NOT
-        // `SettingsStore.accountingLocale()`, which silently answers .CN for an
-        // unrecognised value: a ledger stamped "FR" would then be rendered under
-        // Chinese rules with no indication.
-        guard ["CN", "US", "JP", "EU", "KR", "TW"].contains(locale) else {
-            throw Failure.unsupportedLocale(locale)
-        }
+        let locale = try resolveLocale(db, explicitLocale)
 
         let year = explicitYear ?? String(Calendar(identifier: .gregorian)
             .component(.year, from: Date()))                       // index.js:33
@@ -88,22 +80,8 @@ public enum ReportDispatcher {
         let source = selectReportSource(hasTransactionsTable: hasTable,
                                         periodTxnCount: periodTxnCount)
 
-        // The legacy branch stops here. Rows are read only when the source is
-        // `transactions`; otherwise the engines see nothing, which is the honest
-        // consequence of §6.1 rather than a bug.
-        let incomeRows = source == .transactions
-            ? try ReportFetch.rows(db, type: "income", from: from, to: to) : []
-        let expenseRows = source == .transactions
-            ? try ReportFetch.rows(db, type: "expense", from: from, to: to) : []
-        // index.js:68-71 — the categories read is wrapped in a swallowing catch
-        // because the table may not exist on an early-schema database.
-        let categories = (try? ReportFetch.categories(db, locale: locale)) ?? []
-
-        let ctx = ReportContext(
-            incomeRows: incomeRows, expenseRows: expenseRows, categories: categories,
-            adminExpense: ReportSettings.number(db, "admin_expense_annual", fallback: 0),
-            currency: ReportSettings.string(db, "currency", fallback: "CNY"),
-            year: year, from: from, to: to)
+        let ctx = try context(db, locale: locale, source: source,
+                              year: year, from: from, to: to)
 
         let taxInclusive: TaxInclusiveSummary?
         let monthly: [ReportMonth]
@@ -128,6 +106,57 @@ public enum ReportDispatcher {
             warnings: [],
             // index.js:90 — appended LAST, after the engine has run.
             cashflowStatement: try cashflow(db, source: source, from: from, to: to))
+    }
+
+    /// `index.js:27-31` — the effective accounting locale, or a throw.
+    ///
+    /// Extracted so that anything else needing the locale (``context(_:locale:source:year:from:to:)``
+    /// resolves the income-tax rate against it) asks the SAME question. Note this is
+    /// NOT `SettingsStore.accountingLocale()`, which silently answers `.CN` for an
+    /// unrecognised value: a ledger stamped "FR" would then be rendered under
+    /// Chinese rules with no indication.
+    static func resolveLocale(_ db: SQLiteDatabase, _ explicit: String?) throws -> String {
+        let locale = explicit ?? ReportSettings.string(db, "accounting_locale", fallback: "CN")
+        guard ["CN", "US", "JP", "EU", "KR", "TW"].contains(locale) else {
+            throw Failure.unsupportedLocale(locale)      // index.js:29-31
+        }
+        return locale
+    }
+
+    /// `index.js:47-102` — the rows, the categories and the settings the engines see.
+    ///
+    /// Split out of ``batchTwo(_:locale:year:from:to:)`` for one reason: the
+    /// income-tax rate's three states (plan §6.2) are decided HERE, from the
+    /// database, and R6 has no engine that consumes them yet — R7's estimate layer
+    /// is where they are first multiplied by anything. A test that could only
+    /// observe them through a finished report would have to wait for R7 to exist,
+    /// which is how a resolution rule ships unverified.
+    ///
+    /// The legacy branch is absent, per §6.1: rows are read only when the source is
+    /// `transactions`; otherwise the engines see nothing, which is the honest
+    /// consequence of not mirroring `index.js:56-65` rather than a bug.
+    ///
+    /// - Parameter locale: already resolved and validated by ``resolveLocale(_:_:)``.
+    ///   The rate gate reads it, so handing it the stored setting where an explicit
+    ///   `opts.locale` overrode it would gate on one regime and compute under another.
+    static func context(_ db: SQLiteDatabase, locale: String, source: ReportSource,
+                        year: String, from: String, to: String) throws -> ReportContext {
+        let incomeRows = source == .transactions
+            ? try ReportFetch.rows(db, type: "income", from: from, to: to) : []
+        let expenseRows = source == .transactions
+            ? try ReportFetch.rows(db, type: "expense", from: from, to: to) : []
+        // index.js:79-83 — the categories read is wrapped in a swallowing catch
+        // because the table may not exist on an early-schema database.
+        let categories = (try? ReportFetch.categories(db, locale: locale)) ?? []
+
+        return ReportContext(
+            incomeRows: incomeRows, expenseRows: expenseRows, categories: categories,
+            adminExpense: ReportSettings.number(db, "admin_expense_annual", fallback: 0),
+            // index.js:88-99 — scheme A. Decided by whether the ROW exists, never by
+            // the number it would have produced (A-3).
+            incomeTaxRate: ReportSettings.incomeTaxRate(db, locale: locale),
+            currency: ReportSettings.string(db, "currency", fallback: "CNY"),
+            year: year, from: from, to: to)
     }
 
     /// `_cashflow.js:40-97`, transactions branch only.

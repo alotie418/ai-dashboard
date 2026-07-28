@@ -19,8 +19,11 @@ final class ReportBatch4BlindSpotTests: XCTestCase {
 
     private func ctx(income: [ReportRow] = [], expense: [ReportRow] = [],
                      adminExpense: Double = 0, currency: String = "CNY") -> ReportContext {
+        // The turnover-tax blocks read no rate at all — they sum recorded
+        // `tax_amount` (plan §0). `.notConfigured` is the strictest filler.
         ReportContext(incomeRows: income, expenseRows: expense, categories: [],
-                      adminExpense: adminExpense, currency: currency, year: "2026",
+                      adminExpense: adminExpense, incomeTaxRate: .notConfigured,
+                      currency: currency, year: "2026",
                       from: "2026-01-01", to: "2026-12-31")
     }
 

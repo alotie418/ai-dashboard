@@ -22,8 +22,12 @@ final class ReportBatch3BlindSpotTests: XCTestCase {
 
     private func ctx(income: [ReportRow] = [], expense: [ReportRow] = [],
                      categories: [ReportCategory] = [], year: String = "2026") -> ReportContext {
+        // Batch 3 (Schedule C) is measurably rate-independent — see
+        // `testScheduleCIsUnaffectedByEveryRateVariant`. `.notConfigured` is the
+        // strictest filler.
         ReportContext(incomeRows: income, expenseRows: expense, categories: categories,
-                      adminExpense: 0, currency: "USD", year: year,
+                      adminExpense: 0, incomeTaxRate: .notConfigured,
+                      currency: "USD", year: year,
                       from: "\(year)-01-01", to: "\(year)-12-31")
     }
 
