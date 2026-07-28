@@ -67,6 +67,7 @@ final class ReportFetchTests: LedgerTestCase {
             [.text("2025-01-01"), .text("2025-12-31")]).first?.double("s"))
         let ctx = ReportContext(incomeRows: rows, expenseRows: [], categories: [],
                                 adminExpense: 0, incomeTaxRate: .notConfigured,
+                                surchargeRate: .notConfigured,
                                 currency: "CNY",
                                 year: "2025", from: "2025-01-01", to: "2025-12-31")
         XCTAssertEqual(CNReportEngine.taxInclusiveSummary(ctx).salesTotal,

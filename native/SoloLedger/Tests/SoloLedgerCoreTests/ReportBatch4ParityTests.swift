@@ -138,6 +138,7 @@ final class ReportBatch4ParityTests: LedgerTestCase {
             categories: (try? ReportFetch.categories(db, locale: locale)) ?? [],
             adminExpense: ReportSettings.number(db, "admin_expense_annual", fallback: 0),
             incomeTaxRate: ReportSettings.incomeTaxRate(db, locale: locale),
+            surchargeRate: ReportSettings.surchargeRate(db, locale: locale),
             currency: ReportSettings.string(db, "currency", fallback: "CNY"),
             year: p.year, from: p.from, to: p.to)
     }
@@ -293,6 +294,7 @@ final class ReportBatch4ParityTests: LedgerTestCase {
     private func mirroredFieldNames(locale: String, reportTypeID: String) -> Set<String>? {
         let ctx = ReportContext(incomeRows: [], expenseRows: [], categories: [],
                                 adminExpense: 0, incomeTaxRate: .notConfigured,
+                                surchargeRate: .notConfigured,
                                 currency: "CNY", year: "2026",
                                 from: "2026-01-01", to: "2026-12-31")
         let block: Any?

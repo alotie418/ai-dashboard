@@ -33,7 +33,7 @@ final class ReportBatch1BlindSpotTests: XCTestCase {
             // Batches 1-4 read no tax rate at all (plan §2). `.notConfigured` is the
             // strictest filler: if this batch ever started reading one, it would
             // produce nothing rather than quietly pricing at some default.
-            incomeTaxRate: .notConfigured, currency: "X",
+            incomeTaxRate: .notConfigured, surchargeRate: .notConfigured, currency: "X",
             year: "2025", from: "2025-01-01", to: "2025-12-31")
     }
 
