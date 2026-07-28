@@ -58,6 +58,29 @@ public extension TWReportEngine {
             difference: r(totalIncome - totalExpense))
     }
 
+    /// `tw.js:29`, `:41-43` — 營業稅.
+    ///
+    /// Field-for-field identical to Japan's block and named differently
+    /// (`businessTax` vs `consumptionTax`) for a different tax. Kept as its own
+    /// type for the same reason Korea's is.
+    static func businessTax(_ ctx: ReportContext) -> TWBusinessTax {
+        let r = ReportMath.round2OrZero
+        // tw.js:18 / :21
+        var totalIncomeTax = 0.0
+        for row in ctx.incomeRows { totalIncomeTax += ReportMath.orZero(row.taxAmount) }
+        var totalExpenseTax = 0.0
+        for row in ctx.expenseRows { totalExpenseTax += ReportMath.orZero(row.taxAmount) }
+
+        // tw.js:29 — the local name is `businessTaxPayable`.
+        let businessTaxPayable = r(ReportMath.max(0, totalIncomeTax - totalExpenseTax))
+
+        return TWBusinessTax(
+            collected: r(totalIncomeTax),                                // tw.js:42
+            paid: r(totalExpenseTax),                                    // tw.js:42
+            payable: businessTaxPayable,                                 // tw.js:42 — NOT re-rounded
+            unclampedDifference: r(totalIncomeTax - totalExpenseTax))    // not in tw.js
+    }
+
     /// `tw.js:52-62` — the monthly breakdown.
     ///
     /// Twelve entries keyed on `ctx.year`, never on the reporting period

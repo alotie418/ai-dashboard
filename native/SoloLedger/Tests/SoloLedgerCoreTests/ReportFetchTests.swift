@@ -19,10 +19,13 @@ final class ReportFetchTests: LedgerTestCase {
     private func largeLedger(rows: Int) throws -> (SQLiteDatabase, expectedSum: Double) {
         let db = try SQLiteDatabase(path: try trackedTempDir()
             .appendingPathComponent("large.db").path, mode: .readWriteCreate)
+        // `tax_amount` is part of the real schema (SchemaMigrator.swift:165) and
+        // joined the report projection in batch 4; this synthetic table carries it
+        // so the fetch under test is the one production runs.
         try db.execute("""
             CREATE TABLE transactions (id TEXT, type TEXT, date TEXT, amount REAL,
-              amount_net REAL, category_id TEXT, paid_amount REAL, payment_status TEXT,
-              payment_date TEXT)
+              amount_net REAL, tax_amount REAL, category_id TEXT, paid_amount REAL,
+              payment_status TEXT, payment_date TEXT)
             """)
         try db.execute("BEGIN")
         var expected = 0.0
@@ -33,7 +36,7 @@ final class ReportFetchTests: LedgerTestCase {
             let month = String(format: "%02d", (i % 12) + 1)
             try db.execute("""
                 INSERT INTO transactions VALUES ('t\(i)', 'income', '2025-\(month)-15',
-                  \(net), \(net), NULL, \(net), 'paid', NULL)
+                  \(net), \(net), 0, NULL, \(net), 'paid', NULL)
                 """)
         }
         try db.execute("COMMIT")
@@ -113,7 +116,9 @@ final class ReportFetchTests: LedgerTestCase {
         for sql in [ReportFetch.rowSQL(type: "income"), ReportFetch.cashflowSQL] {
             XCTAssertFalse(sql.contains("SELECT *"), "report reads must project explicitly")
         }
-        XCTAssertEqual(ReportFetch.rowColumns, "amount_net, amount, category_id, date",
+        // `tax_amount` joined the projection in batch 4 — it is the turnover-tax
+        // blocks' only input, and nothing else reads it.
+        XCTAssertEqual(ReportFetch.rowColumns, "amount_net, amount, tax_amount, category_id, date",
                        "exactly the columns the engines read — widening this is not free")
     }
 

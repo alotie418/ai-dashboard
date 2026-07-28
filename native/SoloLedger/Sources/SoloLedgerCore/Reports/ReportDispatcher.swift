@@ -32,9 +32,12 @@ public enum ReportDispatcher {
     /// comes from `year`, not from `[from, to]`, so without the period beside it
     /// the Appendix A9 mismatch would leave no trace in the output at all.
     ///
-    /// `reportTypes` is absent — it carries jurisdiction-specific names
-    /// (「消費税概要」and the like) whose review is batch 4 / R5's job, and shipping
-    /// it here would mean shipping wording no six-language check has looked at.
+    /// `reportTypes` is absent from THIS struct and stays absent. Batch 4 mirrored
+    /// it as ``ReportTypes``, where the review it was waiting for is recorded: the
+    /// `name` maps are historical copy covering two or three of six UI languages
+    /// and carrying four defects, so they are mirrored verbatim and are not display
+    /// strings. Putting them in a batch-2 result would hand a view a `name` it
+    /// would reasonably render.
     public struct BatchTwo: Equatable, Sendable {
         public let locale: String
         public let year: String

@@ -107,6 +107,42 @@ public extension CNReportEngine {
             difference: ReportMath.round2(totalIncome - totalExpense))
     }
 
+    /// `cn.js:69-75` — 增值税统计, plus the disclosure the clamp would hide.
+    ///
+    /// Reads `tax_amount` and nothing else — no rate, no `amount`, no `amount_net`.
+    ///
+    /// `round2` (not `round2OrZero`) because `cn.js:43` is the rounder without the
+    /// `|| 0`. Stated honestly, as in ``taxInclusiveSummary(_:)``: here that is a
+    /// FIDELITY choice, not a behavioural one. `cn.js:20` and `:23` already guard
+    /// each term with `(r.tax_amount || 0)`, so a NaN tax contributes 0 and no NaN
+    /// can reach the rounder. Measured in node — a NaN tax on one of two rows gives
+    /// `{20, 50, 20, 50, 30}` under China exactly as it does under Japan.
+    static func vatSummary(_ ctx: ReportContext) -> CNVATSummary {
+        // cn.js:20 / :23
+        var totalIncomeTax = 0.0
+        for row in ctx.incomeRows { totalIncomeTax += ReportMath.orZero(row.taxAmount) }
+        var totalExpenseTax = 0.0
+        for row in ctx.expenseRows { totalExpenseTax += ReportMath.orZero(row.taxAmount) }
+
+        // cn.js:32 — the clamp. `ReportMath.max`, not `Swift.max`: the two differ
+        // on NaN and on signed zero, and this is the same expression whose NaN
+        // behaviour makes `malformed-CN-2025` record nulls further down the file.
+        let vatPayable = ReportMath.max(0, totalIncomeTax - totalExpenseTax)
+        let r = ReportMath.round2
+
+        return CNVATSummary(
+            cumulativeInput: r(totalExpenseTax),        // cn.js:70
+            cumulativeOutput: r(totalIncomeTax),        // cn.js:71
+            certifiedInput: r(totalExpenseTax),         // cn.js:72 — the SAME expression as :70
+            invoicedOutput: r(totalIncomeTax),          // cn.js:73 — the SAME expression as :71
+            estimatedPayable: r(vatPayable),            // cn.js:74
+            // NOT in cn.js. The clamp above reports a credit position as 0; this
+            // carries what it discarded. Rounded ONCE, with this engine's rounder,
+            // so it is comparable with `estimatedPayable` rather than being a
+            // differently-scaled number.
+            unclampedDifference: r(totalIncomeTax - totalExpenseTax))
+    }
+
     /// `cn.js:91-108` — 月度明细.
     ///
     /// China rounds INLINE here (`cn.js:102-104`) rather than through `r`, but the

@@ -1,0 +1,202 @@
+import Foundation
+
+/// One entry of `reportTypes` — every engine's fourth top-level key
+/// (`cn.js:4-8`, `jp.js:3-6`, `eu.js:3-6`, `kr.js:3-6`, `tw.js:3-6`, `us.js:3-6`).
+///
+/// The `id` is a stable identifier. The `name` map is HISTORICAL COPY and is
+/// mirrored verbatim, gaps and all — see ``ReportTypeEntry/name``.
+public struct ReportTypeEntry: Equatable, Sendable {
+    public let id: String
+
+    /// The engine's own `name` map, byte for byte, INCLUDING what is wrong with it.
+    ///
+    /// **This is not display copy and must not be rendered.** The app ships six UI
+    /// languages; no entry here carries more than three, and the batch that
+    /// reviewed this copy (R5) recorded four separate defects in it rather than
+    /// repairing them, because repairing them means writing wording — a
+    /// jurisdiction/translation decision CLAUDE.md reserves for a human, and
+    /// because these strings live in `electron/reports/*`, which this phase does
+    /// not touch.
+    ///
+    /// ## What is wrong with it, each pinned by a test
+    ///
+    /// 1. **Sparse.** CN and US carry `zh-CN` + `en`; JP adds `ja`, EU adds `fr`,
+    ///    KR adds `ko`, TW adds `zh-TW`. Four to five of the six UI languages are
+    ///    missing from every entry. **Nothing is backfilled here** — a map with a
+    ///    key is a string the engine really emits, and a map without one is a fact
+    ///    about the engine, not a hole to plug.
+    /// 2. **`jp.js`'s `zh-CN` slot holds Japanese.** Both JP values are
+    ///    byte-identical to their own `ja` sibling: `消費税概要` uses the
+    ///    traditional 費 (U+8CBB) where Simplified Chinese is 消费税概要, and
+    ///    `損益計算書` is Japanese throughout. A zh-CN reader on a Japan ledger
+    ///    would be shown Japanese.
+    /// 3. **`eu.js`'s `vat-return` says 申报** (`"VAT 申报概要"`) — the filing word
+    ///    that `scripts/check-tax-labels.mjs:22` bans on every other user-facing
+    ///    tax label in the product. That guard does not read `electron/reports/`,
+    ///    which is why it never fired.
+    /// 4. **It contradicts the shipped UI copy for the same concept.** CN
+    ///    `vat-summary` is `"VAT Summary"` here and `"VAT Statistics"` in
+    ///    `components/accountingLocaleConfig.ts:194`; KR `vat-summary` is
+    ///    `"附加价值税概要"` here and `"韩国 VAT 统计"` there.
+    ///
+    /// Today nothing renders it: no `.tsx`, no handler and no Swift view reads
+    /// `reportTypes[].name` — only `scripts/test-handlers.mjs:1953` asserts the
+    /// array is non-empty. R8 supplies its own reviewed six-language strings and
+    /// uses ``ReportTypes/availability(for:locale:)`` to decide what may be shown
+    /// at all. Deliberately, there is **no `name(for language:)` accessor here**:
+    /// any such helper would have to invent a fallback, and inventing a fallback is
+    /// how historical copy escapes into a UI.
+    public let name: [String: String]
+
+    public init(id: String, name: [String: String]) {
+        self.id = id
+        self.name = name
+    }
+}
+
+/// How much of a report type the native mirror can actually produce today.
+///
+/// **The gate plan §7.3 requires.** After batches 1–4 the China income statement
+/// has no pre-tax profit, no income tax and no net profit; rendering it beside a
+/// complete-looking title is exactly the "貌似完整的中国损益表" the plan forbids.
+/// A caller that switches over this enum cannot forget the case, whereas a caller
+/// handed a bare list of report types has nothing to forget.
+///
+/// The three cases are defined AGAINST THE GOLDENS, not against intent, so they
+/// can be checked by machine rather than believed:
+/// `ReportBatch4ParityTests.testAvailabilityMatchesWhatTheGoldensShowIsMirrored`
+/// derives them from the committed golden blocks and asserts the table below.
+public enum ReportTypeAvailability: Equatable, Sendable {
+    /// Every field the golden block carries is produced by the native mirror.
+    case mirrored
+    /// Some fields are produced and some are not. **Rendering this as a finished
+    /// statement is the plan §7.3 violation**; a caller must either withhold the
+    /// report or mark the missing lines as not-yet-provided.
+    case truncated
+    /// No field of this report type is mirrored yet.
+    case absent
+}
+
+/// The six engines' `reportTypes` arrays, mirrored verbatim.
+public enum ReportTypes {
+
+    /// `cn.js:4-8`.
+    public static let cn: [ReportTypeEntry] = [
+        ReportTypeEntry(id: "income-statement",
+                        name: ["zh-CN": "损益表（利润表）", "en": "Income Statement (P&L)"]),
+        ReportTypeEntry(id: "vat-summary",
+                        name: ["zh-CN": "增值税统计", "en": "VAT Summary"]),
+        // ONLY China declares this one, although all five VAT engines emit a
+        // `taxInclusiveSummary` block. Mirrored as-is: the asymmetry is the
+        // source's, and "add the missing entry" would be authoring a report type.
+        ReportTypeEntry(id: "tax-inclusive",
+                        name: ["zh-CN": "含税金额汇总", "en": "Tax-Inclusive Summary"]),
+    ]
+
+    /// `jp.js:3-6`. Both `zh-CN` values are the `ja` value — defect 2 above.
+    public static let jp: [ReportTypeEntry] = [
+        ReportTypeEntry(id: "income-statement",
+                        name: ["zh-CN": "損益計算書", "en": "Income Statement (P&L)", "ja": "損益計算書"]),
+        ReportTypeEntry(id: "consumption-tax",
+                        name: ["zh-CN": "消費税概要", "en": "Consumption Tax Summary", "ja": "消費税概要"]),
+    ]
+
+    /// `eu.js:3-6`. `vat-return`'s `zh-CN` carries 申报 — defect 3 above.
+    public static let eu: [ReportTypeEntry] = [
+        ReportTypeEntry(id: "profit-loss",
+                        name: ["zh-CN": "损益表", "en": "Profit & Loss", "fr": "Compte de résultat"]),
+        ReportTypeEntry(id: "vat-return",
+                        name: ["zh-CN": "VAT 申报概要", "en": "VAT Return Summary", "fr": "Déclaration TVA"]),
+    ]
+
+    /// `kr.js:3-6`.
+    public static let kr: [ReportTypeEntry] = [
+        ReportTypeEntry(id: "income-statement",
+                        name: ["zh-CN": "损益计算书", "en": "Income Statement", "ko": "손익계산서"]),
+        ReportTypeEntry(id: "vat-summary",
+                        name: ["zh-CN": "附加价值税概要", "en": "VAT Summary", "ko": "부가가치세 요약"]),
+    ]
+
+    /// `tw.js:3-6`.
+    public static let tw: [ReportTypeEntry] = [
+        ReportTypeEntry(id: "income-statement",
+                        name: ["zh-CN": "损益表", "en": "Income Statement", "zh-TW": "損益表"]),
+        ReportTypeEntry(id: "business-tax",
+                        name: ["zh-CN": "营业税概要", "en": "Business Tax Summary", "zh-TW": "營業稅概要"]),
+    ]
+
+    /// `us.js:3-6`. The `zh-CN` strings use FULLWIDTH parentheses (U+FF08/U+FF09).
+    public static let us: [ReportTypeEntry] = [
+        ReportTypeEntry(id: "schedule-c",
+                        name: ["zh-CN": "Schedule C（个体经营损益）", "en": "Schedule C (Profit or Loss)"]),
+        ReportTypeEntry(id: "se-tax",
+                        name: ["zh-CN": "Self-Employment Tax 估算", "en": "Self-Employment Tax Estimate"]),
+    ]
+
+    /// The table for an accounting locale, or `nil` for one no engine serves.
+    ///
+    /// `nil` rather than an empty array: `index.js:29-31` THROWS on an unknown
+    /// locale, so "no report types" is not a state the source can reach, and
+    /// returning `[]` would let a caller render an empty picker for a ledger that
+    /// should have been rejected.
+    public static func table(for locale: String) -> [ReportTypeEntry]? {
+        switch locale {
+        case "CN": return cn
+        case "US": return us
+        case "JP": return jp
+        case "EU": return eu
+        case "KR": return kr
+        case "TW": return tw
+        default:   return nil
+        }
+    }
+
+    /// How much of `id` under `locale` the native mirror produces today.
+    ///
+    /// Hand-written rather than computed, because the thing being stated is which
+    /// Swift code EXISTS — and that is not derivable at run time from a type that
+    /// has not been written. The parity test closes the loop by deriving the same
+    /// answer from the goldens and comparing.
+    ///
+    /// **Every `.truncated` below becomes `.mirrored` in R7** (the estimate layer:
+    /// income tax, net profit, net margin everywhere, plus China's surcharge chain),
+    /// and `se-tax` becomes `.mirrored` there too.
+    ///
+    /// The two are not equally well defended, and the difference is worth knowing
+    /// before relying on it. For the five `.truncated` rows the test **forces** the
+    /// update: their structs are already wired into its reflection switch, so
+    /// widening one makes the derived answer `.mirrored` and the assertion fails
+    /// until this table agrees. For `.absent` it does NOT: the test has no way to
+    /// notice a Swift type that did not exist when it was written, so whoever adds
+    /// `SelfEmploymentTax` must extend the switch in
+    /// `ReportBatch4ParityTests.mirroredFieldNames` by hand — otherwise `se-tax`
+    /// keeps reporting `.absent` and nothing complains.
+    public static func availability(for id: String, locale: String) -> ReportTypeAvailability {
+        switch (locale, id) {
+        // Batch 4 (R5) — the whole turnover-tax block, every field.
+        case ("CN", "vat-summary"), ("JP", "consumption-tax"), ("EU", "vat-return"),
+             ("KR", "vat-summary"), ("TW", "business-tax"):
+            return .mirrored
+        // Batch 2 (R3) — China is the only regime that declares this report type.
+        case ("CN", "tax-inclusive"):
+            return .mirrored
+        // Batch 3 (R4) — all 25 Schedule C lines.
+        case ("US", "schedule-c"):
+            return .mirrored
+        // Batch 1 (R2) reaches gross profit, and for JP/EU/KR/TW operating profit.
+        // The estimate lines below that are R7, so these are INCOMPLETE and a view
+        // must say so.
+        case ("CN", "income-statement"), ("JP", "income-statement"),
+             ("EU", "profit-loss"), ("KR", "income-statement"),
+             ("TW", "income-statement"):
+            return .truncated
+        // R7. Nothing of `selfEmploymentTax` is mirrored.
+        case ("US", "se-tax"):
+            return .absent
+        default:
+            // An id/locale pair no engine emits. `.absent` is the only honest
+            // answer: the caller asked about a report that does not exist here.
+            return .absent
+        }
+    }
+}
