@@ -438,7 +438,7 @@ R0 的实测把这条从"值判断有风险"升级为**"值判断不可行"**:
 | 小规模纳税人适用税率 | 税务政策 | 单独记录,不阻塞 |
 | 类别在切换记账制度后被"孤立" | 两侧同源缺陷 | 本阶段**原样镜像**;若要处理,最低诚实标准是给出警告而非自动重挂 |
 | **交易列表静默截断在 500 行**(`LedgerStore.listTransactions` 默认值;视图无任何计数或「显示 N / 共 M」文案,六语 `.strings` 无相关键,`Store/` 内无任何日志) | 原生侧已发货缺陷 | **归 R8**,与报表 UI 一并处理——修它需要先设计「显示 N / 共 M」这个可见性,那属于呈现层。同族的 CSV 导出硬编码 5000 已单独修掉(见本节开头的分工说明) |
-| **#415 的 `unclampedDifference`** ⚠️ | **镜像 PR 越界(本阶段自身产生的问题)** | `CNVATSummary` / `JPConsumptionTax` / `EUVATReturn` / `KRVATSummary` / `TWBusinessTax` 五个 public 结构各带一个 `unclampedDifference` 字段。**`electron/reports/*` 不产出它,任何黄金里也没有它**,因此它不是 R5 的镜像契约的一部分,与本阶段「镜像 PR 逐字照搬、不做任何修正」的范围约束(见文首前提与 §3)直接冲突——纠正方向是**在 R6/R8 之前单独开纠正 PR 移除**该字段(引擎与五个结构一并,同步测试与附录 A14 的措辞),同时**保留 Electron 原始钳位结果的逐字镜像**(`estimatedPayable` / `payable` / `vatPayable` 一个字节不改)。若日后决定保留这项披露能力,**必须走单独、明确批准的非镜像 PR**,不得再随镜像批次夹带 |
+| **#415 的 `unclampedDifference`** ⚠️ | **镜像 PR 越界(本阶段自身产生的问题)** | `CNVATSummary` / `JPConsumptionTax` / `EUVATReturn` / `KRVATSummary` / `TWBusinessTax` 五个 public 结构各带一个 `unclampedDifference` 字段。**`electron/reports/*` 不产出它,任何黄金里也没有它**,因此它不是 R5 的镜像契约的一部分,与本阶段「镜像 PR 逐字照搬、不做任何修正」的范围约束(见文首前提与 §3)直接冲突。**已由 #417 纠正:五个结构与五个引擎里的该字段全部移除,测试与附录 A14 同步**,`estimatedPayable` / `payable` / `vatPayable` 一个字节未改(153 个流转税黄金字段仍全数吻合)。**本行保留为登记,不再是待办。** 若日后决定恢复这项披露能力,**必须走单独、明确批准的非镜像 PR**,不得再随镜像批次夹带 |
 
 ---
 
@@ -477,9 +477,9 @@ R5 自身交付的是引擎侧契约:`reportTypes` 的 `name` 映射**逐字镜�
 与 `accountingLocaleConfig.ts` 同概念说法不一致);另配 `availability(for:locale:)`
 三态(mirrored / truncated / absent),**但该 API 只提供判定、不强制使用**(见 §7.3)。
 
-> **#415 的一处越界,已登记待纠正**:五个 turnover-tax public 结构带了非 Electron 契约
-> 字段 `unclampedDifference`。见 §9.2 表格该行——**它不属于 R5 的镜像契约**,应在
-> R6/R8 之前单独开纠正 PR 移除。
+> **#415 的一处越界,已由 #417 纠正**:五个 turnover-tax public 结构曾带非 Electron 契约
+> 字段 `unclampedDifference`;它不属于 R5 的镜像契约,已连同引擎实现一并移除,钳位后的
+> 镜像值一个字节未改。登记见 §9.2 表格该行。
 
 **贯穿全阶段的红线**:黄金全冻结。镜像 PR 里出现 `Allowed-Golden-Changes` 尾注即越界——该尾注只属于单独标注的有意修正 PR,且声明是上界不是义务(§3.2)。
 
@@ -506,4 +506,13 @@ R5 自身交付的是引擎侧契约:`reportTypes` 的 `name` 映射**逐字镜�
 
 ## 11. 同期跟进(不属本阶段,归 #394 跟进)
 
-日 / 欧 / 韩 / 台**直接隐藏附加税率字段**(这四地区预设为 0,且引擎可证明不读取它,`scripts/test-surcharge-locale.mjs` 已锁死该行为),顺带修掉 `ja.lproj` 里未翻译的中文"附加税率"。单独小 PR。
+附加税率字段与它的六语措辞。**范围与拆分以 §10.1 的四行落地表为准,本节不复述**——早先这里写的是"日/欧/韩/台隐藏 + 顺带修日文",两处都已被 2026-07-27 的拍板取代,再抄一遍只会重新漂移。
+
+指向 §10.1 的两行:
+
+- **显示门控**:附加税率字段改为**仅中国制度显示**(US / JP / EU / KR / TW 全部隐藏);不删存储字段、不迁数据、不改公式或默认值。注意隐藏名单**含美国**——美国的 `surcharge_rate` 同样是 0 且引擎不读,而它此前只在 zh-Hans/zh-Hant 两语被覆写成「地方税率」,与其余四语的「附加税率 / Surcharge」本就是两个税种概念(见 §7.2)。
+- **六语措辞**:`settings.surchargeRate` 的 ja / ko / fr 定稿值,原生 `.strings` 与 Electron `i18n/locales/*.json` **必须同改**。
+
+**这是两个独立 PR,不合并成一个**:门控是显示逻辑,措辞是翻译定稿,爆炸半径与评审所需的判断都不同。
+
+引擎侧的事实基础不变:这五个地区的预设附加税率是 0,且引擎**可证明地不读取它**(`scripts/test-surcharge-locale.mjs` 已锁死该行为),所以隐藏零计算损失。
