@@ -3,15 +3,18 @@ import { useTranslation } from 'react-i18next';
 import { ACCOUNTING_PROFILES, ACCOUNTING_LOCALES, getProfile, DEFAULT_ACCOUNTING_LOCALE } from './accountingProfiles';
 import type { LangCode } from '../i18n';
 import { fetchSettings, saveSettings } from '../services/api';
-import { rateSettingsPayload } from './rateSettingsPayload';
+import { rateFieldsFromSettings, rateSettingsPayload, type RateFieldValue } from './rateSettingValue';
 
 const AccountingSection: React.FC = () => {
   const { t, i18n } = useTranslation();
   const lang = i18n.language as LangCode;
   const [currentLocale, setCurrentLocale] = useState<string>(DEFAULT_ACCOUNTING_LOCALE);
-  const [vatRate, setVatRate] = useState<number>(13);
-  const [surchargeRate, setSurchargeRate] = useState<number>(12);
-  const [incomeTaxRate, setIncomeTaxRate] = useState<number>(25);
+  // `RateFieldValue` = number | '' —— `''` 表示这个字段没有可用的数字(存储值损坏,
+  // 或输入框被清空)。刻意不用 NaN 当状态值:NaN 能通过 typeof === 'number',能被塞进
+  // 受控 input,还能在任何一次 isFinite 漏判里变回一个数。见 rateSettingValue.ts。
+  const [vatRate, setVatRate] = useState<RateFieldValue>(13);
+  const [surchargeRate, setSurchargeRate] = useState<RateFieldValue>(12);
+  const [incomeTaxRate, setIncomeTaxRate] = useState<RateFieldValue>(25);
   const [currency, setCurrency] = useState<string>('CNY');
   // PR-7B P2 收尾：经营主体类型 + 期初未分配利润（管理口径概览权益用；仅影响概览标签，非法定主体认定）。
   const [entityType, setEntityType] = useState<'individual' | 'company'>('individual');
@@ -24,29 +27,15 @@ const AccountingSection: React.FC = () => {
       const loc = s.accounting_locale || DEFAULT_ACCOUNTING_LOCALE;
       const p = getProfile(loc);
       if (s.accounting_locale) setCurrentLocale(loc);
-      // A stored rate that does not read as a finite number is DAMAGED, and this
-      // form must not quietly launder it. The state is left non-finite on purpose;
-      // the save below drops non-finite rates from the payload, so the damaged
-      // bytes stay exactly as they are until a human types a replacement.
-      //
-      // What this replaces: `Number("25%")` is NaN, the old code put that NaN in
-      // state, and Save sent all four fields regardless of which one was edited —
-      // `JSON.stringify(NaN)` is the literal `null`, which reads back as 0. So
-      // editing only the currency silently changed the income-tax rate to 0%.
-      if (s.vat_rate !== undefined) {
-        const v = Number(s.vat_rate);
-        // Default-value protection: a persisted rate outside the current regime's
-        // option range (e.g. CN's 13% lingering after switching to US, whose
-        // options top out at 10) falls back to the regime default instead of
-        // leaking across. CN keeps 13 (within its own range).
-        // Guarded by isFinite so a damaged value cannot slip through the two
-        // comparisons — both are false for NaN, which used to keep the NaN.
-        const opts = p.vatRateOptions;
-        setVatRate(!Number.isFinite(v) ? v
-          : (v < Math.min(...opts) || v > Math.max(...opts) ? p.vatRate : v));
-      }
-      if (s.surcharge_rate !== undefined) setSurchargeRate(Number(s.surcharge_rate));
-      if (s.income_tax_rate !== undefined) setIncomeTaxRate(Number(s.income_tax_rate));
+      // 三个税率一律走严格解析,**不再直接 Number(...)**。这是 A4-1 的要害:
+      // Number(null)/Number("")/Number([]) 都是 0,Number(true) 是 1,所以直接
+      // Number 会把一个损坏的存储值变成一个看起来正常的数字,随后被原样提交回去 ——
+      // 用户只改币种也会静默覆盖损坏字节。损坏的值在这里就停住,成为 `''`。
+      const loaded = rateFieldsFromSettings(
+        s, { vatRate, surchargeRate, incomeTaxRate }, p.vatRateOptions, p.vatRate);
+      setVatRate(loaded.vatRate);
+      setSurchargeRate(loaded.surchargeRate);
+      setIncomeTaxRate(loaded.incomeTaxRate);
       if (s.currency) setCurrency(s.currency);
       // PR-7B P2 收尾：读取主体类型（缺/非法→individual）与期初未分配利润（NaN→0，允许负）。
       if (s.entity_type === 'company' || s.entity_type === 'individual') setEntityType(s.entity_type);
@@ -160,17 +149,17 @@ const AccountingSection: React.FC = () => {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{profile.taxLabel[lang] || profile.taxLabel['en']} (%)</label>
-            <input type="number" step="0.1" value={vatRate} onChange={e => setVatRate(Number(e.target.value))}
+            <input type="number" step="0.1" value={vatRate} onChange={e => setVatRate(e.target.value === '' ? '' : Number(e.target.value))}
               className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white" />
           </div>
           <div>
             <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{(profile.surchargeLabel?.[lang] ?? t('settings.accounting.surcharge'))} (%)</label>
-            <input type="number" step="0.1" value={surchargeRate} onChange={e => setSurchargeRate(Number(e.target.value))}
+            <input type="number" step="0.1" value={surchargeRate} onChange={e => setSurchargeRate(e.target.value === '' ? '' : Number(e.target.value))}
               className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white" />
           </div>
           <div>
             <label className="block text-[11px] font-medium text-[#4a4a48] mb-1">{t('settings.accounting.incomeTax')} (%)</label>
-            <input type="number" step="0.1" value={incomeTaxRate} onChange={e => setIncomeTaxRate(Number(e.target.value))}
+            <input type="number" step="0.1" value={incomeTaxRate} onChange={e => setIncomeTaxRate(e.target.value === '' ? '' : Number(e.target.value))}
               className="w-full px-3 py-1.5 border border-[#e0ddd5] rounded-lg text-sm bg-white" />
           </div>
           <div>

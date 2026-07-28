@@ -82,41 +82,50 @@ for (const k of ['accounting_locale', 'currency', 'company_info', 'fx_reference_
   ok(!RATE_KEYS.has(k), `${k} 不得被数字判定约束(它本来就不是税率)`);
 }
 
-// ---- 1.5 表单侧:决定「哪些税率键会被发出去」的那条规则 ----
-// 这一条与 §2.3 是一对:§2.3 证明「载荷里没有那个键 → 字节不变」,这一条证明
-// 「税率损坏时载荷里确实没有那个键」。少了任何一半,「只改币种、坏字节不变」
-// 这句话就只被证明了一半。
+// ---- 1.5 表单侧:严格解析 + 载荷规则 ----
+const { parseRateSetting, rateFieldsFromSettings, rateSettingsPayload } =
+  await import(join(ROOT, 'components/rateSettingValue.ts'));
 {
-  const { rateSettingsPayload } = await import(join(ROOT, 'components/rateSettingsPayload.ts'));
+  // 解析:可用的两种形状。
+  for (const [raw, want] of [[25, 25], [0, 0], [-5, -5], [25.5, 25.5],
+                             ['25', 25], ['13', 13], [' 25 ', 25], ['0', 0]]) {
+    ok(parseRateSetting(raw) === want, `parseRateSetting(${json(raw)}) 应为 ${want},得到 ${json(parseRateSetting(raw))}`);
+  }
+  // 解析:损坏一律 ''。这一组就是漏洞本体 —— 它们的 Number() 都是**有限数**
+  // (0 / 0 / 1 / 0 / 0 / 25),旧代码因此把它们当成正常税率提交了回去。
+  for (const raw of [null, undefined, true, false, [], [25], [1, 2], {}, { v: 25 },
+                     '', '   ', '25%', 'abc', 'Infinity', NaN, Infinity]) {
+    const got = parseRateSetting(raw);
+    ok(got === '', `parseRateSetting(${json(raw) ?? String(raw)}) 必须是 '',得到 ${json(got)}`);
+  }
+  ok(Number(null) === 0 && Number('') === 0 && Number(true) === 1 && Number([]) === 0 && Number([25]) === 25,
+    '（记录:这五个的 Number() 都是有限数 —— 直接 Number(...) 正是被修掉的那条路）');
 
   const all = rateSettingsPayload({ vatRate: 13, surchargeRate: 12, incomeTaxRate: 25 });
   ok(json(all) === json({ vat_rate: 13, surcharge_rate: 12, income_tax_rate: 25 }),
     `三个都可用时三个都发,得到 ${json(all)}`);
-
-  // 损坏的税率在表单里读成 NaN(Number("25%")),必须整个键消失 —— 不是发 null、
-  // 不是发 0、不是发上一次的值。
-  const damaged = rateSettingsPayload({ vatRate: 13, surchargeRate: 12, incomeTaxRate: NaN });
+  const damaged = rateSettingsPayload({ vatRate: 13, surchargeRate: 12, incomeTaxRate: '' });
   ok(!('income_tax_rate' in damaged),
-    `所得税率损坏时,income_tax_rate 这个键必须根本不出现,得到 ${json(damaged)}`);
-  ok(json(damaged) === json({ vat_rate: 13, surcharge_rate: 12 }), '其余两个照常发');
-
-  const allDamaged = rateSettingsPayload({ vatRate: NaN, surchargeRate: NaN, incomeTaxRate: NaN });
-  ok(json(allDamaged) === '{}', `三个都损坏时载荷里一个税率键都没有,得到 ${json(allDamaged)}`);
-
+    `损坏时 income_tax_rate 这个键必须根本不出现,得到 ${json(damaged)}`);
+  ok(json(rateSettingsPayload({ vatRate: '', surchargeRate: '', incomeTaxRate: '' })) === '{}',
+    '三个都损坏时载荷里一个税率键都没有');
   // 0 是一个真实税率,不得被 falsy 判断误伤。
-  const zeros = rateSettingsPayload({ vatRate: 0, surchargeRate: 0, incomeTaxRate: 0 });
-  ok(json(zeros) === json({ vat_rate: 0, surcharge_rate: 0, income_tax_rate: 0 }),
-    `显式 0% 必须照常发出,得到 ${json(zeros)}`);
+  ok(json(rateSettingsPayload({ vatRate: 0, surchargeRate: 0, incomeTaxRate: 0 }))
+     === json({ vat_rate: 0, surcharge_rate: 0, income_tax_rate: 0 }), '显式 0% 必须照常发出');
+}
 
-  // 表单放行的值,服务端必须也放行 —— 两侧用同一条判定,不得各说各话。
-  for (const v of [0, 13, 25.5, -5, 1e3]) {
-    const p = rateSettingsPayload({ vatRate: v, surchargeRate: v, incomeTaxRate: v });
-    ok('vat_rate' in p && rateValueIsUsable(p.vat_rate),
-      `表单放行的 ${v} 服务端也必须放行(两侧判定必须一致)`);
-  }
-  for (const v of [NaN, Infinity, -Infinity]) {
-    const p = rateSettingsPayload({ vatRate: v, surchargeRate: v, incomeTaxRate: v });
-    ok(json(p) === '{}', `${v} 表单侧就该拦下,不该走到服务端`);
+// ---- 1.6 两份实现必须说同一件事 ----
+// 前端(TS,渲染进程)与服务端(CJS,主进程)各有一份判定,因为渲染进程不能引主进程
+// 代码。既然必须有两份,就必须有一个测试证明它们逐形状一致,而不是靠「我记得改了两处」。
+{
+  const CORPUS = [25, 0, -5, 25.5, 1e3, '25', '13', ' 25 ', '0', '25.5',
+                  null, undefined, true, false, [], [25], [1, 2], {}, { v: 25 },
+                  '', '   ', '25%', 'abc', 'Infinity', NaN, Infinity, -Infinity];
+  for (const v of CORPUS) {
+    const frontend = parseRateSetting(v) !== '';
+    const backend = rateValueIsUsable(v);
+    ok(frontend === backend,
+      `两侧判定分叉:${json(v) ?? String(v)} 前端 ${frontend ? '可用' : '损坏'},服务端 ${backend ? '可用' : '拒绝'}`);
   }
 }
 
@@ -211,6 +220,92 @@ if (Database) {
     // 反证这条链的终点确实是 0%:如果当年那个 null 落了盘,读出来就是 0。
     ok(Number(JSON.parse('null')) === 0,
       '（记录:null 读回来是 0 —— 这就是被挡住的那个终点）');
+  }
+
+  // ---- 2.4b 真实链路:get → 表单归一化 → 载荷 → save ----
+  //
+  // **本文件最重要的一节。** §2.3 只证明了「载荷里没有税率键 → 字节不变」,它是直接
+  // 调 save({currency}) 得出的,绕过了表单。而漏洞恰恰长在被绕过的那一段:载入时的
+  // `Number(...)` 会把 null / "" / true / [] / [25] 变成 0 / 0 / 1 / 0 / 25 —— 一个
+  // **有限数**,于是后面任何 isFinite 过滤都拦不住它,用户只改币种也会把损坏字节
+  // 改写成 0。所以这里走完整条链,一步都不省。
+  {
+    const { getProfile } = await import(join(ROOT, 'components/accountingProfiles.ts'));
+    const p = getProfile('CN');
+    const INITIAL = { vatRate: p.vatRate, surchargeRate: p.surchargeRate, incomeTaxRate: p.incomeTaxRate };
+
+    // 走一次完整链路,返回三行的原始字节。
+    const roundTrip = async (rawBytes) => {
+      fresh();
+      for (const k of ['vat_rate', 'surcharge_rate', 'income_tax_rate']) put(k, rawBytes);
+      await save({ accounting_locale: 'CN' });                  // 让 get() 有制度可读
+      const s = await settings.get();                           // 真 handler
+      const loaded = rateFieldsFromSettings(s, INITIAL, p.vatRateOptions, p.vatRate);
+      const payload = { ...rateSettingsPayload(loaded), currency: 'JPY' };  // 用户只改了币种
+      await save(payload);                                      // 真 handler
+      return {
+        loaded, payload,
+        bytes: {
+          vat_rate: rawOf('vat_rate'),
+          surcharge_rate: rawOf('surcharge_rate'),
+          income_tax_rate: rawOf('income_tax_rate'),
+        },
+      };
+    };
+
+    // 损坏的八种:三行的原始字节必须**逐字不变**,而币种要保存成功。
+    for (const raw of ['"25%"', 'null', '""', 'true', 'false', '[]', '{}', 'abc']) {
+      const r = await roundTrip(raw);
+      for (const key of ['vat_rate', 'surcharge_rate', 'income_tax_rate']) {
+        ok(r.bytes[key] === raw,
+          `[真实链路] 存储 ${raw} 时只改币种,${key} 的原始字节必须不变:期望 ${raw},得到 ${r.bytes[key]}`);
+      }
+      ok(json(r.payload) === json({ currency: 'JPY' }),
+        `[真实链路] 存储 ${raw} 时载荷里不得出现任何税率键,得到 ${json(r.payload)}`);
+      ok(r.loaded.vatRate === '' && r.loaded.surchargeRate === '' && r.loaded.incomeTaxRate === '',
+        `[真实链路] 存储 ${raw} 时三个字段都必须归一化成 '',得到 ${json(r.loaded)}`);
+      ok(rawOf('currency') === '"JPY"', `[真实链路] 存储 ${raw} 时币种本身要保存成功`);
+    }
+
+    // `[25]` 单列:它的 Number() 是 25 —— 一个看起来完全正常的税率。旧代码会把它
+    // 写成 25,而且没有任何迹象表明发生过什么。
+    {
+      const r = await roundTrip('[25]');
+      ok(r.bytes.income_tax_rate === '[25]',
+        `[真实链路] '[25]' 的 Number() 是 25,最容易被当成正常值写回去;字节必须不变,得到 ${r.bytes.income_tax_rate}`);
+    }
+
+    // 健康的形状:必须照常被识别并提交(数字字符串是已发货的兼容形状)。
+    // 这里比的是**值**不是字节 —— 数字字符串会被规范化成 JSON 数字,那是对一个
+    // 可用值的规范化,不是对损坏值的静默修复。
+    for (const [raw, want] of [['13', 13], ['"13"', 13], ['" 13 "', 13], ['0', 0], ['5', 5]]) {
+      const r = await roundTrip(raw);
+      ok(r.loaded.incomeTaxRate === want,
+        `[真实链路] 健康值 ${raw} 必须解析成 ${want},得到 ${json(r.loaded.incomeTaxRate)}`);
+      ok(r.payload.income_tax_rate === want,
+        `[真实链路] 健康值 ${raw} 必须照常提交,得到 ${json(r.payload.income_tax_rate)}`);
+      ok(rawOf('income_tax_rate') === String(want),
+        `[真实链路] 健康值 ${raw} 落盘为 ${want},得到 ${rawOf('income_tax_rate')}`);
+    }
+
+    // 混合:一个损坏 + 两个健康 —— 只有损坏的那个键消失,另外两个照常保存。
+    {
+      fresh();
+      put('vat_rate', '13');
+      put('surcharge_rate', '12');
+      put('income_tax_rate', '"25%"');
+      await save({ accounting_locale: 'CN' });
+      const s = await settings.get();
+      const loaded = rateFieldsFromSettings(s, INITIAL, p.vatRateOptions, p.vatRate);
+      const payload = { ...rateSettingsPayload(loaded), currency: 'JPY' };
+      await save(payload);
+      ok(json(payload) === json({ vat_rate: 13, surcharge_rate: 12, currency: 'JPY' }),
+        `[真实链路] 混合场景:只有损坏的那个键消失,得到 ${json(payload)}`);
+      ok(rawOf('income_tax_rate') === '"25%"',
+        `[真实链路] 混合场景:损坏的那一行字节不变,得到 ${rawOf('income_tax_rate')}`);
+      ok(rawOf('vat_rate') === '13' && rawOf('surcharge_rate') === '12',
+        '[真实链路] 混合场景:健康的两行照常保存');
+    }
   }
 
   // ---- 2.5 非税率键不受影响 ----
