@@ -42,10 +42,15 @@ import Foundation
 /// `base-CN-2025Q2` the ledger has 135.85 of input tax and no output tax, and the
 /// golden says `estimatedPayable: 0`.
 ///
-/// The clamp is mirrored exactly. ``CNVATSummary/unclampedDifference`` and its
-/// siblings carry the un-clamped figure ALONGSIDE it as a disclosure, so the
-/// information the clamp discards is not lost — but it is not part of the
-/// contract and no golden contains it; see that property's own note.
+/// **The clamp is mirrored exactly, and nothing here compensates for it.** An
+/// earlier revision of this batch also exported the un-clamped difference as a
+/// disclosure field. That was an overreach and was removed: `electron/reports/*`
+/// emits no such value and no golden contains one, so carrying it made a mirror
+/// PR the place where a new number entered the product — which is precisely what
+/// this phase's premise (逐字照搬公式、不做任何修正) exists to prevent. The
+/// information the clamp discards is registered in plan Appendix A14 instead, and
+/// re-introducing any form of it requires a separate, explicitly approved
+/// non-mirror PR.
 
 /// `cn.js:69-75` — 增值税统计.
 ///
@@ -71,25 +76,6 @@ public struct CNVATSummary: Equatable, Sendable {
     public let invoicedOutput: Double
     /// `r(Math.max(0, totalIncomeTax - totalExpenseTax))` (`cn.js:32`, `:74`).
     public let estimatedPayable: Double
-
-    /// The un-clamped `output - input`, rounded by this engine's own rounder.
-    ///
-    /// **NOT part of the Electron contract and NOT in any golden.** `cn.js` never
-    /// emits it; it is carried because the clamp above turns a credit position into
-    /// a `0` and a report that shows only the `0` cannot distinguish "nothing owed"
-    /// from "135.85 carried forward". Negative here means input tax exceeded output
-    /// tax for the period.
-    ///
-    /// Precedent for carrying a non-contract field on a mirrored struct:
-    /// ``ScheduleC/rawMealsTotal``. As there, it is excluded from the golden
-    /// comparison by construction — the parity test iterates the contract fields by
-    /// name and asserts the golden block's key count, so this field can never be
-    /// mistaken for one of them.
-    ///
-    /// It is a DISCLOSURE, not a correction: `estimatedPayable` still reports what
-    /// the engine reports. Whether a credit position should be presented, and in
-    /// what words, is a tax-presentation decision for the view layer.
-    public let unclampedDifference: Double
 }
 
 /// `jp.js:46-49` — 消費税（仕入税額控除方式）.
@@ -99,8 +85,6 @@ public struct JPConsumptionTax: Equatable, Sendable {
     /// `r(Math.max(0, collected - paid))` — `jp.js:34`, already rounded when it is
     /// placed into the block at `:48` rather than rounded a second time.
     public let payable: Double
-    /// The un-clamped `collected - paid`. See ``CNVATSummary/unclampedDifference``.
-    public let unclampedDifference: Double
 }
 
 /// `eu.js:44-46` — VAT return summary.
@@ -111,8 +95,6 @@ public struct EUVATReturn: Equatable, Sendable {
     public let inputVAT: Double
     /// `r(Math.max(0, vatCollected - vatDeductible))` — `eu.js:32`.
     public let vatPayable: Double
-    /// The un-clamped `outputVAT - inputVAT`. See ``CNVATSummary/unclampedDifference``.
-    public let unclampedDifference: Double
 }
 
 /// `kr.js:41-43` — 부가가치세 요약.
@@ -126,8 +108,6 @@ public struct KRVATSummary: Equatable, Sendable {
     public let inputVAT: Double
     /// `r(Math.max(0, totalIncomeTax - totalExpenseTax))` — `kr.js:29`.
     public let vatPayable: Double
-    /// The un-clamped `outputVAT - inputVAT`. See ``CNVATSummary/unclampedDifference``.
-    public let unclampedDifference: Double
 }
 
 /// `tw.js:41-43` — 營業稅.
@@ -136,6 +116,4 @@ public struct TWBusinessTax: Equatable, Sendable {
     public let paid: Double
     /// `r(Math.max(0, totalIncomeTax - totalExpenseTax))` — `tw.js:29`.
     public let payable: Double
-    /// The un-clamped `collected - paid`. See ``CNVATSummary/unclampedDifference``.
-    public let unclampedDifference: Double
 }

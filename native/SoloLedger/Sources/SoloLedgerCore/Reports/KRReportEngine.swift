@@ -80,8 +80,7 @@ public extension KRReportEngine {
         return KRVATSummary(
             outputVAT: r(totalIncomeTax),                                // kr.js:42
             inputVAT: r(totalExpenseTax),                                // kr.js:42
-            vatPayable: vatPayable,                                      // kr.js:42 — NOT re-rounded
-            unclampedDifference: r(totalIncomeTax - totalExpenseTax))    // not in kr.js
+            vatPayable: vatPayable)                                      // kr.js:42 — NOT re-rounded
     }
 
     /// `kr.js:52-62` — the monthly breakdown.
