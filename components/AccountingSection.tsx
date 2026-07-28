@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ACCOUNTING_PROFILES, ACCOUNTING_LOCALES, getProfile, DEFAULT_ACCOUNTING_LOCALE } from './accountingProfiles';
 import type { LangCode } from '../i18n';
 import { fetchSettings, saveSettings } from '../services/api';
+import { rateSettingsPayload } from './rateSettingsPayload';
 
 const AccountingSection: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -23,14 +24,26 @@ const AccountingSection: React.FC = () => {
       const loc = s.accounting_locale || DEFAULT_ACCOUNTING_LOCALE;
       const p = getProfile(loc);
       if (s.accounting_locale) setCurrentLocale(loc);
+      // A stored rate that does not read as a finite number is DAMAGED, and this
+      // form must not quietly launder it. The state is left non-finite on purpose;
+      // the save below drops non-finite rates from the payload, so the damaged
+      // bytes stay exactly as they are until a human types a replacement.
+      //
+      // What this replaces: `Number("25%")` is NaN, the old code put that NaN in
+      // state, and Save sent all four fields regardless of which one was edited —
+      // `JSON.stringify(NaN)` is the literal `null`, which reads back as 0. So
+      // editing only the currency silently changed the income-tax rate to 0%.
       if (s.vat_rate !== undefined) {
+        const v = Number(s.vat_rate);
         // Default-value protection: a persisted rate outside the current regime's
         // option range (e.g. CN's 13% lingering after switching to US, whose
         // options top out at 10) falls back to the regime default instead of
         // leaking across. CN keeps 13 (within its own range).
-        const v = Number(s.vat_rate);
+        // Guarded by isFinite so a damaged value cannot slip through the two
+        // comparisons — both are false for NaN, which used to keep the NaN.
         const opts = p.vatRateOptions;
-        setVatRate(v < Math.min(...opts) || v > Math.max(...opts) ? p.vatRate : v);
+        setVatRate(!Number.isFinite(v) ? v
+          : (v < Math.min(...opts) || v > Math.max(...opts) ? p.vatRate : v));
       }
       if (s.surcharge_rate !== undefined) setSurchargeRate(Number(s.surcharge_rate));
       if (s.income_tax_rate !== undefined) setIncomeTaxRate(Number(s.income_tax_rate));
@@ -170,7 +183,12 @@ const AccountingSection: React.FC = () => {
           onClick={async () => {
             setSaving(true);
             try {
-              await saveSettings({ vat_rate: vatRate, surcharge_rate: surchargeRate, income_tax_rate: incomeTaxRate, currency } as any);
+              // Only rates this form holds a usable number for are sent — a damaged
+              // stored value reads as non-finite (see the load effect above) and is
+              // omitted, so saving the currency alone leaves those bytes untouched
+              // instead of overwriting them with `null`/0. Rule and rationale in
+              // rateSettingsPayload.ts; pinned by scripts/test-rate-write-gate.mjs.
+              await saveSettings({ ...rateSettingsPayload({ vatRate, surchargeRate, incomeTaxRate }), currency } as any);
               setToast({ type: 'success', text: t('settings.savedToast') });
             } catch (e: any) {
               setToast({ type: 'error', text: e?.message || 'Save failed' });
