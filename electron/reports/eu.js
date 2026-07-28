@@ -10,6 +10,7 @@ function generate(ctx) {
   // PR-T5: split expenses into COGS vs operating (additive fields; costOfSales
   // and netProfit are unchanged — cogsNet + operatingExpensesNet === totalExpenseNet).
   const { splitExpenses } = require('./_expenseSplit');
+  const { rateIsMissing } = require('./_missingRate');
   const { cogsNet, operatingExpensesNet } = splitExpenses(expenseRows, categories);
   const r = (v) => Math.round((v || 0) * 100) / 100;
 
@@ -24,8 +25,11 @@ function generate(ctx) {
   const costs = cogsNet; // PR-T5-2A: COGS-only (was totalExpenseNet)
   const grossProfit = revenue - costs; // now revenue − COGS
   const operatingProfit = grossProfit - operatingExpensesNet - adminExpense; // PR-T5-2A: subtract operating expenses (netProfit unchanged)
-  const tax = r(Math.max(0, operatingProfit) * (incomeTaxRate / 100));
-  const netProfit = operatingProfit - tax;
+  // 方案 A:所得税率设置行缺失 → 不计算、不显示 0,产出 null(_missingRate.js)。
+  // 营业利润及其以上各行不受影响 —— 它们不读税率。
+  const rateMissing = rateIsMissing(incomeTaxRate);
+  const tax = rateMissing ? null : r(Math.max(0, operatingProfit) * (incomeTaxRate / 100));
+  const netProfit = rateMissing ? null : operatingProfit - tax;
 
   const vatCollected = totalIncomeTax;
   const vatDeductible = totalExpenseTax;
@@ -38,8 +42,8 @@ function generate(ctx) {
       costOfGoodsSold: r(cogsNet), operatingExpenses: r(operatingExpensesNet),
       grossProfit: r(grossProfit), grossMargin: revenue > 0 ? r(grossProfit / revenue * 100) : 0,
       adminExpense: r(adminExpense), operatingProfit: r(operatingProfit),
-      incomeTax: tax, netProfit: r(netProfit),
-      netMargin: revenue > 0 ? r(netProfit / revenue * 100) : 0,
+      incomeTax: tax, netProfit: rateMissing ? null : r(netProfit),
+      netMargin: rateMissing ? null : (revenue > 0 ? r(netProfit / revenue * 100) : 0),
     },
     vatReturn: {
       outputVAT: r(vatCollected), inputVAT: r(vatDeductible), vatPayable,

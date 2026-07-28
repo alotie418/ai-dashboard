@@ -10,6 +10,7 @@ function generate(ctx) {
   // SE-tax constants are year-keyed (see usTaxParams.js); unknown years fall
   // back to the latest. Management estimate only — not tax-filing advice.
   const { params: se, year: seParamYear } = require('./usTaxParams').resolveSeTaxParams(year);
+  const { rateIsMissing } = require('./_missingRate');
 
   // Gross receipts (Line 1)
   const grossReceipts = incomeRows.reduce((s, r) => s + (r.amount || 0), 0);
@@ -72,9 +73,14 @@ function generate(ctx) {
   const additionalMedicare = seEarnings > se.addlMedicareThreshold ? (seEarnings - se.addlMedicareThreshold) * se.addlMedicareRate : 0;
   const totalSETax = r(ssTax + medicareTax + additionalMedicare);
 
-  // Quarterly estimated tax
-  const estimatedAnnualTax = r(netProfit * (incomeTaxRate / 100)) + totalSETax;
-  const quarterlyPayment = r(estimatedAnnualTax / 4);
+  // Quarterly estimated tax.
+  // 方案 A:所得税率设置行缺失 → 所得税相关的三项产出 null(_missingRate.js)。
+  // 自雇税不读所得税率,所以 selfEmploymentTax 整块与 annualSETax 保持不变;
+  // dueDates 是日历日期,同样不变。
+  const rateMissing = rateIsMissing(incomeTaxRate);
+  const annualIncomeTax = rateMissing ? null : r(netProfit * (incomeTaxRate / 100));
+  const estimatedAnnualTax = rateMissing ? null : annualIncomeTax + totalSETax;
+  const quarterlyPayment = rateMissing ? null : r(estimatedAnnualTax / 4);
 
   return {
     locale: 'US',
@@ -99,7 +105,7 @@ function generate(ctx) {
     },
 
     estimatedTax: {
-      annualIncomeTax: r(netProfit * (incomeTaxRate / 100)),
+      annualIncomeTax,
       annualSETax: totalSETax,
       totalAnnual: estimatedAnnualTax,
       quarterlyPayment,
@@ -109,7 +115,9 @@ function generate(ctx) {
     monthlyBreakdown: buildMonthly(incomeRows, expenseRows, year),
 
     warnings: [
-      netProfit > 0 && totalSETax > 0 ? `Estimated quarterly tax payment: $${quarterlyPayment.toLocaleString()}` : null,
+      // 税率缺失时 quarterlyPayment 是 null —— 报不出的数就不报,不拼成 "$null"。
+      netProfit > 0 && totalSETax > 0 && !rateMissing
+        ? `Estimated quarterly tax payment: $${quarterlyPayment.toLocaleString()}` : null,
       expenseBySlug['meals'] ? 'Meals expense is automatically limited to 50% deductible (Line 24b)' : null,
     ].filter(Boolean),
   };
