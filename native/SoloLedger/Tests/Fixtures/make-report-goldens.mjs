@@ -87,16 +87,34 @@ const RATE_VARIANTS = {
       ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=datetime('now')`);
     for (const k of RATE_KEYS) put.run(k, JSON.stringify(0));
   },
-  // A stored value that is PRESENT but not a number. This — not a missing row — is
-  // what actually produces the NaN path: index.js coerces with a bare `Number()`,
-  // and cn.js's rounder has no `|| 0` guard, so five CN fields serialize as JSON
-  // null while the other engines quietly emit null too. The state is modelled by
-  // the repo's own e2e fixtures (e2e/helpers/fixtures.ts writes '13%'-style rates).
+  // A stored value that is PRESENT but not usable — VALID JSON, unusable content.
+  // The stored bytes are `"12%"` / `"25%"`, i.e. JSON strings. Before A4-3 this was
+  // the NaN path: index.js coerced with a bare `Number()`, cn.js's rounder has no
+  // `|| 0` guard so five CN fields serialised as JSON null, and the other four
+  // engines' guarded rounders flattened the NaN to a confident 0. Since A4-3 the
+  // dispatcher refuses outright, so every engine emits null for the rate-driven
+  // fields — same bytes for China, different bytes for the rest.
   malformed: (db) => {
     const put = db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
       ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=datetime('now')`);
     put.run('surcharge_rate', JSON.stringify('12%'));
     put.run('income_tax_rate', JSON.stringify('25%'));
+  },
+  // The OTHER unusable shape, and the one no variant covered until A4-3: stored text
+  // that is not JSON AT ALL. Note the missing JSON.stringify — the bytes are a bare
+  // `25%`, not `"25%"`.
+  //
+  // This is a separate defect with a separate mechanism, and it was the more dangerous
+  // of the two. `JSON.parse` throws, `readSetting`'s catch swallows it and returns the
+  // FALLBACK, and `settingRowExists` has already answered true — so scheme A's gate
+  // opened and a US ledger was priced at China's 25%. Measured before A4-3:
+  // `estimatedTax.annualIncomeTax` = 1100, byte-identical to the pre-#419 missing-row
+  // bug. This variant exists so that hole can never reopen without a golden moving.
+  'malformed-raw': (db) => {
+    const put = db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=datetime('now')`);
+    put.run('surcharge_rate', '12%');
+    put.run('income_tax_rate', '25%');
   },
 };
 
@@ -118,6 +136,7 @@ const PERIODS = [
 // The directed rate pair only needs a period that actually produces a tax line.
 const VARIANT_PERIODS = {
   base: PERIODS, unset: [PERIODS[1]], zero: [PERIODS[1]], malformed: [PERIODS[1]],
+  'malformed-raw': [PERIODS[1]],
 };
 
 // --- generate ---------------------------------------------------------------
@@ -174,6 +193,8 @@ writeFileSync(join(OUT_DIR, 'GOLDEN_ENV.json'), JSON.stringify({
     unset: `DELETE FROM settings WHERE key IN (${RATE_KEYS.join(', ')})`,
     zero: 'every rate key set to the JSON number 0',
     malformed: "surcharge_rate and income_tax_rate set to the JSON strings '12%' / '25%'",
+    'malformed-raw': "surcharge_rate and income_tax_rate set to the RAW text 12% / 25% — " +
+      'not valid JSON at all, so JSON.parse throws and readSetting used to return the fallback',
   },
   locales: LOCALES,
   periods: PERIODS,

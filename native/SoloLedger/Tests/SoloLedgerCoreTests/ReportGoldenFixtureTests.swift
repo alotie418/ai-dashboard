@@ -10,7 +10,7 @@ import XCTest
 /// reason.
 final class ReportGoldenFixtureTests: LedgerTestCase {
 
-    private let variants = ["base", "unset", "zero", "malformed"]
+    private let variants = ["base", "unset", "zero", "malformed", "malformed-raw"]
     private let locales = ["CN", "US", "JP", "EU", "KR", "TW"]
     private let basePeriods = ["2024", "2025", "2026", "2025Q2", "2025-06", "2024H2-2025H1"]
 
@@ -59,7 +59,9 @@ final class ReportGoldenFixtureTests: LedgerTestCase {
         var expected = Set<String>()
         for locale in locales {
             for period in basePeriods { expected.insert("base-\(locale)-\(period)") }
-            for variant in ["unset", "zero", "malformed"] { expected.insert("\(variant)-\(locale)-2025") }
+            for variant in ["unset", "zero", "malformed", "malformed-raw"] {
+                expected.insert("\(variant)-\(locale)-2025")
+            }
         }
         let dir = try goldensDirectory()
         let present = Set(try FileManager.default.contentsOfDirectory(atPath: dir.path)
@@ -160,14 +162,29 @@ final class ReportGoldenFixtureTests: LedgerTestCase {
         XCTAssertNotEqual(base["annualIncomeTax"] as? Double, unset["annualIncomeTax"] as? Double)
     }
 
-    /// A rate that is PRESENT but not a number is what actually produces the NaN
-    /// path — not a missing row, which quietly takes the fallback. CN degrades to
-    /// JSON null while US degrades to 0; both are pinned so the mirror reproduces
-    /// the asymmetry rather than tidying it.
-    func testMalformedRateProducesTheNaNPathNotAFallback() throws {
+    /// A rate that is PRESENT but unusable is refused outright (A4-3); a MISSING row
+    /// is a different state again.
+    ///
+    /// China's bytes here have not moved across three batches, and the reason has
+    /// changed twice — worth stating, because "the golden did not change" is easy to
+    /// misread as "nothing happened". Before A4-3 these nulls were an ACCIDENT:
+    /// `Number("25%")` was NaN, and `cn.js:43`'s rounder has no `|| 0` guard (the
+    /// other four engines do), so the NaN survived to `JSON.stringify`. Since A4-3 the
+    /// dispatcher refuses before any arithmetic, so the same nulls are a DECISION. The
+    /// four non-Chinese engines are where that difference became visible: their
+    /// guarded rounders used to flatten the NaN to a confident `0`, and now they too
+    /// emit null.
+    func testMalformedRateIsRefusedRatherThanPriced() throws {
         let cn = try XCTUnwrap(try golden("malformed-CN-2025")["incomeStatement"] as? [String: Any])
-        XCTAssertTrue(cn["taxSurcharge"] is NSNull, "CN serializes NaN as null (cn.js has no || 0 guard)")
-        XCTAssertTrue(cn["netProfit"] is NSNull, "the NaN propagates through the CN chain")
+        XCTAssertTrue(cn["taxSurcharge"] is NSNull, "CN refuses: the surcharge row is unusable")
+        XCTAssertTrue(cn["netProfit"] is NSNull, "and the whole chain below it declines to compute")
+        // The four that DID move — a corrupt rate is no longer a confident 0.
+        for locale in ["JP", "EU", "KR", "TW"] {
+            let key = locale == "EU" ? "profitLoss" : "incomeStatement"
+            let block = try XCTUnwrap(try golden("malformed-\(locale)-2025")[key] as? [String: Any])
+            XCTAssertTrue(block["incomeTax"] is NSNull,
+                          "\(locale): refused, not flattened to 0 by the `|| 0` rounder")
+        }
         let unsetCN = try XCTUnwrap(try golden("unset-CN-2025")["incomeStatement"] as? [String: Any])
         XCTAssertEqual(unsetCN["taxSurcharge"] as? Double, 24.45,
                        "a MISSING row takes the 12% fallback — it is not the NaN path")

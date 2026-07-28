@@ -10,6 +10,9 @@ const kr = require('./kr');
 const tw = require('./tw');
 const { selectReportSource } = require('./_reportSource');
 const { computeOperatingCashflow } = require('./_cashflow');
+// A4-1 建立的唯一税率判定处。reports → handlers 这个方向是有意的:该模块零依赖,
+// 不构成环;把它复制进 reports/ 才是问题的开始(两套逐渐分叉的解析器)。
+const { classifyStoredRate } = require('../handlers/_rateValue');
 
 const ENGINES = { CN: cn, US: us, JP: jp, EU: eu, KR: kr, TW: tw };
 
@@ -30,6 +33,43 @@ function settingRowExists(db, key) {
   try {
     return !!db.prepare('SELECT 1 AS present FROM settings WHERE key = ?').get(key);
   } catch { return false; }
+}
+
+// 存储原文(SQLite 里那串 TEXT),行不存在时为 null。
+//
+// 与 readSetting 分开,是因为 readSetting **吞掉解析异常并返回兜底**,而这里要的正是
+// 「解析不了」这个事实本身。
+function settingRawText(db, key) {
+  try {
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+    return row ? row.value : null;
+  } catch { return null; }
+}
+
+// 税率参数的解析 —— A-4「需修复」态(计划 §6.4)。
+//
+// 四个状态,只看两件事:**行在不在**,以及**存储文本长什么样**。绝不从算出的值反推。
+//
+//   行不在 + 中国       → 兜底(25 / 12),与方案 A 之前完全一致
+//   行不在 + 非中国     → null,不计算(方案 A,PR #419)
+//   行在 + 值可用       → 那个数
+//   行在 + 值不可用     → null,不计算(本次 A4-3)
+//
+// 最后一条堵的是方案 A 的一个洞:存储文本**根本不是合法 JSON** 时(`abc`、裸的 `25%`),
+// readSetting 的 catch 会返回兜底 25,而 settingRowExists 已经答了 true,于是闸门照常
+// 放行 —— 实测美国账本 annualIncomeTax 又变回 1100,正是 #419 修掉的那个数换了一扇门。
+// 现在解析失败一律判「需修复」,**禁止回退到 25 / 12**。
+//
+// 判定逻辑不在这里,在 electron/handlers/_rateValue.js —— 那是 A4-1 写侧封口用的同一份
+// 规则,原生侧 ReportSettings.classifyRate 也镜像它。三处共用一条规则,而不是各写一套
+// 慢慢分叉的解析器。引擎侧对「未配置」与「需修复」的处置相同(都不计算),所以这里把
+// 两者都编码成 null;两个状态的区分留在各自 App 的设置读取层,由 R8 分别呈现。
+function resolveRate(db, key, locale, chinaFallback) {
+  if (!settingRowExists(db, key)) return locale === 'CN' ? chinaFallback : null;
+  const raw = settingRawText(db, key);
+  if (raw === null) return null;
+  const verdict = classifyStoredRate(raw);
+  return verdict.usable ? verdict.value : null;
 }
 
 // 生成报表
@@ -84,19 +124,12 @@ function generate(db, opts = {}) {
 
   // 读取会计参数
   const vatRate = Number(readSetting(db, 'vat_rate', 13));
-  const surchargeRate = Number(readSetting(db, 'surcharge_rate', 12));
-  // 方案 A(失败即拒)—— 见 docs/SWIFTUI_REPORTS_MIRROR_PLAN.md §9.1。
-  //
-  // 非中国制度 + income_tax_rate 设置行缺失 → 不再静默套用中国兜底 25%,而是把 null
-  // 交给引擎,由引擎产出 null、由 UI 渲染「未配置」。不发明任何税率:把「我们不知道」
-  // 写成一个看起来权威的数字,正是这里要消灭的东西。
-  //   • 中国制度保留兜底(A-2),与本次改动前完全一致;
-  //   • 行存在但值不可解析(如 "25%")不走这条路 —— 那是另一个可区分的「需修复」
-  //     状态(A-4),行为保持不变,留给单独 PR;
-  //   • admin_expense_annual 不是税率,它的兜底 0 也不参与本判定。
-  const incomeTaxRate = (locale === 'CN' || settingRowExists(db, 'income_tax_rate'))
-    ? Number(readSetting(db, 'income_tax_rate', 25))
-    : null;
+  // 两个税率都走同一条四态判定(见 resolveRate 的注释)。中国的兜底仍是 12 / 25。
+  //   • admin_expense_annual 不是税率,它的兜底 0 不参与判定 —— 缺行仍是 0,
+  //     所以营业利润及其以上各行不受任何影响;
+  //   • vat_rate 六个引擎都不读(附录 A6),按现状原样载入,不接入判定。
+  const surchargeRate = resolveRate(db, 'surcharge_rate', locale, 12);
+  const incomeTaxRate = resolveRate(db, 'income_tax_rate', locale, 25);
   const adminExpense = Number(readSetting(db, 'admin_expense_annual', 0));
   const currency = readSetting(db, 'currency', 'CNY');
 
