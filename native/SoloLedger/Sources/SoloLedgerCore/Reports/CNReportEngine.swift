@@ -135,12 +135,7 @@ public extension CNReportEngine {
             cumulativeOutput: r(totalIncomeTax),        // cn.js:71
             certifiedInput: r(totalExpenseTax),         // cn.js:72 — the SAME expression as :70
             invoicedOutput: r(totalIncomeTax),          // cn.js:73 — the SAME expression as :71
-            estimatedPayable: r(vatPayable),            // cn.js:74
-            // NOT in cn.js. The clamp above reports a credit position as 0; this
-            // carries what it discarded. Rounded ONCE, with this engine's rounder,
-            // so it is comparable with `estimatedPayable` rather than being a
-            // differently-scaled number.
-            unclampedDifference: r(totalIncomeTax - totalExpenseTax))
+            estimatedPayable: r(vatPayable))            // cn.js:74
     }
 
     /// `cn.js:91-108` — 月度明细.

@@ -45,33 +45,33 @@ final class ReportBatch4BlindSpotTests: XCTestCase {
     ///     => CN {135.85, 0, 135.85, 0, 0}  JP/TW {0, 135.85, 0}
     ///        EU/KR {0, 135.85, 0}
     ///
-    /// The mirror reports the same `0` — and carries the discarded figure beside
-    /// it, which is the only thing this batch adds beyond the contract.
+    /// **The mirror reports the same `0` and adds nothing.** The information the
+    /// clamp discards — that 135.85 is carried forward rather than nothing being
+    /// owed — is registered in plan Appendix A14, not surfaced as an extra field.
+    /// An earlier revision of this batch did carry one; it was removed because a
+    /// value no engine emits and no golden contains does not belong in a mirror.
+    /// The 135.85 remains visible here on the INPUT row, which is what the engine
+    /// itself reports.
     func testTheClampTurnsACreditPositionIntoZero() {
         let c = ctx(expense: [row(135.85)])
 
         let cn = CNReportEngine.vatSummary(c)
         XCTAssertEqual(cn.cumulativeInput, 135.85)
         XCTAssertEqual(cn.cumulativeOutput, 0)
-        XCTAssertEqual(cn.estimatedPayable, 0, "the clamp, mirrored")
-        XCTAssertEqual(cn.unclampedDifference, -135.85,
-                       "the disclosure: 135.85 of input tax is carried forward, not owed")
+        XCTAssertEqual(cn.estimatedPayable, 0,
+                       "the clamp, mirrored — the credit position reads as owing nothing")
 
         let jp = JPReportEngine.consumptionTax(c)
         XCTAssertEqual([jp.collected, jp.paid, jp.payable], [0, 135.85, 0])
-        XCTAssertEqual(jp.unclampedDifference, -135.85)
 
         let eu = EUReportEngine.vatReturn(c)
         XCTAssertEqual([eu.outputVAT, eu.inputVAT, eu.vatPayable], [0, 135.85, 0])
-        XCTAssertEqual(eu.unclampedDifference, -135.85)
 
         let kr = KRReportEngine.vatSummary(c)
         XCTAssertEqual([kr.outputVAT, kr.inputVAT, kr.vatPayable], [0, 135.85, 0])
-        XCTAssertEqual(kr.unclampedDifference, -135.85)
 
         let tw = TWReportEngine.businessTax(c)
         XCTAssertEqual([tw.collected, tw.paid, tw.payable], [0, 135.85, 0])
-        XCTAssertEqual(tw.unclampedDifference, -135.85)
     }
 
     /// The clamp happens BEFORE the rounding, and the two orders disagree.
@@ -90,8 +90,10 @@ final class ReportBatch4BlindSpotTests: XCTestCase {
         let cn = CNReportEngine.vatSummary(c)
         XCTAssertEqual(cn.cumulativeOutput, 0.01, "0.005 rounds up on its own")
         XCTAssertEqual(cn.cumulativeInput, 0, "0.004 rounds down on its own")
-        XCTAssertEqual(cn.estimatedPayable, 0, "…yet the payable is 0, not 0.01")
-        XCTAssertEqual(cn.unclampedDifference, 0, "r(0.001) is 0 too — the clamp is not what did it")
+        // …yet the payable is 0, not 0.01. Note it is the ROUNDING that produces
+        // the 0 here, not the clamp: the difference is +0.001, which the clamp
+        // passes through untouched and `r` then takes to 0.
+        XCTAssertEqual(cn.estimatedPayable, 0)
 
         XCTAssertEqual(JPReportEngine.consumptionTax(c).payable, 0)
         XCTAssertEqual(EUReportEngine.vatReturn(c).vatPayable, 0)
@@ -191,7 +193,6 @@ final class ReportBatch4BlindSpotTests: XCTestCase {
     func testAnEmptyPeriodIsZeroRatherThanAbsent() {
         let c = ctx()
         XCTAssertEqual(CNReportEngine.vatSummary(c).estimatedPayable, 0)
-        XCTAssertEqual(CNReportEngine.vatSummary(c).unclampedDifference, 0)
         XCTAssertEqual(JPReportEngine.consumptionTax(c).payable, 0)
     }
 
@@ -210,7 +211,6 @@ final class ReportBatch4BlindSpotTests: XCTestCase {
         let cn = CNReportEngine.vatSummary(c)
         XCTAssertEqual(cn.cumulativeInput, -40)
         XCTAssertEqual(cn.estimatedPayable, 140, "100 - (-40); mirrored, and unconstrained by goldens")
-        XCTAssertEqual(cn.unclampedDifference, 140, "the clamp does not bite, so the two agree")
         XCTAssertEqual(JPReportEngine.consumptionTax(c).payable, 140)
         XCTAssertEqual(EUReportEngine.vatReturn(c).vatPayable, 140)
         XCTAssertEqual(KRReportEngine.vatSummary(c).vatPayable, 140)
@@ -331,8 +331,9 @@ final class ReportBatch4BlindSpotTests: XCTestCase {
         let c = ctx(income: [row(10)], expense: [row(4)])
         let china = Mirror(reflecting: CNReportEngine.vatSummary(c)).children.count
         let korea = Mirror(reflecting: KRReportEngine.vatSummary(c)).children.count
-        XCTAssertEqual(china, 6, "5 contract fields + unclampedDifference")
-        XCTAssertEqual(korea, 4, "3 contract fields + unclampedDifference")
+        // Contract fields only — the blocks carry nothing the engines do not emit.
+        XCTAssertEqual(china, 5)
+        XCTAssertEqual(korea, 3)
         XCTAssertNotEqual(china, korea,
                           "same block key, different shape — reading one as the other is what "
                           + "printed five fabricated zeros on four profiles before #414")

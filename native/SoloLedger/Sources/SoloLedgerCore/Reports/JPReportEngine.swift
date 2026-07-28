@@ -104,8 +104,7 @@ public extension JPReportEngine {
         return JPConsumptionTax(
             collected: r(collected),                                    // jp.js:47
             paid: r(paid),                                              // jp.js:47
-            payable: payable,                                           // jp.js:48 — NOT re-rounded
-            unclampedDifference: r(collected - paid))                   // not in jp.js
+            payable: payable)                                           // jp.js:48 — NOT re-rounded
     }
 
     /// `jp.js:59-69` — the monthly breakdown.

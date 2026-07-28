@@ -149,9 +149,8 @@ final class ReportBatch4ParityTests: LedgerTestCase {
                                    "EU": "vatReturn", "KR": "vatSummary",
                                    "TW": "businessTax"]
 
-    /// The CONTRACT fields only, keyed exactly as the golden keys them.
-    /// `unclampedDifference` is deliberately absent — it is this mirror's
-    /// disclosure, not the engine's output.
+    /// The contract fields, keyed exactly as the golden keys them — which for
+    /// batch 4 is every field the block has.
     private func contractFields(_ locale: String, _ ctx: ReportContext) -> [(String, Double)] {
         switch locale {
         case "CN":
@@ -319,8 +318,12 @@ final class ReportBatch4ParityTests: LedgerTestCase {
     /// intermediates. Removed before the comparison, and separately asserted to be
     /// absent from every golden so this list cannot be used to hide a real
     /// mismatch.
+    ///
+    /// Batch 4 contributes NOTHING to this list — its five blocks carry contract
+    /// fields only. It briefly carried a sixth, `unclampedDifference`; that was an
+    /// overreach for a mirror PR and was removed, so the entries below are batch
+    /// 3's alone.
     private static let nonContractFields: Set<String> = [
-        "unclampedDifference",                                    // batch 4
         "unroundedGrossIncome", "unroundedTotalExpenses", "rawMealsTotal",  // batch 3
     ]
 
