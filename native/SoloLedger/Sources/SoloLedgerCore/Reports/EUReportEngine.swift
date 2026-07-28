@@ -84,8 +84,7 @@ public extension EUReportEngine {
         return EUVATReturn(
             outputVAT: r(vatCollected),                                  // eu.js:45
             inputVAT: r(vatDeductible),                                  // eu.js:45
-            vatPayable: vatPayable,                                      // eu.js:45 — NOT re-rounded
-            unclampedDifference: r(vatCollected - vatDeductible))        // not in eu.js
+            vatPayable: vatPayable)                                      // eu.js:45 — NOT re-rounded
     }
 
     /// `eu.js:55-65` — the monthly breakdown.

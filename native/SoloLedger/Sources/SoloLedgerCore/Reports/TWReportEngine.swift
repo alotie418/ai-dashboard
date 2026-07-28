@@ -77,8 +77,7 @@ public extension TWReportEngine {
         return TWBusinessTax(
             collected: r(totalIncomeTax),                                // tw.js:42
             paid: r(totalExpenseTax),                                    // tw.js:42
-            payable: businessTaxPayable,                                 // tw.js:42 — NOT re-rounded
-            unclampedDifference: r(totalIncomeTax - totalExpenseTax))    // not in tw.js
+            payable: businessTaxPayable)                                 // tw.js:42 — NOT re-rounded
     }
 
     /// `tw.js:52-62` — the monthly breakdown.
