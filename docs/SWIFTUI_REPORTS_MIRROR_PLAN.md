@@ -111,6 +111,13 @@ vatSummary, taxInclusiveSummary, monthlyBreakdown, warnings, cashflowStatement
 >
 > R4 因此不发 `warnings`,但在 `ScheduleC` 上带出 `rawMealsTotal`,让第 5 批不必重新镜像整个映射就能求值餐费谓词——该谓词测的是**原始 slug 合计**而非 `line24b_meals`:合计 0.004 会触发提示,而它的 Line 24b 取整为 0。
 
+> **R7 必须手动做的一件事(R5 登记,测试抓不到)**:`ReportTypes.availability` 里
+> `("US", "se-tax")` 现在答 `.absent`。校验它的测试靠反射真实结构体反推,而 switch
+> **无法察觉一个写它时还不存在的类型**——R7 加出 `SelfEmploymentTax` 之后,若不同时扩
+> `ReportBatch4ParityTests.mirroredFieldNames` 的分支,`se-tax` 会继续报 `.absent` 而
+> 没有任何测试报警。五个 `.truncated` 不存在这个问题:它们的结构体已经接在那个反射
+> switch 上,一旦变宽就会逼着更新表格。
+
 兜底口径、"未配置"空态、一次性参数确认提示(约束 3)**全部随本批落地**——因为这正好是"设置值一变、数字就变"的字段全集,爆炸半径统一。
 
 若本批过大,按数据里已有的接缝再切:**5a** = 中国附加税链(仅中国),**5b** = 六地区所得税 + 美国自雇税/预缴。
@@ -323,11 +330,26 @@ R0 的实测把这条从"值判断有风险"升级为**"值判断不可行"**:
 
 **不允许出现貌似完整的中国损益表。** 建议做法:在报表视图里用一个编译期常量或功能开关标记"估算层未就位",未就位时截断部分一律走空态;并配一个测试断言"估算层缺席时,损益表不得渲染净利润行"。
 
-### 7.2 辖区错配审计结果(需在 R5/R6 修掉)
+> **R5 交付了这道闸的判定依据,但没有交付闸本身**(#415):`ReportTypeAvailability` 三态 +
+> `ReportTypes.availability(for:locale:)`。今天它对五个损益表(中/日/欧/韩/台)一律答
+> `.truncated`,`ReportBatch4ParityTests` 从黄金反推同一答案并比对,所以判定本身是可证伪
+> 的断言而非注释。
+>
+> **当前 API 仅提供 availability 判定,不强制调用方使用**——`ReportTypes.table(for:)`
+> 与 `entry.name` 都是 public,调用方完全可以绕开判定直接读取。因此:**R8 必须显式把每个
+> report type 与 availability 组合,禁止直接渲染历史 `name`,并用真实呈现层测试锁定
+> truncated / absent 的空态。**
 
-- **`ja.lproj` 的 `settings.surchargeRate` = "附加税率" 是未翻译的中文**——这是我在 #394 里为了避开与"付加価値税"混淆而选的写法,现确认对日文界面不合适。
-- 更彻底的做法:**日/欧/韩/台的附加税率字段直接隐藏**。这四个地区的预设附加税率是 0,且引擎**可证明地不读取它**(`scripts/test-surcharge-locale.mjs` 已锁死该行为),隐藏它零损失。
-- Electron 侧 `FinancePage.tsx:641-642` 在无报表时会把中国专属的"税金及附加"行泄漏到其他制度——**不要把这个门控逻辑镜像过来**(Electron 侧的修复另开 PR,见 §9)。
+### 7.2 辖区错配审计结果(审查已于 R5 完成,修复各自单独 PR)
+
+原定"在 R5/R6 修掉"。实际执行时按 CLAUDE.md「AI 不得发明会计政策/译法」拆开:**R5 只做审查
+与登记,一个字都没改**;措辞与显示口径由用户 2026-07-27 拍板,落地清单见 §10.1 的四行表格,
+**四项均尚未开工**。
+
+- **`ja.lproj` 的 `settings.surchargeRate` = "附加税率" 是未翻译的中文**——这是我在 #394 里为了避开与"付加価値税"混淆而选的写法,现确认对日文界面不合适。R5 复核结论:该字符串**与 `zh-Hans` 逐字节相同**,且 Electron 侧 `settings.accounting.surcharge` 六语与原生完全一致,**两侧必须同改**,只改 `ja.lproj` 会让两个 App 分叉。
+- R5 另查出**同一字段的 ko 值 `부가 세율` 与 `부가세`(부가가치세 的通用缩写)相撞**,而本仓在 `ko.json:580/581/1335` 与 `accountingLocaleConfig.ts:204` 正是用 `부가세` 指增值税;在中国/韩国制度下它上一行就是标着 `부가가치세` 的税率字段。
+- 更彻底的做法:**附加税率字段仅中国制度显示**(原案是"日/欧/韩/台隐藏";R5 复核发现 **override 在美国而非日本**——`AccountingProfile.swift:66` 只覆盖 zh-Hans/zh-Hant 两语的「地方税率」,与其余四语的「附加税率/Surcharge」是两个税种概念)。已拍板:US 一并隐藏,**不删存储字段、不迁数据、不改公式或默认值**。这五个地区的预设附加税率是 0,且引擎**可证明地不读取它**(`scripts/test-surcharge-locale.mjs` 已锁死该行为),隐藏零损失。
+- Electron 侧 `FinancePage.tsx:641-642` 在无报表时会把中国专属的"税金及附加"行泄漏到其他制度——**不要把这个门控逻辑镜像过来**(Electron 侧的修复另开 PR,见 §9)。**该条 R5 未复核**,仍是 2026-07-25 的读码结论。
 
 ---
 
@@ -416,6 +438,7 @@ R0 的实测把这条从"值判断有风险"升级为**"值判断不可行"**:
 | 小规模纳税人适用税率 | 税务政策 | 单独记录,不阻塞 |
 | 类别在切换记账制度后被"孤立" | 两侧同源缺陷 | 本阶段**原样镜像**;若要处理,最低诚实标准是给出警告而非自动重挂 |
 | **交易列表静默截断在 500 行**(`LedgerStore.listTransactions` 默认值;视图无任何计数或「显示 N / 共 M」文案,六语 `.strings` 无相关键,`Store/` 内无任何日志) | 原生侧已发货缺陷 | **归 R8**,与报表 UI 一并处理——修它需要先设计「显示 N / 共 M」这个可见性,那属于呈现层。同族的 CSV 导出硬编码 5000 已单独修掉(见本节开头的分工说明) |
+| **#415 的 `unclampedDifference`** ⚠️ | **镜像 PR 越界(本阶段自身产生的问题)** | `CNVATSummary` / `JPConsumptionTax` / `EUVATReturn` / `KRVATSummary` / `TWBusinessTax` 五个 public 结构各带一个 `unclampedDifference` 字段。**`electron/reports/*` 不产出它,任何黄金里也没有它**,因此它不是 R5 的镜像契约的一部分,与本阶段「镜像 PR 逐字照搬、不做任何修正」的范围约束(见文首前提与 §3)直接冲突——纠正方向是**在 R6/R8 之前单独开纠正 PR 移除**该字段(引擎与五个结构一并,同步测试与附录 A14 的措辞),同时**保留 Electron 原始钳位结果的逐字镜像**(`estimatedPayable` / `payable` / `vatPayable` 一个字节不改)。若日后决定保留这项披露能力,**必须走单独、明确批准的非镜像 PR**,不得再随镜像批次夹带 |
 
 ---
 
@@ -436,14 +459,27 @@ R0 的实测把这条从"值判断有风险"升级为**"值判断不可行"**:
 | R2 无税率损益核心 | ✅ #407 已合并 |
 | R3 含税汇总 / 月度分解 / 经营现金流 | ✅ #409 已合并 |
 | R4 美国 Schedule C 映射 | ✅ #412 已合并 |
-| R5 流转税汇总块 + `reportTypes` 原始契约 | 🔨 施工中 |
+| R5 流转税汇总块 + `reportTypes` 原始契约 | ✅ **#415 已合并** |
 | R6–R8 | ⬜ 未开工 |
 
-**R5 的文案审查结论(2026-07-27 拍板,落地不在本批)**:中国卡片重复段落撤掉(Electron
-单独 PR)、韩/台标题与行标签定稿、附加税率字段改为仅中国制度显示、ja/ko/fr 措辞定稿。
-`reportTypes` 的 `name` 映射**逐字镜像、不补语言、不修错**,并配 `availability(for:)`
-三态(mirrored / truncated / absent)供 R8 在渲染前必须先处理;R8 用完整审查过的原生六语
-strings,不得直接渲染这些历史 name。
+**R5 的文案审查结论(2026-07-27 拍板)**。审查在 R5 内完成,**落地一律不在 R5**——
+下表四项各自单独 PR,均尚未开工:
+
+| 决定 | 落点 | 状态 |
+| --- | --- | --- |
+| 中国卡片重复段落(`certifiedInput` / `invoicedOutput` 两行)整体撤掉 | Electron 显示层(`components/VATStatistics.tsx`) | ⬜ 未开工 |
+| 韩国标题保留国别标记;台湾标题/行标签按定稿六语改写 | `components/accountingLocaleConfig.ts` | ⬜ 未开工 |
+| 附加税率字段改为**仅中国制度显示**(US/JP/EU/KR/TW 全隐藏,不删字段、不迁数据、不改公式或默认值) | 原生 `SettingsView` + Electron `AccountingSection` | ⬜ 未开工 |
+| `settings.surchargeRate` ja=「増値税付加税率」/ ko=「증치세 추가세율」;fr 设置页=「Taux de surtaxe」、税款记录=「Surtaxe」;zh-Hant 维持「附加稅率」不动 | 两侧 `.strings` / `i18n/locales/*.json` 必须同改 | ⬜ 未开工 |
+
+R5 自身交付的是引擎侧契约:`reportTypes` 的 `name` 映射**逐字镜像、不补语言、不修错**,
+四个缺陷各配测试钉住(稀疏 2–3/6 语、`jp.js` 的 `zh-CN` 槽装日文、`eu.js` 带「申报」、
+与 `accountingLocaleConfig.ts` 同概念说法不一致);另配 `availability(for:locale:)`
+三态(mirrored / truncated / absent),**但该 API 只提供判定、不强制使用**(见 §7.3)。
+
+> **#415 的一处越界,已登记待纠正**:五个 turnover-tax public 结构带了非 Electron 契约
+> 字段 `unclampedDifference`。见 §9.2 表格该行——**它不属于 R5 的镜像契约**,应在
+> R6/R8 之前单独开纠正 PR 移除。
 
 **贯穿全阶段的红线**:黄金全冻结。镜像 PR 里出现 `Allowed-Golden-Changes` 尾注即越界——该尾注只属于单独标注的有意修正 PR,且声明是上界不是义务(§3.2)。
 
@@ -466,7 +502,7 @@ strings,不得直接渲染这些历史 name。
 | A11 | **美国 `line30_homeOffice` 被并入 `line28_totalExpenses`** | 真实表格上家庭办公室走 **Form 8829**,Schedule C 的 Line 28 只含 8–27a。`us.js:61-63` 的键过滤把 `line30` 也算了进去。**fixture 自己的 `categories.schedule_line` 列对该 slug 写的正是 "Form 8829"**——账本与引擎对这笔钱的归属意见不一致 | **会计判断,需会计确认**。同上 |
 | A12 | **美国负数 `returns` 行抬高毛收入** | `line7 = line1 − line2 + line6`,而 line2 为负时相当于加。实测:50000 + 一行 −1500 的 returns → line1 48500 / line2 −1500 / **line7 50000**。fixture 不可达,**没有任何黄金约束这个符号** | 需先确定负数 returns 行是否为合法录入;若是,则属会计判断 |
 | A13 | **负数 `tax_amount` 抬高流转税应纳额** | 五个引擎的应纳额都是 `output − input`,进项为负时相当于加。实测:销项 100 + 一行 −40 的进项 → 进项显示 −40.00、**应纳额 140**。fixture 无负税行,**没有任何黄金约束它**,与 A12 同族 | 需先确定负数 `tax_amount` 是否为合法录入;若是,则属会计判断 |
-| A14 | **留抵税额被钳位成 0** | `Math.max(0, output − input)` 把进项大于销项的期间报成「应纳 0」,而真实状态是留抵结转。fixture 可达:`base-CN-2025Q2` 进项 135.85、销项 0、黄金 `estimatedPayable: 0` | 镜像已额外导出未钳差额 `unclampedDifference`(**不属 Electron 契约、不在任何黄金里**)作为披露项;是否呈现、用什么措辞属税务呈现判断 |
+| A14 | **留抵税额被钳位成 0** | `Math.max(0, output − input)` 把进项大于销项的期间报成「应纳 0」,而真实状态是留抵结转。fixture 可达:`base-CN-2025Q2` 进项 135.85、销项 0、黄金 `estimatedPayable: 0` **钳位本身逐字镜像,保持不动。** #415 曾额外导出未钳差额 `unclampedDifference` 作为披露项——**该字段是镜像 PR 的越界,已登记在 §9.2 待单独纠正 PR 移除**(本行的措辞随那个 PR 一并更新)。留抵是否呈现、用什么措辞,属税务呈现判断,须走单独、明确批准的非镜像 PR |
 
 ## 11. 同期跟进(不属本阶段,归 #394 跟进)
 
