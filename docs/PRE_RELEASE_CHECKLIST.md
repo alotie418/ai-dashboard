@@ -1,5 +1,26 @@
 # 发布前安全与发布准备清单（Pre-Release Checklist）
 
+> ## ✅ 现状（2026-07-28 核实）—— **1.0.0 已发布**，本文件是发布过程的历史记录
+>
+> **`v1.0.0` 已于 2026-07-08 作为 GitHub Release「SoloLedger 1.0.0」（Latest）正式发布**——签名 + 公证 + staple 的 Apple Silicon DMG。证据：git tag `v1.0.0`、GitHub Releases、[`CHANGELOG.md`](../CHANGELOG.md) 的 1.0.0 条目（并记明「与 1.0.0-rc.2 代码零差异」）。
+>
+> 因此本文件中的下列状态**一律已过期**，读时请当作历史：
+>
+> | 过期表述 | 实际 |
+> |---|---|
+> | 头部「不启用任何发布功能（NO RELEASE FEATURE ENABLED）」 | 签名 + 公证已启用并已用于正式发布；CSP 已 enforce |
+> | 「版本 **1.0.0 正式版准备中**」 | 已发布（该句写于发布收尾 PR 合并时、打 tag 之前） |
+> | §2 标题「**当前**发布前 blocker」 | 表内 4 项**全部已闭合**——含最后一项「干净机断网 DMG 冒烟」，已于 2026-07-08 以**同机模拟口径**完成（同机新建标准用户 `SoloLedgerQA`、浏览器下载带 quarantine 的 DMG、断网安装启动、无 Gatekeeper 拦截）。**注意口径**：从未在第二台真机上执行 |
+> | §7「本文件不启用任何发布功能」 | 作为「建档 PR 本身不启用任何东西」为真；作为对**仓库现状**的陈述已假 |
+>
+> **仍然成立的未完项**（不因发布而闭合）：`arm64`-only（无 universal / Intel 包）、无 auto-update（`publish: null`，local-first 的有意决策）、电商 Woo 真店 QA 仍是发布后验证项（Beta）。
+>
+> **RC 与人工 QA 的时间线（下方各节）全部保留为历史记录**——它是 1.0.0 如何被验收的唯一记载。
+
+---
+
+## 【历史记录】以下为 2026-06-26 建档原文 + 四次状态更新
+
 > 状态：**盘点记录 / 不启用任何发布功能（NO RELEASE FEATURE ENABLED）**
 > 文档日期：2026-06-26 ｜ 基线：main HEAD `98879c4`（🟢×17）
 > **状态更新：2026-07-07 ｜ 基线 main `3fc241e`** —— §2 的「Electron 33 已 EOL」「CSP 尚未 enforce」两项 blocker 已解决（#348 / #349）；sandbox 已加固为 true（#343）；新增 §5「2026-07 工程体检执行记录（#350–#353）」。
@@ -44,13 +65,15 @@
 
 ## 2. 当前发布前 blocker
 
+> **【已全部闭合 · 2026-07-28 核实】** 表内四项:签名+公证 ✅、Electron EOL ✅、CSP ✅、干净机断网冒烟 ✅（2026-07-08，同机模拟口径）。`arm64`-only 一项**不是 blocker 而是分发决策**，至今未变。
+
 | Blocker | 级别 | 说明 |
 |---|---|---|
 | ~~对外分发缺签名 + 公证~~ | ✅ **已解决（#355 + PR-C·2026-07-07）** | `electron-builder.dmg.yml` `identity:null` / `hardenedRuntime:false` / 无 notarize。只读实施方案已固化于 [`SIGNING_NOTARIZATION_PLAN.md`](SIGNING_NOTARIZATION_PLAN.md)：electron-builder 25.1.8 **内建** `mac.notarize:true`（免 afterSign，凭证走 `APPLE_ID`/`APPLE_APP_SPECIFIC_PASSWORD`/`APPLE_TEAM_ID` 环境变量）+ `hardenedRuntime:true` + 最小 entitlements（`allow-jit`+`allow-unsigned-executable-memory`，`disable-library-validation` 仅 .node 加载失败时补）。**排在 Electron 43 + CSP 之后（发布线最后一步）**；Apple 账号可现在并行注册；safeStorage 换签名后旧 Key 需重录。**当前作为「本地自用未签名 DMG」是自洽的。**（**PR-C 执行成功·2026-07-07**：PR-B #355 接线后真机执行——App Developer ID 签名 ✓ · Apple notarization successful · DMG notarytool **Accepted** · `stapler validate` 通过 · 安装到 /Applications 后 `spctl accepted (source=Notarized Developer ID)` + `codesign` valid + 正常打开；最小 entitlements 两项够用，**无需** disable-library-validation；safeStorage 重录用户须知已入 CHANGELOG。已知非阻塞：DMG 自身 `spctl --type open/install` 显示 rejected/no usable signature——DMG 本体未单独 codesign，但公证票据已 staple 且 DMG 内与安装后 App 均过 Gatekeeper。实测记录见 [`RELEASE.md`](RELEASE.md) §9。） |
 | ~~Electron 33 已 EOL~~ | ✅ **已解决（#348·2026-07-06）** | 已升 **Electron 42.6.0 + better-sqlite3 12.11.1**（按 [`ELECTRON_UPGRADE_ASSESSMENT.md`](ELECTRON_UPGRADE_ASSESSMENT.md) 的「分阶段回退」过渡路径）。E42 EOL 2026-10-20。**E42→E43 再 bump 等 better-sqlite3 12.11.2 上 npm**（截至 2026-07-07 npm latest 仍为 12.11.1，仅 GitHub tag）——有界止损决策待定：超期则带 E42 直接进入签名/公证。 |
 | **arm64-only** | 🟡 分发覆盖决策 | `mac.target.arch: arm64`。Intel 用户无包；`universal` 或 Intel 属分发决策。 |
 | ~~CSP 尚未 enforce~~ | ✅ **已解决（#349·2026-07-06）** | 生产构建注入 meta CSP（仅 build·Vite `transformIndexHtml`）+ `check:csp` 守卫入 `check:all`；file://+CSP 真机验收零违规。方案与逐条依据见 [`CSP_PLAN.md`](CSP_PLAN.md)。 |
-| **干净机断网 DMG 冒烟未验收** | 🟠 需人工 | Gatekeeper 右键打开 + 离线启动 + 核心流程，只能人工验证（见 §6）。 |
+| ~~干净机断网 DMG 冒烟未验收~~ | ✅ **已完成（2026-07-08·同机模拟口径）** | Gatekeeper 右键打开 + 离线启动 + 核心流程，只能人工验证（见 §6）。 |
 
 ---
 

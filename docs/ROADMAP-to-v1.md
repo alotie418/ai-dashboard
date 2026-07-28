@@ -1,5 +1,39 @@
 # SoloLedger — 距离「成品」(v1.0) 的差距路线图
 
+> ## ⚠️ 现状（2026-07-28 核实）—— 本文件是**审计快照**，不是当前状态
+>
+> **它是 2026-06-15 全项目只读审计的产出 + 2026-07-07 的一次增量更新。文件中所有 `- [ ]` 一律不代表今天的状态**，原文与勾选框按历史记录保留不动。
+>
+> **当前发布状态以 [`CHANGELOG.md`](../CHANGELOG.md) 与 [`PRE_RELEASE_CHECKLIST.md`](PRE_RELEASE_CHECKLIST.md) 为准；v1.0.0 已于 2026-07-08 发布。**
+>
+> ### 关键项状态对照（只列快照里最容易被误读的几条）
+>
+> | 快照里的说法 | 今天的事实 | 出处 |
+> |---|---|---|
+> | 「代码签名 — Blocker — `identity:null`」 | ✅ 已接线并用于正式发布；`identity` 键已删（自动探测钥匙串证书，**探测不到则降级为未签名**） | `electron-builder.dmg.yml` |
+> | 「公证 + stapler + hardened runtime — Blocker」 | ✅ `hardenedRuntime: true` · `notarize: true` · `gatekeeperAssess: false`；真机执行成功 | `electron-builder.dmg.yml` · [`RELEASE.md`](RELEASE.md) §9 |
+> | 「仓库无 entitlements 文件」 | ✅ `build/entitlements.mac.plist`（DMG 线）+ `entitlements.mas.plist` / `.mas.inherit.plist`（MAS 线） | `build/` |
+> | 「`build:mas` 是坏的（死 script）」 | ⚠️ **快照与 2026-07-07 更新都已失真**：MAS 线已**重建**——`electron-builder.mas.yml` 存在，`build:mas` 是可用脚本。2026-07-07 那句「`build:mas` 已删」也已过期 | `electron-builder.mas.yml` · `package.json` |
+> | 「完全没有 CI」 | ✅ `.github/workflows/ci.yml`（仓库唯一 workflow）四个 job | `.github/workflows/ci.yml` |
+> | 「无 CSP」 | ✅ 构建期注入 10 条 directive + `check:csp` 守卫；源 `index.html` 仍**故意**无 CSP（dev/HMR） | `vite.config.ts` · `scripts/check-csp.mjs` |
+> | 「无 LICENSE — 动作:加 MIT」 | ⚠️ LICENSE 已存在，但采用的是**专有许可**，**不是 MIT**。README 许可证章节与之一致 | `LICENSE` · `README.md` |
+> | 「无隐私声明」 | ✅ 根目录有 `PRIVACY.md` / `PRIVACY.en.md`；⚠️ 但**应用内仍无隐私/法律页** | 仓库根 |
+> | 「IPC handler / 迁移 = 零执行测试」 | ✅ `test-handlers.mjs` / `test-balance-handlers.mjs` / `test-migrations.mjs`，已入 `check:all` 与 CI | `scripts/` |
+> | 「e2e 从不跑真 Electron」 | ✅ 真主进程套件已存在（`e2e-electron/`，3 spec）；⚠️ 但 CI 里该 job **仅 `workflow_dispatch` 手动触发** | `playwright.electron.config.ts` · `.github/workflows/ci.yml` |
+> | 「删除/归档整个 web 栈」 | ✅ 已执行，历史在 `archive/web-legacy` 分支 | 工作树 |
+> | 「README 系统性过期」 | ✅ README 已重写 | `README.md` |
+> | 「无测试框架 / 无 `tsc --noEmit`」 | 🟡 **一半闭合**：`typecheck`（`tsc --noEmit`）已在 CI；但仍无 vitest / jest / eslint，"单测"仍是手写 `.mjs` | `package.json` |
+> | 「资产负债 / 现金流未实现」 | ✅ 均已实现（**管理口径·非法定**） | `electron/reports/_cashflow.js` · `components/FinancePage.tsx` |
+>
+> ### 快照里**仍然成立**的未完项
+>
+> `universal` / Intel 构建（仍 `arm64` 单架构）· auto-update（`publish: null`，local-first 有意不做）· AI 调用无 `AbortController` · OCR 仅读 PDF 第一页 · 无暗色模式 · 无 husky · Track A 会计师确认 B1–B5（**仓库内无法验证**）。
+>
+> ### 无法从仓库判定的
+>
+> App Store 审核 / 上架状态。本文件与本仓库任何文档都**不对此作断言**。
+
+
 > 来源:2026-06-15 全项目只读审计(8 个并行 agent 覆盖 构建/分发、双架构、测试/CI、会计口径、AI·OCR、数据安全、安全、文档·i18n·UX)。
 > 性质:**只读审计的产出清单**,本文件本身不改任何代码。每项给出 严重度 / 证据(file:line) / 动作 / 工作量(S/M/L)。
 > 用法:把每个 `- [ ]` 当 tracker 勾。**永不在工程 PR 内擅自改税务口径公式**(见 Track A)。

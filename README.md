@@ -17,7 +17,21 @@ SoloLedger 是一个**经营管理估算工具**,帮助小微经营者把日常�
 > **它不是法定会计软件,不出具法定财务报表,不做自动报税,不能替代会计师 / 税务师。**
 > 报表与税额均为**按你录入数据的管理估算**,口径经过简化(例如所得税按单一税率估算、增值税附加按默认假设)。正式申报、审计与合规请以专业会计师 / 税务机关口径为准。
 
-应用内每个报表、税务与 AI 输出界面都会显示对应的免责声明。会计口径的进一步精确化属于待会计师确认事项,详见 [`docs/ROADMAP-to-v1.md`](docs/ROADMAP-to-v1.md)。
+应用内每个报表、税务与 AI 输出界面都会显示对应的免责声明。会计口径的进一步精确化属于待会计师确认事项,详见 [`docs/ROADMAP-to-v1.md`](docs/ROADMAP-to-v1.md)(**该文件是 2026-06-15 的审计快照,不代表当前状态**)。
+
+---
+
+## 当前发布状态(2026-07-28)
+
+本仓库同时存在**三条 macOS 产品线**,状态不同,请勿混为一谈:
+
+| 产品线 | 状态 | 说明 |
+|---|---|---|
+| **GitHub 直分发 DMG**(Developer ID) | ✅ **1.0.0 已发布**(2026-07-08) | **已签名 + 已公证 + 已 staple** 的 Apple Silicon 构建,离线可通过 Gatekeeper。见 [Releases](https://github.com/alotie418/ai-dashboard/releases) 与 [`CHANGELOG.md`](CHANGELOG.md) |
+| **Mac App Store(MAS)构建** | 🟡 构建配置已就绪,**上架状态本文件不做断言** | 独立配置 `electron-builder.mas.yml`(App Sandbox + provisioning profile),与 DMG 线的签名方式不同。审核/上架进度不在仓库内可查证,见 [`docs/MAS_SUBMISSION.md`](docs/MAS_SUBMISSION.md) |
+| **原生 SwiftUI 重写版**(`native/SoloLedger`) | 🚧 **开发中,未发布** | 与上面两条线并行的重写,尚不可供用户使用。当前进度:报表引擎镜像 R0–R5 已合并,R6–R8 未开工,见 [`docs/SWIFTUI_REPORTS_MIRROR_PLAN.md`](docs/SWIFTUI_REPORTS_MIRROR_PLAN.md) |
+
+下文的功能与技术栈描述,除非另有说明,均指**已发布的 Electron 桌面版**。
 
 ---
 
@@ -34,7 +48,7 @@ SoloLedger 是一个**经营管理估算工具**,帮助小微经营者把日常�
 | 📄 业务单据 | 报价/订单等业务单据生成,支持 PDF 导出与附件 |
 | 📉 数据分析 | 多维经营分析与趋势预测(预测为简化估算模型,仅供管理参考) |
 | 💳 应收应付 | 客户/供应商维度汇总,账龄分析,收付款率 |
-| 💰 财务报表 | 经营损益概览(利润表 / Schedule C 口径);管理口径资产负债概览已提供(只读·非法定),现金流概览开发中 |
+| 💰 财务报表 | 经营损益概览(利润表 / Schedule C 口径);管理口径资产负债概览(**非法定**;账户与负债由你维护,报表本身是派生视图);经营活动现金流概览(收付实现制,**非法定**) |
 | 🧮 收支记录 | 全量交易流水,支持成本类型(COGS/经营费用)与批量重分类 |
 | 🇺🇸 美国税务工具 | Schedule C、自雇税(SE-tax,按年表)、里程与家庭办公室扣除估算 |
 | ⚙️ 系统设置 | 公司信息、记账口径、税率、分类管理、AI 服务商、数据备份/恢复 |
@@ -55,6 +69,8 @@ SoloLedger 是一个**经营管理估算工具**,帮助小微经营者把日常�
 ---
 
 ## BYOK —— 自带 API Key,支持 8 家服务商
+
+> **本节仅适用于 GitHub 直分发的 DMG 版。** MAS(Mac App Store)构建**物理排除**整个 AI / BYOK 子系统(`electron-builder.mas.yml` 以 `!electron/ai/**` 等排除规则剔除,为 App Review 3.1.1),因此 MAS 版没有下述功能。
 
 SoloLedger **不内置任何 AI 后端**。在「系统设置 → AI 服务商」或首次启动的引导向导中填入你自己的 Key 即可,支持任意组合、随时切换默认服务商。
 
@@ -119,7 +135,7 @@ SoloLedger **不内置任何 AI 后端**。在「系统设置 → AI 服务商�
 
 ## 快速开始
 
-> 仅支持 macOS(Apple Silicon)。需要 Node.js 20+。
+> 仅支持 macOS(Apple Silicon)。CI 基线为 **Node.js 22**(`.github/workflows/ci.yml`);`package.json` 未声明 `engines`,更低版本未经验证。
 
 ```bash
 git clone https://github.com/alotie418/ai-dashboard.git
@@ -140,13 +156,17 @@ npm run build:dmg
 # 产物:release/SoloLedger-<version>-arm64.dmg
 ```
 
-> 当前 DMG 为**本地自用、未签名/未公证**的 Apple Silicon 构建,首次启动需在「访达」中右键 →「打开」过一次 Gatekeeper。代码签名、公证、universal/Intel 构建与自动更新属路线图项(见 [`docs/ROADMAP-to-v1.md`](docs/ROADMAP-to-v1.md))。
+> **对外发布的 DMG 已签名 + 已公证 + 已 staple**(Developer ID · Hardened Runtime),从 [Releases](https://github.com/alotie418/ai-dashboard/releases) 下载后**离线双击即可打开**,无需右键绕过 Gatekeeper。配置见 `electron-builder.dmg.yml`(`hardenedRuntime: true` · `notarize: true`),流程见 [`docs/RELEASE.md`](docs/RELEASE.md)。
+>
+> **但你在本机跑 `npm run build:dmg` 未必得到签名产物**:配置里不写死 `identity`,由 electron-builder 自动探测钥匙串中的 Developer ID Application 证书;**机器上没有证书时会跳过签名,产出未签名 DMG**(此时才需要右键 →「打开」)。公证还需要 `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` 环境变量。
+>
+> **仍属未做项**:universal / Intel 构建(当前仅 `arm64`)与自动更新(`publish: null`,有意不做)。
 
 ---
 
 ## 质量守卫与测试
 
-仓库内置 20+ 个 `check:*` 守卫脚本(报表口径不变量、COGS 拆分、税额标签、免责声明挂载、AI 语气、服务商 registry 一致性、离线资源、国际化 key 矩阵等)与基于 Playwright 的界面验收 `test:locale-ui`。常用:
+仓库内置数十个 `check:*` 守卫脚本(截至 2026-07-28 为 44 个:报表口径不变量、COGS 拆分、税额标签、免责声明挂载、AI 语气、服务商 registry 一致性、离线资源、国际化 key 矩阵、CSP、报表黄金可复现等)与两套 Playwright 验收。常用:
 
 ```bash
 npm run check:cogs-split      # 报表 COGS/经营费用拆分 + 净利不变量
@@ -157,7 +177,12 @@ npm run check:disclaimer      # 免责声明挂载点 + i18n 齐备
 npm run test:locale-ui        # vite build + Playwright 六语言界面验收
 ```
 
-> 现状:以上守卫、数据库迁移测试、构建与 Playwright 界面 e2e 已纳入 CI(`.github/workflows/ci.yml`,每次 push/PR 自动运行);仍待补的是**真 Electron(打包应用)端到端测试**——CI 中 e2e 由 Playwright 驱动 vite preview、`electronAPI` 被 mock,不启动 Electron 运行时。
+**两套 e2e,别混淆**:
+
+- `npm run test:locale-ui`(`playwright.config.ts` → `e2e/`)——**界面层**验收,Playwright 驱动 vite preview,`electronAPI` 被 mock,不启动 Electron 运行时。
+- `npm run test:electron`(`playwright.electron.config.ts` → `e2e-electron/`)——**真主进程**验收,经 `_electron.launch` 启动真实 Electron,走真实 IPC 路由与真实 better-sqlite3(附件 IPC、附件文件系统、备份恢复闭环)。它需要 better-sqlite3 按 **Electron ABI** 重建,与守卫脚本所需的 node ABI 相反,因此**有意不并入 `check:all`**。
+
+> CI 现状(`.github/workflows/ci.yml`,仓库唯一 workflow):守卫 + 迁移测试 + 构建、界面 e2e、报表黄金可复现三个 job 在 **PR 与 push 到 `main`** 时自动运行（feature 分支的 push 不触发);**真 Electron e2e 有独立 job,但目前仅 `workflow_dispatch` 手动触发**,尚未放开到每次 PR。所以"真 Electron e2e 存在"与"每次 PR 都跑"是两回事——前者成立,后者不成立。
 
 ---
 
@@ -177,7 +202,9 @@ npm run test:locale-ui        # vite build + Playwright 六语言界面验收
 │   ├── ecommerce/           # 电商连接/拉单/暂存/提交入账 + provider 适配(Shopify/Woo/demo)
 │   └── db/                  # SQLite schema、迁移、分类种子
 ├── scripts/                 # check:* 守卫脚本
-├── e2e/                     # Playwright 界面验收
+├── e2e/                     # Playwright 界面验收(mock electronAPI)
+├── e2e-electron/            # Playwright 真主进程验收(_electron.launch + 真实 IPC/SQLite)
+├── native/SoloLedger/       # 原生 SwiftUI 重写版(开发中,未发布)
 └── docs/                    # ROADMAP-to-v1.md / ECOMMERCE_MVP_STATUS.md / PRE_RELEASE_CHECKLIST.md 等
 ```
 
