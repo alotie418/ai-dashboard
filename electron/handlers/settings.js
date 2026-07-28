@@ -1,5 +1,6 @@
 // Settings get/save
 const { getDb } = require('../db');
+const { RATE_KEYS, rateValueIsUsable } = require('./_rateValue');
 
 // 字段白名单
 // AI 模型选择已移到 ai_providers 表（每 provider 独立），settings 不再存 ai_model
@@ -45,13 +46,44 @@ async function save({ body }) {
     throw new Error('Request body must be a JSON object');
   }
 
+  const entries = Object.entries(data);
+
+  // ── 税率类键的写侧封口(A4-1)────────────────────────────────────────────────
+  //
+  // 全部校验完再决定写不写:任何一个税率值不可用 → **整次请求失败,一个字节都不写**。
+  // 刻意不做另外三件看起来更友好的事:
+  //   • 不跳过那个键继续保存其余的 —— 那会让调用方拿到 success 却少存了一项;
+  //   • 不改写成 null / 0 —— 那正是今天最坏的路径(NaN 经 JSON.stringify 变成
+  //     字面量 null,再读回来是 0%,一次静默的税率变更);
+  //   • 不部分保存 —— 事务在这之后才开始,所以失败时连已经合法的键也不落盘,
+  //     调用方看到的状态与它发起请求前完全一致。
+  //
+  // 判定规则见 _rateValue.js,数字字符串("13")仍然合法,这是已发货路径的兼容点。
+  const invalidRates = [];
+  for (const [key, value] of entries) {
+    if (!SETTINGS_ALLOWED_KEYS.has(key) || !RATE_KEYS.has(key)) continue;
+    if (!rateValueIsUsable(value)) {
+      invalidRates.push(`${key}=${JSON.stringify(value)}`);
+      continue;
+    }
+    // 尺寸也在这里挡:税率键绝不能落进下面的 skippedKeys 分支,否则「不得跳过」
+    // 就被一条 10000 字节的路径绕过去了。合法数字不可能这么长。
+    if (JSON.stringify(value).length > 10000) invalidRates.push(`${key}=<oversized>`);
+  }
+  if (invalidRates.length > 0) {
+    throw new Error(
+      `Rate settings must be a finite number or a numeric string. Rejected: ${invalidRates.join(', ')}. ` +
+      'Nothing was saved.'
+    );
+  }
+
   const skippedKeys = [];
   const upsert = db.prepare(
     "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))"
   );
 
-  const tx = db.transaction((entries) => {
-    for (const [key, value] of entries) {
+  const tx = db.transaction((rows) => {
+    for (const [key, value] of rows) {
       if (!SETTINGS_ALLOWED_KEYS.has(key)) continue;
       const serialized = JSON.stringify(value);
       if (serialized.length > 10000) { skippedKeys.push(key); continue; }
@@ -59,7 +91,7 @@ async function save({ body }) {
     }
   });
 
-  tx(Object.entries(data));
+  tx(entries);
 
   return {
     success: true,
