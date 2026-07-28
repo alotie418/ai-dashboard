@@ -35,14 +35,14 @@ import Foundation
 /// check to get in. Integer and float LITERALS still work (`.configured(21)`), which
 /// keeps call sites readable; there is no way to write a non-finite literal in Swift.
 ///
-/// ## The decision is made on the STORED BYTES
+/// ## The decision is made on the STORED TEXT
 ///
 /// Not on the coerced number, and this is the same hard constraint as A-3, one layer
 /// down. Measured: `Number(null)`, `Number("")`, `Number([])` and `Number(false)` are
 /// all **0**, `Number(true)` is **1**, and `Number([25])` is **25** — every one a
 /// perfectly ordinary rate. A gate that looked at the coerced value would classify a
-/// corrupt row as a deliberate 0% (or 1%, or 25%). Only the raw text tells them apart,
-/// which is why ``needsRepair`` carries it.
+/// corrupt row as a deliberate 0% (or 1%, or 25%). Only the stored TEXT tells them
+/// apart, which is why ``needsRepair`` carries it.
 public enum ReportRateSetting: Equatable, Sendable {
 
     /// The row exists and holds a usable rate.
@@ -68,12 +68,23 @@ public enum ReportRateSetting: Equatable, Sendable {
 
     /// The row EXISTS but its value is not a usable rate. **Nothing is computed.**
     ///
-    /// The payload is the **raw `settings.value` text**, byte for byte as SQLite
-    /// holds it — not the `JSON.parse` result and not the `Number()` result. Both of
-    /// those destroy the evidence: parsing turns `abc` into a throw and `"25%"` into
-    /// a string that no longer looks stored, and coercing turns half of them into
-    /// ordinary numbers. R8's repair flow has to show the user what is actually in
-    /// their ledger, so this is what is actually in their ledger.
+    /// The payload is the `settings.value` **TEXT as it stands before JSON parsing and
+    /// before numeric coercion** — not the `JSON.parse` result and not the `Number()`
+    /// result. Both of those destroy the evidence: parsing turns `abc` into a throw
+    /// and `"25%"` into a string that no longer looks stored, and coercing turns half
+    /// of them into ordinary numbers. R8's repair flow has to show the user what is in
+    /// their ledger, so this is as close to it as the read path gets.
+    ///
+    /// **What "as it stands" does and does not promise.** Valid UTF-8 survives
+    /// unchanged. Invalid UTF-8 does not: `SQLiteDatabase` decodes TEXT with
+    /// `String(decoding:as: UTF8.self)`, which substitutes U+FFFD (its own comment
+    /// says so, and it is the deliberate choice there — `String(cString:)` would stop
+    /// at an embedded NUL and silently truncate). So a row holding bytes that are not
+    /// valid UTF-8 arrives here already lossy, and this type does not claim otherwise.
+    /// Widening the read path to `Data` was considered and declined: it would change a
+    /// primitive every settings reader shares, for a case no write path can produce.
+    /// The boundary is pinned by
+    /// `ReportRateSettingTests.testInvalidUTF8ArrivesLossyAtTheDecodingBoundary`.
     case needsRepair(rawValue: String)
 
     /// The rate to price with, or `nil` when there is none.
@@ -92,7 +103,10 @@ public enum ReportRateSetting: Equatable, Sendable {
     /// Whether the estimate layer may produce numbers at all.
     public var isConfigured: Bool { rate != nil }
 
-    /// The stored bytes when this is ``needsRepair``, else `nil`.
+    /// The stored TEXT when this is ``needsRepair``, else `nil`.
+    ///
+    /// Same promise as ``needsRepair(rawValue:)``: pre-parse, pre-coercion, and
+    /// lossy for invalid UTF-8 at the SQLite decoding boundary.
     ///
     /// Spelled as an accessor so a presentation layer can ask "is there something to
     /// repair, and what does it say" without switching, and so that the answer is

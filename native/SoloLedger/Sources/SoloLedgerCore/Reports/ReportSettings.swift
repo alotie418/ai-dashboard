@@ -107,7 +107,7 @@ public enum ReportSettings {
         rate(db, "surcharge_rate", locale: locale, chinaFallback: 12)
     }
 
-    /// The shared resolution: row presence first (A-3), then the STORED BYTES (A-4).
+    /// The shared resolution: row presence first (A-3), then the STORED TEXT (A-4).
     ///
     /// The order of the two questions is the mirror's, and it matters: China never
     /// asks about row presence, so a Chinese ledger's not-configured behaviour is
@@ -141,7 +141,12 @@ public enum ReportSettings {
         return classifyRate(raw)
     }
 
-    /// The stored bytes → one of the two "row exists" states.
+    /// The stored TEXT → one of the two "row exists" states.
+    ///
+    /// "Stored TEXT" means the `settings.value` string as it stands BEFORE JSON
+    /// parsing and BEFORE numeric coercion. Valid UTF-8 is preserved verbatim;
+    /// invalid UTF-8 has already been substituted with U+FFFD by ``SQLiteDatabase``'s
+    /// TEXT decoding, which is the existing boundary and is not changed here.
     ///
     /// Mirrors `electron/handlers/_rateValue.js`'s `classifyStoredRate` — the write
     /// gate that shipped in A4-1 — so a value this app prices with is a value that app

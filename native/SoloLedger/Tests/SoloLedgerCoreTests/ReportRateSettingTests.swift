@@ -18,7 +18,8 @@ import XCTest
 /// corrupt row a deliberate 0%, or 1%, or 25% — and `malformed-US-2025.json` is today
 /// **byte-identical to `zero-US-2025.json`**, warning string included, which is the
 /// proof that no value-based check can separate them. So the classification reads the
-/// STORED BYTES, and ``ReportRateSetting/needsRepair(rawValue:)`` carries them.
+/// STORED TEXT — the `settings.value` string before JSON parsing and before numeric
+/// coercion — and ``ReportRateSetting/needsRepair(rawValue:)`` carries it.
 ///
 /// ## What this suite deliberately does NOT assert
 ///
@@ -91,7 +92,7 @@ final class ReportRateSettingTests: LedgerTestCase {
             XCTAssertEqual(s, .needsRepair(rawValue: raw), "stored \(raw) must need repair")
             XCTAssertNil(s.rate, "stored \(raw) must not price anything")
             XCTAssertEqual(s.needsRepairRawValue, raw,
-                           "the RAW bytes are what a repair flow has to show the user")
+                           "the stored TEXT is what a repair flow has to show the user")
         }
     }
 
@@ -103,7 +104,7 @@ final class ReportRateSettingTests: LedgerTestCase {
         XCTAssertEqual(ReportMath.number(.string("")), 0)
         XCTAssertEqual(ReportMath.number(.array([])), 0)
         XCTAssertEqual(ReportMath.number(.array([.number(25)])), 25)
-        // …and what the stored bytes say. Every one of the five above is corrupt.
+        // …and what the stored TEXT says. Every one of the five above is corrupt.
         for raw in ["null", "true", "\"\"", "[]", "[25]"] {
             XCTAssertNil(ReportSettings.classifyRate(raw).rate,
                          "\(raw) coerces to a perfectly ordinary rate and is still corrupt")
@@ -293,6 +294,51 @@ final class ReportRateSettingTests: LedgerTestCase {
                        "…and an unparseable admin expense takes the 0 fallback, as it does in Electron")
     }
 
+    /// The exact edge of what ``ReportRateSetting/needsRepair(rawValue:)`` promises.
+    ///
+    /// The payload is the stored TEXT before parsing and before coercion — and that
+    /// promise stops at ``SQLiteDatabase``'s decoding boundary, which is NOT lossless.
+    /// TEXT is read with `String(decoding:as: UTF8.self)`, deliberately (its own
+    /// comment explains why `String(cString:)` would be worse: it stops at an embedded
+    /// NUL and silently truncates), and that substitutes U+FFFD for invalid UTF-8.
+    ///
+    /// So a row holding `0xFF` does NOT come back as `0xFF`. Asserted rather than
+    /// documented-and-hoped, because the difference between "the bytes in your ledger"
+    /// and "the bytes your ledger's reader could decode" is exactly the kind of
+    /// over-claim a repair flow would inherit and repeat to the user.
+    ///
+    /// The classification is unaffected: the substituted text is still not JSON, so
+    /// the row is still needs-repair. Only the fidelity of the carried payload moves.
+    func testInvalidUTF8ArrivesLossyAtTheDecodingBoundary() throws {
+        let db = try fixtureCopy("invalid-utf8")
+        // A lone 0xFF is not valid UTF-8 in any position. CAST(... AS TEXT) stores the
+        // raw byte in the TEXT column without SQLite validating it.
+        try db.execute("""
+            INSERT INTO settings (key, value, updated_at)
+            VALUES ('income_tax_rate', CAST(x'FF' AS TEXT), datetime('now'))
+            ON CONFLICT(key) DO UPDATE SET value=CAST(x'FF' AS TEXT), updated_at=datetime('now')
+            """)
+
+        let s = ReportSettings.incomeTaxRate(db, locale: "US")
+        XCTAssertEqual(s, .needsRepair(rawValue: "\u{FFFD}"),
+                       "the row is still needs-repair, and the payload is what the decoder produced")
+        XCTAssertNil(s.rate, "still nothing to price with")
+        XCTAssertEqual(s.needsRepairRawValue, "\u{FFFD}")
+        XCTAssertNotEqual(s.needsRepairRawValue, "\u{00FF}",
+                          "it is NOT the original byte reinterpreted — it is the replacement character")
+
+        // Same boundary through the row reader itself, so the loss is attributed to
+        // SQLiteDatabase rather than to anything this batch added.
+        XCTAssertEqual(ReportSettings.rawValue(db, "income_tax_rate"), "\u{FFFD}")
+
+        // Valid UTF-8, including non-ASCII, is untouched — the promise still holds
+        // everywhere a write path can actually reach.
+        try put(db, "surcharge_rate", "十二%")
+        XCTAssertEqual(ReportSettings.surchargeRate(db, locale: "CN"),
+                       .needsRepair(rawValue: "十二%"),
+                       "valid UTF-8 survives verbatim, multi-byte scalars included")
+    }
+
     /// ``ReportMath/jsTrim(_:)`` — added by this batch and otherwise asserted nowhere.
     ///
     /// It exists because the coerced value cannot report emptiness: `Number("")` and
@@ -339,7 +385,7 @@ final class ReportRateSettingTests: LedgerTestCase {
     /// BOM made `JSONSerialization` parse where `JSON.parse` throws, and every test in
     /// this file passed anyway. Found by adversarial review, fixed in ``jsonFragment``.
     func testTheStoredShapeRulesMatchTheShippedWriteGate() {
-        // (stored bytes, usable?) — the same table as _rateValue.js's classifyStoredRate.
+        // (stored TEXT, usable?) — the same table as _rateValue.js's classifyStoredRate.
         let corpus: [(String, Bool)] = [
             ("25", true), ("25.5", true), ("0", true), ("-5", true), ("1e3", true),
             ("\"25\"", true), ("\"13\"", true), ("\" 25 \"", true), ("\"0\"", true),

@@ -157,7 +157,8 @@ final class ReportMissingRateTests: LedgerTestCase {
     /// R6 modelled this as `.configured(.nan)`, which made the corrupt state a *kind
     /// of configured* — so every `guard let rate = setting.rate` in R7 would have
     /// sailed past it and multiplied by NaN. A4-2 makes it its own case, carrying the
-    /// stored bytes so a repair flow can show the user what is actually there.
+    /// stored TEXT (pre-parse, pre-coercion) so a repair flow can show the user what
+    /// is in their ledger.
     ///
     /// It must not collapse into `.notConfigured` either: both refuse to compute, but
     /// one says "go configure a rate" and the other says "fix a broken value", and
@@ -173,7 +174,7 @@ final class ReportMissingRateTests: LedgerTestCase {
             XCTAssertFalse(s.isConfigured, "\(locale): nothing may be priced with it")
             XCTAssertNil(s.rate, "\(locale): and there is no NaN to accidentally multiply by")
             XCTAssertEqual(s.needsRepairRawValue, "\"25%\"",
-                           "\(locale): the RAW stored text, not the parsed string, not Number()")
+                           "\(locale): the stored TEXT, not the parsed string, not Number()")
 
             // The surcharge row is malformed in this variant too — and it is the one
             // that produces China's five nulls in `malformed-CN-2025.json`.
