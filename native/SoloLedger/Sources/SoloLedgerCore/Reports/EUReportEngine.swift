@@ -63,6 +63,31 @@ public extension EUReportEngine {
             difference: r(totalIncome - totalExpense))
     }
 
+    /// `eu.js:30-32`, `:44-46` — the VAT return summary.
+    ///
+    /// The block is named `vatReturn`, and its two component names are
+    /// `vatCollected` / `vatDeductible` inside the function (`eu.js:30-31`) but
+    /// `outputVAT` / `inputVAT` in the emitted object (`:45`). Both spellings are
+    /// kept where the source puts them.
+    static func vatReturn(_ ctx: ReportContext) -> EUVATReturn {
+        let r = ReportMath.round2OrZero
+        // eu.js:18 / :21
+        var totalIncomeTax = 0.0
+        for row in ctx.incomeRows { totalIncomeTax += ReportMath.orZero(row.taxAmount) }
+        var totalExpenseTax = 0.0
+        for row in ctx.expenseRows { totalExpenseTax += ReportMath.orZero(row.taxAmount) }
+
+        let vatCollected = totalIncomeTax                                // eu.js:30
+        let vatDeductible = totalExpenseTax                              // eu.js:31
+        let vatPayable = r(ReportMath.max(0, vatCollected - vatDeductible)) // eu.js:32
+
+        return EUVATReturn(
+            outputVAT: r(vatCollected),                                  // eu.js:45
+            inputVAT: r(vatDeductible),                                  // eu.js:45
+            vatPayable: vatPayable,                                      // eu.js:45 — NOT re-rounded
+            unclampedDifference: r(vatCollected - vatDeductible))        // not in eu.js
+    }
+
     /// `eu.js:55-65` — the monthly breakdown.
     ///
     /// Twelve entries keyed on `ctx.year`, never on the reporting period

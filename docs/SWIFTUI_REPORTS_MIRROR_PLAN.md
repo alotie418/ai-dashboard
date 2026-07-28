@@ -436,7 +436,14 @@ R0 的实测把这条从"值判断有风险"升级为**"值判断不可行"**:
 | R2 无税率损益核心 | ✅ #407 已合并 |
 | R3 含税汇总 / 月度分解 / 经营现金流 | ✅ #409 已合并 |
 | R4 美国 Schedule C 映射 | ✅ #412 已合并 |
-| R5–R8 | ⬜ 未开工 |
+| R5 流转税汇总块 + `reportTypes` 原始契约 | 🔨 施工中 |
+| R6–R8 | ⬜ 未开工 |
+
+**R5 的文案审查结论(2026-07-27 拍板,落地不在本批)**:中国卡片重复段落撤掉(Electron
+单独 PR)、韩/台标题与行标签定稿、附加税率字段改为仅中国制度显示、ja/ko/fr 措辞定稿。
+`reportTypes` 的 `name` 映射**逐字镜像、不补语言、不修错**,并配 `availability(for:)`
+三态(mirrored / truncated / absent)供 R8 在渲染前必须先处理;R8 用完整审查过的原生六语
+strings,不得直接渲染这些历史 name。
 
 **贯穿全阶段的红线**:黄金全冻结。镜像 PR 里出现 `Allowed-Golden-Changes` 尾注即越界——该尾注只属于单独标注的有意修正 PR,且声明是上界不是义务(§3.2)。
 
@@ -458,6 +465,8 @@ R0 的实测把这条从"值判断有风险"升级为**"值判断不可行"**:
 | A10 | **美国 `other-income` 被计两次** ⚠️ | `line1_grossReceipts` 汇总**全部**收入行,`line6_otherIncome` 再把 `other-income` 子集汇总一次,而 `line7_grossIncome = line1 − line2 + line6` 是**加**回去(`us.js:24`)。实测:一行 900 的 other-income → line1 900 / line6 900 / **line7 1800**。重复**已烘进 `base-US-2026`**(52400 − 1500 + 900 = 51800) | **会计判断,需会计确认**。修正会改动已有期间的毛收入金额,因此必须单独 PR、单独标注,并声明 `Allowed-Golden-Changes` |
 | A11 | **美国 `line30_homeOffice` 被并入 `line28_totalExpenses`** | 真实表格上家庭办公室走 **Form 8829**,Schedule C 的 Line 28 只含 8–27a。`us.js:61-63` 的键过滤把 `line30` 也算了进去。**fixture 自己的 `categories.schedule_line` 列对该 slug 写的正是 "Form 8829"**——账本与引擎对这笔钱的归属意见不一致 | **会计判断,需会计确认**。同上 |
 | A12 | **美国负数 `returns` 行抬高毛收入** | `line7 = line1 − line2 + line6`,而 line2 为负时相当于加。实测:50000 + 一行 −1500 的 returns → line1 48500 / line2 −1500 / **line7 50000**。fixture 不可达,**没有任何黄金约束这个符号** | 需先确定负数 returns 行是否为合法录入;若是,则属会计判断 |
+| A13 | **负数 `tax_amount` 抬高流转税应纳额** | 五个引擎的应纳额都是 `output − input`,进项为负时相当于加。实测:销项 100 + 一行 −40 的进项 → 进项显示 −40.00、**应纳额 140**。fixture 无负税行,**没有任何黄金约束它**,与 A12 同族 | 需先确定负数 `tax_amount` 是否为合法录入;若是,则属会计判断 |
+| A14 | **留抵税额被钳位成 0** | `Math.max(0, output − input)` 把进项大于销项的期间报成「应纳 0」,而真实状态是留抵结转。fixture 可达:`base-CN-2025Q2` 进项 135.85、销项 0、黄金 `estimatedPayable: 0` | 镜像已额外导出未钳差额 `unclampedDifference`(**不属 Electron 契约、不在任何黄金里**)作为披露项;是否呈现、用什么措辞属税务呈现判断 |
 
 ## 11. 同期跟进(不属本阶段,归 #394 跟进)
 

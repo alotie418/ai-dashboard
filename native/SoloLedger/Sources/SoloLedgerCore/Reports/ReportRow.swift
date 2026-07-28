@@ -8,8 +8,7 @@ import Foundation
 /// treats them when they are absent. Reusing the app model would quietly supply
 /// defaults the engines never had.
 ///
-/// Only the columns batch 1 and batch 2 read are carried. `tax_amount` is still
-/// absent because the turnover-tax blocks are batch 4.
+/// Only the columns batches 1–4 read are carried.
 ///
 /// `date` was absent in batch 1 — the period filter happens in SQL
 /// (`index.js:47-52`), so the engines never needed it. Batch 2 changed that:
@@ -25,6 +24,18 @@ public struct ReportRow: Equatable, Sendable {
     public let amountNet: Double?
     /// `amount` — the tax-inclusive amount.
     public let amount: Double?
+    /// `tax_amount` — the tax carried on the row, read by batch 4 alone.
+    ///
+    /// The turnover-tax blocks are the ONLY place this column is used, and they use
+    /// it through `(row.tax_amount || 0)` (`cn.js:20`, `:23` and the same pair in
+    /// jp/eu/kr/tw). That guard is why a NaN here contributes 0 rather than
+    /// poisoning the sum — so China's unguarded rounder (`cn.js:43`) cannot emit
+    /// `null` from this path, even though it can from others. Measured in node: a
+    /// `NaN` tax on one row of two yields the other row's tax, under every engine.
+    ///
+    /// Optional for the same reason as ``amountNet``: SQL NULL and a real 0 are
+    /// different values, and only `ReportMath.orZero` may collapse them.
+    public let taxAmount: Double?
     /// `category_id`.
     ///
     /// SQL NULL and "this query never selected the column" collapse to the SAME
@@ -51,10 +62,11 @@ public struct ReportRow: Equatable, Sendable {
     public let date: String?
 
     public init(amountNet: Double? = nil, amount: Double? = nil,
-                categoryID: String? = nil, shippingCost: Double? = nil,
-                date: String? = nil) {
+                taxAmount: Double? = nil, categoryID: String? = nil,
+                shippingCost: Double? = nil, date: String? = nil) {
         self.amountNet = amountNet
         self.amount = amount
+        self.taxAmount = taxAmount
         self.categoryID = categoryID
         self.shippingCost = shippingCost
         self.date = date

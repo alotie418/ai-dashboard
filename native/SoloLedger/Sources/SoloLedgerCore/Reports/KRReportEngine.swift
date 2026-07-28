@@ -58,6 +58,32 @@ public extension KRReportEngine {
             difference: r(totalIncome - totalExpense))
     }
 
+    /// `kr.js:29`, `:41-43` — 부가가치세 요약.
+    ///
+    /// Korea emits this under the key `vatSummary` — the same key China uses for a
+    /// FIVE-field block with different field names. Nothing in the JSON says which
+    /// shape a `vatSummary` is; only the ledger's locale does. That is the trap
+    /// `#414` fell into, and the reason ``KRVATSummary`` is its own type here.
+    ///
+    /// Korea also skips the intermediate names Japan and the EU use: the clamp at
+    /// `kr.js:29` reads `totalIncomeTax` / `totalExpenseTax` directly.
+    static func vatSummary(_ ctx: ReportContext) -> KRVATSummary {
+        let r = ReportMath.round2OrZero
+        // kr.js:18 / :21
+        var totalIncomeTax = 0.0
+        for row in ctx.incomeRows { totalIncomeTax += ReportMath.orZero(row.taxAmount) }
+        var totalExpenseTax = 0.0
+        for row in ctx.expenseRows { totalExpenseTax += ReportMath.orZero(row.taxAmount) }
+
+        let vatPayable = r(ReportMath.max(0, totalIncomeTax - totalExpenseTax)) // kr.js:29
+
+        return KRVATSummary(
+            outputVAT: r(totalIncomeTax),                                // kr.js:42
+            inputVAT: r(totalExpenseTax),                                // kr.js:42
+            vatPayable: vatPayable,                                      // kr.js:42 — NOT re-rounded
+            unclampedDifference: r(totalIncomeTax - totalExpenseTax))    // not in kr.js
+    }
+
     /// `kr.js:52-62` — the monthly breakdown.
     ///
     /// Twelve entries keyed on `ctx.year`, never on the reporting period

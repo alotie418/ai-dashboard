@@ -77,6 +77,37 @@ public extension JPReportEngine {
             difference: r(totalIncome - totalExpense))
     }
 
+    /// `jp.js:32-34`, `:46-49` — 消費税（仕入税額控除方式）.
+    ///
+    /// Note the shape difference from China's: the payable is rounded ONCE, at
+    /// `jp.js:34`, and placed into the block already rounded (`:48`). China clamps
+    /// at `:32` and rounds at the emit (`:74`). Same result, different line — and
+    /// the JS is what is being mirrored, so the rounding stays where the source
+    /// puts it.
+    ///
+    /// The currency is irrelevant here. A JPY ledger is still rounded to two
+    /// decimals (Appendix A8) because the rounder is `Math.round(v * 100) / 100`
+    /// regardless of regime — measured: a 1234.567 tax gives 1234.57 under a JPY
+    /// context exactly as under CNY. Mirrored, not repaired.
+    static func consumptionTax(_ ctx: ReportContext) -> JPConsumptionTax {
+        let r = ReportMath.round2OrZero
+        // jp.js:18 / :21
+        var totalIncomeTax = 0.0
+        for row in ctx.incomeRows { totalIncomeTax += ReportMath.orZero(row.taxAmount) }
+        var totalExpenseTax = 0.0
+        for row in ctx.expenseRows { totalExpenseTax += ReportMath.orZero(row.taxAmount) }
+
+        let collected = totalIncomeTax                                  // jp.js:32
+        let paid = totalExpenseTax                                      // jp.js:33
+        let payable = r(ReportMath.max(0, collected - paid))            // jp.js:34
+
+        return JPConsumptionTax(
+            collected: r(collected),                                    // jp.js:47
+            paid: r(paid),                                              // jp.js:47
+            payable: payable,                                           // jp.js:48 — NOT re-rounded
+            unclampedDifference: r(collected - paid))                   // not in jp.js
+    }
+
     /// `jp.js:59-69` — the monthly breakdown.
     ///
     /// Twelve entries keyed on `ctx.year`, never on the reporting period

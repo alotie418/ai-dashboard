@@ -22,7 +22,7 @@ import Foundation
 /// `SELECT *`: every column is boxed into a `SQLiteValue` and every row into a
 /// dictionary. Measured on release/arm64, a two-query period fetch costs roughly
 /// 2 KB of resident memory per row under `SELECT *` (about 1.9 GB at a million
-/// rows) against a small fraction of that when only the four columns the engines
+/// rows) against a small fraction of that when only the five columns the engines
 /// read are selected. At sizes a real ledger reaches — 100 orders a day for a
 /// year is on the order of 10^5 rows — the narrow fetch is tens of milliseconds.
 ///
@@ -35,7 +35,7 @@ public enum ReportFetch {
     ///
     /// `ReportRow` documents which those are; adding a column here without adding
     /// it there would silently widen the read for nothing.
-    static let rowColumns = "amount_net, amount, category_id, date"
+    static let rowColumns = "amount_net, amount, tax_amount, category_id, date"
 
     /// `index.js:47-52` — income and expense rows for the period.
     ///
@@ -86,6 +86,9 @@ public enum ReportFetch {
         try db.query(rowSQL(type: type), [.text(from), .text(to)]).map {
             ReportRow(amountNet: $0.double("amount_net"),
                       amount: $0.double("amount"),
+                      // Batch 4's only new column. The turnover-tax blocks read it
+                      // and nothing else does.
+                      taxAmount: $0.double("tax_amount"),
                       categoryID: $0.string("category_id"),
                       // The transactions table has no shippingCost column, which is
                       // why China's shipping deduction is structurally 0 here.
