@@ -185,6 +185,7 @@ final class ReportBatch1ParityTests: LedgerTestCase {
             incomeRows: incomeRows, expenseRows: expenseRows, categories: categories,
             adminExpense: try adminExpense(db),
             incomeTaxRate: ReportSettings.incomeTaxRate(db, locale: locale),
+            surchargeRate: ReportSettings.surchargeRate(db, locale: locale),
             currency: "CNY", year: year, from: from, to: to)
         return (ctx, source)
     }

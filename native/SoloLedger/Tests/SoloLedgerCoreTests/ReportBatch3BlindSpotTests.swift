@@ -27,6 +27,7 @@ final class ReportBatch3BlindSpotTests: XCTestCase {
         // strictest filler.
         ReportContext(incomeRows: income, expenseRows: expense, categories: categories,
                       adminExpense: 0, incomeTaxRate: .notConfigured,
+                      surchargeRate: .notConfigured,
                       currency: "USD", year: year,
                       from: "\(year)-01-01", to: "\(year)-12-31")
     }

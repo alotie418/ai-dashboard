@@ -1,7 +1,7 @@
 import XCTest
 @testable import SoloLedgerCore
 
-/// R6 — the income-tax rate's three states, and the rule that decides them.
+/// The income-tax rate's states, and the rule that decides them (R6 + A4-2).
 ///
 /// The rule (plan §6.2 / §9.1 scheme A) is one sentence: **"not configured" is
 /// decided by the ABSENCE of the settings row, never by the computed value.** It
@@ -152,20 +152,34 @@ final class ReportMissingRateTests: LedgerTestCase {
                        "A-2 — China keeps the 25 fallback")
     }
 
-    /// malformed is a FOURTH state and R6 does not touch it (A-4, separate PR).
+    /// malformed is the FOURTH state (A-4): the row exists and its value is unusable.
     ///
-    /// The row exists, so scheme A does not fire; `Number("25%")` is NaN and the NaN
-    /// is handed on, exactly as the JS hands it on. Reading it as `.notConfigured`
-    /// would merge two states the plan spends four golden variants keeping apart.
-    func testMalformedStaysTheNaNPathAndIsNotMistakenForNotConfigured() throws {
+    /// R6 modelled this as `.configured(.nan)`, which made the corrupt state a *kind
+    /// of configured* — so every `guard let rate = setting.rate` in R7 would have
+    /// sailed past it and multiplied by NaN. A4-2 makes it its own case, carrying the
+    /// stored bytes so a repair flow can show the user what is actually there.
+    ///
+    /// It must not collapse into `.notConfigured` either: both refuse to compute, but
+    /// one says "go configure a rate" and the other says "fix a broken value", and
+    /// R8 puts a different door in front of each.
+    func testMalformedIsItsOwnStateAndCarriesTheStoredBytes() throws {
         let bad = try variant("malformed")
         for locale in nonCN + ["CN"] {
             let s = ReportSettings.incomeTaxRate(bad, locale: locale)
+            XCTAssertEqual(s, .needsRepair(rawValue: "\"25%\""),
+                           "\(locale): the row EXISTS and its value is unusable")
             XCTAssertNotEqual(s, .notConfigured,
-                              "\(locale): the row EXISTS — malformed is not absent")
-            XCTAssertTrue(s.isConfigured, "\(locale): configured, in the row-exists sense")
-            let rate = try XCTUnwrap(s.rate)
-            XCTAssertTrue(rate.isNaN, "\(locale): Number(\"25%\") is NaN, mirrored not repaired")
+                              "\(locale): needs-repair and not-configured are two states")
+            XCTAssertFalse(s.isConfigured, "\(locale): nothing may be priced with it")
+            XCTAssertNil(s.rate, "\(locale): and there is no NaN to accidentally multiply by")
+            XCTAssertEqual(s.needsRepairRawValue, "\"25%\"",
+                           "\(locale): the RAW stored text, not the parsed string, not Number()")
+
+            // The surcharge row is malformed in this variant too — and it is the one
+            // that produces China's five nulls in `malformed-CN-2025.json`.
+            XCTAssertEqual(ReportSettings.surchargeRate(bad, locale: locale),
+                           .needsRepair(rawValue: "\"12%\""),
+                           "\(locale): the surcharge row is malformed in this variant as well")
         }
     }
 
@@ -307,24 +321,42 @@ final class ReportMissingRateTests: LedgerTestCase {
 
     // MARK: - The type itself
 
-    func testTheRateAccessorRefusesOnlyTheAbsentCase() {
-        XCTAssertEqual(IncomeTaxRateSetting.configured(21).rate, 21)
-        XCTAssertEqual(IncomeTaxRateSetting.chinaFallback(25).rate, 25)
-        XCTAssertNil(IncomeTaxRateSetting.notConfigured.rate)
-        XCTAssertTrue(IncomeTaxRateSetting.configured(0).isConfigured,
+    func testTheRateAccessorRefusesBothNonComputingCases() {
+        XCTAssertEqual(ReportRateSetting.configured(21).rate, 21)
+        XCTAssertEqual(ReportRateSetting.chinaFallback(25).rate, 25)
+        XCTAssertNil(ReportRateSetting.notConfigured.rate)
+        XCTAssertNil(ReportRateSetting.needsRepair(rawValue: "\"25%\"").rate,
+                     "a corrupt rate is not a rate — there is no NaN to hand back")
+        XCTAssertTrue(ReportRateSetting.configured(0).isConfigured,
                       "0 is a rate; falsiness is a JavaScript problem, not a state")
-        XCTAssertFalse(IncomeTaxRateSetting.notConfigured.isConfigured)
-        // A malformed rate is configured-with-NaN, and `rate` hands the NaN back
-        // rather than laundering it into nil (which would be A-4's job to decide).
-        XCTAssertTrue(try XCTUnwrap(IncomeTaxRateSetting.configured(.nan).rate).isNaN)
-        XCTAssertTrue(IncomeTaxRateSetting.configured(.nan).isConfigured)
+        XCTAssertFalse(ReportRateSetting.notConfigured.isConfigured)
+        XCTAssertFalse(ReportRateSetting.needsRepair(rawValue: "x").isConfigured)
+        // Only needs-repair answers the raw-bytes question.
+        XCTAssertEqual(ReportRateSetting.needsRepair(rawValue: "abc").needsRepairRawValue, "abc")
+        XCTAssertNil(ReportRateSetting.notConfigured.needsRepairRawValue)
+        XCTAssertNil(ReportRateSetting.configured(21).needsRepairRawValue)
+        // `.configured(.nan)` does not compile: the payload is FiniteRate, whose only
+        // NON-LITERAL initialiser is failable. That is the guarantee, in the type.
+        //
+        // A runtime value has to pass the check…
+        let nan = Double.nan, plusInf = Double.infinity, ordinary = 21.0
+        XCTAssertNil(FiniteRate(nan))
+        XCTAssertNil(FiniteRate(plusInf))
+        XCTAssertNil(FiniteRate(-plusInf))
+        XCTAssertEqual(FiniteRate(ordinary)?.value, 21)
+        // …while a LITERAL takes the non-failable path, which is why `.configured(21)`
+        // reads normally at call sites. There is no non-finite literal to abuse it
+        // with: `.nan` and `.infinity` are members of Double, not literals, and
+        // FiniteRate has no such members.
+        XCTAssertEqual(ReportRateSetting.configured(21).rate, 21)
+        XCTAssertEqual(ReportRateSetting.configured(23.2).rate, 23.2)
     }
 
     /// The same number in two different states is two different values.
     func testEqualityDistinguishesTheOriginOfTheSameNumber() {
-        XCTAssertNotEqual(IncomeTaxRateSetting.configured(25), .chinaFallback(25))
-        XCTAssertEqual(IncomeTaxRateSetting.configured(25).rate,
-                       IncomeTaxRateSetting.chinaFallback(25).rate,
+        XCTAssertNotEqual(ReportRateSetting.configured(25), .chinaFallback(25))
+        XCTAssertEqual(ReportRateSetting.configured(25).rate,
+                       ReportRateSetting.chinaFallback(25).rate,
                        "…while the number they price with is the same, which is the whole problem")
     }
 }

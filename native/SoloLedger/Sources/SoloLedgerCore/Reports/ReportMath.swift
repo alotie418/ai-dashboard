@@ -305,6 +305,22 @@ public enum ReportMath {
     /// | `""` | `0` | `nil` |
     /// | `"0b101"` / `"0o17"` | `5` / `15` | `nil` |
     /// | `"0x1p4"` | `NaN` | `16` — Swift takes hex FLOATS |
+    /// JS `String.prototype.trim` — the same `StrWhiteSpace` set ``stringToNumber(_:)``
+    /// strips, exposed rather than duplicated.
+    ///
+    /// A caller sometimes needs to know that trimming left NOTHING, and the coerced
+    /// value cannot tell it: `Number("")` and `Number("   ")` are both `0`, which is
+    /// indistinguishable from a stored `0`. A-4's rate gate has to see that difference
+    /// (an empty string is a corrupt rate; a zero is a real one), so it asks here
+    /// instead of carrying a second copy of a Unicode set that must not drift.
+    static func jsTrim(_ raw: String) -> String {
+        let scalars = Array(raw.unicodeScalars)
+        var start = 0, end = scalars.count
+        while start < end && jsWhitespace.contains(scalars[start]) { start += 1 }
+        while end > start && jsWhitespace.contains(scalars[end - 1]) { end -= 1 }
+        return String(String.UnicodeScalarView(scalars[start..<end]))
+    }
+
     static func stringToNumber(_ raw: String) -> Double {
         var scalars = Array(raw.unicodeScalars)
         var start = 0, end = scalars.count

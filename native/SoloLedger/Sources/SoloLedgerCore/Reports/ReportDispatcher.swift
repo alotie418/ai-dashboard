@@ -152,9 +152,12 @@ public enum ReportDispatcher {
         return ReportContext(
             incomeRows: incomeRows, expenseRows: expenseRows, categories: categories,
             adminExpense: ReportSettings.number(db, "admin_expense_annual", fallback: 0),
-            // index.js:88-99 — scheme A. Decided by whether the ROW exists, never by
-            // the number it would have produced (A-3).
+            // index.js:87-99 — schemes A and A-4. Decided by whether the ROW exists
+            // (A-3) and then by its stored BYTES (A-4), never by the number it would
+            // have produced. Both rates go through the same resolution; only China's
+            // engine may consume the surcharge.
             incomeTaxRate: ReportSettings.incomeTaxRate(db, locale: locale),
+            surchargeRate: ReportSettings.surchargeRate(db, locale: locale),
             currency: ReportSettings.string(db, "currency", fallback: "CNY"),
             year: year, from: from, to: to)
     }

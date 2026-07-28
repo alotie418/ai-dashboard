@@ -241,6 +241,7 @@ final class ReportBatch2BlindSpotTests: XCTestCase {
         // than quietly pricing at some default.
         ReportContext(incomeRows: income, expenseRows: expense, categories: [],
                       adminExpense: 0, incomeTaxRate: .notConfigured,
+                      surchargeRate: .notConfigured,
                       currency: "X", year: year, from: from, to: to)
     }
 
