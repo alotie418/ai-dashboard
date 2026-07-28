@@ -1,11 +1,23 @@
 # CSP 安全策略计划（Content-Security-Policy）
 
-> 状态：~~计划草案 / 当前未启用~~ → ✅ **已 ENFORCE（#349·2026-07-06）**
-> 文档日期：2026-06-26 ｜ 基线：main HEAD `bc05230`（🟢×15）
-> **状态更新（2026-07-07）**：本计划已按 §「实施」落地——生产构建经 Vite `transformIndexHtml` 注入 meta CSP，`check:csp` 守卫已入 `check:all`，file://（`SOLOLEDGER_LOAD_DIST=1`）真机验收零违规。头部原「NOT ENABLED」已过期；下文保留为策略设计依据与逐条 directive 出处。
-> 本文件仅记录只读分析与未来计划，**不改变任何运行时行为**。~~本仓当前**没有** CSP。~~
+> ## ⚠️ 现状（2026-07-28 核实）—— 本文件是**历史设计记录**
+>
+> | 维度 | 当前事实 | 出处 |
+> |---|---|---|
+> | CSP | ✅ **已 ENFORCE** | `vite.config.ts:31` 构建期经 `transformIndexHtml` 注入 meta；源 `index.html` 仍**故意**无 CSP（dev/HMR 需要 inline script） |
+> | 守卫 | ✅ `check:csp` 已入 `check:all` | `scripts/check-csp.mjs`：断言源 `index.html` 无 CSP meta、`dist/index.html` **恰好一个**、10 条 directive 集合精确匹配、`script-src` 无 `unsafe-eval`/`unsafe-inline` |
+> | Electron sandbox | ✅ **已启用**（`sandbox: true`） | `electron/main.js:61`（本文件 §2 表格里的 `sandbox:false` 是 2026-06-26 的旧值，**已过期**） |
+> | 其余窗口设置 | `contextIsolation: true` · `nodeIntegration: false` | `electron/main.js:56-57` |
+>
+> **下文（§1 起）全部保留为历史记录**：它写于 CSP 尚未启用时，因此「当前未启用」「本 PR 不写入任何文件」「未来 PR-2 计划」等表述**均已过期**，不代表今天的状态。保留的价值在于**逐条 directive 的代码依据**——那部分今天依然是这套策略为何长这样的唯一说明。
+>
+> 原始头部（存档）：状态「计划草案 / 当前未启用」→ ✅ 已 ENFORCE（#349 · 2026-07-06）；文档日期 2026-06-26；基线 main HEAD `bc05230`；2026-07-07 状态更新记录 file://（`SOLOLEDGER_LOAD_DIST=1`）真机验收零违规。
 
-本文档固化一次针对 SoloLedger（Electron + Vite 本地桌面应用）的 CSP 只读分析结果，给出推荐策略草案、每条 directive 的代码依据、当前不能直接启用的原因，以及未来 PR-2 的实施与验证计划。
+---
+
+## 【历史记录】以下为 2026-06-26 的只读分析原文
+
+本文档固化一次针对 SoloLedger（Electron + Vite 本地桌面应用）的 CSP 只读分析结果，给出推荐策略草案、每条 directive 的代码依据、当时不能直接启用的原因，以及（当时）未来 PR-2 的实施与验证计划。**PR-2 已作为 #349 于 2026-07-06 落地。**
 
 ---
 
@@ -19,11 +31,14 @@
 
 ## 2. 当前状态（已对照代码核实）
 
-| 维度 | 事实 | 出处 |
+> **【历史快照 · 2026-06-26】** 下表是当时的代码事实。其中**两行今天已经不成立**，见文首现状框：
+> `sandbox` 现为 `true`（`electron/main.js:61`），「现有 CSP：无」现为「生产构建注入 meta CSP」（`vite.config.ts:31`）。其余各行今天仍成立。
+
+| 维度 | 事实（2026-06-26） | 出处 |
 |---|---|---|
-| BrowserWindow | `contextIsolation:true`·`nodeIntegration:false`·`sandbox:false`·无 `webSecurity` 覆盖（默认 true） | `electron/main.js` |
+| BrowserWindow | `contextIsolation:true`·`nodeIntegration:false`·`sandbox:false`（**今已为 true**）·无 `webSecurity` 覆盖（默认 true） | `electron/main.js` |
 | 加载方式 | 生产 `loadFile(dist/index.html)` = **file://**；dev `loadURL('http://localhost:3000')`（Vite HMR） | `electron/main.js` |
-| 现有 CSP | **无**（无 meta、无 `onHeadersReceived`、无自定义协议、无 session 头注入） | 全仓 |
+| 现有 CSP | **无**（无 meta、无 `onHeadersReceived`、无自定义协议、无 session 头注入）——**今已改变：生产构建注入 meta CSP** | 全仓 |
 | 内联 `<script>` | **无**（仅外链 module script，dist 为 `./assets/index-*.js` crossorigin） | `index.html` / `dist/index.html` |
 | 内联 `<style>` | **有**（`index.html` 手写 body/scrollbar 基础样式，随 dist 带出） | `index.html` |
 | favicon | `data:image/svg+xml`（emoji SVG） | `index.html` |
@@ -35,9 +50,10 @@
 
 ---
 
-## 3. 推荐 CSP 策略草案（**当前不启用 / 不 enforce**）
+## 3. 推荐 CSP 策略草案（**写于未启用时；该草案即今天线上的策略**）
 
-> 仅作为 PR-2 的设计目标记录。**本 PR 不写入任何文件、不注入 meta。**
+> **【历史记录】** 原文：「仅作为 PR-2 的设计目标记录。本 PR 不写入任何文件、不注入 meta。」
+> **今天**：这十条 directive 就是 `vite.config.ts` 注入、`scripts/check-csp.mjs` 逐条断言的线上策略。
 
 ```
 default-src 'self';
@@ -103,7 +119,7 @@ form-action 'none';
 
 ---
 
-## 8. 未来 PR-2 计划（需显式解禁 enforce 后才做）
+## 8. 未来 PR-2 计划（**已完成 = #349，2026-07-06**）
 
 1. **Vite 生产构建注入 meta CSP**：`transformIndexHtml` 插件，仅 `apply: 'build'`（dev 不注入，保 HMR）；策略取 §3 草案。
 2. **新增 `check:csp` 守卫**：扫 `dist/index.html` 断言含预期 CSP meta 与各 directive（与 `check:offline` 同类·纯 Node·入 `check:all`）。

@@ -1,7 +1,15 @@
 # SoloLedger macOS 发布 Runbook（签名 / 公证 / 验证 / 冒烟）
 
+> ## ✅ 现状（2026-07-28 核实）
+>
+> **`v1.0.0` 已按本 runbook 发布**（2026-07-08，GitHub Release「SoloLedger 1.0.0」·Latest·非 Pre-release）。rc.1 / rc.2 亦均按本 runbook 发布。
+>
+> **本文件的流程部分（§1–§4、§7–§8）仍然有效**——它是今天再出一个签名 + 公证版本要走的步骤。**已过期的只有"状态"性质的表述**：§5 的空勾选框（已于 2026-07-08 执行，见下方逐条标注）、§9 末尾的"尚未完成"三项（全部已闭合）、以及 §11 最后一条"发布后给 rc.1 / rc.2 各加一行『已被 1.0.0 取代』"——**该步骤至今未执行**，两个 Pre-release 正文里都没有这句话。
+>
+> **口径提醒**：§5 的"干净机"从未按字面执行（没有第二台真机）。1.0.0 采用的是**同机模拟口径**：同机新建标准用户 `SoloLedgerQA` + 浏览器下载带 quarantine 的 DMG + 断网安装启动。
+
 > 状态：**PR-B 接线（#355）+ PR-C 真实签名 / 公证 / staple 已执行成功（2026-07-07，实测记录见 §9）；rc.1 / rc.2 均已按本 runbook 发布。**
-> **1.0.0 正式版门槛已全部闭合（2026-07-08）**：断网 Gatekeeper 冒烟 ✓（同机模拟口径）、safeStorage 重录 QA ✓（(a) 分支）、xlsx 真实导入 ✓（rc.2 / #357）；Woo 真店 QA 按决策 B 降级为 Beta / 发布后验证项。1.0.0 发布步骤见 §11。
+> **1.0.0 正式版门槛已全部闭合（2026-07-08）**：断网 Gatekeeper 冒烟 ✓（同机模拟口径）、safeStorage 重录 QA ✓（(a) 分支）、xlsx 真实导入 ✓（rc.2 / #357）；Woo 真店 QA 按决策 B 降级为 Beta / 发布后验证项。1.0.0 的发布步骤见 §11（**已执行**）。
 > 方案依据：[`SIGNING_NOTARIZATION_PLAN.md`](SIGNING_NOTARIZATION_PLAN.md)（目标配置 §3 / 凭证 §4-§5 / safeStorage §6 / 验证 §10）。
 > 铁律：**任何证书、密码、Team ID、API Key 不入库、不写进本文件、不出现在任何日志/汇报里。**
 
@@ -27,7 +35,7 @@ export APPLE_TEAM_ID="<10 位 Team ID>"
 ```
 
 - 配置文件（`electron-builder.dmg.yml`）里只有 `notarize: true`，不含任何账号 / 团队标识。
-- `.gitignore` 已兜底 `*.p12` / `*.p8` / `.env*`。
+- `.gitignore` 已兜底 `*.p12` / `*.p8` / `*.provisionprofile`；`.env` 系列是**三条精确条目**（`.env` / `.env.production` / `.env.local`），**不是** `.env*` 通配。
 - CI 路线（未来）：`CSC_LINK` + `CSC_KEY_PASSWORD` 或 ASC API Key，全走 CI encrypted secrets——本机手动发布不需要。
 
 ## 3. 构建
@@ -68,11 +76,14 @@ xcrun stapler validate "release/SoloLedger-<version>-arm64.dmg"
 
 ## 5. 干净机断网 Gatekeeper 冒烟清单（最终门槛，只能人工）
 
-- [ ] DMG 拷贝到一台**从未安装过本应用**的 Mac
-- [ ] **断网**（拔网线 / 关 Wi-Fi）
-- [ ] 打开 DMG → 拖入「应用程序」→ 双击启动
-- [ ] 期望：**无「无法验证开发者」拦截、无 Gatekeeper 提示、离线直接打开**（staple = 公证票据随包，离线可验）
-- [ ] 核心记账流程冒烟：新建销售/采购 → 看板 → 报表 → 备份导出/恢复
+> **【1.0.0 已执行 · 2026-07-08 · 同机模拟口径】** 下列勾选框保留原样作为**清单模板**；1.0.0 的实际执行结果标在每条后面。
+> **口径必须写明**：没有第二台真机，用的是同机新建标准用户 `SoloLedgerQA` + 浏览器下载带 quarantine 的 DMG。按字面的"另一台从未装过的 Mac"**至今未做过**。
+
+- [ ] DMG 拷贝到一台**从未安装过本应用**的 Mac —— *1.0.0 未按字面执行；以同机新建标准用户 + quarantine 下载替代*
+- [ ] **断网**（拔网线 / 关 Wi-Fi）—— *✅ 已执行（QA 用户断网完成安装与启动）*
+- [ ] 打开 DMG → 拖入「应用程序」→ 双击启动 —— *✅ 已执行（装入 `~/Applications` 首启成功）*
+- [ ] 期望：**无「无法验证开发者」拦截、无 Gatekeeper 提示、离线直接打开**（staple = 公证票据随包，离线可验）—— *✅ 已验证（开发用户 2026-07-07 + QA 用户断网 2026-07-08 双确认）*
+- [ ] 核心记账流程冒烟：新建销售/采购 → 看板 → 报表 → 备份导出/恢复 —— *✅ 断网基础功能已验（QA-3）*
 - [x] safeStorage 重录流程（见 §6）：✅ 2026-07-08 实测——实际走 **(a) 分支**：钥匙串授权后**旧 Key 直接可用**，无需重录；退出重开持久
 - [ ] 解密失败提示是**可操作的重录引导**而非崩溃（未触发——本次走 (a) 分支未遇解密失败；保留为后续观察项）
 
@@ -113,6 +124,7 @@ xcrun stapler validate "release/SoloLedger-<version>-arm64.dmg"
 - **最小 entitlements（两项）已足够**：better-sqlite3 / @napi-rs/canvas 在 hardened runtime 下加载正常，`disable-library-validation` 确认无需添加。
 - 已知非阻塞现象：DMG 自身 `spctl --type open/install` 显示 rejected / no usable signature——DMG 本体未单独 codesign 所致；因 DMG notarytool **Accepted** + stapler validate 通过、且 DMG 内与安装后 App 均过 Gatekeeper，**判定不阻塞发布**。如需消除该观感，可后续评估对 DMG 本体签名（可选优化）。
 - 尚未完成（1.0.0 正式版门槛）：§5 干净机断网冒烟、safeStorage 重录 QA、xlsx 真实文件导入冒烟。
+  > **【该行是 2026-07-07 当天的快照，三项均已于 2026-07-08 闭合】** 断网冒烟（同机模拟口径）、safeStorage QA-6（走 (a) 分支，旧 Key 直接可用）、xlsx 导入（#357 修复后 rc.2 复测通过）。
 
 ## 10. rc.2 重发说明（2026-07-08）
 
@@ -126,3 +138,4 @@ xcrun stapler validate "release/SoloLedger-<version>-arm64.dmg"
 - **必须重新构建 1.0.0 DMG，不能复用 rc.2 的 DMG**——版本号写进产物文件名与包内元数据，公证票据对应具体二进制。
 - GitHub Release **不标 Pre-release**（首个正式版）。发布说明包含：CHANGELOG `[1.0.0]` 条目的升级须知（钥匙串授权措辞——据 QA-6 实测修正，不写死"必须重录"）+ **电商订单导入 Beta 声明**。
 - 发布后：rc.1 / rc.2 的 Release 说明各加一行"已被 1.0.0 取代"。
+  > **⚠️ 这一步至今未执行**（2026-07-28 核实：两个 Pre-release 的正文里都没有"已被取代 / superseded"字样）。仍是待办，不是已完成项。

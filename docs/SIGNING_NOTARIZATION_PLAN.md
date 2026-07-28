@@ -1,27 +1,55 @@
 # macOS 签名 / 公证实施只读方案（Signing & Notarization Plan）
 
-> 状态：~~只读方案 / 未接线~~ → ✅ **已接线（#355·PR-B）+ 真机执行验证成功（PR-C·2026-07-07：notarization successful / stapler validate 通过 / 安装后 spctl accepted；最小 entitlements 两项够用；实测记录见 [`RELEASE.md`](RELEASE.md) §9）**
-> 文档日期：2026-07-05 ｜ 基线：main HEAD `4637b44`（schema v23·working tree clean）
-> 本文件仅固化「macOS 代码签名 + 公证」的实施方案，**不改 `electron-builder.dmg.yml` / `package.json` / `package-lock` / `build/` / 任何代码**。实际接线与执行为后续独立 PR，需 Apple 账号 + 显式授权。
-> **前置状态更新（2026-07-07·main `3fc241e`）**：§0 要求的两项前置已落地——**Electron 升级（#348·E42.6.0 + better-sqlite3 12.11.1 过渡）**与**生产 CSP enforce（#349）**；sandbox 亦已加固 true（#343）；Apple 凭证已备。剩余执行门控 = **E43/E42 止损决策**（better-sqlite3 12.11.2 截至 2026-07-07 未上 npm；超期可按 E42 直接公证）。执行顺序：决策 → `build/entitlements.mac.plist` → `dmg.yml` 接线 → 公证 → 干净机断网冒烟；**§0 的 safeStorage 旧 Key 重录风险须以用户须知形式随执行 PR 落地**。本方案其余内容仍有效。
+> ## ⚠️ 现状（2026-07-28 核实）—— 方案已执行完毕，本文件是**历史方案 + 执行记录**
+>
+> | 维度 | 当前事实 | 出处 |
+> |---|---|---|
+> | 签名 | ✅ 已接线（**#355 · PR-B**） | `electron-builder.dmg.yml` 不写 `identity`，由 electron-builder 自动探测钥匙串中的 Developer ID Application 证书 |
+> | 硬化运行时 | ✅ `hardenedRuntime: true` | `electron-builder.dmg.yml`（注释：公证硬前提） |
+> | entitlements | ✅ 已入库 | `build/entitlements.mac.plist`（DMG 线）；MAS 线另有 `entitlements.mas.plist` / `entitlements.mas.inherit.plist` |
+> | 公证 | ✅ `notarize: true` | `electron-builder.dmg.yml`；凭证走 `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` 环境变量 |
+> | 真机执行 | ✅ **PR-C · 2026-07-07** | notarization successful / `stapler validate` 通过 / 安装后 `spctl` accepted；实测记录见 [`RELEASE.md`](RELEASE.md) §9 |
+> | 对外发布 | ✅ **v1.0.0 已发布**（2026-07-08） | GitHub Release「SoloLedger 1.0.0」（Latest）；另有 v1.0.0-rc.1 / rc.2 预发布；见 [`CHANGELOG.md`](../CHANGELOG.md) |
+>
+> **两条必须保留的限定**，否则读者会得到过于乐观的印象：
+>
+> 1. **不是"永远签名"**：`identity` 未写死意味着**本机没有 Developer ID 证书时会跳过签名，产出未签名 DMG**。这是配置的有意行为，不是故障。
+> 2. **DMG 线 ≠ MAS 线**：本文件通篇讲的是 **Developer ID + 公证 + 直分发**。仓库另有一条 **Mac App Store** 线（`electron-builder.mas.yml`，App Sandbox + provisioning profile，`hardenedRuntime: false`，用的是 Apple Distribution 而非 Developer ID 证书）。**本文件不涉及 MAS，也不对 App Store 审核/上架状态作任何断言**——那不是仓库内可查证的事实。
+>
+> **下文（§0 起）保留为历史记录**：写于尚未接线时，「当前未签名」「现在能做的只有两件」「等 Electron 43」等表述**均已过期**（实际发布运行时是 Electron 42.6.0，E43 未采用）。保留价值在于**最小 entitlements 的取舍依据**与**风险清单**。
+>
+> 原始头部（存档）：状态「只读方案 / 未接线」→ ✅ 已接线（#355·PR-B）+ 真机执行验证成功（PR-C·2026-07-07）；文档日期 2026-07-05；基线 main HEAD `4637b44`。
+
+---
+
+## 【历史记录】以下为 2026-07-05 的只读方案原文（2026-07-07 有一次前置状态更新）
+
+> **原前置状态更新（2026-07-07·main `3fc241e`）**：§0 要求的两项前置已落地——**Electron 升级（#348·E42.6.0 + better-sqlite3 12.11.1 过渡）**与**生产 CSP enforce（#349）**；sandbox 亦已加固 true（#343）；Apple 凭证已备。剩余执行门控 = **E43/E42 止损决策**。
+> **该门控此后已消解**：采纳「按 E42 直接公证」路线并执行完毕，未等 better-sqlite3 12.11.2。
 
 ---
 
 ## 0. 一句话结论
 
-当前是自洽的「本地自用未签名 DMG」（`identity:null` · `hardenedRuntime:false` · 无 entitlements · 无 notarize）。转签名+公证的**最小方案**成型清晰：electron-builder 25.1.8 **内建** `mac.notarize`（走系统 `notarytool`，公证引擎与最新版逐字节相同），**不需要手写 afterSign 钩子**。
+> **【已过期 · 本节写于未接线时】** 下面三段描述的是 2026-07-05 的状态与计划，今天全部已完成，见文首现状框。
 
-**关键排序：签名/公证是发布线的最后一步**——必须在 **Electron 43 + CSP 都落地后**，对最终、完整的构建**公证一次**；对 EOL 的 E33 或缺 CSP 的构建公证 = 白公证 + 返工。
+当时是自洽的「本地自用未签名 DMG」（`identity:null` · `hardenedRuntime:false` · 无 entitlements · 无 notarize）。转签名+公证的**最小方案**成型清晰：electron-builder 25.1.8 **内建** `mac.notarize`（走系统 `notarytool`，公证引擎与最新版逐字节相同），**不需要手写 afterSign 钩子**。（**此判断被执行验证为正确**：今天 dmg.yml 里确实只有 `notarize: true`，全仓无 `afterSign` 钩子。）
 
-**现在能做的只有两件**：① 纯文档（本方案，PR-A）；② 并行启动 **Apple Developer 账号注册**（$99/年，真实身份，约 1–2 天审批）。其余全部等 Apple 证书 + Electron 43 + CSP。
+**关键排序：签名/公证是发布线的最后一步**——必须在 Electron 与 CSP 都落地后，对最终、完整的构建**公证一次**。（**实际执行顺序**：Electron 42.6.0（#348）→ CSP enforce（#349）→ 签名/公证（#355 + PR-C）；原文写的「Electron 43」未采用。）
 
-**唯一有感的迁移风险 = safeStorage**：未签名→签名换了代码签名身份 → Keychain ACL 变 → 旧的 AI Key / 电商凭证解不开 → **用户需重录**（业务数据 DB 不受影响；当前未对外分发，爆炸半径≈开发者自己的机器）。
+**当时能做的只有两件**：① 纯文档（本方案，PR-A）；② 并行启动 **Apple Developer 账号注册**（$99/年，真实身份，约 1–2 天审批）。（**均已完成。**）
+
+**当时判断的唯一有感迁移风险 = safeStorage**：未签名→签名换了代码签名身份 → Keychain ACL 变 → 旧的 AI Key / 电商凭证解不开 → 用户需重录。
+> **⚠️ 该预测已被真机 QA 推翻，勿照抄**：QA-6 实测走的是「弹钥匙串授权对话框 → 选『始终允许』后旧 Key 直接可用」这一分支，**不需要普遍重录**；重录只是「无法解密」失败分支的兜底。1.0.0 对外发布说明用的正是按实测修正后的措辞，而非本文 §6 / §9 的「必须重录」模板。
 
 ---
 
 ## 1. 当前状态核对
 
-| 项 | 现状 | 出处 |
+> **【历史快照 · 2026-07-05】此表整张已过期**，不要按它判断今天的配置。行号也已漂移。
+> 今天的对应事实见文首现状框：`identity` 键已删（自动探测）、`hardenedRuntime: true`、`build/entitlements.mac.plist` 已入库、`notarize: true`、版本 1.0.0（不是 0.1.0）、`.gitignore` 已补 `*.p12` / `*.p8`。仍然成立的：无 `afterSign` 钩子、`@electron/notarize` 仅装不引用、`arch: arm64` 单架构、appId / productName 未变、`publish: null`。
+
+| 项 | 现状（2026-07-05） | 出处（行号已漂移） |
 |---|---|---|
 | 签名 | **无** · `identity: null`（adhoc · `Identifier=Electron` · spctl rejected） | `electron-builder.dmg.yml:38` |
 | 硬化运行时 | `hardenedRuntime: false` | `:39` |
@@ -138,10 +166,12 @@ APPLE_TEAM_ID="<10 位 Team ID>"
 **影响面**：
 - ✅ **业务数据 DB / 附件 / 备份不受影响**（appId/productName 不变 → `userData` 路径不变）。
 - ⚠️ **AI Key + 电商凭证需在「系统设置」重录一次**（沿用现有「删 Key→重录」路径）。
+  > **【已被实测推翻，勿照抄此模板】** QA-6 真机结果：macOS 弹钥匙串授权对话框，选「始终允许」后**旧 Key 直接可用**；只有出现「无法解密」提示时才需重录。1.0.0 的发布说明用的是按实测修正后的措辞。
 - 爆炸半径极小：应用尚未对外分发，受影响的≈开发者自己装过未签名版的机器；新装用户无感。
 
 **待办（必做）**：
 1. 首个签名版**发布说明**明确写：「升级后需重新填入 AI Key 与电商凭证，业务数据（记账/库存/单据/备份）不受影响。」
+   > **【实际未照此执行】** 按 QA-6 实测改写为：可能弹出钥匙串授权对话框，选「始终允许」后旧 Key 可直接使用；若遇「无法解密」再重录。
 2. QA 核对解密失败时 UI 是**可操作的重录提示**而非崩溃（现有 `isEncryptionAvailable` / throw 路径应已 graceful，需真机确认）。
 
 ---

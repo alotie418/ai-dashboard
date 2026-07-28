@@ -1,7 +1,30 @@
 # Phase 3 迁移方案：e2e 从 mock-fetch (Web) → mock electronAPI (IPC) 启动
 
-> 状态：**方案文档（planning only）**。本文件只记录方案，不含任何源码/测试改动。
-> 推进方式：按 PR-3.1 → PR-3.8 小步拆分，每个 PR 只含相关文件，作者从不自行 merge。
+> ## ✅ 现状（2026-07-28 逐条核对代码后标注）—— 迁移**已完成**，本文件是历史方案 + 执行记录
+>
+> Phase 3 已于 **2026-06-16 全部落地并合入 main**，实际不是 8 个 PR 而是 2 个：
+> **PR #167**（merge `2696a2e`）承载 PR-3.1→3.7 且**与本文件同一个提交**；**PR #168**（merge `8e0677a`）承载 PR-3.8，删除 `components/LoginPage.tsx`、`App.tsx` 的 Web auth gate、`services/{api,aiBriefingService,ocrService}.ts` 与 `components/DataAnalysisPage.tsx` 的 fetch 分支。
+>
+> **逐条状态（按代码核对，不是按勾选框推断）**：
+>
+> | 项 | 状态 | 证据 |
+> |---|---|---|
+> | e2e 由 mock-fetch → mock `electronAPI` | ✅ **已实施** | `e2e/` 内零 `page.route('**/api' \| '**/auth')` |
+> | 删除 Web fallback / auth gate / `LoginPage` | ✅ **已实施**（PR-3.8） | 四个文件均无 fetch 分支；`LoginPage.tsx` 不存在 |
+> | `check:no-web-fetch` 守卫 | ✅ **已实施，且比方案更严** | 扫**两个域**（`e2e/` + 源码 `App.tsx`/`services/`/`components/`），规则含 source web fetch、`/auth/` path、`API_BASE` 残留、`LoginPage` 残留 |
+> | `tsc --noEmit` 门禁 | ✅ **已实施**（以 `npm run typecheck` 形式） | `package.json` · `.github/workflows/ci.yml` |
+> | `injectDocsElectronAPI` 重构进共享 helper | ⬜ **仍待办** | 至今仍内联在 `e2e/locale-matrix.spec.ts` |
+> | `e2e/types.d.ts`（§3.3 可选项） | ⬜ **未做** | 文件不存在 |
+> | mock 表面与真实 preload 一致（不含 `buildTarget`） | 🟡 **部分** | 共享 helper 满足；仍有少数自带 mock 的测试设 `buildTarget`，而真实 preload 早已无此字段 |
+>
+> **§0 那句「真实 Electron 打包应用 e2e 仍是路线图独立项」今天要拆开读**：真主进程 e2e **已经存在**（`e2e-electron/` 三个 spec，经 `_electron.launch` 走真实 IPC 与真实 better-sqlite3），但它跑的是**源码目录**而非 electron-builder 产物，且 CI 里仅 `workflow_dispatch` 手动触发。所以「启动打包产物的 e2e」这一条**仍然未做**。
+>
+> **文中所有规模数字均为当时快照**（测试条数、行数、分组数），今天已变化；`check:locale-matrix` 379/379 这一条今天仍成立。
+>
+> **下文全部保留为历史记录**——包括 §12 的空勾选框、§13/§14 标题里的「未 commit / 未 push / 未 merge」、以及 §14 中「**严禁 PR-3.8**」那条用户指令（它在约 53 分钟后即被推翻，PR #168 正是做了它禁止的事）。这些是决策过程的记载，**不改写成现在时**。
+
+> 状态：~~**方案文档（planning only）**~~ → **已实施（2026-06-16 · PR #167 + #168）**。本文件最初只记录方案；实际它与 e2e 代码同在一个提交里落地。
+> 推进方式（原计划）：按 PR-3.1 → PR-3.8 小步拆分，每个 PR 只含相关文件，作者从不自行 merge。**实际合并为 2 个 PR。**
 > 适用前提：旧 Web/云端栈（Cloud Run / Cloudflare Worker / D1 / KV / DNS）已退役，产品形态为 Electron 本地桌面版，数据本地 SQLite，IPC 经 `api:request` 路由。
 
 ---
@@ -307,7 +330,7 @@ npm run check:all              # 全部守卫聚合，收尾 PR 全跑一遍
 
 ---
 
-## 13. 执行记录（2026-06-16 夜间自动推进，未 commit / 未 push）
+## 13. 执行记录（2026-06-16 夜间自动推进，~~未 commit / 未 push~~ → **已 commit `223888a` / 已 push / 已 merge `2696a2e`（PR #167）**）
 
 > 边界：仅改 `e2e/locale-matrix.spec.ts` + 新增 `e2e/helpers/{fixtures,electronMock}.ts` + 本节记录；
 > 零改 App.tsx / services/* / components/* / electron/* / package.json / i18n / schema；零删除 Web fallback。
@@ -330,7 +353,7 @@ npm run check:all              # 全部守卫聚合，收尾 PR 全跑一遍
 
 ---
 
-## 14. 执行记录 · PR-3.7（2026-06-16 续，未 commit / 未 push / 未 merge）
+## 14. 执行记录 · PR-3.7（2026-06-16 续，~~未 commit / 未 push / 未 merge~~ → **同属 commit `223888a` · PR #167 · merge `2696a2e`**）
 
 > 用户决策：① 桌面降级三组改为 IPC-only、验证真实桌面 UI（放弃 no-electronAPI 断言）；
 > ② Node 侧录用三组批准浏览器侧 `recordCalls` 重构；③ 收敛 page.route/bootCombo/bootFinance/bootRecat

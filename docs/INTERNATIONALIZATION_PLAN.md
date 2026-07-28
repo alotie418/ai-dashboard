@@ -1,8 +1,30 @@
 # SoloLedger 国际化数据模型重构计划
 
+> ## ⚠️ 现状（2026-07-28 核实）—— 本文件是**设计规划**，实现已在多处偏离
+>
+> **§7 路线图中的核心数据与报表产物已落地：D / E / F 已完成；C 的 `transactions` 表、迁移、CRUD 与 `TransactionsPage` 已实现，但「替代 Sales/Purchase 页面」的原目标仅部分完成，旧销售/采购页面仍并存**（`App.tsx:455` `SalesAndOutputPage`、`:456` `PurchaseAndInputPage`、`:463` `TransactionsPage` 三者同时注册）。已落地部分随 v1.0.0 发布。
+>
+> ### 当前的语言与资源事实（本节数字截至 **2026-07-28**，会随开发变动）
+>
+> | 维度 | 事实 | 出处 |
+> |---|---|---|
+> | 界面语言 | **6 种**：简体中文 / 繁體中文 / English / 日本語 / 한국어 / Français | — |
+> | 记账口径 | **6 套**：CN / US / JP / KR / EU / TW，各有独立报表引擎 | `electron/reports/` |
+> | Electron 侧文案 | JSON，每种语言 **1516 个叶子键**（六语等长） | `i18n/locales/{en,fr,ja,ko,zh-CN,zh-TW}.json` |
+> | 原生 SwiftUI 侧文案 | `.strings`，每种语言 **227 个键**（六语等长） | `native/SoloLedger/Sources/SoloLedger/Resources/*.lproj/Localizable.strings` |
+> | ⚠️ 两侧语言代码拼写**不同** | Electron 用 `zh-CN` / `zh-TW`；原生用 Apple 的 `zh-Hans` / `zh-Hant` | 同上 |
+>
+> **上表的键数是某一天的计数，不是契约。** 判断"六语是否齐备"请跑守卫，**不要引用这里的数字**：`npm run check:locale-matrix`、`npm run check:raw-keys`（脚本文件是 `scripts/check-raw-key-leaks.mjs`，**npm script 名不同**）、`npm run check:i18n-keys`、`npm run check:i18n-placeholders`、`npm run test:locale-ui`。前两个另有合并入口 `npm run check:locale`。
+>
+> ### 下文与实现的已知偏离（抽样，不完整）
+>
+> 本文件是**设计稿**，很多细节在实现时被有意改掉或从未实现。**不要把下文的 DDL、类别清单、税表字段当作代码事实**——它们与实现的差异包括但不限于：`transactions.currency` 默认值实为 `CNY`（非 `USD`）；`categories` 实表多一列 `is_cogs`；`tax_payments` 表的最终形状与 §ER 图完全不同；美国预置支出类别是 19 条而非 ~22 条（Depletion / Employee Benefits / Pension 三行无预置类别，报表引擎也无对应字段）；六国报表的 `reportTypes` 名称与 §报表章节所写不一致（没有"增值税申报草表""消費税申告書草表""부가가치세 신고 초안""營業稅申報"这些名字）；SE-tax 的社保上限与里程费率已改为**按年份查表**（非单一 2024 值）；季度预缴的 $1,000 门槛**从未实现**；Additional Medicare 只有单一 20 万门槛，无申报身份分档；"回滚 30 天有效"无任何时间限制。
+>
+> 需要代码事实时，请以 `electron/reports/*`、`electron/db/`、`scripts/check-*.mjs` 为准。
+
 > 本文档是 SoloLedger 从「中国 VAT 体系单一产品」演进为「多国会计制度通用账本」的实施规划。
 > 目标读者：未来的 me / claude / 协作者。
-> 工作量评估：**1-2 个月**净开发时间（不含会计师审计 / 法律合规 / TestFlight 反馈迭代）。
+> 工作量评估（**原始估计，仅为历史记录**）：**1-2 个月**净开发时间（不含会计师审计 / 法律合规 / TestFlight 反馈迭代）。
 
 ---
 
@@ -382,7 +404,13 @@ Q1: 4/15 / Q2: 6/15 / Q3: 9/15 / Q4: 1/15(次年)
 
 ## 7. 实施阶段拆分
 
-| 阶段 | 工作量 | 内容 | 当前会话 |
+> **【状态对照 · 2026-07-28】** 末列「当前会话」是**建档当天**的会话状态，`❌` 只表示「不在那次会话里做」，**不表示至今未做**。实际进度：
+> - **D / E / F 已完成**（`electron/reports/` 六引擎、Schedule C 类别映射、`selfEmploymentTax` + `estimatedTax`）。
+> - **C 部分完成**：`transactions` 表、迁移、CRUD 与 `TransactionsPage` 均已实现，但本行验收条件里的「TransactionsPage **替代** Sales/Purchase 页面」**尚未达成**——旧销售/采购页面仍并存（`App.tsx:455` / `:456` / `:463` 三者同时注册）。
+> - **G 已完成**（全仓无 tons / pricePerTon 字面量）。
+> - **H**（法律 / 会计师审计）仍不在工程范围，**至今未做**。
+
+| 阶段 | 工作量 | 内容 | 当前会话（建档当天） |
 |---|---|---|---|
 | **A** | 半天 | 本文档：完整设计 + ER 图 + 迁移规则 + 6 国类别清单 | ✅ 本次完成 |
 | **B** | 1-2 天 | DB v4 migration 建 categories 表 + 6 国种子数据；handler + IPC + service + 设置页 CategoriesSection.tsx | ✅ 本次完成 |
