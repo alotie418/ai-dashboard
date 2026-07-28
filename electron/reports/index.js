@@ -20,6 +20,18 @@ function readSetting(db, key, fallback) {
   } catch { return fallback; }
 }
 
+// 「设置行在不在」与「值等于多少」是两个问题,方案 A 只问前者。
+//
+// 这不是风格偏好,是实测结论(docs/SWIFTUI_REPORTS_MIRROR_PLAN.md §6.2 四变体矩阵):
+// income_tax_rate 缺行时,readSetting 会套用中国兜底 25,于是美国账本产出 1100 —— 一个
+// 完全正常的数字,与「用户真的配了 25%」在数值上不可分。所以「未配置」只能由行的缺失
+// 来判定,绝不能从算出的值反推。
+function settingRowExists(db, key) {
+  try {
+    return !!db.prepare('SELECT 1 AS present FROM settings WHERE key = ?').get(key);
+  } catch { return false; }
+}
+
 // 生成报表
 // opts: { locale?, from?, to?, year? }
 // 返回: { locale, period, sections[], totals, warnings[] }
@@ -73,7 +85,18 @@ function generate(db, opts = {}) {
   // 读取会计参数
   const vatRate = Number(readSetting(db, 'vat_rate', 13));
   const surchargeRate = Number(readSetting(db, 'surcharge_rate', 12));
-  const incomeTaxRate = Number(readSetting(db, 'income_tax_rate', 25));
+  // 方案 A(失败即拒)—— 见 docs/SWIFTUI_REPORTS_MIRROR_PLAN.md §9.1。
+  //
+  // 非中国制度 + income_tax_rate 设置行缺失 → 不再静默套用中国兜底 25%,而是把 null
+  // 交给引擎,由引擎产出 null、由 UI 渲染「未配置」。不发明任何税率:把「我们不知道」
+  // 写成一个看起来权威的数字,正是这里要消灭的东西。
+  //   • 中国制度保留兜底(A-2),与本次改动前完全一致;
+  //   • 行存在但值不可解析(如 "25%")不走这条路 —— 那是另一个可区分的「需修复」
+  //     状态(A-4),行为保持不变,留给单独 PR;
+  //   • admin_expense_annual 不是税率,它的兜底 0 也不参与本判定。
+  const incomeTaxRate = (locale === 'CN' || settingRowExists(db, 'income_tax_rate'))
+    ? Number(readSetting(db, 'income_tax_rate', 25))
+    : null;
   const adminExpense = Number(readSetting(db, 'admin_expense_annual', 0));
   const currency = readSetting(db, 'currency', 'CNY');
 

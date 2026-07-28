@@ -190,16 +190,25 @@ final class ReportBatch3ParityTests: LedgerTestCase {
     /// Plan §2 claims batch 3 is "完全不受 incomeTaxRate 影响". This turns that
     /// sentence into a machine check, for free, using goldens already on disk:
     /// `scheduleC` is byte-identical across all four rate variants while
-    /// `estimatedTax.annualIncomeTax` moves 880 / 1100 / 0 / 0.
+    /// `estimatedTax.annualIncomeTax` moves 880 / null / 0 / 0.
+    ///
+    /// `unset` reads null rather than a number because a MISSING settings row is no
+    /// longer priced at China's 25% fallback (plan §9.1 scheme A). The KEY still has
+    /// to be there — a field that vanished would be a contract change, not a refusal
+    /// to guess — so the raw value is unwrapped first and only then narrowed.
     func testScheduleCIsUnaffectedByEveryRateVariant() throws {
         var blocks: [String: NSDictionary] = [:]
         var incomeTaxes: [String: Double] = [:]
+        var incomeTaxIsNull: [String: Bool] = [:]
         for variant in ["base", "unset", "zero", "malformed"] {
             let g = try golden("\(variant)-US-2025")
             blocks[variant] = NSDictionary(dictionary:
                 try XCTUnwrap(g["scheduleC"] as? [String: Any]))
-            incomeTaxes[variant] = try XCTUnwrap(
-                (g["estimatedTax"] as? [String: Any])?["annualIncomeTax"] as? Double)
+            let estimated = try XCTUnwrap(g["estimatedTax"] as? [String: Any])
+            let raw = try XCTUnwrap(estimated["annualIncomeTax"],
+                                    "\(variant): the annualIncomeTax key must exist even when null")
+            incomeTaxIsNull[variant] = raw is NSNull
+            incomeTaxes[variant] = raw as? Double
         }
         for variant in ["unset", "zero", "malformed"] {
             XCTAssertEqual(blocks["base"], blocks[variant],
@@ -207,7 +216,9 @@ final class ReportBatch3ParityTests: LedgerTestCase {
         }
         // …while the estimate layer, which IS rate-driven, moves a great deal.
         XCTAssertEqual(incomeTaxes["base"], 880)
-        XCTAssertEqual(incomeTaxes["unset"], 1100)
+        XCTAssertEqual(incomeTaxIsNull["unset"], true,
+                       "a missing rate row is not priced — null, never a number")
+        XCTAssertNil(incomeTaxes["unset"])
         XCTAssertEqual(incomeTaxes["zero"], 0)
         XCTAssertEqual(incomeTaxes["malformed"], 0)
     }

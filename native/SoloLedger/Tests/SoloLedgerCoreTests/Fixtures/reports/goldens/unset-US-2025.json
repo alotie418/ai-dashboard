@@ -59,10 +59,10 @@
     "paramYear": 2025
   },
   "estimatedTax": {
-    "annualIncomeTax": 1100,
+    "annualIncomeTax": null,
     "annualSETax": 621.7,
-    "totalAnnual": 1721.7,
-    "quarterlyPayment": 430.43,
+    "totalAnnual": null,
+    "quarterlyPayment": null,
     "dueDates": [
       "2025-04-15",
       "2025-06-15",
@@ -144,9 +144,7 @@
       "profit": 0
     }
   ],
-  "warnings": [
-    "Estimated quarterly tax payment: $430.43"
-  ],
+  "warnings": [],
   "cashflowStatement": {
     "basis": "cash",
     "statutory": false,

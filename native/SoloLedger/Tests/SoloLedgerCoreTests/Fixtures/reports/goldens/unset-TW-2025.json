@@ -33,9 +33,9 @@
     "grossMargin": 100,
     "adminExpense": 0,
     "operatingProfit": 4196.23,
-    "incomeTax": 1049.06,
-    "netProfit": 3147.17,
-    "netMargin": 25.72
+    "incomeTax": null,
+    "netProfit": null,
+    "netMargin": null
   },
   "businessTax": {
     "collected": 566.04,

@@ -136,10 +136,17 @@ final class ReportGoldenFixtureTests: LedgerTestCase {
                               "\(locale): a missing rate row must not look like an explicit 0%")
         }
         // Spelled out for the two shapes, so a future reader sees WHAT differs.
+        //
+        // The missing row used to read 1100 — China's 25% fallback quietly applied to
+        // a US ledger, a perfectly normal-looking number that no value-based check
+        // could tell from a user who really did store 25%. It now reads null: the KEY
+        // survives (dropping the field would be a contract change, not a refusal to
+        // guess) and the value says "we do not know".
         let unsetUS = try XCTUnwrap(try golden("unset-US-2025")["estimatedTax"] as? [String: Any])
         let zeroUS = try XCTUnwrap(try golden("zero-US-2025")["estimatedTax"] as? [String: Any])
-        XCTAssertEqual(unsetUS["annualIncomeTax"] as? Double, 1100,
-                       "today a missing rate silently applies China's 25% to a US ledger")
+        XCTAssertNotNil(unsetUS["annualIncomeTax"], "the annualIncomeTax key must still be present")
+        XCTAssertTrue(unsetUS["annualIncomeTax"] is NSNull,
+                      "a missing rate row must not be priced at all — null, never a number")
         XCTAssertEqual(zeroUS["annualIncomeTax"] as? Double, 0, "an explicit 0% is a real, different answer")
     }
 
