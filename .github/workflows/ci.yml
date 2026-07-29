@@ -109,6 +109,13 @@ jobs:
         run: node scripts/test-golden-changes.mjs
       - name: Install Electron binary
         run: npm rebuild electron
+      # The toLocaleString corpus lives in THIS job and not in `check:all`, for the
+      # same reason the goldens do: it records ICU output, and ICU comes from the
+      # pinned Electron binary. Under the `checks` job's plain node it would be
+      # recorded against a different ICU and drift silently. No new required check —
+      # this is a step inside the existing one.
+      - name: toLocaleString corpus reproducible
+        run: npm run check:tolocalestring
       - name: Rebuild better-sqlite3 for Electron ABI
         run: npm run electron:rebuild
       - name: Regenerate report goldens

@@ -158,19 +158,22 @@ public enum ReportTypes {
     /// has not been written. The parity test closes the loop by deriving the same
     /// answer from the goldens and comparing.
     ///
-    /// **Every `.truncated` below becomes `.mirrored` in R7** (the estimate layer:
-    /// income tax, net profit, net margin everywhere, plus China's surcharge chain),
-    /// and `se-tax` becomes `.mirrored` there too.
+    /// **R7 moved every row to `.mirrored`**, and the two halves of that move were
+    /// defended very differently — worth keeping, because the weaker one will be
+    /// the shape of the next `.absent` row somebody adds.
     ///
-    /// The two are not equally well defended, and the difference is worth knowing
-    /// before relying on it. For the five `.truncated` rows the test **forces** the
-    /// update: their structs are already wired into its reflection switch, so
-    /// widening one makes the derived answer `.mirrored` and the assertion fails
-    /// until this table agrees. For `.absent` it does NOT: the test has no way to
-    /// notice a Swift type that did not exist when it was written, so whoever adds
-    /// `SelfEmploymentTax` must extend the switch in
-    /// `ReportBatch4ParityTests.mirroredFieldNames` by hand — otherwise `se-tax`
-    /// keeps reporting `.absent` and nothing complains.
+    /// For the five formerly-`.truncated` rows the test **forced** the update: their
+    /// structs are wired into its reflection switch, so widening one made the derived
+    /// answer `.mirrored` and the assertion failed until this table agreed. Seven
+    /// assertions went red the moment the structs grew, which is exactly what should
+    /// have happened.
+    ///
+    /// For `se-tax` it did NOT. A switch cannot notice a type that did not exist when
+    /// it was written, so `ReportBatch4ParityTests.mirroredFieldNames` had to gain its
+    /// `("US", "se-tax")` branch BY HAND alongside this line. Had both been forgotten,
+    /// every test would still have passed and R8 would simply never have rendered the
+    /// self-employment tax. Only changing one of the two goes red — which is the safe
+    /// failure and the reason to change them in the same edit.
     public static func availability(for id: String, locale: String) -> ReportTypeAvailability {
         switch (locale, id) {
         // Batch 4 (R5) — the whole turnover-tax block, every field.
@@ -183,16 +186,17 @@ public enum ReportTypes {
         // Batch 3 (R4) — all 25 Schedule C lines.
         case ("US", "schedule-c"):
             return .mirrored
-        // Batch 1 (R2) reaches gross profit, and for JP/EU/KR/TW operating profit.
-        // The estimate lines below that are R7, so these are INCOMPLETE and a view
-        // must say so.
+        // Batch 1 (R2) reached gross profit; batch 5 (R7) added the estimate lines
+        // below it — income tax, net profit, net margin, and China's surcharge
+        // chain — so these blocks are now complete.
         case ("CN", "income-statement"), ("JP", "income-statement"),
              ("EU", "profit-loss"), ("KR", "income-statement"),
              ("TW", "income-statement"):
-            return .truncated
-        // R7. Nothing of `selfEmploymentTax` is mirrored.
+            return .mirrored
+        // Batch 5 (R7). Both `selfEmploymentTax` and the `estimatedTax` block it
+        // feeds are mirrored; only the former has a report-type id.
         case ("US", "se-tax"):
-            return .absent
+            return .mirrored
         default:
             // An id/locale pair no engine emits. `.absent` is the only honest
             // answer: the caller asked about a report that does not exist here.

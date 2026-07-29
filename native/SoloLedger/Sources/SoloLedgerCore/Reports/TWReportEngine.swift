@@ -22,6 +22,26 @@ public enum TWReportEngine {
         let grossProfit = revenue - cogs                      // tw.js:25
         let operatingProfit = grossProfit - split.operatingExpensesNet - ctx.adminExpense // tw.js:26
 
+        // tw.js:30-33 — the estimate layer. `refusal` is the ONLY path to a refusal:
+        // asking `ctx.incomeTaxRate.rate` and defaulting to `.notConfigured` would
+        // render a corrupt value as "go configure one".
+        let refusal = EstimatedValue.refusal(for: ctx.incomeTaxRate, parameter: .incomeTaxRate)
+        let rate = ctx.incomeTaxRate.rate
+        // tw.js:31 — clamped at 0, so a loss period pays no income tax and netProfit
+        // equals operatingProfit. Rounded ONCE here…
+        let taxPayable = rate.map { r(ReportMath.max(0, operatingProfit) * ($0 / 100)) }
+        // …and NOT rounded again at the emit (tw.js:42 passes `taxPayable`
+        // straight through), unlike China which rounds it twice.
+        let incomeTax = refusal ?? .computed(taxPayable ?? 0)
+        // tw.js:32 — the UNROUNDED operating profit minus the ROUNDED tax.
+        let netProfitRaw = taxPayable.map { operatingProfit - $0 }
+        let netProfit = refusal ?? .computed(r(netProfitRaw ?? 0))
+        // tw.js:43 — ×100 then the rounder's ×100 again. China multiplies by
+        // 10000 once (cn.js:60); algebraically equal, measurably different in
+        // binary64, so the two must not be "unified".
+        let netMargin = refusal ?? .computed(
+            revenue > 0 ? r((netProfitRaw ?? 0) / revenue * 100) : 0)
+
         return BatchOneIncomeStatementWithOperatingProfit(
             salesRevenue: r(revenue),                         // tw.js:34
             costOfSales: r(cogs),                             // tw.js:34
@@ -31,7 +51,15 @@ public enum TWReportEngine {
             // tw.js:36 — inline, scaled by 100 twice (not 10000 once, as CN does).
             grossMargin: revenue > 0 ? r(grossProfit / revenue * 100) : 0,
             adminExpense: r(ctx.adminExpense),                // tw.js:37
-            operatingProfit: r(operatingProfit)               // tw.js:37
+            operatingProfit: r(operatingProfit),               // tw.js:37
+            // ── Batch 5 (R7) — the estimate layer ──────────────────────────────
+            //
+            // Reads the UNROUNDED `operatingProfit` local, not the rounded field
+            // emitted above: tw.js:31 multiplies the local. Taking the struct's
+            // value back out would round twice.
+            incomeTax: incomeTax,
+            netProfit: netProfit,
+            netMargin: netMargin
         )
     }
 }

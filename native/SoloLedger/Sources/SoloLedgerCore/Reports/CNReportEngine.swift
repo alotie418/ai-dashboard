@@ -65,6 +65,60 @@ public enum CNReportEngine {
         // happy path.
         let r = ReportMath.round2
 
+        // ── Batch 5 (R7) — China's surcharge chain, then income tax ───────────
+        //
+        // TWO independent gates, and they are not the same gate. `taxSurcharge` and
+        // pre-tax profit ride on the SURCHARGE rate alone; income tax and everything
+        // below it ride on `cannotPrice = surchargeMissing || rateMissing`
+        // (cn.js:53). So "surcharge usable, income-tax row corrupt" is a reachable
+        // state where the first two are numbers and the last three refuse — no
+        // golden covers that combination (the malformed variants break BOTH rows),
+        // which is why ReportBatch5BlindSpotTests pins it directly.
+        let surchargeRefusal = EstimatedValue.refusal(for: ctx.surchargeRate,
+                                                      parameter: .surchargeRate)
+        let rateRefusal = EstimatedValue.refusal(for: ctx.incomeTaxRate,
+                                                 parameter: .incomeTaxRate)
+        // `||` short-circuits in JS, so with BOTH rows unusable the blocker named is
+        // the SURCHARGE. Reproduced by asking surcharge first, not by deciding
+        // afterwards from which number came out.
+        let cannotPrice = surchargeRefusal ?? rateRefusal
+
+        // cn.js:20 / :23 — the tax-amount sums. Recomputed here rather than read
+        // back out of ``vatSummary(_:)``: that block emits them ROUNDED, and the
+        // surcharge multiplies the raw clamped difference.
+        var totalIncomeTax = 0.0
+        for row in ctx.incomeRows { totalIncomeTax += ReportMath.orZero(row.taxAmount) }
+        var totalExpenseTax = 0.0
+        for row in ctx.expenseRows { totalExpenseTax += ReportMath.orZero(row.taxAmount) }
+
+        // cn.js:33 — the RAW clamped payable, not the rounded `estimatedPayable` the
+        // VAT block emits. Measured: the two disagree on 192,655 of the sampled
+        // inputs, so reading the batch-4 field back out would be a different number.
+        let vatPayable = ReportMath.max(0, totalIncomeTax - totalExpenseTax)
+        // cn.js:41-43 — `Math.round(v * 100) / 100` INLINE, and China's rounder has
+        // no `|| 0` guard.
+        let taxSurchargeRaw = ctx.surchargeRate.rate.map { ReportMath.round2(vatPayable * ($0 / 100)) }
+        // cn.js:50-52 — five terms, left to right, all UNROUNDED. The shipping term
+        // is non-zero only on the legacy path (Appendix A4) and `base-CN-2024` is
+        // the single golden that proves it is subtracted at all.
+        let profitBeforeTax = taxSurchargeRaw.map {
+            grossProfit - split.operatingExpensesNet - $0 - totalShipping - ctx.adminExpense
+        }
+        // cn.js:54-56 — clamped, rounded once here and again at the emit (cn.js:82).
+        let incomeTaxRaw: Double? = (cannotPrice == nil)
+            ? ReportMath.round2(ReportMath.max(0, profitBeforeTax ?? 0)
+                                * ((ctx.incomeTaxRate.rate ?? 0) / 100))
+            : nil
+        let netProfitRaw = incomeTaxRaw.map { (profitBeforeTax ?? 0) - $0 }
+
+        let taxSurcharge = surchargeRefusal ?? .computed(ReportMath.round2(taxSurchargeRaw ?? 0))
+        let operatingProfit = surchargeRefusal ?? .computed(ReportMath.round2(profitBeforeTax ?? 0))
+        let incomeTax = cannotPrice ?? .computed(ReportMath.round2(incomeTaxRaw ?? 0))
+        let netProfit = cannotPrice ?? .computed(ReportMath.round2(netProfitRaw ?? 0))
+        // cn.js:58-60 — ×10000 ONCE, and emitted WITHOUT a second round (cn.js:84).
+        let netMargin = cannotPrice ?? .computed(
+            salesRevenue > 0 ? ReportMath.percent2((netProfitRaw ?? 0) / salesRevenue) : 0)
+
         return CNBatchOneIncomeStatement(
             salesRevenue: r(salesRevenue),               // cn.js:53
             costOfSales: r(costOfSales),                 // cn.js:54
@@ -73,7 +127,16 @@ public enum CNReportEngine {
             grossProfit: r(grossProfit),                 // cn.js:58
             grossMargin: grossMargin,                    // cn.js:59 — raw, not rounded again
             shippingFee: r(totalShipping),               // cn.js:61
-            adminExpense: r(ctx.adminExpense)            // cn.js:62
+            adminExpense: r(ctx.adminExpense),            // cn.js:62
+
+            // ── Batch 5 (R7) ──────────────────────────────────────────────────
+            // `operatingProfit` carries PRE-TAX profit — the source's own naming
+            // (plan §1.2), not a mistake to tidy.
+            operatingProfit: operatingProfit,
+            taxSurcharge: taxSurcharge,
+            incomeTax: incomeTax,
+            netProfit: netProfit,
+            netMargin: netMargin
         )
     }
 }

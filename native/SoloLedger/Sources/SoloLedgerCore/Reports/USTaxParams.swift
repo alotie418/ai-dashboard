@@ -46,13 +46,44 @@ public enum USTaxParams {
     public struct Year: Equatable, Sendable {
         /// The share of meal expense that Line 24b may deduct (`us.js:54`).
         public let mealsDeductiblePct: Double
+        /// Schedule SE's net-earnings factor (`us.js:69`).
+        public let seEarningsFactor: Double
+        /// Social-security rate on the capped earnings (`us.js:71`).
+        public let ssRate: Double
+        /// The SSA Contribution and Benefit Base — the only figure that differs
+        /// between the three keyed years, and the one the fixture never reaches.
+        public let ssWageCap: Double
+        public let medicareRate: Double
+        public let addlMedicareThreshold: Double
+        public let addlMedicareRate: Double
     }
 
-    /// `US_SE_TAX_PARAMS_BY_YEAR` — batch-3 fields only (`usTaxParams.js:17-21`).
+    /// `US_SE_TAX_PARAMS_BY_YEAR` — `usTaxParams.js:17-21`, now complete.
+    ///
+    /// Batch 3 copied one field and said why the rest were absent: "a mirrored tax
+    /// constant with no caller is a number nobody is checking". R7 is that caller,
+    /// so the six SE constants arrive here — transcribed digit for digit, never
+    /// derived. Changing one is a tax decision, not a code change.
+    ///
+    /// **What no test in this repository can establish**, restated because the SE
+    /// figures make it sharper than `mealsDeductiblePct` did: `ssWageCap` differs by
+    /// year and the fixture's largest `seEarnings` is 39,479.63 against a cap of
+    /// 168,600, so the cap NEVER binds in any golden; `addlMedicareThreshold` is
+    /// 200,000 and `additionalMedicare` is 0 in all ten US goldens. Hard-coding one
+    /// year's constants for all three, or mistyping either threshold, moves no
+    /// golden cell. `ReportBatch5BlindSpotTests` covers those branches directly, and
+    /// the legal correctness of the numbers is a human reading the SSA/IRS
+    /// publication — made explicitly, not assumed.
     public static let byYear: [Int: Year] = [
-        2024: Year(mealsDeductiblePct: 0.5),
-        2025: Year(mealsDeductiblePct: 0.5),
-        2026: Year(mealsDeductiblePct: 0.5),
+        2024: Year(mealsDeductiblePct: 0.5, seEarningsFactor: 0.9235, ssRate: 0.124,
+                   ssWageCap: 168600, medicareRate: 0.029,
+                   addlMedicareThreshold: 200000, addlMedicareRate: 0.009),
+        2025: Year(mealsDeductiblePct: 0.5, seEarningsFactor: 0.9235, ssRate: 0.124,
+                   ssWageCap: 176100, medicareRate: 0.029,
+                   addlMedicareThreshold: 200000, addlMedicareRate: 0.009),
+        2026: Year(mealsDeductiblePct: 0.5, seEarningsFactor: 0.9235, ssRate: 0.124,
+                   ssWageCap: 184500, medicareRate: 0.029,
+                   addlMedicareThreshold: 200000, addlMedicareRate: 0.009),
     ]
 
     /// `LATEST_YEAR` — `Math.max(...YEARS)` at `usTaxParams.js:23-24`.
@@ -79,6 +110,9 @@ public enum USTaxParams {
         }
         // `byYear[latestYear]` is non-nil whenever the table is non-empty; the
         // fallback keeps this total rather than force-unwrapping.
-        return (latestYear, byYear[latestYear] ?? Year(mealsDeductiblePct: 0.5))
+        return (latestYear, byYear[latestYear] ?? Year(
+            mealsDeductiblePct: 0.5, seEarningsFactor: 0.9235, ssRate: 0.124,
+            ssWageCap: 176100, medicareRate: 0.029,
+            addlMedicareThreshold: 200000, addlMedicareRate: 0.009))
     }
 }

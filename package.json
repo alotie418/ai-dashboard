@@ -47,6 +47,7 @@
     "check:swift-warnings": "node scripts/check-swift-warnings.mjs",
     "check:golden-changes": "node scripts/check-golden-changes.mjs",
     "check:reportmath": "node native/SoloLedger/Tests/Fixtures/make-reportmath-corpus.mjs --verify",
+    "check:tolocalestring": "LC_ALL=C LANG=C TZ=UTC ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron native/SoloLedger/Tests/Fixtures/make-tolocalestring-corpus.mjs --verify",
     "test:golden-changes": "node scripts/test-golden-changes.mjs",
     "check:auto-backup": "node scripts/test-auto-backup.mjs",
     "check:backup-bundle": "node scripts/test-backup-bundle.mjs",
