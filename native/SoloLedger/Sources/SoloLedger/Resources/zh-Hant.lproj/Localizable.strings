@@ -232,7 +232,7 @@
 "settings.surchargeRate" = "附加稅率";
 "settings.incomeTaxRate" = "所得稅率";
 "settings.adminExpenseAnnual" = "年度管理費用";
-"settings.reportParamsPending" = "本 App 尚未提供財務報表功能。這些參數會儲存在帳本中，供報表計算使用；留空表示未設定，報表功能會按其內建預設值計算。";
+"settings.reportParamsPending" = "本 App 尚未提供財務報表功能。這些參數會儲存在帳本中，供報表計算使用。留空表示該參數尚未設定；未設定的參數不會被報表計算採用，請自行設定需要的值。";
 "settings.reportParamsNote" = "切換「會計制度」會把三項稅率重設為該制度的預設值（年度管理費用不變），既有紀錄不會重新計算。預設稅率僅為參考值，可能隨政策調整，請核對最新官方稅率。";
 "settings.appearance.system" = "跟隨系統";
 "settings.appearance.light" = "淺色";

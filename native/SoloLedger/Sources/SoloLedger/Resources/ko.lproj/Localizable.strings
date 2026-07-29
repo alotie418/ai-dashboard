@@ -232,7 +232,7 @@
 "settings.surchargeRate" = "부가 세율";
 "settings.incomeTaxRate" = "소득세율";
 "settings.adminExpenseAnnual" = "연간 관리비";
-"settings.reportParamsPending" = "이 앱은 아직 재무 보고서를 제공하지 않습니다. 이 매개변수는 보고서 계산을 위해 장부에 저장됩니다. 비워 두면 설정되지 않은 상태이며 보고서 기능이 자체 기본값으로 계산합니다.";
+"settings.reportParamsPending" = "이 앱은 아직 재무 보고서를 제공하지 않습니다. 이 매개변수는 보고서 계산을 위해 장부에 저장됩니다. 비워 두면 해당 매개변수가 설정되지 않은 상태입니다. 설정되지 않은 매개변수는 보고서 계산에 사용되지 않으므로 필요한 값은 직접 설정하세요.";
 "settings.reportParamsNote" = "‘회계 방식’을 전환하면 세 가지 세율이 해당 방식의 기본값으로 재설정됩니다(연간 관리비는 그대로). 기존 기록은 재계산되지 않습니다. 기본 세율은 참고값이며 정책에 따라 변경될 수 있으니 최신 공식 세율을 확인하세요.";
 "settings.appearance.system" = "시스템 설정 따름";
 "settings.appearance.light" = "라이트";
