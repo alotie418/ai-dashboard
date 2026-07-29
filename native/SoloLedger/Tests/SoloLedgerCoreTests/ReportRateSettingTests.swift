@@ -335,6 +335,94 @@ final class ReportRateSettingTests: LedgerTestCase {
         }
     }
 
+    /// The BOM fix lands in ``ReportSettings/jsonFragment(_:)``, so it also repairs the
+    /// two OTHER settings readers — and those were producing a visible divergence today.
+    ///
+    /// This is not scope creep, it is where the bug was: the rate gate only made the
+    /// pre-existing hole reachable from a new place. `accounting_locale` is the sharp
+    /// one — a single BOM-prefixed row routed the SAME ledger to China's engine in
+    /// Electron and the US engine here, which is a different regime for the entire
+    /// report, not a rounding difference.
+    func testTheBOMFixAlsoAlignsTheOtherSettingsReaders() throws {
+        let db = try fixtureCopy("bom-others")
+        try put(db, "accounting_locale", "\u{FEFF}\"US\"")
+        try put(db, "admin_expense_annual", "\u{FEFF}5000")
+
+        // `readSetting`'s catch returns the fallback on a parse failure, and now both
+        // languages agree that these ARE parse failures.
+        XCTAssertEqual(ReportSettings.string(db, "accounting_locale", fallback: "CN"), "CN",
+                       "a BOM-prefixed locale is unparseable — the ledger must not silently switch regime")
+        XCTAssertEqual(ReportSettings.number(db, "admin_expense_annual", fallback: 0), 0,
+                       "…and an unparseable admin expense takes the 0 fallback, as it does in Electron")
+    }
+
+    /// The exact edge of what ``ReportRateSetting/needsRepair(rawValue:)`` promises.
+    ///
+    /// The payload is the stored TEXT before parsing and before coercion — and that
+    /// promise stops at ``SQLiteDatabase``'s decoding boundary, which is NOT lossless.
+    /// TEXT is read with `String(decoding:as: UTF8.self)`, deliberately (its own
+    /// comment explains why `String(cString:)` would be worse: it stops at an embedded
+    /// NUL and silently truncates), and that substitutes U+FFFD for invalid UTF-8.
+    ///
+    /// So a row holding `0xFF` does NOT come back as `0xFF`. Asserted rather than
+    /// documented-and-hoped, because the difference between "the bytes in your ledger"
+    /// and "the bytes your ledger's reader could decode" is exactly the kind of
+    /// over-claim a repair flow would inherit and repeat to the user.
+    ///
+    /// The classification is unaffected: the substituted text is still not JSON, so
+    /// the row is still needs-repair. Only the fidelity of the carried payload moves.
+    func testInvalidUTF8ArrivesLossyAtTheDecodingBoundary() throws {
+        let db = try fixtureCopy("invalid-utf8")
+        // A lone 0xFF is not valid UTF-8 in any position. CAST(... AS TEXT) stores the
+        // raw byte in the TEXT column without SQLite validating it.
+        try db.execute("""
+            INSERT INTO settings (key, value, updated_at)
+            VALUES ('income_tax_rate', CAST(x'FF' AS TEXT), datetime('now'))
+            ON CONFLICT(key) DO UPDATE SET value=CAST(x'FF' AS TEXT), updated_at=datetime('now')
+            """)
+
+        let s = ReportSettings.incomeTaxRate(db, locale: "US")
+        XCTAssertEqual(s, .needsRepair(rawValue: "\u{FFFD}"),
+                       "the row is still needs-repair, and the payload is what the decoder produced")
+        XCTAssertNil(s.rate, "still nothing to price with")
+        XCTAssertEqual(s.needsRepairRawValue, "\u{FFFD}")
+        XCTAssertNotEqual(s.needsRepairRawValue, "\u{00FF}",
+                          "it is NOT the original byte reinterpreted — it is the replacement character")
+
+        // Same boundary through the row reader itself, so the loss is attributed to
+        // SQLiteDatabase rather than to anything this batch added.
+        XCTAssertEqual(ReportSettings.rawValue(db, "income_tax_rate"), "\u{FFFD}")
+
+        // Valid UTF-8, including non-ASCII, is untouched — the promise still holds
+        // everywhere a write path can actually reach.
+        try put(db, "surcharge_rate", "十二%")
+        XCTAssertEqual(ReportSettings.surchargeRate(db, locale: "CN"),
+                       .needsRepair(rawValue: "十二%"),
+                       "valid UTF-8 survives verbatim, multi-byte scalars included")
+    }
+
+    /// ``ReportMath/jsTrim(_:)`` — added by this batch and otherwise asserted nowhere.
+    ///
+    /// It exists because the coerced value cannot report emptiness: `Number("")` and
+    /// `Number("   ")` are both 0, indistinguishable from a stored 0. If its whitespace
+    /// set ever drifted from `stringToNumber`'s, an empty-ish string would start
+    /// reading as a deliberate 0% — the exact confusion this batch exists to prevent.
+    func testJSTrimMatchesTheCoercerItWasExtractedFrom() {
+        for raw in ["", " ", "\t", "\n", "\r", "\u{000B}", "\u{000C}", "\u{00A0}",
+                    "\u{FEFF}", "\u{2028}", "\u{2029}", "\u{1680}", "  \t\n  "] {
+            XCTAssertEqual(ReportMath.jsTrim(raw), "",
+                           "\(raw.unicodeScalars.map { String($0.value, radix: 16) }) is JS whitespace")
+            // The pairing that matters: whatever trims to nothing coerces to 0, so the
+            // emptiness question has to be asked separately — which is why jsTrim exists.
+            XCTAssertEqual(ReportMath.stringToNumber(raw), 0)
+            XCTAssertEqual(ReportSettings.classifyRate("\"\(raw)\""), .needsRepair(rawValue: "\"\(raw)\""),
+                           "…and a rate that trims to nothing is corrupt, not 0%")
+        }
+        XCTAssertEqual(ReportMath.jsTrim(" 25 "), "25")
+        XCTAssertEqual(ReportMath.jsTrim("2 5"), "2 5", "only the ends are trimmed")
+        XCTAssertEqual(ReportMath.jsTrim("\u{FEFF}25\u{FEFF}"), "25")
+    }
+
     // MARK: - One rule, two implementations
 
     /// The native classifier and A4-1's shipped write gate must agree, shape by shape.
