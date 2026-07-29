@@ -311,7 +311,7 @@ final class ReportBatch4ParityTests: LedgerTestCase {
         case ("TW", "business-tax"):     block = TWReportEngine.businessTax(ctx)
         case ("CN", "tax-inclusive"):    block = CNReportEngine.taxInclusiveSummary(ctx)
         case ("US", "schedule-c"):       block = USReportEngine.scheduleC(ctx)
-        case ("US", "se-tax"):           block = nil       // batch 5
+        case ("US", "se-tax"):           block = USReportEngine.selfEmploymentTax(ctx)
         default:                         block = nil
         }
         guard let block else { return nil }
@@ -338,11 +338,11 @@ final class ReportBatch4ParityTests: LedgerTestCase {
     /// estimate layer, every `.truncated` row becomes derivable as `.mirrored` and
     /// this test fails until the table is updated.
     ///
-    /// **That force does not extend to `.absent`.** `mirroredFieldNames` returns
-    /// `nil` for `("US", "se-tax")` because no Swift type exists yet — and it will
-    /// keep returning `nil` after one does, since a switch cannot notice a type it
-    /// was never told about. R7 must extend that switch by hand; this test cannot
-    /// catch the omission, and saying so is cheaper than discovering it.
+    /// **That force did not extend to `.absent`.** `mirroredFieldNames` returned
+    /// `nil` for `("US", "se-tax")` while no Swift type existed, and would have kept
+    /// returning `nil` after one did — a switch cannot notice a type it was never
+    /// told about. R7 extended it by hand; this test could not have caught the
+    /// omission, which is why the note stays rather than being deleted as done.
     func testAvailabilityMatchesWhatTheGoldensShowIsMirrored() throws {
         let goldenBlockKey: [String: String] = [
             "income-statement": "incomeStatement", "profit-loss": "profitLoss",
@@ -382,12 +382,16 @@ final class ReportBatch4ParityTests: LedgerTestCase {
             }
         }
 
-        // 5 turnover blocks + CN tax-inclusive + US schedule-c.
-        XCTAssertEqual(seen[.mirrored], 7)
-        // Five income statements, all waiting on the estimate layer.
-        XCTAssertEqual(seen[.truncated], 5)
-        // US se-tax alone.
-        XCTAssertEqual(seen[.absent], 1)
+        // Every report type the six engines declare: 5 turnover blocks +
+        // CN tax-inclusive + US schedule-c + 5 income statements + US se-tax.
+        XCTAssertEqual(seen[.mirrored], 13)
+        // R7 emptied both of these. `XCTAssertNil` rather than `== 0`: the counter is
+        // a dictionary, so an absent key is the shape a zero takes here, and asserting
+        // 0 would silently pass on a key that was never inserted for another reason.
+        XCTAssertNil(seen[.truncated],
+                     "the estimate layer landed; no declared report type is partial")
+        XCTAssertNil(seen[.absent],
+                     "…and none is missing entirely — se-tax was the last one")
     }
 
     /// The non-contract fields really are non-contract: no golden, anywhere, has a

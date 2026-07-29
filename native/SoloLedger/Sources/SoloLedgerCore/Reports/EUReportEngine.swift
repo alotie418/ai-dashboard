@@ -26,6 +26,20 @@ public enum EUReportEngine {
         let grossProfit = revenue - costs                     // eu.js:25
         let operatingProfit = grossProfit - split.operatingExpensesNet - ctx.adminExpense // eu.js:26
 
+        // eu.js:29-32 — the estimate layer. `refusal` is the ONLY path to a refusal.
+        let refusal = EstimatedValue.refusal(for: ctx.incomeTaxRate, parameter: .incomeTaxRate)
+        let rate = ctx.incomeTaxRate.rate
+        // eu.js:30 — clamped at 0; rounded ONCE here and NOT again at the emit
+        // (eu.js:45 passes it straight through), unlike China's double round.
+        let tax = rate.map { r(ReportMath.max(0, operatingProfit) * ($0 / 100)) }
+        let incomeTax = refusal ?? .computed(tax ?? 0)
+        // eu.js:31 — UNROUNDED operating profit minus the ROUNDED tax.
+        let netProfitRaw = tax.map { operatingProfit - $0 }
+        let netProfit = refusal ?? .computed(r(netProfitRaw ?? 0))
+        // eu.js:46 — ×100 then the rounder's ×100 again (cn.js:60 does ×10000 once).
+        let netMargin = refusal ?? .computed(
+            revenue > 0 ? r((netProfitRaw ?? 0) / revenue * 100) : 0)
+
         return EUBatchOneProfitLoss(
             revenue: r(revenue),                              // eu.js:37
             costOfSales: r(costs),                            // eu.js:37
@@ -36,7 +50,14 @@ public enum EUReportEngine {
             // like Japan's it scales by 100 twice rather than by 10000 once.
             grossMargin: revenue > 0 ? r(grossProfit / revenue * 100) : 0,
             adminExpense: r(ctx.adminExpense),                // eu.js:40
-            operatingProfit: r(operatingProfit)               // eu.js:40
+            operatingProfit: r(operatingProfit),               // eu.js:40
+
+            // ── Batch 5 (R7) ──────────────────────────────────────────────────
+            // Reads the UNROUNDED `operatingProfit` local (eu.js:30 multiplies the
+            // local); taking the struct's rounded field back out would round twice.
+            incomeTax: incomeTax,
+            netProfit: netProfit,
+            netMargin: netMargin
         )
     }
 }

@@ -436,11 +436,174 @@ public enum ReportMath {
     /// prints something JS does not need naming: `-0.0` prints "-0.0" and would
     /// come back NEGATIVE zero where JS gives `+0`, and the infinities print "inf",
     /// which is not a JS numeric literal at all.
+    /// JS `String(number)`, for the one place the engines interpolate a computed
+    /// year (`us.js:106`'s `${Number(year) + 1}`). Same function the array-to-string
+    /// path uses; exposed because batch 5 needs it directly.
+    public static func jsNumberToString(_ d: Double) -> String { numberToString(d) }
+
     private static func numberToString(_ d: Double) -> String {
         if d.isNaN { return "NaN" }
         if d == 0 { return "0" }                 // JS String(-0) === "0"
         if d == .infinity { return "Infinity" }
         if d == -.infinity { return "-Infinity" }
-        return String(d)
+        // Swift and V8 agree on the DIGITS and disagree on two cosmetic details, both
+        // of which matter once the result is interpolated into a string rather than
+        // re-parsed. Measured:
+        //
+        //     value    Swift        V8
+        //     2026     "2026.0"     "2026"     ← `us.js:106`'s `${Number(year) + 1}`
+        //     1e-7     "1e-07"      "1e-7"
+        //     1e21     "1e+21"      "1e+21"    ← agree
+        //
+        // The array-join path that used to be this function's only caller re-parses
+        // its output, so neither difference could surface there; batch 5 interpolates
+        // it into a due date, where "2026.0-01-15" is plainly wrong.
+        var s = String(d)
+        if s.hasSuffix(".0") { s.removeLast(2) }
+        if let e = s.firstIndex(of: "e") {
+            let mantissa = String(s[..<e])
+            var exp = String(s[s.index(after: e)...])
+            let negative = exp.hasPrefix("-")
+            exp = exp.trimmingCharacters(in: CharacterSet(charactersIn: "+-"))
+            while exp.count > 1 && exp.hasPrefix("0") { exp.removeFirst() }
+            s = mantissa + "e" + (negative ? "-" : "+") + exp
+        }
+        return s
+    }
+
+    // MARK: - toLocaleString
+
+    /// JS `Number.prototype.toLocaleString()` with NO arguments, under the locale the
+    /// goldens pin (`en-US`).
+    ///
+    /// `us.js:120` builds a user-visible warning with it:
+    /// ``Estimated quarterly tax payment: $${quarterlyPayment.toLocaleString()}``.
+    /// This is the ONLY ICU-dependent expression in `electron/reports/*`, which is why
+    /// the goldens pin `LC_ALL` — measured, the same call emits `$298.41` under en_US
+    /// and `$298,41` under de_DE.
+    ///
+    /// ## Deliberately not `NumberFormatter`
+    ///
+    /// A `NumberFormatter` follows the DEVICE locale, so on a French Mac the mirror
+    /// would emit `3 647,6` where the engine emits `3,647.6` — a divergence no golden
+    /// could catch, because the goldens are generated on a pinned en-US runtime. The
+    /// format is therefore implemented rather than delegated, and pinned against a
+    /// corpus recorded from the real V8 under that same pinned runtime
+    /// (`Tests/Fixtures/make-tolocalestring-corpus.mjs`).
+    ///
+    /// ## The rules, all of them observed rather than assumed
+    ///
+    /// * grouping separator `,` every three integer digits;
+    /// * at most **3** fraction digits, rounded **half away from zero** — `1.2345`
+    ///   gives `1.235` and `0.0005` gives `0.001`, so an implementation that
+    ///   truncates passes every golden and fails the corpus;
+    /// * trailing zeros dropped — `3647.60` gives `3,647.6`. That missing zero is
+    ///   Appendix A3, mirrored and NOT repaired;
+    /// * `-0` gives `"-0"`, where JS `String(-0)` gives `"0"` — the two spellings
+    ///   disagree and both are reachable;
+    /// * `∞` / `-∞` / `NaN` (the infinity SYMBOL, not the word);
+    /// * no exponential notation anywhere in the double range: `1e21` expands to
+    ///   `1,000,000,000,000,000,000,000`.
+    ///
+    /// The digits come from Swift's shortest round-trip description, which produces
+    /// the same significant digits as V8's `Number::toString` — verified across the
+    /// corpus, including `1.7976931348623157e308`, whose expansion is the shortest
+    /// digits followed by zeros rather than the exact binary value.
+    public static func toLocaleString(_ value: Double) -> String {
+        if value.isNaN { return "NaN" }
+        if value == .infinity { return "∞" }
+        if value == -.infinity { return "-∞" }
+
+        // `sign` rather than `< 0`: negative zero must keep its sign here, unlike in
+        // ``numberToString(_:)`` where JS drops it.
+        let negative = value.sign == .minus
+        var (digits, exponent) = significandDigits(abs(value))
+
+        // Split into integer and fraction digit strings around the decimal point.
+        var integerDigits: [Character]
+        var fractionDigits: [Character]
+        if exponent >= 0 {
+            integerDigits = digits + Array(repeating: "0", count: exponent)
+            fractionDigits = []
+        } else {
+            let pointFromRight = -exponent
+            if digits.count <= pointFromRight {
+                digits = Array(repeating: "0", count: pointFromRight - digits.count + 1) + digits
+            }
+            let split = digits.count - pointFromRight
+            integerDigits = Array(digits[..<split])
+            fractionDigits = Array(digits[split...])
+        }
+
+        // Round the fraction to 3 digits, half away from zero, carrying into the
+        // integer part. `0.9999` really does become `1`.
+        let maxFraction = 3
+        if fractionDigits.count > maxFraction {
+            let roundUp = fractionDigits[maxFraction].wholeNumberValue.map { $0 >= 5 } ?? false
+            fractionDigits = Array(fractionDigits[..<maxFraction])
+            if roundUp {
+                var i = fractionDigits.count - 1
+                var carry = true
+                while carry && i >= 0 {
+                    let d = (fractionDigits[i].wholeNumberValue ?? 0) + 1
+                    fractionDigits[i] = Character(String(d % 10))
+                    carry = d >= 10
+                    i -= 1
+                }
+                if carry {
+                    var j = integerDigits.count - 1
+                    while carry && j >= 0 {
+                        let d = (integerDigits[j].wholeNumberValue ?? 0) + 1
+                        integerDigits[j] = Character(String(d % 10))
+                        carry = d >= 10
+                        j -= 1
+                    }
+                    if carry { integerDigits.insert("1", at: 0) }
+                }
+            }
+        }
+        while fractionDigits.last == "0" { fractionDigits.removeLast() }
+
+        while integerDigits.count > 1 && integerDigits.first == "0" { integerDigits.removeFirst() }
+        if integerDigits.isEmpty { integerDigits = ["0"] }
+
+        var grouped = ""
+        for (offset, ch) in integerDigits.enumerated() {
+            if offset > 0 && (integerDigits.count - offset) % 3 == 0 { grouped.append(",") }
+            grouped.append(ch)
+        }
+
+        var out = negative ? "-" : ""
+        out += grouped
+        if !fractionDigits.isEmpty { out += "." + String(fractionDigits) }
+        return out
+    }
+
+    /// The significant decimal digits of a non-negative finite double, and the power
+    /// of ten they are scaled by: `value == digits × 10^exponent`.
+    ///
+    /// Reads Swift's own shortest round-trip description rather than doing the
+    /// conversion, because that description carries exactly the digits V8 would
+    /// produce. The two spell the exponent differently (`1e-07` vs `1e-7`) and that
+    /// is cosmetic — the parse below reads the number, not the spelling.
+    private static func significandDigits(_ value: Double) -> ([Character], Int) {
+        if value == 0 { return (["0"], 0) }
+        let text = String(value)
+        var mantissa = text
+        var exponent = 0
+        if let eIndex = text.firstIndex(where: { $0 == "e" || $0 == "E" }) {
+            mantissa = String(text[..<eIndex])
+            exponent = Int(text[text.index(after: eIndex)...].replacingOccurrences(of: "+", with: "")) ?? 0
+        }
+        if let dot = mantissa.firstIndex(of: ".") {
+            let fractionCount = mantissa.distance(from: mantissa.index(after: dot), to: mantissa.endIndex)
+            exponent -= fractionCount
+            mantissa.remove(at: dot)
+        }
+        var digits = Array(mantissa)
+        while digits.count > 1 && digits.first == "0" { digits.removeFirst() }
+        // Swift prints whole doubles as "100.0"; the trailing zero is a digit like any
+        // other and the exponent above already accounts for it.
+        return (digits, exponent)
     }
 }

@@ -344,20 +344,32 @@ final class ReportBatch4BlindSpotTests: XCTestCase {
     }
 
     /// R8's gate. A caller must not be able to reach a rendered report type without
-    /// meeting the availability enum first, and the values it returns today are the
-    /// ones plan §7.3 turns on.
-    func testAvailabilityMarksEveryIncomeStatementTruncated() {
-        for (locale, id) in [("CN", "income-statement"), ("JP", "income-statement"),
-                             ("EU", "profit-loss"), ("KR", "income-statement"),
-                             ("TW", "income-statement")] {
-            XCTAssertEqual(ReportTypes.availability(for: id, locale: locale), .truncated,
-                           "\(locale)/\(id): the estimate lines are batch 5")
+    /// meeting the availability enum first.
+    ///
+    /// This test used to be called `testAvailabilityMarksEveryIncomeStatementTruncated`
+    /// and asserted exactly that, which was true until R7 mirrored the estimate layer.
+    /// It is renamed rather than edited in place because the old name was a claim
+    /// about the product, and a guard whose name says the opposite of what it checks
+    /// is worse than no guard.
+    ///
+    /// **Every report type the six engines declare is now `.mirrored`** — 13 of them.
+    /// `.truncated` and `.absent` have no rows left, and both cases are kept: R8
+    /// needs them, and `ReportBatch4ParityTests` still derives its answer through
+    /// them. What that means for plan §7.3's "no plausible-looking Chinese income
+    /// statement" gate is that the gate is satisfied by having the lines, not by
+    /// hiding them.
+    func testAvailabilityMarksEveryDeclaredReportTypeMirrored() {
+        for locale in ["CN", "US", "JP", "EU", "KR", "TW"] {
+            let table = ReportTypes.table(for: locale) ?? []
+            XCTAssertFalse(table.isEmpty, "\(locale) declares report types")
+            for entry in table {
+                XCTAssertEqual(ReportTypes.availability(for: entry.id, locale: locale), .mirrored,
+                               "\(locale)/\(entry.id)")
+            }
         }
-        for (locale, id) in [("CN", "vat-summary"), ("JP", "consumption-tax"),
-                             ("EU", "vat-return"), ("KR", "vat-summary"),
-                             ("TW", "business-tax")] {
-            XCTAssertEqual(ReportTypes.availability(for: id, locale: locale), .mirrored)
-        }
-        XCTAssertEqual(ReportTypes.availability(for: "se-tax", locale: "US"), .absent)
+        // A pair that does not exist is still `.absent` — the enum did not lose the
+        // case, only its rows.
+        XCTAssertEqual(ReportTypes.availability(for: "se-tax", locale: "CN"), .absent)
+        XCTAssertEqual(ReportTypes.availability(for: "no-such-report", locale: "US"), .absent)
     }
 }

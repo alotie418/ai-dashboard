@@ -137,3 +137,125 @@ public extension USReportEngine {
             rawMealsTotal: rawMeals)
     }
 }
+
+// MARK: - Batch 5 (R7) — the estimate layer
+
+public extension USReportEngine {
+
+    /// `us.js:68-74`, `:91-99` — the Self-Employment Tax estimate.
+    ///
+    /// Reads the **unrounded** Line 31 (`ScheduleC.unroundedGrossIncome −
+    /// unroundedTotalExpenses`), not the rounded `line31_netProfit` the block emits:
+    /// `us.js:66` computes the local and `us.js:69` multiplies it. Taking the
+    /// rounded field back out would round twice.
+    ///
+    /// Nothing here reads the income-tax rate, so nothing here can refuse — that is
+    /// why every field is a plain `Double`. A ledger whose rate row is missing or
+    /// corrupt still gets a complete SE-tax block, and the goldens say so:
+    /// `unset-US-2025` and `malformed-US-2025` carry the same seven numbers as the
+    /// base run.
+    ///
+    /// **Two branches no golden reaches**, measured: the social-security cap never
+    /// binds (largest fixture `seEarnings` 39,479.63 against a cap of 168,600) and
+    /// `additionalMedicare` is 0 in all ten US goldens. `ReportBatch5BlindSpotTests`
+    /// exercises both directly.
+    static func selfEmploymentTax(_ ctx: ReportContext) -> SelfEmploymentTax {
+        let r = ReportMath.round2OrZero                        // us.js:150 — guarded
+        let c = scheduleC(ctx)
+        let resolved = USTaxParams.resolve(year: ctx.year)     // us.js:12
+        let se = resolved.params
+
+        let netProfit = c.unroundedGrossIncome - c.unroundedTotalExpenses   // us.js:66
+        let seEarnings = netProfit * se.seEarningsFactor                    // us.js:69
+        // us.js:71 — `Math.min`, NOT Swift.min: the two disagree on NaN and on the
+        // sign of zero, and this is `ReportMath.min`'s first production caller.
+        let ssTax = ReportMath.min(seEarnings, se.ssWageCap) * se.ssRate
+        let medicareTax = seEarnings * se.medicareRate                      // us.js:72
+        // us.js:73 — strictly GREATER than the threshold, and no clamp on the
+        // negative side because the comparison already excludes it.
+        let additionalMedicare = seEarnings > se.addlMedicareThreshold
+            ? (seEarnings - se.addlMedicareThreshold) * se.addlMedicareRate
+            : 0
+        // us.js:74 — the raw sum rounded ONCE. Rounding the three parts first and
+        // adding them differs: measured, 1,641,186 divergences in 4,000,000
+        // one-cent steps.
+        let totalSETax = r(ssTax + medicareTax + additionalMedicare)
+
+        return SelfEmploymentTax(
+            netEarnings: r(netProfit),                 // us.js:92
+            seEarnings: r(seEarnings),                 // us.js:93
+            socialSecurityTax: r(ssTax),               // us.js:94
+            medicareTax: r(medicareTax),               // us.js:95
+            additionalMedicare: r(additionalMedicare), // us.js:96
+            totalSETax: totalSETax,                    // us.js:97 — already rounded
+            paramYear: resolved.year)                  // us.js:98
+    }
+
+    /// `us.js:76-83`, `:101-107` — the quarterly estimated-tax block.
+    ///
+    /// `totalAnnual` is **not rounded** (`us.js:82`), and that is the sharpest
+    /// discriminator in the batch: `base-US-2024` records `1542.6599999999999` and
+    /// `base-US-2026` records `14590.380000000001`. A tidy `round2` here produces
+    /// `1542.66` / `14590.38` and fails on exactly those two cells — which is also
+    /// why `ReportBatch5ParityTests` compares exactly rather than with the plan's
+    /// `eps = 0.011`, a tolerance that would swallow the difference.
+    ///
+    /// There is NO `Math.max(0, ·)` clamp on the US side, unlike the five VAT
+    /// engines: a loss period produces a NEGATIVE estimated income tax, and two
+    /// goldens (`base-US-2024` = −570, `base-US-2025Q2` = −720) prove it. Copying
+    /// the clamped shape across from `jp.js` would fail there.
+    static func estimatedTax(_ ctx: ReportContext) -> EstimatedTax {
+        let r = ReportMath.round2OrZero
+        let c = scheduleC(ctx)
+        let netProfit = c.unroundedGrossIncome - c.unroundedTotalExpenses
+        let totalSETax = selfEmploymentTax(ctx).totalSETax
+
+        let refusal = EstimatedValue.refusal(for: ctx.incomeTaxRate, parameter: .incomeTaxRate)
+        let annualIncomeTaxRaw = ctx.incomeTaxRate.rate.map { r(netProfit * ($0 / 100)) } // us.js:81
+        let totalAnnualRaw = annualIncomeTaxRaw.map { $0 + totalSETax }                    // us.js:82
+
+        return EstimatedTax(
+            annualIncomeTax: refusal ?? .computed(annualIncomeTaxRaw ?? 0),
+            annualSETax: totalSETax,                                    // us.js:103
+            totalAnnual: refusal ?? .computed(totalAnnualRaw ?? 0),      // NOT rounded
+            quarterlyPayment: refusal ?? .computed(r((totalAnnualRaw ?? 0) / 4)), // us.js:83
+            // us.js:106 — `${Number(year) + 1}` for the January date, so the year
+            // goes through JS number coercion and back to a string.
+            dueDates: ["\(ctx.year)-04-15", "\(ctx.year)-06-15", "\(ctx.year)-09-15",
+                       "\(ReportMath.jsNumberToString(ReportMath.number(.string(ctx.year)) + 1))-01-15"])
+    }
+
+    /// `us.js:117-122` — the warnings array.
+    ///
+    /// The WHOLE array belongs to this batch, not just its first entry, and the plan
+    /// says why: it is a `.filter(Boolean)` literal, so when net profit is ≤ 0 the
+    /// meals hint SLIDES from index 1 to index 0. The two entries cannot be shipped
+    /// in different batches without the indices lying.
+    ///
+    /// The first entry is the only ICU-dependent expression in `electron/reports/*`;
+    /// it goes through ``ReportMath/toLocaleString(_:)``, pinned against a corpus
+    /// recorded from the real V8 under the same environment the goldens use. The
+    /// `$3,647.6` in `base-US-2026` — with its missing trailing zero — is Appendix
+    /// A3, mirrored and not repaired.
+    ///
+    /// The second predicate tests `rawMealsTotal`, the sum of the meals slug BEFORE
+    /// the 50% limit and before rounding, with JS truthiness: a 0.004 total fires
+    /// the hint even though `line24b_meals` rounds to 0.
+    static func warnings(_ ctx: ReportContext) -> [String] {
+        let c = scheduleC(ctx)
+        let netProfit = c.unroundedGrossIncome - c.unroundedTotalExpenses
+        let totalSETax = selfEmploymentTax(ctx).totalSETax
+        let estimate = estimatedTax(ctx)
+
+        var out: [String] = []
+        // us.js:119 — `!rateMissing` is the A4-3 guard: a payment that cannot be
+        // computed is not announced, rather than announced as "$null".
+        if netProfit > 0, totalSETax > 0, case .computed(let quarterly) = estimate.quarterlyPayment {
+            out.append("Estimated quarterly tax payment: $\(ReportMath.toLocaleString(quarterly))")
+        }
+        if ReportMath.isTruthy(c.rawMealsTotal) {                       // us.js:121
+            out.append("Meals expense is automatically limited to 50% deductible (Line 24b)")
+        }
+        return out
+    }
+}

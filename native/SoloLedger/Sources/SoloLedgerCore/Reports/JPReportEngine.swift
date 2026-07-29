@@ -42,6 +42,26 @@ public enum JPReportEngine {
         // rounded before being emitted; the emit at jp.js:42 rounds it once.
         let operatingProfit = grossProfit - split.operatingExpensesNet - ctx.adminExpense
 
+        // jp.js:30-33 — the estimate layer. `refusal` is the ONLY path to a refusal:
+        // asking `ctx.incomeTaxRate.rate` and defaulting to `.notConfigured` would
+        // render a corrupt value as "go configure one".
+        let refusal = EstimatedValue.refusal(for: ctx.incomeTaxRate, parameter: .incomeTaxRate)
+        let rate = ctx.incomeTaxRate.rate
+        // jp.js:31 — clamped at 0, so a loss period pays no income tax and netProfit
+        // equals operatingProfit. Rounded ONCE here…
+        let taxPayable = rate.map { r(ReportMath.max(0, operatingProfit) * ($0 / 100)) }
+        // …and NOT rounded again at the emit (jp.js:47 passes `taxPayable` straight
+        // through), unlike China which rounds it twice.
+        let incomeTax = refusal ?? .computed(taxPayable ?? 0)
+        // jp.js:32 — the UNROUNDED operating profit minus the ROUNDED tax.
+        let netProfitRaw = taxPayable.map { operatingProfit - $0 }
+        let netProfit = refusal ?? .computed(r(netProfitRaw ?? 0))
+        // jp.js:48 — ×100 then the rounder's ×100 again. China multiplies by 10000
+        // once (cn.js:60); algebraically equal, measurably different in binary64,
+        // so the two must not be "unified".
+        let netMargin = refusal ?? .computed(
+            salesRevenue > 0 ? r((netProfitRaw ?? 0) / salesRevenue * 100) : 0)
+
         return BatchOneIncomeStatementWithOperatingProfit(
             salesRevenue: r(salesRevenue),                     // jp.js:39
             costOfSales: r(costOfSales),                       // jp.js:39
@@ -50,7 +70,16 @@ public enum JPReportEngine {
             grossProfit: r(grossProfit),                       // jp.js:41
             grossMargin: grossMargin,                          // jp.js:41 — already rounded
             adminExpense: r(ctx.adminExpense),                 // jp.js:42
-            operatingProfit: r(operatingProfit)                // jp.js:42
+            operatingProfit: r(operatingProfit),               // jp.js:42
+
+            // ── Batch 5 (R7) — the estimate layer ──────────────────────────────
+            //
+            // Reads the UNROUNDED `operatingProfit` local, not the rounded field
+            // emitted above: jp.js:31 multiplies the local. Taking the struct's value
+            // back out would round twice.
+            incomeTax: incomeTax,
+            netProfit: netProfit,
+            netMargin: netMargin
         )
     }
 }

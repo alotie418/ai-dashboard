@@ -107,6 +107,18 @@ public struct CNBatchOneIncomeStatement: Equatable, Sendable {
     public let grossMargin: Double
     public let shippingFee: Double
     public let adminExpense: Double
+
+    // MARK: - Batch 5 (R7) — the estimate layer
+
+    /// `cn.js:76`. **The key holds pre-tax profit**, not operating profit — the name
+    /// is the source's and plan §1.2 forbids tidying it. Refused when the SURCHARGE
+    /// is unusable, because it is subtracted here.
+    public let operatingProfit: EstimatedValue
+    /// `cn.js:79` — 城建/教育/地方教育附加 on the clamped VAT payable.
+    public let taxSurcharge: EstimatedValue
+    public let incomeTax: EstimatedValue
+    public let netProfit: EstimatedValue
+    public let netMargin: EstimatedValue
 }
 
 /// JP / KR / TW batch-1 block: the shared fields plus operating profit.
@@ -118,7 +130,15 @@ public struct BatchOneIncomeStatementWithOperatingProfit: Equatable, Sendable {
     public let grossProfit: Double
     public let grossMargin: Double
     public let adminExpense: Double
+    /// Batch 1: reads no rate, so it is a plain `Double` even here — a Japanese
+    /// report must not be blocked by a rate no Japanese line consumes.
     public let operatingProfit: Double
+
+    // MARK: - Batch 5 (R7)
+
+    public let incomeTax: EstimatedValue
+    public let netProfit: EstimatedValue
+    public let netMargin: EstimatedValue
 }
 
 /// The EU block.
@@ -138,4 +158,10 @@ public struct EUBatchOneProfitLoss: Equatable, Sendable {
     public let grossMargin: Double
     public let adminExpense: Double
     public let operatingProfit: Double
+
+    // MARK: - Batch 5 (R7)
+
+    public let incomeTax: EstimatedValue
+    public let netProfit: EstimatedValue
+    public let netMargin: EstimatedValue
 }

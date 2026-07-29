@@ -1,0 +1,246 @@
+{
+  "note": "Number.prototype.toLocaleString() with NO arguments, as electron/reports/us.js:120 calls it. Values are IEEE-754 bits; `repr` is documentation. Where Swift and this corpus disagree, THE CORPUS IS RIGHT.",
+  "generator": "native/SoloLedger/Tests/Fixtures/make-tolocalestring-corpus.mjs",
+  "expression": "value.toLocaleString()",
+  "env": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC"
+  },
+  "resolvedIntlLocale": "en-US",
+  "electron": "42.6.0",
+  "node": "24.18.0",
+  "icu": "78.2",
+  "vectors": [
+    {
+      "bits": "0x40ac7f3333333333",
+      "repr": "3647.6",
+      "formatted": "3,647.6"
+    },
+    {
+      "bits": "0x407776e147ae147b",
+      "repr": "375.43",
+      "formatted": "375.43"
+    },
+    {
+      "bits": "0x407ae6e147ae147b",
+      "repr": "430.43",
+      "formatted": "430.43"
+    },
+    {
+      "bits": "0x40636dc28f5c28f6",
+      "repr": "155.43",
+      "formatted": "155.43"
+    },
+    {
+      "bits": "0x4064cdc28f5c28f6",
+      "repr": "166.43",
+      "formatted": "166.43"
+    },
+    {
+      "bits": "0x408f380000000000",
+      "repr": "999",
+      "formatted": "999"
+    },
+    {
+      "bits": "0x408f3feb851eb852",
+      "repr": "999.99",
+      "formatted": "999.99"
+    },
+    {
+      "bits": "0x408f400000000000",
+      "repr": "1000",
+      "formatted": "1,000"
+    },
+    {
+      "bits": "0x408f440000000000",
+      "repr": "1000.5",
+      "formatted": "1,000.5"
+    },
+    {
+      "bits": "0x40c387feb851eb85",
+      "repr": "9999.99",
+      "formatted": "9,999.99"
+    },
+    {
+      "bits": "0x40c3880000000000",
+      "repr": "10000",
+      "formatted": "10,000"
+    },
+    {
+      "bits": "0x40f86a0000000000",
+      "repr": "100000",
+      "formatted": "100,000"
+    },
+    {
+      "bits": "0x412e847ffae147ae",
+      "repr": "999999.99",
+      "formatted": "999,999.99"
+    },
+    {
+      "bits": "0x412e848000000000",
+      "repr": "1000000",
+      "formatted": "1,000,000"
+    },
+    {
+      "bits": "0x4132d687e4189375",
+      "repr": "1234567.891",
+      "formatted": "1,234,567.891"
+    },
+    {
+      "bits": "0x3fe0000000000000",
+      "repr": "0.5",
+      "formatted": "0.5"
+    },
+    {
+      "bits": "0x3fd0000000000000",
+      "repr": "0.25",
+      "formatted": "0.25"
+    },
+    {
+      "bits": "0x3fc0000000000000",
+      "repr": "0.125",
+      "formatted": "0.125"
+    },
+    {
+      "bits": "0x3ff3c083126e978d",
+      "repr": "1.2345",
+      "formatted": "1.235"
+    },
+    {
+      "bits": "0x3ff3c01a36e2eb1c",
+      "repr": "1.2344",
+      "formatted": "1.234"
+    },
+    {
+      "bits": "0x4000010624dd2f1b",
+      "repr": "2.0005",
+      "formatted": "2.001"
+    },
+    {
+      "bits": "0x3ff00068db8bac71",
+      "repr": "1.0001",
+      "formatted": "1"
+    },
+    {
+      "bits": "0x3f3a36e2eb1c432d",
+      "repr": "0.0004",
+      "formatted": "0"
+    },
+    {
+      "bits": "0x3f40624dd2f1a9fc",
+      "repr": "0.0005",
+      "formatted": "0.001"
+    },
+    {
+      "bits": "0x3ff8000000000000",
+      "repr": "1.5",
+      "formatted": "1.5"
+    },
+    {
+      "bits": "0x3ff8000000000000",
+      "repr": "1.5",
+      "formatted": "1.5"
+    },
+    {
+      "bits": "0x4000cccccccccccd",
+      "repr": "2.1",
+      "formatted": "2.1"
+    },
+    {
+      "bits": "0x4059000000000000",
+      "repr": "100",
+      "formatted": "100"
+    },
+    {
+      "bits": "0x4059066666666666",
+      "repr": "100.1",
+      "formatted": "100.1"
+    },
+    {
+      "bits": "0x0000000000000000",
+      "repr": "0",
+      "formatted": "0"
+    },
+    {
+      "bits": "0x8000000000000000",
+      "repr": "-0",
+      "formatted": "-0"
+    },
+    {
+      "bits": "0xbff0000000000000",
+      "repr": "-1",
+      "formatted": "-1"
+    },
+    {
+      "bits": "0xc08f440000000000",
+      "repr": "-1000.5",
+      "formatted": "-1,000.5"
+    },
+    {
+      "bits": "0xc0a3890000000000",
+      "repr": "-2500.5",
+      "formatted": "-2,500.5"
+    },
+    {
+      "bits": "0xc0ac7f3333333333",
+      "repr": "-3647.6",
+      "formatted": "-3,647.6"
+    },
+    {
+      "bits": "0xbfe0000000000000",
+      "repr": "-0.5",
+      "formatted": "-0.5"
+    },
+    {
+      "bits": "0x41cdcd6500000000",
+      "repr": "1000000000",
+      "formatted": "1,000,000,000"
+    },
+    {
+      "bits": "0x41d26580b4800000",
+      "repr": "1234567890",
+      "formatted": "1,234,567,890"
+    },
+    {
+      "bits": "0x41cd6f34588fbe77",
+      "repr": "987654321.123",
+      "formatted": "987,654,321.123"
+    },
+    {
+      "bits": "0x7ff0000000000000",
+      "repr": "Infinity",
+      "formatted": "∞"
+    },
+    {
+      "bits": "0xfff0000000000000",
+      "repr": "-Infinity",
+      "formatted": "-∞"
+    },
+    {
+      "bits": "0x7ff8000000000000",
+      "repr": "NaN",
+      "formatted": "NaN"
+    },
+    {
+      "bits": "0x3e7ad7f29abcaf48",
+      "repr": "1e-7",
+      "formatted": "0"
+    },
+    {
+      "bits": "0x4415af1d78b58c40",
+      "repr": "100000000000000000000",
+      "formatted": "100,000,000,000,000,000,000"
+    },
+    {
+      "bits": "0x444b1ae4d6e2ef50",
+      "repr": "1e+21",
+      "formatted": "1,000,000,000,000,000,000,000"
+    },
+    {
+      "bits": "0x7fefffffffffffff",
+      "repr": "1.7976931348623157e+308",
+      "formatted": "179,769,313,486,231,570,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000,000"
+    }
+  ]
+}
