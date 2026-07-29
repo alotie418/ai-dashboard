@@ -134,6 +134,55 @@ jobs:
           GOLDEN_BASE_REF: origin/${{ github.base_ref || github.ref_name }}
         run: node scripts/check-golden-changes.mjs
 
+  # 真 SwiftUI App 的编译 + App-hosted 单元测试。
+  #
+  # `swift test`（checks job）只覆盖 SwiftPM 包 SoloLedgerCore —— Package.swift 明确
+  # 声明 Sources/SoloLedger/ 不属于任何 SwiftPM target，由 App/SoloLedger.xcodeproj
+  # 编译。所以在此 job 之前，**整个 SwiftUI App 层没有任何 CI 覆盖**：View、AppModel、
+  # 启动链、六语 .strings parity 测试全部只在本机跑过。R8 要在这一层做报表呈现，
+  # 先把编译与单元测试的闸门装上。
+  #
+  # 只跑 SoloLedgerUnitTests，**显式排除 SoloLedgerUITests**：scheme 的 TestAction
+  # 两个 testable 都未 skip，不加 -only-testing 就会顺带拉起 XCUITest。而 XCUITest 需要
+  # runner 打开 automation mode，实测在无 GUI 会话下会挂住（2026-07-21：GUI 会话 12/12
+  # 通过，headless 超时）。UITests 是否能进 CI 另开探索性 job 验证，不在本 job 范围内。
+  #
+  # 本 job 暂不进 required checks —— 按 CLAUDE.md「Required status checks」，workflow
+  # 必须先合入 main 并在 main 上跑成功，之后才配置为必需；反过来会让每个 PR 永久卡在
+  # "Expected"。
+  #
+  # 不做 paths 过滤，与 report-goldens 同理：一个被路径过滤掉的必需检查根本不会上报。
+  native-app:
+    name: Native SwiftUI app (xcodebuild + unit tests)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # 工具链版本入日志：这个 job 唯一的外部依赖就是 runner 自带的 Xcode，
+      # 将来若因镜像升级而红，第一件要看的就是它变成了什么。
+      - name: Xcode version
+        run: xcodebuild -version
+      # DerivedData 放 RUNNER_TEMP，不落进工作区 —— 仓库根的 .swift-gate-build 是
+      # swift build 的 scratch path，两者互不复用也不该互相污染。
+      - name: Build the real SwiftUI app
+        run: |
+          xcodebuild \
+            -project native/SoloLedger/App/SoloLedger.xcodeproj \
+            -scheme SoloLedger \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/SoloLedgerDerivedData" \
+            build
+      - name: App-hosted unit tests (SoloLedgerUnitTests only)
+        run: |
+          xcodebuild test \
+            -project native/SoloLedger/App/SoloLedger.xcodeproj \
+            -scheme SoloLedger \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/SoloLedgerDerivedData" \
+            -only-testing:SoloLedgerUnitTests
+
   # 真 Electron e2e（PR-1 #176 documents fs 分支 + PR-2 #177 attachment IPC）。
   # 仅 workflow_dispatch 手动触发：push/PR 一律不跑、永不作为 merge 门、不入 required checks。
   #   - 与 checks/e2e 两 job 不同，这里要 Electron 二进制 + better-sqlite3 的 ELECTRON ABI
