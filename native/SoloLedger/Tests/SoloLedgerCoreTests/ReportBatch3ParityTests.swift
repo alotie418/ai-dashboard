@@ -9,9 +9,11 @@ import XCTest
 /// That is a much weaker statement than it sounds, and the numbers are worth
 /// stating rather than leaving a reader to assume:
 ///
-/// * **175 of the 225 asserted cells are the literal 0.** The fixture's US rows
+/// * **195 of the 250 asserted cells are the literal 0.** The fixture's US rows
 ///   touch few lines, so most of the comparison is zero-against-zero.
-/// * **There are only 5 distinct `scheduleC` vectors** across the 9 goldens.
+/// * **There are only 5 distinct `scheduleC` vectors** across the 10 goldens — the
+///   count did not move when A4-3 added a tenth, because that variant differs only in
+///   a rate and Schedule C reads none.
 /// * **Only 4 of the 19 slug→line mappings are pinned here** — advertising, meals,
 ///   home-office and other — and three of those four rest on `base-US-2026` alone.
 ///
@@ -28,7 +30,9 @@ import XCTest
 /// goldens could cover them was considered and declined; that coverage is
 /// permanent as it stands.
 ///
-/// The goldens are FROZEN — no commit here declares `Allowed-Golden-Changes`.
+/// The goldens this file READS are not frozen in A4-3 — that batch declares the
+/// `malformed-*` series and adds `malformed-raw-*` — but this file changes none of
+/// them; it only follows the counts.
 final class ReportBatch3ParityTests: LedgerTestCase {
 
     private func bundledFixtureURL() throws -> URL {
@@ -66,6 +70,15 @@ final class ReportBatch3ParityTests: LedgerTestCase {
                     ON CONFLICT(key) DO UPDATE SET value='0', updated_at=datetime('now')
                     """)
             }
+        case "malformed-raw":
+            // Bytes that are not JSON at all — note the absent quoting, which is the
+            // whole point of the variant.
+            for (key, raw) in [("surcharge_rate", "12%"), ("income_tax_rate", "25%")] {
+                try db.execute("""
+                    INSERT INTO settings (key, value, updated_at) VALUES ('\(key)', '\(raw)', datetime('now'))
+                    ON CONFLICT(key) DO UPDATE SET value='\(raw)', updated_at=datetime('now')
+                    """)
+            }
         case "malformed":
             for (key, raw) in [("surcharge_rate", "\"12%\""), ("income_tax_rate", "\"25%\"")] {
                 try db.execute("""
@@ -79,7 +92,7 @@ final class ReportBatch3ParityTests: LedgerTestCase {
 
     private static let variantPeriods: [(String, [String])] = [
         ("base", ["2024", "2025", "2026", "2025Q2", "2025-06", "2024H2-2025H1"]),
-        ("malformed", ["2025"]), ("unset", ["2025"]), ("zero", ["2025"]),
+        ("malformed", ["2025"]), ("malformed-raw", ["2025"]), ("unset", ["2025"]), ("zero", ["2025"]),
     ]
     private static let periods: [String: (year: String, from: String, to: String)] = [
         "2024": ("2024", "2024-01-01", "2024-12-31"),
@@ -181,10 +194,17 @@ final class ReportBatch3ParityTests: LedgerTestCase {
             }
         }
 
-        XCTAssertEqual(checked, 225, "9 US goldens x 25 scheduleC fields")
+        XCTAssertEqual(checked, 250, "10 US goldens x 25 scheduleC fields")
         // The discrimination facts, asserted rather than described — if the fixture
         // ever gains US rows these numbers move and this header stops being true.
-        XCTAssertEqual(zeros, 175, "175 of the 225 asserted cells are the literal 0")
+        //
+        // A4-3 added `malformed-raw-US-2025`, so the counts went 225 → 250 and
+        // 175 → 195. That is 25 more cells and 20 more zeros, and it buys NO new
+        // discrimination for Schedule C: the new variant differs only in a rate, and
+        // Schedule C reads none — `vectors.count` is still 5, which is the assertion
+        // that says so. The numbers are updated because they are facts, not because
+        // coverage improved.
+        XCTAssertEqual(zeros, 195, "195 of the 250 asserted cells are the literal 0")
         XCTAssertEqual(vectors.count, 5, "only 5 distinct scheduleC vectors exist")
         XCTAssertEqual(legacyPeriodsSeen, 1, "base-US-2024 is the one legacy-sourced US golden")
     }
@@ -192,7 +212,7 @@ final class ReportBatch3ParityTests: LedgerTestCase {
     /// Plan §2 claims batch 3 is "完全不受 incomeTaxRate 影响". This turns that
     /// sentence into a machine check, for free, using goldens already on disk:
     /// `scheduleC` is byte-identical across all four rate variants while
-    /// `estimatedTax.annualIncomeTax` moves 880 / null / 0 / 0.
+    /// `estimatedTax.annualIncomeTax` moves 880 / null / 0 / null / null.
     ///
     /// `unset` reads null rather than a number because a MISSING settings row is no
     /// longer priced at China's 25% fallback (plan §9.1 scheme A). The KEY still has
@@ -202,7 +222,7 @@ final class ReportBatch3ParityTests: LedgerTestCase {
         var blocks: [String: NSDictionary] = [:]
         var incomeTaxes: [String: Double] = [:]
         var incomeTaxIsNull: [String: Bool] = [:]
-        for variant in ["base", "unset", "zero", "malformed"] {
+        for variant in ["base", "unset", "zero", "malformed", "malformed-raw"] {
             let g = try golden("\(variant)-US-2025")
             blocks[variant] = NSDictionary(dictionary:
                 try XCTUnwrap(g["scheduleC"] as? [String: Any]))
@@ -212,7 +232,7 @@ final class ReportBatch3ParityTests: LedgerTestCase {
             incomeTaxIsNull[variant] = raw is NSNull
             incomeTaxes[variant] = raw as? Double
         }
-        for variant in ["unset", "zero", "malformed"] {
+        for variant in ["unset", "zero", "malformed", "malformed-raw"] {
             XCTAssertEqual(blocks["base"], blocks[variant],
                            "scheduleC must not move with the rate — \(variant)")
         }
@@ -222,7 +242,18 @@ final class ReportBatch3ParityTests: LedgerTestCase {
                        "a missing rate row is not priced — null, never a number")
         XCTAssertNil(incomeTaxes["unset"])
         XCTAssertEqual(incomeTaxes["zero"], 0)
-        XCTAssertEqual(incomeTaxes["malformed"], 0)
+        // A4-3: an unusable rate is REFUSED, so there is no number here at all. It
+        // used to read 0 — `Number("25%")` is NaN and us.js's `|| 0` rounder flattened
+        // it — which was indistinguishable from a ledger that configured 0%.
+        XCTAssertEqual(incomeTaxIsNull["malformed"], true,
+                       "a corrupt rate is not priced at 0")
+        XCTAssertNil(incomeTaxes["malformed"])
+        // …and the same for bytes that are not JSON at all, which used to be WORSE:
+        // readSetting's catch returned the fallback, so this read 1100 — China's 25%
+        // silently applied to a US ledger, the very number scheme A removed.
+        XCTAssertEqual(incomeTaxIsNull["malformed-raw"], true,
+                       "the fallback must not come back through the parse-failure door")
+        XCTAssertNil(incomeTaxes["malformed-raw"])
     }
 
     /// The INDEPENDENT oracle for the 15 mappings no golden reaches.

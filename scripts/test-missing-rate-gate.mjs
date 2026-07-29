@@ -19,8 +19,10 @@
 //   A-2:中国制度保留兜底(12% 附加税 / 25% 所得税),缺行时输出与「行在、值为 25」
 //     完全一致 —— 本次修正对中国账本零影响。
 //
-//   A-4 未被波及:行存在但值不可解析(如 "25%")仍走既有的 NaN 路径(非中国引擎降为
-//     0、中国序列化为 null),那是第三个可区分的「需修复」状态,留给单独 PR。
+//   A-4(已于本仓 A4-3 落地):行存在但值不可用(如 "25%",或根本不是合法 JSON 的
+//     裸文本)是第三个状态「需修复」,同样拒算。它与「未配置」在**引擎侧处置相同**
+//     (都产出 null),区别在呈现层。本文件下面那条对照因此断言的是「两者同为 null,
+//     但都不是 0、也不是兜底」——专项守卫在 scripts/test-malformed-rate-refusal.mjs。
 //
 // 第 1 部分是纯函数(无 DB,恒执行);第 2 部分驱动调度器打真库 —— better-sqlite3 的
 // 原生绑定按 Electron ABI 编时在普通 node 下加载不了,那时优雅 SKIP(CI 会把它重建
@@ -255,10 +257,20 @@ if (Database) {
       `[db] ${locale}: 行在=0 → 真实的 0(不是 null),得到 ${json(z)}`);
     ok(json(zero) !== json(absent), `[db] ${locale}: 显式 0% 与缺行的输出必须不同`);
 
-    // A-4 未被波及:行在、值不可解析 → 仍是既有的 NaN 路径(非中国引擎降为 0)。
+    // A-4(A4-3 落地):行在、值不可用 → 同样拒算。
+    //
+    // 这条断言此前写的是「仍降为 0」—— 那是 #419 当时的真实行为,也是 A4-3 要消灭的
+    // 东西:一个损坏的税率被压成 0,与「用户主动配了 0%」完全不可分。改成新契约,
+    // 而不是放宽。
     const m = pick(malformed);
-    ok(m.tax === 0,
-      `[db] ${locale}: malformed("25%") 仍走既有 NaN 路径 → 0(不是 null),得到 ${json(m.tax)}`);
+    ok(m.tax === null,
+      `[db] ${locale}: malformed("25%") 必须拒算 → null,得到 ${json(m.tax)}`);
+    ok(m.tax !== 0,
+      `[db] ${locale}: 尤其不得被压成 0 —— 那与显式 0% 不可分`);
+    // 而「未配置」与「需修复」在报表 JSON 里都是 null,这是有意的:引擎侧处置相同,
+    // 区分留在设置读取层(原生 ReportRateSetting 的四态),由 R8 分别呈现。
+    ok(json(pick(absent).tax) === json(m.tax),
+      `[db] ${locale}: 未配置与需修复在报表输出里同为 null(区分不在这一层)`);
 
     // 税率之上的部分一个数都不变。
     if (locale === 'US') {
@@ -294,13 +306,13 @@ report();
 
 function report() {
   console.log('\n=== Missing income-tax-rate gate (方案 A) ===\n');
-  console.log('缺行 → null(非中国)· 显式 0% → 真实 0 · malformed → 既有 NaN 路径 · 中国兜底不变');
+  console.log('缺行 → null(非中国)· 显式 0% → 真实 0 · 值不可用 → 拒算 · 中国兜底不变');
   console.log(`Failures: ${failures.length}\n`);
   if (failures.length) {
     for (const f of failures) console.error('  ✗ ' + f);
     console.error('');
     process.exit(1);
   }
-  console.log('✓ 「未配置」由设置行的缺失判定,不由算出的值反推;中国兜底与 malformed 状态未被波及。\n');
+  console.log('✓ 「未配置」由设置行的缺失判定,不由算出的值反推;中国兜底未被波及。\n');
   process.exit(0);
 }

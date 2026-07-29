@@ -1,5 +1,5 @@
 {
-  "locale": "TW",
+  "locale": "CN",
   "period": {
     "from": "2025-01-01",
     "to": "2025-12-31",
@@ -10,37 +10,46 @@
     {
       "id": "income-statement",
       "name": {
-        "zh-CN": "损益表",
-        "en": "Income Statement",
-        "zh-TW": "損益表"
+        "zh-CN": "损益表（利润表）",
+        "en": "Income Statement (P&L)"
       }
     },
     {
-      "id": "business-tax",
+      "id": "vat-summary",
       "name": {
-        "zh-CN": "营业税概要",
-        "en": "Business Tax Summary",
-        "zh-TW": "營業稅概要"
+        "zh-CN": "增值税统计",
+        "en": "VAT Summary"
+      }
+    },
+    {
+      "id": "tax-inclusive",
+      "name": {
+        "zh-CN": "含税金额汇总",
+        "en": "Tax-Inclusive Summary"
       }
     }
   ],
   "incomeStatement": {
     "salesRevenue": 12233.96,
-    "costOfSales": 0,
-    "costOfGoodsSold": 0,
-    "operatingExpenses": 8037.73,
-    "grossProfit": 12233.96,
-    "grossMargin": 100,
+    "costOfSales": 3773.58,
+    "costOfGoodsSold": 3773.58,
+    "operatingExpenses": 4264.15,
+    "operatingProfit": null,
+    "grossProfit": 8460.38,
+    "grossMargin": 69.15,
+    "taxSurcharge": null,
+    "shippingFee": 0,
     "adminExpense": 12000,
-    "operatingProfit": -7803.77,
     "incomeTax": null,
     "netProfit": null,
     "netMargin": null
   },
-  "businessTax": {
-    "collected": 566.04,
-    "paid": 362.27,
-    "payable": 203.77
+  "vatSummary": {
+    "cumulativeInput": 362.27,
+    "cumulativeOutput": 566.04,
+    "certifiedInput": 362.27,
+    "invoicedOutput": 566.04,
+    "estimatedPayable": 203.77
   },
   "taxInclusiveSummary": {
     "purchaseTotal": 8400,

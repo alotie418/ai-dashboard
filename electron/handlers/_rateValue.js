@@ -63,33 +63,38 @@ function rateValueIsUsable(value) {
 /// 比 `rateValueIsUsable` 多一层:先 `JSON.parse`,因为「根本不是合法 JSON」是一条
 /// **独立的**、后果最严重的坏路径,而它在 parse 之后就再也看不见了。
 ///
-/// 返回 `{ usable, verdict, effect }`:
+/// 返回 `{ usable, verdict, effect, value }`:
 ///   • `verdict` 是稳定标识符,给测试和盘点脚本用;
-///   • `effect` 说的是**今天**的引擎拿这个值会干什么 —— 盘点报告要给人看,
-///     「不可用」远不如「它会让你的报表按 25% 算税」有说服力。
+///   • `effect` 说的是**修正前**的引擎拿这个值会干什么 —— 盘点报告要给人看,
+///     「不可用」远不如「它会让你的报表按 25% 算税」有说服力。A4-3 之后引擎
+///     已经拒算了,这一列因此是「如果没有那道闸会怎样」的说明。
+///   • `value` 是可用时的数值(`Number()` 之后),不可用时为 `null`。它在这里而不是
+///     让调用方自己再 parse 一次,是为了让**判定与取值出自同一次解析** —— 两处各
+///     parse 一次,就是两套会慢慢分叉的解析器的开始。
 function classifyStoredRate(rawText) {
   let parsed;
   try {
     parsed = JSON.parse(rawText);
   } catch {
-    // readSetting 的 catch 吞掉它 → 返回兜底 → 引擎按 25 / 12 计算。
-    return { usable: false, verdict: 'invalidJson',
-             effect: '静默回退到兜底税率(所得税 25 / 附加税 12),报表照常出数' };
+    // 修正前:readSetting 的 catch 吞掉它 → 返回兜底 → 引擎按 25 / 12 计算。
+    return { usable: false, verdict: 'invalidJson', value: null,
+             effect: '(A4-3 之前)静默回退到兜底税率(所得税 25 / 附加税 12),报表照常出数' };
   }
   if (typeof parsed === 'number') {
     return Number.isFinite(parsed)
-      ? { usable: true, verdict: 'number', effect: '正常' }
-      : { usable: false, verdict: 'nonFiniteNumber', effect: 'NaN / Infinity 路径' };
+      ? { usable: true, verdict: 'number', value: parsed, effect: '正常' }
+      : { usable: false, verdict: 'nonFiniteNumber', value: null, effect: 'NaN / Infinity 路径' };
   }
   if (typeof parsed === 'string') {
     const trimmed = parsed.trim();
     return (trimmed !== '' && Number.isFinite(Number(trimmed)))
-      ? { usable: true, verdict: 'numericString', effect: '正常(数字字符串,跨端兼容形状)' }
-      : { usable: false, verdict: 'textNotNumeric',
-          effect: 'NaN 路径:中国序列化成 null,其余四地区被 `|| 0` 压成 0' };
+      ? { usable: true, verdict: 'numericString', value: Number(trimmed),
+          effect: '正常(数字字符串,跨端兼容形状)' }
+      : { usable: false, verdict: 'textNotNumeric', value: null,
+          effect: '(A4-3 之前)NaN 路径:中国序列化成 null,其余四地区被 `|| 0` 压成 0' };
   }
-  return { usable: false, verdict: 'nonScalar',
-           effect: 'null/布尔/数组/对象被静默强制成一个数字(0 或 1)' };
+  return { usable: false, verdict: 'nonScalar', value: null,
+           effect: '(A4-3 之前)null/布尔/数组/对象被静默强制成一个数字(0 或 1)' };
 }
 
 module.exports = { RATE_KEYS, rateValueIsUsable, classifyStoredRate };

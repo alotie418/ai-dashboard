@@ -26,7 +26,8 @@
     "base": "the fixture as committed — every rate row present",
     "unset": "DELETE FROM settings WHERE key IN (vat_rate, surcharge_rate, income_tax_rate, admin_expense_annual)",
     "zero": "every rate key set to the JSON number 0",
-    "malformed": "surcharge_rate and income_tax_rate set to the JSON strings '12%' / '25%'"
+    "malformed": "surcharge_rate and income_tax_rate set to the JSON strings '12%' / '25%'",
+    "malformed-raw": "surcharge_rate and income_tax_rate set to the RAW text 12% / 25% — not valid JSON at all, so JSON.parse throws and readSetting used to return the fallback"
   },
   "locales": [
     "CN",
@@ -90,6 +91,9 @@
       "2025"
     ],
     "malformed": [
+      "2025"
+    ],
+    "malformed-raw": [
       "2025"
     ]
   }

@@ -21,12 +21,12 @@ import XCTest
 /// STORED TEXT — the `settings.value` string before JSON parsing and before numeric
 /// coercion — and ``ReportRateSetting/needsRepair(rawValue:)`` carries it.
 ///
-/// ## What this suite deliberately does NOT assert
+/// ## The two apps now agree
 ///
-/// That the two apps agree. They do not, yet: until A4-3 lands, `electron/reports/*`
-/// still coerces these rows while the native model refuses them. That divergence is
-/// pinned below by name rather than left to be discovered, and closing it is A4-3's
-/// whole job.
+/// A4-2 left them deliberately divergent — the native model refused a malformed rate
+/// while `electron/reports/*` still coerced it — and pinned that gap by name. A4-3
+/// closed it, so `testTheNativeStatesAgreeWithTheRefusingEngines` asserts the
+/// agreement variant by variant instead.
 ///
 /// **The goldens are FROZEN here** — this suite reads them and changes none; no
 /// commit in A4-2 declares `Allowed-Golden-Changes`.
@@ -239,38 +239,100 @@ final class ReportRateSettingTests: LedgerTestCase {
 
     // MARK: - The divergence A4-3 has to close
 
-    /// **Pinned on purpose.** After A4-2 the native model refuses a malformed rate
-    /// while `electron/reports/*` still coerces it, so the committed goldens disagree
-    /// with the model. That is expected — A4-2 is native-only and changes no golden —
-    /// and it is asserted here so the gap is a fact under test rather than a surprise.
+    /// The goldens now record the refusal, and the two apps agree again.
     ///
-    /// A4-3 makes the engines refuse too, at which point these expectations become
-    /// null / absent and this test is the one that says so.
-    func testTheGoldensStillRecordTheOldCoercionUntilA4Dash3() throws {
-        // Four non-CN engines flatten NaN to 0 through their `|| 0` rounders.
+    /// A4-2 left this deliberately divergent — the native model refused a malformed
+    /// rate while `electron/reports/*` still coerced it — and said so in a test named
+    /// after the batch that would close it. A4-3 closed it, so this is that test,
+    /// rewritten to the contract rather than relaxed to fit.
+    ///
+    /// What actually moved, measured against the committed goldens:
+    ///   * JP / EU / KR / TW `incomeTax` 0 → null (their `|| 0` rounders used to
+    ///     flatten the NaN into a confident zero);
+    ///   * US `annualIncomeTax` 0 → null, and its quarterly-payment warning is gone;
+    ///   * CN **did not move** — its rounder already let the NaN through to a null.
+    ///     Same bytes, different reason: an accident became a decision.
+    func testTheGoldensRecordTheRefusal() throws {
         for locale in ["JP", "EU", "KR", "TW"] {
             let key = locale == "EU" ? "profitLoss" : "incomeStatement"
-            let block = try XCTUnwrap(try golden("malformed-\(locale)-2025")[key] as? [String: Any])
-            XCTAssertEqual(block["incomeTax"] as? Double, 0,
-                           "\(locale): TODAY the golden records 0 — A4-3 turns this null")
+            for variant in ["malformed", "malformed-raw"] {
+                let block = try XCTUnwrap(try golden("\(variant)-\(locale)-2025")[key] as? [String: Any])
+                for field in ["incomeTax", "netProfit", "netMargin"] {
+                    XCTAssertTrue(block[field] is NSNull,
+                                  "\(variant)/\(locale): \(field) must be null, not a priced number")
+                }
+                // Everything above the rate is untouched — the refusal is surgical.
+                XCTAssertNotNil(block["operatingProfit"] as? Double,
+                                "\(variant)/\(locale): operating profit does not read a rate")
+                XCTAssertNotNil(block["grossProfit"] as? Double)
+            }
         }
-        // The US estimate layer does the same.
-        let us = try XCTUnwrap(try golden("malformed-US-2025")["estimatedTax"] as? [String: Any])
-        XCTAssertEqual(us["annualIncomeTax"] as? Double, 0,
-                       "US: TODAY 0 — A4-3 turns this null")
 
-        // China is the exception and will NOT move in A4-3: `cn.js`'s rounder has no
-        // `|| 0` guard, so the NaN already serialises as null. Same bytes, different
-        // reason — an explicit refusal instead of an accident.
-        let cn = try XCTUnwrap(try golden("malformed-CN-2025")["incomeStatement"] as? [String: Any])
-        XCTAssertTrue(cn["taxSurcharge"] is NSNull, "CN already records null, via the NaN path")
-        XCTAssertTrue(cn["netProfit"] is NSNull)
+        for variant in ["malformed", "malformed-raw"] {
+            let us = try XCTUnwrap(try golden("\(variant)-US-2025")["estimatedTax"] as? [String: Any])
+            for field in ["annualIncomeTax", "totalAnnual", "quarterlyPayment"] {
+                XCTAssertTrue(us[field] is NSNull, "\(variant)/US: \(field) must be null")
+            }
+            // Self-employment tax reads no income-tax rate, so it must still be there.
+            XCTAssertNotNil(us["annualSETax"] as? Double, "\(variant)/US: SE tax is unaffected")
+            let warnings = try XCTUnwrap(try golden("\(variant)-US-2025")["warnings"] as? [Any])
+            XCTAssertTrue(warnings.isEmpty,
+                          "\(variant)/US: a quarterly payment that cannot be computed is not announced")
 
-        // And the measurement that justifies the whole batch: a corrupt US ledger is
-        // today indistinguishable from one that deliberately configured 0%.
-        let zeroUS = try XCTUnwrap(try golden("zero-US-2025")["estimatedTax"] as? [String: Any])
-        XCTAssertEqual(NSDictionary(dictionary: us), NSDictionary(dictionary: zeroUS),
-                       "malformed and zero are the SAME document today — that is the defect")
+            let cn = try XCTUnwrap(try golden("\(variant)-CN-2025")["incomeStatement"] as? [String: Any])
+            XCTAssertTrue(cn["taxSurcharge"] is NSNull, "\(variant)/CN: surcharge refused")
+            XCTAssertTrue(cn["incomeTax"] is NSNull)
+            XCTAssertTrue(cn["operatingProfit"] is NSNull,
+                          "\(variant)/CN: pre-tax profit consumes the surcharge, so it goes too")
+        }
+
+        // The pair that proves a corrupt rate is no longer confusable with 0%. Before
+        // A4-3 these two documents were byte-identical, warning string included.
+        let malformedUS = try golden("malformed-US-2025")
+        let zeroUS = try golden("zero-US-2025")
+        XCTAssertNotEqual(NSDictionary(dictionary: malformedUS), NSDictionary(dictionary: zeroUS),
+                          "a corrupt rate and a deliberate 0% must not be the same document")
+
+        // …and the pair that proves the parse-failure door is shut. `malformed-raw`
+        // stores bytes that are not JSON at all; before A4-3 `readSetting`'s catch
+        // returned the fallback and this read 1100 — China's 25% on a US ledger,
+        // exactly the number scheme A removed.
+        let rawUS = try XCTUnwrap(try golden("malformed-raw-US-2025")["estimatedTax"] as? [String: Any])
+        XCTAssertNotEqual(rawUS["annualIncomeTax"] as? Double, 1100)
+        XCTAssertNotEqual(rawUS["annualIncomeTax"] as? Double, 880,
+                          "nor the fixture's own 20% — nothing is priced here at all")
+    }
+
+    /// The native model and the Electron goldens now say the same thing, variant by
+    /// variant. This is the cross-end agreement A4-2 could only promise.
+    func testTheNativeStatesAgreeWithTheRefusingEngines() throws {
+        for (variant, bytes) in [("malformed", ("\"12%\"", "\"25%\"")),
+                                 ("malformed-raw", ("12%", "25%"))] {
+            let db = try fixtureCopy("agree-\(variant)")
+            try put(db, "surcharge_rate", bytes.0)
+            try put(db, "income_tax_rate", bytes.1)
+
+            for locale in allLocales {
+                XCTAssertEqual(ReportSettings.incomeTaxRate(db, locale: locale),
+                               .needsRepair(rawValue: bytes.1),
+                               "\(variant)/\(locale): the model refuses")
+                XCTAssertEqual(ReportSettings.surchargeRate(db, locale: locale),
+                               .needsRepair(rawValue: bytes.0))
+
+                // …and the golden the Electron engine produced for the SAME bytes has
+                // no number in the rate-driven fields either.
+                let g = try golden("\(variant)-\(locale)-2025")
+                let priced: Any?
+                if locale == "US" {
+                    priced = (g["estimatedTax"] as? [String: Any])?["annualIncomeTax"]
+                } else {
+                    let key = locale == "EU" ? "profitLoss" : "incomeStatement"
+                    priced = (g[key] as? [String: Any])?["incomeTax"]
+                }
+                XCTAssertTrue(priced is NSNull,
+                              "\(variant)/\(locale): the engine refused too — the ends agree")
+            }
+        }
     }
 
     /// The BOM fix lands in ``ReportSettings/jsonFragment(_:)``, so it also repairs the

@@ -12,6 +12,7 @@ function generate(ctx) {
   // PR-T5: split expenses into COGS vs operating (additive fields; costOfSales
   // and netProfit are unchanged — cogsNet + operatingExpensesNet === totalExpenseNet).
   const { splitExpenses } = require('./_expenseSplit');
+  const { rateIsMissing } = require('./_missingRate');
   const { cogsNet, operatingExpensesNet } = splitExpenses(expenseRows, categories);
 
   // 汇总
@@ -30,15 +31,33 @@ function generate(ctx) {
   const grossMargin = salesRevenue > 0 ? Math.round(grossProfit / salesRevenue * 10000) / 100 : 0;
 
   const vatPayable = Math.max(0, totalIncomeTax - totalExpenseTax);
-  const taxSurcharge = Math.round(vatPayable * (surchargeRate / 100) * 100) / 100;
+  // A4-3:附加税率/所得税率不可用(缺行在中国不会发生,但**行在、值不可用**会)→
+  // 显式拒算,产出 null。中国此前是靠 NaN 顺着链条传下去、由 JSON 序列化成 null 的
+  // ——`cn.js` 的 r 没有 `|| 0` 守卫(其余四个引擎有)。同样的 null,现在是明说的拒绝
+  // 而不是一次意外;而对「非合法 JSON」那一族,此前根本走不到 NaN,它会静默回退到
+  // 兜底 12 / 25 并照常出数,那才是这条分支真正堵住的东西。
+  const surchargeMissing = rateIsMissing(surchargeRate);
+  const rateMissing = rateIsMissing(incomeTaxRate);
+  const taxSurcharge = surchargeMissing
+    ? null
+    : Math.round(vatPayable * (surchargeRate / 100) * 100) / 100;
 
   // PR-T5-2A: gross profit is now COGS-only, so operating expenses are subtracted
   // here. profitBeforeTax (and netProfit) are numerically unchanged: grossProfit −
   // operatingExpensesNet === old (revenue − totalExpenseNet).
-  const profitBeforeTax = grossProfit - operatingExpensesNet - taxSurcharge - totalShipping - adminExpense;
-  const incomeTax = Math.round(Math.max(0, profitBeforeTax) * (incomeTaxRate / 100) * 100) / 100;
-  const netProfit = profitBeforeTax - incomeTax;
-  const netMargin = salesRevenue > 0 ? Math.round(netProfit / salesRevenue * 10000) / 100 : 0;
+  // 税前利润吃附加税,所以附加税不可用时它也算不出来 —— 这条依赖链是中国独有的
+  // (cn.js 的 operatingProfit 装的就是 profitBeforeTax)。
+  const profitBeforeTax = surchargeMissing
+    ? null
+    : grossProfit - operatingExpensesNet - taxSurcharge - totalShipping - adminExpense;
+  const cannotPrice = surchargeMissing || rateMissing;
+  const incomeTax = cannotPrice
+    ? null
+    : Math.round(Math.max(0, profitBeforeTax) * (incomeTaxRate / 100) * 100) / 100;
+  const netProfit = cannotPrice ? null : profitBeforeTax - incomeTax;
+  const netMargin = cannotPrice
+    ? null
+    : (salesRevenue > 0 ? Math.round(netProfit / salesRevenue * 10000) / 100 : 0);
 
   const r = (v) => Math.round(v * 100) / 100;
 
@@ -54,14 +73,14 @@ function generate(ctx) {
       costOfSales: r(costOfSales),
       costOfGoodsSold: r(cogsNet),
       operatingExpenses: r(operatingExpensesNet),
-      operatingProfit: r(profitBeforeTax),
+      operatingProfit: surchargeMissing ? null : r(profitBeforeTax),
       grossProfit: r(grossProfit),
       grossMargin,
-      taxSurcharge: r(taxSurcharge),
+      taxSurcharge: surchargeMissing ? null : r(taxSurcharge),
       shippingFee: r(totalShipping),
       adminExpense: r(adminExpense),
-      incomeTax: r(incomeTax),
-      netProfit: r(netProfit),
+      incomeTax: cannotPrice ? null : r(incomeTax),
+      netProfit: cannotPrice ? null : r(netProfit),
       netMargin,
     },
 
