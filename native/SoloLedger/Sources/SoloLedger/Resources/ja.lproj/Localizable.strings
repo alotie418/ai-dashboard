@@ -232,7 +232,7 @@
 "settings.surchargeRate" = "附加税率";
 "settings.incomeTaxRate" = "所得税率";
 "settings.adminExpenseAnnual" = "年間管理費用";
-"settings.reportParamsPending" = "本アプリはまだ財務帳票を提供していません。これらのパラメータは帳票計算のために台帳へ保存されます。空欄は未設定を意味し、帳票機能は独自の既定値で計算します。";
+"settings.reportParamsPending" = "本アプリはまだ財務帳票を提供していません。これらのパラメータは帳票計算のために台帳へ保存されます。空欄はそのパラメータが未設定であることを意味します。未設定のパラメータは帳票計算に使われませんので、必要な値はご自身で設定してください。";
 "settings.reportParamsNote" = "「会計方式」を切り替えると、3 つの税率がその方式のプリセット値に戻ります（年間管理費用はそのまま）。既存の記録が再計算されることはありません。プリセット税率は参考値であり変更される場合があります。最新の公式税率をご確認ください。";
 "settings.appearance.system" = "システムに合わせる";
 "settings.appearance.light" = "ライト";

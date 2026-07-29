@@ -232,7 +232,7 @@
 "settings.surchargeRate" = "Taux additionnel";
 "settings.incomeTaxRate" = "Taux d'impôt sur les bénéfices";
 "settings.adminExpenseAnnual" = "Frais administratifs annuels";
-"settings.reportParamsPending" = "Cette app ne propose pas encore de rapports financiers. Ces paramètres sont enregistrés dans la comptabilité pour les calculs de rapports ; laissez un champ vide pour ne rien enregistrer, les fonctions de rapport appliquent alors leur propre valeur par défaut.";
+"settings.reportParamsPending" = "Cette app ne propose pas encore de rapports financiers. Ces paramètres sont enregistrés dans la comptabilité pour les calculs de rapports. Un champ vide signifie que ce paramètre n'est pas configuré ; les calculs de rapports n'utilisent pas un paramètre non configuré, définissez donc vous-même les valeurs dont vous avez besoin.";
 "settings.reportParamsNote" = "Changer le « Régime comptable » réinitialise les trois taux aux valeurs préréglées de ce régime (les frais administratifs annuels ne changent pas) ; les enregistrements existants ne sont jamais recalculés. Les taux préréglés sont des valeurs de référence et peuvent évoluer — vérifiez les taux officiels en vigueur.";
 "settings.appearance.system" = "Système";
 "settings.appearance.light" = "Clair";
