@@ -1,0 +1,507 @@
+{
+  "note": "Recorded from the repo-locked Electron runtime. Regenerated and byte-compared in CI. `repr` is documentation; `bits` is the ground truth.",
+  "generator": "native/SoloLedger/Tests/Fixtures/make-settings-coercion-corpus.mjs",
+  "source": "electron/reports/index.js readSetting + Number(), fallbacks per key",
+  "runtime": "electron",
+  "fallbacks": {
+    "vat_rate": 13,
+    "admin_expense_annual": 0
+  },
+  "cases": [
+    {
+      "name": "rowAbsent",
+      "storedText": null,
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "402A000000000000",
+          "repr": "13"
+        },
+        "admin_expense_annual": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        }
+      }
+    },
+    {
+      "name": "zero",
+      "storedText": "0",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        },
+        "admin_expense_annual": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        }
+      }
+    },
+    {
+      "name": "positive",
+      "storedText": "5000",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "40B3880000000000",
+          "repr": "5000"
+        },
+        "admin_expense_annual": {
+          "bits": "40B3880000000000",
+          "repr": "5000"
+        }
+      }
+    },
+    {
+      "name": "negative",
+      "storedText": "-5000",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "C0B3880000000000",
+          "repr": "-5000"
+        },
+        "admin_expense_annual": {
+          "bits": "C0B3880000000000",
+          "repr": "-5000"
+        }
+      }
+    },
+    {
+      "name": "numericString",
+      "storedText": "\"5000\"",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "40B3880000000000",
+          "repr": "5000"
+        },
+        "admin_expense_annual": {
+          "bits": "40B3880000000000",
+          "repr": "5000"
+        }
+      }
+    },
+    {
+      "name": "paddedNumericString",
+      "storedText": "\" 5000 \"",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "40B3880000000000",
+          "repr": "5000"
+        },
+        "admin_expense_annual": {
+          "bits": "40B3880000000000",
+          "repr": "5000"
+        }
+      }
+    },
+    {
+      "name": "emptyString",
+      "storedText": "\"\"",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        },
+        "admin_expense_annual": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        }
+      }
+    },
+    {
+      "name": "blankString",
+      "storedText": "\"   \"",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        },
+        "admin_expense_annual": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        }
+      }
+    },
+    {
+      "name": "jsonNull",
+      "storedText": "null",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        },
+        "admin_expense_annual": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        }
+      }
+    },
+    {
+      "name": "jsonTrue",
+      "storedText": "true",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "3FF0000000000000",
+          "repr": "1"
+        },
+        "admin_expense_annual": {
+          "bits": "3FF0000000000000",
+          "repr": "1"
+        }
+      }
+    },
+    {
+      "name": "jsonFalse",
+      "storedText": "false",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        },
+        "admin_expense_annual": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        }
+      }
+    },
+    {
+      "name": "emptyArray",
+      "storedText": "[]",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        },
+        "admin_expense_annual": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        }
+      }
+    },
+    {
+      "name": "singletonArray",
+      "storedText": "[5000]",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "40B3880000000000",
+          "repr": "5000"
+        },
+        "admin_expense_annual": {
+          "bits": "40B3880000000000",
+          "repr": "5000"
+        }
+      }
+    },
+    {
+      "name": "pairArray",
+      "storedText": "[1,2]",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "7FF8000000000000",
+          "repr": "NaN"
+        },
+        "admin_expense_annual": {
+          "bits": "7FF8000000000000",
+          "repr": "NaN"
+        }
+      }
+    },
+    {
+      "name": "emptyObject",
+      "storedText": "{}",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "7FF8000000000000",
+          "repr": "NaN"
+        },
+        "admin_expense_annual": {
+          "bits": "7FF8000000000000",
+          "repr": "NaN"
+        }
+      }
+    },
+    {
+      "name": "object",
+      "storedText": "{\"v\":5000}",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "7FF8000000000000",
+          "repr": "NaN"
+        },
+        "admin_expense_annual": {
+          "bits": "7FF8000000000000",
+          "repr": "NaN"
+        }
+      }
+    },
+    {
+      "name": "unitSuffixString",
+      "storedText": "\"5000元\"",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "7FF8000000000000",
+          "repr": "NaN"
+        },
+        "admin_expense_annual": {
+          "bits": "7FF8000000000000",
+          "repr": "NaN"
+        }
+      }
+    },
+    {
+      "name": "bareUnitSuffix",
+      "storedText": "5000元",
+      "parseThrew": true,
+      "applied": {
+        "vat_rate": {
+          "bits": "402A000000000000",
+          "repr": "13"
+        },
+        "admin_expense_annual": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        }
+      }
+    },
+    {
+      "name": "bareLetters",
+      "storedText": "abc",
+      "parseThrew": true,
+      "applied": {
+        "vat_rate": {
+          "bits": "402A000000000000",
+          "repr": "13"
+        },
+        "admin_expense_annual": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        }
+      }
+    },
+    {
+      "name": "emptyText",
+      "storedText": "",
+      "parseThrew": true,
+      "applied": {
+        "vat_rate": {
+          "bits": "402A000000000000",
+          "repr": "13"
+        },
+        "admin_expense_annual": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        }
+      }
+    },
+    {
+      "name": "positiveOverflow",
+      "storedText": "1e999",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "7FF0000000000000",
+          "repr": "Infinity"
+        },
+        "admin_expense_annual": {
+          "bits": "7FF0000000000000",
+          "repr": "Infinity"
+        }
+      }
+    },
+    {
+      "name": "negativeOverflow",
+      "storedText": "-1e999",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "FFF0000000000000",
+          "repr": "-Infinity"
+        },
+        "admin_expense_annual": {
+          "bits": "FFF0000000000000",
+          "repr": "-Infinity"
+        }
+      }
+    },
+    {
+      "name": "maxFinite",
+      "storedText": "1e308",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "7FE1CCF385EBC8A0",
+          "repr": "1e+308"
+        },
+        "admin_expense_annual": {
+          "bits": "7FE1CCF385EBC8A0",
+          "repr": "1e+308"
+        }
+      }
+    },
+    {
+      "name": "bareInfinity",
+      "storedText": "Infinity",
+      "parseThrew": true,
+      "applied": {
+        "vat_rate": {
+          "bits": "402A000000000000",
+          "repr": "13"
+        },
+        "admin_expense_annual": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        }
+      }
+    },
+    {
+      "name": "bareNaN",
+      "storedText": "NaN",
+      "parseThrew": true,
+      "applied": {
+        "vat_rate": {
+          "bits": "402A000000000000",
+          "repr": "13"
+        },
+        "admin_expense_annual": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        }
+      }
+    },
+    {
+      "name": "bomPrefixedNumber",
+      "storedText": "﻿5000",
+      "parseThrew": true,
+      "applied": {
+        "vat_rate": {
+          "bits": "402A000000000000",
+          "repr": "13"
+        },
+        "admin_expense_annual": {
+          "bits": "0000000000000000",
+          "repr": "0"
+        }
+      }
+    },
+    {
+      "name": "bomInsideString",
+      "storedText": "\"﻿5000\"",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "40B3880000000000",
+          "repr": "5000"
+        },
+        "admin_expense_annual": {
+          "bits": "40B3880000000000",
+          "repr": "5000"
+        }
+      }
+    },
+    {
+      "name": "hexString",
+      "storedText": "\"0x1388\"",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "40B3880000000000",
+          "repr": "5000"
+        },
+        "admin_expense_annual": {
+          "bits": "40B3880000000000",
+          "repr": "5000"
+        }
+      }
+    },
+    {
+      "name": "beyondTwoFiftyThree",
+      "storedText": "9007199254740993",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "4340000000000000",
+          "repr": "9007199254740992"
+        },
+        "admin_expense_annual": {
+          "bits": "4340000000000000",
+          "repr": "9007199254740992"
+        }
+      }
+    },
+    {
+      "name": "seventeenDigitsHighExponent",
+      "storedText": "1.12345678912345678e145",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "5E0CCA5AE160DAA9",
+          "repr": "1.1234567891234568e+145"
+        },
+        "admin_expense_annual": {
+          "bits": "5E0CCA5AE160DAA9",
+          "repr": "1.1234567891234568e+145"
+        }
+      }
+    },
+    {
+      "name": "seventeenDigitsInRange",
+      "storedText": "1.12345678912345678e144",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "5DD70848B44D7BBA",
+          "repr": "1.1234567891234567e+144"
+        },
+        "admin_expense_annual": {
+          "bits": "5DD70848B44D7BBA",
+          "repr": "1.1234567891234567e+144"
+        }
+      }
+    },
+    {
+      "name": "smallestSubnormal",
+      "storedText": "4.9e-324",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "0000000000000001",
+          "repr": "5e-324"
+        },
+        "admin_expense_annual": {
+          "bits": "0000000000000001",
+          "repr": "5e-324"
+        }
+      }
+    },
+    {
+      "name": "subnormal",
+      "storedText": "1e-320",
+      "parseThrew": false,
+      "applied": {
+        "vat_rate": {
+          "bits": "00000000000007E8",
+          "repr": "1e-320"
+        },
+        "admin_expense_annual": {
+          "bits": "00000000000007E8",
+          "repr": "1e-320"
+        }
+      }
+    }
+  ]
+}
