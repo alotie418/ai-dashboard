@@ -207,6 +207,31 @@ final class LocalizationWordingGuardTests: XCTestCase {
               reason: "invoice status enum value, not a tax-amount label"),
         .init(locale: "zh-Hant", key: "invoice.issued", pattern: "已開票",
               reason: "invoice status enum value, not a tax-amount label"),
+        // — R8 P3d, the report page's four disclaimers. Same shape as the three above and for
+        //   the same reason: each one uses the filing word in order to DENY that this app does
+        //   the thing. `report.disclaimer.rates` says nothing about filing and needs no entry.
+        .init(locale: "zh-Hans", key: "report.disclaimer.report", pattern: "申报",
+              reason: "report-page disclaimer: denies being a statutory statement or a basis for filing"),
+        .init(locale: "zh-Hans", key: "report.disclaimer.report", pattern: "报税",
+              reason: "report-page disclaimer: denies being a statutory statement or a basis for filing"),
+        .init(locale: "zh-Hant", key: "report.disclaimer.report", pattern: "申報",
+              reason: "report-page disclaimer: denies being a statutory statement or a basis for filing"),
+        .init(locale: "zh-Hant", key: "report.disclaimer.report", pattern: "報稅",
+              reason: "report-page disclaimer: denies being a statutory statement or a basis for filing"),
+        .init(locale: "en", key: "report.disclaimer.report", pattern: #"(?i)\bFiling\b"#,
+              reason: "report-page disclaimer: denies being a statutory statement or a basis for filing"),
+        .init(locale: "zh-Hans", key: "report.disclaimer.tax", pattern: "申报",
+              reason: "tax-block disclaimer: denies being a basis for filing"),
+        .init(locale: "zh-Hant", key: "report.disclaimer.tax", pattern: "申報",
+              reason: "tax-block disclaimer: denies being a basis for filing"),
+        .init(locale: "en", key: "report.disclaimer.tax", pattern: #"(?i)\bFiling\b"#,
+              reason: "tax-block disclaimer: denies being a basis for filing"),
+        .init(locale: "zh-Hans", key: "report.disclaimer.usTax", pattern: "报税",
+              reason: "US tax disclaimer: denies being a basis for filing, points to a professional"),
+        .init(locale: "zh-Hant", key: "report.disclaimer.usTax", pattern: "報稅",
+              reason: "US tax disclaimer: denies being a basis for filing, points to a professional"),
+        .init(locale: "en", key: "report.disclaimer.usTax", pattern: #"(?i)\bFiling\b"#,
+              reason: "US tax disclaimer: denies being a basis for filing, points to a professional"),
     ]
 
     // MARK: - The scan, as a pure function

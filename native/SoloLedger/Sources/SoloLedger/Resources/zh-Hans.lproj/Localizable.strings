@@ -455,3 +455,13 @@
 "report.period.caption" = "会计期间：{from} – {to}";
 "report.estimate.badge" = "估算 · 仅供经营管理参考";
 "report.storedText.label" = "账本中实际存放的内容";
+
+/* ── R8 P3d：报表页四条免责声明（逐字复用 Electron 已审文案；挂载位置见 ReportPageComposition） ── */
+/* 页脚：整页的定性，在 .report / .blocked / .failed 三态显示 */
+"report.disclaimer.report" = "本视图为经营管理估算，依据你录入的数据按简化口径生成，并非法定财务报表；报税、申报及对外报送请以专业会计师及官方口径为准。";
+/* 五个周转税 section 的块脚（CN vat-summary / JP consumption-tax / EU vat-return / KR vat-summary / TW business-tax） */
+"report.disclaimer.tax" = "估算，仅供经营参考，非申报依据。";
+/* US se-tax section 的块脚 */
+"report.disclaimer.usTax" = "估算，非报税依据，请咨询税务专业人士。";
+/* 参数披露 section 的块脚 */
+"report.disclaimer.rates" = "税率为预设参考值，可能随政策调整，请核对最新官方税率。";

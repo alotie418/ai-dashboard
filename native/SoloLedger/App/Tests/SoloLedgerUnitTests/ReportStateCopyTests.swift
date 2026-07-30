@@ -70,6 +70,11 @@ final class ReportStateCopyTests: XCTestCase {
         "report.monthly.cost", "report.monthly.profit",
         // grouping headings
         "report.notes.title", "report.warnings.title",
+        // the four disclaimers, added by the view PR. They live in the `report.*` namespace and
+        // the presenter does not emit them, so they are claimed here — which is exactly what
+        // this list is for, and what made the closure test go red until they were.
+        "report.disclaimer.report", "report.disclaimer.tax",
+        "report.disclaimer.usTax", "report.disclaimer.rates",
     ]
 
     private func stateKeys() -> Set<String> {
@@ -95,12 +100,12 @@ final class ReportStateCopyTests: XCTestCase {
         return Set(dict.keys.filter { $0.hasPrefix(ReportPresenter.keyPrefix) })
     }
 
-    // MARK: - C2 — the universe is exactly 79, split 37 / 42
+    // MARK: - C2 — the universe is exactly 83, split 37 / 46
 
     func testStateKeyUniverseIsExactlySeventyNine() {
         XCTAssertEqual(presenterStateKeys().count, 37)
-        XCTAssertEqual(Self.viewLayerKeys.count, 42)
-        XCTAssertEqual(stateKeys().count, 79, "37 presenter-emitted + 42 view-layer")
+        XCTAssertEqual(Self.viewLayerKeys.count, 46)
+        XCTAssertEqual(stateKeys().count, 83, "37 presenter-emitted + 46 view-layer")
         XCTAssertTrue(presenterStateKeys().isDisjoint(with: Self.viewLayerKeys),
                       "a key is emitted by the presenter or declared by the view, never both")
     }
@@ -120,8 +125,8 @@ final class ReportStateCopyTests: XCTestCase {
                 asked for by code, not written (add it): \(accounted.subtracting(onDisk).sorted())
                 """)
         }
-        // 82 structural (P3b) + 79 state (P3c)
-        XCTAssertEqual(accounted.count, 161)
+        // 82 structural (P3b) + 79 state (P3c) + 4 disclaimers (P3d)
+        XCTAssertEqual(accounted.count, 165)
     }
 
     // MARK: - C1 — every key resolves, in all six languages
