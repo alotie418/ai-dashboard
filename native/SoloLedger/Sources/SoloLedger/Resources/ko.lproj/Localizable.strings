@@ -354,3 +354,101 @@
 "report.line.annualSETax" = "연간 자영업세 추정액";
 "report.line.totalAnnual" = "연간 세액 합계 추정액";
 "report.line.quarterlyPayment" = "분기 추정세";
+
+/* ── R8 P3c：报表状态与参数披露文案（7 blocker + field 三态 + 参数四轴 + 现金流 + 月度 + 附注/提示 + 页面 chrome = 79 键） ── */
+/* 7 个 blocker：标题 + 正文。七条正文一律以「账本文件未被修改」收尾——阻断态最容易被读成数据出事了，而事实相反 */
+"report.blocker.accountingLocaleNotConfigured.title" = "이 장부에 회계 방식이 기록되어 있지 않습니다";
+"report.blocker.accountingLocaleNotConfigured.body" = "보고서는 하나의 회계 방식을 기준으로 산출되는데 이 장부에는 그 기록이 없습니다. 이 App은 대신 선택하지 않으므로 보고서를 만들지 않았습니다. 「설정」의 「회계」 탭에서 회계 방식을 선택할 수 있습니다. 장부 파일은 변경되지 않았습니다.";
+"report.blocker.accountingLocaleInvalid.title" = "장부에 기록된 회계 방식을 인식할 수 없습니다";
+"report.blocker.accountingLocaleInvalid.body" = "장부의 회계 방식 항목이 이 App이 아는 여섯 가지 중 어느 것도 아니어서 보고서를 만들지 않았습니다. 장부에 실제로 들어 있는 내용을 아래에 그대로 표시합니다. 「설정」의 「회계」 탭에서 회계 방식을 선택할 수 있습니다. 장부 파일은 변경되지 않았습니다.";
+"report.blocker.currencyNotConfigured.title" = "이 장부에 통화가 기록되어 있지 않습니다";
+"report.blocker.currencyNotConfigured.body" = "보고서는 하나의 통화로 금액을 표시하는데 이 장부에는 그 기록이 없습니다. 이 App은 대신 선택하지 않으므로 보고서를 만들지 않았습니다. 이 App에는 아직 통화를 변경하는 방법이 없습니다. 장부 파일은 변경되지 않았습니다.";
+"report.blocker.currencyInvalid.title" = "장부에 기록된 통화를 사용할 수 없습니다";
+"report.blocker.currencyInvalid.body" = "장부의 통화 항목이 사용할 수 있는 통화 코드가 아니어서 보고서를 만들지 않았습니다. 장부에 실제로 들어 있는 내용을 아래에 그대로 표시합니다. 이 App에는 아직 통화를 변경하는 방법이 없습니다. 장부 파일은 변경되지 않았습니다.";
+"report.blocker.legacySourceUnavailable.title" = "이 기간의 보고서를 생성할 수 없습니다";
+"report.blocker.legacySourceUnavailable.body" = "이 App에는 보고서를 만들 수 있는 해당 기간의 거래가 없으며, 이전 형식의 보고서 데이터도 읽지 않습니다. 따라서 이 기간에 실제로 거래가 없었는지, 기록이 이전 데이터에 남아 있는지 판단할 수 없습니다. 장부 파일은 변경되지 않았습니다.";
+"report.blocker.currencyMismatch.title" = "장부의 통화와 이 기간 기록의 통화가 일치하지 않습니다";
+"report.blocker.currencyMismatch.body" = "장부에 기록된 통화와 이 기간 거래가 실제로 표시된 통화가 다릅니다. 보고서는 이 금액들을 그대로 합산하므로, 통화가 다르면 합계에 의미가 없습니다. 그래서 보고서를 만들지 않았습니다. 장부 파일은 변경되지 않았습니다.";
+"report.blocker.multipleCurrenciesInPeriod.title" = "이 기간에 두 가지 이상의 통화가 있습니다";
+"report.blocker.multipleCurrenciesInPeriod.body" = "이 기간의 거래가 두 가지 이상의 통화로 표시되어 있습니다. 보고서는 환율 환산을 하지 않으므로 통화를 넘나들며 금액을 합산해도 의미 있는 숫자가 되지 않습니다. 그래서 보고서를 만들지 않았습니다. 장부 파일은 변경되지 않았습니다.";
+
+/* blocker 附带的事实行（视图层；带占位符） */
+"report.blocker.storedCurrency" = "장부에 기록된 통화: {currency}";
+"report.blocker.periodCurrencies" = "이 기간 기록에 사용된 통화: {codes}";
+"report.blocker.regimeDefaultCurrency" = "이 회계 방식의 기본 통화: {currency}";
+
+/* 一个字段的三个非数值态：一律说「未计算」，不说 0、—、N/A */
+"report.field.corrupted" = "이 항목의 데이터가 손상되어 금액을 표시할 수 없습니다";
+"report.field.notConfigured" = "미계산: 장부에 이 항목이 없고 이 회계 방식에 기본값도 없습니다";
+"report.field.needsRepair" = "미계산: 장부의 이 항목 내용은 사용할 수 있는 값이 아닙니다";
+
+/* 参数披露：账本中的状态 / 本次报表的采用情况 / 来源 / 本制度是否读取 */
+"report.params.title" = "보고서 계산 매개변수";
+"report.params.axis.stored" = "장부에서의 상태";
+"report.params.axis.effect" = "이 보고서에서의 사용";
+"report.params.axis.consumption" = "이 회계 방식이 읽는지 여부";
+"report.param.stored.absent" = "장부에 없습니다";
+"report.param.stored.usable" = "사용할 수 있는 값이 저장되어 있습니다";
+"report.param.stored.needsRepair" = "저장되어 있으나 사용할 수 있는 값이 아닙니다";
+"report.param.effect.applied" = "이 보고서는 이 값으로 계산했습니다";
+"report.param.effect.nonFinite" = "이 보고서에 전달된 값은 계산에 쓸 수 없는 값이었습니다";
+"report.param.effect.refused" = "이 보고서는 이 항목으로 아무것도 계산하지 않았습니다";
+"report.param.origin.storedValue" = "장부에 저장된 값에서 가져왔습니다";
+"report.param.origin.regimeDefault" = "이 매개변수에는 사용자 값이 저장되어 있지 않습니다. 이 보고서는 회계 방식의 기본값 {percent}%를 사용했습니다.";
+"report.param.origin.dispatcherFallback" = "장부에 이 항목이 없어 이 보고서는 0으로 계산했습니다. 계산 거부가 아니라 실제 0입니다";
+"report.param.consumption.consumed" = "이 회계 방식은 이 보고서에서 이 항목을 읽습니다";
+"report.param.consumption.storedButUnread" = "이 회계 방식은 이 보고서에서 이 항목을 읽지 않습니다.";
+
+/* 四个参数名。{tax} 取报表制度的 AccountingProfile.taxName，语言取 UI */
+"report.param.name.vatRate" = "{tax}율";
+"report.param.name.surchargeRate" = "부가 세율";
+"report.param.name.incomeTaxRate" = "소득세율";
+"report.param.name.adminExpenseAnnual" = "연간 관리비";
+
+/* 现金流（管理口径）。四个区名 + 一条共享的「无法推算」说明——不可推算不是零 */
+"report.cashflow.title" = "현금흐름 (관리 목적)";
+"report.cashflow.operating.title" = "영업활동 현금흐름";
+"report.cashflow.inflow" = "영업활동 현금유입";
+"report.cashflow.outflow" = "영업활동 현금유출";
+"report.cashflow.net" = "영업활동 순현금흐름";
+"report.cashflow.investing" = "투자활동";
+"report.cashflow.financing" = "재무활동";
+"report.cashflow.beginningCash" = "기초 현금";
+"report.cashflow.endingCash" = "기말 현금";
+"report.cashflow.notDerivable" = "이 App의 데이터 모델에는 현금 계정, 고정자산 대장, 부채, 기초 잔액이 없으므로 이 항목은 산출할 수 없습니다. 0이 아닙니다.";
+"report.cashflow.basisNote" = "관리 목적 · 현금주의 · 법정 보고서가 아닙니다.";
+"report.cashflow.vsProfitNote" = "현금흐름은 실제 수금·지급일 기준, 경영 손익 개요는 거래일 또는 발생일 기준이라 서로 다를 수 있습니다.";
+
+/* 按月收支。cost/profit 的口径与损益表的同名行不同（cn.js:99 汇总全部支出，cn.js:28 只取 COGS），故不共用标签 */
+"report.monthly.title" = "월별 수입·지출";
+"report.monthly.month" = "월";
+"report.monthly.revenue" = "매출";
+"report.monthly.cost" = "지출 합계";
+"report.monthly.profit" = "수입·지출 차액";
+
+/* 附注与提示 */
+"report.notes.title" = "주석";
+"report.warnings.title" = "유의 사항";
+"report.note.estimatedTaxDueDates" = "납기: {dates}";
+"report.note.selfEmploymentParameterYear" = "적용한 자영업세 매개변수 연도: {year}";
+"report.warning.estimatedQuarterlyPayment" = "분기 추정세 예상액: {amount}";
+"report.warning.mealsLimitedToFiftyPercent" = "식비는 50%로 반영됩니다 (Line 24b)";
+
+/* 页面 chrome：年份、空态、I/O 故障、打开设置、币种与期间、估算标记 */
+"report.page.title" = "보고서";
+"report.year.label" = "연도";
+"report.year.invalid" = "네 자리 연도(0001–9999)를 입력하세요.";
+"report.action.build" = "보고서 생성";
+"report.notRequested.title" = "아직 보고서가 없습니다";
+"report.notRequested.message" = "연도를 선택한 뒤 「보고서 생성」을 누르세요.";
+"report.error.title" = "장부를 읽을 수 없습니다";
+"report.error.message" = "장부를 읽는 중 문제가 발생하여 보고서가 생성되지 않았습니다. 장부 파일은 변경되지 않았으며 다시 시도할 수 있습니다.";
+"report.action.retry" = "재시도";
+"report.action.openSettings" = "설정 열기";
+"report.action.openSettings.hint" = "메뉴 막대에서 「SoloLedger ▸ 설정…」을 선택한 뒤 「회계」 탭을 열 수도 있습니다.";
+"report.currency.caption" = "통화: {currency}";
+"report.currency.note" = "통화 코드는 장부 기록을 그대로 사용하며, 이 App은 유효성을 검증하지 않습니다.";
+"report.currency.formatNote" = "이 통화 코드는 세 글자 형식이 아닙니다. 금액은 장부 기록 그대로 표시하며 환산이나 대체를 하지 않습니다.";
+"report.period.caption" = "보고 기간: {from} – {to}";
+"report.estimate.badge" = "추정 · 경영 관리 참고용";
+"report.storedText.label" = "장부에 실제로 들어 있는 내용";

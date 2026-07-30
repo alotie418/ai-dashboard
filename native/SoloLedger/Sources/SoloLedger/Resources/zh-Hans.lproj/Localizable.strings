@@ -357,3 +357,101 @@
 "report.line.annualSETax" = "年度自雇税估算";
 "report.line.totalAnnual" = "年度税额合计估算";
 "report.line.quarterlyPayment" = "季度预估税";
+
+/* ── R8 P3c：报表状态与参数披露文案（7 blocker + field 三态 + 参数四轴 + 现金流 + 月度 + 附注/提示 + 页面 chrome = 79 键） ── */
+/* 7 个 blocker：标题 + 正文。七条正文一律以「账本文件未被修改」收尾——阻断态最容易被读成数据出事了，而事实相反 */
+"report.blocker.accountingLocaleNotConfigured.title" = "账本未记录会计制度";
+"report.blocker.accountingLocaleNotConfigured.body" = "报表要按某一套会计制度计算，而账本里没有这项记录。本 App 不会替你挑一个，所以没有生成报表。你可以在「设置」的「会计」标签中选择会计制度。账本文件未被修改。";
+"report.blocker.accountingLocaleInvalid.title" = "账本记录的会计制度无法识别";
+"report.blocker.accountingLocaleInvalid.body" = "账本里会计制度一栏的内容不是本 App 认识的六种制度之一，所以没有生成报表。下面是账本中实际存放的内容，原样显示。你可以在「设置」的「会计」标签中选择会计制度。账本文件未被修改。";
+"report.blocker.currencyNotConfigured.title" = "账本未记录币种";
+"report.blocker.currencyNotConfigured.body" = "报表要以某一种币种列示金额，而账本里没有这项记录。本 App 不会替你挑一个，所以没有生成报表。本 App 目前没有修改币种的入口。账本文件未被修改。";
+"report.blocker.currencyInvalid.title" = "账本记录的币种无法使用";
+"report.blocker.currencyInvalid.body" = "账本里币种一栏的内容不是可用的币种代码，所以没有生成报表。下面是账本中实际存放的内容，原样显示。本 App 目前没有修改币种的入口。账本文件未被修改。";
+"report.blocker.legacySourceUnavailable.title" = "无法生成此期间的报表";
+"report.blocker.legacySourceUnavailable.body" = "此 App 在该期间没有可用于报表的交易记录，也不会读取旧版报表数据，因此无法判断该期间确实没有业务，还是记录仍保存在旧版数据中。账本文件未被修改。";
+"report.blocker.currencyMismatch.title" = "账本币种与本期记录的币种不一致";
+"report.blocker.currencyMismatch.body" = "账本记录的币种与本期交易记录实际使用的币种不是同一个。报表会把这些金额直接相加，两者不一致时相加的结果没有意义，所以没有生成报表。账本文件未被修改。";
+"report.blocker.multipleCurrenciesInPeriod.title" = "本期存在多种币种";
+"report.blocker.multipleCurrenciesInPeriod.body" = "本期的交易记录不止使用一种币种。报表不做汇率换算，把不同币种的金额相加得到的数字没有意义，所以没有生成报表。账本文件未被修改。";
+
+/* blocker 附带的事实行（视图层；带占位符） */
+"report.blocker.storedCurrency" = "账本记录的币种：{currency}";
+"report.blocker.periodCurrencies" = "本期记录使用的币种：{codes}";
+"report.blocker.regimeDefaultCurrency" = "此会计制度的预设币种：{currency}";
+
+/* 一个字段的三个非数值态：一律说「未计算」，不说 0、—、N/A */
+"report.field.corrupted" = "此项数据已损坏，无法显示金额";
+"report.field.notConfigured" = "未计算：账本中没有这项参数，本会计制度也没有可用的预设值";
+"report.field.needsRepair" = "未计算：账本中这项参数的内容不是可用的数值";
+
+/* 参数披露：账本中的状态 / 本次报表的采用情况 / 来源 / 本制度是否读取 */
+"report.params.title" = "报表计算参数";
+"report.params.axis.stored" = "账本中的状态";
+"report.params.axis.effect" = "本次报表的采用情况";
+"report.params.axis.consumption" = "本会计制度是否读取";
+"report.param.stored.absent" = "账本中没有这一项";
+"report.param.stored.usable" = "账本中存有可用的数值";
+"report.param.stored.needsRepair" = "账本中存有内容，但不是可用的数值";
+"report.param.effect.applied" = "本次报表按此数值计算";
+"report.param.effect.nonFinite" = "本次报表收到的是一个无法参与计算的值";
+"report.param.effect.refused" = "本次报表没有用这一项计算任何数字";
+"report.param.origin.storedValue" = "来自账本中保存的值";
+"report.param.origin.regimeDefault" = "此参数未保存用户值；本次报表使用了该会计制度的预设值 {percent}%。";
+"report.param.origin.dispatcherFallback" = "账本中没有这一项，本次报表按 0 计算——这是一个真实的零，不是拒绝计算";
+"report.param.consumption.consumed" = "本会计制度在本报表中读取该参数";
+"report.param.consumption.storedButUnread" = "本会计制度在本报表中不读取该参数。";
+
+/* 四个参数名。{tax} 取报表制度的 AccountingProfile.taxName，语言取 UI */
+"report.param.name.vatRate" = "{tax}率";
+"report.param.name.surchargeRate" = "附加税率";
+"report.param.name.incomeTaxRate" = "所得税率";
+"report.param.name.adminExpenseAnnual" = "年度管理费用";
+
+/* 现金流（管理口径）。四个区名 + 一条共享的「无法推算」说明——不可推算不是零 */
+"report.cashflow.title" = "现金流（管理口径）";
+"report.cashflow.operating.title" = "经营活动现金流";
+"report.cashflow.inflow" = "经营活动现金流入";
+"report.cashflow.outflow" = "经营活动现金流出";
+"report.cashflow.net" = "经营活动净现金流";
+"report.cashflow.investing" = "投资活动";
+"report.cashflow.financing" = "筹资活动";
+"report.cashflow.beginningCash" = "期初现金";
+"report.cashflow.endingCash" = "期末现金";
+"report.cashflow.notDerivable" = "本 App 的数据模型里没有现金账户、固定资产台账、负债与期初余额，因此这一项无法推算——这不是零。";
+"report.cashflow.basisNote" = "管理口径 · 收付实现制 · 不是法定报表。";
+"report.cashflow.vsProfitNote" = "现金流按实际收付日统计，经营损益概览按交易/权责发生日，二者可能不同。";
+
+/* 按月收支。cost/profit 的口径与损益表的同名行不同（cn.js:99 汇总全部支出，cn.js:28 只取 COGS），故不共用标签 */
+"report.monthly.title" = "按月收支";
+"report.monthly.month" = "月份";
+"report.monthly.revenue" = "营业收入";
+"report.monthly.cost" = "支出合计";
+"report.monthly.profit" = "收支差额";
+
+/* 附注与提示 */
+"report.notes.title" = "附注";
+"report.warnings.title" = "需要注意";
+"report.note.estimatedTaxDueDates" = "到期日：{dates}";
+"report.note.selfEmploymentParameterYear" = "所用自雇税参数年度：{year}";
+"report.warning.estimatedQuarterlyPayment" = "季度预估税估算额：{amount}";
+"report.warning.mealsLimitedToFiftyPercent" = "餐饮支出按 50% 计入（Line 24b）";
+
+/* 页面 chrome：年份、空态、I/O 故障、打开设置、币种与期间、估算标记 */
+"report.page.title" = "报表";
+"report.year.label" = "年度";
+"report.year.invalid" = "请输入四位数字的年份（0001–9999）。";
+"report.action.build" = "生成报表";
+"report.notRequested.title" = "尚未生成报表";
+"report.notRequested.message" = "选择年份后点击「生成报表」。";
+"report.error.title" = "无法读取账本";
+"report.error.message" = "读取账本时出了问题，报表没有生成。账本文件未被修改，可以重试。";
+"report.action.retry" = "重试";
+"report.action.openSettings" = "打开设置";
+"report.action.openSettings.hint" = "也可以在菜单栏选择「SoloLedger ▸ 设置…」，再打开「会计」标签。";
+"report.currency.caption" = "币种：{currency}";
+"report.currency.note" = "币种代码取自账本记录，本 App 未对其做有效性校验。";
+"report.currency.formatNote" = "此币种代码不是三个字母的格式。金额按账本记录原样显示，未做换算或替换。";
+"report.period.caption" = "会计期间：{from} – {to}";
+"report.estimate.badge" = "估算 · 仅供经营管理参考";
+"report.storedText.label" = "账本中实际存放的内容";

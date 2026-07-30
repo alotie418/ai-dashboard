@@ -357,3 +357,101 @@
 "report.line.annualSETax" = "Annual SE Tax (est.)";
 "report.line.totalAnnual" = "Total Annual (est.)";
 "report.line.quarterlyPayment" = "Quarterly Estimated Tax";
+
+/* ── R8 P3c：报表状态与参数披露文案（7 blocker + field 三态 + 参数四轴 + 现金流 + 月度 + 附注/提示 + 页面 chrome = 79 键） ── */
+/* 7 个 blocker：标题 + 正文。七条正文一律以「账本文件未被修改」收尾——阻断态最容易被读成数据出事了，而事实相反 */
+"report.blocker.accountingLocaleNotConfigured.title" = "No accounting profile is recorded in this ledger";
+"report.blocker.accountingLocaleNotConfigured.body" = "A report is computed under one accounting profile, and this ledger records none. This app does not pick one for you, so no report was produced. You can choose a profile in the Accounting tab of Settings. The ledger file was not modified.";
+"report.blocker.accountingLocaleInvalid.title" = "The recorded accounting profile is not one this app knows";
+"report.blocker.accountingLocaleInvalid.body" = "The accounting-profile entry in this ledger is not one of the six this app knows, so no report was produced. What the ledger actually holds is shown below, verbatim. You can choose a profile in the Accounting tab of Settings. The ledger file was not modified.";
+"report.blocker.currencyNotConfigured.title" = "No currency is recorded in this ledger";
+"report.blocker.currencyNotConfigured.body" = "A report states amounts in one currency, and this ledger records none. This app does not pick one for you, so no report was produced. This app has no way to change the currency yet. The ledger file was not modified.";
+"report.blocker.currencyInvalid.title" = "The recorded currency cannot be used";
+"report.blocker.currencyInvalid.body" = "The currency entry in this ledger is not a usable currency code, so no report was produced. What the ledger actually holds is shown below, verbatim. This app has no way to change the currency yet. The ledger file was not modified.";
+"report.blocker.legacySourceUnavailable.title" = "No report can be produced for this period";
+"report.blocker.legacySourceUnavailable.body" = "This app has no transactions for this period that a report can be built from, and it does not read the older report data, so it cannot tell whether there really was no business in this period or whether the records still live in the older data. The ledger file was not modified.";
+"report.blocker.currencyMismatch.title" = "The ledger's currency and this period's currency disagree";
+"report.blocker.currencyMismatch.body" = "The currency recorded in the ledger is not the one this period's transactions are actually denominated in. A report adds these amounts together, and adding them across two different currencies gives a meaningless figure, so no report was produced. The ledger file was not modified.";
+"report.blocker.multipleCurrenciesInPeriod.title" = "This period holds more than one currency";
+"report.blocker.multipleCurrenciesInPeriod.body" = "This period's transactions are denominated in more than one currency. A report performs no exchange-rate conversion, and adding amounts across currencies gives a meaningless figure, so no report was produced. The ledger file was not modified.";
+
+/* blocker 附带的事实行（视图层；带占位符） */
+"report.blocker.storedCurrency" = "Currency recorded in the ledger: {currency}";
+"report.blocker.periodCurrencies" = "Currencies used by this period's records: {codes}";
+"report.blocker.regimeDefaultCurrency" = "This accounting profile's preset currency: {currency}";
+
+/* 一个字段的三个非数值态：一律说「未计算」，不说 0、—、N/A */
+"report.field.corrupted" = "This figure is damaged and cannot be shown";
+"report.field.notConfigured" = "Not computed: the ledger holds no such parameter, and this accounting profile has no preset to fall back on";
+"report.field.needsRepair" = "Not computed: what the ledger holds for this parameter is not a usable number";
+
+/* 参数披露：账本中的状态 / 本次报表的采用情况 / 来源 / 本制度是否读取 */
+"report.params.title" = "Report calculation parameters";
+"report.params.axis.stored" = "In the ledger";
+"report.params.axis.effect" = "Used by this report";
+"report.params.axis.consumption" = "Read by this accounting profile";
+"report.param.stored.absent" = "Not present in the ledger";
+"report.param.stored.usable" = "A usable number is stored";
+"report.param.stored.needsRepair" = "Something is stored, but it is not a usable number";
+"report.param.effect.applied" = "This report was computed with this value";
+"report.param.effect.nonFinite" = "The value that reached this report cannot be used in arithmetic";
+"report.param.effect.refused" = "This report computed nothing from this parameter";
+"report.param.origin.storedValue" = "From the value stored in the ledger";
+"report.param.origin.regimeDefault" = "No user value is stored for this parameter; this report used the accounting profile's preset of {percent}%.";
+"report.param.origin.dispatcherFallback" = "The ledger holds no such entry, so this report used 0 — a real zero, not a refusal to compute";
+"report.param.consumption.consumed" = "This accounting profile reads this parameter in this report";
+"report.param.consumption.storedButUnread" = "This accounting profile does not read this parameter in this report.";
+
+/* 四个参数名。{tax} 取报表制度的 AccountingProfile.taxName，语言取 UI */
+"report.param.name.vatRate" = "{tax} Rate";
+"report.param.name.surchargeRate" = "Surcharge rate";
+"report.param.name.incomeTaxRate" = "Income tax rate";
+"report.param.name.adminExpenseAnnual" = "Annual admin expense";
+
+/* 现金流（管理口径）。四个区名 + 一条共享的「无法推算」说明——不可推算不是零 */
+"report.cashflow.title" = "Cash flow (management basis)";
+"report.cashflow.operating.title" = "Operating Cash Flow";
+"report.cashflow.inflow" = "Cash inflow (operating)";
+"report.cashflow.outflow" = "Cash outflow (operating)";
+"report.cashflow.net" = "Net operating cash flow";
+"report.cashflow.investing" = "Investing activities";
+"report.cashflow.financing" = "Financing activities";
+"report.cashflow.beginningCash" = "Cash at the start of the period";
+"report.cashflow.endingCash" = "Cash at the end of the period";
+"report.cashflow.notDerivable" = "This app's data model has no cash accounts, no fixed-asset register, no liabilities and no opening balances, so this cannot be derived — it is not zero.";
+"report.cashflow.basisNote" = "Management basis · cash basis · not a statutory statement.";
+"report.cashflow.vsProfitNote" = "Cash flow is dated by actual payment; the management P&L is dated by transaction or accrual, so the two can differ.";
+
+/* 按月收支。cost/profit 的口径与损益表的同名行不同（cn.js:99 汇总全部支出，cn.js:28 只取 COGS），故不共用标签 */
+"report.monthly.title" = "Month by month";
+"report.monthly.month" = "Month";
+"report.monthly.revenue" = "Revenue";
+"report.monthly.cost" = "Total expenses";
+"report.monthly.profit" = "Revenue less expenses";
+
+/* 附注与提示 */
+"report.notes.title" = "Notes";
+"report.warnings.title" = "Worth noting";
+"report.note.estimatedTaxDueDates" = "Due: {dates}";
+"report.note.selfEmploymentParameterYear" = "Self-employment tax parameters for {year} were applied";
+"report.warning.estimatedQuarterlyPayment" = "Estimated quarterly tax payment: {amount}";
+"report.warning.mealsLimitedToFiftyPercent" = "Meals are counted at 50% (Line 24b)";
+
+/* 页面 chrome：年份、空态、I/O 故障、打开设置、币种与期间、估算标记 */
+"report.page.title" = "Reports";
+"report.year.label" = "Year";
+"report.year.invalid" = "Enter a four-digit year (0001–9999).";
+"report.action.build" = "Build report";
+"report.notRequested.title" = "No report yet";
+"report.notRequested.message" = "Choose a year, then tap Build report.";
+"report.error.title" = "The ledger could not be read";
+"report.error.message" = "Something went wrong while reading the ledger, so no report was produced. The ledger file was not modified; you can try again.";
+"report.action.retry" = "Retry";
+"report.action.openSettings" = "Open Settings";
+"report.action.openSettings.hint" = "You can also choose SoloLedger ▸ Settings… in the menu bar, then open the Accounting tab.";
+"report.currency.caption" = "Currency: {currency}";
+"report.currency.note" = "The currency code is taken from the ledger; this app does not check it against any list.";
+"report.currency.formatNote" = "This currency code is not in three-letter form. Amounts are shown exactly as the ledger records them, with no conversion or substitution.";
+"report.period.caption" = "Period: {from} – {to}";
+"report.estimate.badge" = "Estimate · management reference only";
+"report.storedText.label" = "What the ledger actually holds";
