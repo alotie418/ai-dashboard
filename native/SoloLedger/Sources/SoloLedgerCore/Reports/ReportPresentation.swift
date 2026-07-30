@@ -249,7 +249,12 @@ public struct ReportTypePresentation: Equatable, Sendable {
     public let id: String
     public let section: ReportSectionPresentation
 
-    public init(id: String, section: ReportSectionPresentation) {
+    /// INTERNAL. Same reason as the other presented types: a forged
+    /// `ReportTypePresentation(id:section:)` is a report type paired with an availability
+    /// nothing derived. Narrowed here although it shipped public in #427 — it is the same
+    /// defect class as the initialisers this change closes, and leaving one open would make
+    /// the rule arbitrary.
+    init(id: String, section: ReportSectionPresentation) {
         self.id = id
         self.section = section
     }

@@ -68,6 +68,24 @@ public enum ReportBlocker: Equatable, Sendable {
     /// The row exists and is not a usable currency code.
     case currencyInvalid(storedText: String, periodCurrencies: [String], regimeDefault: String)
 
+    /// The period holds no rows in `transactions`, so the dispatcher's source decision is
+    /// `.legacy` — and this app does not read the legacy `sales` / `purchases` tables at all
+    /// (plan §6.1, per #395).
+    ///
+    /// **Why this blocks instead of reporting zeros.** Running the engines over empty arrays
+    /// produces a complete-looking statement of zeros: revenue 0, gross profit 0, twelve
+    /// months of 0, cash flow {0,0,0}. Electron, which DOES read those tables, reports real
+    /// money for exactly such a period — `base-CN-2024` records inflow 9040 / outflow 7780 /
+    /// net 1260. A zero there is not "no data", it is a confident and wrong claim that
+    /// nothing happened, which is the placeholder-metric CLAUDE.md's product boundary forbids.
+    ///
+    /// And the two situations CANNOT be told apart from here: without reading the legacy
+    /// tables, "this ledger genuinely has nothing in this period" and "this ledger's money
+    /// for this period lives in tables we do not read" produce identical inputs. Both must
+    /// therefore stop, which is why this carries no "is it really empty" hint — there is no
+    /// honest way to compute one.
+    case legacySourceUnavailable
+
     /// The ledger's currency and the period's single currency disagree.
     ///
     /// Note what is NOT a blocker: a stored currency that differs from the REGIME DEFAULT.

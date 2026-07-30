@@ -12,9 +12,6 @@ public struct PresentedReport: Equatable, Sendable {
     public let period: ReportPeriod
     /// Proven against the period's rows. Never a silent `"CNY"` fallback.
     public let currency: String
-    /// `.legacy` means this period's rows live in tables this app does not read, so every
-    /// figure below is structurally empty rather than measured (plan §6.1, per #395).
-    public let source: ReportSource
     /// All four keys, always — including the ones this locale does not read.
     public let parameters: [PresentedParameter]
     /// One entry per report type the locale DECLARES, in the engines' own order.
@@ -29,7 +26,12 @@ public struct PresentedReport: Equatable, Sendable {
     public let cashflow: PresentedCashflow
     public let warnings: [PresentedWarning]
 
-    public init(locale: String, period: ReportPeriod, currency: String, source: ReportSource,
+    /// INTERNAL. A view CONSUMES a report; it must never be able to assemble one. A public
+    /// memberwise init would let the App forge combinations the builder cannot produce — a
+    /// `.withhold` section carrying lines, a `statutory: true` cash-flow block, a statement
+    /// whose numbers came from nowhere — and every structural claim this type makes would
+    /// then hold only for reports that happened to come from `ReportBuilder`.
+    init(locale: String, period: ReportPeriod, currency: String,
                 parameters: [PresentedParameter], sections: [PresentedSection],
                 undeclaredTaxInclusiveSummary: PresentedTaxInclusiveSummary?,
                 monthlyBreakdown: [PresentedMonth], cashflow: PresentedCashflow,
@@ -37,7 +39,6 @@ public struct PresentedReport: Equatable, Sendable {
         self.locale = locale
         self.period = period
         self.currency = currency
-        self.source = source
         self.parameters = parameters
         self.sections = sections
         self.undeclaredTaxInclusiveSummary = undeclaredTaxInclusiveSummary
@@ -60,7 +61,7 @@ public struct PresentedSection: Equatable, Sendable {
     public let lines: [PresentedLine]
     public let notes: [PresentedNote]
 
-    public init(reportTypeID: String, availability: ReportSectionPresentation,
+    init(reportTypeID: String, availability: ReportSectionPresentation,
                 lines: [PresentedLine], notes: [PresentedNote]) {
         self.reportTypeID = reportTypeID
         self.availability = availability
@@ -78,7 +79,7 @@ public struct PresentedLine: Equatable, Sendable {
     public let unit: ReportLineUnit
     public let value: ReportFieldPresentation
 
-    public init(id: String, unit: ReportLineUnit, value: ReportFieldPresentation) {
+    init(id: String, unit: ReportLineUnit, value: ReportFieldPresentation) {
         self.id = id
         self.unit = unit
         self.value = value
@@ -105,7 +106,7 @@ public struct PresentedTaxInclusiveSummary: Equatable, Sendable {
     public let salesTotal: ReportFieldPresentation
     public let difference: ReportFieldPresentation
 
-    public init(purchaseTotal: ReportFieldPresentation, salesTotal: ReportFieldPresentation,
+    init(purchaseTotal: ReportFieldPresentation, salesTotal: ReportFieldPresentation,
                 difference: ReportFieldPresentation) {
         self.purchaseTotal = purchaseTotal
         self.salesTotal = salesTotal
@@ -119,7 +120,7 @@ public struct PresentedMonth: Equatable, Sendable {
     public let cost: ReportFieldPresentation
     public let profit: ReportFieldPresentation
 
-    public init(month: Int, revenue: ReportFieldPresentation,
+    init(month: Int, revenue: ReportFieldPresentation,
                 cost: ReportFieldPresentation, profit: ReportFieldPresentation) {
         self.month = month
         self.revenue = revenue
@@ -133,20 +134,18 @@ public struct PresentedMonth: Equatable, Sendable {
 public struct PresentedCashflow: Equatable, Sendable {
     public let basis: String
     public let statutory: Bool
-    public let source: ReportSource
     public let operating: PresentedCashflowSection
     public let investing: PresentedCashflowSection
     public let financing: PresentedCashflowSection
     public let beginningCash: PresentedCashflowSection
     public let endingCash: PresentedCashflowSection
 
-    public init(basis: String, statutory: Bool, source: ReportSource,
+    init(basis: String, statutory: Bool,
                 operating: PresentedCashflowSection, investing: PresentedCashflowSection,
                 financing: PresentedCashflowSection, beginningCash: PresentedCashflowSection,
                 endingCash: PresentedCashflowSection) {
         self.basis = basis
         self.statutory = statutory
-        self.source = source
         self.operating = operating
         self.investing = investing
         self.financing = financing
@@ -155,18 +154,16 @@ public struct PresentedCashflow: Equatable, Sendable {
     }
 }
 
-/// Three DISTINCT names for what the model spells with two same-named `.notConfigured`s.
+/// Two cases, because only two are reachable.
 ///
-/// Merging them would be a category error: one is permanent and structural, the other is
-/// per-period and is emphatically not "no cash moved" — Electron, which reads the legacy
-/// tables, reports real money for such a period (`base-CN-2024`: inflow 9040 / net 1260).
+/// The model's other "unavailable" — a period whose rows live in the legacy tables — never
+/// gets here: `ReportBuilder` stops at `legacySourceUnavailable` before any engine runs, so
+/// a cash-flow section can only be a real figure or a structurally underivable one. A third
+/// case for the legacy situation would be a branch no view could ever take.
 public enum PresentedCashflowSection: Equatable, Sendable {
     case computed(inflow: ReportFieldPresentation,
                   outflow: ReportFieldPresentation,
                   net: ReportFieldPresentation)
-    /// Operating only: this period holds no transactions and this app does not read the
-    /// legacy tables. NOT a claim that no cash moved.
-    case noTransactionsInPeriod
     /// Investing / financing / opening / closing: there are no cash accounts, no
     /// fixed-asset register, no liabilities and no opening balances in this data model, so
     /// these can never carry a number.

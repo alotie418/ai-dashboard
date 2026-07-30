@@ -3,7 +3,7 @@
   "productName": "SoloLedger",
   "private": true,
   "version": "1.0.0",
-  "description": "SoloLedger \u72ec\u8d26 \u2014 \u4e3a\u4e00\u4eba\u516c\u53f8\u6253\u9020\u7684\u667a\u80fd\u8bb0\u8d26\u4e0e\u7ecf\u8425\u7ba1\u7406\u684c\u9762\u5e94\u7528",
+  "description": "SoloLedger 独账 — 为一人公司打造的智能记账与经营管理桌面应用",
   "author": "alotie418",
   "license": "UNLICENSED",
   "type": "module",

@@ -35,6 +35,14 @@ final class ReportParameterMatrixTests: XCTestCase {
             """)
         _ = try db.run("INSERT INTO settings VALUES ('accounting_locale','\"CN\"','')")
         _ = try db.run("INSERT INTO settings VALUES ('currency','\"CNY\"','')")
+        // One in-period row: without it the period is a legacy stop and no report — and so
+        // no parameter state — is produced at all.
+        _ = try db.run("""
+            INSERT INTO transactions (id, type, date, amount, amount_net, tax_amount,
+                                      category_id, currency, payment_status, paid_amount,
+                                      payment_date)
+            VALUES ('t1','income','2025-06-01',100,100,0,NULL,'CNY','paid',100,NULL)
+            """)
         if let storedAdmin {
             _ = try db.run("INSERT INTO settings VALUES ('admin_expense_annual',?,'')",
                            [.text(storedAdmin)])

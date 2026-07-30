@@ -51,18 +51,23 @@ public enum ReportBuilder {
             }
             let regimeDefaultCurrency = AccountingLocale(rawValue: locale)?.defaultCurrency ?? ""
 
-            // ── 2. The source, BEFORE any row is read ────────────────────────────────
-            // Order matters: on `.legacy` this app reads no transaction rows at all, so the
-            // currency question must not be asked of a table nothing will be taken from.
+            // ── 2. The source — and a hard stop when it is not `transactions` ────────
+            // This is a FAIL-CLOSED gate, and it comes before everything else on purpose.
+            // Continuing here would hand the engines empty arrays and produce a
+            // complete-looking statement of zeros for a period whose money may be sitting in
+            // the legacy tables this app does not read. See `legacySourceUnavailable`.
             let hasTable = try ReportFetch.hasTransactionsTable(db)
             let periodTxnCount = hasTable
                 ? try ReportFetch.periodTransactionCount(db, from: period.from, to: period.to) : 0
-            let source = selectReportSource(hasTransactionsTable: hasTable,
-                                            periodTxnCount: periodTxnCount)
+            guard selectReportSource(hasTransactionsTable: hasTable,
+                                     periodTxnCount: periodTxnCount) == .transactions else {
+                return .blocked(.legacySourceUnavailable)
+            }
 
             // ── 3. The currency ──────────────────────────────────────────────────────
-            let periodCurrencies = source == .transactions
-                ? try periodCurrencySet(db, period: period) : []
+            // Reached only on the transactions path, so the set below always describes rows
+            // that really do feed this report.
+            let periodCurrencies = try periodCurrencySet(db, period: period)
             let currency: String
             switch resolveCurrency(db, periodCurrencies: periodCurrencies,
                                    regimeDefault: regimeDefaultCurrency) {
@@ -71,10 +76,10 @@ public enum ReportBuilder {
             }
 
             // ── 4. The engines' input, read once ─────────────────────────────────────
-            let incomeRows = source == .transactions
-                ? try ReportFetch.rows(db, type: "income", from: period.from, to: period.to) : []
-            let expenseRows = source == .transactions
-                ? try ReportFetch.rows(db, type: "expense", from: period.from, to: period.to) : []
+            let incomeRows = try ReportFetch.rows(db, type: "income",
+                                                  from: period.from, to: period.to)
+            let expenseRows = try ReportFetch.rows(db, type: "expense",
+                                                   from: period.from, to: period.to)
             // `index.js:79-83` wraps the categories read in a swallowing catch because the
             // table may not exist on an early-schema ledger.
             let categories = (try? ReportFetch.categories(db, locale: locale)) ?? []
@@ -90,16 +95,15 @@ public enum ReportBuilder {
                 currency: currency, year: period.year, from: period.from, to: period.to)
 
             // ── 5. Everything below is pure ──────────────────────────────────────────
-            let cashflowRows = source == .transactions
-                ? try ReportFetch.cashflowRows(db, from: period.from, to: period.to) : []
+            let cashflowRows = try ReportFetch.cashflowRows(db, from: period.from, to: period.to)
 
             return .report(PresentedReport(
-                locale: locale, period: period, currency: currency, source: source,
+                locale: locale, period: period, currency: currency,
                 parameters: parameters(db, locale: locale, ctx: ctx),
                 sections: sections(locale: locale, ctx: ctx),
                 undeclaredTaxInclusiveSummary: undeclaredTaxInclusive(locale: locale, ctx: ctx),
                 monthlyBreakdown: months(locale: locale, ctx: ctx),
-                cashflow: cashflow(source: source, rows: cashflowRows),
+                cashflow: cashflow(rows: cashflowRows),
                 warnings: warnings(locale: locale, ctx: ctx)))
         }
     }
@@ -464,18 +468,18 @@ public enum ReportBuilder {
                                         cost: money($0.cost), profit: money($0.profit)) }
     }
 
-    private static func cashflow(source: ReportSource,
-                                 rows: [CashflowRow]) -> PresentedCashflow {
-        let operating: PresentedCashflowSection
-        if source == .transactions {
-            let c = Cashflow.operating(rows: rows)
-            operating = .computed(inflow: money(c.inflow), outflow: money(c.outflow),
-                                  net: money(c.net))
-        } else {
-            operating = .noTransactionsInPeriod
-        }
-        return PresentedCashflow(basis: "cash", statutory: false, source: source,
-                                 operating: operating,
+    /// Only ever reached on the transactions path, so operating cash is always computed.
+    ///
+    /// An empty `rows` here is a HONEST zero and a different thing from the legacy stop: the
+    /// period does have transactions, none of them is paid or partial, so no cash was
+    /// realized. The table was read and the answer is nothing — which is exactly what the
+    /// legacy case cannot say about itself.
+    private static func cashflow(rows: [CashflowRow]) -> PresentedCashflow {
+        let c = Cashflow.operating(rows: rows)
+        return PresentedCashflow(basis: "cash", statutory: false,
+                                 operating: .computed(inflow: money(c.inflow),
+                                                      outflow: money(c.outflow),
+                                                      net: money(c.net)),
                                  investing: .notDerivableFromThisDataModel,
                                  financing: .notDerivableFromThisDataModel,
                                  beginningCash: .notDerivableFromThisDataModel,

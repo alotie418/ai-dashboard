@@ -33,6 +33,11 @@ final class AppTargetBypassGuardTests: XCTestCase {
         "CashflowStatement", "OperatingCashflow", "CashflowSection",
         "OperatingCashflowSection", "CashflowRow", "ReportMonth",
         "selectReportSource", "readSnapshot",
+        // Narrowed with the rest: `PresentedReport` no longer carries a `source`, because
+        // `ReportBuilder` stops at `legacySourceUnavailable` and a successful report is by
+        // construction built from `transactions`. A field with one possible value would only
+        // suggest the other one is reachable.
+        "ReportSource",
     ]
 
     /// What the App SHOULD use. Listed so the guard cannot be satisfied by an App that
@@ -46,7 +51,7 @@ final class AppTargetBypassGuardTests: XCTestCase {
         "EffectOrigin", "ParameterConsumption",
         "ReportFieldPresentation", "ReportRateProvenance",
         "ReportSectionPresentation", "ReportTypePresentation",
-        "ReportRateParameter", "ReportSource",
+        "ReportRateParameter",
     ]
 
     // MARK: - The scan, as a pure function

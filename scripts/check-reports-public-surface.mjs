@@ -1,6 +1,9 @@
 #!/usr/bin/env node
-// PROPOSAL (P2-0 v4) — not committed. Closed-set guard over the report subsystem's public
-// API, driven by the Swift symbol graph rather than by scanning source text.
+// Closed-set guard over the report subsystem's public API, driven by the Swift symbol graph
+// rather than by scanning source text.
+//
+//   npm run check:reports-public-surface          verify (part of `check:all`)
+//   node scripts/check-reports-public-surface.mjs --print  > the allowlist, to regenerate it
 //
 // WHY THE SYMBOL GRAPH: a regex over `public ` misses members added by an extension in
 // another file, multi-line declarations, attributed declarations, subscripts, and

@@ -32,7 +32,9 @@ public struct PresentedParameter: Equatable, Sendable {
     /// Whether any engine for this accounting locale reads the parameter at all.
     public let consumption: ParameterConsumption
 
-    public init(key: ReportParameterKey, stored: StoredSettingState,
+    /// INTERNAL, for the same reason the report's own initialiser is: a view reads a
+    /// parameter's two axes, it does not get to assert them.
+    init(key: ReportParameterKey, stored: StoredSettingState,
                 nativeEffect: ParameterEffect, consumption: ParameterConsumption) {
         self.key = key
         self.stored = stored
@@ -41,8 +43,17 @@ public struct PresentedParameter: Equatable, Sendable {
     }
 }
 
-/// AXIS 1 — the stored value, judged by the rule BOTH apps implement:
-/// `electron/handlers/_rateValue.js`'s `classifyStoredRate` and `ReportSettings.classifyRate`.
+/// AXIS 1 — the stored value, judged by THIS app's `ReportSettings.classifyRate`.
+///
+/// That rule is written to match `electron/handlers/_rateValue.js`'s `classifyStoredRate`,
+/// and on every shape a user could plausibly store the two agree. They are two
+/// implementations of one intent, not one implementation — and the committed corpus
+/// (`js-settings-coercion.json`) records where the underlying parsers do NOT agree: at the
+/// extremes of the JSON number grammar, `JSONSerialization` refuses input V8 accepts
+/// (`1e999`, `1.12345678912345678e145`) and parses one value 4 ULP away from V8's on another
+/// (`1.12345678912345678e144`). So this states what the NATIVE app judged, which is what the
+/// native report was computed from; it is not a claim about the other app's verdict.
+///
 /// Usable iff a finite JSON number, or a JSON string that trims to a non-empty numeric
 /// literal. Applied to all four keys, so "is this row sound" is one question everywhere.
 public enum StoredSettingState: Equatable, Sendable {

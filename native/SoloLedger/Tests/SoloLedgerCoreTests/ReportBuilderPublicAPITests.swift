@@ -53,12 +53,12 @@ final class ReportBuilderPublicAPITests: XCTestCase {
             case .currencyInvalid:               XCTFail("currency is valid")
             case .currencyMismatch:              XCTFail("currency matches")
             case .multipleCurrenciesInPeriod:    XCTFail("one currency")
+            case .legacySourceUnavailable:       XCTFail("the period has a transaction")
             }
 
         case .report(let report):
             XCTAssertEqual(report.locale, "CN")
             XCTAssertEqual(report.currency, "CNY")
-            XCTAssertEqual(report.source, ReportSource.transactions)
             XCTAssertEqual(report.period.year, "2025")
 
             // Parameters — both axes, exhaustively.
@@ -113,7 +113,7 @@ final class ReportBuilderPublicAPITests: XCTestCase {
                             report.cashflow.financing, report.cashflow.beginningCash,
                             report.cashflow.endingCash] {
                 switch section {
-                case .computed, .noTransactionsInPeriod, .notDerivableFromThisDataModel: break
+                case .computed, .notDerivableFromThisDataModel: break
                 }
             }
             for warning in report.warnings {
@@ -144,7 +144,6 @@ final class ReportBuilderPublicAPITests: XCTestCase {
         XCTAssertTrue(requireSendable(ReportFieldPresentation.amount(1)))
         XCTAssertTrue(requireSendable(ReportSectionPresentation.renderInFull))
         XCTAssertTrue(requireSendable(ReportRateProvenance.userConfigured))
-        XCTAssertTrue(requireSendable(ReportTypePresentation(id: "x", section: .withhold)))
         XCTAssertTrue(requireSendable(ReportPeriod(year: "2025")))
         XCTAssertTrue(requireSendable(ReportLineUnit.money))
         XCTAssertTrue(requireSendable(ReportParameterKey.vatRate))
@@ -153,7 +152,7 @@ final class ReportBuilderPublicAPITests: XCTestCase {
         XCTAssertTrue(requireSendable(EffectOrigin.regimeDefault))
         XCTAssertTrue(requireSendable(ParameterConsumption.consumed))
         XCTAssertTrue(requireSendable(PresentedWarning.mealsLimitedToFiftyPercent))
-        XCTAssertTrue(requireSendable(PresentedCashflowSection.noTransactionsInPeriod))
+        XCTAssertTrue(requireSendable(PresentedCashflowSection.notDerivableFromThisDataModel))
         XCTAssertTrue(requireSendable(PresentedNote.selfEmploymentParameterYear(2025)))
     }
 }

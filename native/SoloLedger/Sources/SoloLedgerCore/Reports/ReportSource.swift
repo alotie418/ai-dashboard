@@ -18,7 +18,7 @@ import Foundation
 /// #395). The engines are pure functions of the rows they are handed; choosing
 /// where rows come from is the dispatcher's job, and the dispatcher will not offer
 /// the legacy option.
-public enum ReportSource: String, Equatable, Sendable {
+enum ReportSource: String, Equatable, Sendable {
     case transactions
     case legacy
 }
