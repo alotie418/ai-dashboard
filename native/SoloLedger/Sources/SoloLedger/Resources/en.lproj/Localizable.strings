@@ -455,3 +455,13 @@
 "report.period.caption" = "Period: {from} – {to}";
 "report.estimate.badge" = "Estimate · management reference only";
 "report.storedText.label" = "What the ledger actually holds";
+
+/* ── R8 P3d：报表页四条免责声明（逐字复用 Electron 已审文案；挂载位置见 ReportPageComposition） ── */
+/* 页脚：整页的定性，在 .report / .blocked / .failed 三态显示 */
+"report.disclaimer.report" = "This view is a management estimate generated from your data using simplified rules. It is not a statutory financial statement — rely on a qualified accountant and official figures for tax filing and external reporting.";
+/* 五个周转税 section 的块脚（CN vat-summary / JP consumption-tax / EU vat-return / KR vat-summary / TW business-tax） */
+"report.disclaimer.tax" = "Estimate for management reference only — not a basis for tax filing.";
+/* US se-tax section 的块脚 */
+"report.disclaimer.usTax" = "Estimates only — not for tax filing. Consult a tax professional.";
+/* 参数披露 section 的块脚 */
+"report.disclaimer.rates" = "Tax rates are preset reference values and may change — verify against current official rates.";

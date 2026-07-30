@@ -452,3 +452,13 @@
 "report.period.caption" = "보고 기간: {from} – {to}";
 "report.estimate.badge" = "추정 · 경영 관리 참고용";
 "report.storedText.label" = "장부에 실제로 들어 있는 내용";
+
+/* ── R8 P3d：报表页四条免责声明（逐字复用 Electron 已审文案；挂载位置见 ReportPageComposition） ── */
+/* 页脚：整页的定性，在 .report / .blocked / .failed 三态显示 */
+"report.disclaimer.report" = "본 화면은 입력 데이터를 단순화된 기준으로 산출한 경영 관리용 추정치이며 법정 재무제표가 아닙니다. 세무 신고 및 외부 보고는 전문 회계사와 공식 기준을 따르세요.";
+/* 五个周转税 section 的块脚（CN vat-summary / JP consumption-tax / EU vat-return / KR vat-summary / TW business-tax） */
+"report.disclaimer.tax" = "추정치이며 경영 참고용입니다. 신고 근거가 아닙니다.";
+/* US se-tax section 的块脚 */
+"report.disclaimer.usTax" = "추정치이며 세금 신고용이 아닙니다. 세무 전문가와 상담하세요.";
+/* 参数披露 section 的块脚 */
+"report.disclaimer.rates" = "세율은 기본 참고값이며 정책에 따라 변경될 수 있습니다. 최신 공식 세율을 확인하세요.";

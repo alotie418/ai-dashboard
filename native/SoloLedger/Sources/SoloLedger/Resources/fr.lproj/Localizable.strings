@@ -452,3 +452,13 @@
 "report.period.caption" = "Période : {from} – {to}";
 "report.estimate.badge" = "Estimation · référence de gestion uniquement";
 "report.storedText.label" = "Ce que le livre contient réellement";
+
+/* ── R8 P3d：报表页四条免责声明（逐字复用 Electron 已审文案；挂载位置见 ReportPageComposition） ── */
+/* 页脚：整页的定性，在 .report / .blocked / .failed 三态显示 */
+"report.disclaimer.report" = "Cette vue est une estimation de gestion générée à partir de vos données selon des règles simplifiées. Ce n'est pas un état financier légal ; pour la déclaration fiscale et les rapports externes, référez-vous à un comptable qualifié et aux chiffres officiels.";
+/* 五个周转税 section 的块脚（CN vat-summary / JP consumption-tax / EU vat-return / KR vat-summary / TW business-tax） */
+"report.disclaimer.tax" = "Estimation à titre indicatif — ne constitue pas une base de déclaration.";
+/* US se-tax section 的块脚 */
+"report.disclaimer.usTax" = "Estimations uniquement — pas pour la déclaration fiscale. Consultez un fiscaliste.";
+/* 参数披露 section 的块脚 */
+"report.disclaimer.rates" = "Les taux d'imposition sont des valeurs de référence préréglées et peuvent évoluer — vérifiez les taux officiels en vigueur.";

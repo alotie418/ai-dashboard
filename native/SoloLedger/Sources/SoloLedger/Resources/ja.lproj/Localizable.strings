@@ -452,3 +452,13 @@
 "report.period.caption" = "対象期間：{from} – {to}";
 "report.estimate.badge" = "概算 · 経営管理の参考用";
 "report.storedText.label" = "台帳に実際に入っている内容";
+
+/* ── R8 P3d：报表页四条免责声明（逐字复用 Electron 已审文案；挂载位置见 ReportPageComposition） ── */
+/* 页脚：整页的定性，在 .report / .blocked / .failed 三态显示 */
+"report.disclaimer.report" = "本ビューは入力データに基づく簡易的な経営管理上の試算であり、法定の財務諸表ではありません。納税・申告・外部提出は会計士や公式基準に従ってください。";
+/* 五个周转税 section 的块脚（CN vat-summary / JP consumption-tax / EU vat-return / KR vat-summary / TW business-tax） */
+"report.disclaimer.tax" = "試算値です。経営の参考用であり、申告の根拠にはなりません。";
+/* US se-tax section 的块脚 */
+"report.disclaimer.usTax" = "試算値であり、申告には使用できません。税務の専門家にご相談ください。";
+/* 参数披露 section 的块脚 */
+"report.disclaimer.rates" = "税率はプリセットの参考値であり変更される場合があります。最新の公式税率をご確認ください。";
