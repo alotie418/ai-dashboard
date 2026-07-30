@@ -16,14 +16,14 @@ import Foundation
 /// `jp.js:64`, `us.js:135`), against a prefix built from `ctx.year`. So the column
 /// is now read twice for two different purposes, and the second one is the reason
 /// Appendix A9 exists — see ``ReportMonth``.
-public struct ReportRow: Equatable, Sendable {
+struct ReportRow: Equatable, Sendable {
     /// `amount_net` — the pre-tax amount. Optional because SQL NULL is a real
     /// value here, and because `ReportMath.netAmount` needs to see the difference
     /// between "absent" and "0" (JS treats both as falsy, but only after the
     /// column has been read).
-    public let amountNet: Double?
+    let amountNet: Double?
     /// `amount` — the tax-inclusive amount.
-    public let amount: Double?
+    let amount: Double?
     /// `tax_amount` — the tax carried on the row, read by batch 4 alone.
     ///
     /// The turnover-tax blocks are the ONLY place this column is used, and they use
@@ -35,7 +35,7 @@ public struct ReportRow: Equatable, Sendable {
     ///
     /// Optional for the same reason as ``amountNet``: SQL NULL and a real 0 are
     /// different values, and only `ReportMath.orZero` may collapse them.
-    public let taxAmount: Double?
+    let taxAmount: Double?
     /// `category_id`.
     ///
     /// SQL NULL and "this query never selected the column" collapse to the SAME
@@ -45,23 +45,23 @@ public struct ReportRow: Equatable, Sendable {
     /// `category_id`, so every legacy row hits the `undefined` side. That is the
     /// mechanism behind the quirk that COGS is structurally 0 on every legacy
     /// period, and it is preserved rather than repaired.
-    public let categoryID: String?
+    let categoryID: String?
     /// `shippingCost` — legacy `sales` only.
     ///
     /// The `transactions` table HAS NO SUCH COLUMN (verified against the fixture
     /// schema), so on the transactions path this is always nil and China's
     /// shipping deduction at `cn.js:24` is structurally 0. Mirrored, not fixed —
     /// plan Appendix A4 records the correction as needing a schema decision.
-    public let shippingCost: Double?
+    let shippingCost: Double?
     /// `date`, as STORED — never parsed.
     ///
     /// `monthlyBreakdown` matches it with a string prefix (`"\(year)-\(mm)"`), not
     /// with a date comparison, so a row stamped `2025-06-15T00:00:00` matches
     /// `2025-06` for exactly the reason a lexicographic prefix does. Parsing it
     /// into a `Date` here would introduce a time zone the engines do not have.
-    public let date: String?
+    let date: String?
 
-    public init(amountNet: Double? = nil, amount: Double? = nil,
+    init(amountNet: Double? = nil, amount: Double? = nil,
                 taxAmount: Double? = nil, categoryID: String? = nil,
                 shippingCost: Double? = nil, date: String? = nil) {
         self.amountNet = amountNet
@@ -74,8 +74,8 @@ public struct ReportRow: Equatable, Sendable {
 }
 
 /// A category row, as the COGS split sees it.
-public struct ReportCategory: Equatable, Sendable {
-    public let id: String
+struct ReportCategory: Equatable, Sendable {
+    let id: String
     /// `is_cogs`, kept in its RAW SQLite storage class rather than as a `Bool`.
     ///
     /// `index.js:70` fetches categories with `SELECT *`, so the value reaching
@@ -85,7 +85,7 @@ public struct ReportCategory: Equatable, Sendable {
     /// Decoding to `Bool` here would silently pick one interpretation; keeping the
     /// storage class lets ``isCogsTruthy`` apply JS's `!!` to the same value the
     /// engine sees.
-    public let isCogs: SQLiteValue
+    let isCogs: SQLiteValue
 
     /// `slug`, also in its RAW storage class and for the same reason: `index.js:70`
     /// is `SELECT *`, so the value reaching `us.js`'s category lookups is whatever
@@ -96,9 +96,9 @@ public struct ReportCategory: Equatable, Sendable {
     /// (`us.js:121`), while the expense side uses it as an OBJECT KEY
     /// (`us.js:29-30`) after a `|| 'other'` fallback. See ``slugKeyOrOther`` and
     /// ``slugEquals(_:)``.
-    public let slug: SQLiteValue
+    let slug: SQLiteValue
 
-    public init(id: String, isCogs: SQLiteValue, slug: SQLiteValue = .null) {
+    init(id: String, isCogs: SQLiteValue, slug: SQLiteValue = .null) {
         self.id = id
         self.isCogs = isCogs
         self.slug = slug
@@ -108,7 +108,7 @@ public struct ReportCategory: Equatable, Sendable {
     ///
     /// Strict equality against a string literal, so only a TEXT cell can ever
     /// match: a numeric or null slug is simply not equal to `"returns"`.
-    public func slugEquals(_ literal: String) -> Bool {
+    func slugEquals(_ literal: String) -> Bool {
         if case .text(let s) = slug { return s == literal }
         return false
     }
@@ -129,7 +129,7 @@ public struct ReportCategory: Equatable, Sendable {
     /// Non-TEXT slugs are unreachable in practice (the column is TEXT) and are
     /// mapped to a key nothing reads, which is what a stringified number would do
     /// anyway.
-    public var slugKeyOrOther: String {
+    var slugKeyOrOther: String {
         if case .text(let s) = slug, !s.isEmpty { return s }
         if case .integer(let i) = slug, i != 0 { return String(i) }
         if case .real(let d) = slug, !(d == 0 || d.isNaN) { return String(d) }
@@ -144,7 +144,7 @@ public struct ReportCategory: Equatable, Sendable {
     /// at each of its three write sites. But `SELECT *` imposes no affinity of its
     /// own, so the rule is written out for the values that COULD arrive rather
     /// than for the ones that do.
-    public var isCogsTruthy: Bool {
+    var isCogsTruthy: Bool {
         switch isCogs {
         case .null:            return false
         case .integer(let i):  return i != 0

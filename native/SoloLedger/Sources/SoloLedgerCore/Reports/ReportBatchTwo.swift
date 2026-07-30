@@ -11,21 +11,21 @@ import Foundation
 ///
 /// Every figure here is TAX-INCLUSIVE: these sum `row.amount`, where the P&L sums
 /// `amount_net || amount || 0`. Two different questions over the same rows.
-public struct TaxInclusiveSummary: Equatable, Sendable {
-    public let purchaseTotal: Double
-    public let salesTotal: Double
-    public let difference: Double
+struct TaxInclusiveSummary: Equatable, Sendable {
+    let purchaseTotal: Double
+    let salesTotal: Double
+    let difference: Double
 }
 
 /// One entry of `monthlyBreakdown`.
 ///
 /// `month` is 1...12 and there are ALWAYS twelve of them — see
 /// ``ReportMonth/prefixes(year:)``.
-public struct ReportMonth: Equatable, Sendable {
-    public let month: Int
-    public let revenue: Double
-    public let cost: Double
-    public let profit: Double
+struct ReportMonth: Equatable, Sendable {
+    let month: Int
+    let revenue: Double
+    let cost: Double
+    let profit: Double
 
     /// The twelve `"YYYY-MM"` prefixes a breakdown matches against, built from
     /// **`ctx.year`** — not from the reporting period.
@@ -43,7 +43,7 @@ public struct ReportMonth: Equatable, Sendable {
     ///
     /// Mirrored exactly. The correction is registered in Appendix A9 as needing to
     /// be designed together with the period selector.
-    public static func prefixes(year: String) -> [String] {
+    static func prefixes(year: String) -> [String] {
         (1...12).map { "\(year)-\(String(format: "%02d", $0))" }
     }
 }

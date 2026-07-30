@@ -4,11 +4,11 @@ import Foundation
 ///
 /// Batch-1 arithmetic matches Japan and Korea exactly today. Kept as its own file
 /// on purpose — see the note in ``JPReportEngine``.
-public enum TWReportEngine {
+enum TWReportEngine {
 
     /// `tw.js` batch-1 lines: 14 (rounder), 16-26 (sums, operating profit),
     /// 33-37 (emitted block).
-    public static func batchOne(_ ctx: ReportContext) -> BatchOneIncomeStatementWithOperatingProfit {
+    static func batchOne(_ ctx: ReportContext) -> BatchOneIncomeStatementWithOperatingProfit {
         let split = ExpenseSplit.splitExpenses(ctx.expenseRows, ctx.categories)
 
         let r = ReportMath.round2OrZero                       // tw.js:14 — has `|| 0`
@@ -66,7 +66,7 @@ public enum TWReportEngine {
 
 // MARK: - Batch 2
 
-public extension TWReportEngine {
+extension TWReportEngine {
 
     /// `tw.js:44-46` — the tax-inclusive summary.
     ///

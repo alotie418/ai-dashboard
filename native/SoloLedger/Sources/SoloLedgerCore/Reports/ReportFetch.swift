@@ -29,7 +29,7 @@ import Foundation
 /// So the honest option and the fast option are the same one, and no trade-off
 /// between them had to be made. If that ever stops being true, the answer is a
 /// disclosed incompleteness flag, never a silent cap.
-public enum ReportFetch {
+enum ReportFetch {
 
     /// The P&L / monthly projection: exactly the columns the engines read.
     ///
@@ -70,18 +70,18 @@ public enum ReportFetch {
 
     /// `index.js:43` — how many transactions fall in the period, which decides the
     /// source. Counted on `date`, NOT on the cash date.
-    public static func periodTransactionCount(_ db: SQLiteDatabase,
+    static func periodTransactionCount(_ db: SQLiteDatabase,
                                               from: String, to: String) throws -> Int {
         try db.query("SELECT COUNT(*) AS c FROM transactions WHERE date >= ? AND date <= ?",
                      [.text(from), .text(to)]).first?.int("c") ?? 0
     }
 
-    public static func hasTransactionsTable(_ db: SQLiteDatabase) throws -> Bool {
+    static func hasTransactionsTable(_ db: SQLiteDatabase) throws -> Bool {
         !(try db.query(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='transactions'")).isEmpty
     }
 
-    public static func rows(_ db: SQLiteDatabase, type: String,
+    static func rows(_ db: SQLiteDatabase, type: String,
                             from: String, to: String) throws -> [ReportRow] {
         try db.query(rowSQL(type: type), [.text(from), .text(to)]).map {
             ReportRow(amountNet: $0.double("amount_net"),
@@ -97,7 +97,7 @@ public enum ReportFetch {
         }
     }
 
-    public static func cashflowRows(_ db: SQLiteDatabase,
+    static func cashflowRows(_ db: SQLiteDatabase,
                                     from: String, to: String) throws -> [CashflowRow] {
         try db.query(cashflowSQL, [.text(from), .text(to)]).map {
             CashflowRow(type: $0.string("type"),
@@ -112,7 +112,7 @@ public enum ReportFetch {
     /// `WHERE locale = ?` is why a row whose category belongs to another regime
     /// matches nothing and falls to operating expenses. The whole read is wrapped
     /// in a swallowing catch upstream because the table may not exist.
-    public static func categories(_ db: SQLiteDatabase, locale: String) throws -> [ReportCategory] {
+    static func categories(_ db: SQLiteDatabase, locale: String) throws -> [ReportCategory] {
         try db.query("SELECT * FROM categories WHERE locale = ? ORDER BY type, sort_order",
                      [.text(locale)]).map {
             ReportCategory(id: $0.string("id") ?? "", isCogs: $0["is_cogs"], slug: $0["slug"])

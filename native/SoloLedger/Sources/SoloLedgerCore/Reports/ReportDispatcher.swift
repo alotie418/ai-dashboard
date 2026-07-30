@@ -12,12 +12,12 @@ import Foundation
 /// What that decision costs is stated rather than hidden: for a period whose rows
 /// live only in the legacy tables, Electron reports real money and this reports
 /// nothing. See ``OperatingCashflowSection`` for why "nothing" is not `{0, 0, 0}`.
-public enum ReportDispatcher {
+enum ReportDispatcher {
 
-    public enum Failure: Error, CustomStringConvertible, Equatable {
+    enum Failure: Error, CustomStringConvertible, Equatable {
         case unsupportedLocale(String)
 
-        public var description: String {
+        var description: String {
             switch self {
             case .unsupportedLocale(let l):
                 // index.js:30's message, kept recognisable.
@@ -38,19 +38,19 @@ public enum ReportDispatcher {
     /// and carrying four defects, so they are mirrored verbatim and are not display
     /// strings. Putting them in a batch-2 result would hand a view a `name` it
     /// would reasonably render.
-    public struct BatchTwo: Equatable, Sendable {
-        public let locale: String
-        public let year: String
-        public let from: String
-        public let to: String
-        public let currency: String
+    struct BatchTwo: Equatable, Sendable {
+        let locale: String
+        let year: String
+        let from: String
+        let to: String
+        let currency: String
         /// Absent for the US — `us.js` has no such block (not an empty one).
-        public let taxInclusiveSummary: TaxInclusiveSummary?
-        public let monthlyBreakdown: [ReportMonth]
+        let taxInclusiveSummary: TaxInclusiveSummary?
+        let monthlyBreakdown: [ReportMonth]
         /// Hardcoded `[]` in all five VAT engines; the US warnings are derived from
         /// the estimate layer and are batch 5.
-        public let warnings: [String]
-        public let cashflowStatement: CashflowStatement
+        let warnings: [String]
+        let cashflowStatement: CashflowStatement
     }
 
     /// `index.js:26-91`, minus the legacy branch.
@@ -59,7 +59,7 @@ public enum ReportDispatcher {
     ///   `new Date().getFullYear()`, which would make output depend on the wall
     ///   clock; the goldens are generated with an explicit year for that reason
     ///   (plan §4.2 item 4) and callers here should do the same.
-    public static func batchTwo(_ db: SQLiteDatabase,
+    static func batchTwo(_ db: SQLiteDatabase,
                                 locale explicitLocale: String? = nil,
                                 year explicitYear: String? = nil,
                                 from explicitFrom: String? = nil,

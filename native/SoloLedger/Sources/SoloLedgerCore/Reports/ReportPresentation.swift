@@ -39,7 +39,7 @@ import Foundation
 /// * **No database.** A presentation layer that could re-read `settings` would be able
 ///   to explain a number with a state that no longer produced it — the snapshot rule
 ///   `EstimatedValue` is documented with.
-public enum ReportPresentation {
+enum ReportPresentation {
 
     // MARK: - A single field
 
@@ -56,7 +56,7 @@ public enum ReportPresentation {
     /// A view handed that would render whatever `NumberFormatter` does with a NaN.
     /// ``ReportFieldPresentation/corrupted`` exists so it renders "the data is damaged"
     /// instead, and so the compiler asks.
-    public static func field(_ value: EstimatedValue) -> ReportFieldPresentation {
+    static func field(_ value: EstimatedValue) -> ReportFieldPresentation {
         switch value {
         case .computed(let x):
             return field(x)
@@ -80,7 +80,7 @@ public enum ReportPresentation {
     /// `admin_expense_annual` renders as a **confident 0** there and as damaged data on
     /// China. Both are the mirror's behaviour and neither is repaired here; this
     /// function only stops the Chinese one from reaching a formatter.
-    public static func field(_ value: Double) -> ReportFieldPresentation {
+    static func field(_ value: Double) -> ReportFieldPresentation {
         guard value.isFinite else { return .corrupted }
         // Negative zero is normalised to positive zero HERE and nowhere else. The
         // engines' rounders can produce it (`round2(-0.001)` is `-0.0`, because
@@ -111,7 +111,7 @@ public enum ReportPresentation {
     /// chose, and CLAUDE.md forbids exactly that ("do not silently choose a policy
     /// without documentation"). This is the only channel through which a view can find
     /// out, and it carries the percent so the disclosure can name it.
-    public static func provenance(_ setting: ReportRateSetting) -> ReportRateProvenance {
+    static func provenance(_ setting: ReportRateSetting) -> ReportRateProvenance {
         switch setting {
         case .configured:
             return .userConfigured
@@ -143,7 +143,7 @@ public enum ReportPresentation {
     /// throws on an unknown locale, so "no report types" is not a state the source can
     /// reach, and an empty array would let a caller render an empty picker for a ledger
     /// that should have been rejected outright.
-    public static func reportTypes(locale: String) -> [ReportTypePresentation]? {
+    static func reportTypes(locale: String) -> [ReportTypePresentation]? {
         guard let table = ReportTypes.table(for: locale) else { return nil }
         return table.map {
             ReportTypePresentation(id: $0.id,

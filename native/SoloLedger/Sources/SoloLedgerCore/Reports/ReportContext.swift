@@ -30,12 +30,12 @@ import Foundation
 /// no empty state and no confirmation prompt. It is **not** a tax rate and scheme A
 /// deliberately does not gate on it — a missing admin-expense row still means 0,
 /// and operating profit is therefore unaffected by everything above.
-public struct ReportContext: Equatable, Sendable {
-    public let incomeRows: [ReportRow]
-    public let expenseRows: [ReportRow]
-    public let categories: [ReportCategory]
+struct ReportContext: Equatable, Sendable {
+    let incomeRows: [ReportRow]
+    let expenseRows: [ReportRow]
+    let categories: [ReportCategory]
     /// `admin_expense_annual`, already coerced the way the dispatcher coerces it.
-    public let adminExpense: Double
+    let adminExpense: Double
     /// `income_tax_rate` as the four states of plan §6.2 / §6.4 — resolved from
     /// whether the settings ROW exists (A-3) and then from its stored BYTES (A-4),
     /// never from a computed figure.
@@ -43,19 +43,19 @@ public struct ReportContext: Equatable, Sendable {
     /// Every engine in R7 must branch on this. There is no `Double` spelling of it
     /// for the same reason `index.js` hands the engines `null`: a rate that is not
     /// there must be impossible to multiply by.
-    public let incomeTaxRate: ReportRateSetting
+    let incomeTaxRate: ReportRateSetting
     /// `surcharge_rate`, in the same four states.
     ///
     /// **Only China's engine may consume it** (`cn.js:33`). Outside China a missing
     /// row answers `.notConfigured` and R7 must simply not look: a Japanese report
     /// must not be blocked because a rate no Japanese line reads has no row.
-    public let surchargeRate: ReportRateSetting
-    public let currency: String
-    public let year: String
-    public let from: String
-    public let to: String
+    let surchargeRate: ReportRateSetting
+    let currency: String
+    let year: String
+    let from: String
+    let to: String
 
-    public init(incomeRows: [ReportRow], expenseRows: [ReportRow],
+    init(incomeRows: [ReportRow], expenseRows: [ReportRow],
                 categories: [ReportCategory], adminExpense: Double,
                 incomeTaxRate: ReportRateSetting, surchargeRate: ReportRateSetting,
                 currency: String, year: String, from: String, to: String) {
@@ -80,14 +80,14 @@ public struct ReportContext: Equatable, Sendable {
 /// the same value, which is the exact confusion plan §6.2 spends four variants
 /// keeping apart. A later batch adds the field and every call site that must learn
 /// about it fails to compile.
-public struct BatchOneIncomeStatement: Equatable, Sendable {
-    public let salesRevenue: Double
-    public let costOfSales: Double
-    public let costOfGoodsSold: Double
-    public let operatingExpenses: Double
-    public let grossProfit: Double
-    public let grossMargin: Double
-    public let adminExpense: Double
+struct BatchOneIncomeStatement: Equatable, Sendable {
+    let salesRevenue: Double
+    let costOfSales: Double
+    let costOfGoodsSold: Double
+    let operatingExpenses: Double
+    let grossProfit: Double
+    let grossMargin: Double
+    let adminExpense: Double
 }
 
 /// China's batch-1 block.
@@ -98,47 +98,47 @@ public struct BatchOneIncomeStatement: Equatable, Sendable {
 /// `cn.js:57` holds `profitBeforeTax`, which consumes `surchargeRate`. So China
 /// stops at gross profit in batch 1 while the others do not. That asymmetry is
 /// forced by the dependency chain, not chosen (plan §0).
-public struct CNBatchOneIncomeStatement: Equatable, Sendable {
-    public let salesRevenue: Double
-    public let costOfSales: Double
-    public let costOfGoodsSold: Double
-    public let operatingExpenses: Double
-    public let grossProfit: Double
-    public let grossMargin: Double
-    public let shippingFee: Double
-    public let adminExpense: Double
+struct CNBatchOneIncomeStatement: Equatable, Sendable {
+    let salesRevenue: Double
+    let costOfSales: Double
+    let costOfGoodsSold: Double
+    let operatingExpenses: Double
+    let grossProfit: Double
+    let grossMargin: Double
+    let shippingFee: Double
+    let adminExpense: Double
 
     // MARK: - Batch 5 (R7) — the estimate layer
 
     /// `cn.js:76`. **The key holds pre-tax profit**, not operating profit — the name
     /// is the source's and plan §1.2 forbids tidying it. Refused when the SURCHARGE
     /// is unusable, because it is subtracted here.
-    public let operatingProfit: EstimatedValue
+    let operatingProfit: EstimatedValue
     /// `cn.js:79` — 城建/教育/地方教育附加 on the clamped VAT payable.
-    public let taxSurcharge: EstimatedValue
-    public let incomeTax: EstimatedValue
-    public let netProfit: EstimatedValue
-    public let netMargin: EstimatedValue
+    let taxSurcharge: EstimatedValue
+    let incomeTax: EstimatedValue
+    let netProfit: EstimatedValue
+    let netMargin: EstimatedValue
 }
 
 /// JP / KR / TW batch-1 block: the shared fields plus operating profit.
-public struct BatchOneIncomeStatementWithOperatingProfit: Equatable, Sendable {
-    public let salesRevenue: Double
-    public let costOfSales: Double
-    public let costOfGoodsSold: Double
-    public let operatingExpenses: Double
-    public let grossProfit: Double
-    public let grossMargin: Double
-    public let adminExpense: Double
+struct BatchOneIncomeStatementWithOperatingProfit: Equatable, Sendable {
+    let salesRevenue: Double
+    let costOfSales: Double
+    let costOfGoodsSold: Double
+    let operatingExpenses: Double
+    let grossProfit: Double
+    let grossMargin: Double
+    let adminExpense: Double
     /// Batch 1: reads no rate, so it is a plain `Double` even here — a Japanese
     /// report must not be blocked by a rate no Japanese line consumes.
-    public let operatingProfit: Double
+    let operatingProfit: Double
 
     // MARK: - Batch 5 (R7)
 
-    public let incomeTax: EstimatedValue
-    public let netProfit: EstimatedValue
-    public let netMargin: EstimatedValue
+    let incomeTax: EstimatedValue
+    let netProfit: EstimatedValue
+    let netMargin: EstimatedValue
 }
 
 /// The EU block.
@@ -149,19 +149,19 @@ public struct BatchOneIncomeStatementWithOperatingProfit: Equatable, Sendable {
 /// to read 0, because they only know `incomeStatement` (Appendix A7). Keeping the
 /// name here keeps the mirror honest about what it is mirroring; the Electron-side
 /// defect is a separate, separately-approved PR.
-public struct EUBatchOneProfitLoss: Equatable, Sendable {
-    public let revenue: Double
-    public let costOfSales: Double
-    public let costOfGoodsSold: Double
-    public let operatingExpenses: Double
-    public let grossProfit: Double
-    public let grossMargin: Double
-    public let adminExpense: Double
-    public let operatingProfit: Double
+struct EUBatchOneProfitLoss: Equatable, Sendable {
+    let revenue: Double
+    let costOfSales: Double
+    let costOfGoodsSold: Double
+    let operatingExpenses: Double
+    let grossProfit: Double
+    let grossMargin: Double
+    let adminExpense: Double
+    let operatingProfit: Double
 
     // MARK: - Batch 5 (R7)
 
-    public let incomeTax: EstimatedValue
-    public let netProfit: EstimatedValue
-    public let netMargin: EstimatedValue
+    let incomeTax: EstimatedValue
+    let netProfit: EstimatedValue
+    let netMargin: EstimatedValue
 }

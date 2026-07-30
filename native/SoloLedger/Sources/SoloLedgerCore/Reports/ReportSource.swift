@@ -24,7 +24,7 @@ public enum ReportSource: String, Equatable, Sendable {
 }
 
 /// `selectReportSource` — `_reportSource.js:15-18`.
-public func selectReportSource(hasTransactionsTable: Bool, periodTxnCount: Int) -> ReportSource {
+func selectReportSource(hasTransactionsTable: Bool, periodTxnCount: Int) -> ReportSource {
     if hasTransactionsTable && periodTxnCount > 0 { return .transactions }
     return .legacy
 }

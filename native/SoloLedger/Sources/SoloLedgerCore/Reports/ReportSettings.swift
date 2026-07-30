@@ -29,7 +29,7 @@ import Foundation
 /// telling apart. Batch 2 reads no tax rates, so it needs no three-state
 /// machinery; it needs a primitive that does not destroy the distinction before
 /// R6 arrives to use it.
-public enum ReportSettings {
+enum ReportSettings {
 
     /// The raw stored JSON text for a key, or nil when the row (or the table) is
     /// absent. The caller applies the fallback, exactly as the JS does.
@@ -82,7 +82,7 @@ public enum ReportSettings {
     ///   dispatcher will route on (`index.js:27`), not whatever is in `settings`.
     ///   Passing the stored value where an explicit `opts.locale` overrode it would
     ///   gate on one regime and compute under another.
-    public static func incomeTaxRate(_ db: SQLiteDatabase, locale: String) -> ReportRateSetting {
+    static func incomeTaxRate(_ db: SQLiteDatabase, locale: String) -> ReportRateSetting {
         rate(db, "income_tax_rate", locale: locale, chinaFallback: 25)
     }
 
@@ -103,7 +103,7 @@ public enum ReportSettings {
     /// R6's `ReportContext` note said this parameter "has no missing state to model".
     /// That was true of *not-configured* and false of *needs-repair*; this is the
     /// correction.
-    public static func surchargeRate(_ db: SQLiteDatabase, locale: String) -> ReportRateSetting {
+    static func surchargeRate(_ db: SQLiteDatabase, locale: String) -> ReportRateSetting {
         rate(db, "surcharge_rate", locale: locale, chinaFallback: 12)
     }
 
@@ -203,7 +203,7 @@ public enum ReportSettings {
 
     /// `readSetting(db, key, fallback)` for a STRING-valued setting
     /// (`accounting_locale`, `currency`).
-    public static func string(_ db: SQLiteDatabase, _ key: String, fallback: String) -> String {
+    static func string(_ db: SQLiteDatabase, _ key: String, fallback: String) -> String {
         guard let raw = rawValue(db, key) else { return fallback }
         guard case .string(let s)? = jsonFragment(raw) else {
             // JSON.parse succeeded but the value is not a string, or it threw.
@@ -221,7 +221,7 @@ public enum ReportSettings {
     ///
     /// The fallback is substituted BEFORE the coercion, so `Number()` never sees a
     /// missing row — which is the whole of point 1 above.
-    public static func number(_ db: SQLiteDatabase, _ key: String, fallback: Double) -> Double {
+    static func number(_ db: SQLiteDatabase, _ key: String, fallback: Double) -> Double {
         guard let raw = rawValue(db, key) else { return fallback }
         guard let parsed = jsonFragment(raw) else { return fallback }   // JSON.parse threw
         return ReportMath.number(parsed)

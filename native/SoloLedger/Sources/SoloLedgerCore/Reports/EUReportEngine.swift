@@ -8,11 +8,11 @@ import Foundation
 /// naming has already caused two Electron downstream handlers to read 0, because
 /// they only recognise `incomeStatement` (Appendix A7). A mirror that quietly
 /// renamed it would hide a live defect rather than reproduce the system.
-public enum EUReportEngine {
+enum EUReportEngine {
 
     /// `eu.js` batch-1 lines: 14 (rounder), 16-26 (sums, operating profit),
     /// 36-40 (emitted block).
-    public static func batchOne(_ ctx: ReportContext) -> EUBatchOneProfitLoss {
+    static func batchOne(_ ctx: ReportContext) -> EUBatchOneProfitLoss {
         let split = ExpenseSplit.splitExpenses(ctx.expenseRows, ctx.categories)
 
         let r = ReportMath.round2OrZero                       // eu.js:14 — has `|| 0`
@@ -64,7 +64,7 @@ public enum EUReportEngine {
 
 // MARK: - Batch 2
 
-public extension EUReportEngine {
+extension EUReportEngine {
 
     /// `eu.js:47-49` — the tax-inclusive summary.
     ///

@@ -55,7 +55,7 @@ public enum ReportRateParameter: Equatable, Sendable {
 /// re-classified at render time would then explain the number with a state that no
 /// longer produced it. The report is a statement about the ledger AT THE MOMENT IT
 /// WAS COMPUTED, and everything needed to explain it is carried here.
-public enum EstimatedValue: Equatable, Sendable {
+enum EstimatedValue: Equatable, Sendable {
     /// The rate was usable and this is what the mirrored formula produced.
     case computed(Double)
     /// The settings row is absent and the regime is not China.
@@ -81,7 +81,7 @@ public enum EstimatedValue: Equatable, Sendable {
     /// the refusal must name it. That order is a fact about the JS, not a preference,
     /// and `ReportBatch5BlindSpotTests` pins it; deriving it afterwards from which
     /// number came out is the value-based reasoning A-3 rules out.
-    public static func refusal(for setting: ReportRateSetting,
+    static func refusal(for setting: ReportRateSetting,
                                parameter: ReportRateParameter) -> EstimatedValue? {
         switch setting {
         case .configured, .chinaFallback:
@@ -108,18 +108,18 @@ public enum EstimatedValue: Equatable, Sendable {
 /// social-security wage cap never binds (the largest `seEarnings` in the fixture is
 /// 39,479.63 against a cap of 168,600). Both branches are covered by
 /// `ReportBatch5BlindSpotTests` instead, because the goldens cannot.
-public struct SelfEmploymentTax: Equatable, Sendable {
-    public let netEarnings: Double
-    public let seEarnings: Double
-    public let socialSecurityTax: Double
-    public let medicareTax: Double
-    public let additionalMedicare: Double
-    public let totalSETax: Double
+struct SelfEmploymentTax: Equatable, Sendable {
+    let netEarnings: Double
+    let seEarnings: Double
+    let socialSecurityTax: Double
+    let medicareTax: Double
+    let additionalMedicare: Double
+    let totalSETax: Double
     /// The YEAR whose constants were applied, after `resolveSeTaxParams`'s
     /// unknown-year fallback. The only golden-visible evidence that the constant
     /// table is year-keyed at all — every other SE figure is identical across the
     /// three keyed years.
-    public let paramYear: Int
+    let paramYear: Int
 }
 
 /// `us.js:101-107` — the quarterly estimated-tax block.
@@ -131,12 +131,12 @@ public struct SelfEmploymentTax: Equatable, Sendable {
 /// They are the sharpest discriminator in the batch, which is also why the parity
 /// suite compares exactly rather than with the plan's `eps = 0.011`: that tolerance
 /// would swallow the difference.
-public struct EstimatedTax: Equatable, Sendable {
-    public let annualIncomeTax: EstimatedValue
+struct EstimatedTax: Equatable, Sendable {
+    let annualIncomeTax: EstimatedValue
     /// Never refused: the SE tax reads no income-tax rate.
-    public let annualSETax: Double
-    public let totalAnnual: EstimatedValue
-    public let quarterlyPayment: EstimatedValue
+    let annualSETax: Double
+    let totalAnnual: EstimatedValue
+    let quarterlyPayment: EstimatedValue
     /// Calendar dates, so likewise never refused (`us.js:106`).
-    public let dueDates: [String]
+    let dueDates: [String]
 }
