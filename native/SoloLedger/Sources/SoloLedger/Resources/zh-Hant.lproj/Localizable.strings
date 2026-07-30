@@ -251,3 +251,106 @@
 "restore.error.invalidBundle" = "所選備份無效或已損毀，未做任何變更。";
 "restore.error.safetyBackupFailed" = "無法備份目前帳本，已中止還原；目前資料未變動。";
 "restore.error.failed" = "還原失敗。你的自動備份保存在「備份」資料夾中。";
+
+/* ── R8 P3b：报表结构文案（13 section 标题 + 4 含税块 + 2 条说明 + 63 line 标签 = 82 键） ── */
+/* 13 个 (会计制度, 报表类型) 标题 —— 一律为「概览/统计/汇总」等管理口径措辞，无一使用法定报表名 */
+"report.section.CN.incomeStatement" = "經營損益概覽";
+"report.section.CN.vatSummary" = "增值稅統計";
+"report.section.CN.taxInclusive" = "含稅金額統計";
+"report.section.US.scheduleC" = "經營損益概覽（Schedule C 科目）";
+"report.section.US.seTax" = "自僱稅";
+"report.section.JP.incomeStatement" = "經營損益概覽";
+"report.section.JP.consumptionTax" = "消費稅彙總";
+"report.section.EU.profitLoss" = "經營損益概覽";
+"report.section.EU.vatReturn" = "VAT 統計";
+"report.section.KR.incomeStatement" = "經營損益概覽";
+"report.section.KR.vatSummary" = "韓國 VAT 統計";
+"report.section.TW.incomeStatement" = "經營損益概覽";
+"report.section.TW.businessTax" = "台灣營業稅統計";
+
+/* JP/EU/KR/TW 只发出、不声明报表类型的含税块标题 */
+"report.block.JP.taxInclusive" = "消費稅含稅匯總 (對帳用)";
+"report.block.EU.taxInclusive" = "VAT 含稅匯總 (對帳用)";
+"report.block.KR.taxInclusive" = "韓國 VAT 含稅彙總（對帳用）";
+"report.block.TW.taxInclusive" = "臺灣營業稅彙總（對帳用）";
+
+/* section 部分行未镜像时的说明（该状态今日无生产者，键仍须存在） */
+"report.section.missingLines" = "本報表類型有部分行尚未由本 App 計算，下方未列出的行不代表其數值為零。";
+
+/* CN 周转税块的历史别名说明：两对行由同一表达式产出，如实呈现并说明 */
+"report.section.CN.vatSummary.aliasNote" = "本會計制度的報表來源對同一金額發出兩個歷史名稱：「進項稅額合計」與「累計進項稅額」為同一數字，「銷項稅額合計」與「累計銷項稅額」亦然。此處按來源如實呈現，不代表二者在會計上不同。";
+
+/* 损益族 14 行（regime 语境由上方 section 标题承担，故标签共享） */
+"report.line.salesRevenue" = "營業收入";
+"report.line.revenue" = "營業收入";
+"report.line.costOfSales" = "營業成本";
+"report.line.costOfGoodsSold" = "銷貨成本";
+"report.line.operatingExpenses" = "期間費用";
+"report.line.grossProfit" = "毛利";
+"report.line.grossMargin" = "毛利率";
+"report.line.shippingFee" = "減：運費支出 (銷售費用)";
+"report.line.adminExpense" = "管理費用";
+"report.line.operatingProfit" = "經營利潤";
+"report.line.taxSurcharge" = "減：稅金及附加";
+"report.line.incomeTax" = "所得稅";
+"report.line.netProfit" = "淨利潤";
+"report.line.netMargin" = "淨利率";
+
+/* CN 周转税 5 行 */
+"report.line.cumulativeInput" = "累計進項稅額";
+"report.line.cumulativeOutput" = "累計銷項稅額";
+"report.line.certifiedInput" = "進項稅額合計";
+"report.line.invoicedOutput" = "銷項稅額合計";
+"report.line.estimatedPayable" = "增值稅估算額";
+
+/* 周转税三行 ×2 组：{tax} 取报表制度的 AccountingProfile.taxName，语言取 UI */
+"report.line.paid" = "採購{tax}";
+"report.line.collected" = "銷售{tax}";
+"report.line.payable" = "{tax}估算額";
+"report.line.inputVAT" = "採購{tax}";
+"report.line.outputVAT" = "銷售{tax}";
+"report.line.vatPayable" = "{tax}估算額";
+
+/* 含税块 3 行（CN 的声明 section 与另四制度的未声明块共用） */
+"report.line.purchaseTotal" = "採購含稅總額";
+"report.line.salesTotal" = "銷售含稅總額";
+"report.line.difference" = "含稅差額";
+
+/* US Schedule C 25 行（保留 Line N 前缀以便逐行对照） */
+"report.line.line1_grossReceipts" = "Line 1 — 總收入或銷售額";
+"report.line.line2_returns" = "Line 2 — 退貨與折讓";
+"report.line.line6_otherIncome" = "Line 6 — 其他收入";
+"report.line.line7_grossIncome" = "Line 7 — 總收入";
+"report.line.line8_advertising" = "Line 8 — 廣告費";
+"report.line.line9_car" = "Line 9 — 車輛費用";
+"report.line.line10_commissions" = "Line 10 — 佣金";
+"report.line.line11_contract" = "Line 11 — 合約工";
+"report.line.line13_depreciation" = "Line 13 — 折舊";
+"report.line.line15_insurance" = "Line 15 — 保險";
+"report.line.line16b_interest" = "Line 16b — 利息";
+"report.line.line17_legal" = "Line 17 — 法律及專業費用";
+"report.line.line18_office" = "Line 18 — 辦公費用";
+"report.line.line20_rent" = "Line 20 — 租金";
+"report.line.line21_repairs" = "Line 21 — 維修";
+"report.line.line22_supplies" = "Line 22 — 用品";
+"report.line.line23_taxes" = "Line 23 — 稅費及執照";
+"report.line.line24a_travel" = "Line 24a — 差旅";
+"report.line.line24b_meals" = "Line 24b — 餐飲 (50%)";
+"report.line.line25_utilities" = "Line 25 — 水電費";
+"report.line.line26_wages" = "Line 26 — 工資";
+"report.line.line27a_other" = "Line 27a — 其他費用";
+"report.line.line30_homeOffice" = "Line 30 — 家庭辦公";
+"report.line.line28_totalExpenses" = "Line 28 — 費用總額";
+"report.line.line31_netProfit" = "Line 31 — 淨利潤或虧損";
+
+/* US 自雇税 10 行 */
+"report.line.netEarnings" = "自僱淨收益";
+"report.line.seEarnings" = "自僱稅計稅基數（淨收益 × 92.35%）";
+"report.line.socialSecurityTax" = "社會保障稅（Social Security，12.4%）";
+"report.line.medicareTax" = "醫療保險稅（Medicare，2.9%）";
+"report.line.additionalMedicare" = "Additional Medicare（附加醫療保險稅）";
+"report.line.totalSETax" = "自僱稅";
+"report.line.annualIncomeTax" = "年度所得稅估算";
+"report.line.annualSETax" = "年度自僱稅估算";
+"report.line.totalAnnual" = "年度稅額合計估算";
+"report.line.quarterlyPayment" = "季度預估稅";

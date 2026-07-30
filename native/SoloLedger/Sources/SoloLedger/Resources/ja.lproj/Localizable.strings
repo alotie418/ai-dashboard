@@ -251,3 +251,106 @@
 "restore.error.invalidBundle" = "選択したバックアップは無効または破損しています。変更は行われていません。";
 "restore.error.safetyBackupFailed" = "現在の帳簿をバックアップできなかったため、復元を中止しました。データは変更されていません。";
 "restore.error.failed" = "復元に失敗しました。自動バックアップは Backups フォルダに保存されています。";
+
+/* ── R8 P3b：报表结构文案（13 section 标题 + 4 含税块 + 2 条说明 + 63 line 标签 = 82 键） ── */
+/* 13 个 (会计制度, 报表类型) 标题 —— 一律为「概览/统计/汇总」等管理口径措辞，无一使用法定报表名 */
+"report.section.CN.incomeStatement" = "経営損益サマリー";
+"report.section.CN.vatSummary" = "増値税統計";
+"report.section.CN.taxInclusive" = "税込金額集計（照合用）";
+"report.section.US.scheduleC" = "経営損益サマリー（Schedule C）";
+"report.section.US.seTax" = "自営業税";
+"report.section.JP.incomeStatement" = "経営損益サマリー";
+"report.section.JP.consumptionTax" = "消費税集計";
+"report.section.EU.profitLoss" = "経営損益サマリー";
+"report.section.EU.vatReturn" = "VAT集計";
+"report.section.KR.incomeStatement" = "経営損益サマリー";
+"report.section.KR.vatSummary" = "韓国VAT集計";
+"report.section.TW.incomeStatement" = "経営損益サマリー";
+"report.section.TW.businessTax" = "営業税集計";
+
+/* JP/EU/KR/TW 只发出、不声明报表类型的含税块标题 */
+"report.block.JP.taxInclusive" = "税込金額集計（照合用）";
+"report.block.EU.taxInclusive" = "VAT税込集計（照合用）";
+"report.block.KR.taxInclusive" = "韓国VAT税込集計（照合用）";
+"report.block.TW.taxInclusive" = "税込金額集計（照合用）";
+
+/* section 部分行未镜像时的说明（该状态今日无生产者，键仍须存在） */
+"report.section.missingLines" = "このレポート種別には、本 App がまだ算出していない行があります。以下に表示されていない行は、値がゼロであることを意味しません。";
+
+/* CN 周转税块的历史别名说明：两对行由同一表达式产出，如实呈现并说明 */
+"report.section.CN.vatSummary.aliasNote" = "この会計方式のレポート元は、同一の金額を二つの歴史的な名称で出力します。「仕入税額合計」と「仕入税額累計」は同じ数値であり、「売上税額合計」と「売上税額累計」も同様です。ここでは出力元のとおりに表示しており、両者が会計上異なることを意味しません。";
+
+/* 损益族 14 行（regime 语境由上方 section 标题承担，故标签共享） */
+"report.line.salesRevenue" = "売上高";
+"report.line.revenue" = "売上";
+"report.line.costOfSales" = "売上原価";
+"report.line.costOfGoodsSold" = "商品仕入原価";
+"report.line.operatingExpenses" = "営業費用";
+"report.line.grossProfit" = "売上総利益";
+"report.line.grossMargin" = "売上総利益率";
+"report.line.shippingFee" = "運送費";
+"report.line.adminExpense" = "一般管理費";
+"report.line.operatingProfit" = "営業利益";
+"report.line.taxSurcharge" = "租税公課";
+"report.line.incomeTax" = "法人税";
+"report.line.netProfit" = "純利益";
+"report.line.netMargin" = "純利益率";
+
+/* CN 周转税 5 行 */
+"report.line.cumulativeInput" = "仕入税額累計";
+"report.line.cumulativeOutput" = "売上税額累計";
+"report.line.certifiedInput" = "仕入税額合計";
+"report.line.invoicedOutput" = "売上税額合計";
+"report.line.estimatedPayable" = "増値税の試算額";
+
+/* 周转税三行 ×2 组：{tax} 取报表制度的 AccountingProfile.taxName，语言取 UI */
+"report.line.paid" = "仕入{tax}";
+"report.line.collected" = "売上{tax}";
+"report.line.payable" = "{tax}の試算額";
+"report.line.inputVAT" = "仕入{tax}";
+"report.line.outputVAT" = "売上{tax}";
+"report.line.vatPayable" = "{tax}の試算額";
+
+/* 含税块 3 行（CN 的声明 section 与另四制度的未声明块共用） */
+"report.line.purchaseTotal" = "仕入税込合計";
+"report.line.salesTotal" = "売上税込合計";
+"report.line.difference" = "税込差額";
+
+/* US Schedule C 25 行（保留 Line N 前缀以便逐行对照） */
+"report.line.line1_grossReceipts" = "Line 1 — 総収入";
+"report.line.line2_returns" = "Line 2 — 返品・値引";
+"report.line.line6_otherIncome" = "Line 6 — その他収入";
+"report.line.line7_grossIncome" = "Line 7 — 総所得";
+"report.line.line8_advertising" = "Line 8 — 広告費";
+"report.line.line9_car" = "Line 9 — 車両費";
+"report.line.line10_commissions" = "Line 10 — 手数料";
+"report.line.line11_contract" = "Line 11 — 契約労務";
+"report.line.line13_depreciation" = "Line 13 — 減価償却";
+"report.line.line15_insurance" = "Line 15 — 保険料";
+"report.line.line16b_interest" = "Line 16b — 利息";
+"report.line.line17_legal" = "Line 17 — 法務・専門家報酬";
+"report.line.line18_office" = "Line 18 — 事務費";
+"report.line.line20_rent" = "Line 20 — 賃借料";
+"report.line.line21_repairs" = "Line 21 — 修繕費";
+"report.line.line22_supplies" = "Line 22 — 消耗品";
+"report.line.line23_taxes" = "Line 23 — 租税公課";
+"report.line.line24a_travel" = "Line 24a — 旅費";
+"report.line.line24b_meals" = "Line 24b — 接待飲食 (50%)";
+"report.line.line25_utilities" = "Line 25 — 水道光熱費";
+"report.line.line26_wages" = "Line 26 — 給与";
+"report.line.line27a_other" = "Line 27a — その他費用";
+"report.line.line30_homeOffice" = "Line 30 — 在宅勤務";
+"report.line.line28_totalExpenses" = "Line 28 — 費用合計";
+"report.line.line31_netProfit" = "Line 31 — 純利益または純損失";
+
+/* US 自雇税 10 行 */
+"report.line.netEarnings" = "自営業純利益";
+"report.line.seEarnings" = "自営業税の課税標準（純利益 × 92.35%）";
+"report.line.socialSecurityTax" = "Social Security（社会保障税） (12.4%)";
+"report.line.medicareTax" = "Medicare（医療保険税） (2.9%)";
+"report.line.additionalMedicare" = "Additional Medicare（追加医療保険税）";
+"report.line.totalSETax" = "自営業税";
+"report.line.annualIncomeTax" = "年間所得税の試算額";
+"report.line.annualSETax" = "年間自営業税の試算額";
+"report.line.totalAnnual" = "年間税額合計の試算額";
+"report.line.quarterlyPayment" = "四半期概算税";
