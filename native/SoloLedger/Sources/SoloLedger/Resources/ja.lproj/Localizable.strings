@@ -345,7 +345,7 @@
 
 /* US 自雇税 10 行 */
 "report.line.netEarnings" = "自営業純利益";
-"report.line.seEarnings" = "自営業税の課税標準(純利益 × 92.35%)";
+"report.line.seEarnings" = "自営業税の課税標準（純利益 × 92.35%）";
 "report.line.socialSecurityTax" = "Social Security（社会保障税） (12.4%)";
 "report.line.medicareTax" = "Medicare（医療保険税） (2.9%)";
 "report.line.additionalMedicare" = "Additional Medicare（追加医療保険税）";
