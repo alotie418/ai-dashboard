@@ -708,6 +708,49 @@ final class AppModel: ObservableObject {
         reloadAll()
     }
 
+    // MARK: - Reports (R8 P3a — state model only; nothing in the UI reaches this yet)
+
+    /// The report page's state. Every non-empty case carries its own year, so the heading and
+    /// the numbers under it cannot come from different years.
+    @Published private(set) var reportState: ReportPageState = .notRequested
+
+    /// The year the picker holds, as typed — four ASCII digits, `0001`–`9999`.
+    ///
+    /// The initialiser here is **the only wall-clock read in the report feature**, and it runs
+    /// once per `AppModel`. Neither `buildReport()` nor anything in `ReportPresenter` /
+    /// `ReportFormat` asks the clock again, so a page left open across midnight on 31 December
+    /// keeps describing the year it was describing.
+    @Published var reportYearText: String = ReportYear.currentYearText()
+
+    var reportYearIsValid: Bool { ReportYear.isValid(reportYearText) }
+
+    /// Build the report for `reportYearText`.
+    ///
+    /// The old state is cleared FIRST. A rebuild after a year change must never leave the
+    /// previous year's figures on screen under the new heading — and because every non-empty
+    /// `ReportPageState` carries its own year, a view that reads the year from the state
+    /// cannot show a mismatched pair even if this ordering were ever changed.
+    ///
+    /// Synchronous on the main actor, deliberately: `ReportBuilder.build` answers from one
+    /// local snapshot in milliseconds, and a `.loading` case would be a spinner no frame ever
+    /// renders. An invalid year does not attempt a build at all — a malformed period would be
+    /// refused as a missing source, which is a true statement about the wrong question.
+    func buildReport() {
+        reportState = .notRequested
+        guard let db = store?.db, ReportYear.isValid(reportYearText) else { return }
+        let year = reportYearText
+        do {
+            switch try ReportBuilder.build(db, period: ReportPeriod(year: year)) {
+            case .report(let report):   reportState = .report(report)
+            case .blocked(let blocker): reportState = .blocked(year: year, blocker)
+            }
+        } catch {
+            // The detail goes to the log and NOT to the UI: `.failed` has nowhere to put it.
+            ReportDiagnostics.buildFailed(year: year, error: error)
+            reportState = .failed(year: year)
+        }
+    }
+
     // MARK: - CSV
 
     func exportCSV(to url: URL) {
