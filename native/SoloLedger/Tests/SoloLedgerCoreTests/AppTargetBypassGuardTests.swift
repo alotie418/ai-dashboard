@@ -38,6 +38,10 @@ final class AppTargetBypassGuardTests: XCTestCase {
         // construction built from `transactions`. A field with one possible value would only
         // suggest the other one is reachable.
         "ReportSource",
+        // Narrowed once it was clear nothing public returns or carries them: rate provenance
+        // reaches the App through `ParameterEffect`/`EffectOrigin`, and a section carries its
+        // id and decision directly.
+        "ReportRateProvenance", "ReportTypePresentation",
     ]
 
     /// What the App SHOULD use. Listed so the guard cannot be satisfied by an App that
@@ -49,8 +53,7 @@ final class AppTargetBypassGuardTests: XCTestCase {
         "PresentedWarning", "PresentedTaxInclusiveSummary", "PresentedParameter",
         "ReportLineUnit", "ReportParameterKey", "StoredSettingState", "ParameterEffect",
         "EffectOrigin", "ParameterConsumption",
-        "ReportFieldPresentation", "ReportRateProvenance",
-        "ReportSectionPresentation", "ReportTypePresentation",
+        "ReportFieldPresentation", "ReportSectionPresentation",
         "ReportRateParameter",
     ]
 

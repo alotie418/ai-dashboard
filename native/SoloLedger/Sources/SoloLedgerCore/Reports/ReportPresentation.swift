@@ -20,9 +20,11 @@ import Foundation
 ///   plain `Double` that can be `NaN` — measured, and the reason
 ///   `malformed-CN-2025.json` records five nulls where `malformed-US-2025.json`
 ///   records zeros;
-/// * `ReportTypes.table(for:)` and `ReportTypeEntry.name` are public, so a view can
-///   enumerate report types **without ever asking** `ReportTypes/availability(for:locale:)`
-///   — which is exactly what plan §7.3 says must not happen.
+/// * `ReportTypes.table(for:)` and `ReportTypeEntry.name` were public when this layer was
+///   written, so a view could enumerate report types **without ever asking**
+///   `ReportTypes/availability(for:locale:)` — exactly what plan §7.3 says must not happen.
+///   P2 narrowed them to `internal`; this layer remains how the module's own code should
+///   ask, and `PresentedSection` is what leaves it.
 ///
 /// So the three funnels below are the point: ``field(_:)-(EstimatedValue)`` for an
 /// estimate, ``field(_:)-(Double)`` for a plain line, and ``reportTypes(locale:)`` for
@@ -131,10 +133,11 @@ enum ReportPresentation {
     ///
     /// **This is the §7.3 combination, and its shape is the enforcement.** The plan's
     /// complaint is not that `availability(for:locale:)` is wrong, it is that
-    /// `ReportTypes.table(for:)` and `ReportTypeEntry.name` are public, so a caller can
-    /// walk the table and render `name` without ever asking. Those two stay public —
-    /// they are the mirrored contract and this phase does not narrow it — so the fix
-    /// here is to offer a door that CANNOT be walked through incorrectly:
+    /// `ReportTypes.table(for:)` and `ReportTypeEntry.name` WERE public, so a caller could
+    /// walk the table and render `name` without ever asking. P2 narrowed both to `internal`
+    /// along with the rest of the subsystem, so that route is now closed at the module
+    /// boundary; this function remains the shape a caller inside the module should use,
+    /// because it cannot be walked through incorrectly:
     /// ``ReportTypePresentation`` carries the stable `id` and the decision, and it
     /// carries no `name`. A view that uses this function has nothing to render the
     /// historical copy FROM.
@@ -213,7 +216,12 @@ public enum ReportFieldPresentation: Equatable, Sendable {
 }
 
 /// Where the rate behind a computed figure came from.
-public enum ReportRateProvenance: Equatable, Sendable {
+/// **INTERNAL.** No public API returns one and no public type carries one: the App-facing
+/// surface expresses rate provenance through ``ParameterEffect``/``EffectOrigin`` on
+/// `PresentedParameter`. Kept because ``ReportPresentation/provenance(_:)`` is the single
+/// mapping point over `ReportRateSetting`, and narrowing it removes a public contract that
+/// nothing could obtain — an unreachable public type is a promise with no way to call it in.
+enum ReportRateProvenance: Equatable, Sendable {
     /// The ledger holds a usable rate the user stored.
     case userConfigured
     /// No row; the regime supplied this percent on the user's behalf. **Must be
@@ -244,10 +252,14 @@ public enum ReportSectionPresentation: Equatable, Sendable {
 /// `zh-CN` slot, a filing word in `eu.js` — mirrored verbatim as a fact about the
 /// engines and never display copy. R8 maps `id` to its own reviewed six-language
 /// strings.
-public struct ReportTypePresentation: Equatable, Sendable {
+/// **INTERNAL**, for the same reason: `PresentedSection` carries the stable `reportTypeID`
+/// and the `ReportSectionPresentation` decision directly, so nothing public ever hands one
+/// of these out. After its initialiser was narrowed it became unobtainable as well as
+/// unreturned — public surface a caller can neither build nor receive.
+struct ReportTypePresentation: Equatable, Sendable {
     /// The engine's stable identifier — `income-statement`, `schedule-c`, `se-tax`, …
-    public let id: String
-    public let section: ReportSectionPresentation
+    let id: String
+    let section: ReportSectionPresentation
 
     /// INTERNAL. Same reason as the other presented types: a forged
     /// `ReportTypePresentation(id:section:)` is a report type paired with an availability

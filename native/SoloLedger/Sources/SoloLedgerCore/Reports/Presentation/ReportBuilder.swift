@@ -3,10 +3,14 @@ import Foundation
 /// The ONE database→report door the App may use.
 ///
 /// Everything the report layer can say is said through ``build(_:period:)``: the regime,
-/// the period, the currency, the source, all four parameter states, every section already
-/// paired with its availability, and every number already classified. Nothing downstream
-/// re-reads `settings`, and nothing downstream can obtain an unclassified value, because
+/// the period, the currency, all four parameter states, every section already paired with
+/// its availability, and every number already classified. Nothing downstream re-reads
+/// `settings`, and nothing downstream can obtain an unclassified value, because
 /// ``PresentedReport`` does not contain one.
+///
+/// A successful result carries no "source": it is by construction built from `transactions`,
+/// because a period the dispatcher would route to the legacy tables stops at
+/// ``ReportBlocker/legacySourceUnavailable`` before any of this runs.
 ///
 /// ## One snapshot
 ///
@@ -139,8 +143,11 @@ public enum ReportBuilder {
     /// (`ReportFetch.rowSQL`) and the realized-cash window (`ReportFetch.cashflowSQL`,
     /// `payment_status IN ('paid','partial')` included). A currency set that did not match
     /// the rows actually taken would gate on one question and compute on another — an
-    /// `unpaid` row whose `payment_date` lands in the period must not count, and neither
-    /// must anything at all when the source is `.legacy`.
+    /// `unpaid` row whose `payment_date` lands in the period must not count.
+    ///
+    /// Only ever called on the transactions path: a legacy period has already returned
+    /// ``ReportBlocker/legacySourceUnavailable``, so this never runs over a table nothing
+    /// will be taken from.
     private static func periodCurrencySet(_ db: SQLiteDatabase,
                                           period: ReportPeriod) throws -> [String] {
         let sql = """
@@ -177,8 +184,11 @@ public enum ReportBuilder {
         if let only = periodCurrencies.first, only != stored {
             return .blocked(.currencyMismatch(storedCurrency: stored, periodCurrency: only))
         }
-        // Empty set — a `.legacy` period, or a period with no rows. Nothing is priced, so
-        // there is nothing for the stored currency to disagree with.
+        // An empty set is still reachable on the transactions path: the period HAS rows, but
+        // none of them is selected by either window — e.g. every row is `unpaid` and dated
+        // outside the P&L bounds by a same-day timestamp. Nothing is priced in that case, so
+        // there is nothing for the stored currency to disagree with. (A legacy period cannot
+        // arrive here at all; it returned `legacySourceUnavailable` earlier.)
         return .resolved(stored)
     }
 

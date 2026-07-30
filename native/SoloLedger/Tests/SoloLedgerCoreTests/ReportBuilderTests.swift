@@ -186,7 +186,7 @@ final class ReportBuilderTests: XCTestCase {
     /// **Counterexample 2 for the currency query.** With no rows dated in the period the
     /// source is `.legacy`, and this app then reads no transaction rows at all — so a PAID
     /// row from another year whose `payment_date` happens to fall inside the period must not
-    /// manufacture a currency, or a block.
+    /// drag the period onto the transactions path.
     func testLegacyStopIgnoresForeignPaidRowWhosePaymentDateFallsInPeriod() throws {
         let db = try makeLedger(seeded: false)
         try addTxn(db, date: "2024-11-01", currency: "USD",
@@ -543,6 +543,60 @@ final class ReportBuilderTests: XCTestCase {
         for intermediate in ["unroundedGrossIncome", "unroundedTotalExpenses", "rawMealsTotal"] {
             XCTAssertFalse(ids.contains(intermediate), "\(intermediate) is not a contract field")
         }
+    }
+
+    /// **The notes mapping.** `ReportBuilder.notes(locale:id:ctx:)` hand-writes two ordered
+    /// facts for exactly one pair, and nothing else asserted them: the public-API test walks
+    /// `section.notes` but would pass over an empty array, so deleting both notes — or
+    /// swapping them — was invisible.
+    func testOnlyUSSeTaxCarriesNotesAndTheirValuesAndOrderMatchTheEngine() throws {
+        var pairsWithNotes: [String] = []
+
+        for locale in ["CN", "US", "JP", "EU", "KR", "TW"] {
+            let db = try makeLedger(locale: "\"\(locale)\"", seeded: false)
+            try addTxn(db, type: "income", date: "2025-03-01", amount: 8000, taxAmount: 920)
+            try addTxn(db, type: "expense", date: "2025-04-01", amount: 3000, taxAmount: 340)
+            let r = try report(try ReportBuilder.build(db, locale: locale, period: period("2025")))
+            let ctx = try engineContext(db, locale: locale)
+
+            for section in r.sections where !section.notes.isEmpty {
+                pairsWithNotes.append("\(locale)/\(section.reportTypeID)")
+            }
+            for section in r.sections {
+                guard locale == "US", section.reportTypeID == "se-tax" else {
+                    XCTAssertTrue(section.notes.isEmpty,
+                                  "\(locale)/\(section.reportTypeID) must carry no notes")
+                    continue
+                }
+                // Exactly two, in this order.
+                XCTAssertEqual(section.notes,
+                               [.estimatedTaxDueDates(USReportEngine.estimatedTax(ctx).dueDates),
+                                .selfEmploymentParameterYear(
+                                    USReportEngine.selfEmploymentTax(ctx).paramYear)],
+                               "notes must equal the engine's own values, in this order")
+                // GUARD, not assert, before indexing: a dropped note must FAIL this test, not
+                // trap out of the process — a crash produces no summary line and can take
+                // other tests in the same run with it. (Found by mutation: deleting both
+                // notes asserted correctly and then died on `notes[0]`.)
+                guard section.notes.count == 2 else {
+                    XCTFail("US/se-tax must carry two ordered facts, got \(section.notes.count)")
+                    continue
+                }
+                // Each value spelled out too, so a failure names which one drifted.
+                guard case .estimatedTaxDueDates(let dates) = section.notes[0] else {
+                    return XCTFail("the due dates must come first")
+                }
+                XCTAssertEqual(dates, USReportEngine.estimatedTax(ctx).dueDates)
+                XCTAssertEqual(dates.count, 4, "us.js:106 emits four quarterly dates")
+                guard case .selfEmploymentParameterYear(let year) = section.notes[1] else {
+                    return XCTFail("the parameter year must come second")
+                }
+                XCTAssertEqual(year, USReportEngine.selfEmploymentTax(ctx).paramYear)
+            }
+        }
+
+        XCTAssertEqual(pairsWithNotes, ["US/se-tax"],
+                       "exactly one of the 13 pairs carries notes")
     }
 
     private func engineContext(_ db: SQLiteDatabase, locale: String) throws -> ReportContext {

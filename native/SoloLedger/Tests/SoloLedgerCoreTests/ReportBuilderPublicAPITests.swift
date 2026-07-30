@@ -139,11 +139,14 @@ final class ReportBuilderPublicAPITests: XCTestCase {
 
     /// The presented types are `Equatable` and `Sendable` from outside the module — a view
     /// model will hold them across actor boundaries and diff them.
+    ///
+    /// `ReportRateProvenance` and `ReportTypePresentation` are deliberately absent: no public
+    /// API returns either and no public type carries one, so they were narrowed to `internal`
+    /// rather than left as surface a caller can neither build nor receive.
     func testPresentedTypesAreEquatableAndSendableFromOutside() {
         func requireSendable<T: Sendable & Equatable>(_ value: T) -> Bool { value == value }
         XCTAssertTrue(requireSendable(ReportFieldPresentation.amount(1)))
         XCTAssertTrue(requireSendable(ReportSectionPresentation.renderInFull))
-        XCTAssertTrue(requireSendable(ReportRateProvenance.userConfigured))
         XCTAssertTrue(requireSendable(ReportPeriod(year: "2025")))
         XCTAssertTrue(requireSendable(ReportLineUnit.money))
         XCTAssertTrue(requireSendable(ReportParameterKey.vatRate))
