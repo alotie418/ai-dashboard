@@ -354,3 +354,101 @@
 "report.line.annualSETax" = "年間自営業税の試算額";
 "report.line.totalAnnual" = "年間税額合計の試算額";
 "report.line.quarterlyPayment" = "四半期概算税";
+
+/* ── R8 P3c：报表状态与参数披露文案（7 blocker + field 三态 + 参数四轴 + 现金流 + 月度 + 附注/提示 + 页面 chrome = 79 键） ── */
+/* 7 个 blocker：标题 + 正文。七条正文一律以「账本文件未被修改」收尾——阻断态最容易被读成数据出事了，而事实相反 */
+"report.blocker.accountingLocaleNotConfigured.title" = "この台帳に会計方式が記録されていません";
+"report.blocker.accountingLocaleNotConfigured.body" = "レポートはいずれかの会計方式で計算されますが、この台帳にはその記録がありません。本 App が代わりに選ぶことはしないため、レポートは作成していません。「設定」の「会計」タブで会計方式を選べます。台帳ファイルは変更されていません。";
+"report.blocker.accountingLocaleInvalid.title" = "台帳の会計方式を認識できません";
+"report.blocker.accountingLocaleInvalid.body" = "台帳の会計方式の項目は、本 App が認識する 6 種類のいずれでもないため、レポートは作成していません。台帳に実際に入っている内容を下にそのまま表示します。「設定」の「会計」タブで会計方式を選べます。台帳ファイルは変更されていません。";
+"report.blocker.currencyNotConfigured.title" = "この台帳に通貨が記録されていません";
+"report.blocker.currencyNotConfigured.body" = "レポートはいずれかの通貨で金額を示しますが、この台帳にはその記録がありません。本 App が代わりに選ぶことはしないため、レポートは作成していません。本 App にはまだ通貨を変更する手段がありません。台帳ファイルは変更されていません。";
+"report.blocker.currencyInvalid.title" = "台帳の通貨は使用できません";
+"report.blocker.currencyInvalid.body" = "台帳の通貨の項目は使用できる通貨コードではないため、レポートは作成していません。台帳に実際に入っている内容を下にそのまま表示します。本 App にはまだ通貨を変更する手段がありません。台帳ファイルは変更されていません。";
+"report.blocker.legacySourceUnavailable.title" = "この期間のレポートは作成できません";
+"report.blocker.legacySourceUnavailable.body" = "本 App にはこの期間のレポート対象となる取引がなく、旧形式のレポートデータも読み取りません。そのため、この期間に本当に取引がなかったのか、記録が旧形式のデータに残っているのかを判断できません。台帳ファイルは変更されていません。";
+"report.blocker.currencyMismatch.title" = "台帳の通貨と当期の記録の通貨が一致しません";
+"report.blocker.currencyMismatch.body" = "台帳に記録された通貨と、当期の取引が実際に建てられている通貨が異なります。レポートはこれらの金額をそのまま合算するため、通貨が異なると合計に意味がなくなります。したがってレポートは作成していません。台帳ファイルは変更されていません。";
+"report.blocker.multipleCurrenciesInPeriod.title" = "当期に複数の通貨があります";
+"report.blocker.multipleCurrenciesInPeriod.body" = "当期の取引は複数の通貨で建てられています。レポートは為替換算を行わないため、通貨をまたいで金額を合算しても意味のある数字になりません。したがってレポートは作成していません。台帳ファイルは変更されていません。";
+
+/* blocker 附带的事实行（视图层；带占位符） */
+"report.blocker.storedCurrency" = "台帳に記録された通貨：{currency}";
+"report.blocker.periodCurrencies" = "当期の記録で使用されている通貨：{codes}";
+"report.blocker.regimeDefaultCurrency" = "この会計方式の既定通貨：{currency}";
+
+/* 一个字段的三个非数值态：一律说「未计算」，不说 0、—、N/A */
+"report.field.corrupted" = "この項目のデータは壊れており、金額を表示できません";
+"report.field.notConfigured" = "未計算：台帳にこの項目がなく、この会計方式に既定値もありません";
+"report.field.needsRepair" = "未計算：台帳のこの項目の内容は使用できる数値ではありません";
+
+/* 参数披露：账本中的状态 / 本次报表的采用情况 / 来源 / 本制度是否读取 */
+"report.params.title" = "レポート計算パラメータ";
+"report.params.axis.stored" = "台帳での状態";
+"report.params.axis.effect" = "本レポートでの扱い";
+"report.params.axis.consumption" = "この会計方式が読み取るか";
+"report.param.stored.absent" = "台帳にありません";
+"report.param.stored.usable" = "使用できる数値が保存されています";
+"report.param.stored.needsRepair" = "保存されていますが、使用できる数値ではありません";
+"report.param.effect.applied" = "本レポートはこの数値で計算しました";
+"report.param.effect.nonFinite" = "本レポートに渡されたのは計算に使えない値でした";
+"report.param.effect.refused" = "本レポートはこの項目から何も計算していません";
+"report.param.origin.storedValue" = "台帳に保存された値によります";
+"report.param.origin.regimeDefault" = "このパラメータにはユーザー値が保存されていません。本レポートは会計方式の既定値 {percent}% を使用しました。";
+"report.param.origin.dispatcherFallback" = "台帳にこの項目がないため、本レポートは 0 として計算しました。これは計算の拒否ではなく実際のゼロです";
+"report.param.consumption.consumed" = "この会計方式は本レポートでこの項目を読み取ります";
+"report.param.consumption.storedButUnread" = "この会計方式は本レポートでこの項目を読み取りません。";
+
+/* 四个参数名。{tax} 取报表制度的 AccountingProfile.taxName，语言取 UI */
+"report.param.name.vatRate" = "{tax}率";
+"report.param.name.surchargeRate" = "附加税率";
+"report.param.name.incomeTaxRate" = "所得税率";
+"report.param.name.adminExpenseAnnual" = "年間管理費用";
+
+/* 现金流（管理口径）。四个区名 + 一条共享的「无法推算」说明——不可推算不是零 */
+"report.cashflow.title" = "キャッシュフロー（管理目的）";
+"report.cashflow.operating.title" = "営業活動キャッシュフロー";
+"report.cashflow.inflow" = "営業活動による現金流入";
+"report.cashflow.outflow" = "営業活動による現金流出";
+"report.cashflow.net" = "営業活動による純キャッシュフロー";
+"report.cashflow.investing" = "投資活動";
+"report.cashflow.financing" = "財務活動";
+"report.cashflow.beginningCash" = "期首現金";
+"report.cashflow.endingCash" = "期末現金";
+"report.cashflow.notDerivable" = "本 App のデータモデルには現金勘定・固定資産台帳・負債・期首残高がないため、この項目は算出できません。ゼロではありません。";
+"report.cashflow.basisNote" = "管理目的・現金主義・法定の計算書ではありません。";
+"report.cashflow.vsProfitNote" = "キャッシュフローは実際の入出金日、経営損益サマリーは取引日または発生日で集計するため、両者は一致しないことがあります。";
+
+/* 按月收支。cost/profit 的口径与损益表的同名行不同（cn.js:99 汇总全部支出，cn.js:28 只取 COGS），故不共用标签 */
+"report.monthly.title" = "月別収支";
+"report.monthly.month" = "月";
+"report.monthly.revenue" = "売上";
+"report.monthly.cost" = "支出合計";
+"report.monthly.profit" = "収支差額";
+
+/* 附注与提示 */
+"report.notes.title" = "注記";
+"report.warnings.title" = "留意事項";
+"report.note.estimatedTaxDueDates" = "期限：{dates}";
+"report.note.selfEmploymentParameterYear" = "適用した自営業税パラメータの年度：{year}";
+"report.warning.estimatedQuarterlyPayment" = "四半期概算税の試算額：{amount}";
+"report.warning.mealsLimitedToFiftyPercent" = "接待飲食費は 50% で計上しています（Line 24b）";
+
+/* 页面 chrome：年份、空态、I/O 故障、打开设置、币种与期间、估算标记 */
+"report.page.title" = "レポート";
+"report.year.label" = "年度";
+"report.year.invalid" = "4 桁の年（0001–9999）を入力してください。";
+"report.action.build" = "レポートを作成";
+"report.notRequested.title" = "レポートは未作成です";
+"report.notRequested.message" = "年度を選んで「レポートを作成」を押してください。";
+"report.error.title" = "台帳を読み取れませんでした";
+"report.error.message" = "台帳の読み取り中に問題が発生したため、レポートは作成されませんでした。台帳ファイルは変更されていません。再試行できます。";
+"report.action.retry" = "再試行";
+"report.action.openSettings" = "設定を開く";
+"report.action.openSettings.hint" = "メニューバーの「SoloLedger ▸ 設定…」から「会計」タブを開くこともできます。";
+"report.currency.caption" = "通貨：{currency}";
+"report.currency.note" = "通貨コードは台帳の記録をそのまま使用しており、本 App は有効性を検証していません。";
+"report.currency.formatNote" = "この通貨コードは 3 文字の形式ではありません。金額は台帳の記録どおりに表示しており、換算も置き換えも行っていません。";
+"report.period.caption" = "対象期間：{from} – {to}";
+"report.estimate.badge" = "概算 · 経営管理の参考用";
+"report.storedText.label" = "台帳に実際に入っている内容";

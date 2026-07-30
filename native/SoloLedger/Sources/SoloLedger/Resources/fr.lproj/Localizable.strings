@@ -354,3 +354,101 @@
 "report.line.annualSETax" = "Taxe sur le travail indépendant annuelle (estimation)";
 "report.line.totalAnnual" = "Total annuel (estimation)";
 "report.line.quarterlyPayment" = "Acompte trimestriel";
+
+/* ── R8 P3c：报表状态与参数披露文案（7 blocker + field 三态 + 参数四轴 + 现金流 + 月度 + 附注/提示 + 页面 chrome = 79 键） ── */
+/* 7 个 blocker：标题 + 正文。七条正文一律以「账本文件未被修改」收尾——阻断态最容易被读成数据出事了，而事实相反 */
+"report.blocker.accountingLocaleNotConfigured.title" = "Aucun régime comptable n'est enregistré dans ce livre";
+"report.blocker.accountingLocaleNotConfigured.body" = "Un rapport se calcule selon un régime comptable, et ce livre n'en enregistre aucun. Cette app n'en choisit pas un à votre place, donc aucun rapport n'a été produit. Vous pouvez en choisir un dans l'onglet Comptabilité des Réglages. Le fichier de comptes n'a pas été modifié.";
+"report.blocker.accountingLocaleInvalid.title" = "Le régime comptable enregistré n'est pas reconnu";
+"report.blocker.accountingLocaleInvalid.body" = "L'entrée « régime comptable » de ce livre ne correspond à aucun des six que cette app connaît, donc aucun rapport n'a été produit. Le contenu réel du livre est affiché ci-dessous, tel quel. Vous pouvez choisir un régime dans l'onglet Comptabilité des Réglages. Le fichier de comptes n'a pas été modifié.";
+"report.blocker.currencyNotConfigured.title" = "Aucune devise n'est enregistrée dans ce livre";
+"report.blocker.currencyNotConfigured.body" = "Un rapport exprime les montants dans une devise, et ce livre n'en enregistre aucune. Cette app n'en choisit pas une à votre place, donc aucun rapport n'a été produit. Cette app ne permet pas encore de changer la devise. Le fichier de comptes n'a pas été modifié.";
+"report.blocker.currencyInvalid.title" = "La devise enregistrée est inutilisable";
+"report.blocker.currencyInvalid.body" = "L'entrée « devise » de ce livre n'est pas un code de devise utilisable, donc aucun rapport n'a été produit. Le contenu réel du livre est affiché ci-dessous, tel quel. Cette app ne permet pas encore de changer la devise. Le fichier de comptes n'a pas été modifié.";
+"report.blocker.legacySourceUnavailable.title" = "Aucun rapport ne peut être produit pour cette période";
+"report.blocker.legacySourceUnavailable.body" = "Cette app ne dispose d'aucune opération exploitable pour cette période et ne lit pas les données de l'ancienne version. Elle ne peut donc pas déterminer s'il n'y a réellement eu aucune activité ou si les enregistrements se trouvent encore dans les anciennes données. Le fichier de comptes n'a pas été modifié.";
+"report.blocker.currencyMismatch.title" = "La devise du livre et celle de la période ne concordent pas";
+"report.blocker.currencyMismatch.body" = "La devise enregistrée dans le livre n'est pas celle dans laquelle les opérations de cette période sont libellées. Un rapport additionne ces montants, et les additionner entre deux devises donne un chiffre dénué de sens ; aucun rapport n'a donc été produit. Le fichier de comptes n'a pas été modifié.";
+"report.blocker.multipleCurrenciesInPeriod.title" = "Cette période comporte plusieurs devises";
+"report.blocker.multipleCurrenciesInPeriod.body" = "Les opérations de cette période sont libellées dans plusieurs devises. Un rapport n'effectue aucune conversion de change, et additionner des montants de devises différentes donne un chiffre dénué de sens ; aucun rapport n'a donc été produit. Le fichier de comptes n'a pas été modifié.";
+
+/* blocker 附带的事实行（视图层；带占位符） */
+"report.blocker.storedCurrency" = "Devise enregistrée dans le livre : {currency}";
+"report.blocker.periodCurrencies" = "Devises utilisées par les écritures de cette période : {codes}";
+"report.blocker.regimeDefaultCurrency" = "Devise préréglée de ce régime comptable : {currency}";
+
+/* 一个字段的三个非数值态：一律说「未计算」，不说 0、—、N/A */
+"report.field.corrupted" = "Cette donnée est endommagée et ne peut pas être affichée";
+"report.field.notConfigured" = "Non calculé : le livre ne contient pas ce paramètre et ce régime comptable n'a pas de valeur par défaut";
+"report.field.needsRepair" = "Non calculé : ce que le livre contient pour ce paramètre n'est pas un nombre utilisable";
+
+/* 参数披露：账本中的状态 / 本次报表的采用情况 / 来源 / 本制度是否读取 */
+"report.params.title" = "Paramètres de calcul du rapport";
+"report.params.axis.stored" = "Dans le livre";
+"report.params.axis.effect" = "Utilisé par ce rapport";
+"report.params.axis.consumption" = "Lu par ce régime comptable";
+"report.param.stored.absent" = "Absent du livre";
+"report.param.stored.usable" = "Un nombre utilisable est enregistré";
+"report.param.stored.needsRepair" = "Une valeur est enregistrée, mais ce n'est pas un nombre utilisable";
+"report.param.effect.applied" = "Ce rapport a été calculé avec cette valeur";
+"report.param.effect.nonFinite" = "Ce rapport a reçu une valeur inutilisable en calcul";
+"report.param.effect.refused" = "Ce rapport n'a rien calculé à partir de ce paramètre";
+"report.param.origin.storedValue" = "Provient de la valeur enregistrée dans le livre";
+"report.param.origin.regimeDefault" = "Aucune valeur utilisateur n'est enregistrée pour ce paramètre ; ce rapport a utilisé la valeur préréglée du régime comptable, {percent} %.";
+"report.param.origin.dispatcherFallback" = "Le livre ne contient pas cette entrée ; ce rapport a donc utilisé 0 — un vrai zéro, et non un refus de calculer";
+"report.param.consumption.consumed" = "Ce régime comptable lit ce paramètre dans ce rapport";
+"report.param.consumption.storedButUnread" = "Ce régime comptable ne lit pas ce paramètre dans ce rapport.";
+
+/* 四个参数名。{tax} 取报表制度的 AccountingProfile.taxName，语言取 UI */
+"report.param.name.vatRate" = "Taux {tax}";
+"report.param.name.surchargeRate" = "Taux additionnel";
+"report.param.name.incomeTaxRate" = "Taux d'impôt sur les bénéfices";
+"report.param.name.adminExpenseAnnual" = "Frais administratifs annuels";
+
+/* 现金流（管理口径）。四个区名 + 一条共享的「无法推算」说明——不可推算不是零 */
+"report.cashflow.title" = "Flux de trésorerie (base de gestion)";
+"report.cashflow.operating.title" = "Flux de trésorerie d'exploitation";
+"report.cashflow.inflow" = "Entrées de trésorerie (exploitation)";
+"report.cashflow.outflow" = "Sorties de trésorerie (exploitation)";
+"report.cashflow.net" = "Flux net d'exploitation";
+"report.cashflow.investing" = "Activités d'investissement";
+"report.cashflow.financing" = "Activités de financement";
+"report.cashflow.beginningCash" = "Trésorerie en début de période";
+"report.cashflow.endingCash" = "Trésorerie en fin de période";
+"report.cashflow.notDerivable" = "Le modèle de données de cette app ne comporte ni comptes de trésorerie, ni registre d'immobilisations, ni passifs, ni soldes d'ouverture ; cette rubrique ne peut donc pas être calculée — ce n'est pas zéro.";
+"report.cashflow.basisNote" = "Base de gestion · comptabilité de caisse · ce n'est pas un document légal.";
+"report.cashflow.vsProfitNote" = "Les flux sont datés au paiement réel ; l'aperçu du résultat est daté à la transaction ou à l'engagement, les deux peuvent donc différer.";
+
+/* 按月收支。cost/profit 的口径与损益表的同名行不同（cn.js:99 汇总全部支出，cn.js:28 只取 COGS），故不共用标签 */
+"report.monthly.title" = "Mois par mois";
+"report.monthly.month" = "Mois";
+"report.monthly.revenue" = "CA";
+"report.monthly.cost" = "Total des dépenses";
+"report.monthly.profit" = "Recettes moins dépenses";
+
+/* 附注与提示 */
+"report.notes.title" = "Notes";
+"report.warnings.title" = "À noter";
+"report.note.estimatedTaxDueDates" = "Échéance : {dates}";
+"report.note.selfEmploymentParameterYear" = "Paramètres de la taxe sur le travail indépendant de {year} appliqués";
+"report.warning.estimatedQuarterlyPayment" = "Acompte trimestriel estimé : {amount}";
+"report.warning.mealsLimitedToFiftyPercent" = "Les repas sont comptabilisés à 50 % (Line 24b)";
+
+/* 页面 chrome：年份、空态、I/O 故障、打开设置、币种与期间、估算标记 */
+"report.page.title" = "Rapports";
+"report.year.label" = "Exercice";
+"report.year.invalid" = "Saisissez une année à quatre chiffres (0001–9999).";
+"report.action.build" = "Générer le rapport";
+"report.notRequested.title" = "Aucun rapport pour l'instant";
+"report.notRequested.message" = "Choisissez une année, puis touchez Générer le rapport.";
+"report.error.title" = "Le livre n'a pas pu être lu";
+"report.error.message" = "Un problème est survenu à la lecture du livre, aucun rapport n'a été produit. Le fichier de comptes n'a pas été modifié ; vous pouvez réessayer.";
+"report.action.retry" = "Réessayer";
+"report.action.openSettings" = "Ouvrir les Réglages";
+"report.action.openSettings.hint" = "Vous pouvez aussi choisir SoloLedger ▸ Réglages… dans la barre des menus, puis ouvrir l'onglet Comptabilité.";
+"report.currency.caption" = "Devise : {currency}";
+"report.currency.note" = "Le code de devise provient du livre ; cette app ne le vérifie par rapport à aucune liste.";
+"report.currency.formatNote" = "Ce code de devise n'est pas au format à trois lettres. Les montants sont affichés tels que le livre les enregistre, sans conversion ni substitution.";
+"report.period.caption" = "Période : {from} – {to}";
+"report.estimate.badge" = "Estimation · référence de gestion uniquement";
+"report.storedText.label" = "Ce que le livre contient réellement";
