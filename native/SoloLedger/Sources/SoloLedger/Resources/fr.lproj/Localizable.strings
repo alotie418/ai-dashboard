@@ -251,3 +251,106 @@
 "restore.error.invalidBundle" = "La sauvegarde choisie est invalide ou endommagée. Rien n'a été modifié.";
 "restore.error.safetyBackupFailed" = "Impossible de sauvegarder le livre actuel ; la restauration a été annulée. Vos données sont intactes.";
 "restore.error.failed" = "Échec de la restauration. Votre sauvegarde de sécurité est conservée dans le dossier Backups.";
+
+/* ── R8 P3b：报表结构文案（13 section 标题 + 4 含税块 + 2 条说明 + 63 line 标签 = 82 键） ── */
+/* 13 个 (会计制度, 报表类型) 标题 —— 一律为「概览/统计/汇总」等管理口径措辞，无一使用法定报表名 */
+"report.section.CN.incomeStatement" = "Aperçu du résultat (gestion)";
+"report.section.CN.vatSummary" = "Statistiques TVA";
+"report.section.CN.taxInclusive" = "Résumé TTC (rapprochement)";
+"report.section.US.scheduleC" = "Aperçu du résultat (Schedule C)";
+"report.section.US.seTax" = "Taxe sur le travail indépendant";
+"report.section.JP.incomeStatement" = "Aperçu du résultat (gestion)";
+"report.section.JP.consumptionTax" = "Résumé taxe consommation";
+"report.section.EU.profitLoss" = "Aperçu du résultat (gestion)";
+"report.section.EU.vatReturn" = "Résumé TVA";
+"report.section.KR.incomeStatement" = "Aperçu du résultat (gestion)";
+"report.section.KR.vatSummary" = "Résumé TVA (Corée)";
+"report.section.TW.incomeStatement" = "Aperçu du résultat (gestion)";
+"report.section.TW.businessTax" = "Résumé taxe activité";
+
+/* JP/EU/KR/TW 只发出、不声明报表类型的含税块标题 */
+"report.block.JP.taxInclusive" = "Résumé TTC (rapprochement)";
+"report.block.EU.taxInclusive" = "Résumé TTC TVA (rapprochement)";
+"report.block.KR.taxInclusive" = "Résumé TTC TVA Corée (rapprochement)";
+"report.block.TW.taxInclusive" = "Résumé TTC (rapprochement)";
+
+/* section 部分行未镜像时的说明（该状态今日无生产者，键仍须存在） */
+"report.section.missingLines" = "Certaines lignes de ce type de rapport ne sont pas encore calculées par cette app. Une ligne absente ci-dessous n'est pas une ligne dont la valeur est nulle.";
+
+/* CN 周转税块的历史别名说明：两对行由同一表达式产出，如实呈现并说明 */
+"report.section.CN.vatSummary.aliasNote" = "La source du rapport pour ce régime comptable produit un même montant sous deux noms historiques : « TVA déductible (total) » et « TVA déductible cumulée » désignent le même chiffre, de même que « TVA collectée (total) » et « TVA collectée cumulée ». Les deux sont affichés tels que la source les produit ; cela ne signifie pas qu'ils diffèrent sur le plan comptable.";
+
+/* 损益族 14 行（regime 语境由上方 section 标题承担，故标签共享） */
+"report.line.salesRevenue" = "Chiffre d'affaires";
+"report.line.revenue" = "Chiffre d'affaires";
+"report.line.costOfSales" = "Coût des ventes";
+"report.line.costOfGoodsSold" = "Coût des marchandises vendues";
+"report.line.operatingExpenses" = "Charges d'exploitation";
+"report.line.grossProfit" = "Marge brute";
+"report.line.grossMargin" = "Taux de marge brute";
+"report.line.shippingFee" = "Frais de livraison";
+"report.line.adminExpense" = "Frais administratifs";
+"report.line.operatingProfit" = "Résultat d'exploitation";
+"report.line.taxSurcharge" = "Taxes et surtaxes";
+"report.line.incomeTax" = "Impôt sur le revenu";
+"report.line.netProfit" = "Bénéfice net";
+"report.line.netMargin" = "Marge nette";
+
+/* CN 周转税 5 行 */
+"report.line.cumulativeInput" = "TVA déductible cumulée";
+"report.line.cumulativeOutput" = "TVA collectée cumulée";
+"report.line.certifiedInput" = "TVA déductible (total)";
+"report.line.invoicedOutput" = "TVA collectée (total)";
+"report.line.estimatedPayable" = "TVA estimée";
+
+/* 周转税三行 ×2 组：{tax} 取报表制度的 AccountingProfile.taxName，语言取 UI */
+"report.line.paid" = "{tax} déductible";
+"report.line.collected" = "{tax} collectée";
+"report.line.payable" = "{tax} estimée";
+"report.line.inputVAT" = "{tax} déductible";
+"report.line.outputVAT" = "{tax} collectée";
+"report.line.vatPayable" = "{tax} estimée";
+
+/* 含税块 3 行（CN 的声明 section 与另四制度的未声明块共用） */
+"report.line.purchaseTotal" = "Total achats TTC";
+"report.line.salesTotal" = "Total ventes TTC";
+"report.line.difference" = "Différence TTC";
+
+/* US Schedule C 25 行（保留 Line N 前缀以便逐行对照） */
+"report.line.line1_grossReceipts" = "Line 1 — Recettes brutes";
+"report.line.line2_returns" = "Line 2 — Retours et remises";
+"report.line.line6_otherIncome" = "Line 6 — Autres revenus";
+"report.line.line7_grossIncome" = "Line 7 — Revenu brut";
+"report.line.line8_advertising" = "Line 8 — Publicité";
+"report.line.line9_car" = "Line 9 — Véhicules";
+"report.line.line10_commissions" = "Line 10 — Commissions";
+"report.line.line11_contract" = "Line 11 — Sous-traitance";
+"report.line.line13_depreciation" = "Line 13 — Amortissement";
+"report.line.line15_insurance" = "Line 15 — Assurance";
+"report.line.line16b_interest" = "Line 16b — Intérêts";
+"report.line.line17_legal" = "Line 17 — Frais juridiques et professionnels";
+"report.line.line18_office" = "Line 18 — Frais de bureau";
+"report.line.line20_rent" = "Line 20 — Loyer";
+"report.line.line21_repairs" = "Line 21 — Réparations";
+"report.line.line22_supplies" = "Line 22 — Fournitures";
+"report.line.line23_taxes" = "Line 23 — Taxes et licences";
+"report.line.line24a_travel" = "Line 24a — Déplacements";
+"report.line.line24b_meals" = "Line 24b — Repas (50%)";
+"report.line.line25_utilities" = "Line 25 — Services publics";
+"report.line.line26_wages" = "Line 26 — Salaires";
+"report.line.line27a_other" = "Line 27a — Autres frais";
+"report.line.line30_homeOffice" = "Line 30 — Bureau à domicile";
+"report.line.line28_totalExpenses" = "Line 28 — Total des dépenses";
+"report.line.line31_netProfit" = "Line 31 — Bénéfice net (ou perte)";
+
+/* US 自雇税 10 行 */
+"report.line.netEarnings" = "Bénéfice net d'activité indépendante";
+"report.line.seEarnings" = "Base imposable (bénéfice net × 92,35 %)";
+"report.line.socialSecurityTax" = "Social Security (sécurité sociale) (12.4%)";
+"report.line.medicareTax" = "Medicare (assurance maladie) (2.9%)";
+"report.line.additionalMedicare" = "Additional Medicare (taxe additionnelle)";
+"report.line.totalSETax" = "Taxe sur le travail indépendant";
+"report.line.annualIncomeTax" = "Impôt sur le revenu annuel (estimation)";
+"report.line.annualSETax" = "Taxe sur le travail indépendant annuelle (estimation)";
+"report.line.totalAnnual" = "Total annuel (estimation)";
+"report.line.quarterlyPayment" = "Acompte trimestriel";

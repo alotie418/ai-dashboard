@@ -383,6 +383,53 @@ enum ReportPresenter {
         return AccountingProfile.profile(for: locale).taxName(language: uiLanguage)
     }
 
+    // MARK: - A line's finished label
+
+    /// One line's label, ready to draw — or a stated reason there is none.
+    ///
+    /// Three cases rather than a `String?` for the reason ``LineLabel`` has two: the branch a
+    /// caller writes for `nil` is the one that skips the row, and a report line that silently
+    /// disappears is worse than one that says it could not be named. Both refusals are
+    /// unreachable for a report `ReportBuilder` can produce, and the tests are what say so.
+    enum LineLabelText: Equatable {
+        case text(String)
+        /// The builder emitted a line id this layer does not know.
+        case unmapped(id: String)
+        /// The copy carries `{tax}` and the report's accounting regime is not one of the six,
+        /// so there is no tax name to put there. Deliberately NOT "substitute something
+        /// plausible": a label reading `采购` with the tax silently dropped looks finished and
+        /// is wrong, which is the failure this whole layer is built to avoid.
+        case unresolvedTaxName(id: String)
+    }
+
+    /// Resolve one line's label: look up its key, then fill `{tax}` when the key declares it.
+    ///
+    /// `localized` is the app's own lookup (`AppModel.t`), passed in rather than reached for,
+    /// so this stays a pure function over its inputs and a test can drive all six languages
+    /// without a running app.
+    ///
+    /// The regime comes from the REPORT and the language from the UI — the split L8 fixes.
+    /// Which tax it is, is a fact about the report and must not be re-derived from the current
+    /// settings, which the user may have changed since the report was built; what to call it,
+    /// is a fact about the reader.
+    static func lineLabelText(for id: String, reportLocale: String, uiLanguage: String,
+                              localized: (String) -> String) -> LineLabelText {
+        guard case .key(let key) = lineLabel(for: id) else { return .unmapped(id: id) }
+        let copy = localized(key)
+        guard taxInterpolatedLineIDs.contains(id) else { return .text(copy) }
+        guard let tax = turnoverTaxName(reportLocale: reportLocale, uiLanguage: uiLanguage),
+              !tax.isEmpty else { return .unresolvedTaxName(id: id) }
+        return .text(copy.replacingOccurrences(of: taxToken, with: tax))
+    }
+
+    /// The one token this layer substitutes.
+    ///
+    /// ``requiredPlaceholders`` states the same token independently — the copy contract and
+    /// the substitution are two different claims and are written separately on purpose. A test
+    /// asserts they agree, so drift between them fails rather than silently leaving `{tax}` on
+    /// screen.
+    static let taxToken = "{tax}"
+
     // MARK: - Placeholder contract
 
     /// The `{token}` set every listed key's copy MUST carry, in all six languages.
