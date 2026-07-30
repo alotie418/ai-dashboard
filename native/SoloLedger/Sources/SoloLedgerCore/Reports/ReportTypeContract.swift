@@ -5,8 +5,8 @@ import Foundation
 ///
 /// The `id` is a stable identifier. The `name` map is HISTORICAL COPY and is
 /// mirrored verbatim, gaps and all — see ``ReportTypeEntry/name``.
-public struct ReportTypeEntry: Equatable, Sendable {
-    public let id: String
+struct ReportTypeEntry: Equatable, Sendable {
+    let id: String
 
     /// The engine's own `name` map, byte for byte, INCLUDING what is wrong with it.
     ///
@@ -46,9 +46,9 @@ public struct ReportTypeEntry: Equatable, Sendable {
     /// at all. Deliberately, there is **no `name(for language:)` accessor here**:
     /// any such helper would have to invent a fallback, and inventing a fallback is
     /// how historical copy escapes into a UI.
-    public let name: [String: String]
+    let name: [String: String]
 
-    public init(id: String, name: [String: String]) {
+    init(id: String, name: [String: String]) {
         self.id = id
         self.name = name
     }
@@ -66,7 +66,7 @@ public struct ReportTypeEntry: Equatable, Sendable {
 /// can be checked by machine rather than believed:
 /// `ReportBatch4ParityTests.testAvailabilityMatchesWhatTheGoldensShowIsMirrored`
 /// derives them from the committed golden blocks and asserts the table below.
-public enum ReportTypeAvailability: Equatable, Sendable {
+enum ReportTypeAvailability: Equatable, Sendable {
     /// Every field the golden block carries is produced by the native mirror.
     case mirrored
     /// Some fields are produced and some are not. **Rendering this as a finished
@@ -78,10 +78,10 @@ public enum ReportTypeAvailability: Equatable, Sendable {
 }
 
 /// The six engines' `reportTypes` arrays, mirrored verbatim.
-public enum ReportTypes {
+enum ReportTypes {
 
     /// `cn.js:4-8`.
-    public static let cn: [ReportTypeEntry] = [
+    static let cn: [ReportTypeEntry] = [
         ReportTypeEntry(id: "income-statement",
                         name: ["zh-CN": "损益表（利润表）", "en": "Income Statement (P&L)"]),
         ReportTypeEntry(id: "vat-summary",
@@ -94,7 +94,7 @@ public enum ReportTypes {
     ]
 
     /// `jp.js:3-6`. Both `zh-CN` values are the `ja` value — defect 2 above.
-    public static let jp: [ReportTypeEntry] = [
+    static let jp: [ReportTypeEntry] = [
         ReportTypeEntry(id: "income-statement",
                         name: ["zh-CN": "損益計算書", "en": "Income Statement (P&L)", "ja": "損益計算書"]),
         ReportTypeEntry(id: "consumption-tax",
@@ -102,7 +102,7 @@ public enum ReportTypes {
     ]
 
     /// `eu.js:3-6`. `vat-return`'s `zh-CN` carries 申报 — defect 3 above.
-    public static let eu: [ReportTypeEntry] = [
+    static let eu: [ReportTypeEntry] = [
         ReportTypeEntry(id: "profit-loss",
                         name: ["zh-CN": "损益表", "en": "Profit & Loss", "fr": "Compte de résultat"]),
         ReportTypeEntry(id: "vat-return",
@@ -110,7 +110,7 @@ public enum ReportTypes {
     ]
 
     /// `kr.js:3-6`.
-    public static let kr: [ReportTypeEntry] = [
+    static let kr: [ReportTypeEntry] = [
         ReportTypeEntry(id: "income-statement",
                         name: ["zh-CN": "损益计算书", "en": "Income Statement", "ko": "손익계산서"]),
         ReportTypeEntry(id: "vat-summary",
@@ -118,7 +118,7 @@ public enum ReportTypes {
     ]
 
     /// `tw.js:3-6`.
-    public static let tw: [ReportTypeEntry] = [
+    static let tw: [ReportTypeEntry] = [
         ReportTypeEntry(id: "income-statement",
                         name: ["zh-CN": "损益表", "en": "Income Statement", "zh-TW": "損益表"]),
         ReportTypeEntry(id: "business-tax",
@@ -126,7 +126,7 @@ public enum ReportTypes {
     ]
 
     /// `us.js:3-6`. The `zh-CN` strings use FULLWIDTH parentheses (U+FF08/U+FF09).
-    public static let us: [ReportTypeEntry] = [
+    static let us: [ReportTypeEntry] = [
         ReportTypeEntry(id: "schedule-c",
                         name: ["zh-CN": "Schedule C（个体经营损益）", "en": "Schedule C (Profit or Loss)"]),
         ReportTypeEntry(id: "se-tax",
@@ -139,7 +139,7 @@ public enum ReportTypes {
     /// locale, so "no report types" is not a state the source can reach, and
     /// returning `[]` would let a caller render an empty picker for a ledger that
     /// should have been rejected.
-    public static func table(for locale: String) -> [ReportTypeEntry]? {
+    static func table(for locale: String) -> [ReportTypeEntry]? {
         switch locale {
         case "CN": return cn
         case "US": return us
@@ -174,7 +174,7 @@ public enum ReportTypes {
     /// every test would still have passed and R8 would simply never have rendered the
     /// self-employment tax. Only changing one of the two goes red — which is the safe
     /// failure and the reason to change them in the same edit.
-    public static func availability(for id: String, locale: String) -> ReportTypeAvailability {
+    static func availability(for id: String, locale: String) -> ReportTypeAvailability {
         switch (locale, id) {
         // Batch 4 (R5) — the whole turnover-tax block, every field.
         case ("CN", "vat-summary"), ("JP", "consumption-tax"), ("EU", "vat-return"),

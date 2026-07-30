@@ -41,21 +41,21 @@ import Foundation
 /// flat constant would satisfy every test. It is a table because the underlying
 /// figures are year-dependent, and the first year that differs is the one where
 /// that matters.
-public enum USTaxParams {
+enum USTaxParams {
 
-    public struct Year: Equatable, Sendable {
+    struct Year: Equatable, Sendable {
         /// The share of meal expense that Line 24b may deduct (`us.js:54`).
-        public let mealsDeductiblePct: Double
+        let mealsDeductiblePct: Double
         /// Schedule SE's net-earnings factor (`us.js:69`).
-        public let seEarningsFactor: Double
+        let seEarningsFactor: Double
         /// Social-security rate on the capped earnings (`us.js:71`).
-        public let ssRate: Double
+        let ssRate: Double
         /// The SSA Contribution and Benefit Base — the only figure that differs
         /// between the three keyed years, and the one the fixture never reaches.
-        public let ssWageCap: Double
-        public let medicareRate: Double
-        public let addlMedicareThreshold: Double
-        public let addlMedicareRate: Double
+        let ssWageCap: Double
+        let medicareRate: Double
+        let addlMedicareThreshold: Double
+        let addlMedicareRate: Double
     }
 
     /// `US_SE_TAX_PARAMS_BY_YEAR` — `usTaxParams.js:17-21`, now complete.
@@ -74,7 +74,7 @@ public enum USTaxParams {
     /// golden cell. `ReportBatch5BlindSpotTests` covers those branches directly, and
     /// the legal correctness of the numbers is a human reading the SSA/IRS
     /// publication — made explicitly, not assumed.
-    public static let byYear: [Int: Year] = [
+    static let byYear: [Int: Year] = [
         2024: Year(mealsDeductiblePct: 0.5, seEarningsFactor: 0.9235, ssRate: 0.124,
                    ssWageCap: 168600, medicareRate: 0.029,
                    addlMedicareThreshold: 200000, addlMedicareRate: 0.009),
@@ -91,7 +91,7 @@ public enum USTaxParams {
     /// Derived from the table rather than written as a literal, exactly as the
     /// source derives it. A literal would silently stop tracking the table the
     /// first time a year is added.
-    public static let latestYear: Int = byYear.keys.max() ?? 0
+    static let latestYear: Int = byYear.keys.max() ?? 0
 
     /// `resolveSeTaxParams(year)` — `usTaxParams.js:28-32`.
     ///
@@ -99,7 +99,7 @@ public enum USTaxParams {
     /// year, and it never throws. The year arrives as a String from the report
     /// context, so the coercion goes through `ReportMath.number` to match JS's
     /// `Number(year)` — `" 2025 "` resolves, `"2025x"` does not.
-    public static func resolve(year: String) -> (year: Int, params: Year) {
+    static func resolve(year: String) -> (year: Int, params: Year) {
         let coerced = ReportMath.number(.string(year))
         // `Number.isFinite(y) && TABLE[y]` — a non-integral or out-of-table year
         // takes the fallback.

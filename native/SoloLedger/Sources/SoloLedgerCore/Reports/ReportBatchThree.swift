@@ -25,43 +25,43 @@ import Foundation
 ///    slug, so the ledger disagrees with the engine about where the number belongs.
 /// 3. **A negative `returns` row makes `line2` negative** and leaves `line7`
 ///    unchanged in sign. Unreachable from the fixture, so no golden constrains it.
-public struct ScheduleC: Equatable, Sendable {
+struct ScheduleC: Equatable, Sendable {
     // Part I — income (us.js:35-38)
-    public let line1_grossReceipts: Double
-    public let line2_returns: Double
-    public let line6_otherIncome: Double
-    public let line7_grossIncome: Double
+    let line1_grossReceipts: Double
+    let line2_returns: Double
+    let line6_otherIncome: Double
+    let line7_grossIncome: Double
     // Part II — expenses (us.js:40-58)
-    public let line8_advertising: Double
-    public let line9_car: Double
-    public let line10_commissions: Double
-    public let line11_contract: Double
-    public let line13_depreciation: Double
-    public let line15_insurance: Double
-    public let line16b_interest: Double
-    public let line17_legal: Double
-    public let line18_office: Double
-    public let line20_rent: Double
-    public let line21_repairs: Double
-    public let line22_supplies: Double
-    public let line23_taxes: Double
-    public let line24a_travel: Double
-    public let line24b_meals: Double
-    public let line25_utilities: Double
-    public let line26_wages: Double
-    public let line27a_other: Double
-    public let line30_homeOffice: Double
+    let line8_advertising: Double
+    let line9_car: Double
+    let line10_commissions: Double
+    let line11_contract: Double
+    let line13_depreciation: Double
+    let line15_insurance: Double
+    let line16b_interest: Double
+    let line17_legal: Double
+    let line18_office: Double
+    let line20_rent: Double
+    let line21_repairs: Double
+    let line22_supplies: Double
+    let line23_taxes: Double
+    let line24a_travel: Double
+    let line24b_meals: Double
+    let line25_utilities: Double
+    let line26_wages: Double
+    let line27a_other: Double
+    let line30_homeOffice: Double
     // Spread in after the literal (us.js:86-88)
-    public let line28_totalExpenses: Double
-    public let line31_netProfit: Double
+    let line28_totalExpenses: Double
+    let line31_netProfit: Double
 
     /// Unrounded intermediates the estimate layer consumes (`us.js:65` feeds
     /// `:68`, `:76`, `:92`, `:102`). Carried so batch 5 does not have to re-mirror
     /// the whole mapping to get at them; not part of the golden comparison.
-    public let unroundedGrossIncome: Double
-    public let unroundedTotalExpenses: Double
+    let unroundedGrossIncome: Double
+    let unroundedTotalExpenses: Double
     /// The RAW `meals` slug total, before the 50% and before rounding. Batch 5's
     /// meals warning tests this, not `line24b_meals` — a total of 0.004 fires the
     /// warning while its Line 24b rounds to 0.
-    public let rawMealsTotal: Double
+    let rawMealsTotal: Double
 }

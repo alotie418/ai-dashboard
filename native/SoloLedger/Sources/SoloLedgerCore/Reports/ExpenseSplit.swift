@@ -5,12 +5,12 @@ import Foundation
 ///
 /// Verbatim, including the accumulation ORDER and the subtraction. Both matter in
 /// binary64 and neither is a style choice.
-public enum ExpenseSplit {
+enum ExpenseSplit {
 
-    public struct Result: Equatable, Sendable {
-        public let totalExpenseNet: Double
-        public let cogsNet: Double
-        public let operatingExpensesNet: Double
+    struct Result: Equatable, Sendable {
+        let totalExpenseNet: Double
+        let cogsNet: Double
+        let operatingExpensesNet: Double
     }
 
     /// `isCogsRow` — `_expenseSplit.js:17-21`.
@@ -23,7 +23,7 @@ public enum ExpenseSplit {
     /// fetches categories `WHERE locale = ?`. That row silently becomes an
     /// operating expense. Mirrored, not repaired (plan Appendix A: 类别在切换记账
     /// 制度后被"孤立").
-    public static func isCogsRow(_ row: ReportRow, _ categories: [ReportCategory]) -> Bool {
+    static func isCogsRow(_ row: ReportRow, _ categories: [ReportCategory]) -> Bool {
         guard let categoryID = row.categoryID else { return false }
         guard let category = categories.first(where: { $0.id == categoryID }) else { return false }
         return category.isCogsTruthy
@@ -34,7 +34,7 @@ public enum ExpenseSplit {
     /// `ReportMath.netAmount` is the exact match. `??` is NOT: a row whose
     /// `amount_net` is exactly 0 falls back to the TAX-INCLUSIVE `amount` in JS,
     /// and the fixture carries such a row on purpose.
-    public static func net(_ row: ReportRow) -> Double {
+    static func net(_ row: ReportRow) -> Double {
         ReportMath.netAmount(row.amountNet, row.amount)
     }
 
@@ -67,7 +67,7 @@ public enum ExpenseSplit {
     ///
     /// Addition is not associative in binary64 either, so the row order is part of
     /// the answer: `ORDER BY date` in `index.js:47-52` is what fixes it.
-    public static func splitExpenses(_ expenseRows: [ReportRow]?,
+    static func splitExpenses(_ expenseRows: [ReportRow]?,
                                      _ categories: [ReportCategory]) -> Result {
         let rows = expenseRows ?? []          // `expenseRows || []` (line 28)
         var totalExpenseNet = 0.0

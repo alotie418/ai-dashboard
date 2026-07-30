@@ -43,6 +43,16 @@ jobs:
         run: npm run typecheck
       - name: Run all guards + migration test
         run: npm run check:all
+      # settings-coercion oracle. Recorded from the REPO-LOCKED Electron, never from plain
+      # node: the two runtimes do not share a V8 (node 24 ships 13.6, electron 42 ships
+      # 14.8), and this corpus is a claim about what the shipping product does. The Electron
+      # binary is already present — the rebuild step above downloads it — and this generator
+      # touches neither better-sqlite3 (node ABI here) nor ICU, so it needs nothing further.
+      # A separate step rather than a link in `check:all`, matching how the toLocaleString
+      # corpus is wired: none of check:all's other 43 guards needs the Electron binary, and
+      # making one of them need it would hide that dependency inside the chain.
+      - name: settings-coercion corpus reproducible (locked Electron)
+        run: npm run check:settings-coercion
       # Native SwiftUI Core package: unit + guard tests. Includes the schema-version
       # parity guard, which reads Electron's authoritative SCHEMA_VERSION via `node`
       # (set up above) — so native/Electron schema drift fails the PR here. macos-latest

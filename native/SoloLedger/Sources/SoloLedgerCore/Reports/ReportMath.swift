@@ -38,7 +38,7 @@ import Foundation
 /// `ReportMathTests` replays that corpus bit-for-bit. Where an implementation and
 /// the spec's own prose disagree — and for `Math.round` they do — **the corpus
 /// wins and the formula changes.**
-public enum ReportMath {
+enum ReportMath {
 
     // MARK: - `||` — JS truthiness
     //
@@ -62,7 +62,7 @@ public enum ReportMath {
     /// decoding, not here. `SQLiteValue.doubleValue` already yields `nil` for a
     /// non-numeric TEXT, so that path cannot silently arrive as a number.
     @inlinable
-    public static func isTruthy(_ v: Double?) -> Bool {
+    static func isTruthy(_ v: Double?) -> Bool {
         guard let v else { return false }   // null / undefined
         return !(v == 0 || v.isNaN)         // `v == 0` covers +0 AND -0
     }
@@ -70,14 +70,14 @@ public enum ReportMath {
     /// JS `a || b`. Returns `a` when `a` is truthy, otherwise `b` — including when
     /// `b` is itself falsy, which is why the result stays optional.
     @inlinable
-    public static func or(_ a: Double?, _ b: Double?) -> Double? {
+    static func or(_ a: Double?, _ b: Double?) -> Double? {
         isTruthy(a) ? a : b
     }
 
     /// JS `v || 0` — the guard the rounders in us/jp/eu/kr/tw apply and the one
     /// `cn.js` does NOT (see ``round2(_:)``).
     @inlinable
-    public static func orZero(_ v: Double?) -> Double {
+    static func orZero(_ v: Double?) -> Double {
         isTruthy(v) ? v! : 0
     }
 
@@ -89,7 +89,7 @@ public enum ReportMath {
     /// return the `0`. The report fixture carries such a row on purpose
     /// (plan §5.2, "`amount_net = 0` 的行").
     @inlinable
-    public static func netAmount(_ amountNet: Double?, _ amount: Double?) -> Double {
+    static func netAmount(_ amountNet: Double?, _ amount: Double?) -> Double {
         if isTruthy(amountNet) { return amountNet! }
         if isTruthy(amount) { return amount! }
         return 0
@@ -128,7 +128,7 @@ public enum ReportMath {
     /// What follows is the normative algorithm rather than either shortcut, with
     /// `-0` preserved because it survives the engines' trailing `/ 100`
     /// (`Math.round(-0.001 * 100) / 100` is `-0`, verified in node).
-    public static func round(_ x: Double) -> Double {
+    static func round(_ x: Double) -> Double {
         // ECMA-262 states Math.round as five steps. Only ONE of them needs code:
         // the other four are subsumed by the floor-and-compare below, and writing
         // them out anyway would be unreachable lines in a function whose entire
@@ -163,7 +163,7 @@ public enum ReportMath {
     /// `malformed-US-2025.json` (zeros), and the mirror must reproduce it rather
     /// than tidy it (plan §9, row "cn.js 遇不可解析税率时产出 NaN").
     @inlinable
-    public static func round2(_ x: Double) -> Double {
+    static func round2(_ x: Double) -> Double {
         round(x * 100) / 100
     }
 
@@ -171,7 +171,7 @@ public enum ReportMath {
     /// eu.js:14, kr.js:14, tw.js:14. Identical to ``round2(_:)`` except that a
     /// falsy input (including `NaN`) is flattened to `0` first.
     @inlinable
-    public static func round2OrZero(_ v: Double?) -> Double {
+    static func round2OrZero(_ v: Double?) -> Double {
         round2(orZero(v))
     }
 
@@ -180,7 +180,7 @@ public enum ReportMath {
     /// is what the source does, and the two are NOT interchangeable: they round at
     /// different magnitudes and overflow to `Infinity` 100× sooner.
     @inlinable
-    public static func percent2(_ x: Double) -> Double {
+    static func percent2(_ x: Double) -> Double {
         round(x * 10000) / 100
     }
 
@@ -204,7 +204,7 @@ public enum ReportMath {
     ///   would print a plausible tax figure where the engine prints nothing.
     /// - **Signed zero is ordered.** JS treats `+0` as greater than `-0`, so
     ///   `Math.max(0, -0)` is `+0`; `Swift.max(0.0, -0.0)` returns `-0`.
-    public static func max(_ a: Double, _ b: Double) -> Double {
+    static func max(_ a: Double, _ b: Double) -> Double {
         if a.isNaN || b.isNaN { return .nan }
         if a == 0 && b == 0 { return (a.sign == .plus || b.sign == .plus) ? 0 : -0.0 }
         return a > b ? a : b
@@ -216,7 +216,7 @@ public enum ReportMath {
     /// `Swift.min` is additionally ARGUMENT-ORDER dependent with `NaN`
     /// (`Swift.min(.nan, 5)` is `NaN` but `Swift.min(5, .nan)` is `5`), so which of
     /// the two it gets wrong depends on how the call happens to be written.
-    public static func min(_ a: Double, _ b: Double) -> Double {
+    static func min(_ a: Double, _ b: Double) -> Double {
         if a.isNaN || b.isNaN { return .nan }
         if a == 0 && b == 0 { return (a.sign == .minus || b.sign == .minus) ? -0.0 : 0 }
         return a < b ? a : b
@@ -230,7 +230,7 @@ public enum ReportMath {
     /// A `JSON.parse` result, which is exactly the domain `Number()` is applied to
     /// at `index.js:74-78`: `readSetting` returns `JSON.parse(row.value)` when the
     /// row exists and a numeric literal when it does not.
-    public enum JSValue: Equatable, Sendable {
+    enum JSValue: Equatable, Sendable {
         /// No such settings row at all. `readSetting` substitutes its fallback
         /// before `Number()` ever sees this, so it is unreachable from the report
         /// path — carried only so the coercion table is complete and testable.
@@ -256,7 +256,7 @@ public enum ReportMath {
     ///
     /// `Number(null)` is `0` while `Number(undefined)` is `NaN`; the asymmetry is
     /// JS's, not a typo.
-    public static func number(_ v: JSValue) -> Double {
+    static func number(_ v: JSValue) -> Double {
         switch v {
         case .undefined:          return .nan
         case .null:               return 0
@@ -439,7 +439,7 @@ public enum ReportMath {
     /// JS `String(number)`, for the one place the engines interpolate a computed
     /// year (`us.js:106`'s `${Number(year) + 1}`). Same function the array-to-string
     /// path uses; exposed because batch 5 needs it directly.
-    public static func jsNumberToString(_ d: Double) -> String { numberToString(d) }
+    static func jsNumberToString(_ d: Double) -> String { numberToString(d) }
 
     private static func numberToString(_ d: Double) -> String {
         if d.isNaN { return "NaN" }
@@ -509,7 +509,7 @@ public enum ReportMath {
     /// the same significant digits as V8's `Number::toString` — verified across the
     /// corpus, including `1.7976931348623157e308`, whose expansion is the shortest
     /// digits followed by zeros rather than the exact binary value.
-    public static func toLocaleString(_ value: Double) -> String {
+    static func toLocaleString(_ value: Double) -> String {
         if value.isNaN { return "NaN" }
         if value == .infinity { return "∞" }
         if value == -.infinity { return "-∞" }

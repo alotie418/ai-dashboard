@@ -12,11 +12,11 @@ import Foundation
 /// is the ability to read a Swift file next to its JavaScript original line by
 /// line. A shared helper would make the next divergence between them — a
 /// jurisdiction is free to acquire one — silent instead of obvious.
-public enum JPReportEngine {
+enum JPReportEngine {
 
     /// `jp.js` batch-1 lines: 14 (rounder), 16-27 (sums, margin, operating
     /// profit), 38-42 (emitted block).
-    public static func batchOne(_ ctx: ReportContext) -> BatchOneIncomeStatementWithOperatingProfit {
+    static func batchOne(_ ctx: ReportContext) -> BatchOneIncomeStatementWithOperatingProfit {
         let split = ExpenseSplit.splitExpenses(ctx.expenseRows, ctx.categories)
 
         // jp.js:14 — `const r = (v) => Math.round((v || 0) * 100) / 100`.
@@ -86,7 +86,7 @@ public enum JPReportEngine {
 
 // MARK: - Batch 2
 
-public extension JPReportEngine {
+extension JPReportEngine {
 
     /// `jp.js:50-53` — the tax-inclusive summary.
     ///

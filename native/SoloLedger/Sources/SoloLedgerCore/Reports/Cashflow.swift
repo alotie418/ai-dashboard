@@ -23,17 +23,17 @@ import Foundation
 ///
 /// Deliberately no `case amount(Double)`. Adding one "for later" would restore
 /// exactly the reachable-zero this exists to remove.
-public enum CashflowSection: Equatable, Sendable {
+enum CashflowSection: Equatable, Sendable {
     case notConfigured
 }
 
 /// Realized operating cash for a period.
-public struct OperatingCashflow: Equatable, Sendable {
-    public let inflow: Double
-    public let outflow: Double
-    public let net: Double
+struct OperatingCashflow: Equatable, Sendable {
+    let inflow: Double
+    let outflow: Double
+    let net: Double
 
-    public init(inflow: Double, outflow: Double, net: Double) {
+    init(inflow: Double, outflow: Double, net: Double) {
         self.inflow = inflow
         self.outflow = outflow
         self.net = net
@@ -56,28 +56,28 @@ public struct OperatingCashflow: Equatable, Sendable {
 /// rather than a zero means the presentation layer cannot print a total here
 /// even by accident — the same reasoning as `CashflowSection`, applied to a
 /// condition that is per-period rather than permanent.
-public enum OperatingCashflowSection: Equatable, Sendable {
+enum OperatingCashflowSection: Equatable, Sendable {
     case computed(OperatingCashflow)
     /// The period holds no transactions. Not "zero cash moved".
     case notConfigured
 }
 
 /// The block `index.js:90` appends to every engine's output.
-public struct CashflowStatement: Equatable, Sendable {
+struct CashflowStatement: Equatable, Sendable {
     /// `'cash'` — 收付实现制 (`_cashflow.js:84`).
-    public let basis: String
+    let basis: String
     /// Always `false` (`_cashflow.js:85`). Carried, not asserted away: it is the
     /// machine-readable half of the disclaimer.
-    public let statutory: Bool
+    let statutory: Bool
     /// `'transactions' | 'legacy'` (`_cashflow.js:86`).
-    public let source: ReportSource
-    public let operating: OperatingCashflowSection
-    public let investing: CashflowSection
-    public let financing: CashflowSection
-    public let beginningCash: CashflowSection
-    public let endingCash: CashflowSection
+    let source: ReportSource
+    let operating: OperatingCashflowSection
+    let investing: CashflowSection
+    let financing: CashflowSection
+    let beginningCash: CashflowSection
+    let endingCash: CashflowSection
 
-    public init(source: ReportSource, operating: OperatingCashflowSection) {
+    init(source: ReportSource, operating: OperatingCashflowSection) {
         self.basis = "cash"
         self.statutory = false
         self.source = source
@@ -98,15 +98,15 @@ public struct CashflowStatement: Equatable, Sendable {
 ///
 /// No `date` and no `payment_date`: all windowing stays in SQL
 /// (`_cashflow.js:56-57`), so a Swift-side date comparison cannot drift from it.
-public struct CashflowRow: Equatable, Sendable {
+struct CashflowRow: Equatable, Sendable {
     /// `'income' | 'expense'` — and anything else is silently dropped, see
     /// ``Cashflow/operating(rows:)``.
-    public let type: String?
-    public let amount: Double?
-    public let paidAmount: Double?
-    public let paymentStatus: String?
+    let type: String?
+    let amount: Double?
+    let paidAmount: Double?
+    let paymentStatus: String?
 
-    public init(type: String?, amount: Double?, paidAmount: Double?, paymentStatus: String?) {
+    init(type: String?, amount: Double?, paidAmount: Double?, paymentStatus: String?) {
         self.type = type
         self.amount = amount
         self.paidAmount = paidAmount
@@ -114,7 +114,7 @@ public struct CashflowRow: Equatable, Sendable {
     }
 }
 
-public enum Cashflow {
+enum Cashflow {
 
     /// `txnCashAmount` — `_cashflow.js:31-34`.
     ///
@@ -136,7 +136,7 @@ public enum Cashflow {
     ///   (`_cashflow.js:55`), so calling this on an `unpaid` row with a positive
     ///   `paid_amount` returns that amount. The two are separate gates and the
     ///   mirror keeps them separate.
-    public static func txnCashAmount(_ row: CashflowRow) -> Double {
+    static func txnCashAmount(_ row: CashflowRow) -> Double {
         if ReportMath.isTruthy(row.paidAmount), row.paidAmount! > 0 { return row.paidAmount! }
         return row.paymentStatus == "paid" ? ReportMath.orZero(row.amount) : 0
     }
@@ -151,7 +151,7 @@ public enum Cashflow {
     /// The three-way `if / else if` is also kept: a row whose `type` is neither
     /// `income` nor `expense` is silently dropped rather than defaulting either
     /// way.
-    public static func operating(rows: [CashflowRow]) -> OperatingCashflow {
+    static func operating(rows: [CashflowRow]) -> OperatingCashflow {
         var inflow = 0.0
         var outflow = 0.0
         for row in rows {

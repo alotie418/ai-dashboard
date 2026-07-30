@@ -67,34 +67,34 @@ import Foundation
 /// and the R5 copy review resolved the display half by dropping the duplicate
 /// section from the card — a separate Electron PR, not this one. **The engine
 /// contract is unchanged here: all five fields are mirrored.**
-public struct CNVATSummary: Equatable, Sendable {
-    public let cumulativeInput: Double
-    public let cumulativeOutput: Double
+struct CNVATSummary: Equatable, Sendable {
+    let cumulativeInput: Double
+    let cumulativeOutput: Double
     /// Equal to ``cumulativeInput`` for every possible input — see the type note.
-    public let certifiedInput: Double
+    let certifiedInput: Double
     /// Equal to ``cumulativeOutput`` for every possible input — see the type note.
-    public let invoicedOutput: Double
+    let invoicedOutput: Double
     /// `r(Math.max(0, totalIncomeTax - totalExpenseTax))` (`cn.js:32`, `:74`).
-    public let estimatedPayable: Double
+    let estimatedPayable: Double
 }
 
 /// `jp.js:46-49` — 消費税（仕入税額控除方式）.
-public struct JPConsumptionTax: Equatable, Sendable {
-    public let collected: Double
-    public let paid: Double
+struct JPConsumptionTax: Equatable, Sendable {
+    let collected: Double
+    let paid: Double
     /// `r(Math.max(0, collected - paid))` — `jp.js:34`, already rounded when it is
     /// placed into the block at `:48` rather than rounded a second time.
-    public let payable: Double
+    let payable: Double
 }
 
 /// `eu.js:44-46` — VAT return summary.
-public struct EUVATReturn: Equatable, Sendable {
+struct EUVATReturn: Equatable, Sendable {
     /// Output VAT is listed FIRST here, where China lists input first. Field order
     /// is not semantics, but it is what a reader comparing the two files sees.
-    public let outputVAT: Double
-    public let inputVAT: Double
+    let outputVAT: Double
+    let inputVAT: Double
     /// `r(Math.max(0, vatCollected - vatDeductible))` — `eu.js:32`.
-    public let vatPayable: Double
+    let vatPayable: Double
 }
 
 /// `kr.js:41-43` — 부가가치세 요약.
@@ -103,17 +103,17 @@ public struct EUVATReturn: Equatable, Sendable {
 /// the block is even named differently upstream (`vatSummary`, the same key China
 /// uses for a FIVE-field block). A consumer that switches on the key name alone
 /// and assumes China's shape is exactly the `#414` defect.
-public struct KRVATSummary: Equatable, Sendable {
-    public let outputVAT: Double
-    public let inputVAT: Double
+struct KRVATSummary: Equatable, Sendable {
+    let outputVAT: Double
+    let inputVAT: Double
     /// `r(Math.max(0, totalIncomeTax - totalExpenseTax))` — `kr.js:29`.
-    public let vatPayable: Double
+    let vatPayable: Double
 }
 
 /// `tw.js:41-43` — 營業稅.
-public struct TWBusinessTax: Equatable, Sendable {
-    public let collected: Double
-    public let paid: Double
+struct TWBusinessTax: Equatable, Sendable {
+    let collected: Double
+    let paid: Double
     /// `r(Math.max(0, totalIncomeTax - totalExpenseTax))` — `tw.js:29`.
-    public let payable: Double
+    let payable: Double
 }

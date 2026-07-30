@@ -16,14 +16,14 @@ import Foundation
 /// Everything else in `us.js` — Schedule C, self-employment tax, estimated tax and
 /// the warnings derived from them — is batch 3 / batch 5 and is deliberately not
 /// here. That is also why this type has no P&L block: the US engine has none.
-public enum USReportEngine {
+enum USReportEngine {
 
     /// `us.js:130-140` — the monthly breakdown.
     ///
     /// Twelve entries keyed on `ctx.year` regardless of the reporting period
     /// (Appendix A9), the optional-chained date spelling, and `r()` — which for
     /// the US is the guarded rounder (`us.js:142`, `Math.round((v || 0) * 100) / 100`).
-    public static func monthlyBreakdown(_ ctx: ReportContext) -> [ReportMonth] {
+    static func monthlyBreakdown(_ ctx: ReportContext) -> [ReportMonth] {
         let r = ReportMath.round2OrZero
         return ReportMonth.prefixes(year: ctx.year).enumerated().map { index, prefix in
             // us.js:135-136 — `r.amount`, the TAX-INCLUSIVE column. The other five
@@ -44,7 +44,7 @@ public enum USReportEngine {
 
 // MARK: - Batch 3 — Schedule C
 
-public extension USReportEngine {
+extension USReportEngine {
 
     /// `us.js:14-65` and `:85-89` — the Schedule C mapping.
     ///
@@ -140,7 +140,7 @@ public extension USReportEngine {
 
 // MARK: - Batch 5 (R7) — the estimate layer
 
-public extension USReportEngine {
+extension USReportEngine {
 
     /// `us.js:68-74`, `:91-99` — the Self-Employment Tax estimate.
     ///

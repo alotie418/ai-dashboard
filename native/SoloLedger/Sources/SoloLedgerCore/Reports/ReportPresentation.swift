@@ -20,9 +20,11 @@ import Foundation
 ///   plain `Double` that can be `NaN` — measured, and the reason
 ///   `malformed-CN-2025.json` records five nulls where `malformed-US-2025.json`
 ///   records zeros;
-/// * `ReportTypes.table(for:)` and `ReportTypeEntry.name` are public, so a view can
-///   enumerate report types **without ever asking** `ReportTypes/availability(for:locale:)`
-///   — which is exactly what plan §7.3 says must not happen.
+/// * `ReportTypes.table(for:)` and `ReportTypeEntry.name` were public when this layer was
+///   written, so a view could enumerate report types **without ever asking**
+///   `ReportTypes/availability(for:locale:)` — exactly what plan §7.3 says must not happen.
+///   P2 narrowed them to `internal`; this layer remains how the module's own code should
+///   ask, and `PresentedSection` is what leaves it.
 ///
 /// So the three funnels below are the point: ``field(_:)-(EstimatedValue)`` for an
 /// estimate, ``field(_:)-(Double)`` for a plain line, and ``reportTypes(locale:)`` for
@@ -39,7 +41,7 @@ import Foundation
 /// * **No database.** A presentation layer that could re-read `settings` would be able
 ///   to explain a number with a state that no longer produced it — the snapshot rule
 ///   `EstimatedValue` is documented with.
-public enum ReportPresentation {
+enum ReportPresentation {
 
     // MARK: - A single field
 
@@ -56,7 +58,7 @@ public enum ReportPresentation {
     /// A view handed that would render whatever `NumberFormatter` does with a NaN.
     /// ``ReportFieldPresentation/corrupted`` exists so it renders "the data is damaged"
     /// instead, and so the compiler asks.
-    public static func field(_ value: EstimatedValue) -> ReportFieldPresentation {
+    static func field(_ value: EstimatedValue) -> ReportFieldPresentation {
         switch value {
         case .computed(let x):
             return field(x)
@@ -80,7 +82,7 @@ public enum ReportPresentation {
     /// `admin_expense_annual` renders as a **confident 0** there and as damaged data on
     /// China. Both are the mirror's behaviour and neither is repaired here; this
     /// function only stops the Chinese one from reaching a formatter.
-    public static func field(_ value: Double) -> ReportFieldPresentation {
+    static func field(_ value: Double) -> ReportFieldPresentation {
         guard value.isFinite else { return .corrupted }
         // Negative zero is normalised to positive zero HERE and nowhere else. The
         // engines' rounders can produce it (`round2(-0.001)` is `-0.0`, because
@@ -111,7 +113,7 @@ public enum ReportPresentation {
     /// chose, and CLAUDE.md forbids exactly that ("do not silently choose a policy
     /// without documentation"). This is the only channel through which a view can find
     /// out, and it carries the percent so the disclosure can name it.
-    public static func provenance(_ setting: ReportRateSetting) -> ReportRateProvenance {
+    static func provenance(_ setting: ReportRateSetting) -> ReportRateProvenance {
         switch setting {
         case .configured:
             return .userConfigured
@@ -131,10 +133,11 @@ public enum ReportPresentation {
     ///
     /// **This is the §7.3 combination, and its shape is the enforcement.** The plan's
     /// complaint is not that `availability(for:locale:)` is wrong, it is that
-    /// `ReportTypes.table(for:)` and `ReportTypeEntry.name` are public, so a caller can
-    /// walk the table and render `name` without ever asking. Those two stay public —
-    /// they are the mirrored contract and this phase does not narrow it — so the fix
-    /// here is to offer a door that CANNOT be walked through incorrectly:
+    /// `ReportTypes.table(for:)` and `ReportTypeEntry.name` WERE public, so a caller could
+    /// walk the table and render `name` without ever asking. P2 narrowed both to `internal`
+    /// along with the rest of the subsystem, so that route is now closed at the module
+    /// boundary; this function remains the shape a caller inside the module should use,
+    /// because it cannot be walked through incorrectly:
     /// ``ReportTypePresentation`` carries the stable `id` and the decision, and it
     /// carries no `name`. A view that uses this function has nothing to render the
     /// historical copy FROM.
@@ -143,7 +146,7 @@ public enum ReportPresentation {
     /// throws on an unknown locale, so "no report types" is not a state the source can
     /// reach, and an empty array would let a caller render an empty picker for a ledger
     /// that should have been rejected outright.
-    public static func reportTypes(locale: String) -> [ReportTypePresentation]? {
+    static func reportTypes(locale: String) -> [ReportTypePresentation]? {
         guard let table = ReportTypes.table(for: locale) else { return nil }
         return table.map {
             ReportTypePresentation(id: $0.id,
@@ -213,7 +216,12 @@ public enum ReportFieldPresentation: Equatable, Sendable {
 }
 
 /// Where the rate behind a computed figure came from.
-public enum ReportRateProvenance: Equatable, Sendable {
+/// **INTERNAL.** No public API returns one and no public type carries one: the App-facing
+/// surface expresses rate provenance through ``ParameterEffect``/``EffectOrigin`` on
+/// `PresentedParameter`. Kept because ``ReportPresentation/provenance(_:)`` is the single
+/// mapping point over `ReportRateSetting`, and narrowing it removes a public contract that
+/// nothing could obtain — an unreachable public type is a promise with no way to call it in.
+enum ReportRateProvenance: Equatable, Sendable {
     /// The ledger holds a usable rate the user stored.
     case userConfigured
     /// No row; the regime supplied this percent on the user's behalf. **Must be
@@ -244,12 +252,21 @@ public enum ReportSectionPresentation: Equatable, Sendable {
 /// `zh-CN` slot, a filing word in `eu.js` — mirrored verbatim as a fact about the
 /// engines and never display copy. R8 maps `id` to its own reviewed six-language
 /// strings.
-public struct ReportTypePresentation: Equatable, Sendable {
+/// **INTERNAL**, for the same reason: `PresentedSection` carries the stable `reportTypeID`
+/// and the `ReportSectionPresentation` decision directly, so nothing public ever hands one
+/// of these out. After its initialiser was narrowed it became unobtainable as well as
+/// unreturned — public surface a caller can neither build nor receive.
+struct ReportTypePresentation: Equatable, Sendable {
     /// The engine's stable identifier — `income-statement`, `schedule-c`, `se-tax`, …
-    public let id: String
-    public let section: ReportSectionPresentation
+    let id: String
+    let section: ReportSectionPresentation
 
-    public init(id: String, section: ReportSectionPresentation) {
+    /// INTERNAL. Same reason as the other presented types: a forged
+    /// `ReportTypePresentation(id:section:)` is a report type paired with an availability
+    /// nothing derived. Narrowed here although it shipped public in #427 — it is the same
+    /// defect class as the initialisers this change closes, and leaving one open would make
+    /// the rule arbitrary.
+    init(id: String, section: ReportSectionPresentation) {
         self.id = id
         self.section = section
     }

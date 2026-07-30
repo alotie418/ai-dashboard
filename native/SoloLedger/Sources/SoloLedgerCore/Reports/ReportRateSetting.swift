@@ -43,7 +43,7 @@ import Foundation
 /// perfectly ordinary rate. A gate that looked at the coerced value would classify a
 /// corrupt row as a deliberate 0% (or 1%, or 25%). Only the stored TEXT tells them
 /// apart, which is why ``needsRepair`` carries it.
-public enum ReportRateSetting: Equatable, Sendable {
+enum ReportRateSetting: Equatable, Sendable {
 
     /// The row exists and holds a usable rate.
     ///
@@ -93,7 +93,7 @@ public enum ReportRateSetting: Equatable, Sendable {
     /// the same refusal. The difference is what to tell the user, and that is asked
     /// for with ``needsRepairRawValue`` or by switching over the enum — never by
     /// finding a NaN in here, because a NaN can no longer get in here.
-    public var rate: Double? {
+    var rate: Double? {
         switch self {
         case .configured(let r), .chinaFallback(let r): return r.value
         case .notConfigured, .needsRepair: return nil
@@ -101,7 +101,7 @@ public enum ReportRateSetting: Equatable, Sendable {
     }
 
     /// Whether the estimate layer may produce numbers at all.
-    public var isConfigured: Bool { rate != nil }
+    var isConfigured: Bool { rate != nil }
 
     /// The stored TEXT when this is ``needsRepair``, else `nil`.
     ///
@@ -111,7 +111,7 @@ public enum ReportRateSetting: Equatable, Sendable {
     /// Spelled as an accessor so a presentation layer can ask "is there something to
     /// repair, and what does it say" without switching, and so that the answer is
     /// impossible to confuse with ``rate``.
-    public var needsRepairRawValue: String? {
+    var needsRepairRawValue: String? {
         if case .needsRepair(let raw) = self { return raw }
         return nil
     }
@@ -127,11 +127,11 @@ public enum ReportRateSetting: Equatable, Sendable {
 /// Literals are still ergonomic (`.configured(21)`, `.configured(23.2)`) because a
 /// non-finite literal cannot be written in Swift: `.nan` and `.infinity` are static
 /// members of `Double`, not literals, and `FiniteRate` has no such members.
-public struct FiniteRate: Equatable, Sendable {
-    public let value: Double
+struct FiniteRate: Equatable, Sendable {
+    let value: Double
 
     /// Fails for NaN and the infinities. This is the only way a runtime value gets in.
-    public init?(_ value: Double) {
+    init?(_ value: Double) {
         guard value.isFinite else { return nil }
         self.value = value
     }
@@ -141,15 +141,15 @@ extension FiniteRate: ExpressibleByIntegerLiteral, ExpressibleByFloatLiteral {
     // Unreachable in practice — Swift has no non-finite numeric literal — but stated
     // rather than assumed, because "cannot happen" and "is not checked" read the same
     // in a diff.
-    public init(integerLiteral value: Int) {
+    init(integerLiteral value: Int) {
         self.value = Double(value)
     }
-    public init(floatLiteral value: Double) {
+    init(floatLiteral value: Double) {
         precondition(value.isFinite, "FiniteRate literal must be finite")
         self.value = value
     }
 }
 
 extension FiniteRate: CustomStringConvertible {
-    public var description: String { String(value) }
+    var description: String { String(value) }
 }

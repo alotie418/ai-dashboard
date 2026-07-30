@@ -18,13 +18,13 @@ import Foundation
 /// #395). The engines are pure functions of the rows they are handed; choosing
 /// where rows come from is the dispatcher's job, and the dispatcher will not offer
 /// the legacy option.
-public enum ReportSource: String, Equatable, Sendable {
+enum ReportSource: String, Equatable, Sendable {
     case transactions
     case legacy
 }
 
 /// `selectReportSource` — `_reportSource.js:15-18`.
-public func selectReportSource(hasTransactionsTable: Bool, periodTxnCount: Int) -> ReportSource {
+func selectReportSource(hasTransactionsTable: Bool, periodTxnCount: Int) -> ReportSource {
     if hasTransactionsTable && periodTxnCount > 0 { return .transactions }
     return .legacy
 }

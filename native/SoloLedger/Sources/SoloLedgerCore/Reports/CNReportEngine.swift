@@ -14,11 +14,11 @@ import Foundation
 /// empty state. That gate lands with the view layer (R8); what this batch
 /// contributes is the type — the absent fields do not exist, so no view can
 /// accidentally render a zero for one.
-public enum CNReportEngine {
+enum CNReportEngine {
 
     /// `cn.js` batch-1 lines: 18-30 for the sums and margin, 43 for the rounder,
     /// 52-62 for the emitted block.
-    public static func batchOne(_ ctx: ReportContext) -> CNBatchOneIncomeStatement {
+    static func batchOne(_ ctx: ReportContext) -> CNBatchOneIncomeStatement {
         let split = ExpenseSplit.splitExpenses(ctx.expenseRows, ctx.categories)
 
         // cn.js:19 — `incomeRows.reduce((s, r) => s + (r.amount_net || r.amount || 0), 0)`
@@ -143,7 +143,7 @@ public enum CNReportEngine {
 
 // MARK: - Batch 2
 
-public extension CNReportEngine {
+extension CNReportEngine {
 
     /// `cn.js:78-82` — 含税金额汇总.
     ///

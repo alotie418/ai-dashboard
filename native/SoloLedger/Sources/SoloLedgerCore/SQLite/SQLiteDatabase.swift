@@ -361,6 +361,37 @@ public final class SQLiteDatabase {
         }
     }
 
+    /// A DEFERRED (read) transaction that RETURNS a value — one consistent view of the
+    /// database for every statement inside it.
+    ///
+    /// Why a report needs this and `@MainActor` does not supply it: main-actor isolation
+    /// orders *this process's* calls and says nothing about the Electron app writing
+    /// between two of them. A report reads the source decision, the currency set, four
+    /// settings rows, the income rows, the expense rows, the categories and the cash-flow
+    /// rows — eight statements that must describe ONE ledger. `BEGIN` takes its read lock
+    /// on the first statement and holds that view until `COMMIT`.
+    ///
+    /// DEFERRED (plain `BEGIN`, not `BEGIN IMMEDIATE`) because this path never writes: it
+    /// must not take a write lock and must not block a concurrent writer. `PRAGMA
+    /// busy_timeout = 5000` (set at open) covers contention; a hard `SQLITE_BUSY` throws.
+    ///
+    /// Must NOT nest — SQLite has no nested transactions and `BEGIN` inside `BEGIN` errors.
+    ///
+    /// **Internal on purpose.** The minimal public report API is `ReportBuilder`; handing
+    /// the App a general-purpose transaction entry point alongside it would widen the
+    /// surface for no gain.
+    func readSnapshot<T>(_ block: () throws -> T) throws -> T {
+        try execute("BEGIN")
+        do {
+            let value = try block()
+            try execute("COMMIT")
+            return value
+        } catch {
+            try? execute("ROLLBACK")
+            throw error
+        }
+    }
+
     // MARK: - Internals
 
     private func prepare(_ sql: String) throws -> OpaquePointer {
