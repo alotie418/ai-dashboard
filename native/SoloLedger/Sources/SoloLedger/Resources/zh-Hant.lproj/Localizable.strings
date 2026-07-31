@@ -227,6 +227,10 @@
 "settings.about" = "關於";
 "settings.company" = "公司／商號名稱";
 "settings.accountingLocale" = "會計制度";
+"settings.accountingLocale.unreadable.title" = "帳本記錄的會計制度無法識別";
+"settings.accountingLocale.absent.title" = "帳本未記錄會計制度";
+"settings.accountingLocale.repairHint" = "上面顯示的會計制度是本 App 的暫用值，帳本裡並沒有一條可用的紀錄。重新選擇它即會寫入帳本，已儲存的三項稅率不變；改選其他制度會套用該制度的預設稅率，見下方說明。";
+"settings.storedText.label" = "帳本中實際存放的內容";
 "settings.currency" = "預設貨幣";
 "settings.accountingNote" = "會計制度決定可選的收支類別與預設貨幣，獨立於介面語言。此為管理分析用途，非法定申報設定。";
 "settings.reportParams" = "報表計算參數";
