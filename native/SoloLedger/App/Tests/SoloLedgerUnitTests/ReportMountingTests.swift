@@ -465,13 +465,17 @@ final class ReportMountingTests: XCTestCase {
         XCTAssertEqual(SidebarSection(rawValue: "reports"), .reports)
     }
 
-    // MARK: - D20 — the exemption table grew by exactly eleven
+    // MARK: - D20 — the exemption table is exactly this big
 
     /// `sanctionedUses` lives in the SwiftPM test target, which this one cannot import, so the
     /// count is read from the committed source. The BEHAVIOUR of those entries is checked where
     /// they live — `testSanctionedTableMatchesTheRealHitsExactly` makes the table and the real
     /// hits equal as SETS, in both directions.
-    func testTheSanctionedTableIsExactlyTwentyTwoEntries() throws {
+    ///
+    /// The total moved from 22 to 40 when the guard's vocabulary gained the Japanese, Korean
+    /// and French filing words: the same six sentences that already denied filing in Chinese
+    /// and English deny it in those three languages too, and are now read there.
+    func testTheSanctionedTableIsExactlyFortyEntries() throws {
         let url = ReportFixtureBuilder.packageRoot()
             .appendingPathComponent("Tests/SoloLedgerCoreTests/LocalizationWordingGuardTests.swift")
         let source = try String(contentsOf: url, encoding: .utf8)
@@ -481,11 +485,14 @@ final class ReportMountingTests: XCTestCase {
         }
         let table = String(source[start.lowerBound..<end.lowerBound])
         let entries = table.components(separatedBy: ".init(locale:").count - 1
-        XCTAssertEqual(entries, 22, "11 pre-existing + 11 for the report page's disclaimers")
+        XCTAssertEqual(entries, 40, """
+            11 pre-existing + 11 for the report page's disclaimers + 18 reading the same six \
+            denial sentences in ja/ko/fr
+            """)
 
         let onReportDisclaimers = table.components(separatedBy: "key: \"report.disclaimer.").count - 1
-        XCTAssertEqual(onReportDisclaimers, 11)
-        XCTAssertEqual(entries - onReportDisclaimers, 11)
+        XCTAssertEqual(onReportDisclaimers, 20, "11 from this page's disclaimers + 9 in ja/ko/fr")
+        XCTAssertEqual(entries - onReportDisclaimers, 20)
 
         // The rates disclaimer says nothing about filing and must claim no exemption. Matched on
         // the ENTRY, not on the substring: the array carries a comment explaining why that key

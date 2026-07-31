@@ -44,16 +44,34 @@ import XCTest
 /// (they scan a named key list). Chosen deliberately: a key list cannot see a key that does
 /// not exist yet, and every R8 string is a key that does not exist yet.
 ///
+/// ## The ja/ko/fr blind spot, and how it was closed
+///
+/// The lists are Chinese/English by origin, so for three of the six shipped languages this
+/// guard used to scan the Latin patterns and nothing else. `法定申告システム`, `법정 신고
+/// 시스템` and `système de déclaration réglementaire` — the sentences the app actually ships —
+/// went unread, while their Chinese and English siblings were caught. The gap was registered
+/// here rather than closed silently, because widening the vocabulary is a wording decision and
+/// CLAUDE.md reserves those for a human. That decision has since been taken: each of the three
+/// languages now carries its own filing word and its own statutory statement names, and the
+/// eighteen denial sentences that legitimately use those words are sanctioned by triple.
+///
+/// Two shapes were chosen when they were added, and each is pinned by a test rather than left
+/// to this comment:
+///
+/// * **Japanese and Korean are bare strings, with no `\b`.** ICU counts Han and Hangul as word
+///   characters, so in unspaced running text the boundary falls in the wrong places: `\b申告\b`
+///   finds nothing in `法定申告システム`, and nothing in `세금 신고용이` either. Measured over
+///   the committed values by ``testWordBoundariesAreUselessForJapaneseAndKorean``.
+/// * **French is spelt with its accent, with no `[ée]` tolerance.** A tolerant
+///   `d[ée]clarations?` also matches the English word "declaration", which claims nothing — and
+///   the Latin patterns are scanned against every locale, so that false positive would land in
+///   English copy. Correct French always carries the accent, so tolerance buys nothing here.
+///   The statutory NAMES do take `[ée]` (`compte de r[ée]sultat`): an unaccented "compte de
+///   resultat" is still unmistakably the statutory document, and no English word collides.
+///
 /// ## Registered limitations
 ///
-/// **1. Vocabulary coverage.** The banned lists are Chinese/English by origin, so they carry
-/// **no Japanese, Korean or French filing vocabulary** — `法定申告`, `법정 신고` and
-/// `déclaration légale` all pass today. Those three locales are covered only through the
-/// Latin patterns. Widening the vocabulary is a wording decision (CLAUDE.md reserves those
-/// for a human) and would add exemptions to the disclaimers that legitimately use those
-/// words, so it is registered here rather than done silently.
-///
-/// **2. One known equivalent mutant.** Passing ``sanctionedUses`` instead of `[]` to the
+/// **One known equivalent mutant.** Passing ``sanctionedUses`` instead of `[]` to the
 /// statutory scan in ``testNoStatutoryStatementNamesAnywhere`` cannot change any verdict,
 /// because ``testFilingAndStatutoryWordListsAreDisjoint`` proves no sanction ever names a
 /// statutory pattern. It survives mutation testing by construction; the disjointness test is
@@ -122,6 +140,15 @@ final class LocalizationWordingGuardTests: XCTestCase {
     /// `Payable` / 应交 / 应缴 matter most for R8: five of the six engines emit a field
     /// literally called `payable` or `vatPayable`, and the obvious label for it is the one
     /// that asserts a debt to a tax authority — which this product does not compute.
+    ///
+    /// The Japanese, Korean and French entries were added later, closing the blind spot
+    /// described in the type doc. One family was considered and deliberately left out: the
+    /// French VERBS `déclarer` / `télédéclaration`. They have zero hits in the corpus today,
+    /// and `déclarer` carries the ordinary sense "to state" — banning it would fire on copy
+    /// that claims nothing about tax. The noun `déclaration`, in contrast, is the name of the
+    /// filing itself. ``testTheFrenchFilingWordRequiresItsAccentAndSkipsTheVerbFamily`` pins
+    /// that the adopted pattern really does leave the verbs alone, so the exclusion is a
+    /// measured property rather than an assertion in a comment.
     static let filingWords: [BannedWord] = [
         .init(pattern: "申报", label: "申报"),
         .init(pattern: "申報", label: "申報"),
@@ -142,6 +169,13 @@ final class LocalizationWordingGuardTests: XCTestCase {
         .init(pattern: #"(?i)\bDeductible\b"#, label: "Deductible"),
         .init(pattern: #"(?i)Auto-certify"#, label: "Auto-certify"),
         .init(pattern: #"(?i)\bPayable\b"#, label: "Payable"),
+        // — Japanese and Korean: BARE, no `\b`. Han and Hangul are word characters to ICU, so
+        //   a boundary-wrapped pattern misses the running text where the word actually appears.
+        .init(pattern: "申告", label: "申告"),
+        .init(pattern: "신고", label: "신고"),
+        // — French: accented spelling only, singular or plural. See the type doc for why no
+        //   `[ée]` tolerance here, and the comment above for why the verb family is excluded.
+        .init(pattern: #"(?i)\bdéclarations?\b"#, label: "déclaration(s)"),
     ]
 
     /// Names of statutory financial statements. Seeded from
@@ -151,6 +185,17 @@ final class LocalizationWordingGuardTests: XCTestCase {
     /// titled 损益表 / Income Statement claims to be the statutory document. There are
     /// currently ZERO hits and therefore ZERO sanctioned uses — this list starts clean and
     /// must stay that way.
+    ///
+    /// Which is exactly why the three languages' GENERAL terms for the set of statements —
+    /// 財務諸表, 재무제표, "état financier légal" — are NOT here, though they were considered
+    /// alongside the specific names below. Every one of them appears in this app in a denial:
+    /// `正式な財務諸表でも…ありません`, `법정 재무제표가 아닙니다`, `Ce n'est pas un état
+    /// financier légal`. Adding them would force this list to grow its first exemptions, and a
+    /// statement-names list with exemptions in it is no longer the thing that can be read as
+    /// "zero hits, zero sanctions". Chinese and English are excluded for the same reason:
+    /// 财务报表 and "financial statement" are absent from the list while 损益表 and "Income
+    /// Statement" are on it. A specific document title is a claim; the category noun in a
+    /// sentence that denies it is the product boundary being stated.
     static let statutoryStatementNames: [BannedWord] = [
         .init(pattern: "利润表", label: "利润表"),
         .init(pattern: "利潤表", label: "利潤表"),
@@ -166,20 +211,42 @@ final class LocalizationWordingGuardTests: XCTestCase {
         .init(pattern: #"(?i)Balance Sheet"#, label: "Balance Sheet"),
         .init(pattern: #"(?i)Cash Flow Statement"#, label: "Cash Flow Statement"),
         .init(pattern: #"(?i)Profit\s*&?\s*Loss\s+Statement"#, label: "Profit & Loss Statement"),
+        // — ja/ko, completing the pair whose balance sheets (貸借対照表, 재무상태표) the seeded
+        //   list already carried. Bare, for the same ICU reason as the filing words above.
+        .init(pattern: "損益計算書", label: "損益計算書"),
+        .init(pattern: "キャッシュ・フロー計算書", label: "キャッシュ・フロー計算書"),
+        .init(pattern: "손익계산서", label: "손익계산서"),
+        .init(pattern: "현금흐름표", label: "현금흐름표"),
+        // — fr. `bilan comptable`, not a bare `bilan`: on its own the word is everyday French
+        //   for taking stock ("faire le bilan de l'année"), and only the two-word form names
+        //   the statutory document. `[ée]` is tolerated here — unlike in the filing word —
+        //   because no English word collides with these phrases.
+        .init(pattern: #"(?i)compte de r[ée]sultat"#, label: "compte de résultat"),
+        .init(pattern: #"(?i)tableau des flux de tr[ée]sorerie"#,
+              label: "tableau des flux de trésorerie"),
+        .init(pattern: #"(?i)\bbilan comptable\b"#, label: "bilan comptable"),
     ]
 
-    /// The complete authorisation table: 11 triples, no key exempted as a whole.
+    /// The complete authorisation table: 40 triples, no key exempted as a whole.
     ///
-    /// Nine of the eleven are DISCLAIMERS containing 申报 / 报税 / Filing precisely in order
-    /// to DENY that the app does it. Banning the word there would force the product boundary
-    /// to be stated less clearly, which inverts the guard's purpose. The other two are an
-    /// invoice STATUS enum value — not a tax-amount label — the same carve-out
-    /// `check-tax-labels.mjs` documents for `invoices.statusDeducted`.
+    /// Thirty-eight of the forty are DISCLAIMERS containing 申报 / 报税 / Filing / 申告 / 신고 /
+    /// déclaration precisely in order to DENY that the app does it. Banning the word there
+    /// would force the product boundary to be stated less clearly, which inverts the guard's
+    /// purpose. The other two are an invoice STATUS enum value — not a tax-amount label — the
+    /// same carve-out `check-tax-labels.mjs` documents for `invoices.statusDeducted`.
     ///
-    /// Note what the per-locale narrowing already buys: `invoice.issued` is sanctioned in
-    /// zh-Hans and zh-Hant ONLY. Its `en` value is "Issued", which trips nothing — so if
-    /// anyone ever changed it to "Invoiced Output", that would fail, on a key the old
-    /// whole-key form would have waved through.
+    /// The shape is regular and worth reading as a block: six keys deny filing, and each of
+    /// them now does so in all six languages. en/ja/ko/fr contribute exactly those six triples
+    /// each; zh-Hans and zh-Hant contribute eight, because their `report.disclaimer.report`
+    /// uses BOTH 申报 and 报税 (one triple each, per the type doc) and because only they
+    /// sanction the invoice status.
+    ///
+    /// Note what the per-locale narrowing buys, and that widening the vocabulary did not cost
+    /// it: `invoice.issued` is sanctioned in zh-Hans and zh-Hant ONLY. Its `en` value is
+    /// "Issued", its `ja` 発行済み, its `ko` 발행 완료, its `fr` Émise — none of which trips
+    /// anything, so none of them needed an entry. If anyone ever changed the English one to
+    /// "Invoiced Output", that would fail, on a key the old whole-key form would have waved
+    /// through.
     static let sanctionedUses: [SanctionedUse] = [
         // — product positioning: states the app does NOT replace a statutory filing system
         .init(locale: "zh-Hans", key: "about.positioning", pattern: "申报",
@@ -231,6 +298,47 @@ final class LocalizationWordingGuardTests: XCTestCase {
         .init(locale: "zh-Hant", key: "report.disclaimer.usTax", pattern: "報稅",
               reason: "US tax disclaimer: denies being a basis for filing, points to a professional"),
         .init(locale: "en", key: "report.disclaimer.usTax", pattern: #"(?i)\bFiling\b"#,
+              reason: "US tax disclaimer: denies being a basis for filing, points to a professional"),
+        // — ja/ko/fr, added with their vocabulary. These are the SAME six denial sentences the
+        //   three languages above are already sanctioned for, in the three languages that used
+        //   to be scanned by the Latin patterns alone. Each reason is the reason of the entry
+        //   it mirrors: nothing new is being permitted, the same six statements are simply
+        //   being read in the language they ship in.
+        .init(locale: "ja", key: "about.positioning", pattern: "申告",
+              reason: "positioning disclaimer: denies replacing a statutory filing system"),
+        .init(locale: "ko", key: "about.positioning", pattern: "신고",
+              reason: "positioning disclaimer: denies replacing a statutory filing system"),
+        .init(locale: "fr", key: "about.positioning", pattern: #"(?i)\bdéclarations?\b"#,
+              reason: "positioning disclaimer: denies replacing a statutory filing system"),
+        .init(locale: "ja", key: "overview.dataSourceNote", pattern: "申告",
+              reason: "data-source disclaimer: denies being a basis for tax filing"),
+        .init(locale: "ko", key: "overview.dataSourceNote", pattern: "신고",
+              reason: "data-source disclaimer: denies being a basis for tax filing"),
+        .init(locale: "fr", key: "overview.dataSourceNote", pattern: #"(?i)\bdéclarations?\b"#,
+              reason: "data-source disclaimer: denies being a basis for tax filing"),
+        .init(locale: "ja", key: "settings.accountingNote", pattern: "申告",
+              reason: "accounting-profile note: denies being a statutory filing configuration"),
+        .init(locale: "ko", key: "settings.accountingNote", pattern: "신고",
+              reason: "accounting-profile note: denies being a statutory filing configuration"),
+        .init(locale: "fr", key: "settings.accountingNote", pattern: #"(?i)\bdéclarations?\b"#,
+              reason: "accounting-profile note: denies being a statutory filing configuration"),
+        .init(locale: "ja", key: "report.disclaimer.report", pattern: "申告",
+              reason: "report-page disclaimer: denies being a statutory statement or a basis for filing"),
+        .init(locale: "ko", key: "report.disclaimer.report", pattern: "신고",
+              reason: "report-page disclaimer: denies being a statutory statement or a basis for filing"),
+        .init(locale: "fr", key: "report.disclaimer.report", pattern: #"(?i)\bdéclarations?\b"#,
+              reason: "report-page disclaimer: denies being a statutory statement or a basis for filing"),
+        .init(locale: "ja", key: "report.disclaimer.tax", pattern: "申告",
+              reason: "tax-block disclaimer: denies being a basis for filing"),
+        .init(locale: "ko", key: "report.disclaimer.tax", pattern: "신고",
+              reason: "tax-block disclaimer: denies being a basis for filing"),
+        .init(locale: "fr", key: "report.disclaimer.tax", pattern: #"(?i)\bdéclarations?\b"#,
+              reason: "tax-block disclaimer: denies being a basis for filing"),
+        .init(locale: "ja", key: "report.disclaimer.usTax", pattern: "申告",
+              reason: "US tax disclaimer: denies being a basis for filing, points to a professional"),
+        .init(locale: "ko", key: "report.disclaimer.usTax", pattern: "신고",
+              reason: "US tax disclaimer: denies being a basis for filing, points to a professional"),
+        .init(locale: "fr", key: "report.disclaimer.usTax", pattern: #"(?i)\bdéclarations?\b"#,
               reason: "US tax disclaimer: denies being a basis for filing, points to a professional"),
     ]
 
@@ -515,6 +623,233 @@ final class LocalizationWordingGuardTests: XCTestCase {
                       "negative control: clean copy must not be reported")
     }
 
+    // MARK: - The Japanese, Korean and French vocabulary
+
+    // The blind spot registered at the top of this file, and the two shape decisions taken when
+    // it was closed. Each is pinned by the measurement that decided it, so a later reader can
+    // re-run the reasoning instead of trusting a comment.
+
+    /// The three languages the additions cover.
+    static let newlyCoveredLocales: Set<String> = ["ja", "ko", "fr"]
+
+    /// The six keys whose sentences deny that this app files anything. Every language now
+    /// sanctions exactly these; the two Chinese ones sanction two words on one of them, plus
+    /// the invoice status.
+    static let filingDenialKeys: Set<String> = [
+        "about.positioning", "overview.dataSourceNote", "settings.accountingNote",
+        "report.disclaimer.report", "report.disclaimer.tax", "report.disclaimer.usTax",
+    ]
+
+    /// **How complete the blind spot was.** Scanned with only the Chinese/English vocabulary
+    /// this guard shipped with, the ENTIRE ja/ko/fr corpus produces zero hits — not few, none.
+    /// Three languages, every key, nothing to report, which is exactly what an unguarded
+    /// language looks like from inside a green suite.
+    ///
+    /// So every hit those languages now produce comes from a pattern written in the language
+    /// being scanned. The additions are load-bearing, not tidying.
+    func testTheSeededVocabularyFoundNothingAtAllInJapaneseKoreanOrFrench() {
+        let added: Set<String> = ["申告", "신고", "déclaration(s)"]
+        let seeded = Self.filingWords.filter { !added.contains($0.label) }
+        XCTAssertEqual(seeded.count, Self.filingWords.count - added.count,
+                       "the three labels removed here must be exactly the three added")
+        let corpus = Self.allStrings().filter { Self.newlyCoveredLocales.contains($0.locale) }
+        XCTAssertGreaterThan(corpus.count, 600, "the three locales must really have been read")
+        XCTAssertTrue(Self.violations(in: corpus, words: seeded, sanctioned: []).isEmpty, """
+            a seeded Chinese/English pattern now fires in ja/ko/fr. That is not necessarily \
+            wrong — but this test's claim, that the seeded lists were blind to these three \
+            languages, has stopped being true and the reasoning above needs rewriting.
+            """)
+    }
+
+    /// Each language is scanned in ITS OWN words, and lands on exactly the six sentences that
+    /// deny filing: no fewer (a pattern present but never exercised — coverage on paper) and
+    /// no more (a false positive somewhere else in the copy).
+    func testEachOfTheThreeLanguagesIsScannedInItsOwnVocabulary() throws {
+        let corpus = Self.allStrings()
+        for (locale, label) in [("ja", "申告"), ("ko", "신고"), ("fr", "déclaration(s)")] {
+            let pattern = try XCTUnwrap(Self.pattern(labelled: label, in: Self.filingWords), """
+                \(label) is no longer in `filingWords` — \(locale) is back to being scanned by \
+                the Latin patterns alone, which testTheSeededVocabularyFoundNothingAtAllIn… \
+                shows finds nothing there.
+                """)
+            let hits = corpus.filter { $0.locale == locale && Self.matches(pattern, $0.value) }
+            XCTAssertEqual(Set(hits.map(\.key)), Self.filingDenialKeys, """
+                \(locale)/\(label) matched \(hits.map(\.key).sorted()), not the six denial \
+                sentences. A new key means new copy claiming a filing; a missing one means a \
+                denial that stopped denying, or a sanction now pointing at nothing.
+                """)
+        }
+    }
+
+    /// **Why the Japanese and Korean patterns carry no `\b`.** ICU classes Han and Hangul as
+    /// word characters, so a boundary-wrapped pattern matches only where the neighbouring
+    /// characters happen to be punctuation — in unspaced Japanese, almost nowhere.
+    ///
+    /// Measured on the committed values rather than argued from the rulebook: `法定申告システム`
+    /// and `세금 신고용이` are this app's own strings, and `\b` loses both.
+    func testWordBoundariesAreUselessForJapaneseAndKorean() throws {
+        let corpus = Self.allStrings()
+        let ja = try Self.value("ja", "about.positioning", in: corpus)
+        XCTAssertTrue(ja.contains("法定申告システム"), "the sample this test reasons about moved")
+        XCTAssertTrue(Self.matches("申告", ja), "the bare pattern must find it")
+        XCTAssertFalse(Self.matches(#"\b申告\b"#, ja), """
+            \\b申告\\b matched 法定申告システム. The bare patterns stay correct either way, but the \
+            reason recorded for them no longer holds — rewrite the reasoning, do not delete it.
+            """)
+
+        let ko = try Self.value("ko", "report.disclaimer.usTax", in: corpus)
+        XCTAssertTrue(ko.contains("신고용"), "the sample this test reasons about moved")
+        XCTAssertTrue(Self.matches("신고", ko), "the bare pattern must find it")
+        XCTAssertFalse(Self.matches(#"\b신고\b"#, ko), "\\b신고\\b matched 세금 신고용이")
+
+        // Not one unlucky string: over the six sentences each language denies filing in, the
+        // bare pattern finds all six and the boundary-wrapped form finds strictly fewer.
+        for (locale, bare) in [("ja", "申告"), ("ko", "신고")] {
+            let values = corpus
+                .filter { $0.locale == locale && Self.filingDenialKeys.contains($0.key) }
+                .map(\.value)
+            XCTAssertEqual(values.count, Self.filingDenialKeys.count)
+            let bareHits = values.filter { Self.matches(bare, $0) }.count
+            let boundedHits = values.filter { Self.matches(#"\b"# + bare + #"\b"#, $0) }.count
+            XCTAssertEqual(bareHits, Self.filingDenialKeys.count, "\(locale): bare must find all six")
+            XCTAssertLessThan(boundedHits, bareHits, """
+                \(locale): the boundary-wrapped form found \(boundedHits) of \(bareHits) — it is \
+                no longer measurably worse, so the no-`\\b` decision needs re-deciding.
+                """)
+        }
+    }
+
+    /// **Why the French filing word is spelt with its accent and takes no `[ée]` tolerance,**
+    /// and why the verb family is not banned at all.
+    ///
+    /// The Latin patterns are scanned against every locale, so a tolerant `d[ée]clarations?`
+    /// would fire on the ENGLISH word "declaration" — a word that claims nothing about tax.
+    /// Correct French always carries the accent, so the tolerance buys no coverage and costs a
+    /// whole false-positive class. The rejected variant is written out below and shown to do
+    /// precisely that, because a rejected alternative is only worth recording if it is shown.
+    func testTheFrenchFilingWordRequiresItsAccentAndSkipsTheVerbFamily() throws {
+        let corpus = Self.allStrings()
+        let pattern = try XCTUnwrap(Self.pattern(labelled: "déclaration(s)", in: Self.filingWords))
+        for text in ["ni une base pour une déclaration fiscale.",
+                     "les déclarations fiscales annuelles",
+                     "Déclaration réglementaire",
+                     try Self.value("fr", "about.positioning", in: corpus)] {
+            XCTAssertTrue(Self.matches(pattern, text), "\(text.debugDescription) must match")
+        }
+
+        let english = "a declaration of independence"
+        XCTAssertFalse(Self.matches(pattern, english), "the English word claims nothing")
+        XCTAssertTrue(Self.matches(#"(?i)\bd[ée]clarations?\b"#, english), """
+            the rejected accent-tolerant variant no longer fires on the English word — the \
+            reason for rejecting it was that it did.
+            """)
+
+        // The verbs are deliberately absent from `filingWords`: zero hits today, and `déclarer`
+        // carries the ordinary sense "to state". The noun pattern must not smuggle them back in.
+        for text in ["il faut déclarer les revenus", "la télédéclaration en ligne"] {
+            XCTAssertFalse(Self.matches(pattern, text), """
+                \(text.debugDescription) was matched, but the verb family was excluded on the \
+                grounds that this pattern leaves it alone.
+                """)
+        }
+    }
+
+    /// Each new statutory name is really scanned — asserted through the full pure scan, with
+    /// the filing sanctions PASSED IN, so what is proved is that no sanction can excuse a
+    /// statutory name in these languages either.
+    func testTheNewStatutoryNamesAreReportedWhereverTheyAppear() throws {
+        let samples: [(label: String, locale: String, value: String)] = [
+            ("損益計算書", "ja", "損益計算書（2026年度）"),
+            ("キャッシュ・フロー計算書", "ja", "キャッシュ・フロー計算書"),
+            ("손익계산서", "ko", "손익계산서 (2026)"),
+            ("현금흐름표", "ko", "현금흐름표"),
+            ("compte de résultat", "fr", "Compte de résultat 2026"),
+            ("tableau des flux de trésorerie", "fr", "Tableau des flux de trésorerie"),
+            ("bilan comptable", "fr", "Bilan comptable au 31 décembre"),
+        ]
+        for sample in samples {
+            XCTAssertNotNil(Self.pattern(labelled: sample.label, in: Self.statutoryStatementNames),
+                            "\(sample.label) is no longer in `statutoryStatementNames`")
+            let corpus = [LocalizedString(locale: sample.locale, key: "report.plTitle",
+                                          value: sample.value)]
+            XCTAssertEqual(Self.violations(in: corpus, words: Self.statutoryStatementNames,
+                                           sanctioned: Self.sanctionedUses),
+                           [Violation(locale: sample.locale, key: "report.plTitle",
+                                      label: sample.label)],
+                           "\(sample.value.debugDescription) must be reported as \(sample.label)")
+        }
+
+        // The `[ée]` tolerance the filing word deliberately does not have. Nothing in English
+        // collides with these phrases, so an unaccented misspelling is still the document.
+        let plPattern = try XCTUnwrap(Self.pattern(labelled: "compte de résultat",
+                                                   in: Self.statutoryStatementNames))
+        XCTAssertTrue(Self.matches(plPattern, "compte de resultat"))
+    }
+
+    /// The margin between the banned names and the titles this app actually ships, measured on
+    /// committed values: `経営損益サマリー` stops short of `損益計算書`, `현금흐름` stops short of
+    /// `현금흐름표`, "Aperçu du résultat" stops short of "compte de résultat".
+    ///
+    /// ``testNoStatutoryStatementNamesAnywhere`` already proves the whole corpus is clean. This
+    /// says WHERE the line runs, on the handful of titles that come closest to it — so a future
+    /// rewording that crosses it fails against a test that explains what it crossed.
+    func testTheNewStatutoryNamesDoNotCatchTheTitlesThisAppShips() throws {
+        let corpus = Self.allStrings()
+        let nearest = ["report.section.CN.incomeStatement", "report.section.JP.incomeStatement",
+                       "report.section.KR.incomeStatement", "report.cashflow.title",
+                       "report.cashflow.operating.title", "report.page.title"]
+        for key in nearest {
+            for locale in Self.newlyCoveredLocales.sorted() {
+                let value = try Self.value(locale, key, in: corpus)
+                let found = Self.violations(
+                    in: [LocalizedString(locale: locale, key: key, value: value)],
+                    words: Self.statutoryStatementNames, sanctioned: [])
+                XCTAssertTrue(found.isEmpty, """
+                    \(locale)/\(key) = \(value.debugDescription) now names a statutory statement \
+                    (\(found.map(\.description).joined(separator: ", "))).
+                    """)
+            }
+        }
+
+        // Why the French balance sheet is the TWO-WORD form. On its own `bilan` is everyday
+        // French for taking stock; only `bilan comptable` names the document. Both directions
+        // shown, so the choice is legible rather than asserted.
+        let bilan = try XCTUnwrap(Self.pattern(labelled: "bilan comptable",
+                                               in: Self.statutoryStatementNames))
+        XCTAssertFalse(Self.matches(bilan, "faire le bilan de l'année"))
+        XCTAssertTrue(Self.matches(#"(?i)\bbilan\b"#, "faire le bilan de l'année"),
+                      "a bare `bilan` — the rejected alternative — really would have fired here")
+        XCTAssertTrue(Self.matches(bilan, "Bilan comptable au 31 décembre"))
+    }
+
+    /// The three lists' sizes, written down after the decision that set them.
+    ///
+    /// A count is the cheapest thing that goes red when an entry is deleted, and for the
+    /// statutory list it is the ONLY thing: those patterns have zero hits by design, so
+    /// removing one changes no other verdict in the suite. A filing pattern is protected twice
+    /// over — its sanctions would go stale — but the statutory names are protected only here.
+    func testTheWordListsAreExactlyTheApprovedSizes() {
+        XCTAssertEqual(Self.filingWords.count, 22,
+                       "19 seeded Chinese/English + 3 for ja/ko/fr")
+        XCTAssertEqual(Self.statutoryStatementNames.count, 21,
+                       "14 seeded + 2 ja + 2 ko + 3 fr")
+        XCTAssertEqual(Self.sanctionedUses.count, 40,
+                       "22 for zh-Hans/zh-Hant/en + 18 for the same six denials in ja/ko/fr")
+
+        // No list may carry the same pattern or the same label twice — a duplicate would let a
+        // deletion hide behind its twin and keep the counts above green.
+        for list in [Self.filingWords, Self.statutoryStatementNames] {
+            XCTAssertEqual(Set(list.map(\.pattern)).count, list.count, "duplicate patterns")
+            XCTAssertEqual(Set(list.map(\.label)).count, list.count, "duplicate labels")
+        }
+
+        XCTAssertEqual(Dictionary(grouping: Self.sanctionedUses, by: \.locale).mapValues(\.count),
+                       ["zh-Hans": 8, "zh-Hant": 8, "en": 6, "ja": 6, "ko": 6, "fr": 6], """
+                       every language sanctions the same six denial sentences; the two Chinese \
+                       ones add a second word on one disclaimer and the invoice status.
+                       """)
+    }
+
     // MARK: - Anti-vacuity
 
     /// Discovery must find exactly the six shipped languages — no fewer (a language silently
@@ -589,6 +924,21 @@ final class LocalizationWordingGuardTests: XCTestCase {
 
     private func labelFor(_ pattern: String) -> String {
         Self.filingWords.first { $0.pattern == pattern }?.label ?? pattern
+    }
+
+    /// The pattern a list registers for `label`, or `nil` if the entry is gone. Looked up by
+    /// label rather than written out at the call site so that deleting an entry fails the test
+    /// that reasons about it, instead of leaving the test asserting against a literal the list
+    /// no longer contains.
+    private static func pattern(labelled label: String, in list: [BannedWord]) -> String? {
+        list.first { $0.label == label }?.pattern
+    }
+
+    /// One committed value, from a corpus the caller already read.
+    private static func value(_ locale: String, _ key: String,
+                              in corpus: [LocalizedString]) throws -> String {
+        try XCTUnwrap(corpus.first { $0.locale == locale && $0.key == key }?.value,
+                      "\(locale)/\(key) is not in the committed copy")
     }
 
     /// Every (locale, key, value) triple, read from the COMMITTED SOURCE files.
