@@ -205,8 +205,9 @@ final class ReportPresenterTests: XCTestCase {
                        .openSettings)
         XCTAssertEqual(ReportPresenter.copy(for: .accountingLocaleInvalid(storedText: "x")).action,
                        .openSettings)
-        // The four currency blockers: Settings shows the currency READ-ONLY, so a control that
-        // sent the user there would be a route to a screen that cannot help.
+        // The four currency blockers: Settings shows the currency READ-ONLY. Switching the
+        // accounting profile does rewrite it, but it resets the three tax rates with it, so
+        // routing a currency refusal there would be advising a side effect, not a repair.
         XCTAssertEqual(ReportPresenter.copy(for: .currencyNotConfigured(periodCurrencies: [],
                                                                        regimeDefault: "CNY")).action,
                        .none)

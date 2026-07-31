@@ -233,7 +233,7 @@
 "settings.surchargeRate" = "附加稅率";
 "settings.incomeTaxRate" = "所得稅率";
 "settings.adminExpenseAnnual" = "年度管理費用";
-"settings.reportParamsPending" = "本 App 尚未提供財務報表功能。這些參數會儲存在帳本中，供報表計算使用。留空表示該參數尚未設定；未設定的參數不會被報表計算採用，請自行設定需要的值。";
+"settings.reportParamsPending" = "這些參數會儲存在帳本中，供「報表」頁計算使用。報表為經營管理估算，不是法定財務報表。留空表示該參數尚未設定；未設定的參數不會被報表計算採用，請自行設定需要的值。";
 "settings.reportParamsNote" = "切換「會計制度」會把三項稅率重設為該制度的預設值（年度管理費用不變），既有紀錄不會重新計算。預設稅率僅為參考值，可能隨政策調整，請核對最新官方稅率。";
 "settings.appearance.system" = "跟隨系統";
 "settings.appearance.light" = "淺色";
@@ -363,9 +363,9 @@
 "report.blocker.accountingLocaleInvalid.title" = "帳本記錄的會計制度無法識別";
 "report.blocker.accountingLocaleInvalid.body" = "帳本裡會計制度一欄的內容不是本 App 認識的六種制度之一，所以沒有產生報表。下面是帳本中實際存放的內容，原樣顯示。你可以在「設定」的「會計」標籤中選擇會計制度。帳本檔案未被修改。";
 "report.blocker.currencyNotConfigured.title" = "帳本未記錄幣別";
-"report.blocker.currencyNotConfigured.body" = "報表要以某一種幣別列示金額，而帳本裡沒有這項記錄。本 App 不會替你挑一個，所以沒有產生報表。本 App 目前沒有修改幣別的入口。帳本檔案未被修改。";
+"report.blocker.currencyNotConfigured.body" = "報表要以某一種幣別列示金額，而帳本裡沒有這項記錄。本 App 不會替你挑一個，所以沒有產生報表。本 App 沒有單獨設定幣別的控制項。帳本檔案未被修改。";
 "report.blocker.currencyInvalid.title" = "帳本記錄的幣別無法使用";
-"report.blocker.currencyInvalid.body" = "帳本裡幣別一欄的內容不是可用的幣別代碼，所以沒有產生報表。下面是帳本中實際存放的內容，原樣顯示。本 App 目前沒有修改幣別的入口。帳本檔案未被修改。";
+"report.blocker.currencyInvalid.body" = "帳本裡幣別一欄的內容不是可用的幣別代碼，所以沒有產生報表。下面是帳本中實際存放的內容，原樣顯示。本 App 沒有單獨設定幣別的控制項。帳本檔案未被修改。";
 "report.blocker.legacySourceUnavailable.title" = "無法產生此期間的報表";
 "report.blocker.legacySourceUnavailable.body" = "此 App 在該期間沒有可用於報表的交易記錄，也不會讀取舊版報表資料，因此無法判斷該期間確實沒有業務，還是記錄仍保存在舊版資料中。帳本檔案未被修改。";
 "report.blocker.currencyMismatch.title" = "帳本幣別與本期記錄的幣別不一致";
