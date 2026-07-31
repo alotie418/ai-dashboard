@@ -99,6 +99,7 @@
 "nav.overview" = "개요";
 "nav.transactions" = "수입·지출";
 "nav.categories" = "계정 과목";
+"nav.reports" = "보고서";
 
 "type.income" = "수입";
 "type.expense" = "지출";

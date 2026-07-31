@@ -240,6 +240,7 @@ private struct MainSplitView: View {
         case .overview: OverviewView()
         case .transactions: TransactionListView()
         case .categories: CategoriesView()
+        case .reports: ReportsView()
         }
     }
 }

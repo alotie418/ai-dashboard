@@ -431,26 +431,38 @@ final class ReportMountingTests: XCTestCase {
         }
     }
 
-    // MARK: - D19 — the page is still unreachable
+    // MARK: - D19 — the page is reachable, from exactly one place
 
-    /// Two independent facts, and both are needed. `SidebarSection` having no case proves there
-    /// is no route to the page; this proves nothing constructs it by another path.
-    func testReportsViewHasNoCallSite() throws {
+    /// Two independent facts, and both are still needed. `SidebarSection` having the case proves
+    /// there IS a route; this proves the route is the only one — one call site, in the detail
+    /// switch, and no second construction hiding somewhere else in the app.
+    ///
+    /// Comment lines are skipped when counting, the same way `AppTargetBypassGuardTests` does it,
+    /// so a sentence explaining the call cannot be mistaken for a second call.
+    func testReportsViewHasExactlyOneCallSiteAndItIsTheDetailSwitch() throws {
         let root = ReportFixtureBuilder.packageRoot().appendingPathComponent("Sources/SoloLedger")
         let walker = try XCTUnwrap(FileManager.default.enumerator(atPath: root.path))
         var scanned = 0
+        var callSites: [String: Int] = [:]
         for case let relative as String in walker where relative.hasSuffix(".swift") {
             guard !relative.hasSuffix("ReportsView.swift") else { continue }
             let text = try String(contentsOf: root.appendingPathComponent(relative),
                                   encoding: .utf8)
             scanned += 1
-            XCTAssertFalse(text.contains("ReportsView("),
-                           "\(relative) constructs ReportsView — the page must stay unreachable")
+            let uses = text.split(separator: "\n", omittingEmptySubsequences: false)
+                .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+                .reduce(0) { $0 + ($1.components(separatedBy: "ReportsView(").count - 1) }
+            if uses > 0 { callSites[relative] = uses }
         }
         XCTAssertGreaterThan(scanned, 10, "the scan must have seen the app target")
+        XCTAssertEqual(callSites, ["Views/RootView.swift": 1],
+                       "ReportsView must be constructed exactly once, by the detail switch")
+        XCTAssertTrue(try ReportFixtureBuilder.appSource("Views/RootView.swift")
+            .contains("case .reports: ReportsView()"),
+                      "the one call site must be the `.reports` branch of the detail switch")
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
-                       ["overview", "transactions", "categories"])
-        XCTAssertNil(SidebarSection(rawValue: "reports"))
+                       ["overview", "transactions", "categories", "reports"])
+        XCTAssertEqual(SidebarSection(rawValue: "reports"), .reports)
     }
 
     // MARK: - D20 — the exemption table grew by exactly eleven

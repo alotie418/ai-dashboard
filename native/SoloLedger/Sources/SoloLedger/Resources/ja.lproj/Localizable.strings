@@ -99,6 +99,7 @@
 "nav.overview" = "概要";
 "nav.transactions" = "入出金";
 "nav.categories" = "勘定科目";
+"nav.reports" = "レポート";
 
 "type.income" = "収入";
 "type.expense" = "支出";
