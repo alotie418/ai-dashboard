@@ -237,6 +237,8 @@
 "settings.surchargeRate" = "附加稅率";
 "settings.incomeTaxRate" = "所得稅率";
 "settings.adminExpenseAnnual" = "年度管理費用";
+"settings.reportParams.needsRepair" = "帳本中存有內容，但不是可用的數值";
+"settings.reportParams.repairHint" = "鍵入一個數值即會覆蓋帳本裡的這一行；清空既有數值則會刪除該行。";
 "settings.reportParamsPending" = "這些參數會儲存在帳本中，供「報表」頁計算使用。報表為經營管理估算，不是法定財務報表。留空表示該參數尚未設定；未設定的參數不會被報表計算採用，請自行設定需要的值。";
 "settings.reportParamsNote" = "切換「會計制度」會把三項稅率重設為該制度的預設值（年度管理費用不變），既有紀錄不會重新計算。預設稅率僅為參考值，可能隨政策調整，請核對最新官方稅率。";
 "settings.appearance.system" = "跟隨系統";

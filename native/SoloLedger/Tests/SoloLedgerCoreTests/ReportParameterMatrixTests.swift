@@ -69,9 +69,12 @@ final class ReportParameterMatrixTests: XCTestCase {
     ///     SettingsStore.number("admin_expense_annual")            -> 5000
     ///     ReportSettings.number(db, …, fallback: 0)                -> 0
     ///
-    /// The Settings screen shows 5000; the engines used 0. `SettingsStore` is NOT changed
-    /// here — that inconsistency is registered for P4 — but the façade must report the 0 it
-    /// really used, and must not launder the row into a `.usable(5000)`.
+    /// The Settings screen showed 5000; the engines used 0. `SettingsStore.number` still reads
+    /// 5000 — it is the lenient DISPLAY accessor and is deliberately unchanged — but P4d gave
+    /// `SettingsStore` a strict accessor beside it (`reportParameterState`) that applies THIS
+    /// rule, so the Settings screen no longer presents that number as a setting. The two
+    /// readers are pinned equal by `ParameterReadAlignmentTests`. The façade's own job here is
+    /// unchanged: report the 0 it really used, and never launder the row into a `.usable(5000)`.
     func testBOMPrefixedAdminExpenseIsNeedsRepairWithExactTextWhileNativeEffectIsTheFallbackZero()
         throws {
         let stored = "\u{FEFF}5000"

@@ -98,13 +98,54 @@ private struct AccountingSettingsTab: View {
     /// value for that key, which is a real state (the report features apply their own
     /// built-in fallback). Clearing a field leaves the stored value alone rather than
     /// writing a 0 the user never chose.
-    private func parameterField(_ field: ReportParameterField, label: String) -> some View {
+    @ViewBuilder private func parameterField(_ field: ReportParameterField, label: String) -> some View {
         let unit = field.isPercentage ? "%" : model.accountingLocale.defaultCurrency
-        return TextField("\(label) (\(unit))", value: Binding(
+        TextField("\(label) (\(unit))", value: Binding(
             get: { model.reportParameters[field] },
-            set: { model.setReportParameter(field, to: $0) }
+            // `editReportParameter`, not `setReportParameter`: a field that was already empty
+            // must not be able to delete the row just by being clicked into and left.
+            set: { model.editReportParameter(field, to: $0) }
         ), format: .number.precision(.fractionLength(0...6)))
         .multilineTextAlignment(.trailing)
+        DamagedParameterNotice(state: model.reportParameterStates[field])
+    }
+}
+
+/// One parameter row that holds something this app cannot use — shown ONLY then. `.usable`
+/// and `.absent` render nothing, so a settled screen is untouched.
+///
+/// The field above stays EMPTY on purpose. Pre-filling the number the lenient read produced
+/// would confirm a value the engines did not use (a BOM-prefixed `5000` reads as 5000 here and
+/// reaches them as 0); pre-filling the engines' own fallback would dress the app's default up
+/// as the user's choice. An empty field, the row's own bytes, and a sentence saying what typing
+/// does is the only shape that puts no words in the user's mouth.
+///
+/// The stored text goes through the SAME `ReportFormat.safePreview` the report page uses —
+/// including its U+FEFF escape, so the invisible byte that makes this row unusable is visible.
+private struct DamagedParameterNotice: View {
+    @EnvironmentObject var model: AppModel
+    let state: StoredSettingState?
+
+    var body: some View {
+        if case .needsRepair(let storedText) = state {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(model.t("settings.reportParams.needsRepair"))
+                    .font(.footnote).foregroundStyle(.secondary)
+                Text(model.t("settings.storedText.label"))
+                    .font(.caption2).foregroundStyle(.secondary)
+                Text(ReportFormat.safePreview(storedText))
+                    .font(.caption).monospaced()
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(6)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                Text(model.t("settings.reportParams.repairHint"))
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("settings.reportParams.damaged")
+        }
     }
 }
 
