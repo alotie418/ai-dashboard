@@ -706,8 +706,19 @@ final class AppModel: ObservableObject {
     /// So a nil is honoured only when the field HAD a usable value to clear. Clearing a value
     /// that is really there still deletes the row, unchanged and still a deliberate act.
     func editReportParameter(_ field: ReportParameterField, to value: Double?) {
-        if value == nil, reportParameters[field] == nil { return }
+        if value == displayedReportParameter(field) { return }
         setReportParameter(field, to: value)
+    }
+
+    /// What the parameter FIELD shows: nothing at all for a row this app cannot use.
+    ///
+    /// `reportParameters` is the lenient read, and for a damaged row it can still produce a
+    /// number — a `U+FEFF`-prefixed `5000` reads as 5000 there while the engines subtracted 0.
+    /// Showing it would invite the user to confirm a value nothing computed with, so the field
+    /// is empty and the notice beneath it carries the row's actual bytes instead.
+    func displayedReportParameter(_ field: ReportParameterField) -> Double? {
+        if case .needsRepair = reportParameterStates[field] { return nil }
+        return reportParameters[field]
     }
 
     func setReportParameter(_ field: ReportParameterField, to value: Double?) {

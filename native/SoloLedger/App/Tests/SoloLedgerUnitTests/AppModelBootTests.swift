@@ -942,4 +942,58 @@ final class AppModelBootTests: XCTestCase {
                      "clearing a value that is really there must still remove the row")
         try store.db.close()
     }
+
+    // M6 ────────────────────────────────────────────────────────────────────────────────
+    /// The OTHER direction of the same defect, found by the walkthrough after M5 was written.
+    ///
+    /// A `U+FEFF`-prefixed number is damaged, but the lenient read still produces a number for
+    /// it — so that field was NOT empty, and a focus-then-blur wrote that number back. Measured:
+    /// `vat_rate` went from `U+FEFF13` to a clean `13` without anyone typing. On
+    /// `admin_expense_annual` the same move would turn the 0 the engines used into 5000 and
+    /// change the report, still without a keystroke.
+    ///
+    /// So the field shows NOTHING for a damaged row (`displayedReportParameter`), and a write
+    /// that merely repeats what the field was showing is not an edit.
+    func testM6FocusingABOMDamagedFieldCannotRewriteItsRow() async throws {
+        let store = try freshStore("m6.db")
+        try writeRawSetting(store, .vatRate, "\u{FEFF}13")
+        try writeRawSetting(store, .adminExpenseAnnual, "\u{FEFF}5000")
+        let model = await booted(store)
+
+        XCTAssertEqual(model.reportParameters[.vatRate], 13,
+                       "the lenient read still produces a number for this row")
+        XCTAssertNil(model.displayedReportParameter(.vatRate),
+                     "but the field must show nothing, so no value is put in the user's mouth")
+
+        // Exactly what focus-then-blur sends: whatever the field was displaying.
+        model.editReportParameter(.vatRate, to: model.displayedReportParameter(.vatRate))
+        model.editReportParameter(.adminExpenseAnnual,
+                                  to: model.displayedReportParameter(.adminExpenseAnnual))
+
+        XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.vatRate), "\u{FEFF}13",
+                       "the row keeps its bytes, BOM included")
+        XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.adminExpenseAnnual),
+                       "\u{FEFF}5000")
+
+        // And typing a real number over it still repairs.
+        model.editReportParameter(.vatRate, to: 9)
+        XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.vatRate), "9")
+        XCTAssertEqual(model.reportParameterStates[.vatRate], .usable(9))
+        try store.db.close()
+    }
+
+    // M7 ────────────────────────────────────────────────────────────────────────────────
+    /// A sound row is not churned either: focus-then-blur on a field showing 25 writes nothing.
+    func testM7FocusingASoundFieldWritesNothing() async throws {
+        let store = try freshStore("m7.db")
+        try store.settings.setNumber(25, for: SettingsStore.Key.incomeTaxRate)
+        let model = await booted(store)
+        XCTAssertEqual(model.displayedReportParameter(.incomeTaxRate), 25)
+
+        model.editReportParameter(.incomeTaxRate, to: 25)
+
+        XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.incomeTaxRate), "25")
+        XCTAssertEqual(model.reportParameterStates[.incomeTaxRate], .usable(25))
+        try store.db.close()
+    }
 }

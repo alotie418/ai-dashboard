@@ -101,9 +101,10 @@ private struct AccountingSettingsTab: View {
     @ViewBuilder private func parameterField(_ field: ReportParameterField, label: String) -> some View {
         let unit = field.isPercentage ? "%" : model.accountingLocale.defaultCurrency
         TextField("\(label) (\(unit))", value: Binding(
-            get: { model.reportParameters[field] },
-            // `editReportParameter`, not `setReportParameter`: a field that was already empty
-            // must not be able to delete the row just by being clicked into and left.
+            // Empty for a damaged row — the notice below shows what is really stored.
+            get: { model.displayedReportParameter(field) },
+            // `editReportParameter`, not `setReportParameter`: writing back exactly what the
+            // field was already showing is what focus-then-blur does, and it is not an edit.
             set: { model.editReportParameter(field, to: $0) }
         ), format: .number.precision(.fractionLength(0...6)))
         .multilineTextAlignment(.trailing)
