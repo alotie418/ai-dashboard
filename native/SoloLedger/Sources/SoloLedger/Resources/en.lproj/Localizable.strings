@@ -105,7 +105,7 @@
 "settings.surchargeRate" = "Surcharge rate";
 "settings.incomeTaxRate" = "Income tax rate";
 "settings.adminExpenseAnnual" = "Annual admin expense";
-"settings.reportParamsPending" = "This app does not provide financial reports yet. These parameters are stored in the ledger for report calculations. An empty field means that parameter is not configured; report calculations do not use an unconfigured parameter, so set the values you need yourself.";
+"settings.reportParamsPending" = "These parameters are stored in the ledger and used by the Reports page. Those reports are management estimates, not statutory financial statements. An empty field means that parameter is not configured; report calculations do not use an unconfigured parameter, so set the values you need yourself.";
 "settings.reportParamsNote" = "Changing “Accounting profile” resets the three tax rates to that profile's presets (the annual admin expense is left alone); existing records are never recalculated. Preset rates are reference values and may change — verify against current official rates.";
 "settings.schemaVersion" = "Database version";
 "settings.backup" = "Backup";
@@ -366,9 +366,9 @@
 "report.blocker.accountingLocaleInvalid.title" = "The recorded accounting profile is not one this app knows";
 "report.blocker.accountingLocaleInvalid.body" = "The accounting-profile entry in this ledger is not one of the six this app knows, so no report was produced. What the ledger actually holds is shown below, verbatim. You can choose a profile in the Accounting tab of Settings. The ledger file was not modified.";
 "report.blocker.currencyNotConfigured.title" = "No currency is recorded in this ledger";
-"report.blocker.currencyNotConfigured.body" = "A report states amounts in one currency, and this ledger records none. This app does not pick one for you, so no report was produced. This app has no way to change the currency yet. The ledger file was not modified.";
+"report.blocker.currencyNotConfigured.body" = "A report states amounts in one currency, and this ledger records none. This app does not pick one for you, so no report was produced. This app has no separate control for the currency. The ledger file was not modified.";
 "report.blocker.currencyInvalid.title" = "The recorded currency cannot be used";
-"report.blocker.currencyInvalid.body" = "The currency entry in this ledger is not a usable currency code, so no report was produced. What the ledger actually holds is shown below, verbatim. This app has no way to change the currency yet. The ledger file was not modified.";
+"report.blocker.currencyInvalid.body" = "The currency entry in this ledger is not a usable currency code, so no report was produced. What the ledger actually holds is shown below, verbatim. This app has no separate control for the currency. The ledger file was not modified.";
 "report.blocker.legacySourceUnavailable.title" = "No report can be produced for this period";
 "report.blocker.legacySourceUnavailable.body" = "This app has no transactions for this period that a report can be built from, and it does not read the older report data, so it cannot tell whether there really was no business in this period or whether the records still live in the older data. The ledger file was not modified.";
 "report.blocker.currencyMismatch.title" = "The ledger's currency and this period's currency disagree";

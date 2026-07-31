@@ -105,7 +105,7 @@
 "settings.surchargeRate" = "附加税率";
 "settings.incomeTaxRate" = "所得税率";
 "settings.adminExpenseAnnual" = "年度管理费用";
-"settings.reportParamsPending" = "本 App 尚未提供财务报表功能。这些参数会保存在账本中，供报表计算使用。留空表示该参数尚未配置；未配置的参数不会被报表计算采用，请自行设置需要的值。";
+"settings.reportParamsPending" = "这些参数会保存在账本中，供「报表」页计算使用。报表为经营管理估算，不是法定财务报表。留空表示该参数尚未配置；未配置的参数不会被报表计算采用，请自行设置需要的值。";
 "settings.reportParamsNote" = "切换「会计制度」会把三项税率重置为该制度的预设值（年度管理费用不变），已有记录不会重新计算。预设税率仅为参考值，可能随政策调整，请核对最新官方税率。";
 "settings.schemaVersion" = "数据库版本";
 "settings.backup" = "备份";
@@ -366,9 +366,9 @@
 "report.blocker.accountingLocaleInvalid.title" = "账本记录的会计制度无法识别";
 "report.blocker.accountingLocaleInvalid.body" = "账本里会计制度一栏的内容不是本 App 认识的六种制度之一，所以没有生成报表。下面是账本中实际存放的内容，原样显示。你可以在「设置」的「会计」标签中选择会计制度。账本文件未被修改。";
 "report.blocker.currencyNotConfigured.title" = "账本未记录币种";
-"report.blocker.currencyNotConfigured.body" = "报表要以某一种币种列示金额，而账本里没有这项记录。本 App 不会替你挑一个，所以没有生成报表。本 App 目前没有修改币种的入口。账本文件未被修改。";
+"report.blocker.currencyNotConfigured.body" = "报表要以某一种币种列示金额，而账本里没有这项记录。本 App 不会替你挑一个，所以没有生成报表。本 App 没有单独设置币种的控件。账本文件未被修改。";
 "report.blocker.currencyInvalid.title" = "账本记录的币种无法使用";
-"report.blocker.currencyInvalid.body" = "账本里币种一栏的内容不是可用的币种代码，所以没有生成报表。下面是账本中实际存放的内容，原样显示。本 App 目前没有修改币种的入口。账本文件未被修改。";
+"report.blocker.currencyInvalid.body" = "账本里币种一栏的内容不是可用的币种代码，所以没有生成报表。下面是账本中实际存放的内容，原样显示。本 App 没有单独设置币种的控件。账本文件未被修改。";
 "report.blocker.legacySourceUnavailable.title" = "无法生成此期间的报表";
 "report.blocker.legacySourceUnavailable.body" = "此 App 在该期间没有可用于报表的交易记录，也不会读取旧版报表数据，因此无法判断该期间确实没有业务，还是记录仍保存在旧版数据中。账本文件未被修改。";
 "report.blocker.currencyMismatch.title" = "账本币种与本期记录的币种不一致";

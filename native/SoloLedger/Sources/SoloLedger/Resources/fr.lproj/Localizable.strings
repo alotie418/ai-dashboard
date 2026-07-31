@@ -233,7 +233,7 @@
 "settings.surchargeRate" = "Taux additionnel";
 "settings.incomeTaxRate" = "Taux d'impôt sur les bénéfices";
 "settings.adminExpenseAnnual" = "Frais administratifs annuels";
-"settings.reportParamsPending" = "Cette app ne propose pas encore de rapports financiers. Ces paramètres sont enregistrés dans la comptabilité pour les calculs de rapports. Un champ vide signifie que ce paramètre n'est pas configuré ; les calculs de rapports n'utilisent pas un paramètre non configuré, définissez donc vous-même les valeurs dont vous avez besoin.";
+"settings.reportParamsPending" = "Ces paramètres sont enregistrés dans la comptabilité et servent aux calculs de la page « Rapports ». Ces rapports sont des estimations de gestion, pas des états financiers légaux. Un champ vide signifie que ce paramètre n'est pas configuré ; les calculs de rapports n'utilisent pas un paramètre non configuré, définissez donc vous-même les valeurs dont vous avez besoin.";
 "settings.reportParamsNote" = "Changer le « Régime comptable » réinitialise les trois taux aux valeurs préréglées de ce régime (les frais administratifs annuels ne changent pas) ; les enregistrements existants ne sont jamais recalculés. Les taux préréglés sont des valeurs de référence et peuvent évoluer — vérifiez les taux officiels en vigueur.";
 "settings.appearance.system" = "Système";
 "settings.appearance.light" = "Clair";
@@ -363,9 +363,9 @@
 "report.blocker.accountingLocaleInvalid.title" = "Le régime comptable enregistré n'est pas reconnu";
 "report.blocker.accountingLocaleInvalid.body" = "L'entrée « régime comptable » de ce livre ne correspond à aucun des six que cette app connaît, donc aucun rapport n'a été produit. Le contenu réel du livre est affiché ci-dessous, tel quel. Vous pouvez choisir un régime dans l'onglet Comptabilité des Réglages. Le fichier de comptes n'a pas été modifié.";
 "report.blocker.currencyNotConfigured.title" = "Aucune devise n'est enregistrée dans ce livre";
-"report.blocker.currencyNotConfigured.body" = "Un rapport exprime les montants dans une devise, et ce livre n'en enregistre aucune. Cette app n'en choisit pas une à votre place, donc aucun rapport n'a été produit. Cette app ne permet pas encore de changer la devise. Le fichier de comptes n'a pas été modifié.";
+"report.blocker.currencyNotConfigured.body" = "Un rapport exprime les montants dans une devise, et ce livre n'en enregistre aucune. Cette app n'en choisit pas une à votre place, donc aucun rapport n'a été produit. Cette app n'a pas de réglage distinct pour la devise. Le fichier de comptes n'a pas été modifié.";
 "report.blocker.currencyInvalid.title" = "La devise enregistrée est inutilisable";
-"report.blocker.currencyInvalid.body" = "L'entrée « devise » de ce livre n'est pas un code de devise utilisable, donc aucun rapport n'a été produit. Le contenu réel du livre est affiché ci-dessous, tel quel. Cette app ne permet pas encore de changer la devise. Le fichier de comptes n'a pas été modifié.";
+"report.blocker.currencyInvalid.body" = "L'entrée « devise » de ce livre n'est pas un code de devise utilisable, donc aucun rapport n'a été produit. Le contenu réel du livre est affiché ci-dessous, tel quel. Cette app n'a pas de réglage distinct pour la devise. Le fichier de comptes n'a pas été modifié.";
 "report.blocker.legacySourceUnavailable.title" = "Aucun rapport ne peut être produit pour cette période";
 "report.blocker.legacySourceUnavailable.body" = "Cette app ne dispose d'aucune opération exploitable pour cette période et ne lit pas les données de l'ancienne version. Elle ne peut donc pas déterminer s'il n'y a réellement eu aucune activité ou si les enregistrements se trouvent encore dans les anciennes données. Le fichier de comptes n'a pas été modifié.";
 "report.blocker.currencyMismatch.title" = "La devise du livre et celle de la période ne concordent pas";

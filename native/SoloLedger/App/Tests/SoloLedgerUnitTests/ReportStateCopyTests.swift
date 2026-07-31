@@ -258,6 +258,42 @@ final class ReportStateCopyTests: XCTestCase {
         }
     }
 
+    // MARK: - C13 — the two retired over-claims may not come back
+
+    /// Both sentences were true when they were written and both stopped being true later.
+    ///
+    /// "This app does not provide financial reports yet" died the moment P3e put the report page
+    /// in the sidebar. "This app has no way to change the currency" was never quite right:
+    /// Settings holds no currency control, but switching the accounting profile runs
+    /// `applyRegimeSwitch`, which writes the regime, its preset rates AND its currency in one
+    /// transaction — so the ledger's currency does change, from a screen the copy said could not
+    /// change it.
+    ///
+    /// Ratcheted on the WHOLE retired sentence, per locale, rather than on keywords: "yet",
+    /// "currency" and "provide" all have legitimate uses in this copy, and a keyword ban would
+    /// fail the replacement text it is supposed to protect.
+    func testTheRetiredOverclaimsDoNotComeBack() {
+        let retiredPending = ["本 App 尚未提供财务报表功能", "本 App 尚未提供財務報表功能",
+                              "does not provide financial reports yet",
+                              "まだ財務帳票を提供していません", "아직 재무 보고서를 제공하지 않습니다",
+                              "ne propose pas encore de rapports financiers"]
+        let retiredCurrency = ["没有修改币种的入口", "沒有修改幣別的入口",
+                               "no way to change the currency",
+                               "通貨を変更する手段がありません", "통화를 변경하는 방법이 없습니다",
+                               "ne permet pas encore de changer la devise"]
+        for (index, language) in languages.enumerated() {
+            XCTAssertFalse(value(language, "settings.reportParamsPending")
+                .contains(retiredPending[index]),
+                "\(language): the parameters note must not deny that the report page exists")
+            for key in ["\(ReportPresenter.keyPrefix)blocker.currencyNotConfigured.body",
+                        "\(ReportPresenter.keyPrefix)blocker.currencyInvalid.body"] {
+                XCTAssertFalse(value(language, key).contains(retiredCurrency[index]),
+                    "\(language)/\(key) claims the currency cannot be changed — switching the "
+                    + "accounting profile rewrites it")
+            }
+        }
+    }
+
     // MARK: - C9 — no two keys in one region render the same label
 
     /// The extension of P3b's collision check. The regions below are the ones where two labels
