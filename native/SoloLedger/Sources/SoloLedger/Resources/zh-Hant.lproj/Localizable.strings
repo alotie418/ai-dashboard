@@ -99,6 +99,7 @@
 "nav.overview" = "概覽";
 "nav.transactions" = "收支流水";
 "nav.categories" = "會計類別";
+"nav.reports" = "報表";
 
 "type.income" = "收入";
 "type.expense" = "支出";

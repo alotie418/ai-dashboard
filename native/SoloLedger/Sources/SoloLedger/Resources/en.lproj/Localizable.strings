@@ -16,6 +16,7 @@
 "nav.overview" = "Overview";
 "nav.transactions" = "Transactions";
 "nav.categories" = "Categories";
+"nav.reports" = "Reports";
 
 "overview.income" = "Total income";
 "overview.expense" = "Total expense";

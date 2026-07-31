@@ -99,6 +99,7 @@
 "nav.overview" = "Aperçu";
 "nav.transactions" = "Transactions";
 "nav.categories" = "Catégories";
+"nav.reports" = "Rapports";
 
 "type.income" = "Recette";
 "type.expense" = "Dépense";

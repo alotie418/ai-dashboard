@@ -16,6 +16,7 @@
 "nav.overview" = "概览";
 "nav.transactions" = "收支流水";
 "nav.categories" = "会计类别";
+"nav.reports" = "报表";
 
 "overview.income" = "收入合计";
 "overview.expense" = "支出合计";

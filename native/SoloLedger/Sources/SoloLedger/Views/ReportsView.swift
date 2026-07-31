@@ -3,10 +3,10 @@ import SoloLedgerCore
 
 /// The report page.
 ///
-/// **Nothing constructs this view yet.** There is no `SidebarSection` case for it and no branch
-/// in the split view's detail, so it is compiled, tested and unreachable. The entry point is a
-/// separate change, deliberately: until then every intermediate `main` ships a product that is
-/// byte for byte the one before it.
+/// **Reached from the `.reports` sidebar section** (P3e) through the split view's detail switch —
+/// one enum case serving both the sidebar list and the menu-bar picker. The entry point was a
+/// separate change, deliberately: until that case existed this page was compiled, tested and
+/// unreachable, so every intermediate `main` shipped the product byte for byte unchanged.
 ///
 /// Every key this page draws comes from ``ReportPageComposition``. The subviews below take their
 /// slice of that value and render exactly what it names — which is what makes the four

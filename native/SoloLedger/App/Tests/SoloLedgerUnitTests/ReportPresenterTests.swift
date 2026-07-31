@@ -558,14 +558,21 @@ final class ReportPresenterTests: XCTestCase {
     }
 
     // T31 ───────────────────────────────────────────────────────────────────────────────
-    /// P3a adds no user-reachable path. The sidebar list and the menu-bar picker both iterate
-    /// `SidebarSection.allCases`, so one case is two entry points — and there is none.
+    /// P3e adds the user-reachable path. The sidebar list and the menu-bar picker both iterate
+    /// `SidebarSection.allCases`, so the one new case is both entry points at once.
     ///
-    /// **This test is expected to change in the activation PR (P3e), and only there.**
-    func testTheReportPageHasNoEntryPointYet() {
+    /// This owns the ENUM's shape only. The copy behind `titleKey` is owned elsewhere:
+    /// `ReportStructuralCopyTests` proves it resolves in six languages, `ReportStateCopyTests`
+    /// proves it is the same string as the page's own title.
+    func testTheReportPageHasItsEntryPoint() {
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
-                       ["overview", "transactions", "categories"])
-        XCTAssertNil(SidebarSection(rawValue: "reports"))
+                       ["overview", "transactions", "categories", "reports"])
+        XCTAssertEqual(SidebarSection(rawValue: "reports"), .reports)
+        XCTAssertEqual(SidebarSection.reports.titleKey, "nav.reports")
+        for section in SidebarSection.allCases {
+            XCTAssertEqual(section.titleKey, "nav.\(section.rawValue)")
+            XCTAssertFalse(section.systemImage.isEmpty, "\(section.rawValue) has no sidebar icon")
+        }
     }
 
     // T32 / T30 ─────────────────────────────────────────────────────────────────────────

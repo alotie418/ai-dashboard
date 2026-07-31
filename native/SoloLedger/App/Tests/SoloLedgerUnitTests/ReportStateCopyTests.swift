@@ -416,11 +416,19 @@ final class ReportStateCopyTests: XCTestCase {
         }
     }
 
-    // MARK: - C12 — still unreachable
+    // MARK: - C12 — the entry point names the page it opens
 
-    func testP3cAddsNoEntryPoint() {
+    /// The sidebar row and the page's own title are two different keys, and they carry the SAME
+    /// string. The other three sections use ONE key for both, so equal text here is what
+    /// reproduces their behaviour; differing text would make reports the only section whose
+    /// sidebar row and window title disagree.
+    func testTheSidebarLabelMatchesThePageTitleVerbatim() {
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
-                       ["overview", "transactions", "categories"])
-        XCTAssertNil(SidebarSection(rawValue: "reports"))
+                       ["overview", "transactions", "categories", "reports"])
+        for language in languages {
+            XCTAssertEqual(value(language, "nav.reports"),
+                           value(language, "report.page.title"),
+                           "\(language): the sidebar entry and the page title must be identical")
+        }
     }
 }

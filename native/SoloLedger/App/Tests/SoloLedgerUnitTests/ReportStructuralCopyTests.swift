@@ -367,11 +367,26 @@ final class ReportStructuralCopyTests: XCTestCase {
         XCTAssertEqual(lines.count, 5, "all five are kept; the note explains the repetition")
     }
 
-    // MARK: - Still unreachable
+    // MARK: - The entry point, in every language
 
-    func testP3bAddsNoEntryPoint() {
+    /// P3e made the page reachable. Every sidebar row must resolve in all six languages, and no
+    /// two rows may read the same: they sit in one region and one slot, so identical text there
+    /// is an ambiguity the user has no way to resolve.
+    func testTheEntryPointResolvesInEveryLanguage() {
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
-                       ["overview", "transactions", "categories"])
-        XCTAssertNil(SidebarSection(rawValue: "reports"))
+                       ["overview", "transactions", "categories", "reports"])
+        for language in languages {
+            var labels: [String] = []
+            for section in SidebarSection.allCases {
+                let text = value(language, section.titleKey)
+                XCTAssertNotEqual(text, section.titleKey,
+                                  "\(language)/\(section.titleKey) leaks the raw key")
+                XCTAssertFalse(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                               "\(language)/\(section.titleKey) is blank")
+                labels.append(text)
+            }
+            XCTAssertEqual(Set(labels).count, labels.count,
+                           "\(language): two sidebar rows read the same — \(labels)")
+        }
     }
 }

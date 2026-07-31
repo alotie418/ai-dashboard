@@ -6,6 +6,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     case overview
     case transactions
     case categories
+    case reports
     var id: String { rawValue }
     var titleKey: String { "nav.\(rawValue)" }
     var systemImage: String {
@@ -13,6 +14,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         case .overview: return "chart.bar.doc.horizontal"
         case .transactions: return "list.bullet.rectangle"
         case .categories: return "tag"
+        case .reports: return "doc.text.magnifyingglass"
         }
     }
 }
@@ -708,7 +710,7 @@ final class AppModel: ObservableObject {
         reloadAll()
     }
 
-    // MARK: - Reports (R8 P3a — state model only; nothing in the UI reaches this yet)
+    // MARK: - Reports (R8 P3a state model; reached from the `.reports` sidebar section since P3e)
 
     /// The report page's state. Every non-empty case carries its own year, so the heading and
     /// the numbers under it cannot come from different years.
