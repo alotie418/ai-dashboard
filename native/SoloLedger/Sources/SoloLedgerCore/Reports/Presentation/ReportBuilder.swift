@@ -128,11 +128,10 @@ public enum ReportBuilder {
             return .blocked(.accountingLocaleNotConfigured)
         }
         let raw = ReportSettings.rawValue(db, "accounting_locale") ?? ""
-        guard case .string(let value)? = ReportSettings.jsonFragment(raw),
-              ["CN", "US", "JP", "EU", "KR", "TW"].contains(value) else {
+        guard let locale = ReportSettings.recognizedAccountingLocale(fromStoredText: raw) else {
             return .blocked(.accountingLocaleInvalid(storedText: raw))
         }
-        return .resolved(value)
+        return .resolved(locale.rawValue)
     }
 
     // MARK: - The currency

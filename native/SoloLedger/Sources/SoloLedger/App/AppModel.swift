@@ -80,6 +80,10 @@ final class AppModel: ObservableObject {
     @Published private(set) var language: String
     @Published var appearance: Appearance = .system
     @Published var accountingLocale: AccountingLocale = .CN
+    /// What the `accounting_locale` row really holds, by the rule the report engines use.
+    /// `accountingLocale` above is the DISPLAY fallback — it answers `.CN` for a row that
+    /// names no regime, which is why anything that must not invent a regime reads this.
+    @Published private(set) var accountingLocaleState: StoredLocaleState = .absent
     @Published var companyName: String = ""
     /// Records still held in the legacy `sales` / `purchases` tables. Read-only: the
     /// app never converts them, it only says they are there.
@@ -289,10 +293,14 @@ final class AppModel: ObservableObject {
         let savedLang: String?
         let savedAppearance: String?
         let loc: AccountingLocale
+        let locState: StoredLocaleState
         do {
             savedLang = try candidate.settings.string(SettingsStore.Key.uiLanguage)
             savedAppearance = try candidate.settings.string(SettingsStore.Key.appearance)
             loc = try candidate.settings.accountingLocale()
+            // Same row, same primitive: if one of these two reads fails the other would too,
+            // so this adds no new way for adoption to fail — only a second answer about it.
+            locState = try candidate.settings.accountingLocaleState()
         } catch {
             finish(.retriable(MigrationBlock(code: .storeOpenFailed, classification: .retriable,
                                              params: ["op": "adopt"])), generation: gen)
@@ -307,6 +315,7 @@ final class AppModel: ObservableObject {
         if let savedLang { setLanguage(savedLang, persist: false) }
         if let savedAppearance, let ap = Appearance(rawValue: savedAppearance) { appearance = ap }
         accountingLocale = loc
+        accountingLocaleState = locState
         onboardingDone = done
         companyName = co
         reportParameters = params
@@ -387,6 +396,7 @@ final class AppModel: ObservableObject {
             appearance = ap
         }
         accountingLocale = try store.settings.accountingLocale()
+        accountingLocaleState = try store.settings.accountingLocaleState()
         companyName = (try? store.settings.string(SettingsStore.Key.companyName)) ?? ""
         onboardingDone = (try? store.settings.bool(SettingsStore.Key.onboardingDone)) ?? false
         reportParameters = (try? store.settings.reportParameters()) ?? ReportParametersStored()
@@ -662,6 +672,11 @@ final class AppModel: ObservableObject {
         } catch {
             actionError = "\(error)"
         }
+        // Re-read rather than assume: writing a regime is exactly how a damaged row gets
+        // repaired, and a published state left saying "unreadable" after the repair would be
+        // the same kind of stale claim this change exists to remove. A failed re-read leaves
+        // the previous answer standing rather than inventing a better-looking one.
+        if let state = try? store?.settings.accountingLocaleState() { accountingLocaleState = state }
         reloadReportParameters()
         reloadAll()
     }
@@ -740,6 +755,7 @@ final class AppModel: ObservableObject {
     private func seedCurrencyIfProvablyNew() {
         guard let store else { return }
         guard case .some(.none) = (try? store.settings.rawValue(SettingsStore.Key.currency)),
+              case .configured = accountingLocaleState,
               transactions.isEmpty,
               !legacyLedger.holdsHiddenRecords,
               !legacyProbeFailed

@@ -644,4 +644,98 @@ final class AppModelBootTests: XCTestCase {
         try store.db.execute("DROP TRIGGER settings_readonly")
         try store.db.close()
     }
+
+    // MARK: - P4c-1: a damaged regime row is described honestly, and never opens a hole
+
+    /// A U+FEFF before `"US"`. `JSONSerialization` eats it and `JSON.parse` does not, which is
+    /// why this one row used to be read as two different countries by two parts of one app.
+    private static let bomUS = "\u{FEFF}\"US\""
+
+    private func withDamagedRegime(_ store: LedgerStore, _ raw: String = bomUS) throws {
+        _ = try store.db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('accounting_locale', ?)",
+                             [.text(raw)])
+    }
+
+    // A1 ────────────────────────────────────────────────────────────────────────────────
+    /// The ledger still OPENS. Making the regime read strict enough to throw would turn one
+    /// damaged row into a ledger nobody can get into, which is why `accountingLocale()` keeps
+    /// its display fallback — and why the honest answer lives beside it rather than replacing it.
+    func testA1ADamagedRegimeRowStillOpensAndIsPublishedAsUnreadable() async throws {
+        let store = try freshStore("a1.db")
+        try withDamagedRegime(store)
+        let model = await booted(store)
+        XCTAssertNotNil(model.store, "a damaged regime row must not cost the user their ledger")
+        XCTAssertTrue(model.ready)
+        XCTAssertNil(model.bootError)
+        XCTAssertEqual(model.migrationUIState, .none)
+        XCTAssertEqual(model.accountingLocale, .US,
+                       "the display accessor reads the BOM row as the United States — the very "
+                       + "answer the engines refuse to assume")
+        XCTAssertEqual(model.accountingLocaleState, .unreadable(storedText: Self.bomUS),
+                       "and the truth is published alongside it, bytes intact")
+        try store.db.close()
+    }
+
+    // A2 ────────────────────────────────────────────────────────────────────────────────
+    /// P4b's seed gains the same conjunct for the same reason: a currency chosen from a regime
+    /// this app cannot read is a currency nobody chose.
+    func testA2AnUnreadableRegimeStopsTheCurrencySeed() async throws {
+        let store = try freshStore("a2.db")
+        try withDamagedRegime(store)
+        let model = await booted(store)
+        XCTAssertTrue(model.transactions.isEmpty, "every other conjunct must be satisfied")
+        XCTAssertFalse(model.legacyLedger.holdsHiddenRecords)
+        XCTAssertFalse(model.legacyProbeFailed)
+        model.completeOnboarding()
+        XCTAssertEqual(currencyRow(store), .some(.none),
+                       "no currency may be seeded off a regime the app cannot read")
+        try store.db.close()
+    }
+
+    // A3 ────────────────────────────────────────────────────────────────────────────────
+    /// Repairing to the regime the screen was already showing writes the regime row and
+    /// NOTHING else — `shouldApplyPresets` is false for an unchanged regime, so the three tax
+    /// rates the user configured survive the repair.
+    func testA3RepairingToTheDisplayedRegimeWritesOnlyTheRegimeRow() async throws {
+        let store = try freshStore("a3.db")
+        try store.settings.setNumber(3, for: SettingsStore.Key.vatRate)
+        try store.settings.setNumber(7, for: SettingsStore.Key.surchargeRate)
+        try store.settings.setNumber(11, for: SettingsStore.Key.incomeTaxRate)
+        try withDamagedRegime(store)
+        let model = await booted(store)
+        XCTAssertEqual(model.accountingLocale, .US, "the screen is showing the United States")
+
+        model.setAccountingLocale(.US)          // the regime the screen was showing
+
+        XCTAssertEqual(try store.settings.accountingLocaleState(), .configured(.US),
+                       "the damaged row is repaired")
+        XCTAssertEqual(model.accountingLocaleState, .configured(.US),
+                       "and the published state follows the repair without a relaunch")
+        XCTAssertEqual(try store.settings.number(SettingsStore.Key.vatRate), 3)
+        XCTAssertEqual(try store.settings.number(SettingsStore.Key.surchargeRate), 7)
+        XCTAssertEqual(try store.settings.number(SettingsStore.Key.incomeTaxRate), 11,
+                       "an unchanged regime must not cascade over the user's own rates")
+        try store.db.close()
+    }
+
+    // A4 ────────────────────────────────────────────────────────────────────────────────
+    /// Repairing to a DIFFERENT regime cascades, exactly as an ordinary switch does and as
+    /// `settings.reportParamsNote` tells the user on screen. Not a regression — the contrast
+    /// with A3 is the point.
+    func testA4RepairingToADifferentRegimeCascadesLikeAnyOtherSwitch() async throws {
+        let store = try freshStore("a4.db")
+        try store.settings.setNumber(3, for: SettingsStore.Key.vatRate)
+        try withDamagedRegime(store)
+        let model = await booted(store)
+        XCTAssertEqual(model.accountingLocale, .US, "the screen is showing the United States")
+
+        model.setAccountingLocale(.JP)          // a DIFFERENT regime from the displayed one
+
+        XCTAssertEqual(try store.settings.accountingLocaleState(), .configured(.JP))
+        XCTAssertEqual(model.accountingLocaleState, .configured(.JP))
+        XCTAssertEqual(try store.settings.number(SettingsStore.Key.vatRate), 10,
+                       "a real regime change applies that regime's presets")
+        XCTAssertEqual(try store.settings.string(SettingsStore.Key.currency), "JPY")
+        try store.db.close()
+    }
 }
