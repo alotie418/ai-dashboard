@@ -109,6 +109,8 @@
 "settings.surchargeRate" = "Surcharge rate";
 "settings.incomeTaxRate" = "Income tax rate";
 "settings.adminExpenseAnnual" = "Annual admin expense";
+"settings.reportParams.needsRepair" = "Something is stored, but it is not a usable number";
+"settings.reportParams.repairHint" = "Typing a number overwrites this row in the ledger; clearing a value that is there deletes the row.";
 "settings.reportParamsPending" = "These parameters are stored in the ledger and used by the Reports page. Those reports are management estimates, not statutory financial statements. An empty field means that parameter is not configured; report calculations do not use an unconfigured parameter, so set the values you need yourself.";
 "settings.reportParamsNote" = "Changing “Accounting profile” resets the three tax rates to that profile's presets (the annual admin expense is left alone); existing records are never recalculated. Preset rates are reference values and may change — verify against current official rates.";
 "settings.schemaVersion" = "Database version";

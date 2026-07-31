@@ -97,6 +97,11 @@ final class AppModel: ObservableObject {
     /// engines would not use. Nothing in this app consumes them yet; they are stored
     /// in the ledger for the report features that read them.
     @Published private(set) var reportParameters = ReportParametersStored()
+    /// Each report parameter row judged by the rule the report engines are judged by.
+    /// `reportParameters` above is the lenient DISPLAY read — it answers nil for an absent row
+    /// and for a damaged one alike, which is exactly the distinction the Settings screen has to
+    /// make. Absent from this dictionary means the read itself failed.
+    @Published private(set) var reportParameterStates: [ReportParameterField: StoredSettingState] = [:]
 
     // Lifecycle / errors
     @Published var onboardingDone = false
@@ -319,6 +324,7 @@ final class AppModel: ObservableObject {
         onboardingDone = done
         companyName = co
         reportParameters = params
+        reportParameterStates = Self.parameterStates(candidate.settings)
         reloadAll()
         migrationFailure = nil
         ready = true
@@ -400,6 +406,7 @@ final class AppModel: ObservableObject {
         companyName = (try? store.settings.string(SettingsStore.Key.companyName)) ?? ""
         onboardingDone = (try? store.settings.bool(SettingsStore.Key.onboardingDone)) ?? false
         reportParameters = (try? store.settings.reportParameters()) ?? ReportParametersStored()
+        reportParameterStates = Self.parameterStates(store.settings)
         reloadAll()
         migrationFailure = nil
         ready = true
@@ -686,6 +693,34 @@ final class AppModel: ObservableObject {
     /// which is a real state (the report features fall back to their own default), and
     /// a non-finite value is refused rather than written, because the report engines
     /// coerce with a bare `Number()`.
+    /// The Settings FIELD's editing path, and the only thing the parameter fields call.
+    ///
+    /// `setReportParameter` below is unchanged: a value writes, a nil deletes. What this adds
+    /// is which of those a field is entitled to ask for. A parameter row this app cannot use
+    /// renders as an EMPTY field — the lenient read answers nil for it — and SwiftUI writes
+    /// that emptiness back through the binding when the field loses focus. Measured on `main`:
+    /// clicking into such a field and clicking away, without typing anything at all, DELETED
+    /// the damaged row. Focus is not an intent to delete, and the row that vanished is exactly
+    /// the evidence the report page shows the user.
+    ///
+    /// So a nil is honoured only when the field HAD a usable value to clear. Clearing a value
+    /// that is really there still deletes the row, unchanged and still a deliberate act.
+    func editReportParameter(_ field: ReportParameterField, to value: Double?) {
+        if value == displayedReportParameter(field) { return }
+        setReportParameter(field, to: value)
+    }
+
+    /// What the parameter FIELD shows: nothing at all for a row this app cannot use.
+    ///
+    /// `reportParameters` is the lenient read, and for a damaged row it can still produce a
+    /// number — a `U+FEFF`-prefixed `5000` reads as 5000 there while the engines subtracted 0.
+    /// Showing it would invite the user to confirm a value nothing computed with, so the field
+    /// is empty and the notice beneath it carries the row's actual bytes instead.
+    func displayedReportParameter(_ field: ReportParameterField) -> Double? {
+        if case .needsRepair = reportParameterStates[field] { return nil }
+        return reportParameters[field]
+    }
+
     func setReportParameter(_ field: ReportParameterField, to value: Double?) {
         do {
             guard let settings = store?.settings else { return }
@@ -712,6 +747,22 @@ final class AppModel: ObservableObject {
         } catch {
             actionError = "\(error)"
         }
+        reportParameterStates = Self.parameterStates(settings)
+    }
+
+    /// The four parameter rows judged the way the report engines judge them.
+    ///
+    /// A read that fails leaves that field OUT of the dictionary rather than claiming
+    /// `.absent` — a row this app could not read is not a row it may describe. Published
+    /// alongside the lenient `reportParameters` so a screen can never show one while acting
+    /// on the other.
+    private static func parameterStates(_ settings: SettingsStore)
+        -> [ReportParameterField: StoredSettingState] {
+        var out: [ReportParameterField: StoredSettingState] = [:]
+        for field in ReportParameterField.allCases {
+            if let state = try? settings.reportParameterState(field) { out[field] = state }
+        }
+        return out
     }
 
     func setCompanyName(_ name: String) {

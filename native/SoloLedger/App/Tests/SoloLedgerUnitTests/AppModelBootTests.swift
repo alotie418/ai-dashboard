@@ -780,14 +780,19 @@ final class AppModelBootTests: XCTestCase {
         let source = try ReportFixtureBuilder.appSource("Views/SettingsView.swift")
         let notice = try XCTUnwrap(source.range(of: "private struct UnreadableLocaleNotice"))
         let before = String(source[source.startIndex..<notice.lowerBound])
+        // The locale notice's OWN keys, which nothing else on the screen may draw.
+        // `settings.storedText.label` is deliberately absent from this list since P4d: the
+        // damaged-parameter notice legitimately shows the same label, so its position in the
+        // file no longer says anything. That notice's own keys are pinned by `testM3…`.
         for key in ["settings.accountingLocale.unreadable.title",
                     "settings.accountingLocale.absent.title",
-                    "settings.accountingLocale.repairHint",
-                    "settings.storedText.label"] {
+                    "settings.accountingLocale.repairHint"] {
             XCTAssertFalse(before.contains(key),
                            "\(key) is drawn outside the notice — the settled screen would change")
             XCTAssertTrue(source.contains(key), "\(key) must actually be drawn by the notice")
         }
+        XCTAssertTrue(source.contains("settings.storedText.label"),
+                      "the shared stored-text label must still be drawn somewhere")
         try store.db.close()
     }
 
@@ -817,6 +822,178 @@ final class AppModelBootTests: XCTestCase {
         XCTAssertEqual(model.accountingLocaleState, .configured(.CN),
                        "choosing the displayed regime writes it — a same value is not a no-op")
         XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.accountingLocale), "\"CN\"")
+        try store.db.close()
+    }
+
+    // MARK: - P4d: damaged parameter rows are described honestly and never silently deleted
+
+    private func writeRawSetting(_ store: LedgerStore, _ field: ReportParameterField,
+                                 _ raw: String) throws {
+        _ = try store.db.run("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                             [.text(field.settingsKey), .text(raw)])
+    }
+
+    // M1 ────────────────────────────────────────────────────────────────────────────────
+    func testM1ADamagedParameterRowStillOpensAndIsPublishedAsNeedsRepair() async throws {
+        let store = try freshStore("m1.db")
+        try writeRawSetting(store, .adminExpenseAnnual, "5000元")
+        let model = await booted(store)
+        XCTAssertNotNil(model.store)
+        XCTAssertTrue(model.ready)
+        XCTAssertNil(model.bootError)
+        XCTAssertNil(model.reportParameters[.adminExpenseAnnual],
+                     "the lenient read still answers nil, which renders as an empty field")
+        XCTAssertEqual(model.reportParameterStates[.adminExpenseAnnual],
+                       .needsRepair(storedText: "5000元"),
+                       "and the truth is published alongside it, bytes intact")
+        try store.db.close()
+    }
+
+    // M2 ────────────────────────────────────────────────────────────────────────────────
+    /// Typing a number repairs that row and leaves the other three alone.
+    func testM2TypingAValueRepairsOnlyThatRow() async throws {
+        let store = try freshStore("m2.db")
+        try writeRawSetting(store, .adminExpenseAnnual, "5000元")
+        try writeRawSetting(store, .vatRate, "abc")
+        try store.settings.setNumber(11, for: SettingsStore.Key.incomeTaxRate)
+        let model = await booted(store)
+
+        model.editReportParameter(.adminExpenseAnnual, to: 8000)
+
+        XCTAssertEqual(model.reportParameterStates[.adminExpenseAnnual], .usable(8000))
+        XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.adminExpenseAnnual), "8000")
+        XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.vatRate), "abc",
+                       "the other damaged row is untouched, byte for byte")
+        XCTAssertEqual(try store.settings.number(SettingsStore.Key.incomeTaxRate), 11)
+        try store.db.close()
+    }
+
+    // M3 ────────────────────────────────────────────────────────────────────────────────
+    /// A settled ledger draws none of the new copy. Two independent facts, as in P4c-2.
+    func testM3AUsableLedgerDrawsNoneOfTheNewCopy() async throws {
+        let store = try freshStore("m3.db")
+        try store.settings.setNumber(13, for: SettingsStore.Key.vatRate)
+        let model = await booted(store)
+        XCTAssertEqual(model.reportParameterStates[.vatRate], .usable(13))
+        XCTAssertEqual(model.reportParameterStates[.surchargeRate], .absent,
+                       "an absent row is not a damaged one, and draws nothing either")
+
+        let source = try ReportFixtureBuilder.appSource("Views/SettingsView.swift")
+        let notice = try XCTUnwrap(source.range(of: "private struct DamagedParameterNotice"))
+        let before = String(source[source.startIndex..<notice.lowerBound])
+        for key in ["settings.reportParams.needsRepair", "settings.reportParams.repairHint"] {
+            XCTAssertFalse(before.contains(key), "\(key) is drawn outside the notice")
+            XCTAssertTrue(source.contains(key), "\(key) must actually be drawn by the notice")
+        }
+        try store.db.close()
+    }
+
+    // M4 ────────────────────────────────────────────────────────────────────────────────
+    /// The regime cascade still writes three sound rates — the alignment did not disturb it.
+    func testM4TheRegimeCascadeStillLeavesAllThreeRatesUsable() async throws {
+        let store = try freshStore("m4.db")
+        try writeRawSetting(store, .vatRate, "abc")
+        let model = await booted(store)
+        XCTAssertEqual(model.reportParameterStates[.vatRate], .needsRepair(storedText: "abc"))
+
+        model.setAccountingLocale(.JP)
+
+        for f in [ReportParameterField.vatRate, .surchargeRate, .incomeTaxRate] {
+            guard case .usable = model.reportParameterStates[f] else {
+                return XCTFail("\(f) should be usable after a cascade, got \(String(describing: model.reportParameterStates[f]))")
+            }
+        }
+        try store.db.close()
+    }
+
+    // M5 ────────────────────────────────────────────────────────────────────────────────
+    /// **The silent deletion, pinned.**
+    ///
+    /// A damaged row renders as an EMPTY field, and SwiftUI writes that emptiness back through
+    /// the binding when the field loses focus. Measured on `main` before this change: clicking
+    /// into such a field and clicking away, without typing anything, DELETED the row — the very
+    /// row the report page shows the user as evidence. Focus is not an intent to delete.
+    ///
+    /// `editReportParameter` is what the field calls now, and it forwards a nil only when there
+    /// was a usable value to clear. The second half of this test keeps the deliberate behaviour
+    /// honest: clearing a value that really is there still deletes the row.
+    func testM5FocusingADamagedFieldCannotDeleteItsRow() async throws {
+        let store = try freshStore("m5.db")
+        try writeRawSetting(store, .adminExpenseAnnual, "5000元")
+        try writeRawSetting(store, .vatRate, "abc")
+        try writeRawSetting(store, .surchargeRate, "[25]")
+        let model = await booted(store)
+
+        // Exactly what a focus-then-blur does to a field the lenient read left empty.
+        for f in [ReportParameterField.adminExpenseAnnual, .vatRate, .surchargeRate] {
+            model.editReportParameter(f, to: nil)
+        }
+
+        XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.adminExpenseAnnual), "5000元")
+        XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.vatRate), "abc")
+        XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.surchargeRate), "[25]")
+
+        // And clearing a row that IS usable still deletes it — unchanged, still deliberate.
+        // Set it THROUGH the model so the published value the guard consults is the real one.
+        model.editReportParameter(.incomeTaxRate, to: 25)
+        XCTAssertEqual(model.reportParameters[.incomeTaxRate], 25)
+        model.editReportParameter(.incomeTaxRate, to: nil)
+        XCTAssertNil(try store.settings.rawValue(SettingsStore.Key.incomeTaxRate),
+                     "clearing a value that is really there must still remove the row")
+        try store.db.close()
+    }
+
+    // M6 ────────────────────────────────────────────────────────────────────────────────
+    /// The OTHER direction of the same defect, found by the walkthrough after M5 was written.
+    ///
+    /// A `U+FEFF`-prefixed number is damaged, but the lenient read still produces a number for
+    /// it — so that field was NOT empty, and a focus-then-blur wrote that number back. Measured:
+    /// `vat_rate` went from `U+FEFF13` to a clean `13` without anyone typing. On
+    /// `admin_expense_annual` the same move would turn the 0 the engines used into 5000 and
+    /// change the report, still without a keystroke.
+    ///
+    /// So the field shows NOTHING for a damaged row (`displayedReportParameter`), and a write
+    /// that merely repeats what the field was showing is not an edit.
+    func testM6FocusingABOMDamagedFieldCannotRewriteItsRow() async throws {
+        let store = try freshStore("m6.db")
+        try writeRawSetting(store, .vatRate, "\u{FEFF}13")
+        try writeRawSetting(store, .adminExpenseAnnual, "\u{FEFF}5000")
+        let model = await booted(store)
+
+        XCTAssertEqual(model.reportParameters[.vatRate], 13,
+                       "the lenient read still produces a number for this row")
+        XCTAssertNil(model.displayedReportParameter(.vatRate),
+                     "but the field must show nothing, so no value is put in the user's mouth")
+
+        // Exactly what focus-then-blur sends: whatever the field was displaying.
+        model.editReportParameter(.vatRate, to: model.displayedReportParameter(.vatRate))
+        model.editReportParameter(.adminExpenseAnnual,
+                                  to: model.displayedReportParameter(.adminExpenseAnnual))
+
+        XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.vatRate), "\u{FEFF}13",
+                       "the row keeps its bytes, BOM included")
+        XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.adminExpenseAnnual),
+                       "\u{FEFF}5000")
+
+        // And typing a real number over it still repairs.
+        model.editReportParameter(.vatRate, to: 9)
+        XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.vatRate), "9")
+        XCTAssertEqual(model.reportParameterStates[.vatRate], .usable(9))
+        try store.db.close()
+    }
+
+    // M7 ────────────────────────────────────────────────────────────────────────────────
+    /// A sound row is not churned either: focus-then-blur on a field showing 25 writes nothing.
+    func testM7FocusingASoundFieldWritesNothing() async throws {
+        let store = try freshStore("m7.db")
+        try store.settings.setNumber(25, for: SettingsStore.Key.incomeTaxRate)
+        let model = await booted(store)
+        XCTAssertEqual(model.displayedReportParameter(.incomeTaxRate), 25)
+
+        model.editReportParameter(.incomeTaxRate, to: 25)
+
+        XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.incomeTaxRate), "25")
+        XCTAssertEqual(model.reportParameterStates[.incomeTaxRate], .usable(25))
         try store.db.close()
     }
 }

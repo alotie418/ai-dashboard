@@ -74,6 +74,9 @@ final class AppUnitTests: XCTestCase {
         ("settings.accountingLocale.absent.title", "report.blocker.accountingLocaleNotConfigured.title"),
         ("settings.accountingLocale.repairHint", nil),
         ("settings.storedText.label", "report.storedText.label"),
+        // P4d
+        ("settings.reportParams.needsRepair", "report.param.stored.needsRepair"),
+        ("settings.reportParams.repairHint", nil),
     ]
 
     /// …/App/Tests/SoloLedgerUnitTests/<this>.swift → …/native/SoloLedger
@@ -139,8 +142,8 @@ final class AppUnitTests: XCTestCase {
     func testS4TheNewKeysLandedInTheSettingsNamespaceOnly() throws {
         for language in Self.languages {
             let table = try strings(language)
-            XCTAssertEqual(table.keys.filter { $0.hasPrefix("settings.") }.count, 34,
-                           "\(language): 30 settings keys + the 4 P4c-2 adds")
+            XCTAssertEqual(table.keys.filter { $0.hasPrefix("settings.") }.count, 36,
+                           "\(language): 30 + 4 (P4c-2) + 2 (P4d)")
             XCTAssertEqual(table.keys.filter { $0.hasPrefix("report.") }.count, 165,
                            "\(language): the report namespace must not have moved")
         }

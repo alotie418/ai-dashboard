@@ -237,6 +237,8 @@
 "settings.surchargeRate" = "附加税率";
 "settings.incomeTaxRate" = "所得税率";
 "settings.adminExpenseAnnual" = "年間管理費用";
+"settings.reportParams.needsRepair" = "保存されていますが、使用できる数値ではありません";
+"settings.reportParams.repairHint" = "数値を入力するとこの行が上書きされます。入っている値を消すと、その行は削除されます。";
 "settings.reportParamsPending" = "これらのパラメータは台帳に保存され、「レポート」ページの計算に使われます。レポートは経営管理上の試算であり、法定の財務諸表ではありません。空欄はそのパラメータが未設定であることを意味します。未設定のパラメータはレポート計算に使われませんので、必要な値はご自身で設定してください。";
 "settings.reportParamsNote" = "「会計方式」を切り替えると、3 つの税率がその方式のプリセット値に戻ります（年間管理費用はそのまま）。既存の記録が再計算されることはありません。プリセット税率は参考値であり変更される場合があります。最新の公式税率をご確認ください。";
 "settings.appearance.system" = "システムに合わせる";

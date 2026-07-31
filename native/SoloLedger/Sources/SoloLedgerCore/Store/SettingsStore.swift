@@ -57,10 +57,20 @@ public struct SettingsStore {
         try writeRaw(key, value ? "true" : "false")
     }
 
-    /// A numeric setting. Electron persists these inconsistently — its accounting
-    /// section and onboarding wizard write JSON numbers (`13`) while its tax settings
-    /// screen writes a JSON string (`"13"`) — so BOTH encodings are accepted here.
-    /// Returns nil when the row is absent or the value is not a number.
+    /// A numeric setting, read LENIENTLY, for display.
+    ///
+    /// Electron persists these inconsistently — its accounting section and onboarding wizard
+    /// write JSON numbers (`13`) while its tax settings screen writes a JSON string (`"13"`) —
+    /// so BOTH encodings are accepted here.
+    ///
+    /// **This is not the question the report engines ask**, and the difference is not academic:
+    ///   - it answers `nil` both for an ABSENT row and for a row holding something unusable,
+    ///     collapsing two states a screen needs to tell apart;
+    ///   - `JSONSerialization` eats a leading U+FEFF, so a row holding `U+FEFF5000` reads as
+    ///     **5000** here while the engines subtract **0** — one row, two numbers.
+    ///
+    /// **Anything that must know whether the ledger really holds a usable setting asks
+    /// ``reportParameterState(_:)``**, which applies the rule the engines are judged by.
     public func number(_ key: String) throws -> Double? {
         guard let raw = try rawValue(key) else { return nil }
         return JSONFragment.decodeNumber(raw)
@@ -130,6 +140,23 @@ public struct SettingsStore {
             try setNumber(profile.incomeTaxRate, for: Key.incomeTaxRate)
             try setString(profile.currency, for: Key.currency)
         }
+    }
+
+    /// Whether one report parameter's row is a usable setting, judged by the SAME rule the
+    /// report engines are judged by — ``ReportSettings/classifyRate(_:)``, which
+    /// `ReportBuilder` already applies to all four keys when it builds the parameter table.
+    ///
+    /// Distinct from ``number(_:)``, which answers `nil` for an absent row and for a damaged
+    /// one alike. Here they are different answers: `.absent` means there is nothing there,
+    /// `.needsRepair` means there is something there that this app cannot use — and it carries
+    /// the stored text byte for byte, so a screen can show the user what their ledger holds.
+    /// A read failure throws rather than being reported as `.absent`.
+    public func reportParameterState(_ field: ReportParameterField) throws -> StoredSettingState {
+        guard let raw = try rawValue(field.settingsKey) else { return .absent }
+        if case .configured(let usable) = ReportSettings.classifyRate(raw) {
+            return .usable(usable.value)
+        }
+        return .needsRepair(storedText: raw)
     }
 
     /// The four report calculation parameters exactly as stored (absent stays absent —

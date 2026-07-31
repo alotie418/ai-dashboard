@@ -237,6 +237,8 @@
 "settings.surchargeRate" = "Taux additionnel";
 "settings.incomeTaxRate" = "Taux d'impôt sur les bénéfices";
 "settings.adminExpenseAnnual" = "Frais administratifs annuels";
+"settings.reportParams.needsRepair" = "Une valeur est enregistrée, mais ce n'est pas un nombre utilisable";
+"settings.reportParams.repairHint" = "Saisir un nombre remplace cette ligne dans le livre ; effacer une valeur présente supprime la ligne.";
 "settings.reportParamsPending" = "Ces paramètres sont enregistrés dans la comptabilité et servent aux calculs de la page « Rapports ». Ces rapports sont des estimations de gestion, pas des états financiers légaux. Un champ vide signifie que ce paramètre n'est pas configuré ; les calculs de rapports n'utilisent pas un paramètre non configuré, définissez donc vous-même les valeurs dont vous avez besoin.";
 "settings.reportParamsNote" = "Changer le « Régime comptable » réinitialise les trois taux aux valeurs préréglées de ce régime (les frais administratifs annuels ne changent pas) ; les enregistrements existants ne sont jamais recalculés. Les taux préréglés sont des valeurs de référence et peuvent évoluer — vérifiez les taux officiels en vigueur.";
 "settings.appearance.system" = "Système";
