@@ -227,6 +227,24 @@ enum ReportSettings {
         return ReportMath.number(parsed)
     }
 
+    /// **The one reading of what `accounting_locale` holds.** nil = this app does not
+    /// recognise it.
+    ///
+    /// Extracted because there used to be two readings of the same bytes.
+    /// `SettingsStore.accountingLocale()` decoded with `JSONSerialization`, which
+    /// implements RFC 4627 encoding sniffing and therefore EATS a leading U+FEFF; the
+    /// engines go through ``jsonFragment``, which rejects it (`JSON.parse` does too).
+    /// One BOM-prefixed `"US"` row was read as the United States by the Settings screen
+    /// and refused by the report engines — the same ledger, two countries, in one app.
+    ///
+    /// Everything that decides what regime a ledger claims now asks THIS function, so a
+    /// future change to the rule cannot land on one reader and miss the other.
+    /// `SettingsStore.accountingLocaleState()` is the App-facing door onto it.
+    static func recognizedAccountingLocale(fromStoredText raw: String) -> AccountingLocale? {
+        guard case .string(let value)? = jsonFragment(raw) else { return nil }
+        return AccountingLocale(rawValue: value)
+    }
+
     /// `JSON.parse` of a settings value, as a `ReportMath.JSValue`; nil when the
     /// parse throws.
     static func jsonFragment(_ text: String) -> ReportMath.JSValue? {

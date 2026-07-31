@@ -82,9 +82,39 @@ public struct SettingsStore {
 
     // MARK: - Convenience
 
+    /// The regime to DISPLAY, with a deliberate fallback.
+    ///
+    /// The `.CN` returned for an absent or unrecognisable row is a **display fallback and
+    /// nothing more**. It is not a claim that the ledger chose China: the report engines
+    /// refuse that same row (`ReportBlocker.accountingLocaleNotConfigured` /
+    /// `.accountingLocaleInvalid`) rather than compute under a regime nobody selected.
+    ///
+    /// It stays because the rest of the app needs SOME regime to keep working — categories
+    /// are seeded per regime, and the editor and overview need them — and because two boot
+    /// paths (`AppModel.finishBoot`, the C12 adoption) treat this as a REQUIRED read: making
+    /// it throw would turn one damaged row into a ledger that cannot be opened at all.
+    ///
+    /// **Anything that must know whether the ledger really chose a regime asks
+    /// ``accountingLocaleState()`` instead**, which answers with the same rule the engines use.
     public func accountingLocale() throws -> AccountingLocale {
         guard let raw = try string(Key.accountingLocale), let loc = AccountingLocale(rawValue: raw) else { return .CN }
         return loc
+    }
+
+    /// What the `accounting_locale` row actually holds, classified by the SAME rule the
+    /// report engines apply — see ``ReportSettings/recognizedAccountingLocale(fromStoredText:)``.
+    ///
+    /// Distinct from ``accountingLocale()``, which answers with a display fallback. This one
+    /// never invents a regime: an absent row is `.absent` and an unrecognisable one is
+    /// `.unreadable`, carrying the stored text byte for byte so a screen can show it verbatim.
+    /// A read failure throws rather than being reported as `.absent` — a row this app could
+    /// not read is not a row it may describe.
+    public func accountingLocaleState() throws -> StoredLocaleState {
+        guard let raw = try rawValue(Key.accountingLocale) else { return .absent }
+        guard let locale = ReportSettings.recognizedAccountingLocale(fromStoredText: raw) else {
+            return .unreadable(storedText: raw)
+        }
+        return .configured(locale)
     }
 
     /// Commit an accounting-regime switch: the regime itself plus that regime's preset
@@ -112,6 +142,18 @@ public struct SettingsStore {
             adminExpenseAnnual: try number(Key.adminExpenseAnnual)
         )
     }
+}
+
+/// What the `accounting_locale` row holds, as the report engines read it.
+///
+/// Three states and no fourth: the row is there and names one of the six regimes, the row is
+/// there and does not, or the row is not there. `.unreadable` keeps the stored text byte for
+/// byte — including a leading U+FEFF, which is exactly the byte that used to make two readers
+/// disagree — so a screen can show the user what is really in their ledger.
+public enum StoredLocaleState: Equatable {
+    case configured(AccountingLocale)
+    case unreadable(storedText: String)
+    case absent
 }
 
 public enum SettingsStoreError: Error, Equatable {
