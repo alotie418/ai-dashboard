@@ -227,6 +227,10 @@
 "settings.about" = "À propos";
 "settings.company" = "Nom de l'entreprise / raison sociale";
 "settings.accountingLocale" = "Régime comptable";
+"settings.accountingLocale.unreadable.title" = "Le régime comptable enregistré n'est pas reconnu";
+"settings.accountingLocale.absent.title" = "Aucun régime comptable n'est enregistré dans ce livre";
+"settings.accountingLocale.repairHint" = "Le régime affiché ci-dessus est une valeur de remplacement : le livre n'en contient aucun enregistrement utilisable. Le sélectionner à nouveau l'écrit dans le livre et laisse vos trois taux enregistrés intacts ; en choisir un autre applique les taux préréglés de ce régime, comme indiqué ci-dessous.";
+"settings.storedText.label" = "Ce que le livre contient réellement";
 "settings.currency" = "Devise par défaut";
 "settings.accountingNote" = "Le régime comptable détermine les catégories de recettes/dépenses disponibles et la devise par défaut. Il est indépendant de la langue de l'interface et sert à l'analyse de gestion — ce n'est pas une configuration de déclaration légale.";
 "settings.reportParams" = "Paramètres de calcul des rapports";

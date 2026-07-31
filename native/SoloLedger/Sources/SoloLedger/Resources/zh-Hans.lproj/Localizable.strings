@@ -98,6 +98,10 @@
 "settings.appearance.dark" = "深色";
 "settings.language" = "界面语言";
 "settings.accountingLocale" = "会计制度";
+"settings.accountingLocale.unreadable.title" = "账本记录的会计制度无法识别";
+"settings.accountingLocale.absent.title" = "账本未记录会计制度";
+"settings.accountingLocale.repairHint" = "上面显示的会计制度是本 App 的暂用值，账本里并没有一条可用的记录。重新选择它即会写入账本，已保存的三项税率不变；改选其他制度会应用该制度的预设税率，见下方说明。";
+"settings.storedText.label" = "账本中实际存放的内容";
 "settings.currency" = "默认货币";
 "settings.company" = "公司/字号名称";
 "settings.accountingNote" = "会计制度决定可选的收支类别与默认货币，独立于界面语言。此为管理分析用途，非法定申报配置。";

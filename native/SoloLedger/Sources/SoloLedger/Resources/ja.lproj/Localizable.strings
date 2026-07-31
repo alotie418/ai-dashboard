@@ -227,6 +227,10 @@
 "settings.about" = "情報";
 "settings.company" = "会社／屋号名";
 "settings.accountingLocale" = "会計方式";
+"settings.accountingLocale.unreadable.title" = "台帳の会計方式を認識できません";
+"settings.accountingLocale.absent.title" = "この台帳に会計方式が記録されていません";
+"settings.accountingLocale.repairHint" = "上に表示されている会計方式は本 App の暫定値で、台帳には使用できる記録がありません。同じものをもう一度選ぶと台帳に書き込まれ、保存済みの 3 つの税率はそのままです。別の方式を選ぶと、その方式のプリセット税率が適用されます（下の説明を参照）。";
+"settings.storedText.label" = "台帳に実際に入っている内容";
 "settings.currency" = "既定の通貨";
 "settings.accountingNote" = "会計方式は、選択できる収支カテゴリと既定の通貨を決定します。UI 言語とは独立しており、管理分析のための設定で、法定申告の設定ではありません。";
 "settings.reportParams" = "帳票計算パラメータ";

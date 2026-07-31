@@ -188,6 +188,28 @@ final class ReportFormatterTests: XCTestCase {
         XCTAssertEqual(ReportFormat.safePreview("25% 增值税 🙂"), "25% 增值税 🙂")
     }
 
+    /// P4c-2: U+FEFF joins the set, and it is the one that matters most on this screen.
+    ///
+    /// It renders as nothing at all, and on `accounting_locale` it IS the defect:
+    /// `JSONSerialization` eats a leading one while `JSON.parse` rejects it, so an invisible
+    /// byte made the Settings screen say United States while the report engines refused the
+    /// same row. A preview whose whole job is to show the user what is really in their ledger
+    /// cannot leave that byte invisible.
+    ///
+    /// The escape is a DISPLAY transform only — the stored text itself is still carried byte
+    /// for byte (pinned by `AccountingLocaleReadAlignmentTests`), so this makes the evidence
+    /// legible rather than altering it.
+    func testTheByteOrderMarkIsMadeVisible() {
+        XCTAssertEqual(ReportFormat.safePreview("a\u{FEFF}b"), "a<U+FEFF>b")
+        XCTAssertEqual(ReportFormat.safePreview("\u{FEFF}\"US\""), "<U+FEFF>\"US\"")
+        // A row that is merely `"US"` must still read as itself — the escape may not fire
+        // where there is no BOM, or the two rows would look the same again.
+        XCTAssertEqual(ReportFormat.safePreview("\"US\""), "\"US\"")
+        XCTAssertNotEqual(ReportFormat.safePreview("\u{FEFF}\"US\""),
+                          ReportFormat.safePreview("\"US\""),
+                          "the damaged row and the good one must not render identically")
+    }
+
     // T25
     func testThePreviewConsumesAtMostOneHundredAndTwentySourceCharacters() {
         let plain = String(repeating: "x", count: 10_000)

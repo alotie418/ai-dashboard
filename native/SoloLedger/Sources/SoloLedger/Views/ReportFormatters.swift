@@ -167,6 +167,12 @@ enum ReportFormat {
         case 0x2028, 0x2029:            return true   // line / paragraph separator
         case 0x202A...0x202E:           return true   // bidi embeddings and overrides
         case 0x2066...0x2069:           return true   // bidi isolates
+        // U+FEFF renders as nothing at all, and on `accounting_locale` it is the whole
+        // defect: `JSONSerialization` eats a leading one, `JSON.parse` does not, so one
+        // invisible byte made the Settings screen say United States while the engines
+        // refused the same row. A preview whose job is to show the user what is really in
+        // their ledger cannot leave the damage invisible.
+        case 0xFEFF:                    return true   // zero-width no-break space / BOM
         default:                        return false
         }
     }

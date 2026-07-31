@@ -98,6 +98,10 @@
 "settings.appearance.dark" = "Dark";
 "settings.language" = "Language";
 "settings.accountingLocale" = "Accounting profile";
+"settings.accountingLocale.unreadable.title" = "The recorded accounting profile is not one this app knows";
+"settings.accountingLocale.absent.title" = "No accounting profile is recorded in this ledger";
+"settings.accountingLocale.repairHint" = "The profile shown above is this app's stand-in — the ledger holds no usable record of one. Selecting it again writes it to the ledger and leaves your three saved tax rates alone; choosing a different profile applies that profile's preset rates, as described below.";
+"settings.storedText.label" = "What the ledger actually holds";
 "settings.currency" = "Default currency";
 "settings.company" = "Company / business name";
 "settings.accountingNote" = "The accounting profile selects the available income/expense categories and default currency. It is separate from the UI language, and is for management analysis — not a statutory filing configuration.";

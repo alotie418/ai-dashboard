@@ -50,6 +50,7 @@ private struct AccountingSettingsTab: View {
 
     var body: some View {
         Form {
+            UnreadableLocaleNotice(state: model.accountingLocaleState)
             Picker(model.t("settings.accountingLocale"), selection: Binding(
                 get: { model.accountingLocale }, set: { model.setAccountingLocale($0) }
             )) {
@@ -104,6 +105,59 @@ private struct AccountingSettingsTab: View {
             set: { model.setReportParameter(field, to: $0) }
         ), format: .number.precision(.fractionLength(0...6)))
         .multilineTextAlignment(.trailing)
+    }
+}
+
+/// What the ledger's `accounting_locale` row really says — shown ONLY when it does not name
+/// a regime. In `.configured` this renders nothing at all, so the settled screen is untouched.
+///
+/// The picker below keeps showing the regime `AppModel.accountingLocale` falls back to. With
+/// this notice above it that is no longer a claim the ledger made: the fallback is named as a
+/// stand-in, and the row's own bytes are on screen next to it. Re-picking the shown regime
+/// writes it without cascading (an unchanged regime never applies presets), which is the one
+/// repair that leaves the user's saved tax rates alone — `repairHint` says so, and points at
+/// `settings.reportParamsNote` below rather than restating the cascade.
+///
+/// The stored text goes through the SAME `ReportFormat.safePreview` the report page uses. Not
+/// a second escape rule: one damaged row read two ways is the defect this whole line of work
+/// exists to remove, and that applies to how it is displayed as much as to how it is parsed.
+private struct UnreadableLocaleNotice: View {
+    @EnvironmentObject var model: AppModel
+    let state: StoredLocaleState
+
+    var body: some View {
+        switch state {
+        case .configured:
+            EmptyView()
+        case .absent:
+            block(title: "settings.accountingLocale.absent.title", storedText: nil)
+        case .unreadable(let storedText):
+            block(title: "settings.accountingLocale.unreadable.title", storedText: storedText)
+        }
+    }
+
+    @ViewBuilder private func block(title: String, storedText: String?) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(model.t(title)).font(.headline)
+            if let storedText {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(model.t("settings.storedText.label"))
+                        .font(.footnote).foregroundStyle(.secondary)
+                    Text(ReportFormat.safePreview(storedText))
+                        .font(.caption).monospaced()
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                }
+                .accessibilityIdentifier("settings.storedText")
+            }
+            Text(model.t("settings.accountingLocale.repairHint"))
+                .font(.footnote).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("settings.accountingLocale.notice")
     }
 }
 

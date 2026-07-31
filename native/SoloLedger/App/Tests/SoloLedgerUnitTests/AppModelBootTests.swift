@@ -738,4 +738,85 @@ final class AppModelBootTests: XCTestCase {
         XCTAssertEqual(try store.settings.string(SettingsStore.Key.currency), "JPY")
         try store.db.close()
     }
+
+    // MARK: - P4c-2: the Settings screen tells the truth about the same row (S5–S7)
+
+    // S5 ────────────────────────────────────────────────────────────────────────────────
+    /// The notice shows the row's own bytes, through the SAME escape the report page uses —
+    /// and the BOM, which is the entire damage here, is now visible in it.
+    ///
+    /// Two halves, and both matter: the escape makes it LEGIBLE, and the published
+    /// `storedText` is still byte for byte what the ledger holds. A preview that tidied the
+    /// row would destroy the only evidence the user has.
+    func testS5TheNoticeShowsTheStoredBytesThroughTheSharedEscape() async throws {
+        let store = try freshStore("s5.db")
+        try withDamagedRegime(store)
+        let model = await booted(store)
+        guard case .unreadable(let storedText) = model.accountingLocaleState else {
+            return XCTFail("the fixture must present the unreadable state")
+        }
+        XCTAssertEqual(Array(storedText.unicodeScalars.map(\.value)),
+                       [0xFEFF, 0x22, 0x55, 0x53, 0x22],
+                       "the published stored text is the row, verbatim")
+        let shown = ReportFormat.safePreview(storedText)
+        XCTAssertEqual(shown, "<U+FEFF>\"US\"", "the invisible byte must be made visible")
+        XCTAssertNotEqual(shown, ReportFormat.safePreview("\"US\""),
+                          "a damaged row must not render like a good one")
+        try store.db.close()
+    }
+
+    // S6 ────────────────────────────────────────────────────────────────────────────────
+    /// A settled ledger sees NOTHING new. Two independent facts, because either alone would
+    /// be weak: an ordinary ledger really is `.configured` (so the notice takes its
+    /// empty branch), and the three notice keys appear in `SettingsView` only inside the
+    /// notice itself — nothing else on that screen can draw them.
+    func testS6AConfiguredLedgerDrawsNoneOfTheNewCopy() async throws {
+        let store = try freshStore("s6.db")
+        let model = await booted(store)
+        model.setAccountingLocale(.CN)
+        XCTAssertEqual(model.accountingLocaleState, .configured(.CN),
+                       "an ordinary ledger is configured, so the notice renders nothing")
+
+        let source = try ReportFixtureBuilder.appSource("Views/SettingsView.swift")
+        let notice = try XCTUnwrap(source.range(of: "private struct UnreadableLocaleNotice"))
+        let before = String(source[source.startIndex..<notice.lowerBound])
+        for key in ["settings.accountingLocale.unreadable.title",
+                    "settings.accountingLocale.absent.title",
+                    "settings.accountingLocale.repairHint",
+                    "settings.storedText.label"] {
+            XCTAssertFalse(before.contains(key),
+                           "\(key) is drawn outside the notice — the settled screen would change")
+            XCTAssertTrue(source.contains(key), "\(key) must actually be drawn by the notice")
+        }
+        try store.db.close()
+    }
+
+    // S7 ────────────────────────────────────────────────────────────────────────────────
+    /// The repair the notice points at, at the two layers a unit test can reach.
+    ///
+    /// The picker binding is unchanged by P4c-2 — asserted on the source, because the whole
+    /// design rests on it: SwiftUI DOES call the setter when the user re-picks the value
+    /// already shown (measured before this work), so the existing binding is already a
+    /// working repair. What was missing was any reason to use it, which the notice supplies.
+    ///
+    /// The model half then shows that a same-value call really does write: the `.absent`
+    /// ledger below displays the `.CN` fallback, and choosing `.CN` puts the row back.
+    func testS7TheUnchangedPickerBindingStillWritesOnASameValueChoice() async throws {
+        let source = try ReportFixtureBuilder.appSource("Views/SettingsView.swift")
+        XCTAssertTrue(source.contains("get: { model.accountingLocale }, set: { model.setAccountingLocale($0) }"),
+                      "the picker binding must stay the one that already repairs the row")
+
+        let store = try freshStore("s7.db")
+        _ = try store.db.run("DELETE FROM settings WHERE key = 'accounting_locale'")
+        let model = await booted(store)
+        XCTAssertEqual(model.accountingLocaleState, .absent)
+        XCTAssertEqual(model.accountingLocale, .CN, "the screen shows the fallback")
+
+        model.setAccountingLocale(.CN)          // exactly what re-picking the shown row does
+
+        XCTAssertEqual(model.accountingLocaleState, .configured(.CN),
+                       "choosing the displayed regime writes it — a same value is not a no-op")
+        XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.accountingLocale), "\"CN\"")
+        try store.db.close()
+    }
 }
