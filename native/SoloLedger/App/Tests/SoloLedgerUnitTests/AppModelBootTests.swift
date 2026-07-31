@@ -427,4 +427,221 @@ final class AppModelBootTests: XCTestCase {
         }
         XCTAssertEqual(try Data(contentsOf: url), before, "the squatter DB must not be opened or migrated")
     }
+
+    // MARK: - P4b: onboarding seeds a currency ONLY into a provably-empty ledger
+
+    private func freshStore(_ name: String) throws -> LedgerStore {
+        try LedgerStore(databaseURL: tempURL(name), open: .createIfMissing)
+    }
+
+    /// A model booted onto `store` through the real adoption path, so `transactions`,
+    /// `legacyLedger` and `legacyProbeFailed` are populated exactly as they are in production
+    /// by the time the onboarding screen can be submitted.
+    private func booted(_ store: LedgerStore) async -> AppModel {
+        let fake = FakeRunner()
+        fake.outcomes = [openStoreOutcome()]
+        fake.attempts = [.opened(store, nil)]
+        let model = AppModel(runner: fake)
+        model.boot()
+        await model.currentBootTask?.value
+        return model
+    }
+
+    /// `String??`: outer nil = the read failed, `.some(nil)` = the read succeeded and the row
+    /// is absent. The distinction is the point — see `seedCurrencyIfProvablyNew`.
+    private func currencyRow(_ store: LedgerStore) -> String?? {
+        try? store.settings.rawValue(SettingsStore.Key.currency)
+    }
+
+    /// `OnboardingView.finish`'s submit sequence, minus the language / company writes that
+    /// play no part here.
+    private func finishOnboarding(_ model: AppModel, regime: AccountingLocale) {
+        model.setAccountingLocale(regime)
+        model.completeOnboarding()
+    }
+
+    private func aTransaction(_ store: LedgerStore, currency: String = "CNY",
+                              date: String = "2025-03-01") throws {
+        try store.create(Transaction(type: .income, date: date, amount: 1_000, currency: currency))
+    }
+
+    /// One legacy sale with no `legacy_migrations` mapping — `holdsHiddenRecords` becomes true
+    /// while the `transactions` table this app reads stays empty. The shape that looks empty
+    /// and is not.
+    private func anUnconvertedLegacySale(_ store: LedgerStore) throws {
+        _ = try store.db.run(
+            "INSERT INTO sales (id, date, customer, totalAmount) VALUES (?, ?, ?, ?)",
+            [.text("legacy-1"), .text("2025-03-01"), .text("someone"), .real(1_000)])
+    }
+
+    // T1 ────────────────────────────────────────────────────────────────────────────────
+    func testT1OnboardingSeedsTheRegimeCurrencyOnAProvablyNewLedger() async throws {
+        // CN first and isolated, because the DEFAULT regime is the one that does NOT cascade
+        // (`shouldApplyPresets` is false for CN → CN). On this path the row can only have come
+        // from the seed — which is exactly the case the user hit.
+        let cn = try freshStore("t1-cn.db")
+        let cnModel = await booted(cn)
+        XCTAssertEqual(currencyRow(cn), .some(.none), "a fresh ledger carries no currency row")
+        cnModel.setAccountingLocale(.CN)
+        XCTAssertEqual(currencyRow(cn), .some(.none),
+                       "the unchanged-regime path must still not have written a currency")
+        cnModel.completeOnboarding()
+        XCTAssertEqual(try cn.settings.string(SettingsStore.Key.currency), "CNY")
+        try cn.db.close()
+
+        // And the end state holds for all six. For the other five the regime cascade writes it;
+        // either way the ledger leaves onboarding stating the currency it displayed.
+        for regime in AccountingLocale.allCases {
+            let store = try freshStore("t1-\(regime.rawValue).db")
+            let model = await booted(store)
+            finishOnboarding(model, regime: regime)
+            XCTAssertEqual(try store.settings.string(SettingsStore.Key.currency),
+                           AccountingProfile.profile(for: regime).currency, "\(regime)")
+            try store.db.close()
+        }
+    }
+
+    // T2 ────────────────────────────────────────────────────────────────────────────────
+    /// Byte-for-byte, and deliberately including the two rows that are NOT decodable as a
+    /// currency: those are what `currencyInvalid` puts on screen verbatim.
+    func testT2AnExistingCurrencyRowIsNeverTouched() async throws {
+        for (index, stored) in ["\"USD\"", "123", "\"\""].enumerated() {
+            let store = try freshStore("t2-\(index).db")
+            _ = try store.db.run(
+                "INSERT INTO settings (key, value, updated_at) VALUES ('currency', ?, datetime('now'))",
+                [.text(stored)])
+            let model = await booted(store)
+            finishOnboarding(model, regime: .CN)
+            XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.currency), stored,
+                           "an existing currency row must survive onboarding byte for byte")
+            try store.db.close()
+        }
+    }
+
+    // T3 ────────────────────────────────────────────────────────────────────────────────
+    /// Isolates the `holdsHiddenRecords` conjunct: the transactions table IS empty here, so
+    /// only the legacy probe can refuse. The build then answers `legacySourceUnavailable`
+    /// rather than `currencyNotConfigured` — the source gate comes first, on purpose, and it
+    /// is the honest answer for a period whose money may sit in tables this app does not read.
+    func testT3AMigratedLedgerWithHiddenLegacyRecordsIsNeverSeeded() async throws {
+        let store = try freshStore("t3.db")
+        try anUnconvertedLegacySale(store)
+        let model = await booted(store)
+        XCTAssertTrue(model.transactions.isEmpty)
+        XCTAssertTrue(model.legacyLedger.holdsHiddenRecords, "the fixture must present the hidden-records shape")
+        finishOnboarding(model, regime: .CN)
+        XCTAssertEqual(currencyRow(store), .some(.none), "no currency may be chosen for records this app cannot read")
+        guard case .blocked(let blocker) = try ReportBuilder.build(store.db, period: ReportPeriod(year: "2025")) else {
+            return XCTFail("a ledger with hidden legacy records must still be refused")
+        }
+        guard case .legacySourceUnavailable = blocker else {
+            return XCTFail("expected legacySourceUnavailable, got \(blocker)")
+        }
+        try store.db.close()
+    }
+
+    // T4 ────────────────────────────────────────────────────────────────────────────────
+    /// Isolates the `transactions.isEmpty` conjunct: no legacy rows at all, one real
+    /// transaction. The source gate passes, so the refusal is the currency one.
+    func testT4ALedgerWithTransactionsIsNeverSeeded() async throws {
+        let store = try freshStore("t4.db")
+        try aTransaction(store)
+        let model = await booted(store)
+        XCTAssertFalse(model.transactions.isEmpty)
+        XCTAssertFalse(model.legacyLedger.holdsHiddenRecords)
+        finishOnboarding(model, regime: .CN)
+        XCTAssertEqual(currencyRow(store), .some(.none), "no currency may be chosen for money already recorded")
+        guard case .blocked(.currencyNotConfigured) = try ReportBuilder.build(
+            store.db, period: ReportPeriod(year: "2025")) else {
+            return XCTFail("the currency refusal must still stand")
+        }
+        try store.db.close()
+    }
+
+    // T5 ────────────────────────────────────────────────────────────────────────────────
+    /// Isolates the `legacyProbeFailed` conjunct. Renaming the column the unconverted-count
+    /// anti-join reads makes `legacyLedgerSummary()` throw while every settings read still
+    /// works — so the guard is refusing on "emptiness unproven", not on a dead connection.
+    func testT5AFailedLegacyProbeRefusesToSeed() async throws {
+        let store = try freshStore("t5.db")
+        try store.db.execute("ALTER TABLE legacy_migrations RENAME COLUMN legacy_table TO legacy_table_x")
+        let model = await booted(store)
+        XCTAssertTrue(model.legacyProbeFailed, "the fixture must actually break the probe")
+        XCTAssertTrue(model.transactions.isEmpty, "and must not break the ordinary reads")
+        finishOnboarding(model, regime: .CN)
+        XCTAssertEqual(currencyRow(store), .some(.none), "unproven emptiness is not emptiness")
+        try store.db.close()
+    }
+
+    // T6 ────────────────────────────────────────────────────────────────────────────────
+    /// The seed writes the currency and nothing else. Asserted on the CN path, because that is
+    /// the one where no cascade runs — on a regime CHANGE the three rates are written on
+    /// purpose, and this must not be read as a claim about that path.
+    func testT6TheSeedWritesNoTaxRateRow() async throws {
+        let store = try freshStore("t6.db")
+        let model = await booted(store)
+        finishOnboarding(model, regime: .CN)
+        XCTAssertNotNil(try store.settings.rawValue(SettingsStore.Key.currency))
+        for rate in [SettingsStore.Key.vatRate, SettingsStore.Key.surchargeRate,
+                     SettingsStore.Key.incomeTaxRate, SettingsStore.Key.adminExpenseAnnual] {
+            XCTAssertNil(try store.settings.rawValue(rate),
+                         "\(rate) must stay absent — an absent rate is a real state the engines fall back for")
+        }
+        try store.db.close()
+    }
+
+    // T7 ────────────────────────────────────────────────────────────────────────────────
+    /// The bug, end to end: a brand-new ledger with a year's worth of one transaction used to
+    /// be refused for a currency the onboarding screen had just displayed.
+    func testT7AfterOnboardingTheFirstReportIsNoLongerRefusedForACurrency() async throws {
+        let store = try freshStore("t7.db")
+        let model = await booted(store)
+        finishOnboarding(model, regime: .CN)
+        try aTransaction(store)
+        let outcome = try ReportBuilder.build(store.db, period: ReportPeriod(year: "2025"))
+        if case .blocked(let blocker) = outcome {
+            if case .currencyNotConfigured = blocker {
+                XCTFail("the currency refusal must be gone")
+            } else {
+                XCTFail("unexpected refusal: \(blocker)")
+            }
+        }
+        try store.db.close()
+    }
+
+    // T8 ────────────────────────────────────────────────────────────────────────────────
+    /// Idempotent by the first conjunct alone. Proved with a sentinel rather than a timestamp:
+    /// `datetime('now')` has one-second resolution and would hide a rewrite.
+    func testT8SeedingIsIdempotent() async throws {
+        let store = try freshStore("t8.db")
+        let model = await booted(store)
+        finishOnboarding(model, regime: .CN)
+        XCTAssertEqual(try store.settings.string(SettingsStore.Key.currency), "CNY")
+        _ = try store.db.run("UPDATE settings SET value = ? WHERE key = 'currency'", [.text("\"ZZZ\"")])
+        model.completeOnboarding()
+        XCTAssertEqual(try store.settings.rawValue(SettingsStore.Key.currency), "\"ZZZ\"",
+                       "a second run must not write again")
+        try store.db.close()
+    }
+
+    // T9 ────────────────────────────────────────────────────────────────────────────────
+    /// A write failure is surfaced, never swallowed — and it does not trap the user in
+    /// onboarding. The failure is injected with a trigger so READS keep working: the guard
+    /// must reach the write and the write must be the thing that fails.
+    func testT9AFailedSeedSurfacesAndStillCompletesOnboarding() async throws {
+        let store = try freshStore("t9.db")
+        let model = await booted(store)
+        model.setAccountingLocale(.CN)
+        try store.db.execute("""
+            CREATE TRIGGER settings_readonly BEFORE INSERT ON settings
+            BEGIN SELECT RAISE(ABORT, 'injected write failure'); END;
+            """)
+        XCTAssertNil(model.actionError)
+        model.completeOnboarding()
+        XCTAssertNotNil(model.actionError, "a failed currency write must not be swallowed")
+        XCTAssertTrue(model.onboardingDone, "and must not trap the user in onboarding")
+        XCTAssertEqual(currencyRow(store), .some(.none))
+        try store.db.execute("DROP TRIGGER settings_readonly")
+        try store.db.close()
+    }
 }

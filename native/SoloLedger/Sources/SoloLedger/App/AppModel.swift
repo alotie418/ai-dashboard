@@ -705,9 +705,53 @@ final class AppModel: ObservableObject {
     }
 
     func completeOnboarding() {
+        seedCurrencyIfProvablyNew()
         onboardingDone = true
         try? store?.settings.setBool(true, for: SettingsStore.Key.onboardingDone)
         reloadAll()
+    }
+
+    /// Give a brand-new ledger the currency row its own onboarding screen just showed it.
+    ///
+    /// The screen displays the regime's currency and never stored it, so the first report a
+    /// new user asked for was always refused for a currency they had just been shown.
+    ///
+    /// Writing it unconditionally here would be worse than the bug. Onboarding runs for EVERY
+    /// ledger with no `onboarding_done` row — which is every ledger migrated from the Electron
+    /// app (see the note on `setAccountingLocale`) — so an unguarded write would pick a
+    /// currency for money somebody else's app already recorded. This writes ONLY into a ledger
+    /// that can be PROVEN empty:
+    ///
+    ///   - the `currency` row does not exist. Read as a ROW, not as a decodable value: a row
+    ///     holding something unusable is what `currencyInvalid` shows the user verbatim, and
+    ///     overwriting it would destroy the evidence on screen. A failed READ is not "absent"
+    ///     either — a ledger this app could not inspect is not one it may write into.
+    ///   - no transactions this app can see;
+    ///   - no legacy records it cannot see. A ledger migrated from Electron can hold real
+    ///     records this app never reads and still look empty;
+    ///   - the legacy probe succeeded, because otherwise "empty" is unproven.
+    ///
+    /// The last two are the pair `canLoadDemoData` already uses, for the same reason.
+    ///
+    /// The value is the chosen regime's existing `AccountingProfile` currency — the one the
+    /// screen displayed and the one `applyRegimeSwitch` would have written. No currency is
+    /// inferred from the data and no tax rate is touched: the regime cascade stays exactly as
+    /// deliberate as it was.
+    private func seedCurrencyIfProvablyNew() {
+        guard let store else { return }
+        guard case .some(.none) = (try? store.settings.rawValue(SettingsStore.Key.currency)),
+              transactions.isEmpty,
+              !legacyLedger.holdsHiddenRecords,
+              !legacyProbeFailed
+        else { return }
+        do {
+            try store.settings.setString(AccountingProfile.profile(for: accountingLocale).currency,
+                                         for: SettingsStore.Key.currency)
+        } catch {
+            // Never silent. Onboarding still completes — a missing currency only means the
+            // report page states its refusal, which is a true statement about a real state.
+            actionError = "\(error)"
+        }
     }
 
     // MARK: - Reports (R8 P3a state model; reached from the `.reports` sidebar section since P3e)
