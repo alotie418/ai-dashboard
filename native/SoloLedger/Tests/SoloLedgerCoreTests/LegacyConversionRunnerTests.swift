@@ -524,6 +524,181 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
         }
     }
 
+    // MARK: - 2b. The backup and the conversion see ONE snapshot
+
+    /// **P1-②, WAL.** The backup is taken INSIDE the conversion's transaction, after the
+    /// snapshot is pinned and before any write. So an external connection that commits during
+    /// the run cannot end up in the ledger-that-was-converted while being absent from the
+    /// bundle: in WAL the external commit succeeds, and our first write then fails BUSY, so
+    /// the whole batch rolls back.
+    ///
+    /// The lock is real and the timing is deterministic: the external commit is made from the
+    /// `faultInjection` seam, which fires after the first row is written — i.e. strictly after
+    /// the backup and strictly inside the transaction.
+    func testAnExternalCommitAfterTheSnapshotCannotProduceAStaleBackup() throws {
+        let f = try fixture()
+        try insertSale(f, id: "s-1")
+        try insertSale(f, id: "s-2")
+        try f.store.create(Transaction(id: "pre", type: .income, date: "2024-05-01",
+                                       amount: 100, currency: "CNY", paymentStatus: .unpaid))
+        let p = try plan(f)
+        XCTAssertEqual(try f.store.db.query("PRAGMA journal_mode").first?.string("journal_mode"),
+                       "wal", "control: the store really is in WAL")
+
+        let other = try SQLiteDatabase(path: f.dbURL.path)
+        var externalCommit = "not attempted"
+        do {
+            _ = try f.store.runLegacyConversion(request(f, p), afterBackup: {
+                // Strictly after the backup, strictly before the first write — the instant
+                // the snapshot design exists for.
+                do {
+                    try other.execute("BEGIN IMMEDIATE")
+                    _ = try other.run("UPDATE transactions SET amount = 999 WHERE id = 'pre'")
+                    try other.execute("COMMIT")
+                    externalCommit = "committed"
+                } catch { try? other.execute("ROLLBACK"); externalCommit = "refused: \(error)" }
+            }, faultInjection: nil)
+            XCTFail("a conversion racing an external commit must not report success")
+        } catch let error as LegacyConversionFailure {
+            guard case .busy = error else { return XCTFail("expected .busy, got \(error)") }
+        }
+        try other.close()
+        XCTAssertEqual(externalCommit, "committed",
+                       "WAL lets the external writer through while we hold only a read lock")
+
+        // Zero written by us; the external commit survives; the bundle is the pinned snapshot.
+        XCTAssertEqual(try counts(f).transactions, 1, "only the pre-existing row")
+        XCTAssertEqual(try counts(f).mappings, 0)
+        XCTAssertEqual(try f.store.db.query(
+            "SELECT amount FROM transactions WHERE id='pre'").first?["amount"], .real(999),
+                       "the external commit must be preserved")
+        XCTAssertNoThrow(try BackupRestore.validateBundle(f.backupDir))
+        let bundled = try Self.bundleValue(f.backupDir,
+                                           "SELECT amount FROM transactions WHERE id='pre'", "amount")
+        XCTAssertEqual(bundled, .real(100),
+                       "the bundle is the snapshot the conversion would have written into")
+    }
+
+    /// **P1-②, rollback journal.** The combination the ruling forbids — external commit
+    /// succeeded AND the conversion shipped with a backup taken before it — must not occur.
+    /// Here our read lock refuses the external COMMIT outright, so the conversion completes
+    /// and the bundle it produced really is the state it converted from.
+    func testInRollbackJournalTheForbiddenCombinationCannotOccur() throws {
+        let f = try fixture()
+        try f.store.db.execute("PRAGMA journal_mode = DELETE")
+        try insertSale(f, id: "s-1")
+        try insertSale(f, id: "s-2")
+        try f.store.create(Transaction(id: "pre", type: .income, date: "2024-05-01",
+                                       amount: 100, currency: "CNY", paymentStatus: .unpaid))
+        let p = try plan(f)
+
+        let other = try SQLiteDatabase(path: f.dbURL.path)
+        try other.execute("PRAGMA busy_timeout = 0")
+        var externalCommit = "not attempted"
+        let report = try f.store.runLegacyConversion(request(f, p), afterBackup: {
+            do {
+                try other.execute("BEGIN IMMEDIATE")
+                _ = try other.run("UPDATE transactions SET amount = 999 WHERE id = 'pre'")
+                try other.execute("COMMIT")
+                externalCommit = "committed"
+            } catch { try? other.execute("ROLLBACK"); externalCommit = "refused" }
+        }, faultInjection: nil)
+        try other.close()
+
+        XCTAssertEqual(externalCommit, "refused",
+                       "our read lock must refuse the external COMMIT in rollback-journal mode")
+        XCTAssertEqual(report.convertedCount, 2)
+        // The forbidden pair, stated directly.
+        XCTAssertFalse(externalCommit == "committed" && report.convertedCount > 0,
+                       "external commit succeeded AND the conversion shipped a stale backup")
+        XCTAssertEqual(try f.store.db.query(
+            "SELECT amount FROM transactions WHERE id='pre'").first?["amount"], .real(100))
+    }
+
+    /// The success path, end to end: the bundle restores to exactly the pre-conversion
+    /// database — the converted rows and their mappings are absent from it, everything else is
+    /// there — and a file the database references arrives byte for byte.
+    func testTheBundleIsThePreConversionStateAndCarriesAReferencedAttachment() throws {
+        let f = try fixture()
+        try FileManager.default.createDirectory(at: f.attachmentsDir,
+                                                withIntermediateDirectories: true)
+        let bytes = Data([0x25, 0x50, 0x44, 0x46, 0x00, 0xff])          // "%PDF" + two raw bytes
+        try bytes.write(to: f.attachmentsDir.appendingPathComponent("receipt.pdf"))
+        try f.store.create(Transaction(id: "pre", type: .income, date: "2024-05-01", amount: 100,
+                                       currency: "CNY", paymentStatus: .unpaid,
+                                       attachmentPath: "attachments/docs/receipt.pdf"))
+        try insertSale(f, id: "s-1")
+
+        let report = try f.store.runLegacyConversion(request(f, try plan(f)))
+        XCTAssertEqual(report.convertedCount, 1)
+
+        // The database half.
+        XCTAssertEqual(try Self.bundleValue(f.backupDir,
+                                            "SELECT COUNT(*) AS c FROM transactions", "c"),
+                       .integer(1), "the converted row must be absent from a PRE-conversion backup")
+        XCTAssertEqual(try Self.bundleValue(f.backupDir,
+                                            "SELECT COUNT(*) AS c FROM legacy_migrations", "c"),
+                       .integer(0))
+        XCTAssertEqual(try Self.bundleValue(f.backupDir,
+                                            "SELECT COUNT(*) AS c FROM sales", "c"),
+                       .integer(1), "the legacy row is still there, untouched")
+        XCTAssertEqual(try Self.bundleValue(
+            f.backupDir, "SELECT attachment_path AS p FROM transactions WHERE id='pre'", "p"),
+                       .text("attachments/docs/receipt.pdf"))
+        // The file half — byte for byte, including the non-UTF-8 bytes.
+        let bundled = try Data(contentsOf: f.backupDir
+            .appendingPathComponent("attachments/docs/receipt.pdf"))
+        XCTAssertEqual(bundled, bytes)
+    }
+
+    /// A conversion that failed AFTER the backup leaves the bundle where it is — deleting it
+    /// would throw away the only snapshot of the state the failure interrupted. Retrying into
+    /// the same directory is refused; a new directory behaves normally.
+    func testAFailedConversionKeepsItsBundleAndRetryNeedsANewDirectory() throws {
+        let f = try fixture()
+        try insertSale(f, id: "s-1")
+        try insertSale(f, id: "s-2")
+        let p = try plan(f)
+        try f.store.db.execute("""
+            CREATE TRIGGER boom AFTER INSERT ON transactions
+            WHEN (SELECT COUNT(*) FROM transactions) >= 1
+            BEGIN SELECT RAISE(ABORT, 'injected'); END
+            """)
+        XCTAssertThrowsError(try f.store.runLegacyConversion(request(f, p)))
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: f.backupDir.path),
+                      "the bundle from the interrupted attempt must be kept")
+        XCTAssertNoThrow(try BackupRestore.validateBundle(f.backupDir))
+        XCTAssertEqual(try counts(f).transactions, 0)
+
+        // Same directory → refused, and still nothing written.
+        do {
+            _ = try f.store.runLegacyConversion(request(f, p))
+            XCTFail("retrying into an existing bundle directory must be refused")
+        } catch let error as LegacyConversionFailure {
+            guard case .backupFailed(let m) = error else { return XCTFail("got \(error)") }
+            XCTAssertTrue(m.contains("already exists"), m)
+        }
+        XCTAssertEqual(try counts(f).transactions, 0)
+
+        // A new directory: deterministic. (Still refused here, by the trigger — the point is
+        // that the refusal is now the trigger's, not the leftover directory's.)
+        try f.store.db.execute("DROP TRIGGER boom")
+        let second = try trackedTempDir().appendingPathComponent("pre-convert-retry")
+        let report = try f.store.runLegacyConversion(request(f, try plan(f), backupDir: second))
+        XCTAssertEqual(report.convertedCount, 2)
+        XCTAssertEqual(report.backupDirectory, second)
+    }
+
+    /// One value from a bundle's database, read the way a restore would.
+    private static func bundleValue(_ bundle: URL, _ sql: String, _ column: String) throws
+    -> SQLiteValue {
+        let db = try SQLiteDatabase(path: bundle.appendingPathComponent("sololedger.db").path,
+                                    mode: .readOnly)
+        defer { try? db.close() }
+        return try db.query(sql).first?[column] ?? .null
+    }
+
     /// An empty execution set is free: no backup directory is created at all.
     func testAnEmptyExecutionSetTakesNoBackupAndWritesNothing() throws {
         let f = try fixture()
@@ -713,6 +888,81 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
                 "SELECT typeof(\(column)) AS t FROM sales WHERE id = ?", [.text(id)])
                 .first?.string("t"), "blob", column)
         }
+    }
+
+    // MARK: - 3b. The plan is the VALUES, not just the row set
+
+    /// **P1-①.** A legal value replaced by another legal value used to be completely invisible:
+    /// the row's table, id, date and (empty) issue list are unchanged, so `fresh == plan`
+    /// passed and the writer stored money the user never saw. Measured before the fix,
+    /// sixteen of twenty ordinary edits behaved this way.
+    ///
+    /// One test per GROUP of the seventeen protected columns, each changing one column.
+    func testALegalValueChangedAfterThePlanIsLedgerChanged() throws {
+        let edits: [(String, String)] = [
+            ("money/totalAmount",      "UPDATE sales SET totalAmount = 1.0 WHERE id='s-1'"),
+            ("money/taxAmount",        "UPDATE sales SET taxAmount = 0.5 WHERE id='s-1'"),
+            ("money/taxRate",          "UPDATE sales SET taxRate = 6 WHERE id='s-1'"),
+            ("money/paid_amount",      "UPDATE sales SET paid_amount = 0.25 WHERE id='s-1'"),
+            ("money/amountWithoutTax", "UPDATE sales SET amountWithoutTax = 7.0 WHERE id='s-1'"),
+            ("strings/customer",       "UPDATE sales SET customer = '乙' WHERE id='s-1'"),
+            ("strings/invoiceNumber",  "UPDATE sales SET invoiceNumber = 'X' WHERE id='s-1'"),
+            ("status/invoiceStatus",   "UPDATE sales SET invoiceStatus = '待开' WHERE id='s-1'"),
+            ("status/payment_status",  "UPDATE sales SET payment_status = 'unpaid' WHERE id='s-1'"),
+            ("dates/payment_date",     "UPDATE sales SET payment_date = NULL WHERE id='s-1'"),
+            ("dates/due_date",         "UPDATE sales SET due_date = '2024-07-20' WHERE id='s-1'"),
+            ("audit/tons",             "UPDATE sales SET tons = 99 WHERE id='s-1'"),
+            ("audit/pricePerTon",      "UPDATE sales SET pricePerTon = 1 WHERE id='s-1'"),
+            ("audit/shippingCost",     "UPDATE sales SET shippingCost = 0 WHERE id='s-1'"),
+            ("audit/created_at",       "UPDATE sales SET created_at = '2020-01-01' WHERE id='s-1'"),
+        ]
+        for (label, sql) in edits {
+            let f = try fixture()
+            try insertSale(f, id: "s-1")
+            let stale = try plan(f)
+            try f.store.db.execute(sql)
+
+            do {
+                _ = try f.store.runLegacyConversion(request(f, stale))
+                XCTFail("\(label): a stale plan must be refused")
+            } catch let error as LegacyConversionFailure {
+                XCTAssertEqual(error, .ledgerChanged, label)
+            }
+            XCTAssertEqual(try counts(f).transactions, 0, label)
+            XCTAssertEqual(try counts(f).mappings, 0, label)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: f.backupDir.path),
+                           "\(label): a refused conversion must not have cost a backup")
+        }
+    }
+
+    /// **The per-row fingerprint, reached.** The plan-level equality cannot catch this one:
+    /// the row is edited INSIDE our own transaction, after the fresh plan was taken, by a
+    /// trigger that fires as the first row is written. Our own writes are visible to our own
+    /// later reads, so the second row is re-read already changed — clean value to clean
+    /// value, so `issues(in:)` still says nothing is wrong.
+    func testACleanToCleanEditMidTransactionIsCaughtByThePerRowFingerprint() throws {
+        let f = try fixture()
+        try insertSale(f, id: "s-1")
+        try insertSale(f, id: "s-2")
+        let p = try plan(f)
+        try f.store.db.execute("""
+            CREATE TRIGGER retag AFTER INSERT ON transactions
+            BEGIN UPDATE sales SET totalAmount = 1.0 WHERE id = 's-2'; END
+            """)
+
+        do {
+            _ = try f.store.runLegacyConversion(request(f, p))
+            XCTFail("expected the per-row fingerprint to refuse")
+        } catch let error as LegacyConversionFailure {
+            XCTAssertEqual(error, .ledgerChanged)
+        }
+        XCTAssertEqual(try counts(f).transactions, 0)
+        XCTAssertEqual(try counts(f).mappings, 0)
+        // The trigger's own write rolled back with everything else — s-2 still holds 9040.
+        XCTAssertEqual(try f.store.db.query(
+            "SELECT totalAmount AS a FROM sales WHERE id='s-2'").first?["a"], .real(9040))
+        // CONTROL: the row is still perfectly clean, so the re-grade would have passed it.
+        XCTAssertEqual(try plan(f).convertibleIdentities, [sid("s-1"), sid("s-2")])
     }
 
     /// A currency the write path would shorten is refused by the PLAN, so no request carrying
@@ -1120,20 +1370,21 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
         let body = try XCTUnwrap(source.range(of: "faultInjection: (() throws -> Void)?) throws")
             .map { String(source[$0.upperBound...]) })
         let steps = [
-            "throw LegacyConversionFailure.skippedIdentityNotConvertible",  // 1 read-only
-            "try validateConversionCategories(for: expected",               // 1 read-only
-            "guard !expected.isEmpty else {",                               // 2 nothing to do
-            "try BackupExport.writeBundle",                                 // 3 backup
-            "if let busy = LegacyConversionRunner.retriableBusyMessage(error) {",  // 3 busy ≠ broken
-            "throw LegacyConversionFailure.backupFailed",                   // 3 …everything else
-            "try BackupRestore.validateBundle",                             // 4 validate
-            "try db.transaction {",                                         // 5 the one write tx
-            "try legacyConversionPreflightBody()",                          // 6a fresh plan
-            "try validateConversionCategories(for: expectedFresh",          // 6b re-check
-            "try create(LegacyConversionRunner.transaction",                // 7 the row
-            "INSERT INTO legacy_migrations",                                // 7 its mapping
-            "guard converted == expectedFresh else {",                      // 8 closing identity
-            "guard gainedTransactions == expectedFresh.count,",             // 8 closing counts
+            "throw LegacyConversionFailure.skippedIdentityNotConvertible",  // A request shape
+            "guard !LegacyConversionPlan.wouldTruncateCurrency",            // A request shape
+            "guard !expected.isEmpty else {",                               // B nothing to do
+            "try db.transaction {",                                         // C the one write tx
+            "try legacyConversionPreflightBody()",                          // D pins the snapshot
+            "guard expectedFresh == expected else {",                       // E same execution set
+            "try validateConversionCategories(for: expectedFresh",          // F …before the backup
+            "try BackupExport.writeBundle",                                 // G backup, in the tx
+            "if let busy = LegacyConversionRunner.retriableBusyMessage(error) {",  // G busy ≠ broken
+            "throw LegacyConversionFailure.backupFailed",                   // G …everything else
+            "try BackupRestore.validateBundle",                             // G prove it reads
+            "try create(LegacyConversionRunner.transaction",                // H the FIRST write
+            "INSERT INTO legacy_migrations",                                // H its mapping
+            "guard converted == expectedFresh else {",                      // I closing identity
+            "guard gainedTransactions == expectedFresh.count,",             // I closing counts
         ]
         var cursor = body.startIndex
         for step in steps {

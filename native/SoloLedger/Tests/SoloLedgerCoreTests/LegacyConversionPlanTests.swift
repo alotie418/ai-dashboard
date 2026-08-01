@@ -800,6 +800,151 @@ final class LegacyConversionPlanTests: LedgerTestCase {
                        "the regime question comes first, as it does in ReportBuilder")
     }
 
+    // MARK: - The source fingerprint
+
+    /// Every one of the seventeen protected columns, one at a time: a legal value replaced by
+    /// another legal value must move the fingerprint, and therefore the plan.
+    ///
+    /// Grouped so the failure message names the group, but each column is changed on its own —
+    /// a fingerprint covering sixteen of seventeen would pass a group-level check.
+    func testEveryProtectedColumnMovesTheFingerprint() {
+        let base = Self.cleanStoredRow()
+        let cases: [(String, String, (inout LegacyConversionPlan.StoredRow) -> Void)] = [
+            ("identity", "id",              { $0.id = .text("other") }),
+            ("identity", "date",            { $0.date = .text("2024-03-11") }),
+            ("strings",  "counterparty",    { $0.counterparty = .text("Other") }),
+            ("strings",  "invoiceNo",       { $0.invoiceNo = .text("OTHER") }),
+            ("status",   "invoiceStatus",   { $0.invoiceStatus = .text("待开") }),
+            ("money",    "totalAmount",     { $0.totalAmount = .real(1) }),
+            ("money",    "amountWithoutTax", { $0.amountWithoutTax = .real(1) }),
+            ("money",    "taxAmount",       { $0.taxAmount = .real(1) }),
+            ("money",    "taxRate",         { $0.taxRate = .real(1) }),
+            ("money",    "paidAmount",      { $0.paidAmount = .real(1) }),
+            ("status",   "paymentStatus",   { $0.paymentStatus = .text("unpaid") }),
+            ("dates",    "paymentDate",     { $0.paymentDate = .text("2024-03-16") }),
+            ("dates",    "dueDate",         { $0.dueDate = .text("2024-07-20") }),
+            ("audit",    "tons",            { $0.tons = .real(99) }),
+            ("audit",    "pricePerTon",     { $0.pricePerTon = .real(1) }),
+            ("audit",    "shippingCost",    { $0.shippingCost = .real(1) }),
+            ("audit",    "createdAt",       { $0.createdAt = .text("2020-01-01 00:00:00") }),
+        ]
+        XCTAssertEqual(cases.count, 17, "the ruling names seventeen columns")
+        XCTAssertEqual(Set(cases.map(\.1)).count, 17, "each column appears once")
+        let baseline = LegacyConversionPlan.sourceFingerprint(of: base)
+        var digests: Set<String> = [baseline]
+        for (group, column, mutate) in cases {
+            var row = base
+            mutate(&row)
+            let moved = LegacyConversionPlan.sourceFingerprint(of: row)
+            XCTAssertNotEqual(moved, baseline, "\(group)/\(column) is not fingerprinted")
+            digests.insert(moved)
+        }
+        XCTAssertEqual(digests.count, 18, "two columns share a digest — the field tag is missing")
+        // And the fingerprint is a function of nothing else: the same row twice is the same.
+        XCTAssertEqual(LegacyConversionPlan.sourceFingerprint(of: base), baseline)
+    }
+
+    /// The three columns deliberately left out. The converter neither reads nor writes them,
+    /// so an edit there changes nothing about what would be stored, and covering them would
+    /// abort a legitimate conversion over a column this feature has no opinion about.
+    func testTheProductSnapshotColumnsAreNotFingerprintedAndDoNotMoveThePlan() throws {
+        let (store, _) = try configuredStore()
+        try insertSale(store, id: "s-1")
+        let before = try plan(store)
+        try store.db.run("""
+            UPDATE sales SET product_id = 'p-9', product_name_snapshot = 'x', unit_snapshot = '件'
+             WHERE id = 's-1'
+            """)
+        XCTAssertEqual(try plan(store), before,
+                       "a column the converter never reads must not abort a conversion")
+        XCTAssertFalse(LegacyConversionPlan.sourceColumns(for: .sales).contains("product_id"))
+    }
+
+    /// The five storage classes, and the two pairs a decimal rendering would have collapsed.
+    func testTheFingerprintSeparatesEveryStorageClassAndBothSignedPairs() {
+        func digest(_ v: SQLiteValue) -> String {
+            var row = LegacyConversionPlan.StoredRow()
+            row.totalAmount = v
+            return LegacyConversionPlan.sourceFingerprint(of: row)
+        }
+        // The ruled matrix: the same "zero" in five storage classes.
+        let zeroes: [SQLiteValue] = [.null, .integer(0), .real(0), .text("0"), .blob(Data([0x30]))]
+        XCTAssertEqual(Set(zeroes.map(digest)).count, 5,
+                       "a storage class is missing from the encoding")
+        // Signed zero and signed infinity — distinct stored values, distinct digests.
+        XCTAssertNotEqual(digest(.real(0.0)), digest(.real(-0.0)))
+        XCTAssertNotEqual(digest(.real(.infinity)), digest(.real(-.infinity)))
+        // A number and its text rendering are different facts.
+        XCTAssertNotEqual(digest(.integer(1)), digest(.text("1")))
+        XCTAssertNotEqual(digest(.real(1)), digest(.integer(1)))
+
+        // The ruled encoding itself, not merely its consequences: numbers go in as raw bit
+        // patterns, big-endian, eight bytes. A decimal rendering happens to separate these
+        // particular pairs too, so only the bytes can say which rule is implemented.
+        func payload(_ v: SQLiteValue) -> Data { LegacyConversionPlan.fingerprintEncoding(of: v).1 }
+        XCTAssertEqual(payload(.integer(1)), Data([0, 0, 0, 0, 0, 0, 0, 1]))
+        XCTAssertEqual(payload(.integer(-1)), Data(repeating: 0xff, count: 8))
+        XCTAssertEqual(payload(.real(0.0)), Data(repeating: 0x00, count: 8))
+        XCTAssertEqual(payload(.real(-0.0)), Data([0x80, 0, 0, 0, 0, 0, 0, 0]))
+        XCTAssertEqual(payload(.real(.infinity)), Data([0x7f, 0xf0, 0, 0, 0, 0, 0, 0]))
+        XCTAssertEqual(payload(.real(-.infinity)), Data([0xff, 0xf0, 0, 0, 0, 0, 0, 0]))
+        XCTAssertEqual(payload(.null), Data())
+        XCTAssertEqual(payload(.text("0")), Data([0x30]))
+        XCTAssertEqual(payload(.blob(Data([0x30]))), Data([0x30]))
+        // The class tags, in the ruled order.
+        XCTAssertEqual([SQLiteValue.null, .integer(0), .real(0), .text(""), .blob(Data())]
+            .map { LegacyConversionPlan.fingerprintEncoding(of: $0).0 }, [0x00, 0x01, 0x02, 0x03, 0x04])
+    }
+
+    /// Field order, type tags and length boundaries, checked on the ENCODING rather than only
+    /// its hash — a digest test cannot say WHY two inputs differ.
+    func testTheFingerprintEncodingIsVersionedTaggedAndLengthDelimited() {
+        var row = LegacyConversionPlan.StoredRow()
+        row.id = .text("ab")
+        let payload = LegacyConversionPlan.fingerprintPayload(of: row)
+        XCTAssertTrue(payload.starts(with: Data("slcf1".utf8)), "the version prefix is missing")
+        // field 0x01, class 0x03 (text), eight big-endian length bytes, then the payload.
+        let expectedHead = Data([0x01, 0x03, 0, 0, 0, 0, 0, 0, 0, 2]) + Data("ab".utf8)
+        XCTAssertTrue(payload.dropFirst(5).starts(with: expectedHead), "\(Array(payload.prefix(24)))")
+        // Seventeen fields, each at least tag + class + eight length bytes.
+        XCTAssertEqual(LegacyConversionPlan.fingerprintFields(of: row).count, 17)
+        XCTAssertEqual(LegacyConversionPlan.fingerprintFields(of: row).map(\.0),
+                       Array(0x01...0x11), "the field order is part of the digest")
+        XCTAssertGreaterThanOrEqual(payload.count, 5 + 17 * 10)
+
+        // The length prefix is what stops two adjacent fields running together into a third
+        // that hashes the same. Without it these two rows would encode identically.
+        var a = LegacyConversionPlan.StoredRow(); a.id = .text("xy"); a.date = .text("")
+        var b = LegacyConversionPlan.StoredRow(); b.id = .text("x"); b.date = .text("y")
+        XCTAssertNotEqual(LegacyConversionPlan.sourceFingerprint(of: a),
+                          LegacyConversionPlan.sourceFingerprint(of: b))
+    }
+
+    /// A FIXED vector. Recomputed from a literal row, it pins the encoding end to end — a
+    /// change to the version, the order, a tag, the endianness or the digest moves it.
+    func testTheFingerprintOfAKnownRowIsAFixedValue() {
+        var row = LegacyConversionPlan.StoredRow()
+        row.id = .text("s-1")
+        row.date = .text("2024-03-10")
+        row.counterparty = .text("Acme")
+        row.invoiceNo = .null
+        row.invoiceStatus = .text("已开")
+        row.totalAmount = .real(9040)
+        row.amountWithoutTax = .integer(8000)
+        row.taxAmount = .real(1040)
+        row.taxRate = .real(13)
+        row.paidAmount = .real(0)
+        row.paymentStatus = .text("unpaid")
+        row.paymentDate = .null
+        row.dueDate = .blob(Data([0x00, 0xff]))
+        row.tons = .real(-0.0)
+        row.pricePerTon = .real(.infinity)
+        row.shippingCost = .null
+        row.createdAt = .text("2019-01-01 00:00:00")
+        XCTAssertEqual(LegacyConversionPlan.sourceFingerprint(of: row),
+                       "27071a1a5e1e5bdf39e6a55bd1dca0872ff3961cce72b57c943d65d12d21443d")
+    }
+
     // MARK: - Completeness controls
 
     /// A stored row with every column populated and nothing wrong with any of them.

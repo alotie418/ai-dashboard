@@ -198,15 +198,23 @@ extension LedgerStore {
         try runLegacyConversion(request, faultInjection: nil)
     }
 
-    /// Internal test entry point: identical, with a seam that fires after the first row is
-    /// written so the all-or-nothing rollback can be proved. NOT public — the seam must be
-    /// unreachable in production.
+    /// Internal test entry point. NOT public — neither seam may be reachable in production.
+    ///
+    /// - Parameter afterBackup: fires inside the transaction, after the backup and BEFORE the
+    ///   first database write. That instant is the one the whole snapshot design is about and
+    ///   it is otherwise unobservable: `faultInjection` is too late, because by then the first
+    ///   row has been written and the connection already holds the write lock, which changes
+    ///   what a concurrent writer is even able to do.
+    /// - Parameter faultInjection: fires after the first row is written, for the
+    ///   all-or-nothing rollback.
     @discardableResult
     func runLegacyConversion(_ request: LegacyConversionRequest,
+                             afterBackup: (() throws -> Void)? = nil,
                              faultInjection: (() throws -> Void)?) throws
     -> LegacyConversionReport {
         do {
-            return try convertLegacyRows(request, faultInjection: faultInjection)
+            return try convertLegacyRows(request, afterBackup: afterBackup,
+                                         faultInjection: faultInjection)
         } catch let failure as LegacyConversionFailure {
             throw failure                                  // already classified
         } catch {
@@ -226,68 +234,64 @@ extension LedgerStore {
     }
 
     private func convertLegacyRows(_ request: LegacyConversionRequest,
+                                   afterBackup: (() throws -> Void)?,
                                    faultInjection: (() throws -> Void)?) throws
     -> LegacyConversionReport {
         let plan = request.plan
 
-        // ── 1. Read-only checks ─────────────────────────────────────────────────────────
+        // ── A. Request-shape checks. These read NO database ──────────────────────────────
+        // Deliberately: they are about the REQUEST, not the ledger, so they must not be the
+        // thing that pins a snapshot — and a malformed request must not cost the user a
+        // backup. Everything that asks the ledger a question happens inside the transaction.
         let convertible = plan.convertibleIdentities
         for identity in request.skipped.sorted() where !convertible.contains(identity) {
             throw LegacyConversionFailure.skippedIdentityNotConvertible(identity)
         }
-        let expected = convertible.subtracting(request.skipped)
-
         // Belt and braces over a gate the plan already holds: a currency the write path would
-        // shorten is `ReportBlocker`-style blocked in the preflight, so a plan carrying one
-        // cannot exist. Asserted here because this is the line that stamps it on every row.
+        // shorten is blocked in the preflight, so a plan carrying one cannot exist. Asserted
+        // here because this is the line that stamps it on every row.
         guard !LegacyConversionPlan.wouldTruncateCurrency(plan.currency) else {
             throw LegacyConversionFailure.writeSetMismatch(
                 "the plan's currency would not be stored verbatim")
         }
-        try validateConversionCategories(for: expected, request: request,
-                                         locale: plan.accountingLocale)
+        let expected = convertible.subtracting(request.skipped)
 
-        // ── 2. Nothing to do ────────────────────────────────────────────────────────────
-        // Before the backup, deliberately: re-running a finished conversion must be free and
-        // must not litter the backups folder with snapshots of a ledger nothing happened to.
+        // ── B. Nothing to do ────────────────────────────────────────────────────────────
+        // No transaction, no backup: re-running a finished conversion must be free and must
+        // not litter the backups folder with snapshots of a ledger nothing happened to.
         guard !expected.isEmpty else {
             return LegacyConversionReport(converted: [], backupDirectory: nil)
         }
 
-        // ── 3/4. Backup, then prove the backup is readable ──────────────────────────────
-        do {
-            try BackupExport.writeBundle(database: db,
-                                         attachmentsDir: request.attachmentsDirectory,
-                                         to: request.backupDestination)
-        } catch {
-            // A backup refused because another connection holds the database is the SAME
-            // retriable situation as a refused write transaction, and reporting it as
-            // `backupFailed` would tell the user their backup is broken when nothing is:
-            // the online-backup API surfaces it as `sqlite3_backup_step failed (rc 5)` and
-            // succeeds unchanged once the lock is released. Classified before wrapping,
-            // because wrapping turns the typed error into a string.
-            if let busy = LegacyConversionRunner.retriableBusyMessage(error) {
-                throw LegacyConversionFailure.busy(busy)
-            }
-            throw LegacyConversionFailure.backupFailed("\(error)")
-        }
-        do {
-            try BackupRestore.validateBundle(request.backupDestination)
-        } catch {
-            throw LegacyConversionFailure.backupNotValid("\(error)")
-        }
-
-        // ── 5. The one transaction ──────────────────────────────────────────────────────
+        // ── C. The one transaction ──────────────────────────────────────────────────────
+        //
+        // THE BACKUP IS TAKEN INSIDE IT. That is the correction this stage was missing, and
+        // it is measured rather than argued. Taking the backup before `BEGIN` leaves a window
+        // in which another connection can commit: the transaction then SEES that commit and
+        // keeps it, the conversion succeeds, and the "pre-conversion backup" it hands back
+        // does not contain it — so restoring that backup to undo the conversion silently
+        // undoes the other change too. Reproduced in both journal modes: an external
+        // `UPDATE transactions SET amount = 999` in the window left the live ledger at 999
+        // and the bundle at 100.
+        //
+        // A plain deferred `BEGIN` still holds only a READ lock here, so the backup is taken
+        // before any write lock exists — the online-backup API runs happily from inside it
+        // (measured, both modes) and copies THIS transaction's snapshot, not the live file.
+        // What an external commit does next differs by mode and both answers are safe:
+        //   WAL     — the commit succeeds, and our first write then fails BUSY, so the whole
+        //             batch rolls back and the caller gets a retriable `.busy`.
+        //   DELETE  — our read lock refuses the external COMMIT outright.
+        // Neither leaves "external commit succeeded AND the conversion shipped a stale backup".
         var converted: Set<LegacyRowIdentity> = []
         do {
             try db.transaction {
-                // 6a — the plan, recomputed on the view this transaction will write into.
+                // D — the FIRST read. This is what pins the snapshot everything below shares.
                 guard case .plan(let fresh) = try legacyConversionPreflightBody(),
                       fresh == plan else {
                     throw LegacyConversionFailure.ledgerChanged
                 }
-                // Recomputed from the FRESH plan and then required to match, rather than
-                // reused from step 1: the equality above already implies it, and stating it
+                // E — recomputed from the FRESH plan and then required to match, rather than
+                // reused from step A: the equality above already implies it, and stating it
                 // separately means a future change to either side has to break one of two
                 // assertions instead of quietly agreeing with itself.
                 let expectedFresh = fresh.convertibleIdentities.subtracting(request.skipped)
@@ -296,18 +300,43 @@ extension LedgerStore {
                         "the recomputed execution set differs from the one checked")
                 }
 
-                // 6b — categories again, on this transaction's view. A category deleted
-                // between step 1 and here would otherwise be caught only by the FK, which
-                // reports an id and not a reason.
+                // F — categories, on this snapshot, BEFORE the backup: a request naming a
+                // category that does not exist must not cost the user a bundle.
                 try validateConversionCategories(for: expectedFresh, request: request,
                                                  locale: fresh.accountingLocale)
+
+                // G — the backup, and proof it is readable. Still no write lock.
+                do {
+                    try BackupExport.writeBundle(database: db,
+                                                 attachmentsDir: request.attachmentsDirectory,
+                                                 to: request.backupDestination)
+                } catch {
+                    // A backup refused because another connection holds the database is the
+                    // SAME retriable situation as a refused write, and reporting it as
+                    // `backupFailed` would tell the user their backup is broken when nothing
+                    // is: the online-backup API surfaces it as
+                    // `sqlite3_backup_step failed (rc 5)` and succeeds unchanged once the
+                    // lock is released. Classified before wrapping, because wrapping turns
+                    // the typed error into a string.
+                    if let busy = LegacyConversionRunner.retriableBusyMessage(error) {
+                        throw LegacyConversionFailure.busy(busy)
+                    }
+                    throw LegacyConversionFailure.backupFailed("\(error)")
+                }
+                do {
+                    try BackupRestore.validateBundle(request.backupDestination)
+                } catch {
+                    throw LegacyConversionFailure.backupNotValid("\(error)")
+                }
+
+                try afterBackup?()
 
                 let transactionsBefore = try rowCount("transactions")
                 let mappingsBefore = try rowCount("legacy_migrations")
 
-                // 7 — per row: the transaction first, then its mapping, matching
-                // `migrations.js:116-125`. With no per-row catch the order carries no
-                // meaning: either both land or neither does.
+                // H — the first database WRITE happens here and nowhere earlier. Per row: the
+                // transaction first, then its mapping, matching `migrations.js:116-125`. With
+                // no per-row catch the order carries no meaning: either both land or neither.
                 for identity in expectedFresh.sorted() {
                     guard let source = try readLegacySourceRow(identity) else {
                         throw LegacyConversionFailure.rowVanished(identity)
@@ -315,6 +344,19 @@ extension LedgerStore {
                     let issues = LegacyConversionPlan.issues(in: source.graded)
                     guard issues.isEmpty else {
                         throw LegacyConversionFailure.rowNoLongerConvertible(identity, issues)
+                    }
+                    // The values, not just the verdict. A clean value replaced by another
+                    // clean value leaves the table, the id, the date and the (empty) issue
+                    // list identical — measured, sixteen of twenty ordinary edits do exactly
+                    // that — so without this the writer would store money the plan never
+                    // showed. Reachable inside the transaction: our own writes are visible to
+                    // our own later reads, so a trigger that edits a not-yet-converted row is
+                    // caught here.
+                    guard let planned = fresh.row(table: identity.table,
+                                                  legacyID: identity.legacyID),
+                          planned.sourceFingerprint
+                            == LegacyConversionPlan.sourceFingerprint(of: source.graded) else {
+                        throw LegacyConversionFailure.ledgerChanged
                     }
                     try create(LegacyConversionRunner.transaction(
                         from: source, identity: identity, request: request, plan: fresh))
@@ -403,20 +445,14 @@ extension LedgerStore {
 
     // MARK: - Reading one legacy row
 
+    /// The SELECT list is ``LegacyConversionPlan/sourceColumns(for:)`` — the same one the plan
+    /// scanned with. Two lists would mean two fingerprints over two different column sets, and
+    /// the comparison between them would be meaningless.
     private func readLegacySourceRow(_ identity: LegacyRowIdentity) throws
     -> LegacyConversionRunner.SourceRow? {
-        let table = identity.table
-        let shipping = table == .sales ? "r.shippingCost" : "NULL"
         let sql = """
-            SELECT r.id AS id, r.date AS date, r.\(table.counterpartyColumn) AS counterparty,
-                   r.invoiceNumber AS invoiceNumber, r.invoiceStatus AS invoiceStatus,
-                   r.totalAmount AS totalAmount, r.amountWithoutTax AS amountWithoutTax,
-                   r.taxAmount AS taxAmount, r.taxRate AS taxRate,
-                   r.paid_amount AS paid_amount, r.payment_status AS payment_status,
-                   r.payment_date AS payment_date, r.due_date AS due_date,
-                   r.tons AS tons, r.pricePerTon AS pricePerTon,
-                   \(shipping) AS shippingCost, r.created_at AS created_at
-              FROM \(table.rawValue) r
+            SELECT \(LegacyConversionPlan.sourceColumns(for: identity.table))
+              FROM \(identity.table.rawValue) r
              WHERE r.id = ?
             """
         guard let row = try db.query(sql, [.text(identity.legacyID)]).first else { return nil }
@@ -432,29 +468,23 @@ enum LegacyConversionRunner {
     /// the writer needs. The graded subset is rebuilt into a `StoredRow` so the re-grade
     /// inside the transaction asks EXACTLY the question the preflight asked.
     struct SourceRow {
+        /// The whole row, built by ``LegacyConversionPlan/storedRow(from:)`` — the SAME
+        /// function the plan's scan uses. The re-grade and the fingerprint comparison are
+        /// therefore asking the identical question of the identical shape; two constructors
+        /// would let the two sides drift while still looking like they agreed.
         let graded: LegacyConversionPlan.StoredRow
-        let invoiceStatus: SQLiteValue
-        let tons: SQLiteValue
-        let pricePerTon: SQLiteValue
-        let shippingCost: SQLiteValue
-        let createdAt: SQLiteValue
         /// Generated once per row so the `transactions` row and its `legacy_migrations`
         /// mapping cannot disagree about which id was written.
         let newTransactionID: String
 
+        var invoiceStatus: SQLiteValue { graded.invoiceStatus }
+        var tons: SQLiteValue { graded.tons }
+        var pricePerTon: SQLiteValue { graded.pricePerTon }
+        var shippingCost: SQLiteValue { graded.shippingCost }
+        var createdAt: SQLiteValue { graded.createdAt }
+
         init(_ row: SQLiteRow) {
-            graded = LegacyConversionPlan.StoredRow(
-                id: row["id"], date: row["date"], counterparty: row["counterparty"],
-                invoiceNo: row["invoiceNumber"],
-                totalAmount: row["totalAmount"], amountWithoutTax: row["amountWithoutTax"],
-                taxAmount: row["taxAmount"], taxRate: row["taxRate"],
-                paidAmount: row["paid_amount"], paymentStatus: row["payment_status"],
-                paymentDate: row["payment_date"], dueDate: row["due_date"])
-            invoiceStatus = row["invoiceStatus"]
-            tons = row["tons"]
-            pricePerTon = row["pricePerTon"]
-            shippingCost = row["shippingCost"]
-            createdAt = row["created_at"]
+            graded = LegacyConversionPlan.storedRow(from: row)
             newTransactionID = IDGenerator.transactionID()
         }
     }
