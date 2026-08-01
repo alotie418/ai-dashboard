@@ -387,6 +387,64 @@ final class LegacyConversionPlanTests: LedgerTestCase {
         XCTAssertEqual(Transaction(counterparty: long).normalized().counterparty.count, 200)
     }
 
+    /// The converter copies exactly two strings from a legacy row. The counterparty rule was
+    /// ruled first; this is the same rule on the other one, and it exists because a rule that
+    /// holds for one of two copied columns is not a rule. Both caps are MEASURED against the
+    /// write path rather than restated.
+    func testAnInvoiceNumberTheWritePathWouldTruncateNeedsAdjudication() throws {
+        let (store, _) = try configuredStore()
+        let long = String(repeating: "I", count: 101)
+        try store.db.run("""
+            INSERT INTO sales (id, date, customer, invoiceNumber, totalAmount, amountWithoutTax,
+                               taxAmount, taxRate, paid_amount, payment_status)
+            VALUES ('s-1','2024-03-10','Acme',?,9040,8000,1040,13,0,'unpaid'),
+                   ('s-2','2024-03-10','Acme',?,9040,8000,1040,13,0,'unpaid')
+            """, [.text(long), .text(String(repeating: "I", count: 100))])
+        XCTAssertEqual(try issues(store, "s-1"), [.invoiceNoWouldBeTruncated])
+        XCTAssertEqual(try issues(store, "s-2"), [], "exactly at the cap is kept whole")
+        // CONTROL: the cap is real and belongs to the write path, not to the grader.
+        XCTAssertEqual(Transaction(invoiceNo: long).normalized().invoiceNo.count, 100)
+    }
+
+    /// A currency the write path would shorten makes the plan STATE a code no converted row
+    /// could carry, so it stops the whole batch rather than any one row.
+    func testACurrencyTheWritePathWouldShortenBlocksTheWholeBatch() throws {
+        let (store, _) = try configuredStore(currency: "VERYLONGCODE")
+        try insertSale(store, id: "s-1")
+        XCTAssertEqual(try store.legacyConversionPreflight(),
+                       .blocked(.currencyNotStorableVerbatim(currency: "VERYLONGCODE")))
+        // CONTROL + boundary: eight characters survive, nine do not.
+        XCTAssertFalse(LegacyConversionPlan.wouldTruncateCurrency("12345678"))
+        XCTAssertTrue(LegacyConversionPlan.wouldTruncateCurrency("123456789"))
+        XCTAssertEqual(Transaction(currency: "VERYLONGCODE").normalized().currency, "VERYLONG")
+    }
+
+    /// The internal split the runner needs: the public entry point still opens a snapshot,
+    /// and the extracted body answers identically when called inside one.
+    func testTheExtractedPreflightBodyAnswersTheSameAsThePublicEntryPoint() throws {
+        let (store, _) = try configuredStore()
+        try insertSale(store, id: "s-1")
+        try insertSale(store, id: "bad", date: .text("2024/03/10"))
+        let viaPublic = try store.legacyConversionPreflight()
+        let viaBody = try store.db.readSnapshot { try store.legacyConversionPreflightBody() }
+        XCTAssertEqual(viaPublic, viaBody)
+    }
+
+    /// The split's whole point, pinned from both sides: the PUBLIC entry point really does
+    /// open a transaction (so it cannot nest inside one), and the extracted body really does
+    /// not (so the runner can call it inside its write transaction). A test that only
+    /// compared their answers would pass with the snapshot removed.
+    func testOnlyThePublicEntryPointOpensATransaction() throws {
+        let (store, _) = try configuredStore()
+        try insertSale(store, id: "s-1")
+        XCTAssertThrowsError(try store.db.transaction {
+            _ = try store.legacyConversionPreflight()
+        }, "the public entry point takes a snapshot, so BEGIN inside BEGIN must fail")
+        XCTAssertNoThrow(try store.db.transaction {
+            _ = try store.legacyConversionPreflightBody()
+        })
+    }
+
     // MARK: - P8 — line items
 
     func testP8HeadersCarryingLineItemsAreCountedOverTheWorkSetOnly() throws {
@@ -694,6 +752,7 @@ final class LegacyConversionPlanTests: LedgerTestCase {
     private static func cleanStoredRow(id: SQLiteValue = .text("x")) -> LegacyConversionPlan.StoredRow {
         LegacyConversionPlan.StoredRow(
             id: id, date: .text("2024-03-10"), counterparty: .text("Acme"),
+            invoiceNo: .text("OLD-001"),
             totalAmount: .real(9040), amountWithoutTax: .real(8000), taxAmount: .real(1040),
             taxRate: .real(13), paidAmount: .real(9040), paymentStatus: .text("paid"),
             paymentDate: .null, dueDate: .null)
@@ -717,6 +776,7 @@ final class LegacyConversionPlanTests: LedgerTestCase {
             (.amountWithoutTaxNotANumber, { $0.amountWithoutTax = .text("abc") }),
             (.paymentStatusUnrecognized, { $0.paymentStatus = .text("?") }),
             (.counterpartyWouldBeTruncated, { $0.counterparty = .text(long) }),
+            (.invoiceNoWouldBeTruncated, { $0.invoiceNo = .text(String(repeating: "I", count: 101)) }),
         ]
         XCTAssertEqual(LegacyConversionPlan.issues(in: Self.cleanStoredRow()), [],
                        "the base row must be clean or every case below is meaningless")

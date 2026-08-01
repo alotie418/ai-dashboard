@@ -155,6 +155,13 @@ public enum LegacyRowIssue: String, CaseIterable, Equatable, Sendable {
     /// Measured against `Transaction.normalized()` itself rather than restated as a number
     /// here, so the two cannot drift apart — see ``LegacyConversionPlan/wouldTruncateCounterparty(_:)``.
     case counterpartyWouldBeTruncated
+
+    /// `invoiceNumber` is longer than the write path will keep.
+    ///
+    /// The converter copies exactly two strings from a legacy row — the counterparty and this
+    /// one — and both must arrive whole or be reported. Measured against
+    /// ``LegacyConversionPlan/wouldTruncateInvoiceNo(_:)`` for the same reason.
+    case invoiceNoWouldBeTruncated
 }
 
 /// What a conversion may do with one legacy row.
@@ -256,6 +263,10 @@ public enum LegacyConversionBlocker: Equatable, Sendable {
     /// Carries the stored text byte for byte so a screen can show what is actually there —
     /// the same treatment `ReportBlocker.currencyInvalid` gives it.
     case currencyInvalid(storedText: String)
+    /// The stored currency is readable but longer than the write path will keep, so the plan
+    /// would state a code no converted row could actually carry. See
+    /// ``LegacyConversionPlan/wouldTruncateCurrency(_:)``.
+    case currencyNotStorableVerbatim(currency: String)
 }
 
 /// The complete, write-free answer.
@@ -447,12 +458,36 @@ extension LegacyConversionPlan {
         Transaction(counterparty: stored).normalized().counterparty != stored
     }
 
+    /// The same question for `invoice_no`, measured the same way.
+    ///
+    /// Every Electron write path clamps this column at 100 (`safeString(v, 100)`) and so does
+    /// `Transaction.normalized()`, so a truncation is not reachable through the product today.
+    /// It is graded anyway, because the converter COPIES this string verbatim and the whole
+    /// point of the counterparty rule is that a copied string must arrive whole or be
+    /// reported — a rule that holds for one of the two copied columns and not the other is
+    /// not a rule. A hand-edited ledger is the reachable case.
+    static func wouldTruncateInvoiceNo(_ stored: String) -> Bool {
+        Transaction(invoiceNo: stored).normalized().invoiceNo != stored
+    }
+
+    /// True when the write path would not store this currency code verbatim.
+    ///
+    /// `Transaction.normalized()` clamps `currency` to eight characters. The plan STATES a
+    /// currency — every converted row is said to carry it — so a stored code the write path
+    /// would shorten makes the plan describe something the ledger will not hold. Blocked
+    /// whole-batch rather than graded per row: it is a property of the ledger's settings, not
+    /// of any one legacy row.
+    static func wouldTruncateCurrency(_ stored: String) -> Bool {
+        Transaction(currency: stored).normalized().currency != stored
+    }
+
     /// One legacy row's stored columns, straight from SQLite with no coercion applied —
     /// `id` included, because whether it has a text reading at all is one of the questions.
     struct StoredRow: Equatable {
         var id: SQLiteValue = .null
         var date: SQLiteValue = .null
         var counterparty: SQLiteValue = .null
+        var invoiceNo: SQLiteValue = .null
         var totalAmount: SQLiteValue = .null
         var amountWithoutTax: SQLiteValue = .null
         var taxAmount: SQLiteValue = .null
@@ -513,6 +548,9 @@ extension LegacyConversionPlan {
         if let name = row.counterparty.stringValue, wouldTruncateCounterparty(name) {
             found.append(.counterpartyWouldBeTruncated)
         }
+        if let no = row.invoiceNo.stringValue, wouldTruncateInvoiceNo(no) {
+            found.append(.invoiceNoWouldBeTruncated)
+        }
         return found.sorted { $0.rawValue < $1.rawValue }
     }
 }
@@ -528,7 +566,20 @@ extension LedgerStore {
     /// the line-item counts and the per-year currency sets are eight-odd statements that must
     /// describe ONE ledger, and the Electron app may be writing between any two of them.
     public func legacyConversionPreflight() throws -> LegacyConversionPreflight {
-        try db.readSnapshot {
+        try db.readSnapshot { try legacyConversionPreflightBody() }
+    }
+
+    /// The scan itself, WITHOUT opening a read transaction of its own.
+    ///
+    /// Split out because `LegacyConversionRunner` has to recompute the plan INSIDE its write
+    /// transaction — the point of doing so is that the recomputation and the writes see one
+    /// ledger — and SQLite has no nested transactions, so a `readSnapshot` in there would
+    /// fail with `BEGIN` inside `BEGIN`. The public entry point above keeps the snapshot for
+    /// every other caller; this one inherits whichever transaction it is called in.
+    ///
+    /// Internal, and it stays internal: a caller that opens no transaction at all would get
+    /// the torn view the snapshot exists to prevent.
+    func legacyConversionPreflightBody() throws -> LegacyConversionPreflight {
             // ── 1. The two settings a converted row cannot be written without ────────────
             //
             // Both are classified by the rule the REPORT ENGINES apply, not by the lenient
@@ -559,9 +610,11 @@ extension LedgerStore {
                       !currency.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                     return .blocked(.currencyInvalid(storedText: raw))
                 }
+                guard !LegacyConversionPlan.wouldTruncateCurrency(currency) else {
+                    return .blocked(.currencyNotStorableVerbatim(currency: currency))
+                }
                 return .plan(try scanLegacyRows(locale: locale, currency: currency))
             }
-        }
     }
 
     private func scanLegacyRows(locale: AccountingLocale,
@@ -602,6 +655,7 @@ extension LedgerStore {
             : ""
         let sql = """
             SELECT r.id AS id, r.date AS date, r.\(table.counterpartyColumn) AS counterparty,
+                   r.invoiceNumber AS invoiceNumber,
                    r.totalAmount AS totalAmount, r.amountWithoutTax AS amountWithoutTax,
                    r.taxAmount AS taxAmount, r.taxRate AS taxRate,
                    r.paid_amount AS paid_amount, r.payment_status AS payment_status,
@@ -620,6 +674,7 @@ extension LedgerStore {
                 id: row["id"],
                 date: row["date"],
                 counterparty: row["counterparty"],
+                invoiceNo: row["invoiceNumber"],
                 totalAmount: row["totalAmount"],
                 amountWithoutTax: row["amountWithoutTax"],
                 taxAmount: row["taxAmount"],
