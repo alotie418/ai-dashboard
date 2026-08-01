@@ -205,6 +205,29 @@ extension LedgerStore {
     func runLegacyConversion(_ request: LegacyConversionRequest,
                              faultInjection: (() throws -> Void)?) throws
     -> LegacyConversionReport {
+        do {
+            return try convertLegacyRows(request, faultInjection: faultInjection)
+        } catch let failure as LegacyConversionFailure {
+            throw failure                                  // already classified
+        } catch {
+            // A lock held by another connection can be met at ANY point, and every one of
+            // them means the same thing: nothing was written and the whole conversion can be
+            // retried unchanged. Measured, with a second connection holding `BEGIN EXCLUSIVE`
+            // on a rollback-journal ledger: the FIRST thing to notice it is the read-only
+            // category query, well before the backup — so classifying only at the backup
+            // would leave the commonest case surfacing as a raw SQLite error. The backup call
+            // site classifies explicitly as well, because the failure it must NOT produce
+            // there (`backupFailed`, "your backup is broken") is a different lie.
+            if let busy = LegacyConversionRunner.retriableBusyMessage(error) {
+                throw LegacyConversionFailure.busy(busy)
+            }
+            throw error
+        }
+    }
+
+    private func convertLegacyRows(_ request: LegacyConversionRequest,
+                                   faultInjection: (() throws -> Void)?) throws
+    -> LegacyConversionReport {
         let plan = request.plan
 
         // ── 1. Read-only checks ─────────────────────────────────────────────────────────
@@ -237,6 +260,15 @@ extension LedgerStore {
                                          attachmentsDir: request.attachmentsDirectory,
                                          to: request.backupDestination)
         } catch {
+            // A backup refused because another connection holds the database is the SAME
+            // retriable situation as a refused write transaction, and reporting it as
+            // `backupFailed` would tell the user their backup is broken when nothing is:
+            // the online-backup API surfaces it as `sqlite3_backup_step failed (rc 5)` and
+            // succeeds unchanged once the lock is released. Classified before wrapping,
+            // because wrapping turns the typed error into a string.
+            if let busy = LegacyConversionRunner.retriableBusyMessage(error) {
+                throw LegacyConversionFailure.busy(busy)
+            }
             throw LegacyConversionFailure.backupFailed("\(error)")
         }
         do {
@@ -456,8 +488,8 @@ enum LegacyConversionRunner {
             categoryID: identity.table.transactionType == .income
                 ? request.defaultIncomeCategoryID
                 : request.defaultExpenseCategoryID,
-            counterparty: g.counterparty.stringValue ?? "",
-            invoiceNo: g.invoiceNo.stringValue ?? "",
+            counterparty: copiedText(g.counterparty),
+            invoiceNo: copiedText(g.invoiceNo),
             invoiceStatus: mapInvoiceStatus(source.invoiceStatus),
             // The conservative correction: an empty or absent status carries over as `unpaid`
             // — the legacy column's own DEFAULT — and NOT as Electron's optimistic `paid`
@@ -468,8 +500,8 @@ enum LegacyConversionRunner {
             // `LedgerStore.bindings` turns an empty string into SQL NULL for these two, so an
             // empty stored date becomes a real absence rather than a `''` that
             // `COALESCE(payment_date, date)` would take at face value.
-            paymentDate: g.paymentDate.stringValue,
-            dueDate: g.dueDate.stringValue,
+            paymentDate: copiedOptionalText(g.paymentDate),
+            dueDate: copiedOptionalText(g.dueDate),
             description: description(for: source, table: identity.table),
             // Legacy rows carry no attachment.
             attachmentPath: nil,
@@ -495,9 +527,18 @@ enum LegacyConversionRunner {
     /// legacy row actually has. `purchases` has no shipping column, so it never gets that
     /// segment (the SELECT binds `NULL` there).
     ///
-    /// JavaScript's falsiness is what decides inclusion, because that is what the source
-    /// does: `0`, `NULL` and `''` are all omitted. A stored non-empty TEXT is truthy in JS
-    /// and is included with its text, which is why this reads the value rather than a number.
+    /// JavaScript's falsiness is what decides inclusion for four of the five storage classes,
+    /// because that is what the source does: `0`, `NULL` and `''` are omitted, and a stored
+    /// non-empty TEXT is truthy in JS and included with its text — which is why this reads
+    /// the value rather than a number.
+    ///
+    /// **A BLOB is the deliberate exception, and it is NOT a mirror.** better-sqlite3 hands a
+    /// BLOB to `migrations.js` as a `Buffer`, which is truthy, so Electron would interpolate
+    /// its bytes into the description — arbitrary binary decoded as text, control characters
+    /// and all, in a field the app renders. This omits it instead. Nothing is lost by doing
+    /// so: the bytes are kept, tagged and base64-encoded, in `source_meta`, which is where a
+    /// value this app cannot render belongs. Registered as an intentional difference from the
+    /// source rather than dressed up as parity.
     static func description(for source: SourceRow, table: LegacyTable) -> String {
         [segment("qty", source.tons),
          segment("unit", source.pricePerTon),
@@ -507,6 +548,8 @@ enum LegacyConversionRunner {
 
     static func segment(_ label: String, _ value: SQLiteValue) -> String? {
         switch value {
+        // NULL is falsy in the source and omitted; a BLOB is truthy there and is omitted
+        // ANYWAY — see the note above. The two share a line of code, not a reason.
         case .null, .blob: return nil
         case .integer(let i): return i == 0 ? nil : "\(label)=\(i)"
         case .real(let d):
@@ -574,11 +617,22 @@ enum LegacyConversionRunner {
 
     /// The message of a `SQLITE_BUSY` family error, or nil.
     ///
-    /// `SQLiteDatabase` puts the numeric code at the END of the message
-    /// (`"\(lastMessage) (code \(rc))"`), and this file may not change that type, so the code
-    /// is read back out of the suffix. Deferred `BEGIN` means the write lock is taken at the
-    /// first INSERT, so a concurrent writer surfaces as a failed upgrade — which rolls the
-    /// transaction back, leaving nothing to clean up before a retry.
+    /// `SQLiteDatabase` may not be changed by this PR, so the numeric result code is read
+    /// back out of the message — and it appears in TWO shapes that a single suffix test
+    /// cannot cover. Measured against the real strings that type emits:
+    ///
+    ///     "database is locked (code 5)"                                  ← statement path, at the END
+    ///     "sqlite3_backup_step failed (rc 5): database is locked"        ← online-backup path, in the MIDDLE
+    ///     "sqlite3_backup_finish failed (rc 5)"                          ← online-backup path, at the end
+    ///
+    /// So the code is parsed as a DELIMITED TOKEN — `(code N)` or `(rc N)` — never searched
+    /// for as a loose substring: a message that merely contains the digit 5 is not a busy
+    /// error, and `testOnlyTheBusyFamilyIsClassifiedAsRetriable` pins that.
+    ///
+    /// Deferred `BEGIN` means the write lock is taken at the first INSERT, so a concurrent
+    /// writer surfaces as a failed upgrade — which rolls the transaction back, leaving
+    /// nothing to clean up before a retry. A backup refused for the same reason has written
+    /// no bundle and opened no transaction, so it is retriable in the same sense.
     static func retriableBusyMessage(_ error: Error) -> String? {
         guard let sqlite = error as? SQLiteError else { return nil }
         let text: String
@@ -587,8 +641,17 @@ enum LegacyConversionRunner {
         case .open: return nil
         }
         // SQLITE_BUSY, _RECOVERY, _SNAPSHOT, _TIMEOUT.
-        for code in [5, 261, 517, 773] where text.hasSuffix("(code \(code))") { return text }
-        return nil
+        let busy: Set<Int> = [5, 261, 517, 773]
+        return resultCodes(in: text).contains(where: busy.contains) ? text : nil
+    }
+
+    /// Every `(code N)` / `(rc N)` token in a message, in order.
+    static func resultCodes(in text: String) -> [Int] {
+        guard let re = try? NSRegularExpression(pattern: #"\((?:code|rc) (\d+)\)"#) else { return [] }
+        let range = NSRange(text.startIndex..., in: text)
+        return re.matches(in: text, range: range).compactMap { match in
+            Range(match.range(at: 1), in: text).flatMap { Int(text[$0]) }
+        }
     }
 
     // MARK: - Numeric reads
@@ -602,6 +665,31 @@ enum LegacyConversionRunner {
             preconditionFailure("a graded-convertible row held an unusable number")
         }
         return d
+    }
+
+    /// A string column copied verbatim. SQL NULL becomes `""` — the registered difference
+    /// from `migrations.js`, which wrote NULL — and anything with no text reading traps
+    /// rather than being flattened into that same `""`.
+    ///
+    /// The trap is the third layer, not the gate: ``LegacyRowIssue/counterpartyNotReadableAsText``
+    /// and its invoice twin grade such a row `needsAdjudication`, and the re-grade inside the
+    /// write transaction re-checks it. Writing `""` here would have reported "no
+    /// counterparty" for a row that has one.
+    private static func copiedText(_ value: SQLiteValue) -> String {
+        guard !LegacyConversionPlan.hasNoTextReading(value) else {
+            preconditionFailure("a graded-convertible row held a non-text copied string")
+        }
+        return value.stringValue ?? ""
+    }
+
+    /// An optional date copied verbatim. SQL NULL and the empty string are both a real
+    /// absence (`LedgerStore.bindings` turns `""` into SQL NULL); a value with no text
+    /// reading is NOT, and traps for the same reason as ``copiedText(_:)``.
+    private static func copiedOptionalText(_ value: SQLiteValue) -> String? {
+        guard !LegacyConversionPlan.hasNoTextReading(value) else {
+            preconditionFailure("a graded-convertible row held a non-text date")
+        }
+        return value.stringValue
     }
 
     /// The one column where absence is representable, so absence is preserved.

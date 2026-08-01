@@ -429,6 +429,101 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
         XCTAssertEqual(try counts(f).mappings, 0)
     }
 
+    /// Take a REAL exclusive lock on the ledger from a second connection. WAL does not
+    /// reproduce contention here (a backup reads a snapshot), and `BEGIN IMMEDIATE` blocks
+    /// neither reads nor the backup — both measured — so the ledger is switched to a rollback
+    /// journal and the lock is `BEGIN EXCLUSIVE`. Instant, deterministic, releases cleanly.
+    private func lockLedgerExclusively(_ f: Fixture) throws -> SQLiteDatabase {
+        try f.store.db.execute("PRAGMA journal_mode = DELETE")
+        try f.store.db.execute("PRAGMA busy_timeout = 0")
+        let other = try SQLiteDatabase(path: f.dbURL.path)
+        try other.execute("PRAGMA busy_timeout = 0")
+        try other.execute("BEGIN EXCLUSIVE")
+        return other
+    }
+
+    /// **The backup path's own error, produced for real and routed for real.**
+    ///
+    /// The online-backup API reports a lock as `sqlite3_backup_step failed (rc 5): …` — the
+    /// code sits in the MIDDLE of the message and uses `rc`, not `code`, a shape the
+    /// statement path never emits. A classifier written for the statement path alone reads it
+    /// as an ordinary failure, and the conversion then tells the user their BACKUP is broken
+    /// when nothing is broken and a retry would succeed.
+    ///
+    /// Nothing here is simulated: `BackupExport.writeBundle` is called against a genuinely
+    /// locked ledger and the error it actually throws is fed through the actual routing.
+    func testTheRealBackupErrorUnderALockIsClassifiedRetriable() throws {
+        let f = try fixture()
+        let other = try lockLedgerExclusively(f)
+        defer { try? other.execute("ROLLBACK"); try? other.close() }
+
+        var thrown: Error?
+        do {
+            try BackupExport.writeBundle(database: f.store.db,
+                                         attachmentsDir: f.attachmentsDir,
+                                         to: f.backupDir)
+            XCTFail("a locked ledger must refuse the backup")
+        } catch { thrown = error }
+
+        let error = try XCTUnwrap(thrown)
+        XCTAssertTrue("\(error)".contains("sqlite3_backup_step failed (rc 5)"), "\(error)")
+        // The routing, on that exact error — not on a string this test made up.
+        XCTAssertNotNil(LegacyConversionRunner.retriableBusyMessage(error),
+                        "the backup path's own error must classify as retriable")
+        // And the discrimination that matters: it must NOT become `backupFailed`.
+        XCTAssertEqual(LegacyConversionRunner.resultCodes(in: "\(error)"), [5])
+    }
+
+    /// **A locked ledger is retriable, not broken — end to end.**
+    ///
+    /// Note WHERE the lock is noticed: measured, the first statement to meet it is the
+    /// read-only category query, before the backup is ever attempted. There is no lock state
+    /// that blocks the backup while permitting reads (`EXCLUSIVE` blocks both, `IMMEDIATE`
+    /// blocks neither), so classifying only at the backup call site would leave the commonest
+    /// real case surfacing as a raw SQLite error. Both are classified; this proves the whole
+    /// run, and the test above proves the backup path's own error.
+    func testALockedLedgerRefusesRetriablyAndWritesNothing() throws {
+        let f = try fixture()
+        try insertSale(f, id: "s-1")
+        let p = try plan(f)
+        let other = try lockLedgerExclusively(f)
+
+        do {
+            _ = try f.store.runLegacyConversion(request(f, p))
+            XCTFail("expected the locked ledger to refuse")
+        } catch let error as LegacyConversionFailure {
+            guard case .busy(let message) = error else {
+                return XCTFail("a locked ledger must be `busy`, not \(error)")
+            }
+            XCTAssertEqual(LegacyConversionRunner.resultCodes(in: message), [5], message)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: f.backupDir.path),
+                       "no bundle was left behind")
+
+        // Retriable in the literal sense: the same work succeeds once the lock is gone.
+        try other.execute("ROLLBACK")
+        try other.close()
+        XCTAssertEqual(try counts(f).transactions, 0)
+        XCTAssertEqual(try counts(f).mappings, 0)
+        let report = try f.store.runLegacyConversion(request(f, try plan(f)))
+        XCTAssertEqual(Set(report.converted), [sid("s-1")])
+    }
+
+    /// A backup that failed for any OTHER reason stays `backupFailed` — the routing is for
+    /// the busy family alone and must not have swallowed the rest.
+    func testANonBusyBackupFailureIsStillReportedAsBackupFailed() throws {
+        let f = try fixture()
+        try insertSale(f, id: "s-1")
+        let p = try plan(f)
+        try FileManager.default.createDirectory(at: f.backupDir, withIntermediateDirectories: true)
+        do {
+            _ = try f.store.runLegacyConversion(request(f, p))
+            XCTFail("expected a backup failure")
+        } catch let error as LegacyConversionFailure {
+            guard case .backupFailed = error else { return XCTFail("got \(error)") }
+        }
+    }
+
     /// An empty execution set is free: no backup directory is created at all.
     func testAnEmptyExecutionSetTakesNoBackupAndWritesNothing() throws {
         let f = try fixture()
@@ -582,6 +677,44 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
             .first?.string("t"), "text")
     }
 
+    /// The writer's side of the BLOB rule: none of the four columns copied as text can carry
+    /// a BLOB into `transactions`, and the refusal comes from the plan rather than from a
+    /// fallback in the writer. Asserted per column against REAL SQLite storage classes.
+    func testABlobInACopiedTextColumnNeverReachesTheWriter() throws {
+        let blob = SQLiteValue.blob(Data([0x00, 0xff, 0x10]))
+        for (column, id) in [("customer", "b-party"), ("invoiceNumber", "b-invoice"),
+                             ("payment_date", "b-paid"), ("due_date", "b-due")] {
+            let f = try fixture()
+            try insertSale(f, id: "clean")
+            // The target column is bound raw and every other one is ordinary, so exactly one
+            // storage class is under test per iteration.
+            try f.store.db.run("""
+                INSERT INTO sales (id, date, totalAmount, amountWithoutTax, taxAmount,
+                                   taxRate, paid_amount, payment_status, \(column))
+                VALUES (?, '2024-03-10', 9040, 8000, 1040, 13, 0, 'unpaid', ?)
+                """, [.text(id), blob])
+            // CONTROL: TEXT affinity really did leave it a BLOB.
+            XCTAssertEqual(try f.store.db.query(
+                "SELECT typeof(\(column)) AS t FROM sales WHERE id = ?", [.text(id)])
+                .first?.string("t"), "blob", column)
+
+            let p = try plan(f)
+            XCTAssertEqual(p.convertibleIdentities, [sid("clean")], column)
+            let report = try f.store.runLegacyConversion(request(f, p))
+
+            XCTAssertEqual(Set(report.converted), [sid("clean")], column)
+            XCTAssertEqual(try counts(f).transactions, 1, column)
+            XCTAssertEqual(try counts(f).mappings, 1, column)
+            XCTAssertNil(try f.store.db.query(
+                "SELECT new_id FROM legacy_migrations WHERE legacy_id = ?", [.text(id)]).first,
+                         "\(column): the blob row got a mapping")
+            // The original still holds its exact bytes.
+            XCTAssertEqual(try f.store.db.query(
+                "SELECT typeof(\(column)) AS t FROM sales WHERE id = ?", [.text(id)])
+                .first?.string("t"), "blob", column)
+        }
+    }
+
     /// A currency the write path would shorten is refused by the PLAN, so no request carrying
     /// one can be built.
     func testACurrencyLongerThanTheWritePathKeepsIsBlockedByThePlan() throws {
@@ -712,11 +845,13 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
     }
 
     /// The segment rule, per storage class. REAL affinity keeps whichever kind of zero it was
-    /// handed, so a rule written for only one of them is half a rule — and the falsiness being
-    /// mirrored is JavaScript's, where `0`, `''` and NULL are all omitted but a non-empty
-    /// string is kept.
+    /// handed, so a rule written for only one of them is half a rule.
+    ///
+    /// Four of the five omissions mirror JavaScript's falsiness, which is what the source
+    /// uses: `0` (either storage class), `''` and NULL. **The BLOB is not one of them** — see
+    /// `testABlobSegmentIsOmittedAsADeliberateDifferenceFromTheSource`.
     func testTheDescriptionSegmentRuleCoversEveryStorageClass() {
-        for falsy in [SQLiteValue.real(0), .integer(0), .null, .text(""), .blob(Data([0x00]))] {
+        for falsy in [SQLiteValue.real(0), .integer(0), .null, .text("")] {
             XCTAssertNil(LegacyConversionRunner.segment("qty", falsy), "\(falsy)")
         }
         XCTAssertEqual(LegacyConversionRunner.segment("qty", .real(10)), "qty=10")
@@ -725,6 +860,38 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
         XCTAssertEqual(LegacyConversionRunner.segment("qty", .text("1,000")), "qty=1,000")
         XCTAssertEqual(LegacyConversionRunner.segment("qty", .real(.infinity)), "qty=Infinity")
         XCTAssertEqual(LegacyConversionRunner.segment("qty", .real(-.infinity)), "qty=-Infinity")
+    }
+
+    /// **A registered divergence, not a mirror.** better-sqlite3 hands a BLOB to
+    /// `migrations.js` as a `Buffer`, which is TRUTHY in JavaScript, so Electron would
+    /// interpolate its bytes into the description — arbitrary binary decoded as text, control
+    /// characters and all, in a field the app renders. This omits the segment instead, and
+    /// nothing is lost: the bytes are kept tagged and base64-encoded in `source_meta`.
+    ///
+    /// Stated as its own test so the omission cannot be read as parity with the source.
+    func testABlobSegmentIsOmittedAsADeliberateDifferenceFromTheSource() throws {
+        let bytes = Data([0x00, 0x07, 0xff])
+        XCTAssertNil(LegacyConversionRunner.segment("qty", .blob(bytes)),
+                     "the segment is omitted rather than decoded")
+        // The two reasons that share this line of code are different: NULL is falsy in the
+        // source, a Buffer is not.
+        XCTAssertNil(LegacyConversionRunner.segment("qty", .null))
+
+        let f = try fixture()
+        try f.store.db.run("""
+            INSERT INTO sales (id, date, customer, tons, pricePerTon, totalAmount,
+                               amountWithoutTax, taxAmount, taxRate, shippingCost, paid_amount,
+                               payment_status)
+            VALUES ('s-1','2024-03-10','Acme',?,800,9040,8000,1040,13,0,0,'unpaid')
+            """, [.blob(bytes)])
+        _ = try f.store.runLegacyConversion(request(f, try plan(f)))
+
+        let description = try XCTUnwrap(converted(f, "s-1").string("description"))
+        XCTAssertEqual(description, "unit=800", "no qty segment, and no control characters")
+        XCTAssertFalse(description.unicodeScalars.contains { $0.properties.generalCategory == .control })
+        // And the bytes really are still recoverable, in the place they belong.
+        let tons = try XCTUnwrap(sourceMeta(f, "s-1")["tons"] as? [String: String])
+        XCTAssertEqual(Data(base64Encoded: tons["base64"] ?? ""), bytes)
     }
 
     /// The registered, deliberate difference from Electron: `LedgerStore.create` writes an
@@ -957,6 +1124,8 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
             "try validateConversionCategories(for: expected",               // 1 read-only
             "guard !expected.isEmpty else {",                               // 2 nothing to do
             "try BackupExport.writeBundle",                                 // 3 backup
+            "if let busy = LegacyConversionRunner.retriableBusyMessage(error) {",  // 3 busy ≠ broken
+            "throw LegacyConversionFailure.backupFailed",                   // 3 …everything else
             "try BackupRestore.validateBundle",                             // 4 validate
             "try db.transaction {",                                         // 5 the one write tx
             "try legacyConversionPreflightBody()",                          // 6a fresh plan
@@ -975,23 +1144,70 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
         }
     }
 
+    /// The four columns copied AS TEXT must go through the guarded helpers, never through a
+    /// bare `stringValue` that would flatten a BLOB into `""` or SQL NULL.
+    ///
+    /// Structural, because the guard is a THIRD layer: the plan grades such a row
+    /// `needsAdjudication` and the in-transaction re-grade re-checks it, so the trap is
+    /// unreachable while both hold — which is the design (the ruling is that the plan is the
+    /// gate, not the writer). Unreachable is not the same as absent, and this is what tells
+    /// the difference.
+    func testTheCopiedTextColumnsAreWrittenThroughTheGuardedHelpers() throws {
+        let source = try String(contentsOf: Self.packageRoot().appendingPathComponent(
+            "Sources/SoloLedgerCore/Conversion/LegacyConversionRunner.swift"), encoding: .utf8)
+        let spec = try XCTUnwrap(source.range(of: "static func transaction(from source: SourceRow")
+            .flatMap { start in source.range(of: "static func mapInvoiceStatus",
+                                             range: start.upperBound..<source.endIndex)
+                .map { String(source[start.lowerBound..<$0.lowerBound]) } })
+        for expected in ["counterparty: copiedText(g.counterparty)",
+                         "invoiceNo: copiedText(g.invoiceNo)",
+                         "paymentDate: copiedOptionalText(g.paymentDate)",
+                         "dueDate: copiedOptionalText(g.dueDate)"] {
+            XCTAssertTrue(spec.contains(expected), "the write spec must use `\(expected)`")
+        }
+        // And the helpers must actually refuse, rather than being pass-throughs.
+        for helper in ["private static func copiedText", "private static func copiedOptionalText"] {
+            let body = try XCTUnwrap(source.range(of: helper).map { start in
+                String(source[start.lowerBound...].prefix(400)) })
+            XCTAssertTrue(body.contains("hasNoTextReading") && body.contains("preconditionFailure"),
+                          "\(helper) must refuse a value with no text reading")
+        }
+    }
+
     // MARK: - Busy classification
 
-    /// The `SQLITE_BUSY` family is read out of the message suffix because `SQLiteDatabase`
-    /// puts the code there and this PR may not change that type.
+    /// The result code is read as a DELIMITED TOKEN, in both shapes `SQLiteDatabase` emits,
+    /// and never as a loose substring.
     func testOnlyTheBusyFamilyIsClassifiedAsRetriable() {
         for code in [5, 261, 517, 773] {
             XCTAssertNotNil(LegacyConversionRunner.retriableBusyMessage(
-                SQLiteError.step("database is locked (code \(code))")), "\(code)")
+                SQLiteError.step("database is locked (code \(code))")), "code \(code)")
+            // The online-backup shape: the token sits in the MIDDLE, so a suffix test misses it.
+            XCTAssertNotNil(LegacyConversionRunner.retriableBusyMessage(
+                SQLiteError.message("sqlite3_backup_step failed (rc \(code)): database is locked")),
+                            "rc \(code) mid-message")
+            XCTAssertNotNil(LegacyConversionRunner.retriableBusyMessage(
+                SQLiteError.message("sqlite3_backup_finish failed (rc \(code))")), "rc \(code) at end")
         }
         XCTAssertNil(LegacyConversionRunner.retriableBusyMessage(
             SQLiteError.step("constraint failed (code 19)")))
         XCTAssertNil(LegacyConversionRunner.retriableBusyMessage(
+            SQLiteError.message("sqlite3_backup_step failed (rc 14): unable to open database file")))
+        // The other real shape the backup path emits, measured: no code token at all.
+        XCTAssertNil(LegacyConversionRunner.retriableBusyMessage(
+            SQLiteError.message("backup destination open failed: unable to open database file")))
+        XCTAssertNil(LegacyConversionRunner.retriableBusyMessage(
             SQLiteError.open(message: "x", primary: 14, extended: 14, systemErrno: 0)))
         XCTAssertNil(LegacyConversionRunner.retriableBusyMessage(LegacyConversionFailure.ledgerChanged))
-        // A message that merely CONTAINS the digits is not a busy error.
-        XCTAssertNil(LegacyConversionRunner.retriableBusyMessage(
-            SQLiteError.step("(code 5) happened earlier (code 19)")))
+        // Loose digits are not a code. These are the strings a substring test would misread.
+        for notACode in ["error 5 occurred", "rc 5", "(code5)", "(rc  5)", "(errno 5)",
+                         "backup of 5 pages failed"] {
+            XCTAssertNil(LegacyConversionRunner.retriableBusyMessage(SQLiteError.message(notACode)),
+                         notACode)
+        }
+        XCTAssertEqual(LegacyConversionRunner.resultCodes(
+            in: "sqlite3_backup_step failed (rc 5): x (code 19)"), [5, 19])
+        XCTAssertEqual(LegacyConversionRunner.resultCodes(in: "no codes here"), [])
     }
 
     // MARK: - Scan helpers

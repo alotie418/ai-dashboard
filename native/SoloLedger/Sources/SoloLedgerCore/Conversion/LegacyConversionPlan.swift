@@ -162,6 +162,30 @@ public enum LegacyRowIssue: String, CaseIterable, Equatable, Sendable {
     /// one — and both must arrive whole or be reported. Measured against
     /// ``LegacyConversionPlan/wouldTruncateInvoiceNo(_:)`` for the same reason.
     case invoiceNoWouldBeTruncated
+
+    /// `customer` / `supplier` is PRESENT but has no reading as text — a BLOB that TEXT
+    /// affinity left alone.
+    ///
+    /// This is not the same fact as SQL NULL and must not collapse into it. NULL means the
+    /// column was never written, and the ruled treatment is an empty string in
+    /// `transactions.counterparty`. A BLOB means something IS stored and this app cannot read
+    /// it; writing `""` there would report "no counterparty" for a row that has one, which is
+    /// the silent loss every other rule in this file exists to prevent.
+    case counterpartyNotReadableAsText
+
+    /// `invoiceNumber` is present but has no reading as text. Same distinction, same reason.
+    case invoiceNoNotReadableAsText
+
+    /// `payment_date` is present but has no reading as text.
+    ///
+    /// The date rules above only fire on a value they can READ, so without this a BLOB would
+    /// slip past both of them and land as SQL NULL — silently turning "there is a payment
+    /// date this app cannot read" into "this was never paid", which moves the row in and out
+    /// of the realized-cash window.
+    case paymentDateNotReadableAsText
+
+    /// `due_date` is present but has no reading as text.
+    case dueDateNotReadableAsText
 }
 
 /// What a conversion may do with one legacy row.
@@ -470,6 +494,19 @@ extension LegacyConversionPlan {
         Transaction(invoiceNo: stored).normalized().invoiceNo != stored
     }
 
+    /// True when a column that the converter copies AS TEXT holds something present but
+    /// unreadable — in practice a BLOB, which TEXT affinity does not convert.
+    ///
+    /// SQL NULL answers `false` on purpose: absence is a different fact with its own ruled
+    /// treatment (an empty string for the two copied strings, SQL NULL for the two optional
+    /// dates). Only "there is something here and this app cannot read it" is an issue, and it
+    /// has to be caught HERE — every other rule for these four columns reads the value
+    /// through `stringValue` first and so cannot see a BLOB at all.
+    static func hasNoTextReading(_ value: SQLiteValue) -> Bool {
+        if case .null = value { return false }
+        return value.stringValue == nil
+    }
+
     /// True when the write path would not store this currency code verbatim.
     ///
     /// `Transaction.normalized()` clamps `currency` to eight characters. The plan STATES a
@@ -550,6 +587,17 @@ extension LegacyConversionPlan {
         }
         if let no = row.invoiceNo.stringValue, wouldTruncateInvoiceNo(no) {
             found.append(.invoiceNoWouldBeTruncated)
+        }
+
+        // — the four columns copied AS TEXT, checked for being present-but-unreadable.
+        //   Every rule above reads through `stringValue`, so a BLOB slips past all of them
+        //   and would arrive at the writer as an empty string or a SQL NULL — a real value
+        //   reported as an absence.
+        for (value, issue) in [(row.counterparty, LegacyRowIssue.counterpartyNotReadableAsText),
+                               (row.invoiceNo, .invoiceNoNotReadableAsText),
+                               (row.paymentDate, .paymentDateNotReadableAsText),
+                               (row.dueDate, .dueDateNotReadableAsText)] {
+            if hasNoTextReading(value) { found.append(issue) }
         }
         return found.sorted { $0.rawValue < $1.rawValue }
     }

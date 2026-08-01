@@ -406,6 +406,65 @@ final class LegacyConversionPlanTests: LedgerTestCase {
         XCTAssertEqual(Transaction(invoiceNo: long).normalized().invoiceNo.count, 100)
     }
 
+    /// **Present-but-unreadable is not absence.** All four columns the converter copies AS
+    /// TEXT read their value through `stringValue` in every other rule, so a BLOB slips past
+    /// all of them — and would have arrived at the writer as `""` (the two strings) or SQL
+    /// NULL (the two dates), reporting a value that exists as one that does not.
+    ///
+    /// Graded per column, and each in isolation, so a rule that covered three of the four
+    /// could not pass.
+    func testABlobInAColumnCopiedAsTextNeedsAdjudication() throws {
+        let (store, _) = try configuredStore()
+        let blob = SQLiteValue.blob(Data([0x00, 0xff, 0x10]))
+        let columns: [(String, String, LegacyRowIssue)] = [
+            ("customer", "b-party", .counterpartyNotReadableAsText),
+            ("invoiceNumber", "b-invoice", .invoiceNoNotReadableAsText),
+            ("payment_date", "b-paid", .paymentDateNotReadableAsText),
+            ("due_date", "b-due", .dueDateNotReadableAsText),
+        ]
+        for (column, id, _) in columns {
+            // Exactly one column is bound raw per row, so each iteration isolates one class.
+            try store.db.run("""
+                INSERT INTO sales (id, date, totalAmount, amountWithoutTax,
+                                   taxAmount, taxRate, paid_amount, payment_status, \(column))
+                VALUES (?, '2024-03-10', 9040, 8000, 1040, 13, 0, 'unpaid', ?)
+                """, [.text(id), blob])
+        }
+        // CONTROL: SQLite really kept each one as a BLOB — TEXT affinity does not convert them.
+        let kinds = try store.db.query("""
+            SELECT id, typeof(customer) AS c, typeof(invoiceNumber) AS i,
+                   typeof(payment_date) AS p, typeof(due_date) AS d FROM sales ORDER BY id
+            """).map { "\($0.string("id")!):\($0.string("c")!)/\($0.string("i")!)/\($0.string("p")!)/\($0.string("d")!)" }
+        XCTAssertEqual(kinds, ["b-due:null/null/null/blob", "b-invoice:null/blob/null/null",
+                               "b-paid:null/null/blob/null", "b-party:blob/null/null/null"])
+
+        for (_, id, expected) in columns {
+            XCTAssertEqual(try issues(store, id), [expected], id)
+            XCTAssertEqual(try plan(store).rows.first { $0.id == id }?.grade,
+                           .needsAdjudication, id)
+        }
+        XCTAssertTrue(try plan(store).convertibleIdentities.isEmpty,
+                      "not one of the four may be offered for conversion")
+    }
+
+    /// SQL NULL keeps its already-ruled treatment. The new rule must not have widened into
+    /// "anything without a text reading", which would have made ordinary empty columns
+    /// unconvertible.
+    func testASqlNullInThoseSameColumnsIsStillAnOrdinaryAbsence() throws {
+        let (store, _) = try configuredStore()
+        try store.db.run("""
+            INSERT INTO sales (id, date, customer, invoiceNumber, totalAmount, amountWithoutTax,
+                               taxAmount, taxRate, paid_amount, payment_status,
+                               payment_date, due_date)
+            VALUES ('s-1','2024-03-10',NULL,NULL,9040,8000,1040,13,0,'unpaid',NULL,NULL)
+            """)
+        XCTAssertEqual(try issues(store, "s-1"), [])
+        XCTAssertFalse(LegacyConversionPlan.hasNoTextReading(.null))
+        XCTAssertTrue(LegacyConversionPlan.hasNoTextReading(.blob(Data([0x00]))))
+        XCTAssertFalse(LegacyConversionPlan.hasNoTextReading(.text("")))
+        XCTAssertFalse(LegacyConversionPlan.hasNoTextReading(.integer(1)))
+    }
+
     /// A currency the write path would shorten makes the plan STATE a code no converted row
     /// could carry, so it stops the whole batch rather than any one row.
     func testACurrencyTheWritePathWouldShortenBlocksTheWholeBatch() throws {
@@ -777,6 +836,10 @@ final class LegacyConversionPlanTests: LedgerTestCase {
             (.paymentStatusUnrecognized, { $0.paymentStatus = .text("?") }),
             (.counterpartyWouldBeTruncated, { $0.counterparty = .text(long) }),
             (.invoiceNoWouldBeTruncated, { $0.invoiceNo = .text(String(repeating: "I", count: 101)) }),
+            (.counterpartyNotReadableAsText, { $0.counterparty = .blob(Data([0x00])) }),
+            (.invoiceNoNotReadableAsText, { $0.invoiceNo = .blob(Data([0x00])) }),
+            (.paymentDateNotReadableAsText, { $0.paymentDate = .blob(Data([0x00])) }),
+            (.dueDateNotReadableAsText, { $0.dueDate = .blob(Data([0x00])) }),
         ]
         XCTAssertEqual(LegacyConversionPlan.issues(in: Self.cleanStoredRow()), [],
                        "the base row must be clean or every case below is meaningless")
