@@ -375,7 +375,11 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
 
     // MARK: - 2. Backup
 
-    func testAFailedBackupStopsBeforeAnyTransactionIsOpened() throws {
+    /// A backup that cannot be written aborts the transaction it is running inside, so the
+    /// database gains nothing. The bytes are compared as well, but only as a statement about
+    /// the DATABASE — the backup is written after `BEGIN`, so unchanged bytes say the
+    /// transaction rolled back, not that it was never opened.
+    func testAFailedBackupRollsBackTheTransactionAndWritesNothing() throws {
         let f = try fixture()
         try insertSale(f, id: "s-1")
         let p = try plan(f)
@@ -393,7 +397,7 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
         XCTAssertEqual(try counts(f).transactions, 0)
         XCTAssertEqual(try counts(f).mappings, 0)
         XCTAssertEqual(try Data(contentsOf: f.dbURL), dbBefore,
-                       "the database file changed, so a transaction was opened")
+                       "the database file changed, so the transaction did not roll back cleanly")
         XCTAssertEqual(try? Data(contentsOf: URL(fileURLWithPath: f.dbURL.path + "-wal")),
                        walBefore)
     }
@@ -407,9 +411,11 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
             atPath: f.backupDir.appendingPathComponent("sololedger.db").path))
     }
 
-    /// The ORDER, proved from the other side: when the transaction fails, the backup is
-    /// already on disk and still valid, and the ledger gained nothing.
-    func testABackupTakenBeforeAFailedTransactionSurvivesAndTheLedgerDoesNot() throws {
+    /// The ORDER, proved from the other side. The bundle is written inside the transaction
+    /// and before the first database write, so when a later write aborts the transaction the
+    /// database rolls back to nothing — while the bundle, being a filesystem artefact that no
+    /// transaction covers, is still on disk and still valid.
+    func testABackupWrittenBeforeTheFirstWriteSurvivesTheRollbackAndTheLedgerGainsNothing() throws {
         let f = try fixture()
         try insertSale(f, id: "s-1")
         try insertSale(f, id: "s-2")
@@ -423,7 +429,8 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
         XCTAssertThrowsError(try f.store.runLegacyConversion(request(f, p)))
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: f.backupDir.path),
-                      "the backup must precede the transaction")
+                      "the backup must be written before the first database write, and a "
+                      + "rollback must not remove it")
         XCTAssertNoThrow(try BackupRestore.validateBundle(f.backupDir))
         XCTAssertEqual(try counts(f).transactions, 0)
         XCTAssertEqual(try counts(f).mappings, 0)
@@ -477,11 +484,12 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
     /// **A locked ledger is retriable, not broken — end to end.**
     ///
     /// Note WHERE the lock is noticed: measured, the first statement to meet it is the
-    /// read-only category query, before the backup is ever attempted. There is no lock state
-    /// that blocks the backup while permitting reads (`EXCLUSIVE` blocks both, `IMMEDIATE`
-    /// blocks neither), so classifying only at the backup call site would leave the commonest
-    /// real case surfacing as a raw SQLite error. Both are classified; this proves the whole
-    /// run, and the test above proves the backup path's own error.
+    /// category query at step 6, so no bundle has been written yet and this retry needs no
+    /// new directory. There is no lock state that blocks the backup while permitting reads
+    /// (`EXCLUSIVE` blocks both, `IMMEDIATE` blocks neither), so classifying only at the
+    /// backup call site would leave the commonest real case surfacing as a raw SQLite error.
+    /// Both are classified; this proves the whole run, and the test above proves the backup
+    /// path's own error.
     func testALockedLedgerRefusesRetriablyAndWritesNothing() throws {
         let f = try fixture()
         try insertSale(f, id: "s-1")
@@ -532,9 +540,11 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
     /// bundle: in WAL the external commit succeeds, and our first write then fails BUSY, so
     /// the whole batch rolls back.
     ///
-    /// The lock is real and the timing is deterministic: the external commit is made from the
-    /// `faultInjection` seam, which fires after the first row is written — i.e. strictly after
-    /// the backup and strictly inside the transaction.
+    /// The timing is deterministic: the external commit is made from the `afterBackup` seam,
+    /// which fires inside the transaction, after the bundle is written and BEFORE the first
+    /// database write. `faultInjection` would be too late — by the time it runs the first row
+    /// has been written and the connection already holds the write lock, so the external
+    /// writer would simply be blocked and the race under test would never happen.
     func testAnExternalCommitAfterTheSnapshotCannotProduceAStaleBackup() throws {
         let f = try fixture()
         try insertSale(f, id: "s-1")
@@ -1358,33 +1368,35 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
 
     // MARK: - The safety order, asserted structurally
 
-    /// The order in ``LedgerStore/runLegacyConversion(_:)`` IS the safety argument, and three
-    /// of its steps are defences that cannot be reached from inside the process: a backup
-    /// validated but never bad, a category re-check with no window to fail in, a closing
-    /// identity assertion that the loop above it makes true by construction. A behavioural
-    /// test cannot distinguish them from their own absence — so the skeleton is pinned where
-    /// it is written, the same way the calendar rule is pinned against consulting a clock.
+    /// The order in ``LedgerStore/runLegacyConversion(_:)`` IS the safety argument, and two of
+    /// its steps are defences that cannot be reached from inside the process: a backup
+    /// validated but never bad, and a closing identity assertion that the loop above it makes
+    /// true by construction. A behavioural test cannot distinguish those from their own
+    /// absence — so the skeleton is pinned where it is written, the same way the calendar rule
+    /// is pinned against consulting a clock.
+    ///
+    /// The numbering matches the eleven steps documented on `runLegacyConversion`.
     func testTheSafetyOrderIsWrittenInThatOrder() throws {
         let source = try String(contentsOf: Self.packageRoot().appendingPathComponent(
             "Sources/SoloLedgerCore/Conversion/LegacyConversionRunner.swift"), encoding: .utf8)
         let body = try XCTUnwrap(source.range(of: "faultInjection: (() throws -> Void)?) throws")
             .map { String(source[$0.upperBound...]) })
         let steps = [
-            "throw LegacyConversionFailure.skippedIdentityNotConvertible",  // A request shape
-            "guard !LegacyConversionPlan.wouldTruncateCurrency",            // A request shape
-            "guard !expected.isEmpty else {",                               // B nothing to do
-            "try db.transaction {",                                         // C the one write tx
-            "try legacyConversionPreflightBody()",                          // D pins the snapshot
-            "guard expectedFresh == expected else {",                       // E same execution set
-            "try validateConversionCategories(for: expectedFresh",          // F …before the backup
-            "try BackupExport.writeBundle",                                 // G backup, in the tx
-            "if let busy = LegacyConversionRunner.retriableBusyMessage(error) {",  // G busy ≠ broken
-            "throw LegacyConversionFailure.backupFailed",                   // G …everything else
-            "try BackupRestore.validateBundle",                             // G prove it reads
-            "try create(LegacyConversionRunner.transaction",                // H the FIRST write
-            "INSERT INTO legacy_migrations",                                // H its mapping
-            "guard converted == expectedFresh else {",                      // I closing identity
-            "guard gainedTransactions == expectedFresh.count,",             // I closing counts
+            "throw LegacyConversionFailure.skippedIdentityNotConvertible",  // 1 request shape
+            "guard !LegacyConversionPlan.wouldTruncateCurrency",            // 1 request shape
+            "guard !expected.isEmpty else {",                               // 2 nothing to do
+            "try db.transaction {",                                         // 3 the one transaction
+            "try legacyConversionPreflightBody()",                          // 4 pins the snapshot
+            "guard expectedFresh == expected else {",                       // 5 same execution set
+            "try validateConversionCategories(for: expectedFresh",          // 6 categories
+            "try BackupExport.writeBundle",                                 // 7 backup, in the tx
+            "if let busy = LegacyConversionRunner.retriableBusyMessage(error) {",  // 7 busy ≠ broken
+            "throw LegacyConversionFailure.backupFailed",                   // 7 …everything else
+            "try BackupRestore.validateBundle",                             // 7 prove it reads
+            "try create(LegacyConversionRunner.transaction",                // 9 the FIRST write
+            "INSERT INTO legacy_migrations",                                // 9 its mapping
+            "guard converted == expectedFresh else {",                      // 10 closing identity
+            "guard gainedTransactions == expectedFresh.count,",             // 10 closing counts
         ]
         var cursor = body.startIndex
         for step in steps {

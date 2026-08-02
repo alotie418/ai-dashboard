@@ -96,8 +96,9 @@ public struct LegacyConversionRequest: Sendable {
 public struct LegacyConversionReport: Equatable, Sendable {
     /// Exactly the identities carried over, sorted. Empty when there was nothing to do.
     public let converted: [LegacyRowIdentity]
-    /// The backup bundle written before any row was touched — `nil` only when the execution
-    /// set was empty, in which case no backup was taken because nothing was at risk.
+    /// The backup bundle, written inside the conversion's transaction and before the first
+    /// database write — `nil` only when the execution set was empty, in which case no backup
+    /// was taken because nothing was at risk.
     public let backupDirectory: URL?
 
     public init(converted: [LegacyRowIdentity], backupDirectory: URL?) {
@@ -108,7 +109,8 @@ public struct LegacyConversionReport: Equatable, Sendable {
     public var convertedCount: Int { converted.count }
 }
 
-/// Why a conversion refused. Every case leaves the ledger byte-identical.
+/// Why a conversion refused. Every case leaves the DATABASE byte-identical. A bundle already
+/// written by step 7 is a filesystem artefact no transaction covers, and it stays.
 public enum LegacyConversionFailure: Error, Equatable, CustomStringConvertible {
     /// A skipped identity is not in the plan's convertible set — it does not exist, belongs to
     /// the other table, or was never convertible. The caller and the plan disagree.
@@ -136,8 +138,10 @@ public enum LegacyConversionFailure: Error, Equatable, CustomStringConvertible {
     case writeSetMismatch(String)
     case backupFailed(String)
     case backupNotValid(String)
-    /// Another writer held the database. Nothing was written and the whole conversion can be
-    /// retried as-is.
+    /// Another writer held the database. The transaction rolled back, so no row was written.
+    /// Whether the retry can reuse the same request depends on how far the run got: if the
+    /// lock was met after the bundle was written, that bundle is still on disk and the retry
+    /// needs a fresh `backupDestination`.
     case busy(String)
 
     public var description: String {
@@ -172,16 +176,27 @@ extension LedgerStore {
     ///
     /// The order below is the whole safety argument and is not rearrangeable:
     ///
-    /// 1. read-only checks — a bad request must not cost the user a backup;
-    /// 2. an EMPTY execution set returns 0 without a backup and without opening a
-    ///    transaction, so re-running a finished conversion is free;
-    /// 3. the backup is written;
-    /// 4. and immediately validated — an unreadable backup is not a safety net, and finding
-    ///    that out after the writes would be finding out too late;
-    /// 5. only then does the single write transaction open.
+    ///  1. request-shape checks — they read no database, so a bad request costs nothing;
+    ///  2. an EMPTY execution set returns 0 without opening a transaction and without a
+    ///     backup, so re-running a finished conversion is free;
+    ///  3. the single deferred transaction opens;
+    ///  4. the fresh plan is computed — its first read is what pins the snapshot everything
+    ///     below shares;
+    ///  5. the execution set recomputed from that plan must equal the one checked in step 1;
+    ///  6. categories are validated, still before any bundle is written;
+    ///  7. the backup is written and immediately validated — an unreadable backup is not a
+    ///     safety net, and finding that out after the writes would be finding out too late;
+    ///  8. the `afterBackup` test seam fires, if one was supplied;
+    ///  9. the FIRST database write happens — and not one statement earlier;
+    /// 10. the closing assertions run;
+    /// 11. COMMIT.
     ///
-    /// This mirrors `AppModel.restoreFromBackup`'s safety-first order, which snapshots the
-    /// live ledger before anything destructive and aborts if the snapshot fails.
+    /// Steps 3 to 7 are the correction this stage was missing. The backup is taken INSIDE the
+    /// transaction, on the same snapshot the conversion reads and writes against; it is still
+    /// before any database write, because a deferred `BEGIN` holds only a read lock until
+    /// step 9. `AppModel.restoreFromBackup` shows the same shape of safety-first ordering —
+    /// snapshot before anything destructive, abort if the snapshot fails — but it takes its
+    /// snapshot outside a transaction, which is exactly what this one may not do.
     ///
     /// **Never call this from the boot chain.** `AppModelBootTests` T3 proves a ledger holding
     /// unconverted legacy rows is refused by `seedCurrencyIfProvablyNew`, and
@@ -218,14 +233,17 @@ extension LedgerStore {
         } catch let failure as LegacyConversionFailure {
             throw failure                                  // already classified
         } catch {
-            // A lock held by another connection can be met at ANY point, and every one of
-            // them means the same thing: nothing was written and the whole conversion can be
-            // retried unchanged. Measured, with a second connection holding `BEGIN EXCLUSIVE`
-            // on a rollback-journal ledger: the FIRST thing to notice it is the read-only
-            // category query, well before the backup — so classifying only at the backup
-            // would leave the commonest case surfacing as a raw SQLite error. The backup call
-            // site classifies explicitly as well, because the failure it must NOT produce
-            // there (`backupFailed`, "your backup is broken") is a different lie.
+            // A lock held by another connection can be met at ANY point inside the run, and
+            // every one of them means the same thing about the DATABASE: the transaction
+            // rolls back, so no row was written. It does NOT mean nothing happened at all —
+            // if the lock was met after step 7, the bundle is already on disk and a retry
+            // needs a fresh destination directory, because `writeBundle` refuses an existing
+            // one. Measured, with a second connection holding `BEGIN EXCLUSIVE` on a
+            // rollback-journal ledger: the FIRST thing to notice the lock is the category
+            // query at step 6 — so classifying only at the backup would leave the commonest
+            // case surfacing as a raw SQLite error. The backup call site classifies
+            // explicitly as well, because the failure it must NOT produce there
+            // (`backupFailed`, "your backup is broken") is a different lie.
             if let busy = LegacyConversionRunner.retriableBusyMessage(error) {
                 throw LegacyConversionFailure.busy(busy)
             }
@@ -239,7 +257,7 @@ extension LedgerStore {
     -> LegacyConversionReport {
         let plan = request.plan
 
-        // ── A. Request-shape checks. These read NO database ──────────────────────────────
+        // ── 1. Request-shape checks. These read NO database ──────────────────────────────
         // Deliberately: they are about the REQUEST, not the ledger, so they must not be the
         // thing that pins a snapshot — and a malformed request must not cost the user a
         // backup. Everything that asks the ledger a question happens inside the transaction.
@@ -256,27 +274,28 @@ extension LedgerStore {
         }
         let expected = convertible.subtracting(request.skipped)
 
-        // ── B. Nothing to do ────────────────────────────────────────────────────────────
+        // ── 2. Nothing to do ────────────────────────────────────────────────────────────
         // No transaction, no backup: re-running a finished conversion must be free and must
         // not litter the backups folder with snapshots of a ledger nothing happened to.
         guard !expected.isEmpty else {
             return LegacyConversionReport(converted: [], backupDirectory: nil)
         }
 
-        // ── C. The one transaction ──────────────────────────────────────────────────────
+        // ── 3. The one transaction ──────────────────────────────────────────────────────
         //
         // THE BACKUP IS TAKEN INSIDE IT. That is the correction this stage was missing, and
-        // it is measured rather than argued. Taking the backup before `BEGIN` leaves a window
-        // in which another connection can commit: the transaction then SEES that commit and
-        // keeps it, the conversion succeeds, and the "pre-conversion backup" it hands back
-        // does not contain it — so restoring that backup to undo the conversion silently
-        // undoes the other change too. Reproduced in both journal modes: an external
-        // `UPDATE transactions SET amount = 999` in the window left the live ledger at 999
-        // and the bundle at 100.
+        // it is measured rather than argued. An earlier draft wrote the bundle before the
+        // transaction opened, which leaves a window in which another connection can commit:
+        // the transaction then SEES that commit and keeps it, the conversion succeeds, and
+        // the "pre-conversion backup" it hands back does not contain it — so restoring that
+        // backup to undo the conversion silently undoes the other change too. Reproduced in
+        // both journal modes: an external `UPDATE transactions SET amount = 999` in that
+        // window left the live ledger at 999 and the bundle at 100.
         //
-        // A plain deferred `BEGIN` still holds only a READ lock here, so the backup is taken
-        // before any write lock exists — the online-backup API runs happily from inside it
-        // (measured, both modes) and copies THIS transaction's snapshot, not the live file.
+        // A plain deferred `BEGIN` holds only a READ lock until the first INSERT, so the
+        // backup is written inside the transaction and still before any database write — the
+        // online-backup API runs happily from in here (measured, both modes) and copies THIS
+        // transaction's snapshot, not the live file.
         // What an external commit does next differs by mode and both answers are safe:
         //   WAL     — the commit succeeds, and our first write then fails BUSY, so the whole
         //             batch rolls back and the caller gets a retriable `.busy`.
@@ -285,13 +304,13 @@ extension LedgerStore {
         var converted: Set<LegacyRowIdentity> = []
         do {
             try db.transaction {
-                // D — the FIRST read. This is what pins the snapshot everything below shares.
+                // 4 — the FIRST read. This is what pins the snapshot everything below shares.
                 guard case .plan(let fresh) = try legacyConversionPreflightBody(),
                       fresh == plan else {
                     throw LegacyConversionFailure.ledgerChanged
                 }
-                // E — recomputed from the FRESH plan and then required to match, rather than
-                // reused from step A: the equality above already implies it, and stating it
+                // 5 — recomputed from the FRESH plan and then required to match, rather than
+                // reused from step 1: the equality above already implies it, and stating it
                 // separately means a future change to either side has to break one of two
                 // assertions instead of quietly agreeing with itself.
                 let expectedFresh = fresh.convertibleIdentities.subtracting(request.skipped)
@@ -300,12 +319,12 @@ extension LedgerStore {
                         "the recomputed execution set differs from the one checked")
                 }
 
-                // F — categories, on this snapshot, BEFORE the backup: a request naming a
+                // 6 — categories, on this snapshot, before any bundle is written: a request naming a
                 // category that does not exist must not cost the user a bundle.
                 try validateConversionCategories(for: expectedFresh, request: request,
                                                  locale: fresh.accountingLocale)
 
-                // G — the backup, and proof it is readable. Still no write lock.
+                // 7 — the backup, and proof it is readable. Still no database write.
                 do {
                     try BackupExport.writeBundle(database: db,
                                                  attachmentsDir: request.attachmentsDirectory,
@@ -334,7 +353,7 @@ extension LedgerStore {
                 let transactionsBefore = try rowCount("transactions")
                 let mappingsBefore = try rowCount("legacy_migrations")
 
-                // H — the first database WRITE happens here and nowhere earlier. Per row: the
+                // 9 — the first database WRITE happens here and nowhere earlier. Per row: the
                 // transaction first, then its mapping, matching `migrations.js:116-125`. With
                 // no per-row catch the order carries no meaning: either both land or neither.
                 for identity in expectedFresh.sorted() {
@@ -369,7 +388,7 @@ extension LedgerStore {
                     if converted.count == 1 { try faultInjection?() }
                 }
 
-                // 8 — closing assertions, still inside the transaction so a failure rolls
+                // 10 — closing assertions, still inside the transaction so a failure rolls
                 // everything back. Identity sets, not counts: two rows converted twice and
                 // one missed would pass a count check.
                 guard converted == expectedFresh else {
@@ -386,8 +405,9 @@ extension LedgerStore {
                 }
             }
         } catch {
-            // A conversion refused because another process held the database is retriable
-            // as-is: the transaction rolled back, so there is nothing to undo first.
+            // A conversion refused because another process held the database rolled its
+            // transaction back, so no row was written. The bundle, if step 7 had already
+            // written one, stays on disk — a retry then needs a fresh destination.
             if let busy = LegacyConversionRunner.retriableBusyMessage(error) {
                 throw LegacyConversionFailure.busy(busy)
             }
@@ -400,9 +420,10 @@ extension LedgerStore {
 
     // MARK: - Categories
 
-    /// Existence, direction and REGIME, checked before any write and again inside the
-    /// transaction. The foreign key is not allowed to be the only check: it fires mid-write
-    /// with an opaque message, and it cannot see the other two questions at all.
+    /// Existence, direction and REGIME — checked once, inside the transaction, on the same
+    /// snapshot the conversion will write against, and before any bundle is written. The
+    /// foreign key is not allowed to be the only check: it fires mid-write with an opaque
+    /// message, and it cannot see the other two questions at all.
     private func validateConversionCategories(for expected: Set<LegacyRowIdentity>,
                                               request: LegacyConversionRequest,
                                               locale: AccountingLocale) throws {
@@ -660,9 +681,11 @@ enum LegacyConversionRunner {
     /// error, and `testOnlyTheBusyFamilyIsClassifiedAsRetriable` pins that.
     ///
     /// Deferred `BEGIN` means the write lock is taken at the first INSERT, so a concurrent
-    /// writer surfaces as a failed upgrade — which rolls the transaction back, leaving
-    /// nothing to clean up before a retry. A backup refused for the same reason has written
-    /// no bundle and opened no transaction, so it is retriable in the same sense.
+    /// writer surfaces as a failed upgrade — which rolls the transaction back, so no row was
+    /// written. What a retry needs depends on how far the run got: a lock met BEFORE the
+    /// bundle was written leaves nothing behind, while one met after it leaves the bundle on
+    /// disk, and `writeBundle` refuses an existing directory — so that retry needs a fresh
+    /// destination. Either way the database is untouched.
     static func retriableBusyMessage(_ error: Error) -> String? {
         guard let sqlite = error as? SQLiteError else { return nil }
         let text: String
