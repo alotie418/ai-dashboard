@@ -358,9 +358,9 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
         }
     }
 
-    /// A category deleted between the request and the write is caught by the SECOND
-    /// validation, inside the transaction — not by the foreign key, which reports an id
-    /// without a reason.
+    /// A category deleted after the plan was made is caught by the conversion's single
+    /// category validation, which runs inside the transaction — not by the foreign key, which
+    /// would only fire mid-write and reports an id without a reason.
     func testACategoryDeletedAfterTheRequestIsCaughtInsideTheTransaction() throws {
         let f = try fixture()
         try insertSale(f, id: "s-1")
