@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// A READ-ONLY preflight for converting legacy `sales` / `purchases` rows into
@@ -155,6 +156,37 @@ public enum LegacyRowIssue: String, CaseIterable, Equatable, Sendable {
     /// Measured against `Transaction.normalized()` itself rather than restated as a number
     /// here, so the two cannot drift apart — see ``LegacyConversionPlan/wouldTruncateCounterparty(_:)``.
     case counterpartyWouldBeTruncated
+
+    /// `invoiceNumber` is longer than the write path will keep.
+    ///
+    /// The converter copies exactly two strings from a legacy row — the counterparty and this
+    /// one — and both must arrive whole or be reported. Measured against
+    /// ``LegacyConversionPlan/wouldTruncateInvoiceNo(_:)`` for the same reason.
+    case invoiceNoWouldBeTruncated
+
+    /// `customer` / `supplier` is PRESENT but has no reading as text — a BLOB that TEXT
+    /// affinity left alone.
+    ///
+    /// This is not the same fact as SQL NULL and must not collapse into it. NULL means the
+    /// column was never written, and the ruled treatment is an empty string in
+    /// `transactions.counterparty`. A BLOB means something IS stored and this app cannot read
+    /// it; writing `""` there would report "no counterparty" for a row that has one, which is
+    /// the silent loss every other rule in this file exists to prevent.
+    case counterpartyNotReadableAsText
+
+    /// `invoiceNumber` is present but has no reading as text. Same distinction, same reason.
+    case invoiceNoNotReadableAsText
+
+    /// `payment_date` is present but has no reading as text.
+    ///
+    /// The date rules above only fire on a value they can READ, so without this a BLOB would
+    /// slip past both of them and land as SQL NULL — silently turning "there is a payment
+    /// date this app cannot read" into "this was never paid", which moves the row in and out
+    /// of the realized-cash window.
+    case paymentDateNotReadableAsText
+
+    /// `due_date` is present but has no reading as text.
+    case dueDateNotReadableAsText
 }
 
 /// What a conversion may do with one legacy row.
@@ -186,6 +218,24 @@ public struct LegacyConversionRow: Equatable, Sendable {
     /// Sorted by `rawValue`, so two runs over the same ledger compare equal.
     public let issues: [LegacyRowIssue]
 
+    /// The digest of the seventeen stored values a conversion would carry — see
+    /// ``LegacyConversionPlan/sourceFingerprint(of:)``.
+    ///
+    /// **Internal, and it stays internal.** It is a staleness token, not information about
+    /// the ledger: a screen has nothing to do with it, and the public surface should not grow
+    /// a field whose only correct use is an equality test. The synthesized `Equatable` DOES
+    /// include it, which is the whole mechanism — `fresh == plan` compares the values, with
+    /// no second comparison anywhere that could be written to compare a thing with itself.
+    ///
+    /// A row built through the public initializer carries ``unfingerprinted`` instead. That is
+    /// deliberate and fails safe: a hand-assembled plan cannot compare equal to a scanned one,
+    /// so it can never be mistaken for something the ledger actually said.
+    let sourceFingerprint: String
+
+    /// The fingerprint of a row nobody scanned. Not a valid digest — no `StoredRow` can
+    /// produce it, because every real digest is 64 hex characters.
+    static let unfingerprinted = ""
+
     /// The two `unconvertible` issues are the ones where the TARGET column cannot represent
     /// the answer at all — `transactions.date` and `legacy_migrations.legacy_id` are both
     /// `TEXT NOT NULL` — so no user decision can rescue the row.
@@ -196,11 +246,20 @@ public struct LegacyConversionRow: Equatable, Sendable {
         return issues.isEmpty ? .convertible : .needsAdjudication
     }
 
+    /// Signature unchanged from 2a-1 on purpose: the fingerprint is not a public concept, so
+    /// it is not a public parameter.
     public init(table: LegacyTable, id: String?, storedDate: String?, issues: [LegacyRowIssue]) {
+        self.init(table: table, id: id, storedDate: storedDate, issues: issues,
+                  sourceFingerprint: Self.unfingerprinted)
+    }
+
+    init(table: LegacyTable, id: String?, storedDate: String?, issues: [LegacyRowIssue],
+         sourceFingerprint: String) {
         self.table = table
         self.id = id
         self.storedDate = storedDate
         self.issues = issues.sorted { $0.rawValue < $1.rawValue }
+        self.sourceFingerprint = sourceFingerprint
     }
 }
 
@@ -256,6 +315,10 @@ public enum LegacyConversionBlocker: Equatable, Sendable {
     /// Carries the stored text byte for byte so a screen can show what is actually there —
     /// the same treatment `ReportBlocker.currencyInvalid` gives it.
     case currencyInvalid(storedText: String)
+    /// The stored currency is readable but longer than the write path will keep, so the plan
+    /// would state a code no converted row could actually carry. See
+    /// ``LegacyConversionPlan/wouldTruncateCurrency(_:)``.
+    case currencyNotStorableVerbatim(currency: String)
 }
 
 /// The complete, write-free answer.
@@ -293,6 +356,11 @@ public struct LegacyConversionPlan: Equatable, Sendable {
 
     public func rows(graded grade: LegacyRowGrade) -> [LegacyConversionRow] {
         rows.filter { $0.grade == grade }
+    }
+
+    /// The row this plan holds for one composite identity, if any.
+    func row(table: LegacyTable, legacyID: String) -> LegacyConversionRow? {
+        rows.first { $0.table == table && $0.id == legacyID }
     }
 
     public var convertibleCount: Int { rows(graded: .convertible).count }
@@ -447,12 +515,56 @@ extension LegacyConversionPlan {
         Transaction(counterparty: stored).normalized().counterparty != stored
     }
 
+    /// The same question for `invoice_no`, measured the same way.
+    ///
+    /// Every Electron write path clamps this column at 100 (`safeString(v, 100)`) and so does
+    /// `Transaction.normalized()`, so a truncation is not reachable through the product today.
+    /// It is graded anyway, because the converter COPIES this string verbatim and the whole
+    /// point of the counterparty rule is that a copied string must arrive whole or be
+    /// reported — a rule that holds for one of the two copied columns and not the other is
+    /// not a rule. A hand-edited ledger is the reachable case.
+    static func wouldTruncateInvoiceNo(_ stored: String) -> Bool {
+        Transaction(invoiceNo: stored).normalized().invoiceNo != stored
+    }
+
+    /// True when a column that the converter copies AS TEXT holds something present but
+    /// unreadable — in practice a BLOB, which TEXT affinity does not convert.
+    ///
+    /// SQL NULL answers `false` on purpose: absence is a different fact with its own ruled
+    /// treatment (an empty string for the two copied strings, SQL NULL for the two optional
+    /// dates). Only "there is something here and this app cannot read it" is an issue, and it
+    /// has to be caught HERE — every other rule for these four columns reads the value
+    /// through `stringValue` first and so cannot see a BLOB at all.
+    static func hasNoTextReading(_ value: SQLiteValue) -> Bool {
+        if case .null = value { return false }
+        return value.stringValue == nil
+    }
+
+    /// True when the write path would not store this currency code verbatim.
+    ///
+    /// `Transaction.normalized()` clamps `currency` to eight characters. The plan STATES a
+    /// currency — every converted row is said to carry it — so a stored code the write path
+    /// would shorten makes the plan describe something the ledger will not hold. Blocked
+    /// whole-batch rather than graded per row: it is a property of the ledger's settings, not
+    /// of any one legacy row.
+    static func wouldTruncateCurrency(_ stored: String) -> Bool {
+        Transaction(currency: stored).normalized().currency != stored
+    }
+
     /// One legacy row's stored columns, straight from SQLite with no coercion applied —
     /// `id` included, because whether it has a text reading at all is one of the questions.
+    ///
+    /// This carries EVERY column the converter reads, not only the graded ones. The extra
+    /// five (`invoiceStatus`, `tons`, `pricePerTon`, `shippingCost`, `createdAt`) are never
+    /// looked at by ``issues(in:)`` — they cannot make a row unconvertible — but they DO
+    /// reach `transactions.invoice_status`, `description` and `source_meta`, so they are part
+    /// of what the user was shown and belong in the fingerprint.
     struct StoredRow: Equatable {
         var id: SQLiteValue = .null
         var date: SQLiteValue = .null
         var counterparty: SQLiteValue = .null
+        var invoiceNo: SQLiteValue = .null
+        var invoiceStatus: SQLiteValue = .null
         var totalAmount: SQLiteValue = .null
         var amountWithoutTax: SQLiteValue = .null
         var taxAmount: SQLiteValue = .null
@@ -461,6 +573,134 @@ extension LegacyConversionPlan {
         var paymentStatus: SQLiteValue = .null
         var paymentDate: SQLiteValue = .null
         var dueDate: SQLiteValue = .null
+        var tons: SQLiteValue = .null
+        var pricePerTon: SQLiteValue = .null
+        var shippingCost: SQLiteValue = .null
+        var createdAt: SQLiteValue = .null
+    }
+
+    // MARK: - The source fingerprint
+
+    /// A stable digest of EXACTLY the seventeen stored values the converter reads.
+    ///
+    /// ## Why the plan needs one
+    ///
+    /// `LegacyConversionRow` used to carry the table, the id, the stored date and the issue
+    /// list, and `fresh == plan` compared those. Measured, that let sixteen of twenty ordinary
+    /// edits through untouched — `totalAmount 9040 → 1.0`, `payment_status paid → unpaid`,
+    /// `invoiceStatus 已开 → 待开`, `tons 10 → 99` and so on all leave the row's table, id,
+    /// date and (empty) issue list identical. The staleness gate therefore said "this is the
+    /// plan you approved" while the writer went on to store completely different money. The
+    /// fingerprint is what makes that sentence true.
+    ///
+    /// ## The seventeen, and the three that are deliberately absent
+    ///
+    /// Covered: `id`, `date`, `customer`/`supplier`, `invoiceNumber`, `invoiceStatus`,
+    /// `totalAmount`, `amountWithoutTax`, `taxAmount`, `taxRate`, `paid_amount`,
+    /// `payment_status`, `payment_date`, `due_date`, `tons`, `pricePerTon`, `shippingCost`,
+    /// `created_at` — every column that reaches a `transactions` field, the description or
+    /// `source_meta`.
+    ///
+    /// NOT covered: `product_id`, `product_name_snapshot`, `unit_snapshot`. The converter
+    /// neither reads nor writes them, so an edit there changes nothing about what would be
+    /// stored; including them would abort a legitimate conversion over a column this feature
+    /// does not have an opinion about. Widen this set the day the converter starts carrying
+    /// them, and not before.
+    ///
+    /// ## The encoding
+    ///
+    /// Version-prefixed, fixed order, one byte of field identity, one byte of storage class,
+    /// then an explicit 8-byte big-endian length before the payload. The class byte is what
+    /// keeps values apart that would otherwise collide byte for byte: SQL NULL, INTEGER `0`,
+    /// REAL `0`, TEXT `"0"` and BLOB `0x30` all produce different digests even though three
+    /// of them carry the same bytes. Numbers go in as raw bit patterns, so `+0.0` differs
+    /// from `-0.0` and `+Infinity` from `-Infinity` — a decimal rendering would have collapsed
+    /// both pairs.
+    ///
+    /// Byte order is fixed (big-endian) rather than host order so the digest is the same value
+    /// on any machine, and the length prefix means no two field values can run together into a
+    /// third that hashes the same.
+    static let fingerprintVersion = "slcf1"
+
+    /// `(field identity byte, the value)` in FIXED order. The order is part of the digest;
+    /// iterating a dictionary here would make the fingerprint unstable between runs.
+    static func fingerprintFields(of row: StoredRow) -> [(UInt8, SQLiteValue)] {
+        [(0x01, row.id), (0x02, row.date), (0x03, row.counterparty), (0x04, row.invoiceNo),
+         (0x05, row.invoiceStatus), (0x06, row.totalAmount), (0x07, row.amountWithoutTax),
+         (0x08, row.taxAmount), (0x09, row.taxRate), (0x0A, row.paidAmount),
+         (0x0B, row.paymentStatus), (0x0C, row.paymentDate), (0x0D, row.dueDate),
+         (0x0E, row.tons), (0x0F, row.pricePerTon), (0x10, row.shippingCost),
+         (0x11, row.createdAt)]
+    }
+
+    /// The bytes the digest is taken over. Separate from ``sourceFingerprint(of:)`` so the
+    /// encoding itself can be examined by a test rather than only its hash.
+    static func fingerprintPayload(of row: StoredRow) -> Data {
+        var out = Data(fingerprintVersion.utf8)
+        for (field, value) in fingerprintFields(of: row) {
+            let (storageClass, payload) = fingerprintEncoding(of: value)
+            out.append(field)
+            out.append(storageClass)
+            withUnsafeBytes(of: UInt64(payload.count).bigEndian) { out.append(contentsOf: $0) }
+            out.append(payload)
+        }
+        return out
+    }
+
+    /// One value as `(storage-class tag, payload)`.
+    static func fingerprintEncoding(of value: SQLiteValue) -> (UInt8, Data) {
+        switch value {
+        case .null:
+            return (0x00, Data())
+        case .integer(let i):
+            return (0x01, withUnsafeBytes(of: i.bigEndian) { Data($0) })
+        case .real(let d):
+            // The BIT PATTERN, not a rendering: `+0.0`/`-0.0` and `+Inf`/`-Inf` are distinct
+            // stored values and must stay distinct here.
+            return (0x02, withUnsafeBytes(of: d.bitPattern.bigEndian) { Data($0) })
+        case .text(let s):
+            return (0x03, Data(s.utf8))
+        case .blob(let data):
+            return (0x04, data)
+        }
+    }
+
+    /// SHA-256 of ``fingerprintPayload(of:)``, lowercase hex. `CryptoKit` is already used in
+    /// this module (`AttachmentApply`), so this adds no dependency.
+    static func sourceFingerprint(of row: StoredRow) -> String {
+        SHA256.hash(data: fingerprintPayload(of: row)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// The SELECT list both the plan's scan and the runner's per-row re-read use.
+    ///
+    /// ONE list, because the fingerprint is only meaningful if the two sides read the same
+    /// columns under the same names. `purchases` has no `shippingCost`, so both substitute
+    /// SQL NULL for it rather than one of them omitting the column.
+    /// Table and column names are fixed literals derived from a closed enum.
+    static func sourceColumns(for table: LegacyTable) -> String {
+        """
+        r.id AS id, r.date AS date, r.\(table.counterpartyColumn) AS counterparty,
+        r.invoiceNumber AS invoiceNumber, r.invoiceStatus AS invoiceStatus,
+        r.totalAmount AS totalAmount, r.amountWithoutTax AS amountWithoutTax,
+        r.taxAmount AS taxAmount, r.taxRate AS taxRate,
+        r.paid_amount AS paid_amount, r.payment_status AS payment_status,
+        r.payment_date AS payment_date, r.due_date AS due_date,
+        r.tons AS tons, r.pricePerTon AS pricePerTon,
+        \(table == .sales ? "r.shippingCost" : "NULL") AS shippingCost,
+        r.created_at AS created_at
+        """
+    }
+
+    /// The counterpart of ``sourceColumns(for:)``: one row of that SELECT, verbatim.
+    static func storedRow(from row: SQLiteRow) -> StoredRow {
+        StoredRow(id: row["id"], date: row["date"], counterparty: row["counterparty"],
+                  invoiceNo: row["invoiceNumber"], invoiceStatus: row["invoiceStatus"],
+                  totalAmount: row["totalAmount"], amountWithoutTax: row["amountWithoutTax"],
+                  taxAmount: row["taxAmount"], taxRate: row["taxRate"],
+                  paidAmount: row["paid_amount"], paymentStatus: row["payment_status"],
+                  paymentDate: row["payment_date"], dueDate: row["due_date"],
+                  tons: row["tons"], pricePerTon: row["pricePerTon"],
+                  shippingCost: row["shippingCost"], createdAt: row["created_at"])
     }
 
     /// The whole per-row rule set, pure, so it can be proved against synthetic values as
@@ -513,6 +753,20 @@ extension LegacyConversionPlan {
         if let name = row.counterparty.stringValue, wouldTruncateCounterparty(name) {
             found.append(.counterpartyWouldBeTruncated)
         }
+        if let no = row.invoiceNo.stringValue, wouldTruncateInvoiceNo(no) {
+            found.append(.invoiceNoWouldBeTruncated)
+        }
+
+        // — the four columns copied AS TEXT, checked for being present-but-unreadable.
+        //   Every rule above reads through `stringValue`, so a BLOB slips past all of them
+        //   and would arrive at the writer as an empty string or a SQL NULL — a real value
+        //   reported as an absence.
+        for (value, issue) in [(row.counterparty, LegacyRowIssue.counterpartyNotReadableAsText),
+                               (row.invoiceNo, .invoiceNoNotReadableAsText),
+                               (row.paymentDate, .paymentDateNotReadableAsText),
+                               (row.dueDate, .dueDateNotReadableAsText)] {
+            if hasNoTextReading(value) { found.append(issue) }
+        }
         return found.sorted { $0.rawValue < $1.rawValue }
     }
 }
@@ -528,7 +782,20 @@ extension LedgerStore {
     /// the line-item counts and the per-year currency sets are eight-odd statements that must
     /// describe ONE ledger, and the Electron app may be writing between any two of them.
     public func legacyConversionPreflight() throws -> LegacyConversionPreflight {
-        try db.readSnapshot {
+        try db.readSnapshot { try legacyConversionPreflightBody() }
+    }
+
+    /// The scan itself, WITHOUT opening a read transaction of its own.
+    ///
+    /// Split out because `LegacyConversionRunner` has to recompute the plan INSIDE its write
+    /// transaction — the point of doing so is that the recomputation and the writes see one
+    /// ledger — and SQLite has no nested transactions, so a `readSnapshot` in there would
+    /// fail with `BEGIN` inside `BEGIN`. The public entry point above keeps the snapshot for
+    /// every other caller; this one inherits whichever transaction it is called in.
+    ///
+    /// Internal, and it stays internal: a caller that opens no transaction at all would get
+    /// the torn view the snapshot exists to prevent.
+    func legacyConversionPreflightBody() throws -> LegacyConversionPreflight {
             // ── 1. The two settings a converted row cannot be written without ────────────
             //
             // Both are classified by the rule the REPORT ENGINES apply, not by the lenient
@@ -559,9 +826,11 @@ extension LedgerStore {
                       !currency.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                     return .blocked(.currencyInvalid(storedText: raw))
                 }
+                guard !LegacyConversionPlan.wouldTruncateCurrency(currency) else {
+                    return .blocked(.currencyNotStorableVerbatim(currency: currency))
+                }
                 return .plan(try scanLegacyRows(locale: locale, currency: currency))
             }
-        }
     }
 
     private func scanLegacyRows(locale: AccountingLocale,
@@ -600,12 +869,10 @@ extension LedgerStore {
                WHERE m.id IS NULL
               """
             : ""
+        // `purchases` has no `shippingCost`; both the plan and the runner substitute SQL NULL
+        // for it, so the same row yields the same fingerprint from either side.
         let sql = """
-            SELECT r.id AS id, r.date AS date, r.\(table.counterpartyColumn) AS counterparty,
-                   r.totalAmount AS totalAmount, r.amountWithoutTax AS amountWithoutTax,
-                   r.taxAmount AS taxAmount, r.taxRate AS taxRate,
-                   r.paid_amount AS paid_amount, r.payment_status AS payment_status,
-                   r.payment_date AS payment_date, r.due_date AS due_date
+            SELECT \(LegacyConversionPlan.sourceColumns(for: table))
               FROM \(source) r
             \(antiJoin)
              ORDER BY r.date, r.id
@@ -616,21 +883,11 @@ extension LedgerStore {
         // one the probe would keep counting forever afterwards. A row whose `id` has no
         // text reading is therefore GRADED (unconvertible), not skipped.
         return try db.query(sql).map { row in
-            let stored = LegacyConversionPlan.StoredRow(
-                id: row["id"],
-                date: row["date"],
-                counterparty: row["counterparty"],
-                totalAmount: row["totalAmount"],
-                amountWithoutTax: row["amountWithoutTax"],
-                taxAmount: row["taxAmount"],
-                taxRate: row["taxRate"],
-                paidAmount: row["paid_amount"],
-                paymentStatus: row["payment_status"],
-                paymentDate: row["payment_date"],
-                dueDate: row["due_date"])
-            return LegacyConversionRow(table: table, id: row.string("id"),
-                                       storedDate: row.string("date"),
-                                       issues: LegacyConversionPlan.issues(in: stored))
+            let stored = LegacyConversionPlan.storedRow(from: row)
+            return LegacyConversionRow(
+                table: table, id: row.string("id"), storedDate: row.string("date"),
+                issues: LegacyConversionPlan.issues(in: stored),
+                sourceFingerprint: LegacyConversionPlan.sourceFingerprint(of: stored))
         }
     }
 
