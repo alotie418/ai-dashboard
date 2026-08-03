@@ -225,7 +225,14 @@ private struct DataSettingsTab: View {
             }
             Section(model.t("settings.backup")) {
                 Button(model.t("settings.backup.export")) { model.exportBackupViaPanel() }
+                // Settings is its OWN window: it stays usable while the conversion wizard's
+                // sheet is on the main window, so a restore started from here would replace the
+                // ledger the wizard is describing — or, mid-run, the file the background worker
+                // still holds open. `canRestoreFromBackup` is the same predicate the restore
+                // orchestration itself checks; this only makes the refusal visible before the
+                // click. It is NOT the control — see `AppModel.restoreFromBackup`.
                 Button(model.t("settings.restore"), role: .destructive) { showRestoreConfirm = true }
+                    .disabled(!model.canRestoreFromBackup)
             }
             #if DEBUG
             if model.canLoadDemoData {

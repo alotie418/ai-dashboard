@@ -57,8 +57,8 @@ final class LegacyConversionCopyTests: XCTestCase {
         "pending": "PENDING", "na": "NA",
     ]
 
-    // ===== T7 table (generated from origin/main) =====
-    private static let reachableLegacyCopyOnBase: [String: [String: String]] = [
+    // ===== T7 table (the five reachable legacy.* strings, as they stand after 2a-4) =====
+    private static let reachableLegacyCopy: [String: [String: String]] = [
         "legacy.notice.title": [
             "zh-Hans": "此账本有 {count} 条旧版销售 / 采购记录",
             "zh-Hant": "此帳本有 {count} 筆舊版銷售 / 採購紀錄",
@@ -68,12 +68,12 @@ final class LegacyConversionCopyTests: XCTestCase {
             "fr": "Enregistrements de ventes / achats hérités dans cette comptabilité : {count}",
         ],
         "legacy.notice.message": [
-            "zh-Hans": "它们完整保存在账本文件中，没有丢失。本 App 目前只显示「流水」，尚未提供把旧记录转换为流水的功能，因此这里看不到它们。",
-            "zh-Hant": "它們完整保存在帳本檔案中，沒有遺失。本 App 目前只顯示「流水」，尚未提供將舊紀錄轉換為流水的功能，因此這裡看不到它們。",
-            "en": "They are stored intact in the ledger file — nothing was lost. This app currently shows only transactions and does not convert legacy records yet, so they are not listed here.",
-            "ja": "これらは台帳ファイルにそのまま保存されており、失われていません。本アプリは現在「取引」のみを表示し、旧記録を取引へ変換する機能はまだ提供していないため、ここには表示されません。",
-            "ko": "해당 기록은 장부 파일에 그대로 저장되어 있으며 사라지지 않았습니다. 이 앱은 현재 ‘거래’만 표시하고 이전 기록을 거래로 변환하는 기능은 아직 제공하지 않으므로 여기에는 나타나지 않습니다.",
-            "fr": "Ils sont conservés intacts dans le fichier de comptabilité — rien n'a été perdu. Cette app n'affiche pour l'instant que les écritures et ne convertit pas encore les enregistrements hérités, ils ne sont donc pas listés ici.",
+            "zh-Hans": "它们完整保存在账本文件中，没有丢失。本 App 目前只显示「流水」，因此这里看不到它们。现在可以先查看把其中符合条件的旧记录转换为流水会做什么，确认后再开始；在你确认之前不会写入任何内容。",
+            "zh-Hant": "它們完整保存在帳本檔案中，沒有遺失。本 App 目前只顯示「流水」，因此這裡看不到它們。現在可以先查看把其中符合條件的舊紀錄轉換為流水會做什麼，確認後再開始；在你確認之前不會寫入任何內容。",
+            "en": "They are stored intact in the ledger file — nothing was lost. This app currently shows only transactions, so they are not listed here. You can now review what converting the eligible legacy records into transactions would do, and start only after you confirm; nothing is written before you do.",
+            "ja": "これらは台帳ファイルにそのまま保存されており、失われていません。本アプリは現在「取引」のみを表示するため、ここには表示されません。条件を満たす旧記録を取引へ変換すると何が起きるかは、先に確認できます。変換は確認後に開始され、それまで書き込みは行われません。",
+            "ko": "해당 기록은 장부 파일에 그대로 저장되어 있으며 사라지지 않았습니다. 이 앱은 현재 ‘거래’만 표시하므로 여기에는 나타나지 않습니다. 조건을 충족하는 이전 기록을 거래로 변환하면 무엇이 달라지는지 먼저 확인할 수 있습니다. 변환은 확인한 뒤에 시작되며 그 전에는 아무것도 기록되지 않습니다.",
+            "fr": "Ils sont conservés intacts dans le fichier de comptabilité — rien n'a été perdu. Cette app n'affiche pour l'instant que les écritures, ils ne sont donc pas listés ici. Vous pouvez maintenant voir ce que donnerait la conversion des enregistrements hérités éligibles en écritures ; elle ne démarre qu'après votre confirmation, et rien n'est écrit avant.",
         ],
         "legacy.banner": [
             "zh-Hans": "另有 {count} 条旧版销售 / 采购记录未在此显示。",
@@ -579,23 +579,34 @@ final class LegacyConversionCopyTests: XCTestCase {
         return source[start.upperBound..<end.lowerBound].components(separatedBy: ".init(locale:").count - 1
     }
 
-    // MARK: - T6 — the copy ships dormant
+    // MARK: - T6 — the copy is reachable, and every string of it is placed
 
-    /// 2a-3's entire contract. The wizard, the routing and the activation are 2a-4, and the
-    /// copy landing first is what lets that PR be reviewed as one atomic change instead of
-    /// arriving with ninety-seven strings nobody has read.
+    /// 2a-3 asserted the opposite: that no file in the SwiftUI target named any of the
+    /// ninety-seven keys. That was the whole contract of shipping the copy dormant, and 2a-4 is
+    /// the change it was waiting for.
     ///
-    /// Proved with a scanner, and the scanner is proved with a fixture — "no hits" and "the
-    /// scanner is broken" are the same output otherwise. The fixture is synthetic text passed to
-    /// the same pure function; no production file is touched to make the negative case fire.
-    func testT6TheConversionCopyIsNotReachableYet() throws {
+    /// What replaces it is stronger than "at least one key is used now". The wizard draws
+    /// EVERY key from ``LegacyConversionComposition/placement``, so the table is asserted to be
+    /// exactly the adjudicated set in both directions: a key with no placement is copy nothing
+    /// can reach, and a placement with no key is a render that would resolve to a raw string.
+    /// The scan is kept as the anti-vacuity half — it is what would notice if the composition
+    /// table were satisfied by a file the app does not actually build.
+    func testT6TheConversionCopyIsReachableAndEveryKeyIsPlaced() throws {
+        let placed = Set(LegacyConversionComposition.placement.keys)
+        let adjudicated = Set(Self.conversionCopyKeys)
+        XCTAssertEqual(placed, adjudicated, """
+            the composition table and the adjudicated copy disagree.
+            placed but not adjudicated (a render with no string): \(placed.subtracting(adjudicated).sorted())
+            adjudicated but not placed (a string nothing can draw): \(adjudicated.subtracting(placed).sorted())
+            """)
+        XCTAssertEqual(placed.count, 97)
+
         let sources = try Self.appSources()
         XCTAssertGreaterThan(sources.count, 10, "the App target sources did not resolve")
         let found = Self.mentions(of: Self.conversionCopyKeys, in: sources)
-        XCTAssertTrue(found.isEmpty, """
-            the SwiftUI target already reads the conversion copy: \
-            \(found.sorted().joined(separator: ", ")). 2a-3 ships it dormant; the wizard, the \
-            routing and the error mapping are 2a-4.
+        XCTAssertEqual(found, adjudicated, """
+            the conversion copy is no longer fully reachable from the App target: \
+            \(adjudicated.subtracting(found).sorted())
             """)
     }
 
@@ -643,26 +654,102 @@ final class LegacyConversionCopyTests: XCTestCase {
         return found
     }
 
-    // MARK: - T7 — the copy the user can already read did not move
+    // MARK: - T7 — the notice copy and the entry point land together
 
-    /// Ratcheted on the WHOLE sentence, per locale, against the values on this PR's base.
+    /// The rewrite this test used to forbid, and the property that replaces the prohibition.
     ///
-    /// `legacy.notice.message` still says this app does not convert legacy records yet, and on
-    /// this branch that is TRUE — nothing mounts the wizard. Rewriting it here would put "you
-    /// can convert now" on a screen with no button on it, so the rewrite belongs in the same
-    /// commit as the entry point, in 2a-4. A keyword ban would be no use: 转换 / convert are all
-    /// over the new dormant copy, legitimately.
-    func testT7TheReachableLegacyCopyIsUnchangedFromBase() throws {
-        XCTAssertEqual(Self.reachableLegacyCopyOnBase.count, 5)
-        for (key, byLocale) in Self.reachableLegacyCopyOnBase {
+    /// On every commit up to 2a-3, `legacy.notice.message` said this app does not convert
+    /// legacy records yet — and it was TRUE, because nothing mounted a wizard. 2a-4 mounts one,
+    /// which makes the old sentence a false statement sitting directly above a button that
+    /// contradicts it. So the sentence changed, and the only question left is whether it can
+    /// ever change WITHOUT the button, or the button appear without the sentence.
+    ///
+    /// XCTest cannot read git history, so "the same commit" is expressed as a BICONDITIONAL
+    /// over one source tree, and a tree holding only half of the pair fails:
+    ///
+    ///  * forwards — the copy claims a conversion can be started, so the entry point must be
+    ///    composed for a ledger with unconverted rows, and must NOT be composed for the
+    ///    `legacy.other.*` branch. This half is BEHAVIOURAL: it calls the same pure function
+    ///    the views call.
+    ///  * backwards — the entry point exists, so the retired over-claim must be gone from all
+    ///    six values. Ratcheted on the WHOLE clause rather than on keywords: 转换 / convert /
+    ///    変換 / 변환 appear legitimately all over the new copy.
+    ///
+    /// A source scan would be the weaker instrument for the forwards half and is deliberately
+    /// not used for it; `LegacyConversionWizardTests` keeps one as a second line of defence.
+    func testT7TheNoticeCopyAndTheEntryPointLandTogether() throws {
+        XCTAssertEqual(Self.reachableLegacyCopy.count, 5)
+        for (key, byLocale) in Self.reachableLegacyCopy {
             XCTAssertEqual(byLocale.count, 6, "\(key): all six locales must be pinned")
             for language in languages {
                 let expected = try XCTUnwrap(byLocale[language])
                 let landed = try XCTUnwrap(sourceTable(language)[key])
-                XCTAssertEqual(landed, expected,
-                               "\(language)/\(key) changed; the rewrite belongs in 2a-4, atomically "
-                               + "with the entry point that makes it true")
+                XCTAssertEqual(landed, expected, "\(language)/\(key) differs from the adjudicated wording")
             }
+        }
+
+        // — forwards: the copy promises a conversion, so the entry point must be there —
+        let unconverted = LegacyLedgerSummary(salesTotal: 2, salesUnconverted: 2)
+        let notice = LegacyConversionComposition.notice(unconverted)
+        XCTAssertEqual(notice.messageKey, "legacy.notice.message")
+        XCTAssertEqual(notice.entry, ["legacy.convert.cta", "legacy.convert.cta.hint"],
+                       "the notice promises a conversion but offers no way to start one")
+        let banner = LegacyConversionComposition.banner(unconverted, ledgerIsEmpty: false)
+        XCTAssertEqual(banner.entry, ["legacy.convert.cta", "legacy.convert.cta.hint"])
+
+        // — and the branch that must never offer one —
+        let othersOnly = LegacyLedgerSummary(otherRecords: 7)
+        let otherNotice = LegacyConversionComposition.notice(othersOnly)
+        XCTAssertEqual(otherNotice.messageKey, "legacy.other.message")
+        XCTAssertTrue(otherNotice.entry.isEmpty,
+                      "legacy.other.* records are not convertible; an entry point there could "
+                      + "only ever report that there is nothing to convert")
+        XCTAssertTrue(LegacyConversionComposition.banner(othersOnly, ledgerIsEmpty: false).entry.isEmpty)
+
+        // — backwards: the entry point exists, so the retired claim must be gone, per locale —
+        for (language, retired) in Self.retiredNoticeClauses {
+            let landed = try XCTUnwrap(sourceTable(language)["legacy.notice.message"])
+            XCTAssertFalse(landed.contains(retired), """
+                \(language): the notice still says the app does not convert legacy records, on a \
+                build whose notice carries the button that does.
+                """)
+        }
+        XCTAssertEqual(Self.retiredNoticeClauses.count, 6)
+    }
+
+    /// The clause each locale used to carry, kept so its return is a failure rather than a
+    /// silent regression. Anti-vacuity for this table is `testT7TheRetiredClausesWereRealText`.
+    private static let retiredNoticeClauses: [String: String] = [
+        "zh-Hans": "尚未提供把旧记录转换为流水的功能",
+        "zh-Hant": "尚未提供將舊紀錄轉換為流水的功能",
+        "en": "does not convert legacy records yet",
+        "ja": "変換する機能はまだ提供していない",
+        "ko": "변환하는 기능은 아직 제공하지 않으므로",
+        "fr": "ne convertit pas encore les enregistrements hérités",
+    ]
+
+    /// The ratchet above asserts an absence, and an absence is also what a table of typos
+    /// produces. Each clause is therefore checked against the value it was really taken from —
+    /// the one this PR's base shipped — so a mistyped entry fails here instead of passing
+    /// silently forever.
+    func testT7TheRetiredClausesWereRealText() {
+        let base = [
+            "zh-Hans": "它们完整保存在账本文件中，没有丢失。本 App 目前只显示「流水」，尚未提供把旧记录转换为流水的功能，因此这里看不到它们。",
+            "zh-Hant": "它們完整保存在帳本檔案中，沒有遺失。本 App 目前只顯示「流水」，尚未提供將舊紀錄轉換為流水的功能，因此這裡看不到它們。",
+            "en": "They are stored intact in the ledger file — nothing was lost. This app currently shows only transactions and does not convert legacy records yet, so they are not listed here.",
+            "ja": "これらは台帳ファイルにそのまま保存されており、失われていません。本アプリは現在「取引」のみを表示し、旧記録を取引へ変換する機能はまだ提供していないため、ここには表示されません。",
+            "ko": "해당 기록은 장부 파일에 그대로 저장되어 있으며 사라지지 않았습니다. 이 앱은 현재 ‘거래’만 표시하고 이전 기록을 거래로 변환하는 기능은 아직 제공하지 않으므로 여기에는 나타나지 않습니다.",
+            "fr": "Ils sont conservés intacts dans le fichier de comptabilité — rien n'a été perdu. Cette app n'affiche pour l'instant que les écritures et ne convertit pas encore les enregistrements hérités, ils ne sont donc pas listés ici.",
+        ]
+        for (language, clause) in Self.retiredNoticeClauses {
+            XCTAssertTrue(base[language]?.contains(clause) == true,
+                          "\(language): the retired clause is not what the base actually said, so "
+                          + "the ratchet is asserting the absence of text nobody ever wrote")
+        }
+        // And the fact that made the rewrite necessary: the preserved half is still there.
+        for language in languages {
+            let landed = value(language, "legacy.notice.message")
+            XCTAssertFalse(landed.isEmpty)
         }
     }
 
