@@ -469,3 +469,114 @@
 "report.disclaimer.usTax" = "試算値であり、申告には使用できません。税務の専門家にご相談ください。";
 /* 参数披露 section 的块脚 */
 "report.disclaimer.rates" = "税率はプリセットの参考値であり変更される場合があります。最新の公式税率をご確認ください。";
+
+/* ── 阶段 2a-3：legacy sales/purchases 转换向导六语文案（97 键，全部不可达；UI / 路由 / 错误映射 / 激活属 2a-4） ── */
+/* A 入口：CTA 与一句话说明（2 键） */
+"legacy.convert.cta" = "取引に変換…";
+"legacy.convert.cta.hint" = "変換が何をするか、何が変わるかを確認してから、開始するかどうかを決められます。";
+/* B 向导框架：标题、开场、确认按钮（3 键；取消复用 common.cancel） */
+"legacy.convert.title" = "旧版の売上・仕入記録を取引に変換";
+"legacy.convert.intro" = "変換は旧記録ごとに取引を新規作成し、どの旧記録がどの取引になったかを記録します。旧記録そのものはそのまま残り、削除も変更もされません。以下では、この変換が何をするか、何が変わるかを示します。確認するまで書き込みは行いません。";
+"legacy.convert.action.convert" = "変換を開始";
+/* C 预检阻断：5 个 blocker 的标题+正文，及账本原文标签（11 键） */
+"legacy.convert.blocked.accountingLocaleNotConfigured.title" = "この台帳に会計方式が記録されていません";
+"legacy.convert.blocked.accountingLocaleNotConfigured.body" = "変換は、いずれかの会計方式のもとで収入・支出のカテゴリを選びますが、この台帳にはその記録がありません。本 App が代わりに選ぶことはしないため、変換は開始していません。「設定」の「会計」タブで会計方式を選べます。台帳ファイルは変更されていません。";
+"legacy.convert.blocked.accountingLocaleInvalid.title" = "台帳の会計方式を認識できません";
+"legacy.convert.blocked.accountingLocaleInvalid.body" = "台帳の会計方式の項目は、本 App が認識する 6 種類のいずれでもないため、変換は開始していません。台帳に実際に入っている内容を下にそのまま表示します。「設定」の「会計」タブで会計方式を選べます。台帳ファイルは変更されていません。";
+"legacy.convert.blocked.currencyNotConfigured.title" = "この台帳に通貨が記録されていません";
+"legacy.convert.blocked.currencyNotConfigured.body" = "旧テーブルには通貨の列がないため、変換は書き込む取引すべてに通貨を付けますが、この台帳にはその記録がありません。本 App が代わりに選ぶことはしないため、変換は開始していません。本 App には通貨を単独で設定する項目がありません。台帳ファイルは変更されていません。";
+"legacy.convert.blocked.currencyInvalid.title" = "台帳の通貨は使用できません";
+"legacy.convert.blocked.currencyInvalid.body" = "台帳の通貨の項目は使用できる通貨コードではないため、変換は開始していません。台帳に実際に入っている内容を下にそのまま表示します。本 App には通貨を単独で設定する項目がありません。台帳ファイルは変更されていません。";
+"legacy.convert.blocked.currencyNotStorableVerbatim.title" = "台帳の通貨をそのまま書き込めません";
+"legacy.convert.blocked.currencyNotStorableVerbatim.body" = "台帳に記録された通貨コードは {currency} で、取引が保持できる長さを超えるため、書き込み時に切り詰められます。変換は台帳の記録と異なる通貨を書き込まないため、変換は開始していません。台帳ファイルは変更されていません。";
+"legacy.convert.storedText.label" = "台帳に実際に入っている内容";
+/* D 计划摘要：三档分级、计数与空态（9 键） */
+"legacy.convert.summary.title" = "事前チェックの結果";
+"legacy.convert.grade.convertible" = "変換できる記録：{count} 件";
+"legacy.convert.grade.convertible.note" = "これらの記録は、値を推測したり、変換に必要な元データを黙って捨てたりせずに変換できます。旧記録そのものは台帳ファイルにそのまま残ります。";
+"legacy.convert.grade.needsAdjudication" = "あなたの判断が必要な記録：{count} 件";
+"legacy.convert.grade.needsAdjudication.note" = "これらの記録には、本アプリが取引へ確実に引き継げない内容があるため、変換されません。残りの変換可能な記録を変換するか、変換を取り消すことができます。";
+"legacy.convert.grade.unconvertible" = "変換できない記録：{count} 件";
+"legacy.convert.grade.unconvertible.note" = "これらの記録には、取引に必ず必要なもの — 日付、またはテキストとして読める ID — がありません。どの選択をしても引き継げません。旧テーブルにそのまま残ります。";
+"legacy.convert.nothingToConvert.title" = "変換できる記録がありません";
+"legacy.convert.nothingToConvert.message" = "この台帳には変換できる旧版の売上・仕入記録が 1 件もありません。存在する旧記録は台帳ファイルにそのまま保存されており、失われていません。台帳ファイルは変更されていません。";
+/* E 逐行清单：区块标题、四个列头、两个来源表名、两个缺值占位、17 条问题（26 键） */
+"legacy.convert.rows.title" = "記録ごとの内訳";
+"legacy.convert.row.col.table" = "元テーブル";
+"legacy.convert.row.col.id" = "旧記録の ID";
+"legacy.convert.row.col.storedDate" = "台帳に入っている日付";
+"legacy.convert.row.col.issues" = "注意が必要な点";
+"legacy.convert.table.sales" = "旧版の売上";
+"legacy.convert.table.purchases" = "旧版の仕入";
+"legacy.convert.row.idUnreadable" = "ID をテキストとして読めません";
+"legacy.convert.row.storedDateAbsent" = "台帳に日付がありません";
+"legacy.convert.issue.idNotReadableAsText" = "ID が台帳ではテキストではなく読み取れないため、この記録を「変換済み」として記録することができません。";
+"legacy.convert.issue.dateMissing" = "台帳に日付がなく、取引には日付が必須です。";
+"legacy.convert.issue.dateNotACalendarDay" = "日付の先頭 10 文字が YYYY-MM-DD 形式の実在する日ではありません。";
+"legacy.convert.issue.paymentDateNotACalendarDay" = "入出金日の先頭 10 文字が YYYY-MM-DD 形式の実在する日ではありません。";
+"legacy.convert.issue.dueDateNotACalendarDay" = "支払期日の先頭 10 文字が YYYY-MM-DD 形式の実在する日ではありません。";
+"legacy.convert.issue.totalAmountNotANumber" = "金額が台帳にないか、本 App が数値として読めない内容です。";
+"legacy.convert.issue.taxAmountNotANumber" = "税額が台帳にないか、本 App が数値として読めない内容です。";
+"legacy.convert.issue.taxRateNotANumber" = "税率が台帳にないか、本 App が数値として読めない内容です。";
+"legacy.convert.issue.paidAmountNotANumber" = "受取/支払済み金額が台帳にないか、本 App が数値として読めない内容です。";
+"legacy.convert.issue.amountWithoutTaxNotANumber" = "税抜金額には値が保存されていますが、数値として読み取れません。実際に値が保存されていない場合だけ、変換は欠損のまま引き継げます。保存済みの数値でない内容を空欄として扱うことはできません。";
+"legacy.convert.issue.paymentStatusUnrecognized" = "決済状況が本 App の認識しない値です。「決済済み」「一部決済」「未決済」のいずれでもなく、空でもありません。";
+"legacy.convert.issue.counterpartyWouldBeTruncated" = "取引先が取引の保持できる長さを超えており、書き込み時に切り詰められます。";
+"legacy.convert.issue.invoiceNoWouldBeTruncated" = "請求書番号が取引の保持できる長さを超えており、書き込み時に切り詰められます。";
+"legacy.convert.issue.counterpartyNotReadableAsText" = "取引先に何かが入っていますが、テキストではなく読み取れません。空欄として書き込むと、取引先があるのに「取引先なし」と伝えることになります。";
+"legacy.convert.issue.invoiceNoNotReadableAsText" = "請求書番号に何かが入っていますが、テキストではなく読み取れません。";
+"legacy.convert.issue.paymentDateNotReadableAsText" = "入出金日に何かが入っていますが、テキストではなく読み取れません。空欄として書き込むと、「読めない入出金日がある」が「一度も決済されていない」に変わってしまいます。";
+"legacy.convert.issue.dueDateNotReadableAsText" = "支払期日に何かが入っていますが、テキストではなく読み取れません。";
+/* F 方向映射（1 键） */
+"legacy.convert.mapping.note" = "旧版の売上記録は「収入」の取引に、旧版の仕入記録は「支出」の取引になります。この対応は旧版アプリの変換と同じで、本 App が独自に判断したものではありません。";
+/* G 类别选择（5 键） */
+"legacy.convert.category.title" = "変換後の取引に付けるカテゴリを選ぶ";
+"legacy.convert.category.income" = "収入のカテゴリ";
+"legacy.convert.category.expense" = "支出のカテゴリ";
+"legacy.convert.category.placeholder" = "選択してください";
+"legacy.convert.category.note" = "旧テーブルにはカテゴリの列がありません。ここで選んだカテゴリは、変換で作られるすべての取引に書き込まれます。本 App が代わりに選ぶことはしません。カテゴリは台帳が現在記録している会計方式のものである必要があり、この変換に実際に含まれる方向についてのみ選択が必要です。変換後は「入出金」で 1 件ずつ変更できます。";
+/* H 后果披露：转换会改变什么（10 键） */
+"legacy.convert.consequence.title" = "変換で何が変わるか";
+"legacy.convert.consequence.reportSource" = "レポートは年ごとに、取引と旧テーブルのどちらか一方を情報源に選びます。ある年に取引が 1 件でもあれば、その年のレポートは取引のみで計算されます。変換は影響を受けた年を取引側に移すため、レポートの数字が今日とは変わる可能性があります。";
+"legacy.convert.consequence.currency" = "旧テーブルには通貨の列がありません。変換が書き込む取引はすべて {currency} が付きます。これは台帳が現在記録している通貨です。";
+"legacy.convert.consequence.shipping" = "取引には送料欄がありません。旧版の売上記録の送料は取引のソース記録にのみそのまま残り、レポート計算には使われません。その金額がゼロでない場合、中国の会計方式では、影響を受ける年の税引前利益・所得税・純利益が変換前と異なる可能性があります。";
+"legacy.convert.consequence.lineItems" = "変換対象の旧記録のうち {count} 件が明細行を持っています。変換は旧記録 1 件を取引 1 件にまとめます。金額は変わりません（旧記録の金額はもともと明細の合計です）が、明細ごとの内訳は取引からは見えなくなります。明細行そのものは台帳ファイルに残り、削除されません。この数は変換対象すべてを数えたもので、上限値です。";
+"legacy.convert.consequence.createdAt" = "変換された取引の作成時刻は、変換を実行した時点です。旧記録本来のタイムスタンプは取引の元データ記録に保存され、作成時刻には書き込みません。書き込めば入力履歴を偽ることになります。";
+"legacy.convert.consequence.statuses" = "空の決済状態は「未決済」として書き込まれ、認識できる「決済済み / 一部決済 / 未決済」は意味を保ちます。旧版の請求書状態は、「已开 / 已收」が「{issued}」、「待开 / 待收」が「{pending}」、それ以外が「{na}」になります。元の状態は取引のソース記録に残ります。";
+"legacy.convert.consequence.sourceRecord" = "新しい取引にはそれぞれ新しい ID が使われます。旧版 ID、元の作成時刻、元の請求書・決済状態、説明に使われる数量・単価・送料は、取引のソース記録に残ります。安全に表示できないバイナリ値は説明には書き込まれず、レポートはこれらのソース項目を読みません。";
+"legacy.convert.consequence.legacyRowsKept" = "旧版の売上・仕入記録は削除も変更もされません。変換後も台帳ファイルにそのまま保存されており、「未変換」の件数に数えられなくなるだけです。";
+"legacy.convert.consequence.attachments" = "変換そのものは添付ファイルに触れません。変換前のバックアップは添付ファイルをバックアップフォルダにコピーします。そのコピー中に別のプログラムが添付ファイルを変更した場合、バックアップ内の添付ファイルは同時点の台帳と一致しないことがあります。";
+/* I 年度前瞻（5 键） */
+"legacy.convert.year.title" = "影響を受ける年";
+"legacy.convert.year.existing" = "{year} 年：この年には既に {count} 件の取引が台帳にあります。";
+"legacy.convert.year.noneYet" = "{year} 年：この年には台帳に取引がないため、今日この年のレポートは作成できません。変換後は、この年が取引から計算されるようになります。";
+"legacy.convert.year.secondCurrency" = "{year}年：変換によって2つ目の通貨が加わる可能性があります（現在：{codes}）。これは保守的な上限です。変換対象の記録が実際にこの年に入り、複数通貨になる場合に限り、この年のレポートは作成できなくなります。";
+"legacy.convert.year.upperBound" = "上記は「変換できる記録をすべて引き継ぐ」場合の見積もりで、上限値です。飛ばす記録が多いほど、実際に影響を受ける年は少なくなります。";
+/* J 转换前备份（3 键） */
+"legacy.convert.backup.title" = "変換前のバックアップ";
+"legacy.convert.backup.note" = "変換は、何かを書き込む前に、現在の台帳を Backups フォルダにバックアップします。バックアップを書き込めない場合、または書き込んでも読み戻せない場合、変換は開始されません。";
+"legacy.convert.backup.scope" = "バックアップは、台帳データベースのスナップショットと添付ファイルのコピーを含むディスク上のフォルダであり、台帳内の復元ポイントではありません。「設定」の「バックアップから復元…」で使用すると、現在の台帳がそのスナップショットに置き換わるため、変換後に行ったその他の変更も元に戻ります。";
+/* K 运行与完成（8 键） */
+"legacy.convert.running.title" = "変換しています";
+"legacy.convert.running.message" = "バックアップを取り、続いて取引を書き込んでいます…この間はアプリを終了しないでください。";
+"legacy.convert.done.title" = "変換が完了しました";
+"legacy.convert.done.message" = "旧記録 {count} 件を変換し、それぞれ 1 件の取引になりました。";
+"legacy.convert.done.skipped" = "旧記録 {count} 件は変換されていません。飛ばしたものと、変換できないものです。これらは台帳ファイルにそのまま保存されています。";
+"legacy.convert.done.backup" = "変換前のバックアップ：{path}";
+"legacy.convert.done.legacyKept" = "旧版の売上・仕入記録は削除も変更もされていません。";
+"legacy.convert.done.reportNote" = "影響を受けた年については、レポートが取引から計算されるようになったため、数字が変換前と異なる場合があります。";
+/* L 失败：12 个 failure case 的用户可见文案 + 标题 + 重试说明（14 键） */
+"legacy.convert.failed.title" = "変換は行われませんでした";
+"legacy.convert.failed.categoryRequiredIncome" = "この変換には旧版の売上記録が含まれますが、収入のカテゴリが選ばれていません。取引は 1 件も書き込まれておらず、台帳ファイルは変更されていません。";
+"legacy.convert.failed.categoryRequiredExpense" = "この変換には旧版の仕入記録が含まれますが、支出のカテゴリが選ばれていません。取引は 1 件も書き込まれておらず、台帳ファイルは変更されていません。";
+"legacy.convert.failed.categoryNotFound" = "選ばれたカテゴリが台帳に見つかりません。カテゴリを選び直して再試行してください。取引は 1 件も書き込まれておらず、台帳ファイルは変更されていません。";
+"legacy.convert.failed.categoryWrongType" = "選ばれたカテゴリの収支の向きが合っていません。収入の取引には収入のカテゴリ、支出の取引には支出のカテゴリが必要です。取引は 1 件も書き込まれておらず、台帳ファイルは変更されていません。";
+"legacy.convert.failed.categoryWrongLocale" = "選ばれたカテゴリは別の会計方式のものです。レポートは会計方式ごとにカテゴリを読むため、方式の違うカテゴリを使うと、これらの取引が本来の行に載らなくなります。台帳が現在記録している会計方式のカテゴリを選んでください。取引は 1 件も書き込まれておらず、台帳ファイルは変更されていません。";
+"legacy.convert.failed.ledgerChanged" = "事前チェックの結果を表示したあとで、台帳が変更されました。本 App は古くなった一覧に基づいて変換することはしません。事前チェックをやり直してから再試行してください。取引は 1 件も書き込まれておらず、台帳ファイルは変更されていません。";
+"legacy.convert.failed.rowVanished" = "変換予定の旧記録の 1 件が、書き込み時点で台帳に存在しませんでした。事前チェックをやり直してから再試行してください。取引は 1 件も書き込まれておらず、台帳ファイルは変更されていません。";
+"legacy.convert.failed.rowNoLongerConvertible" = "変換予定の旧記録の 1 件が、書き込み時点で変換の条件を満たさなくなっていました。事前チェックをやり直して現在の問題を確認し、飛ばすかどうかを決めてください。取引は 1 件も書き込まれておらず、台帳ファイルは変更されていません。";
+"legacy.convert.failed.backupFailed" = "変換前のバックアップを書き込めなかったため、変換は開始されませんでした。取引は 1 件も書き込まれておらず、台帳ファイルは変更されていません。";
+"legacy.convert.failed.backupNotValid" = "変換前のバックアップは書き込まれましたが、読み戻して検査できなかったため、変換は開始されませんでした。読み戻せないバックアップは退避先になりません。取引は 1 件も書き込まれておらず、台帳ファイルは変更されていません。";
+"legacy.convert.failed.busy" = "別の処理がこの台帳に書き込んでいるため、今回の変換はすべてロールバックされました。取引は1件も書き込まれず、台帳ファイルは変更されていません。台帳を使用している処理を終了してから、もう一度お試しください。";
+"legacy.convert.failed.internal" = "変換は自身の整合性チェックで停止し、全体が取り消されました。取引は 1 件も書き込まれておらず、台帳ファイルは変更されていません。事前チェックをやり直してから再試行してください。";
+"legacy.convert.failed.retryNote" = "バックアップが書き込まれたあとで失敗した場合、そのバックアップは Backups フォルダに残っています。再試行では別のバックアップが新たに作られ、既存のものが上書きされることはありません。";
