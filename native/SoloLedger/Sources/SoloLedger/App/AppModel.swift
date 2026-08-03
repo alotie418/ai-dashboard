@@ -128,6 +128,15 @@ final class AppModel: ObservableObject {
     private var localizer: Localizer
     private(set) var store: LedgerStore?
 
+    /// The authorization the C12 chain opened THIS ledger with, kept for the one other place
+    /// that may open it: the legacy-conversion wizard's background connection. Internal so the
+    /// hosted tests can drive the wizard without a real boot.
+    ///
+    /// Only the two EXISTING-ledger authorizations can ever confirm into `.proceed(.existing)`;
+    /// `.createFreshExpectedAbsent` confirms into `.createFresh` and is refused by
+    /// `confirmLegacyConversion` before any task starts. See `authorizesExistingLedger`.
+    var storeOpenAuthorization: StoreOpenAuthorization?
+
     // C12b-2 boot orchestration. Internal (not private) so the hosted `@testable` unit tests
     // can inspect single-flight / generation state; no PUBLIC App API is added.
     var bootGeneration = 0
@@ -254,7 +263,8 @@ final class AppModel: ObservableObject {
                 // Phase B — synchronous ON the main actor: confirm → open, no await between them.
                 switch runner.attempt(authorization, residual: residual) {
                 case .opened(let candidate, let candidateResidual):
-                    adopt(candidate, residual: candidateResidual, generation: gen); return
+                    adopt(candidate, authorization: authorization,
+                          residual: candidateResidual, generation: gen); return
                 case .ui(let state):
                     finish(state, generation: gen); return
                 case .needsReResolve:
@@ -293,7 +303,14 @@ final class AppModel: ObservableObject {
     /// (`try?` defaults), and `reloadAll` keeps its own `actionError` behavior — neither
     /// participates in the store-open authorization. This does NOT atomically pre-read every
     /// startup query; only the required settings gate publication.
-    private func adopt(_ candidate: LedgerStore, residual: MigrationResidual?, generation gen: Int) {
+    ///
+    /// The `authorization` is RETAINED, not merely consumed: the legacy-conversion wizard opens
+    /// a second connection off the main actor and must re-confirm it from disk immediately
+    /// before doing so. It is a typed INTENT, never a capability — `confirmOpenAuthorization`
+    /// re-derives every precondition at the moment it is used — so holding one across a session
+    /// grants nothing that was not re-checked.
+    private func adopt(_ candidate: LedgerStore, authorization: StoreOpenAuthorization,
+                       residual: MigrationResidual?, generation gen: Int) {
         guard gen == bootGeneration else { return }   // stale: a superseded chain owns NOTHING — never touch inFlight/state
         let savedLang: String?
         let savedAppearance: String?
@@ -317,6 +334,7 @@ final class AppModel: ObservableObject {
         // Required reads passed; optional reads above are best-effort defaults. Publish now —
         // `reloadAll` below may set `actionError` but never un-publishes the store.
         store = candidate
+        storeOpenAuthorization = authorization
         if let savedLang { setLanguage(savedLang, persist: false) }
         if let savedAppearance, let ap = Appearance(rawValue: savedAppearance) { appearance = ap }
         accountingLocale = loc
@@ -394,6 +412,11 @@ final class AppModel: ObservableObject {
     /// Open + load an active store and mark the app ready.
     private func finishBoot(with store: LedgerStore) throws {
         self.store = store
+        // These two paths (the DEBUG demo ledger and the confirmed blank ledger) open a store
+        // WITHOUT a coordinator authorization, so there is none to retain — and any authorization
+        // left over from an earlier open describes a different file. Clearing it means the
+        // conversion wizard refuses rather than re-confirming somebody else's intent.
+        storeOpenAuthorization = nil
         if let savedLang = try store.settings.string(SettingsStore.Key.uiLanguage) {
             setLanguage(savedLang, persist: false)
         }
@@ -862,6 +885,169 @@ final class AppModel: ObservableObject {
             ReportDiagnostics.buildFailed(year: year, error: error)
             reportState = .failed(year: year)
         }
+    }
+
+    // MARK: - Legacy conversion wizard (2a-4)
+
+    /// The wizard's state. `.idle` is also "the sheet is closed".
+    @Published private(set) var legacyConversion: LegacyConversionState = .idle
+    /// The sheet's presentation, mounted once in `RootView`.
+    @Published var showingLegacyConversion = false
+    /// The two category choices, cleared whenever the wizard closes. Nil means "not chosen" —
+    /// the runner refuses a conversion that needs one and did not get it, and this app does
+    /// not pick one on the user's behalf.
+    @Published var conversionIncomeCategoryID: String?
+    @Published var conversionExpenseCategoryID: String?
+
+    /// Whether the confirm button may be pressed: every direction the execution set actually
+    /// contains has a category. The runner re-checks all three questions (existence, direction,
+    /// regime) inside its own transaction; this only keeps the user from being told about a
+    /// choice they were never offered.
+    var legacyConversionCanStart: Bool {
+        guard case .summary(let plan) = legacyConversion, !plan.hasNothingToConvert else {
+            return false
+        }
+        let directions = LegacyConversionComposition.requiredDirections(plan)
+        if directions.contains(.income), conversionIncomeCategoryID == nil { return false }
+        if directions.contains(.expense), conversionExpenseCategoryID == nil { return false }
+        return true
+    }
+
+    /// Run the preflight and open the wizard on what it found.
+    ///
+    /// Reachable ONLY from the two entry points, which render only for `hasUnconverted` — the
+    /// same gate is re-asserted here so a future caller cannot bypass it. The preflight writes
+    /// nothing (`LegacyConversionPlanTests` hashes the database file and its `-wal` either side
+    /// of a full run), so opening the wizard is free and cancelling it costs nothing.
+    func beginLegacyConversion() {
+        guard let store, legacyLedger.hasUnconverted else { return }
+        guard case .idle = legacyConversion else { return }
+        conversionIncomeCategoryID = nil
+        conversionExpenseCategoryID = nil
+        do {
+            switch try store.legacyConversionPreflight() {
+            case .blocked(let blocker): legacyConversion = .blocked(blocker)
+            case .plan(let plan):       legacyConversion = .summary(plan)
+            }
+        } catch {
+            LegacyConversionDiagnostics.preflightFailed(error)
+            legacyConversion = .failed(.internalFailure)
+        }
+        showingLegacyConversion = true
+    }
+
+    /// Convert the plan the user is looking at.
+    ///
+    /// The `guard case .summary` is the double-submit gate: the first press moves the state to
+    /// `.running`, and a second one therefore matches nothing and changes nothing.
+    func confirmLegacyConversion() {
+        guard case .summary(let plan) = legacyConversion, !plan.hasNothingToConvert,
+              legacyConversionCanStart else { return }
+        // Only an EXISTING-ledger authorization may reach the hardened open; a createFresh one
+        // confirms into a plan this feature must never take. A freshly created ledger holds no
+        // legacy rows, so this is a guard against a future caller rather than a reachable state.
+        guard let authorization = storeOpenAuthorization, authorization.authorizesExistingLedger else {
+            LegacyConversionDiagnostics.openRefused("no existing-ledger authorization retained")
+            legacyConversion = .failed(.internalFailure)
+            return
+        }
+        let backups: URL
+        let attachments: URL
+        do {
+            backups = try AppPaths.backupsDirectory()
+            attachments = try AppPaths.nativeAttachmentsDirectory()
+        } catch {
+            LegacyConversionDiagnostics.conversionFailed(error)
+            legacyConversion = .failed(.internalFailure)
+            return
+        }
+        // `skipped` is EMPTY, and stays empty: 2a-4 offers no per-record skip control, so the
+        // execution set is exactly the plan's convertible set. `needsAdjudication` and
+        // `unconvertible` rows are excluded by the plan itself and were disclosed by count and
+        // by row on the page the user just confirmed.
+        let request = LegacyConversionRequest(
+            plan: plan,
+            skipped: [],
+            defaultIncomeCategoryID: conversionIncomeCategoryID,
+            defaultExpenseCategoryID: conversionExpenseCategoryID,
+            backupDestination: Self.conversionBackupDestination(in: backups,
+                                                                timestamp: Self.fileTimestamp()),
+            attachmentsDirectory: attachments)
+        legacyConversion = .running(plan)
+        let rowCount = plan.rows.count
+        Task { [weak self] in
+            // Everything heavy happens on the detached task, on a connection it opens and
+            // closes itself. Only `Sendable` values cross in either direction: the
+            // authorization and the request go in, an outcome comes back. No `LedgerStore`,
+            // no `SQLiteDatabase` and no `LegacyConversionFailure` ever does.
+            let outcome = await Task.detached(priority: .userInitiated) {
+                LegacyConversionWorker.run(authorization: authorization, request: request)
+            }.value
+            self?.finishLegacyConversion(outcome, plannedRowCount: rowCount)
+        }
+    }
+
+    /// Land the background result and, on success, refresh every read model it invalidated.
+    ///
+    /// The completion state is published BEFORE the reload. `reloadAll` reports its own
+    /// failures through `actionError`, and a conversion that committed must never be presented
+    /// as one that rolled back because the screen behind it could not be redrawn.
+    ///
+    /// Internal rather than private, and NOT an injected double: it is the real landing point,
+    /// driven directly by the hosted tests so the refresh contract is asserted against the
+    /// shipped code instead of a copy of it.
+    func finishLegacyConversion(_ outcome: LegacyConversionOutcome, plannedRowCount: Int) {
+        switch outcome {
+        case .converted(let convertedCount, let backupPath):
+            legacyConversion = .completed(convertedCount: convertedCount,
+                                          notConvertedCount: max(0, plannedRowCount - convertedCount),
+                                          backupPath: backupPath)
+            // The affected years are computed from `transactions` from now on, so any report
+            // already on screen describes a ledger that no longer exists. Cleared rather than
+            // rebuilt: rebuilding would be a second decision taken on the user's behalf, and
+            // the year in the picker need not be one this conversion touched.
+            reportState = .notRequested
+            reloadAll()
+        case .failed(let copy):
+            legacyConversion = .failed(copy)
+        }
+    }
+
+    /// Close the wizard. Refused while a conversion is in flight — the transaction is open and
+    /// there is nothing a dismissal could mean except a second opinion on a decision taken.
+    func dismissLegacyConversion() {
+        guard !legacyConversion.isRunning else { return }
+        showingLegacyConversion = false
+        legacyConversion = .idle
+        conversionIncomeCategoryID = nil
+        conversionExpenseCategoryID = nil
+    }
+
+    /// A `pre-convert-<timestamp>` directory that does not exist yet.
+    ///
+    /// `BackupExport.writeBundle` refuses an existing destination, so a retry must be handed a
+    /// fresh one — and the timestamp is only second-resolution, so two attempts inside one
+    /// second would otherwise collide and surface as "the backup could not be written" when
+    /// nothing was wrong with the backup. The suffix is what makes
+    /// `legacy.convert.failed.retryNote`'s promise — a new bundle beside the old one, never
+    /// over it — true at every retry interval rather than most of them.
+    /// The timestamp is a PARAMETER rather than a default that reads the clock: `fileTimestamp`
+    /// is main-actor isolated, and a pure naming function that cannot be called off it — or
+    /// pinned by a test — would be the wrong shape for both callers.
+    static func conversionBackupDestination(
+        in directory: URL,
+        timestamp: String,
+        exists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+    ) -> URL {
+        let base = directory.appendingPathComponent("pre-convert-\(timestamp)", isDirectory: true)
+        guard exists(base) else { return base }
+        for attempt in 2...99 {
+            let candidate = directory.appendingPathComponent("pre-convert-\(timestamp)-\(attempt)",
+                                                             isDirectory: true)
+            if !exists(candidate) { return candidate }
+        }
+        return directory.appendingPathComponent("pre-convert-\(timestamp)-\(UUID().uuidString)",
+                                                isDirectory: true)
     }
 
     // MARK: - CSV

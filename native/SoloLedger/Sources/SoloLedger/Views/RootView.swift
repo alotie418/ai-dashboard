@@ -11,6 +11,13 @@ struct RootView: View {
                 TransactionEditor(existing: model.editingTransaction)
                     .environmentObject(model)
             }
+            // The legacy-conversion wizard's ONE mount. Attached here rather than beside each
+            // entry point so the two call sites (the notice and the banner, both reachable
+            // from two screens) cannot drift into two different sheets.
+            .sheet(isPresented: $model.showingLegacyConversion) {
+                LegacyConversionView()
+                    .environmentObject(model)
+            }
             .alert(model.t("common.error"), isPresented: Binding(
                 get: { model.actionError != nil },
                 set: { if !$0 { model.actionError = nil } }

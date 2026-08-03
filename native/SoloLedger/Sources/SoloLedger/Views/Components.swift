@@ -28,30 +28,39 @@ struct StatView: View {
 /// Says plainly that the ledger holds legacy sales/purchase records this app cannot
 /// display. Shown INSTEAD of a plain "no records" empty state, which would otherwise
 /// tell a migrated user their data is gone when it is sitting in the file untouched.
+///
+/// Which of the two notices this is — and therefore whether it offers a conversion — is
+/// decided by ``LegacyConversionComposition/notice(_:)`` rather than by a ternary here.
+/// `legacy.other.*` describes invoices, products and fixed assets: the preflight never scans
+/// those tables and the runner cannot carry them, so an entry point on that branch would be a
+/// button that can only ever report "nothing to convert".
 struct LegacyLedgerNotice: View {
     @EnvironmentObject var model: AppModel
+
+    private var block: LegacyConversionComposition.NoticeBlock {
+        LegacyConversionComposition.notice(model.legacyLedger)
+    }
 
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: "archivebox")
                 .font(.system(size: 34))
                 .foregroundStyle(.secondary)
-            Text(model.legacyLedger.hasUnconverted
-                 ? model.t("legacy.notice.title", ["count": "\(model.legacyLedger.unconverted)"])
-                 : model.t("legacy.other.title"))
+            Text(model.t(block.titleKey, ["count": "\(model.legacyLedger.unconverted)"]))
                 .font(.headline)
                 .multilineTextAlignment(.center)
-            Text(model.legacyLedger.hasUnconverted
-                 ? model.t("legacy.notice.message")
-                 : model.t("legacy.other.message"))
+            Text(model.t(block.messageKey))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+            if block.offersConversion {
+                LegacyConversionEntry(compact: false)
+            }
         }
         .frame(maxWidth: 420)
         .padding(40)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -61,12 +70,53 @@ struct LegacyLedgerNotice: View {
 struct LegacyLedgerBanner: View {
     @EnvironmentObject var model: AppModel
 
+    private var block: LegacyConversionComposition.BannerBlock {
+        LegacyConversionComposition.banner(model.legacyLedger, ledgerIsEmpty: model.isLedgerEmpty)
+    }
+
     var body: some View {
-        if model.legacyLedger.hasUnconverted && !model.isLedgerEmpty {
-            Label(model.t("legacy.banner", ["count": "\(model.legacyLedger.unconverted)"]),
-                  systemImage: "archivebox")
+        if let labelKey = block.labelKey {
+            HStack(spacing: 10) {
+                Label(model.t(labelKey, ["count": "\(model.legacyLedger.unconverted)"]),
+                      systemImage: "archivebox")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                if block.offersConversion {
+                    LegacyConversionEntry(compact: true)
+                }
+            }
+        }
+    }
+}
+
+/// The conversion call to action. The ONLY thing that opens the wizard.
+///
+/// It draws `LegacyConversionComposition.entryKeys` and nothing else, and it is constructed
+/// only from the `hasUnconverted` branch of the notice and the banner — which is what
+/// `LegacyConversionWizardTests` asserts, in both directions.
+private struct LegacyConversionEntry: View {
+    @EnvironmentObject var model: AppModel
+    /// The banner is one line inside a list; the notice is a centred empty state with room
+    /// for the sentence under the button.
+    let compact: Bool
+
+    var body: some View {
+        if compact {
+            Button(model.t("legacy.convert.cta")) { model.beginLegacyConversion() }
+                .buttonStyle(.link)
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .help(model.t("legacy.convert.cta.hint"))
+        } else {
+            VStack(spacing: 6) {
+                Button(model.t("legacy.convert.cta")) { model.beginLegacyConversion() }
+                    .buttonStyle(.borderedProminent)
+                Text(model.t("legacy.convert.cta.hint"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.top, 6)
         }
     }
 }

@@ -1051,25 +1051,49 @@ final class LegacyConversionPlanTests: LedgerTestCase {
 
     // MARK: - Reachability
 
-    /// The preflight ships UNREACHABLE: no file in the SwiftUI target names any of it.
+    /// The preflight is reached from the WIZARD and from nothing else.
     ///
-    /// That is not a stylistic claim. Two existing guarantees depend on the conversion
-    /// machinery never running by itself — `AppModelBootTests` T3 proves a ledger holding
-    /// unconverted legacy rows is refused by `seedCurrencyIfProvablyNew`, and
-    /// `canLoadDemoData` gates on the same `holdsHiddenRecords`. Wiring this into the boot
-    /// chain would put it on exactly the ledgers those two protect. The wizard (2a-4) is
-    /// where it becomes reachable, deliberately and from a user action.
-    func testThePreflightIsNotReachableFromTheAppTarget() throws {
+    /// 2a-1 through 2a-3 asserted the opposite — that no file in the SwiftUI target named any
+    /// of it — and 2a-4 is the change that was always going to flip it. What survives the flip
+    /// is the property that mattered all along: two existing guarantees depend on the
+    /// conversion machinery never running by ITSELF. `AppModelBootTests` T3 proves a ledger
+    /// holding unconverted legacy rows is refused by `seedCurrencyIfProvablyNew`, and
+    /// `canLoadDemoData` gates on the same `holdsHiddenRecords`; a preflight wired into the
+    /// boot chain would be operating on exactly the ledgers those two protect.
+    ///
+    /// So this is now a CLOSED SET rather than an empty one. Every file allowed to name the
+    /// preflight is listed, and `AppModel` is on the list only because the wizard's entry point
+    /// lives there — `BootChainRunner`, `SoloLedgerApp`, `RootView` and every other boot-path
+    /// file must stay off it, which is what keeps "only from a user action" measured.
+    func testThePreflightIsReachedOnlyFromTheConversionWizard() throws {
         let sources = try Self.appSources()
         XCTAssertGreaterThan(sources.count, 10, "the App target did not resolve")
-        let found = Self.mentions(of: Self.conversionSymbols, in: sources)
-        XCTAssertTrue(found.isEmpty, """
-            the SwiftUI target already names the conversion preflight: \
-            \(found.sorted().joined(separator: ", ")). 2a-1 ships unreachable; \
-            activation is 2a-4, and it must arrive with the wizard that discloses what \
-            converting changes.
+        let files = Set(Self.mentions(of: Self.conversionSymbols, in: sources)
+            .map { $0.components(separatedBy: ":")[0] })
+        XCTAssertEqual(files, Self.conversionCallSites, """
+            the conversion preflight is named outside the wizard, or the wizard stopped naming \
+            it. Reaching it from the boot chain would put it on the ledgers `seedCurrencyIfProvablyNew` \
+            and `canLoadDemoData` protect.
             """)
+        // Named by the wizard, and by no boot-path file.
+        for bootPath in ["Sources/SoloLedger/App/BootChainRunner.swift",
+                         "Sources/SoloLedger/App/SoloLedgerApp.swift",
+                         "Sources/SoloLedger/Views/OnboardingView.swift"] {
+            XCTAssertFalse(files.contains(bootPath), "\(bootPath) must not name the preflight")
+        }
     }
+
+    /// The three App files that may name the preflight, and why each one is on the list.
+    private static let conversionCallSites: Set<String> = [
+        // the wizard's model layer: `beginLegacyConversion` and the request it builds
+        "Sources/SoloLedger/App/AppModel.swift",
+        // the state machine, the failure map and the background worker
+        "Sources/SoloLedger/App/LegacyConversionState.swift",
+        // the key placement that decides what each state draws
+        "Sources/SoloLedger/App/LegacyConversionComposition.swift",
+        // the sheet itself
+        "Sources/SoloLedger/Views/LegacyConversionView.swift",
+    ]
 
     /// The scan itself, proved against synthetic sources — otherwise "no hits" and "the
     /// scanner is broken" look identical.

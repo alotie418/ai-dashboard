@@ -1321,20 +1321,43 @@ final class LegacyConversionRunnerTests: LedgerTestCase {
 
     // MARK: - 7. Reachability
 
-    /// The runner ships UNREACHABLE, for the same reason the preflight does: two existing
-    /// guarantees — `AppModelBootTests` T3 and `canLoadDemoData` — protect exactly the
-    /// ledgers a self-starting conversion would operate on. The wizard (2a-4) is where it
-    /// becomes reachable, from a user action.
-    func testTheRunnerIsNotReachableFromTheAppTarget() throws {
+    /// The runner is reached from the WIZARD's background worker and from nothing else.
+    ///
+    /// 2a-2 shipped it unreachable and asserted so; 2a-4 is the change that flips it. The
+    /// property being kept is the same one — two existing guarantees (`AppModelBootTests` T3
+    /// and `canLoadDemoData`) protect exactly the ledgers a self-starting conversion would
+    /// operate on — so the assertion becomes a CLOSED SET of call sites rather than an empty
+    /// one.
+    ///
+    /// The set is narrower than the preflight's on purpose. A preflight reads and may be named
+    /// by the model layer that offers it; the WRITE is named by one file, the off-main worker,
+    /// and by the state machine that classifies what it returned. `AppModel` names
+    /// `LegacyConversionRequest` because it builds one, and that is the whole of its
+    /// involvement — it never calls `runLegacyConversion`.
+    func testTheRunnerIsReachedOnlyFromTheConversionWorker() throws {
         let sources = try Self.appSources()
         XCTAssertGreaterThan(sources.count, 10, "the App target did not resolve")
-        let found = Self.mentions(of: Self.runnerSymbols, in: sources)
-        XCTAssertTrue(found.isEmpty, """
-            the SwiftUI target already names the conversion runner: \
-            \(found.sorted().joined(separator: ", ")). 2a-2 ships unreachable; activation is \
-            2a-4, and it must arrive with the wizard that discloses what converting changes.
+        let files = Set(Self.mentions(of: Self.runnerSymbols, in: sources)
+            .map { $0.components(separatedBy: ":")[0] })
+        XCTAssertEqual(files, Self.runnerCallSites, """
+            the conversion runner is named outside the wizard's worker, or the worker stopped \
+            naming it.
             """)
+        // The write entry point itself is named by exactly ONE file.
+        let writers = Set(Self.mentions(of: ["runLegacyConversion"], in: sources)
+            .map { $0.components(separatedBy: ":")[0] })
+        XCTAssertEqual(writers, ["Sources/SoloLedger/App/LegacyConversionState.swift"],
+                       "the conversion write must have exactly one call site")
     }
+
+    /// The App files that may name the runner's vocabulary.
+    private static let runnerCallSites: Set<String> = [
+        // builds the `LegacyConversionRequest`; never calls the write entry point
+        "Sources/SoloLedger/App/AppModel.swift",
+        // `LegacyConversionWorker.run` — the single call to `runLegacyConversion` — plus the
+        // failure→copy map, which is the only thing that ever sees a `LegacyConversionFailure`
+        "Sources/SoloLedger/App/LegacyConversionState.swift",
+    ]
 
     func testTheReachabilityScanDetectsARealUseAndIgnoresAComment() {
         XCTAssertFalse(Self.mentions(of: Self.runnerSymbols,
