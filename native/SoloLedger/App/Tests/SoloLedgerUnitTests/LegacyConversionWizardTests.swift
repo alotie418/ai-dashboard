@@ -1060,6 +1060,117 @@ final class LegacyConversionWizardTests: XCTestCase {
         XCTAssertFalse(model.canRestoreFromBackup)
     }
 
+    // ==========================================================================================
+    // MARK: - W29 — the refusal log names the state and nothing inside it
+    // ==========================================================================================
+
+    /// Six cases, six fixed labels, and no eighth answer.
+    func testW29EveryStateMapsToItsOwnFixedLabel() {
+        let some = plan(rows: [row(.sales, "s", "2024-01-01")])
+        let table: [(LegacyConversionState, String)] = [
+            (.idle, "idle"),
+            (.blocked(.currencyNotConfigured), "blocked"),
+            (.summary(some), "summary"),
+            (.running(some), "running"),
+            (.completed(convertedCount: 1, notConvertedCount: 0, backupPath: "/tmp/b"), "completed"),
+            (.failed(.ledgerChanged), "failed"),
+        ]
+        XCTAssertEqual(table.count, 6, "every case of LegacyConversionState must have a label")
+        for (state, label) in table {
+            XCTAssertEqual(state.diagnosticLabel, label)
+        }
+        XCTAssertEqual(Set(table.map(\.1)),
+                       ["idle", "blocked", "summary", "running", "completed", "failed"])
+        XCTAssertEqual(Set(table.map(\.1)).count, 6, "two states share a label")
+    }
+
+    /// The payloads are the point, so every one of them is loaded with a sentinel a `grep` over
+    /// a sysdiagnose would find, and the label is required to contain none of them.
+    ///
+    /// The last assertion is the anti-vacuity half: `String(describing:)` really does print the
+    /// sentinels. Without it, "the label is clean" and "these payloads were never reachable"
+    /// would look identical.
+    func testW29bTheLabelCarriesNoPayloadWhileStringDescribingWould() {
+        let sentinels = ["SENTINEL-STORED-BYTES", "SENTINEL-ROW-ID", "SENTINEL-DATE",
+                         "SENTINEL-CURRENCY", "SENTINEL-BACKUP-PATH", "SENTINEL-FAILURE-KEY",
+                         "SENTINEL-YEAR"]
+        let loaded = LegacyConversionPlan(
+            accountingLocale: .CN,
+            currency: "SENTINEL-CURRENCY",
+            rows: [LegacyConversionRow(table: .sales, id: "SENTINEL-ROW-ID",
+                                       storedDate: "SENTINEL-DATE",
+                                       issues: [.dateNotACalendarDay])],
+            headersWithLineItems: 7,
+            yearOutlook: [LegacyYearOutlook(year: "SENTINEL-YEAR", existingTransactionCount: 3,
+                                            existingCurrencies: ["SENTINEL-CURRENCY"],
+                                            wouldHoldASecondCurrency: true)])
+        let states: [LegacyConversionState] = [
+            .idle,
+            .blocked(.accountingLocaleInvalid(storedText: "SENTINEL-STORED-BYTES")),
+            .blocked(.currencyInvalid(storedText: "SENTINEL-STORED-BYTES")),
+            .blocked(.currencyNotStorableVerbatim(currency: "SENTINEL-CURRENCY")),
+            .summary(loaded),
+            .running(loaded),
+            .completed(convertedCount: 42, notConvertedCount: 7,
+                       backupPath: "/Users/x/Backups/SENTINEL-BACKUP-PATH"),
+            .failed(LegacyConversionFailureCopy(messageKey: "SENTINEL-FAILURE-KEY",
+                                                showsRetryNote: true)),
+        ]
+        let allowed: Set<String> = ["idle", "blocked", "summary", "running", "completed", "failed"]
+        for state in states {
+            let label = state.diagnosticLabel
+            XCTAssertTrue(allowed.contains(label), "\(label) is not one of the six fixed labels")
+            for sentinel in sentinels {
+                XCTAssertFalse(label.contains(sentinel), "the label leaked \(sentinel)")
+            }
+            // Nothing structural either: no separators a payload would have arrived through.
+            for fragment in ["(", ")", "/", "\"", "sales", "purchases", "2024", "42"] {
+                XCTAssertFalse(label.contains(fragment), "the label carries \(fragment)")
+            }
+        }
+
+        // Anti-vacuity: the thing that was being logged really did carry all of it.
+        let described = states.map { String(describing: $0) }.joined(separator: "\n")
+        for sentinel in sentinels {
+            XCTAssertTrue(described.contains(sentinel),
+                          "String(describing:) no longer prints \(sentinel) — this guard is testing nothing")
+        }
+    }
+
+    /// The narrowing has to be structural, not a habit: the diagnostics entry takes the STATE,
+    /// so there is no argument a caller could build that carries a payload.
+    func testW29cNothingInTheAppTargetLogsTheWholeState() throws {
+        let sources = try Self.appSources()
+        XCTAssertGreaterThan(sources.count, 10)
+        for forbidden in ["String(describing: legacyConversion)",
+                          "String(reflecting: legacyConversion)",
+                          "Mirror(reflecting: legacyConversion)",
+                          "\\(legacyConversion)",
+                          "String(describing: state)"] {
+            XCTAssertTrue(Self.mentions(of: forbidden, in: sources).isEmpty,
+                          "\(forbidden) is named at \(Self.mentions(of: forbidden, in: sources))")
+        }
+        let model = try Self.appSource("App/AppModel.swift")
+        // The entry point takes the state, and the only thing it interpolates is the label.
+        XCTAssertEqual(
+            Self.occurrences(of: "static func restoreRefused(_ state: LegacyConversionState)",
+                             inCodeOf: model), 1)
+        XCTAssertEqual(Self.occurrences(of: "state.diagnosticLabel, privacy: .public", inCodeOf: model), 1)
+        XCTAssertEqual(Self.occurrences(of: "privacy: .public", inCodeOf: model), 1,
+                       "the fixed label is the only thing this file logs publicly")
+        // Both call sites hand it the state itself.
+        XCTAssertEqual(
+            Self.callArguments(to: "LegacyConversionDiagnostics.restoreRefused", inCodeOf: model),
+            ["legacyConversion", "legacyConversion"])
+        // The mapping is exhaustive — no default to hide a new case in.
+        let label = try Self.functionBody(startingWith: "var diagnosticLabel: String {", in: model)
+        XCTAssertEqual(Self.occurrences(of: "default:", inCodeOf: label), 0,
+                       "a default would let a new case fall through instead of failing the build")
+        for label6 in ["idle", "blocked", "summary", "running", "completed", "failed"] {
+            XCTAssertEqual(Self.occurrences(of: "return \"\(label6)\"", inCodeOf: label), 1)
+        }
+    }
+
     // MARK: - Helpers
 
     private static let languages = ["zh-Hans", "zh-Hant", "en", "ja", "ko", "fr"]

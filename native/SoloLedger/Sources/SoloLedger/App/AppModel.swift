@@ -1091,7 +1091,7 @@ final class AppModel: ObservableObject {
     /// should leave no trace at all.
     func restoreFromBackup(bundleURL: URL) {
         guard canRestoreFromBackup else {
-            LegacyConversionDiagnostics.restoreRefused(String(describing: legacyConversion))
+            LegacyConversionDiagnostics.restoreRefused(legacyConversion)
             return
         }
         let config: MigrationCoordinator.Config
@@ -1136,7 +1136,7 @@ final class AppModel: ObservableObject {
     func restoreFromBackup(bundleURL: URL, config: MigrationCoordinator.Config,
                            backupsDir: URL, currentAttachmentsDir: URL) {
         guard canRestoreFromBackup else {
-            LegacyConversionDiagnostics.restoreRefused(String(describing: legacyConversion))
+            LegacyConversionDiagnostics.restoreRefused(legacyConversion)
             return
         }
         guard let store else { return }
@@ -1199,15 +1199,48 @@ extension LegacyConversionState {
             return false
         }
     }
+
+    /// The state's NAME, and nothing from inside it.
+    ///
+    /// ## Why this exists rather than `String(describing:)`
+    ///
+    /// Every case but `.idle` carries a payload, and `String(describing:)` walks straight into
+    /// it: `.blocked` would print the ledger's stored accounting-profile or currency bytes,
+    /// `.summary` / `.running` the whole plan — legacy row identities, stored dates, issue
+    /// names, the currency — and `.completed` the pre-conversion backup PATH. The refusal is
+    /// logged at `.public`, which is the level that survives into a sysdiagnose, so that string
+    /// is the one place where a diagnostic aid would have become a disclosure.
+    ///
+    /// Six literals, one per case, and an EXHAUSTIVE switch with no `default`: a case added
+    /// later fails the build here instead of silently falling into an "unknown" bucket that
+    /// somebody would then be tempted to fill with the value itself.
+    var diagnosticLabel: String {
+        switch self {
+        case .idle:      return "idle"
+        case .blocked:   return "blocked"
+        case .summary:   return "summary"
+        case .running:   return "running"
+        case .completed: return "completed"
+        case .failed:    return "failed"
+        }
+    }
 }
 
 extension LegacyConversionDiagnostics {
-    /// A refused restore. The state name is `.public` — it is a case name, not ledger data, and
-    /// it is the one fact that makes a report of "the button did nothing" diagnosable.
-    static func restoreRefused(_ state: String) {
+    /// A refused restore.
+    ///
+    /// Takes the STATE, not a string, and does the narrowing itself. A `String` parameter is
+    /// what let `String(describing:)` reach the log in the first place; with the state as the
+    /// parameter there is no argument a caller can construct that carries a payload, because
+    /// the only thing that ever reaches the format string is
+    /// ``LegacyConversionState/diagnosticLabel`` — one of six literals.
+    ///
+    /// That label is the only part logged at `.public`. It is what makes a report of "the
+    /// restore button did nothing" diagnosable, and it says nothing about the ledger.
+    static func restoreRefused(_ state: LegacyConversionState) {
         logger.error("""
             restore-from-backup refused: a legacy conversion is in \
-            \(state, privacy: .public)
+            \(state.diagnosticLabel, privacy: .public)
             """)
     }
 }
