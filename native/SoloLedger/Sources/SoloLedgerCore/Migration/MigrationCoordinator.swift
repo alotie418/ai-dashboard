@@ -54,13 +54,13 @@ public struct MigrationBlock: Equatable {
 /// was minted. The stored property (and therefore the memberwise initializer) is INTERNAL,
 /// so the App layer cannot fabricate one — only the coordinator mints it, and
 /// `confirmOpenAuthorization` re-verifies the CURRENT bound record against it full-field.
-public struct CompletionEvidence: Equatable {
+public struct CompletionEvidence: Equatable, Sendable {
     let record: ActivationRecord
 }
 
 /// Typed intent for the App layer's single store-construction site. NOT a capability —
 /// see the header; `confirmOpenAuthorization` re-derives each precondition from disk.
-public enum StoreOpenAuthorization: Equatable {
+public enum StoreOpenAuthorization: Equatable, Sendable {
     case createFreshExpectedAbsent
     /// A plain (chain-less) active DB: B2 only — active regular ∧ no record ∧ no
     /// canonical/invalid sentinel, all re-verified at confirm time.
