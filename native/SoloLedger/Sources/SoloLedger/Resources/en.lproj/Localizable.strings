@@ -472,3 +472,114 @@
 "report.disclaimer.usTax" = "Estimates only — not for tax filing. Consult a tax professional.";
 /* 参数披露 section 的块脚 */
 "report.disclaimer.rates" = "Tax rates are preset reference values and may change — verify against current official rates.";
+
+/* ── 阶段 2a-3：legacy sales/purchases 转换向导六语文案（97 键，全部不可达；UI / 路由 / 错误映射 / 激活属 2a-4） ── */
+/* A 入口：CTA 与一句话说明（2 键） */
+"legacy.convert.cta" = "Convert to transactions…";
+"legacy.convert.cta.hint" = "See what a conversion would do and what it would change, before deciding whether to start one.";
+/* B 向导框架：标题、开场、确认按钮（3 键；取消复用 common.cancel） */
+"legacy.convert.title" = "Convert legacy sales / purchase records into transactions";
+"legacy.convert.intro" = "A conversion creates a transaction from each legacy record and records which legacy record became which transaction. The legacy records themselves are left exactly as they are — neither deleted nor edited. What follows sets out what this conversion would do and what it would change; nothing is written until you confirm.";
+"legacy.convert.action.convert" = "Start conversion";
+/* C 预检阻断：5 个 blocker 的标题+正文，及账本原文标签（11 键） */
+"legacy.convert.blocked.accountingLocaleNotConfigured.title" = "No accounting profile is recorded in this ledger";
+"legacy.convert.blocked.accountingLocaleNotConfigured.body" = "A conversion picks its income and expense categories under one accounting profile, and this ledger records none. This app does not pick one for you, so no conversion was started. You can choose a profile in the Accounting tab of Settings. The ledger file was not modified.";
+"legacy.convert.blocked.accountingLocaleInvalid.title" = "The recorded accounting profile is not one this app knows";
+"legacy.convert.blocked.accountingLocaleInvalid.body" = "The accounting-profile entry in this ledger is not one of the six this app knows, so no conversion was started. What the ledger actually holds is shown below, verbatim. You can choose a profile in the Accounting tab of Settings. The ledger file was not modified.";
+"legacy.convert.blocked.currencyNotConfigured.title" = "No currency is recorded in this ledger";
+"legacy.convert.blocked.currencyNotConfigured.body" = "The legacy tables have no currency column, so a conversion stamps one on every transaction it writes — and this ledger records none. This app does not pick one for you, so no conversion was started. This app has no separate control for the currency. The ledger file was not modified.";
+"legacy.convert.blocked.currencyInvalid.title" = "The recorded currency cannot be used";
+"legacy.convert.blocked.currencyInvalid.body" = "The currency entry in this ledger is not a usable currency code, so no conversion was started. What the ledger actually holds is shown below, verbatim. This app has no separate control for the currency. The ledger file was not modified.";
+"legacy.convert.blocked.currencyNotStorableVerbatim.title" = "The recorded currency cannot be stored verbatim";
+"legacy.convert.blocked.currencyNotStorableVerbatim.body" = "The currency code recorded in this ledger is {currency}, which is longer than a transaction can keep and would be shortened on write. A conversion will not stamp a currency that differs from the one the ledger records, so no conversion was started. The ledger file was not modified.";
+"legacy.convert.storedText.label" = "What the ledger actually holds";
+/* D 计划摘要：三档分级、计数与空态（9 键） */
+"legacy.convert.summary.title" = "Preflight result";
+"legacy.convert.grade.convertible" = "Can be converted: {count}";
+"legacy.convert.grade.convertible.note" = "These records can be converted without guessing a value or silently dropping source data the conversion relies on. The legacy records themselves remain intact in the ledger file.";
+"legacy.convert.grade.needsAdjudication" = "Need your decision: {count}";
+"legacy.convert.grade.needsAdjudication.note" = "These records contain values this app cannot carry into transactions reliably, so they will not be converted. You can continue with the remaining convertible records, or cancel the conversion.";
+"legacy.convert.grade.unconvertible" = "Cannot be converted: {count}";
+"legacy.convert.grade.unconvertible.note" = "These records are missing something a transaction must have: a date, or an identifier that can be read as text. No choice you make can carry them over. They stay in the legacy tables, exactly as they are.";
+"legacy.convert.nothingToConvert.title" = "Nothing can be converted";
+"legacy.convert.nothingToConvert.message" = "Not one legacy sales / purchase record in this ledger can be converted. The legacy records that are there remain stored intact in the ledger file — nothing was lost. The ledger file was not modified.";
+/* E 逐行清单：区块标题、四个列头、两个来源表名、两个缺值占位、17 条问题（26 键） */
+"legacy.convert.rows.title" = "Record by record";
+"legacy.convert.row.col.table" = "Source table";
+"legacy.convert.row.col.id" = "Legacy ID";
+"legacy.convert.row.col.storedDate" = "Date as stored";
+"legacy.convert.row.col.issues" = "Points to note";
+"legacy.convert.table.sales" = "Legacy sales";
+"legacy.convert.table.purchases" = "Legacy purchases";
+"legacy.convert.row.idUnreadable" = "Identifier cannot be read as text";
+"legacy.convert.row.storedDateAbsent" = "No date in the ledger";
+"legacy.convert.issue.idNotReadableAsText" = "The identifier is not text in the ledger and cannot be read, so this record could never be recorded as converted.";
+"legacy.convert.issue.dateMissing" = "The ledger holds no date, and a transaction must have one.";
+"legacy.convert.issue.dateNotACalendarDay" = "The first ten characters of the date are not a real calendar day written YYYY-MM-DD.";
+"legacy.convert.issue.paymentDateNotACalendarDay" = "The first ten characters of the payment date are not a real calendar day written YYYY-MM-DD.";
+"legacy.convert.issue.dueDateNotACalendarDay" = "The first ten characters of the due date are not a real calendar day written YYYY-MM-DD.";
+"legacy.convert.issue.totalAmountNotANumber" = "The amount is absent from the ledger, or is not something this app can read as a number.";
+"legacy.convert.issue.taxAmountNotANumber" = "The tax amount is absent from the ledger, or is not something this app can read as a number.";
+"legacy.convert.issue.taxRateNotANumber" = "The tax rate is absent from the ledger, or is not something this app can read as a number.";
+"legacy.convert.issue.paidAmountNotANumber" = "The amount paid/received is absent from the ledger, or is not something this app can read as a number.";
+"legacy.convert.issue.amountWithoutTaxNotANumber" = "The amount excluding tax contains a value in the ledger, but that value cannot be read as a number. Conversion can preserve an absence only when no value is actually stored; existing non-numeric content cannot be treated as an empty field.";
+"legacy.convert.issue.paymentStatusUnrecognized" = "The payment status is a value this app does not recognise — it is neither Paid, Partial nor Unpaid, and it is not empty.";
+"legacy.convert.issue.counterpartyWouldBeTruncated" = "The counterparty is longer than a transaction can keep and would be shortened on write.";
+"legacy.convert.issue.invoiceNoWouldBeTruncated" = "The invoice number is longer than a transaction can keep and would be shortened on write.";
+"legacy.convert.issue.counterpartyNotReadableAsText" = "Something is stored for the counterparty, but it is not text and cannot be read. Writing a blank there would report “no counterparty” for a record that has one.";
+"legacy.convert.issue.invoiceNoNotReadableAsText" = "Something is stored for the invoice number, but it is not text and cannot be read.";
+"legacy.convert.issue.paymentDateNotReadableAsText" = "Something is stored for the payment date, but it is not text and cannot be read. Writing a blank there would turn “there is a payment date this app cannot read” into “this was never settled”.";
+"legacy.convert.issue.dueDateNotReadableAsText" = "Something is stored for the due date, but it is not text and cannot be read.";
+/* F 方向映射（1 键） */
+"legacy.convert.mapping.note" = "A legacy sales record becomes an Income transaction; a legacy purchase record becomes an Expense transaction. This pairing is the one the previous app used — this app did not decide it afresh.";
+/* G 类别选择（5 键） */
+"legacy.convert.category.title" = "Choose the category for the converted transactions";
+"legacy.convert.category.income" = "Income category";
+"legacy.convert.category.expense" = "Expense category";
+"legacy.convert.category.placeholder" = "Choose one";
+"legacy.convert.category.note" = "The legacy tables have no category column. The category you choose here is written onto every transaction the conversion creates — this app will not pick one for you. It must belong to the accounting profile this ledger currently records, and only the directions this conversion actually contains need one. Afterwards you can change them one by one in Transactions.";
+/* H 后果披露：转换会改变什么（10 键） */
+"legacy.convert.consequence.title" = "What a conversion changes";
+"legacy.convert.consequence.reportSource" = "A report picks its source per year, between transactions and the legacy tables: one single transaction in a year puts that whole year's report on transactions. A conversion moves the affected years onto transactions, so the figures a report shows may differ from the ones it shows today.";
+"legacy.convert.consequence.currency" = "The legacy tables have no currency column. Every transaction the conversion writes is stamped {currency}, taken from the currency this ledger currently records.";
+"legacy.convert.consequence.shipping" = "Transactions have no shipping-cost field. A legacy sale’s shipping cost remains verbatim only in the transaction’s source record and does not enter report calculations. If that amount is non-zero, reports for the affected year — including pre-tax profit, income tax and net profit under the China accounting profile — may differ after conversion.";
+"legacy.convert.consequence.lineItems" = "{count} of the legacy records still to convert carry line items. A conversion collapses one legacy record into one transaction: the amount does not change (the legacy record's amount is already the line total), but the line-by-line breakdown is not visible on the transaction. The line items themselves stay in the ledger file and are not deleted. This figure is counted over every record still to convert, so it is an upper bound.";
+"legacy.convert.consequence.createdAt" = "A converted transaction's creation time is the moment the conversion ran. The legacy record's own timestamp is preserved in the transaction's source record; it is not written into the creation time, which would be forging a history of when things were entered.";
+"legacy.convert.consequence.statuses" = "An empty payment status is written as “Unpaid”; recognized Paid / Partial / Unpaid states keep their meaning. For legacy invoice status, “已开” / “已收” becomes “{issued}”, “待开” / “待收” becomes “{pending}”, and every other value becomes “{na}”. The original statuses remain in the transaction’s source record.";
+"legacy.convert.consequence.sourceRecord" = "Each new transaction uses a new ID. The legacy ID, original creation time, original invoice and payment statuses, and the quantity, unit price and shipping cost used for the description remain in the transaction’s source record. Binary values that cannot be displayed safely are not written into the description; reports do not read these source fields.";
+"legacy.convert.consequence.legacyRowsKept" = "Legacy sales / purchase records are neither deleted nor edited. After the conversion they remain stored intact in the ledger file; they simply stop being counted as unconverted.";
+"legacy.convert.consequence.attachments" = "The conversion itself does not touch attachments. The pre-conversion backup copies the attachment files into the backup folder; if another program changes an attachment while that copy is running, the attachments in the backup may not match the ledger it was taken from.";
+/* I 年度前瞻（5 键） */
+"legacy.convert.year.title" = "Years this would affect";
+"legacy.convert.year.existing" = "{year}: the ledger already holds {count} transactions in this year.";
+"legacy.convert.year.noneYet" = "{year}: the ledger holds no transactions in this year, so no report can be produced for it today. After a conversion, this year starts being computed from transactions.";
+"legacy.convert.year.secondCurrency" = "{year}: preflight found that conversion may introduce a second currency (existing: {codes}). This is a conservative upper bound; the report is refused only if converted records actually fall in this year and leave it with multiple currencies.";
+"legacy.convert.year.upperBound" = "The list above assumes every convertible record is carried over, so it is an upper bound. The more records you skip, the fewer years are actually affected.";
+/* J 转换前备份（3 键） */
+"legacy.convert.backup.title" = "Pre-conversion backup";
+"legacy.convert.backup.note" = "Before it writes anything, a conversion backs the current ledger up into the Backups folder. If the backup cannot be written, or cannot be read back, no conversion is started.";
+"legacy.convert.backup.scope" = "The backup is a folder on disk containing a snapshot of the ledger database and copies of its attachments; it is not a restore point inside the ledger. Using Restore from backup… in Settings replaces the current ledger with that snapshot, so other changes made after the conversion are rolled back as well.";
+/* K 运行与完成（8 键） */
+"legacy.convert.running.title" = "Converting";
+"legacy.convert.running.message" = "Backing up, then writing the transactions… Please don't quit the app while this runs.";
+"legacy.convert.done.title" = "Conversion finished";
+"legacy.convert.done.message" = "{count} legacy records were converted, each into one transaction.";
+"legacy.convert.done.skipped" = "{count} legacy records were not converted — the ones you skipped, plus the ones that cannot be. They remain stored intact in the ledger file.";
+"legacy.convert.done.backup" = "Pre-conversion backup: {path}";
+"legacy.convert.done.legacyKept" = "The legacy sales / purchase records were neither deleted nor edited.";
+"legacy.convert.done.reportNote" = "For the years this affected, reports are now computed from transactions, so their figures may differ from before the conversion.";
+/* L 失败：12 个 failure case 的用户可见文案 + 标题 + 重试说明（14 键） */
+"legacy.convert.failed.title" = "The conversion did not run";
+"legacy.convert.failed.categoryRequiredIncome" = "This conversion contains legacy sales records, but no income category was chosen. No transaction was written and the ledger file was not modified.";
+"legacy.convert.failed.categoryRequiredExpense" = "This conversion contains legacy purchase records, but no expense category was chosen. No transaction was written and the ledger file was not modified.";
+"legacy.convert.failed.categoryNotFound" = "The chosen category is not in this ledger. Choose a category again and retry. No transaction was written and the ledger file was not modified.";
+"legacy.convert.failed.categoryWrongType" = "The chosen category faces the wrong way: an income transaction needs an income category, an expense transaction an expense category. No transaction was written and the ledger file was not modified.";
+"legacy.convert.failed.categoryWrongLocale" = "The chosen category belongs to a different accounting profile. Reports read categories by accounting profile, so a category from the wrong one would leave these transactions off the lines they belong on. Choose a category under the profile this ledger currently records. No transaction was written and the ledger file was not modified.";
+"legacy.convert.failed.ledgerChanged" = "The ledger changed after you were shown the preflight result. This app will not convert against a list that has gone stale. Run the preflight again and retry. No transaction was written and the ledger file was not modified.";
+"legacy.convert.failed.rowVanished" = "One of the legacy records due to be converted was no longer in the ledger when the writing began. Run the preflight again and retry. No transaction was written and the ledger file was not modified.";
+"legacy.convert.failed.rowNoLongerConvertible" = "One of the legacy records due to be converted no longer met the conditions for conversion when the writing began. Run the preflight again to see what is wrong with it now, then decide whether to skip it. No transaction was written and the ledger file was not modified.";
+"legacy.convert.failed.backupFailed" = "The pre-conversion backup could not be written, so no conversion was started. No transaction was written and the ledger file was not modified.";
+"legacy.convert.failed.backupNotValid" = "The pre-conversion backup was written but could not be read back and checked, so no conversion was started. A backup that cannot be read back is not a safety net. No transaction was written and the ledger file was not modified.";
+"legacy.convert.failed.busy" = "Another operation is writing to this ledger, so this conversion was rolled back in full. No transaction was written and the ledger file was not modified. Finish the operation using the ledger, then retry.";
+"legacy.convert.failed.internal" = "The conversion stopped at one of its own consistency checks and was rolled back whole. No transaction was written and the ledger file was not modified. Run the preflight again and retry.";
+"legacy.convert.failed.retryNote" = "If the failure came after the backup had been written, that backup is still in the Backups folder. A retry writes a new one alongside it and never overwrites it.";

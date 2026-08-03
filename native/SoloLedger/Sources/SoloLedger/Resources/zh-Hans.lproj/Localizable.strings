@@ -472,3 +472,114 @@
 "report.disclaimer.usTax" = "估算，非报税依据，请咨询税务专业人士。";
 /* 参数披露 section 的块脚 */
 "report.disclaimer.rates" = "税率为预设参考值，可能随政策调整，请核对最新官方税率。";
+
+/* ── 阶段 2a-3：legacy sales/purchases 转换向导六语文案（97 键，全部不可达；UI / 路由 / 错误映射 / 激活属 2a-4） ── */
+/* A 入口：CTA 与一句话说明（2 键） */
+"legacy.convert.cta" = "转换为流水…";
+"legacy.convert.cta.hint" = "先查看转换会做什么、会改变什么，再决定是否开始。";
+/* B 向导框架：标题、开场、确认按钮（3 键；取消复用 common.cancel） */
+"legacy.convert.title" = "把旧版销售 / 采购记录转换为流水";
+"legacy.convert.intro" = "转换会按旧记录新建流水，并记下哪一条旧记录对应哪一条流水。旧记录本身保持原样，不会被删除或修改。下面先列出这次转换会做什么、会改变什么；你确认之后才会开始写入。";
+"legacy.convert.action.convert" = "开始转换";
+/* C 预检阻断：5 个 blocker 的标题+正文，及账本原文标签（11 键） */
+"legacy.convert.blocked.accountingLocaleNotConfigured.title" = "账本未记录会计制度";
+"legacy.convert.blocked.accountingLocaleNotConfigured.body" = "转换要按某一套会计制度挑选收支类别，而账本里没有这项记录。本 App 不会替你挑一个，所以没有开始转换。你可以在「设置」的「会计」标签中选择会计制度。账本文件未被修改。";
+"legacy.convert.blocked.accountingLocaleInvalid.title" = "账本记录的会计制度无法识别";
+"legacy.convert.blocked.accountingLocaleInvalid.body" = "账本里会计制度一栏的内容不是本 App 认识的六种制度之一，所以没有开始转换。下面是账本中实际存放的内容，原样显示。你可以在「设置」的「会计」标签中选择会计制度。账本文件未被修改。";
+"legacy.convert.blocked.currencyNotConfigured.title" = "账本未记录币种";
+"legacy.convert.blocked.currencyNotConfigured.body" = "旧表没有币种列，转换要给每一条新流水标上一个币种，而账本里没有这项记录。本 App 不会替你挑一个，所以没有开始转换。本 App 没有单独设置币种的控件。账本文件未被修改。";
+"legacy.convert.blocked.currencyInvalid.title" = "账本记录的币种无法使用";
+"legacy.convert.blocked.currencyInvalid.body" = "账本里币种一栏的内容不是可用的币种代码，所以没有开始转换。下面是账本中实际存放的内容，原样显示。本 App 没有单独设置币种的控件。账本文件未被修改。";
+"legacy.convert.blocked.currencyNotStorableVerbatim.title" = "账本记录的币种无法原样写入";
+"legacy.convert.blocked.currencyNotStorableVerbatim.body" = "账本记录的币种代码是 {currency}，它比一条流水能保存的长度更长，写入时会被截短。转换不会写入一个和账本记录不一样的币种，所以没有开始转换。账本文件未被修改。";
+"legacy.convert.storedText.label" = "账本中实际存放的内容";
+/* D 计划摘要：三档分级、计数与空态（9 键） */
+"legacy.convert.summary.title" = "预检结果";
+"legacy.convert.grade.convertible" = "可以转换：{count} 条";
+"legacy.convert.grade.convertible.note" = "这些记录可以转换，不需要猜测任何值，也不会静默丢弃转换所依赖的源数据。旧记录本身仍完整保存在账本文件中。";
+"legacy.convert.grade.needsAdjudication" = "需要你决定：{count} 条";
+"legacy.convert.grade.needsAdjudication.note" = "这些记录含有本 App 无法可靠带入流水的内容，因此不会被转换。你可以继续转换其余可转换记录，或取消本次转换。";
+"legacy.convert.grade.unconvertible" = "无法转换：{count} 条";
+"legacy.convert.grade.unconvertible.note" = "这些记录缺少一条流水必须具备的东西：一个日期，或者一个能读成文本的编号。没有任何选择能把它们带过去。它们会留在旧表里，保持原样。";
+"legacy.convert.nothingToConvert.title" = "没有可以转换的记录";
+"legacy.convert.nothingToConvert.message" = "账本里没有一条旧版销售 / 采购记录能被转换。已有的旧记录仍完整保存在账本文件中，没有丢失。账本文件未被修改。";
+/* E 逐行清单：区块标题、四个列头、两个来源表名、两个缺值占位、17 条问题（26 键） */
+"legacy.convert.rows.title" = "逐条记录";
+"legacy.convert.row.col.table" = "来源表";
+"legacy.convert.row.col.id" = "旧记录编号";
+"legacy.convert.row.col.storedDate" = "账本中的日期";
+"legacy.convert.row.col.issues" = "需要注意的地方";
+"legacy.convert.table.sales" = "旧版销售";
+"legacy.convert.table.purchases" = "旧版采购";
+"legacy.convert.row.idUnreadable" = "编号无法读成文本";
+"legacy.convert.row.storedDateAbsent" = "账本中没有日期";
+"legacy.convert.issue.idNotReadableAsText" = "编号在账本里不是文本，读不出来；这条记录也就无法被记下「已转换」。";
+"legacy.convert.issue.dateMissing" = "账本里没有日期，而一条流水必须有日期。";
+"legacy.convert.issue.dateNotACalendarDay" = "日期的前十个字符不是 YYYY-MM-DD 形式的真实日期。";
+"legacy.convert.issue.paymentDateNotACalendarDay" = "收/付款日期的前十个字符不是 YYYY-MM-DD 形式的真实日期。";
+"legacy.convert.issue.dueDateNotACalendarDay" = "到期日的前十个字符不是 YYYY-MM-DD 形式的真实日期。";
+"legacy.convert.issue.totalAmountNotANumber" = "金额在账本里没有，或不是本 App 能当作数字读出的内容。";
+"legacy.convert.issue.taxAmountNotANumber" = "税额在账本里没有，或不是本 App 能当作数字读出的内容。";
+"legacy.convert.issue.taxRateNotANumber" = "税率在账本里没有，或不是本 App 能当作数字读出的内容。";
+"legacy.convert.issue.paidAmountNotANumber" = "已收/付金额在账本里没有，或不是本 App 能当作数字读出的内容。";
+"legacy.convert.issue.amountWithoutTaxNotANumber" = "不含税金额在账本里存有内容，但该内容不能作为数字读取。只有账本中确实未存此值时，转换才会按缺失保留；现有的非数字内容不能被当作空值。";
+"legacy.convert.issue.paymentStatusUnrecognized" = "收付状态是本 App 不认识的值——既不是「已结」「部分」「未结」，也不是空。";
+"legacy.convert.issue.counterpartyWouldBeTruncated" = "往来对象比一条流水能保存的长度更长，写入时会被截短。";
+"legacy.convert.issue.invoiceNoWouldBeTruncated" = "发票号码比一条流水能保存的长度更长，写入时会被截短。";
+"legacy.convert.issue.counterpartyNotReadableAsText" = "往来对象在账本里存有内容，但不是文本，读不出来。写成空白会把「有一个读不出的往来对象」说成「没有往来对象」。";
+"legacy.convert.issue.invoiceNoNotReadableAsText" = "发票号码在账本里存有内容，但不是文本，读不出来。";
+"legacy.convert.issue.paymentDateNotReadableAsText" = "收/付款日期在账本里存有内容，但不是文本，读不出来。写成空白会把「有一个读不出的收/付款日期」说成「从未收/付款」。";
+"legacy.convert.issue.dueDateNotReadableAsText" = "到期日在账本里存有内容，但不是文本，读不出来。";
+/* F 方向映射（1 键） */
+"legacy.convert.mapping.note" = "旧版销售记录会转换成「收入」流水，旧版采购记录会转换成「支出」流水。这一对应关系与旧版 App 的转换一致，本 App 没有另作判断。";
+/* G 类别选择（5 键） */
+"legacy.convert.category.title" = "为转换出来的流水选择类别";
+"legacy.convert.category.income" = "收入类别";
+"legacy.convert.category.expense" = "支出类别";
+"legacy.convert.category.placeholder" = "请选择";
+"legacy.convert.category.note" = "旧表没有类别列。你在这里选的类别会写到每一条转换出来的流水上——本 App 不会替你指定一个。类别必须属于账本当前记录的会计制度；只有这次转换实际涉及的方向才需要选。转换完成后，可以在「收支流水」里逐条改。";
+/* H 后果披露：转换会改变什么（10 键） */
+"legacy.convert.consequence.title" = "转换会改变什么";
+"legacy.convert.consequence.reportSource" = "报表按年度在「流水」和旧表之间二选一：某一年只要有一条流水，那一年的报表就只按流水计算。转换会让被影响的年度改按流水计算，报表上的数字可能因此与今天不同。";
+"legacy.convert.consequence.currency" = "旧表没有币种列。转换写入的每一条流水都会标上 {currency}，取自账本当前记录的币种。";
+"legacy.convert.consequence.shipping" = "流水没有运费栏位。旧版销售记录中的运费只会按原样保存在流水的来源记录里，不参与报表计算；如果该值非零，使用中国会计制度时，受影响年度的税前利润、所得税和净利润可能与转换前不同。";
+"legacy.convert.consequence.lineItems" = "有 {count} 条待转换的旧记录带有明细行。转换会把一条旧记录合并成一条流水：金额不变（旧记录的金额本来就是明细合计），但明细的逐行拆分在流水里看不到。明细行本身留在账本文件里，不会被删除。这个数字按「全部待转换记录」计算，是上界。";
+"legacy.convert.consequence.createdAt" = "转换出来的流水，其录入时间记的是转换发生的时刻。旧记录原来的时间戳保存在流水的来源记录里，不会被写成录入时间——那样等于伪造一段录入历史。";
+"legacy.convert.consequence.statuses" = "空的收付状态会写为「未结」；可识别的「已结 / 部分 / 未结」保持原义。旧版发票状态中的「已开 / 已收」会写为「{issued}」，「待开 / 待收」会写为「{pending}」，其他值写为「{na}」。原始状态仍保存在流水的来源记录中。";
+"legacy.convert.consequence.sourceRecord" = "每条新流水使用新的 ID；旧版 ID、原始创建时间、原始发票与收付状态，以及说明所依据的数量、单价和运费，保存在流水的来源记录中。不能安全显示的二进制值不会写进说明；报表不读取这些来源字段。";
+"legacy.convert.consequence.legacyRowsKept" = "旧版销售 / 采购记录不会被删除，也不会被修改。转换后它们仍完整保存在账本文件中，只是不再计入「未转换」的数量。";
+"legacy.convert.consequence.attachments" = "转换本身不碰附件。转换前的备份会把附件文件复制一份到备份文件夹；复制期间若有别的程序在改附件，备份里的附件可能与当时的账本对不上。";
+/* I 年度前瞻（5 键） */
+"legacy.convert.year.title" = "会被影响的年度";
+"legacy.convert.year.existing" = "{year} 年：账本中已有 {count} 条流水。";
+"legacy.convert.year.noneYet" = "{year} 年：账本中目前没有流水，所以这一年现在生成不出报表。转换之后，这一年会开始按流水计算。";
+"legacy.convert.year.secondCurrency" = "{year} 年：预检发现转换可能引入第二种币种（现有：{codes}）。这是保守上界；只有转换记录实际落入该年度并形成多币种时，该年度报表才会被拒绝生成。";
+"legacy.convert.year.upperBound" = "以上按「把全部可转换记录都转过去」估算，是上界。你跳过的记录越多，实际被影响的年度就越少。";
+/* J 转换前备份（3 键） */
+"legacy.convert.backup.title" = "转换前备份";
+"legacy.convert.backup.note" = "转换会在写入任何数据之前，先把当前账本备份到「备份」文件夹。备份没有写成功、或写出来读不回，就不会开始转换。";
+"legacy.convert.backup.scope" = "备份是磁盘上的文件夹，包含账本数据库快照及附件副本，不是账本内部的还原点。通过「设置」中的「从备份恢复…」使用它时，会用该快照替换当前账本；转换后产生的其他更改也会一并回退。";
+/* K 运行与完成（8 键） */
+"legacy.convert.running.title" = "正在转换";
+"legacy.convert.running.message" = "正在备份，然后写入流水…这期间请不要退出本 App。";
+"legacy.convert.done.title" = "转换完成";
+"legacy.convert.done.message" = "已转换 {count} 条旧记录，每条生成了一条流水。";
+"legacy.convert.done.skipped" = "还有 {count} 条旧记录没有转换——你跳过的，加上无法转换的。它们仍完整保存在账本文件中。";
+"legacy.convert.done.backup" = "转换前的备份：{path}";
+"legacy.convert.done.legacyKept" = "旧版销售 / 采购记录没有被删除，也没有被修改。";
+"legacy.convert.done.reportNote" = "被影响的年度，报表现在改按流水计算，数字可能与转换前不同。";
+/* L 失败：12 个 failure case 的用户可见文案 + 标题 + 重试说明（14 键） */
+"legacy.convert.failed.title" = "转换没有进行";
+"legacy.convert.failed.categoryRequiredIncome" = "这次转换包含旧版销售记录，但没有选择收入类别。没有写入任何流水，账本文件未被修改。";
+"legacy.convert.failed.categoryRequiredExpense" = "这次转换包含旧版采购记录，但没有选择支出类别。没有写入任何流水，账本文件未被修改。";
+"legacy.convert.failed.categoryNotFound" = "所选的类别在账本里找不到。请重新选一个类别再试。没有写入任何流水，账本文件未被修改。";
+"legacy.convert.failed.categoryWrongType" = "所选类别的收支方向不对：收入流水要用收入类别，支出流水要用支出类别。没有写入任何流水，账本文件未被修改。";
+"legacy.convert.failed.categoryWrongLocale" = "所选类别属于另一套会计制度。报表是按会计制度读取类别的，用错制度的类别，会让这些流水在报表里落不到正确的行上。请选一个账本当前会计制度下的类别。没有写入任何流水，账本文件未被修改。";
+"legacy.convert.failed.ledgerChanged" = "账本在你看到预检结果之后发生了变化。本 App 不会照一份已经过时的清单去转换。请重新做一次预检再试。没有写入任何流水，账本文件未被修改。";
+"legacy.convert.failed.rowVanished" = "有一条待转换的旧记录，在写入的时候已经不在账本里了。请重新做一次预检再试。没有写入任何流水，账本文件未被修改。";
+"legacy.convert.failed.rowNoLongerConvertible" = "有一条待转换的旧记录，在写入的时候已经不再符合可转换的条件。请重新做一次预检，看看它现在有什么问题，再决定要不要跳过它。没有写入任何流水，账本文件未被修改。";
+"legacy.convert.failed.backupFailed" = "转换前的备份没有写成功，所以没有开始转换。没有写入任何流水，账本文件未被修改。";
+"legacy.convert.failed.backupNotValid" = "转换前的备份写出来了，但读不回来校验，所以没有开始转换。一份读不回来的备份不能当作退路。没有写入任何流水，账本文件未被修改。";
+"legacy.convert.failed.busy" = "另一项操作正在写入此账本，因此本次转换已完整回滚。没有写入任何流水，账本文件未被修改。请结束占用账本的操作，然后重试。";
+"legacy.convert.failed.internal" = "转换在一次内部一致性检查处停了下来，整体退回。没有写入任何流水，账本文件未被修改。请重新做一次预检再试。";
+"legacy.convert.failed.retryNote" = "如果失败发生在备份写出之后，那份备份仍留在「备份」文件夹里。重试会另外新建一份备份，不会覆盖它。";

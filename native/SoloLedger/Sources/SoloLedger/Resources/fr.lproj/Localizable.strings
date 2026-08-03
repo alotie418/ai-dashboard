@@ -469,3 +469,114 @@
 "report.disclaimer.usTax" = "Estimations uniquement — pas pour la déclaration fiscale. Consultez un fiscaliste.";
 /* 参数披露 section 的块脚 */
 "report.disclaimer.rates" = "Les taux d'imposition sont des valeurs de référence préréglées et peuvent évoluer — vérifiez les taux officiels en vigueur.";
+
+/* ── 阶段 2a-3：legacy sales/purchases 转换向导六语文案（97 键，全部不可达；UI / 路由 / 错误映射 / 激活属 2a-4） ── */
+/* A 入口：CTA 与一句话说明（2 键） */
+"legacy.convert.cta" = "Convertir en écritures…";
+"legacy.convert.cta.hint" = "Voyez ce qu'une conversion ferait et ce qu'elle changerait avant de décider de la lancer.";
+/* B 向导框架：标题、开场、确认按钮（3 键；取消复用 common.cancel） */
+"legacy.convert.title" = "Convertir les enregistrements de ventes / achats hérités en écritures";
+"legacy.convert.intro" = "Une conversion crée une écriture à partir de chaque enregistrement hérité et note quel enregistrement est devenu quelle écriture. Les enregistrements hérités eux-mêmes restent tels quels : ni supprimés, ni modifiés. Ce qui suit indique ce que cette conversion ferait et ce qu'elle changerait ; rien n'est écrit tant que vous n'avez pas confirmé.";
+"legacy.convert.action.convert" = "Lancer la conversion";
+/* C 预检阻断：5 个 blocker 的标题+正文，及账本原文标签（11 键） */
+"legacy.convert.blocked.accountingLocaleNotConfigured.title" = "Aucun régime comptable n'est enregistré dans ce livre";
+"legacy.convert.blocked.accountingLocaleNotConfigured.body" = "Une conversion choisit ses catégories de recettes et de dépenses selon un régime comptable, et ce livre n'en enregistre aucun. Cette app n'en choisit pas un à votre place, donc aucune conversion n'a été lancée. Vous pouvez en choisir un dans l'onglet Comptabilité des Réglages. Le fichier de comptes n'a pas été modifié.";
+"legacy.convert.blocked.accountingLocaleInvalid.title" = "Le régime comptable enregistré n'est pas reconnu";
+"legacy.convert.blocked.accountingLocaleInvalid.body" = "L'entrée « régime comptable » de ce livre ne correspond à aucun des six que cette app connaît, donc aucune conversion n'a été lancée. Le contenu réel du livre est affiché ci-dessous, tel quel. Vous pouvez choisir un régime dans l'onglet Comptabilité des Réglages. Le fichier de comptes n'a pas été modifié.";
+"legacy.convert.blocked.currencyNotConfigured.title" = "Aucune devise n'est enregistrée dans ce livre";
+"legacy.convert.blocked.currencyNotConfigured.body" = "Les tables héritées n'ont pas de colonne devise : une conversion en appose donc une sur chaque écriture qu'elle écrit, et ce livre n'en enregistre aucune. Cette app n'en choisit pas une à votre place, donc aucune conversion n'a été lancée. Cette app n'a pas de réglage distinct pour la devise. Le fichier de comptes n'a pas été modifié.";
+"legacy.convert.blocked.currencyInvalid.title" = "La devise enregistrée est inutilisable";
+"legacy.convert.blocked.currencyInvalid.body" = "L'entrée « devise » de ce livre n'est pas un code de devise utilisable, donc aucune conversion n'a été lancée. Le contenu réel du livre est affiché ci-dessous, tel quel. Cette app n'a pas de réglage distinct pour la devise. Le fichier de comptes n'a pas été modifié.";
+"legacy.convert.blocked.currencyNotStorableVerbatim.title" = "La devise enregistrée ne peut pas être stockée telle quelle";
+"legacy.convert.blocked.currencyNotStorableVerbatim.body" = "Le code de devise enregistré dans ce livre est {currency} ; il dépasse la longueur qu'une écriture peut conserver et serait tronqué à l'écriture. Une conversion n'apposera pas une devise différente de celle que le livre enregistre, donc aucune conversion n'a été lancée. Le fichier de comptes n'a pas été modifié.";
+"legacy.convert.storedText.label" = "Ce que le livre contient réellement";
+/* D 计划摘要：三档分级、计数与空态（9 键） */
+"legacy.convert.summary.title" = "Résultat du contrôle préalable";
+"legacy.convert.grade.convertible" = "Convertibles : {count}";
+"legacy.convert.grade.convertible.note" = "Ces enregistrements peuvent être convertis sans deviner de valeur ni écarter silencieusement les données source nécessaires à la conversion. Les enregistrements hérités eux-mêmes restent intacts dans le fichier de comptabilité.";
+"legacy.convert.grade.needsAdjudication" = "Nécessitent votre décision : {count}";
+"legacy.convert.grade.needsAdjudication.note" = "Ces enregistrements contiennent des valeurs que cette app ne peut pas reporter de façon fiable dans les écritures ; ils ne seront donc pas convertis. Vous pouvez poursuivre avec les autres enregistrements convertibles, ou annuler la conversion.";
+"legacy.convert.grade.unconvertible" = "Non convertibles : {count}";
+"legacy.convert.grade.unconvertible.note" = "Il manque à ces enregistrements quelque chose qu'une écriture doit avoir : une date, ou un identifiant lisible comme du texte. Aucun choix ne peut les reporter. Ils restent dans les tables héritées, tels quels.";
+"legacy.convert.nothingToConvert.title" = "Rien à convertir";
+"legacy.convert.nothingToConvert.message" = "Aucun enregistrement de ventes / achats hérité de ce livre ne peut être converti. Ceux qui s'y trouvent restent conservés intacts dans le fichier — rien n'a été perdu. Le fichier de comptes n'a pas été modifié.";
+/* E 逐行清单：区块标题、四个列头、两个来源表名、两个缺值占位、17 条问题（26 键） */
+"legacy.convert.rows.title" = "Enregistrement par enregistrement";
+"legacy.convert.row.col.table" = "Table d'origine";
+"legacy.convert.row.col.id" = "Identifiant hérité";
+"legacy.convert.row.col.storedDate" = "Date telle qu'enregistrée";
+"legacy.convert.row.col.issues" = "Points à noter";
+"legacy.convert.table.sales" = "Ventes héritées";
+"legacy.convert.table.purchases" = "Achats hérités";
+"legacy.convert.row.idUnreadable" = "Identifiant illisible comme texte";
+"legacy.convert.row.storedDateAbsent" = "Aucune date dans le livre";
+"legacy.convert.issue.idNotReadableAsText" = "L'identifiant n'est pas du texte dans le livre et ne peut pas être lu ; cet enregistrement ne pourrait donc jamais être noté comme converti.";
+"legacy.convert.issue.dateMissing" = "Le livre ne contient pas de date, et une écriture doit en avoir une.";
+"legacy.convert.issue.dateNotACalendarDay" = "Les dix premiers caractères de la date ne forment pas un jour réel au format YYYY-MM-DD.";
+"legacy.convert.issue.paymentDateNotACalendarDay" = "Les dix premiers caractères de la date de règlement ne forment pas un jour réel au format YYYY-MM-DD.";
+"legacy.convert.issue.dueDateNotACalendarDay" = "Les dix premiers caractères de la date d'échéance ne forment pas un jour réel au format YYYY-MM-DD.";
+"legacy.convert.issue.totalAmountNotANumber" = "Le montant est absent du livre, ou n'est pas quelque chose que cette app peut lire comme un nombre.";
+"legacy.convert.issue.taxAmountNotANumber" = "Le montant de la taxe est absent du livre, ou n'est pas quelque chose que cette app peut lire comme un nombre.";
+"legacy.convert.issue.taxRateNotANumber" = "Le taux de taxe est absent du livre, ou n'est pas quelque chose que cette app peut lire comme un nombre.";
+"legacy.convert.issue.paidAmountNotANumber" = "Le montant réglé est absent du livre, ou n'est pas quelque chose que cette app peut lire comme un nombre.";
+"legacy.convert.issue.amountWithoutTaxNotANumber" = "Le montant hors taxe contient une valeur dans le livre, mais cette valeur ne peut pas être lue comme un nombre. La conversion ne peut conserver une absence que lorsqu’aucune valeur n’est réellement enregistrée ; un contenu non numérique existant ne peut pas être traité comme un champ vide.";
+"legacy.convert.issue.paymentStatusUnrecognized" = "Le statut du règlement est une valeur que cette app ne reconnaît pas : ni Réglé, ni Partiel, ni Non réglé, et pas vide non plus.";
+"legacy.convert.issue.counterpartyWouldBeTruncated" = "Le tiers dépasse la longueur qu'une écriture peut conserver et serait tronqué à l'écriture.";
+"legacy.convert.issue.invoiceNoWouldBeTruncated" = "Le numéro de facture dépasse la longueur qu'une écriture peut conserver et serait tronqué à l'écriture.";
+"legacy.convert.issue.counterpartyNotReadableAsText" = "Quelque chose est enregistré pour le tiers, mais ce n'est pas du texte et ne peut pas être lu. Écrire un blanc reviendrait à annoncer « aucun tiers » pour un enregistrement qui en a un.";
+"legacy.convert.issue.invoiceNoNotReadableAsText" = "Quelque chose est enregistré pour le numéro de facture, mais ce n'est pas du texte et ne peut pas être lu.";
+"legacy.convert.issue.paymentDateNotReadableAsText" = "Quelque chose est enregistré pour la date de règlement, mais ce n'est pas du texte et ne peut pas être lu. Écrire un blanc transformerait « il y a une date de règlement illisible » en « rien n'a jamais été réglé ».";
+"legacy.convert.issue.dueDateNotReadableAsText" = "Quelque chose est enregistré pour la date d'échéance, mais ce n'est pas du texte et ne peut pas être lu.";
+/* F 方向映射（1 键） */
+"legacy.convert.mapping.note" = "Un enregistrement de vente hérité devient une écriture de Recette ; un enregistrement d'achat hérité devient une écriture de Dépense. Cette correspondance est celle de l'app précédente — cette app ne l'a pas redéfinie.";
+/* G 类别选择（5 键） */
+"legacy.convert.category.title" = "Choisissez la catégorie des écritures converties";
+"legacy.convert.category.income" = "Catégorie de recettes";
+"legacy.convert.category.expense" = "Catégorie de dépenses";
+"legacy.convert.category.placeholder" = "À choisir";
+"legacy.convert.category.note" = "Les tables héritées n'ont pas de colonne catégorie. La catégorie choisie ici est écrite sur chaque écriture créée par la conversion — cette app n'en choisira pas une à votre place. Elle doit appartenir au régime comptable que ce livre enregistre actuellement, et seules les directions réellement présentes dans cette conversion en demandent une. Ensuite, vous pourrez les modifier une par une dans Transactions.";
+/* H 后果披露：转换会改变什么（10 键） */
+"legacy.convert.consequence.title" = "Ce que la conversion change";
+"legacy.convert.consequence.reportSource" = "Un rapport choisit sa source année par année, entre les écritures et les tables héritées : une seule écriture dans une année bascule tout le rapport de cette année sur les écritures. Une conversion fait passer les années concernées sur les écritures, et les chiffres affichés peuvent donc différer de ceux d'aujourd'hui.";
+"legacy.convert.consequence.currency" = "Les tables héritées n'ont pas de colonne devise. Chaque écriture écrite par la conversion porte {currency}, la devise que ce livre enregistre actuellement.";
+"legacy.convert.consequence.shipping" = "Les écritures n’ont pas de champ pour les frais de port. Les frais de port d’une vente héritée ne sont conservés tels quels que dans l’enregistrement source de l’écriture et ne participent pas aux calculs des rapports. Si ce montant n’est pas nul, les chiffres de l’année concernée — notamment le bénéfice avant impôt, l’impôt sur le revenu et le bénéfice net sous le régime comptable Chine — peuvent différer après la conversion.";
+"legacy.convert.consequence.lineItems" = "{count} des enregistrements hérités encore à convertir portent des lignes de détail. Une conversion réduit un enregistrement hérité à une seule écriture : le montant ne change pas (le montant de l'enregistrement hérité est déjà le total des lignes), mais le détail ligne par ligne n'apparaît pas sur l'écriture. Les lignes de détail elles-mêmes restent dans le fichier et ne sont pas supprimées. Ce chiffre porte sur tous les enregistrements encore à convertir : c'est une borne supérieure.";
+"legacy.convert.consequence.createdAt" = "L'heure de création d'une écriture convertie est le moment où la conversion a eu lieu. L'horodatage propre à l'enregistrement hérité est conservé dans l'enregistrement source de l'écriture ; il n'est pas inscrit comme heure de création, ce qui reviendrait à falsifier un historique de saisie.";
+"legacy.convert.consequence.statuses" = "Un état de règlement vide est écrit comme « Non réglé » ; les états reconnus « Réglé / Partiel / Non réglé » conservent leur sens. Pour l’état de facture hérité, « 已开 / 已收 » devient « {issued} », « 待开 / 待收 » devient « {pending} » et toute autre valeur devient « {na} ». Les états d’origine restent dans l’enregistrement source de l’écriture.";
+"legacy.convert.consequence.sourceRecord" = "Chaque nouvelle écriture reçoit un nouvel identifiant. L’identifiant hérité, l’heure de création d’origine, les états d’origine de facture et de règlement, ainsi que les quantités, prix unitaires et frais de port utilisés pour la description, sont conservés dans l’enregistrement source de l’écriture. Les valeurs binaires qui ne peuvent pas être affichées sans risque ne sont pas écrites dans la description ; les rapports ne lisent pas ces champs source.";
+"legacy.convert.consequence.legacyRowsKept" = "Les enregistrements de ventes / achats hérités ne sont ni supprimés ni modifiés. Après la conversion, ils restent conservés intacts dans le fichier ; ils cessent simplement d'être comptés comme non convertis.";
+"legacy.convert.consequence.attachments" = "La conversion elle-même ne touche pas aux pièces jointes. La sauvegarde préalable copie les fichiers joints dans le dossier de sauvegarde ; si un autre programme modifie une pièce jointe pendant cette copie, les pièces jointes de la sauvegarde peuvent ne pas correspondre au livre dont elle a été prise.";
+/* I 年度前瞻（5 键） */
+"legacy.convert.year.title" = "Années concernées";
+"legacy.convert.year.existing" = "{year} : le livre contient déjà {count} écritures pour cette année.";
+"legacy.convert.year.noneYet" = "{year} : le livre ne contient aucune écriture pour cette année, aucun rapport ne peut donc être produit pour elle aujourd'hui. Après une conversion, cette année commencera à être calculée à partir des écritures.";
+"legacy.convert.year.secondCurrency" = "{year} : le contrôle préalable indique que la conversion peut introduire une seconde devise (devises actuelles : {codes}). Il s’agit d’une borne supérieure prudente ; le rapport n’est refusé que si des écritures converties appartiennent réellement à cette année et y créent plusieurs devises.";
+"legacy.convert.year.upperBound" = "La liste ci-dessus suppose que tous les enregistrements convertibles sont reportés : c'est une borne supérieure. Plus vous en ignorez, moins d'années sont réellement concernées.";
+/* J 转换前备份（3 键） */
+"legacy.convert.backup.title" = "Sauvegarde préalable à la conversion";
+"legacy.convert.backup.note" = "Avant toute écriture, une conversion sauvegarde le livre actuel dans le dossier Backups. Si la sauvegarde ne peut pas être écrite, ou pas relue, aucune conversion n'est lancée.";
+"legacy.convert.backup.scope" = "La sauvegarde est un dossier sur disque contenant un instantané de la base du livre et des copies de ses pièces jointes ; ce n’est pas un point de restauration interne au livre. Utiliser « Restaurer depuis une sauvegarde… » dans Réglages remplace le livre actuel par cet instantané ; les autres modifications effectuées après la conversion sont donc également annulées.";
+/* K 运行与完成（8 键） */
+"legacy.convert.running.title" = "Conversion en cours";
+"legacy.convert.running.message" = "Sauvegarde en cours, puis écriture des écritures… Ne quittez pas l'app pendant cette opération.";
+"legacy.convert.done.title" = "Conversion terminée";
+"legacy.convert.done.message" = "{count} enregistrements hérités ont été convertis, chacun en une écriture.";
+"legacy.convert.done.skipped" = "{count} enregistrements hérités n'ont pas été convertis : ceux que vous avez ignorés, plus ceux qui ne peuvent pas l'être. Ils restent conservés intacts dans le fichier.";
+"legacy.convert.done.backup" = "Sauvegarde préalable à la conversion : {path}";
+"legacy.convert.done.legacyKept" = "Les enregistrements de ventes / achats hérités n'ont été ni supprimés ni modifiés.";
+"legacy.convert.done.reportNote" = "Pour les années concernées, les rapports sont désormais calculés à partir des écritures ; leurs chiffres peuvent donc différer de ceux d'avant la conversion.";
+/* L 失败：12 个 failure case 的用户可见文案 + 标题 + 重试说明（14 键） */
+"legacy.convert.failed.title" = "La conversion n'a pas eu lieu";
+"legacy.convert.failed.categoryRequiredIncome" = "Cette conversion contient des enregistrements de ventes hérités, mais aucune catégorie de recettes n'a été choisie. Aucune écriture n'a été écrite et le fichier de comptes n'a pas été modifié.";
+"legacy.convert.failed.categoryRequiredExpense" = "Cette conversion contient des enregistrements d'achats hérités, mais aucune catégorie de dépenses n'a été choisie. Aucune écriture n'a été écrite et le fichier de comptes n'a pas été modifié.";
+"legacy.convert.failed.categoryNotFound" = "La catégorie choisie ne se trouve pas dans ce livre. Choisissez-en une à nouveau, puis réessayez. Aucune écriture n'a été écrite et le fichier de comptes n'a pas été modifié.";
+"legacy.convert.failed.categoryWrongType" = "La catégorie choisie n'a pas le bon sens : une écriture de recette demande une catégorie de recettes, une écriture de dépense une catégorie de dépenses. Aucune écriture n'a été écrite et le fichier de comptes n'a pas été modifié.";
+"legacy.convert.failed.categoryWrongLocale" = "La catégorie choisie appartient à un autre régime comptable. Les rapports lisent les catégories par régime : une catégorie du mauvais régime laisserait ces écritures hors des lignes auxquelles elles appartiennent. Choisissez une catégorie du régime que ce livre enregistre actuellement. Aucune écriture n'a été écrite et le fichier de comptes n'a pas été modifié.";
+"legacy.convert.failed.ledgerChanged" = "Le livre a changé après l'affichage du résultat du contrôle préalable. Cette app ne convertira pas sur la base d'une liste devenue obsolète. Relancez le contrôle préalable, puis réessayez. Aucune écriture n'a été écrite et le fichier de comptes n'a pas été modifié.";
+"legacy.convert.failed.rowVanished" = "Un des enregistrements hérités à convertir n'était plus dans le livre au moment de l'écriture. Relancez le contrôle préalable, puis réessayez. Aucune écriture n'a été écrite et le fichier de comptes n'a pas été modifié.";
+"legacy.convert.failed.rowNoLongerConvertible" = "Un des enregistrements hérités à convertir ne remplissait plus les conditions de conversion au moment de l'écriture. Relancez le contrôle préalable pour voir ce qui ne va pas, puis décidez de l'ignorer ou non. Aucune écriture n'a été écrite et le fichier de comptes n'a pas été modifié.";
+"legacy.convert.failed.backupFailed" = "La sauvegarde préalable n'a pas pu être écrite, donc aucune conversion n'a été lancée. Aucune écriture n'a été écrite et le fichier de comptes n'a pas été modifié.";
+"legacy.convert.failed.backupNotValid" = "La sauvegarde préalable a été écrite mais n'a pas pu être relue et vérifiée, donc aucune conversion n'a été lancée. Une sauvegarde qu'on ne peut pas relire n'est pas un filet de sécurité. Aucune écriture n'a été écrite et le fichier de comptes n'a pas été modifié.";
+"legacy.convert.failed.busy" = "Une autre opération écrit dans ce livre ; cette conversion a donc été entièrement annulée. Aucune écriture n’a été créée et le fichier du livre n’a pas été modifié. Terminez l’opération qui utilise le livre, puis réessayez.";
+"legacy.convert.failed.internal" = "La conversion s'est arrêtée à l'une de ses propres vérifications de cohérence et a été entièrement annulée. Aucune écriture n'a été écrite et le fichier de comptes n'a pas été modifié. Relancez le contrôle préalable, puis réessayez.";
+"legacy.convert.failed.retryNote" = "Si l'échec est survenu après l'écriture de la sauvegarde, celle-ci est toujours dans le dossier Backups. Une nouvelle tentative en écrit une autre à côté et n'écrase jamais la précédente.";
