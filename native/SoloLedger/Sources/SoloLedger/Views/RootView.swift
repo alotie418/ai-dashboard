@@ -14,9 +14,24 @@ struct RootView: View {
             // The legacy-conversion wizard's ONE mount. Attached here rather than beside each
             // entry point so the two call sites (the notice and the banner, both reachable
             // from two screens) cannot drift into two different sheets.
+            //
+            // `interactiveDismissDisabled()` is UNCONDITIONAL, and that is the point. A system
+            // dismissal — Escape, a swipe, the window's own close — writes `false` straight
+            // into the presentation binding without going through
+            // `AppModel.dismissLegacyConversion()`, so the sheet would vanish while the model
+            // stayed in `.blocked` / `.summary` / `.completed` / `.failed` with the category
+            // choices still set. The next entry-point press then hits the `guard case .idle`
+            // and does nothing at all: a button that has silently stopped working.
+            //
+            // Disabling it only for `.running` would close the write window and leave that
+            // whole class open — and `.completed` is the case where it costs the most, because
+            // the pre-conversion backup path is on that page and nowhere else. Every state
+            // therefore leaves through the footer's Cancel/OK, which is the one path that
+            // clears the state and the choices together.
             .sheet(isPresented: $model.showingLegacyConversion) {
                 LegacyConversionView()
                     .environmentObject(model)
+                    .interactiveDismissDisabled()
             }
             .alert(model.t("common.error"), isPresented: Binding(
                 get: { model.actionError != nil },

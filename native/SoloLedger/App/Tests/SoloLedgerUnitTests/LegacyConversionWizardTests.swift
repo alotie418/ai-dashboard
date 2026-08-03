@@ -864,9 +864,153 @@ final class LegacyConversionWizardTests: XCTestCase {
                       "whole-identifier matching only")
     }
 
+    // ==========================================================================================
+    // MARK: - W27 — the sheet has exactly one way out, and it is the footer
+    // ==========================================================================================
+
+    /// A system dismissal writes `false` straight into `$model.showingLegacyConversion` without
+    /// going through `dismissLegacyConversion()`. The sheet would disappear while the model
+    /// stayed in `.blocked` / `.summary` / `.completed` / `.failed` with the category choices
+    /// still set — and the next press of the entry point would hit `guard case .idle` and do
+    /// nothing at all, which reads as a button that has silently stopped working.
+    ///
+    /// So the modifier is UNCONDITIONAL. A `.running`-only version would close the write window
+    /// and leave the rest of that class open, `.completed` most expensively of all: the
+    /// pre-conversion backup path is on that page and nowhere else.
+    func testW27TheWizardSheetDisablesInteractiveDismissalUnconditionally() throws {
+        let root = try Self.appSource("Views/RootView.swift")
+        let closure = try Self.sheetClosure(binding: "showingLegacyConversion", in: root)
+        XCTAssertTrue(Self.occurrences(of: "LegacyConversionView()", inCodeOf: closure) == 1,
+                      "the wizard sheet closure must build the wizard")
+
+        let arguments = Self.callArguments(to: "interactiveDismissDisabled", inCodeOf: closure)
+        XCTAssertEqual(arguments, [""], """
+            the wizard sheet must carry exactly one UNCONDITIONAL interactiveDismissDisabled().
+            found: \(arguments)
+            """)
+        // File-wide, so the modifier cannot be satisfied by one somewhere else on the view tree.
+        XCTAssertEqual(Self.occurrences(of: "interactiveDismissDisabled", inCodeOf: root), 1)
+
+        // The transaction editor is deliberately NOT disabled: it is an ordinary form with no
+        // state left behind, and taking Escape away from it would be a regression of its own.
+        let editor = try Self.sheetClosure(binding: "showingEditor", in: root)
+        XCTAssertEqual(Self.occurrences(of: "interactiveDismissDisabled", inCodeOf: editor), 0)
+    }
+
+    /// The guard above asserts the SHAPE of a call, so its own parser is proved against the
+    /// three ways this modifier gets weakened — removed, made conditional, or passed `false`.
+    /// Without this, "the assertion passes" and "the parser cannot see the argument" look the
+    /// same.
+    func testW27bTheDismissGuardRejectsEveryWeakenedForm() throws {
+        func closure(_ body: String) throws -> String {
+            try Self.sheetClosure(binding: "showingLegacyConversion", in: """
+                struct R: View {
+                    var body: some View {
+                        content
+                            .sheet(isPresented: $model.showingLegacyConversion) {
+                \(body)
+                            }
+                    }
+                }
+                """)
+        }
+        // The shipping shape.
+        XCTAssertEqual(
+            Self.callArguments(to: "interactiveDismissDisabled",
+                               inCodeOf: try closure("            LegacyConversionView()\n                .interactiveDismissDisabled()")),
+            [""])
+        // Removed entirely.
+        XCTAssertEqual(
+            Self.callArguments(to: "interactiveDismissDisabled",
+                               inCodeOf: try closure("            LegacyConversionView()")),
+            [])
+        // Made conditional on the run.
+        XCTAssertEqual(
+            Self.callArguments(to: "interactiveDismissDisabled",
+                               inCodeOf: try closure("            LegacyConversionView()\n                .interactiveDismissDisabled(model.legacyConversion.isRunning)")),
+            ["model.legacyConversion.isRunning"])
+        // Turned off outright.
+        XCTAssertEqual(
+            Self.callArguments(to: "interactiveDismissDisabled",
+                               inCodeOf: try closure("            LegacyConversionView()\n                .interactiveDismissDisabled(false)")),
+            ["false"])
+        // Commented out is not a call.
+        XCTAssertEqual(
+            Self.callArguments(to: "interactiveDismissDisabled",
+                               inCodeOf: try closure("            LegacyConversionView()\n                // .interactiveDismissDisabled()")),
+            [])
+    }
+
+    /// Taking the system's exits away is only safe because the app's own are still there: one
+    /// per state that can be closed, and none for the one that cannot.
+    func testW27cTheFooterButtonsRemainTheWayOut() throws {
+        let view = try Self.appSource("Views/LegacyConversionView.swift")
+        XCTAssertEqual(Self.occurrences(of: "model.dismissLegacyConversion()", inCodeOf: view), 3,
+                       "one Cancel for .blocked, one for .summary, one OK for .completed/.failed")
+        // `.running` shares its footer arm with `.idle`, and that arm draws nothing — the write
+        // is in flight and there is nothing a dismissal could mean.
+        XCTAssertEqual(Self.occurrences(of: "case .idle, .running:", inCodeOf: view), 1)
+        XCTAssertTrue(LegacyConversionState.running(plan(rows: [row(.sales, "s", "2024-01-01")]))
+            .isRunning)
+        // Every other state IS closable, which is why each of them has a button.
+        for state: LegacyConversionState in [.idle, .blocked(.currencyNotConfigured),
+                                             .summary(plan(rows: [row(.sales, "s", "2024-01-01")])),
+                                             .completed(convertedCount: 1, notConvertedCount: 0,
+                                                        backupPath: nil),
+                                             .failed(.ledgerChanged)] {
+            XCTAssertFalse(state.isRunning, "\(state) has a footer button and must be closable")
+        }
+    }
+
     // MARK: - Helpers
 
     private static let languages = ["zh-Hans", "zh-Hant", "en", "ja", "ko", "fr"]
+
+    /// The body of `.sheet(isPresented: $model.<binding>) { … }`, brace-matched.
+    private static func sheetClosure(binding: String, in source: String) throws -> String {
+        let opener = ".sheet(isPresented: $model.\(binding)) {"
+        let start = try XCTUnwrap(source.range(of: opener),
+                                  "no sheet is presented by $model.\(binding)")
+        var depth = 1
+        var index = start.upperBound
+        while index < source.endIndex, depth > 0 {
+            if source[index] == "{" { depth += 1 }
+            if source[index] == "}" { depth -= 1; if depth == 0 { break } }
+            index = source.index(after: index)
+        }
+        XCTAssertEqual(depth, 0, "the \(binding) sheet closure is unbalanced")
+        return String(source[start.upperBound..<index])
+    }
+
+    /// The argument text of every call to `name(...)` on a non-comment line, in order. An empty
+    /// string means the call takes no argument, which is the only form that disables a sheet's
+    /// interactive dismissal for good.
+    private static func callArguments(to name: String, inCodeOf source: String) -> [String] {
+        var out: [String] = []
+        for raw in source.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = String(raw)
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.hasPrefix("//"), !trimmed.hasPrefix("*"), !trimmed.hasPrefix("/*") else {
+                continue
+            }
+            var search = line.startIndex
+            while let call = line.range(of: "\(name)(", range: search..<line.endIndex) {
+                var depth = 1
+                var index = call.upperBound
+                while index < line.endIndex, depth > 0 {
+                    if line[index] == "(" { depth += 1 }
+                    if line[index] == ")" { depth -= 1; if depth == 0 { break } }
+                    index = line.index(after: index)
+                }
+                if depth == 0 {
+                    out.append(String(line[call.upperBound..<index])
+                        .trimmingCharacters(in: .whitespaces))
+                }
+                search = call.upperBound
+            }
+        }
+        return out
+    }
 
     /// `ActivationRecord`'s only initialiser binds a real `PreparedImport`, so a stand-in is
     /// decoded rather than constructed. Its CONTENT is irrelevant here — the assertion is about
