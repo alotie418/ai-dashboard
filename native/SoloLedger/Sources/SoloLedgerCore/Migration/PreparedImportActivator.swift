@@ -252,7 +252,7 @@ func fsyncDirectoryEntry(_ parent: DirectoryHandle, pathHint: String) throws -> 
 /// alone cannot prove ownership. All fields derive deterministically from the
 /// `PreparedImport`; there is deliberately no timestamp (it would break the full-field
 /// idempotent resume comparison and decides nothing).
-struct ActivationRecord: Codable, Equatable {
+struct ActivationRecord: Codable, Equatable, Sendable {
     static let currentFormatVersion = 1
     var formatVersion: Int
     var importID: String

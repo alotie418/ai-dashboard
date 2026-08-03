@@ -967,4 +967,109 @@ final class MigrationCoordinatorTests: LedgerTestCase {
         XCTAssertEqual(M.map(FinalizeError.attachmentConflict("x")).classification, .terminal)
         XCTAssertEqual(M.map(FinalizeError.referencedFileChangedSinceAudit("x")).classification, .retriable)
     }
+
+    // MARK: - The hardened-authorization Sendable bridge
+
+    /// Three types a background conversion worker would carry across a `@Sendable` boundary to
+    /// reach `confirmOpenAuthorization` → `LedgerStore.openActiveExistingHardened` — the route
+    /// that keeps the C12x hardened active-open on that path instead of a plain `.existingOnly`,
+    /// which `AppModel.openStoreForPlan` forbids for the active slot. They form a dependency
+    /// chain: `StoreOpenAuthorization` carries `CompletionEvidence` in `.openExistingCompleted`,
+    /// and `CompletionEvidence` stores an `ActivationRecord`.
+    ///
+    /// ## What is proved here, and what deliberately is not
+    ///
+    /// This package builds in the **Swift 5 language mode** (`Package.swift:1`; the Xcode app
+    /// target sets `SWIFT_VERSION = 5.0`) with no strict-concurrency setting anywhere, and under
+    /// *minimal* concurrency checking a `T: Sendable` generic constraint is not diagnosed at all.
+    /// Measured on this branch: a `func assertSendable<T: Sendable>(_: T.Type) {}` helper accepted
+    /// `SQLiteDatabase.self` — a `final class` holding a mutable `OpaquePointer?` and conforming
+    /// to nothing — with zero errors and zero warnings, while a deliberate type error placed on
+    /// the same line WAS caught. A conformance-constraint helper is therefore not a negative gate
+    /// in this mode, and nothing below pretends to be one. That is why this file's gate is a
+    /// SOURCE guard.
+    ///
+    /// Holds today:
+    ///  * the three conformances are declared and synthesized — no `@unchecked` anywhere — and
+    ///    the whole package and the App target build with them;
+    ///  * `ActivationRecord`'s stored properties are `Int` / `String` / `String?` only, so the
+    ///    synthesis rests on something checkable rather than on a bare claim
+    ///    (``testActivationRecordHoldsOnlySendableStoredPropertyTypes``).
+    ///
+    /// NOT claimed:
+    ///  * that deleting any one conformance breaks the build — in this language mode it does not;
+    ///  * that the three-layer dependency is enforced layer-by-layer by today's compiler;
+    ///  * that the full `BootOutcome`-side Swift 6 strict-concurrency pass is done. It is not.
+    ///    `ActiveOpenEvidence`, `ConfirmedOpenPlan`, `OpenPrecheck`, `FileFingerprint` and
+    ///    `BootOutcome` are deliberately untouched.
+    ///
+    /// The declarations are pinned as exact strings, so removing a conformance from ANY of the
+    /// three turns this red even though the compiler stays silent; and `@unchecked Sendable` —
+    /// which would satisfy a type-level check identically while switching the compiler's own
+    /// reasoning off — is banned outright in both files.
+    func testTheSendableBridgeDeclarationsAreExactAndNeverUnchecked() throws {
+        let expected: [(file: String, declarations: [String])] = [
+            ("Sources/SoloLedgerCore/Migration/MigrationCoordinator.swift",
+             ["public struct CompletionEvidence: Equatable, Sendable {",
+              "public enum StoreOpenAuthorization: Equatable, Sendable {"]),
+            ("Sources/SoloLedgerCore/Migration/PreparedImportActivator.swift",
+             ["struct ActivationRecord: Codable, Equatable, Sendable {"]),
+        ]
+        for (file, declarations) in expected {
+            let source = try String(contentsOf: Self.packageRoot().appendingPathComponent(file),
+                                    encoding: .utf8)
+            for declaration in declarations {
+                XCTAssertTrue(source.contains(declaration),
+                              "\(file) no longer declares: \(declaration)")
+            }
+            XCTAssertFalse(source.contains("@unchecked"),
+                           "\(file) carries an unchecked conformance; this bridge must be synthesized")
+        }
+    }
+
+    /// `ActivationRecord` is the bottom of the three-layer chain and the one that can be broken
+    /// SILENTLY: adding a stored property of a non-Sendable type leaves the declaration line
+    /// above untouched, so the source guard stays green while the synthesized conformance becomes
+    /// unsound the day strict concurrency is switched on. The stored property TYPES are therefore
+    /// pinned too, not just the declaration.
+    ///
+    /// `static let currentFormatVersion` is not matched on purpose — it is a type property, not
+    /// part of the value's storage.
+    func testActivationRecordHoldsOnlySendableStoredPropertyTypes() throws {
+        let file = "Sources/SoloLedgerCore/Migration/PreparedImportActivator.swift"
+        let source = try String(contentsOf: Self.packageRoot().appendingPathComponent(file),
+                                encoding: .utf8)
+        let start = try XCTUnwrap(
+            source.range(of: "struct ActivationRecord: Codable, Equatable, Sendable {"),
+            "the record declaration moved; the property scan below would read the wrong type")
+        let rest = source[start.upperBound...]
+        let end = try XCTUnwrap(rest.range(of: "\n\n    init("), "the record body no longer ends at its init")
+        let body = String(rest[..<end.lowerBound])
+
+        let regex = try NSRegularExpression(pattern: #"\n    var ([A-Za-z0-9_]+): ([A-Za-z0-9_?]+)"#)
+        var properties: [(name: String, type: String)] = []
+        for match in regex.matches(in: body, range: NSRange(body.startIndex..., in: body)) {
+            let name = try XCTUnwrap(Range(match.range(at: 1), in: body).map { String(body[$0]) })
+            let type = try XCTUnwrap(Range(match.range(at: 2), in: body).map { String(body[$0]) })
+            properties.append((name, type))
+        }
+        XCTAssertEqual(properties.count, 8, "the record's stored-property set moved: \(properties)")
+
+        let allowed: Set<String> = ["Int", "String", "String?"]
+        for property in properties {
+            XCTAssertTrue(allowed.contains(property.type),
+                          "\(property.name) is \(property.type); a stored property outside "
+                          + "\(allowed.sorted()) makes the synthesized Sendable unsound")
+        }
+        // Anti-vacuity: an empty or mis-parsed scan would satisfy the loop above silently.
+        XCTAssertEqual(Set(properties.map(\.type)), allowed,
+                       "the scan no longer sees all three declared property types")
+    }
+
+    /// …/native/SoloLedger/Tests/SoloLedgerCoreTests/<this>.swift → …/native/SoloLedger
+    private static func packageRoot() -> URL {
+        var dir = URL(fileURLWithPath: #filePath)
+        for _ in 0..<3 { dir.deleteLastPathComponent() }
+        return dir
+    }
 }
