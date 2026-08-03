@@ -1074,8 +1074,26 @@ final class AppModel: ObservableObject {
 
     // MARK: - Restore from backup (replace the active ledger)
 
+    /// Whether a destructive restore may START. **One predicate, two readers** — the Settings
+    /// button's `disabled` and the restore orchestration itself.
+    ///
+    /// The Settings window is a SEPARATE window: the conversion sheet's
+    /// `interactiveDismissDisabled` does not reach it, and a Settings window opened before the
+    /// wizard stays fully usable while the wizard is on screen. So the UI's `disabled` is a
+    /// first hint, not the control — a restore confirmed just as the state changes must still
+    /// be refused, and that decision belongs where the destruction happens.
+    var canRestoreFromBackup: Bool { legacyConversion.permitsDestructiveRestore }
+
     /// Replace the current ledger with the backup bundle at `bundleURL`, using production paths.
+    ///
+    /// The guard comes FIRST, before the paths are even resolved: `AppPaths.backupsDirectory()`
+    /// and `nativeAttachmentsDirectory()` both create their directory, and a refused restore
+    /// should leave no trace at all.
     func restoreFromBackup(bundleURL: URL) {
+        guard canRestoreFromBackup else {
+            LegacyConversionDiagnostics.restoreRefused(String(describing: legacyConversion))
+            return
+        }
         let config: MigrationCoordinator.Config
         let backups: URL
         let attachments: URL
@@ -1092,8 +1110,35 @@ final class AppModel: ObservableObject {
     /// `Backups/` (BackupExport) → close the live store → clear the active slot → re-import the bundle
     /// through the hardened chain (rebuilds DB + attachments, closing G1). Any failure BEFORE the store
     /// closes aborts with the current ledger untouched; after that, the `Backups/` snapshot is the net.
+    ///
+    /// ## The conversion interlock, and why it is HERE
+    ///
+    /// A conversion runs off the main actor on its OWN connection to the active file. Nothing
+    /// about this function knew that: it would close the main store, clear the active slot and
+    /// import another ledger while that worker went on committing to the old file handle —
+    /// after which the wizard reports success for transactions that are not in the ledger the
+    /// user is now looking at.
+    ///
+    /// The interlock is the FIRST statement, ahead of every side effect this function has:
+    /// the security-scope grant, `validateBundle`, the `pre-restore-` safety backup,
+    /// `store.db.close()`, `store = nil`, `ready = false`, `clearActiveSlot` and the
+    /// re-import. Refusing after any of them would already have cost the user something.
+    ///
+    /// It refuses on EVERY non-idle state, not only `.running`. `.summary` holds a plan of a
+    /// ledger that is about to be replaced; `.completed` holds the only on-screen copy of the
+    /// backup path; `.blocked` and `.failed` describe a ledger that would no longer be the one
+    /// on disk. Each of them would survive the restore as a true-looking statement about a
+    /// ledger that is gone.
+    ///
+    /// Silent, like the `legacyRecoveryAllowed` guards above it: the button that reaches here
+    /// is already disabled, so this fires only on a race, and there is no localized copy for it
+    /// (2a-4 may not add a key). The reason goes to the log instead.
     func restoreFromBackup(bundleURL: URL, config: MigrationCoordinator.Config,
                            backupsDir: URL, currentAttachmentsDir: URL) {
+        guard canRestoreFromBackup else {
+            LegacyConversionDiagnostics.restoreRefused(String(describing: legacyConversion))
+            return
+        }
         guard let store else { return }
         let scoped = bundleURL.startAccessingSecurityScopedResource()
         defer { if scoped { bundleURL.stopAccessingSecurityScopedResource() } }
@@ -1126,6 +1171,44 @@ final class AppModel: ObservableObject {
 
     var databasePath: String {
         (try? AppPaths.databaseURL().path) ?? "—"
+    }
+}
+
+// MARK: - The restore interlock, as one predicate
+
+extension LegacyConversionState {
+    /// Whether a destructive restore-from-backup may start while the wizard is in this state.
+    ///
+    /// **Only `.idle`.** Written as an allow-list of one rather than as a deny-list, so a state
+    /// added later is refused until somebody decides otherwise — the safe direction for a check
+    /// that guards a ledger replacement.
+    ///
+    /// Every other state is a claim about the ledger that is on disk NOW: `.summary` holds a
+    /// plan (row identities, source fingerprints) of it, `.running` has a second connection
+    /// writing to it, `.completed` holds the only on-screen copy of the pre-conversion backup
+    /// path, and `.blocked` / `.failed` describe its settings and its refusals. A restore
+    /// replaces the file underneath all of them, leaving statements that still read as true.
+    ///
+    /// The single source both the model guard and the Settings button read — see
+    /// ``AppModel/canRestoreFromBackup``.
+    var permitsDestructiveRestore: Bool {
+        switch self {
+        case .idle:
+            return true
+        case .blocked, .summary, .running, .completed, .failed:
+            return false
+        }
+    }
+}
+
+extension LegacyConversionDiagnostics {
+    /// A refused restore. The state name is `.public` — it is a case name, not ledger data, and
+    /// it is the one fact that makes a report of "the button did nothing" diagnosable.
+    static func restoreRefused(_ state: String) {
+        logger.error("""
+            restore-from-backup refused: a legacy conversion is in \
+            \(state, privacy: .public)
+            """)
     }
 }
 

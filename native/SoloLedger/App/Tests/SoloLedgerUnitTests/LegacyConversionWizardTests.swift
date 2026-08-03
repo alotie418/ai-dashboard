@@ -962,9 +962,129 @@ final class LegacyConversionWizardTests: XCTestCase {
         }
     }
 
+    // ==========================================================================================
+    // MARK: - W28 — a restore may not start unless the wizard is idle
+    // ==========================================================================================
+
+    /// The predicate, over EVERY state the wizard can be in. Only `.idle` permits a restore.
+    ///
+    /// This is where `.running` is covered. Reaching `.running` at runtime means calling
+    /// `confirmLegacyConversion`, which resolves the app's REAL `AppPaths` and starts a worker
+    /// against the production container — so the end-to-end refusals below drive the four
+    /// non-idle states an isolated test can honestly reach, and the binding to `.running` is
+    /// made here and pinned structurally by
+    /// ``testW28bTheRestoreGuardIsTheFirstStatementAndReadsTheOnePredicate``.
+    func testW28OnlyIdlePermitsADestructiveRestore() {
+        let some = plan(rows: [row(.sales, "s", "2024-01-01")])
+        let table: [(LegacyConversionState, Bool)] = [
+            (.idle, true),
+            (.blocked(.currencyNotConfigured), false),
+            (.summary(some), false),
+            (.running(some), false),
+            (.completed(convertedCount: 1, notConvertedCount: 0, backupPath: "/tmp/b"), false),
+            (.failed(.ledgerChanged), false),
+        ]
+        XCTAssertEqual(table.count, 6, "every case of LegacyConversionState must be decided")
+        for (state, permitted) in table {
+            XCTAssertEqual(state.permitsDestructiveRestore, permitted, "\(state)")
+        }
+        XCTAssertEqual(table.filter(\.1).count, 1, "exactly one state may restore")
+    }
+
+    /// The guard has to be the FIRST thing the destructive seam does, and it has to read the
+    /// same predicate the Settings button reads. Both halves are structural because both are
+    /// about ordering and identity, which no single call can demonstrate.
+    func testW28bTheRestoreGuardIsTheFirstStatementAndReadsTheOnePredicate() throws {
+        let model = try Self.appSource("App/AppModel.swift")
+        let seam = try Self.functionBody(
+            startingWith: "func restoreFromBackup(bundleURL: URL, config: MigrationCoordinator.Config,",
+            in: model)
+        let statements = Self.codeLines(of: seam)
+        XCTAssertEqual(statements.first, "guard canRestoreFromBackup else {", """
+            the interlock must precede every side effect of the restore. first statement: \
+            \(statements.prefix(3))
+            """)
+        // Every side effect the authorisation names must come AFTER it.
+        for effect in ["startAccessingSecurityScopedResource", "BackupRestore.validateBundle",
+                       "BackupExport.writeBundle", "store.db.close()", "self.store = nil",
+                       "ready = false", "BackupRestore.clearActiveSlot", "migrateFromUserDir"] {
+            let at = try XCTUnwrap(statements.firstIndex { $0.contains(effect) },
+                                   "\(effect) is no longer in the restore seam")
+            XCTAssertGreaterThan(at, 0, "\(effect) runs before the interlock")
+        }
+        // The production wrapper is guarded too — it creates directories while resolving paths.
+        let wrapper = try Self.functionBody(startingWith: "func restoreFromBackup(bundleURL: URL) {",
+                                            in: model)
+        XCTAssertEqual(Self.codeLines(of: wrapper).first, "guard canRestoreFromBackup else {")
+
+        // One predicate, one definition, delegating to the pure state answer.
+        XCTAssertEqual(Self.occurrences(of: "var canRestoreFromBackup: Bool", inCodeOf: model), 1)
+        XCTAssertEqual(Self.occurrences(of: "legacyConversion.permitsDestructiveRestore",
+                                        inCodeOf: model), 1)
+        XCTAssertEqual(Self.occurrences(of: "canRestoreFromBackup", inCodeOf: model), 3,
+                       "its one declaration and the two restore guards — no third reader, and "
+                       + "no second definition to drift from it")
+    }
+
+    /// The Settings button follows the same predicate — and it is the SECOND line of defence,
+    /// which is why the model guard above is asserted independently of it.
+    func testW28cTheSettingsRestoreButtonFollowsTheSamePredicate() throws {
+        let settings = try Self.appSource("Views/SettingsView.swift")
+        let arguments = Self.callArguments(to: "disabled", inCodeOf: settings)
+        XCTAssertTrue(arguments.contains("!model.canRestoreFromBackup"), """
+            the restore button must be disabled by the one predicate. found: \(arguments)
+            """)
+        XCTAssertEqual(Self.occurrences(of: "!model.canRestoreFromBackup", inCodeOf: settings), 1)
+        // It sits on the restore button, not on the export beside it.
+        let restoreLine = try XCTUnwrap(Self.codeLines(of: settings).firstIndex {
+            $0.contains("model.t(\"settings.restore\"), role: .destructive")
+        })
+        XCTAssertTrue(Self.codeLines(of: settings)[restoreLine + 1]
+            .contains(".disabled(!model.canRestoreFromBackup)"),
+                      "the disabled modifier must be attached to the restore button itself")
+    }
+
+    /// The other destructive recovery path — the legacy `DatabaseUpgrade` screen — is already
+    /// unreachable during a conversion, and this records WHY rather than adding a second guard
+    /// that would never fire. `legacyRecoveryAllowed` requires `store == nil && !ready`, and a
+    /// conversion cannot start without a live, ready store.
+    func testW28dTheLegacyRecoveryPathIsStructurallyUnreachableDuringAConversion() async throws {
+        let model = try await bootedModel(withLegacyRows: true)
+        XCTAssertTrue(model.ready)
+        XCTAssertNotNil(model.store)
+        XCTAssertFalse(model.legacyRecoveryAllowed,
+                       "a ready ledger already refuses the DatabaseUpgrade recovery actions")
+        model.beginLegacyConversion()
+        guard case .summary = model.legacyConversion else { return XCTFail("no plan") }
+        XCTAssertFalse(model.legacyRecoveryAllowed)
+        XCTAssertFalse(model.canRestoreFromBackup)
+    }
+
     // MARK: - Helpers
 
     private static let languages = ["zh-Hans", "zh-Hant", "en", "ja", "ko", "fr"]
+
+    /// The body of the first function whose declaration begins with `prefix`, brace-matched.
+    private static func functionBody(startingWith prefix: String, in source: String) throws -> String {
+        let start = try XCTUnwrap(source.range(of: prefix), "no function begins with \(prefix)")
+        let open = try XCTUnwrap(source.range(of: "{", range: start.lowerBound..<source.endIndex))
+        var depth = 1
+        var index = open.upperBound
+        while index < source.endIndex, depth > 0 {
+            if source[index] == "{" { depth += 1 }
+            if source[index] == "}" { depth -= 1; if depth == 0 { break } }
+            index = source.index(after: index)
+        }
+        XCTAssertEqual(depth, 0, "\(prefix) is unbalanced")
+        return String(source[open.upperBound..<index])
+    }
+
+    /// Non-comment, non-blank lines, trimmed — the statements, in order.
+    private static func codeLines(of source: String) -> [String] {
+        source.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("//") && !$0.hasPrefix("*") && !$0.hasPrefix("/*") }
+    }
 
     /// The body of `.sheet(isPresented: $model.<binding>) { … }`, brace-matched.
     private static func sheetClosure(binding: String, in source: String) throws -> String {
