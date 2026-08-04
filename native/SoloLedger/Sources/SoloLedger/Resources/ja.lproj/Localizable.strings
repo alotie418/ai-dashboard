@@ -580,3 +580,68 @@
 "legacy.convert.failed.busy" = "別の処理がこの台帳に書き込んでいるため、今回の変換はすべてロールバックされました。取引は1件も書き込まれず、台帳ファイルは変更されていません。台帳を使用している処理を終了してから、もう一度お試しください。";
 "legacy.convert.failed.internal" = "変換は自身の整合性チェックで停止し、全体が取り消されました。取引は 1 件も書き込まれておらず、台帳ファイルは変更されていません。事前チェックをやり直してから再試行してください。";
 "legacy.convert.failed.retryNote" = "バックアップが書き込まれたあとで失敗した場合、そのバックアップは Backups フォルダに残っています。再試行では別のバックアップが新たに作られ、既存のものが上書きされることはありません。";
+
+/* ── 商品 / 服务项目（2b-A2）──────────────────────────────────────────
+   基础资料页的文案。default_unit_cost 只登记不参与计算，页内 note 对用户
+   如实说明这一点；凡「不进入库存统计」一类的说法一律用将来时，因为本 App
+   目前还没有库存统计。此处只有文案，没有任何视图消费它们。 */
+
+/* A 页面 chrome（3 键） */
+"product.page.title" = "商品・サービス";
+"product.page.subtitle" = "商品・サービス項目と単位を管理します。";
+"product.page.note" = "ここでは基礎データのみを登録します。既定単価は記録されるだけで、本アプリは在庫原価やレポートの数値の計算には使用しません。";
+
+/* B 列表列头（5 键） */
+"product.col.name" = "名称";
+"product.col.unit" = "単位";
+"product.col.cost" = "既定単価（税抜）";
+"product.col.type" = "種別";
+"product.col.status" = "状態";
+
+/* C 类型与状态（4 键） */
+"product.type.product" = "商品";
+"product.type.service" = "サービス";
+"product.status.active" = "有効";
+"product.status.inactive" = "無効";
+
+/* D 单位显示名，逐字取自 components/accountingHelpers.ts:190-203（11 键） */
+"product.unit.piece" = "個";
+"product.unit.box" = "箱";
+"product.unit.bag" = "袋";
+"product.unit.kg" = "kg";
+"product.unit.ton" = "トン";
+"product.unit.liter" = "L";
+"product.unit.bottle" = "本";
+"product.unit.pack" = "パック";
+"product.unit.session" = "回";
+"product.unit.hour" = "時間";
+"product.unit.month" = "ヶ月";
+
+/* E 表单（5 键） */
+"product.form.newTitle" = "新規項目";
+"product.form.editTitle" = "項目を編集";
+"product.form.namePlaceholder" = "例：A型梱包箱 / コンサルティング";
+"product.form.isService" = "サービス項目";
+"product.form.isServiceHint" = "サービス項目は、在庫集計が追加された際にはその対象外となります。";
+
+/* F 操作（1 键） */
+"product.action.add" = "商品・サービスを追加";
+
+/* G 删除确认，按钮复用 common.delete / common.cancel（2 键） */
+"product.delete.confirmTitle" = "「{name}」を削除しますか？";
+"product.delete.confirmMessage" = "この基礎データは帳簿から削除され、アプリ内で元に戻すことはできません。すでにこの項目を参照している記録は削除も変更もされません。";
+
+/* H 空态（2 键） */
+"product.empty.title" = "商品・サービスがありません";
+"product.empty.message" = "最初の商品・サービス項目を追加すると、ここに表示されます。";
+
+/* I ProductCatalogError 六个 case 各一句（6 键） */
+"product.error.invalidID" = "対象の項目が指定されていません。";
+"product.error.nameRequired" = "名称は空にできません。";
+"product.error.unitNotRecognized" = "この単位は選択できる範囲にありません。";
+"product.error.notFound" = "この項目は帳簿にありません。すでに削除された可能性があります。";
+"product.error.idCollision" = "生成された識別子が既存の項目と重複しました。もう一度お試しください。";
+"product.error.storageFailure" = "帳簿はこの変更を保存できませんでした。";
+
+/* J 读不出的行：Core 的 unreadableCount 在界面上的落点（1 键） */
+"product.unreadable.notice" = "この帳簿には読み取れない商品レコードが {count} 件あり、上には表示されていません。帳簿ファイル内にはそのまま保存されており、本アプリは変更していません。";
