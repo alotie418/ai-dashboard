@@ -491,15 +491,36 @@ final class ProductCatalogTests: LedgerTestCase {
                        ["First", "A active", "B active", "Retired"])
     }
 
-    // MARK: - T-K · nothing constructs any of this yet
+    // MARK: - T-K · who is allowed to name the catalog
 
-    /// The read/write layer ships BEFORE the copy and the view, so no production source file may
-    /// name any of it. Whole-identifier matching, and `//` comments are not uses — the declaring
-    /// file names these symbols constantly and is excluded by path, not by pattern.
-    func testNoProductionSourceFileNamesTheCatalogYet() throws {
-        let forbidden = ["Product", "ProductUnit", "ProductCatalogPage", "ProductCatalogError",
-                         "productCatalog", "createProduct", "updateProduct", "deleteProduct"]
-        var offenders: [String] = []
+    /// Until 2b-A3 the answer was "nobody". It is now a CLOSED SET rather than an empty one: the
+    /// products page's model reaches the store, the page's composition names the model types, and
+    /// no third file names either.
+    ///
+    /// Asserted per symbol and in both directions, so this fails on a use that appears somewhere
+    /// new AND on a use that quietly disappears from where it belongs. Whole-identifier matching,
+    /// and `//` comments are not uses — the declaring file names these symbols constantly and is
+    /// excluded by path, not by pattern.
+    ///
+    /// `Views/ProductsView.swift` is deliberately absent from every row: the view is handed
+    /// composed values and never names a Core type, which is the same discipline that keeps it
+    /// free of `product.*` string literals.
+    func testTheCatalogIsNamedOnlyByTheProductPagesModelAndItsComposition() throws {
+        let expected: [String: [String]] = [
+            "Product":             ["SoloLedger/App/AppModel.swift",
+                                    "SoloLedger/App/ProductPageComposition.swift"],
+            "ProductUnit":         ["SoloLedger/App/AppModel.swift",
+                                    "SoloLedger/App/ProductPageComposition.swift"],
+            "ProductCatalogPage":  ["SoloLedger/App/AppModel.swift",
+                                    "SoloLedger/App/ProductPageComposition.swift"],
+            "ProductCatalogError": ["SoloLedger/App/AppModel.swift",
+                                    "SoloLedger/App/ProductPageComposition.swift"],
+            "productCatalog":      ["SoloLedger/App/AppModel.swift"],
+            "createProduct":       ["SoloLedger/App/AppModel.swift"],
+            "updateProduct":       ["SoloLedger/App/AppModel.swift"],
+            "deleteProduct":       ["SoloLedger/App/AppModel.swift"],
+        ]
+        var found: [String: [String]] = [:]
         for (path, text) in try Self.productionSources() {
             let code = text
                 .split(separator: "\n", omittingEmptySubsequences: false)
@@ -508,14 +529,21 @@ final class ProductCatalogTests: LedgerTestCase {
                     return String(line[line.startIndex..<comment.lowerBound])
                 }
                 .joined(separator: "\n")
-            for symbol in forbidden {
+            for symbol in expected.keys {
                 let pattern = "(^|[^A-Za-z0-9_])\(symbol)([^A-Za-z0-9_]|$)"
                 if code.range(of: pattern, options: .regularExpression) != nil {
-                    offenders.append("\(path): \(symbol)")
+                    found[symbol, default: []].append(path)
                 }
             }
         }
-        XCTAssertEqual(offenders, [], "the catalog must still be unreachable")
+        for (symbol, paths) in expected {
+            XCTAssertEqual((found[symbol] ?? []).sorted(), paths.sorted(), """
+                \(symbol) is named by a different set of files than the one this stage allows.
+                unexpected: \(Set(found[symbol] ?? []).subtracting(paths).sorted())
+                missing:    \(Set(paths).subtracting(found[symbol] ?? []).sorted())
+                """)
+        }
+        XCTAssertEqual(Set(found.keys), Set(expected.keys))
     }
 
     /// The scan is worthless if it cannot see a use, so prove it fires.

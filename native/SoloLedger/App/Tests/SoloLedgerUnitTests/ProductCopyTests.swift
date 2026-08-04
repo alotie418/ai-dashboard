@@ -345,11 +345,27 @@ final class ProductCopyTests: XCTestCase {
         }
     }
 
-    // MARK: - P12 · the copy is still dormant
+    // MARK: - P12 · exactly one file names the copy
 
-    func testP12NoSourceFileNamesAnyProductKeyYet() throws {
-        let mentioned = Self.mentions(of: Self.adjudicatedKeys, in: try Self.allSources())
-        XCTAssertEqual(mentioned.sorted(), [], "2b-A2 lands the copy dormant; the view is 2b-A3")
+    /// 2b-A2 landed these forty strings dormant and this test asserted nobody named them. 2b-A3
+    /// gives them a page, so the assertion becomes a CLOSED SET rather than an empty one: every
+    /// key is named by `ProductPageComposition.swift` and by nothing else.
+    ///
+    /// Both directions matter. A key named nowhere is copy the page cannot reach; a key named in
+    /// a second file means the page has grown a source of strings the composition does not know
+    /// about, which is precisely what makes `ProductMountingTests`' placement proof meaningful.
+    func testP12EveryProductKeyIsNamedByTheCompositionAndByNothingElse() throws {
+        let sources = try Self.allSources()
+        for key in Self.adjudicatedKeys {
+            let files = Set(sources.filter { source in
+                source.text.split(separator: "\n", omittingEmptySubsequences: false).contains {
+                    let trimmed = $0.trimmingCharacters(in: .whitespaces)
+                    return !trimmed.hasPrefix("//") && !trimmed.hasPrefix("*")
+                        && !trimmed.hasPrefix("/*") && $0.contains("\"\(key)\"")
+                }
+            }.map(\.path))
+            XCTAssertEqual(files, ["ProductPageComposition.swift"], "\(key) is named by \(files.sorted())")
+        }
     }
 
     /// The scan is worthless if it cannot see a use, or is reading nothing.

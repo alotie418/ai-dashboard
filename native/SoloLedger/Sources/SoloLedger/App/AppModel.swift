@@ -1050,6 +1050,131 @@ final class AppModel: ObservableObject {
                                                 isDirectory: true)
     }
 
+    // MARK: - Products / service items (2b-A3 page state; nothing reaches this page yet)
+
+    /// The product catalogue as last read, together with the rows that could not be decoded.
+    ///
+    /// Loaded LAZILY — `ProductsView` asks for it when it appears, and `reloadAll()` deliberately
+    /// does not. Until the sidebar gains its entry there is no way to open that page, and a
+    /// query nobody can see the result of should not be run on every refresh of every other
+    /// screen. It also keeps this stage's shipped behaviour byte-for-byte identical to the
+    /// stage before it.
+    @Published private(set) var products = ProductCatalogPage(products: [], unreadableCount: 0)
+
+    /// The last refused write, as a case and never as text. `ProductCatalogError` has no
+    /// payload, so nothing the database said can travel from here to the screen.
+    @Published private(set) var productError: ProductCatalogError?
+
+    /// The inline new/edit panel's state, or `nil` when it is closed.
+    @Published var productForm: ProductFormDraft?
+
+    /// The row a delete is awaiting confirmation for. The ledger is NOT touched until
+    /// `confirmProductDelete()`.
+    @Published private(set) var pendingProductDelete: Product?
+
+    /// One undecided write at a time. Opening the form while a delete is pending — or deleting
+    /// the row that is open in the form — would leave the user confirming one thing while
+    /// looking at another, so every intent below refuses while this is true.
+    var productWriteIsPending: Bool { productForm != nil || pendingProductDelete != nil }
+
+    /// What the page draws, assembled from the state above and nothing else.
+    var productInput: ProductPageComposition.Input {
+        ProductPageComposition.Input(catalog: products, form: productForm,
+                                     pendingDelete: pendingProductDelete, error: productError)
+    }
+
+    func reloadProducts() {
+        guard let store else { return }
+        do { products = try store.productCatalog() } catch { productError = .storageFailure }
+    }
+
+    func newProduct() {
+        guard !productWriteIsPending else { return }
+        productForm = ProductFormDraft(editing: nil)
+    }
+
+    func editProduct(_ product: Product) {
+        guard !productWriteIsPending else { return }
+        productForm = ProductFormDraft(editing: product)
+    }
+
+    func cancelProductForm() { productForm = nil }
+
+    /// Create or update, and close the panel only if the ledger accepted it.
+    ///
+    /// An edit submits ONLY the fields that differ from what the panel is showing
+    /// (`ProductFormDraft.changes`), and an edit that changes nothing is not a write at all —
+    /// it never reaches the store, so `updated_at` does not move and a leniently-read value is
+    /// never written back as though the user had confirmed it.
+    func saveProductForm() {
+        guard let store, let draft = productForm else { return }
+        guard let editing = draft.editing else {
+            let created = performProductWrite {
+                _ = try store.createProduct(name: draft.name,
+                                            unit: draft.unit ?? ProductUnit.piece.rawValue,
+                                            defaultUnitCost: ProductFormDraft.parseCost(draft.costText),
+                                            isService: draft.isService)
+            }
+            if created { productForm = nil }
+            return
+        }
+        let changes = draft.changes
+        guard !changes.isEmpty else { productForm = nil; productError = nil; return }
+        let updated = performProductWrite {
+            try store.updateProduct(id: editing.id, name: changes.name, unit: changes.unit,
+                                    defaultUnitCost: changes.defaultUnitCost,
+                                    isService: changes.isService)
+        }
+        if updated { productForm = nil }
+    }
+
+    /// Flip one row's active flag. Not a form field on either side — the list cell is the
+    /// control, exactly as it is in the other app.
+    func toggleProductActive(_ product: Product) {
+        guard let store, !productWriteIsPending else { return }
+        performProductWrite { try store.updateProduct(id: product.id, isActive: !product.isActive) }
+    }
+
+    func requestProductDelete(_ product: Product) {
+        guard !productWriteIsPending else { return }
+        pendingProductDelete = product
+    }
+
+    func cancelProductDelete() { pendingProductDelete = nil }
+
+    func confirmProductDelete() {
+        guard let store, let product = pendingProductDelete else { return }
+        pendingProductDelete = nil
+        performProductWrite { try store.deleteProduct(id: product.id) }
+    }
+
+    func dismissProductError() { productError = nil }
+
+    /// Run one catalogue write and land its outcome.
+    ///
+    /// On success the read model is refreshed HERE, so no caller can forget: a list that still
+    /// shows the row a moment after it was deleted is the same defect class the conversion
+    /// wizard's M14 mutation exposed — "the state is right" is not "the screen is right".
+    /// On failure nothing is reloaded and the list stays exactly as it was, because nothing in
+    /// the ledger changed.
+    @discardableResult
+    private func performProductWrite(_ work: () throws -> Void) -> Bool {
+        do {
+            try work()
+        } catch let error as ProductCatalogError {
+            productError = error
+            return false
+        } catch {
+            // Anything the store raises that is not one of the six adjudicated refusals — a raw
+            // SQLite failure, say. Mapped rather than printed: its text carries the statement.
+            productError = .storageFailure
+            return false
+        }
+        productError = nil
+        reloadProducts()
+        return true
+    }
+
     // MARK: - CSV
 
     func exportCSV(to url: URL) {
