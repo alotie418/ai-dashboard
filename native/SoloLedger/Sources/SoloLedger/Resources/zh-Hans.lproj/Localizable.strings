@@ -17,6 +17,7 @@
 "nav.transactions" = "收支流水";
 "nav.categories" = "会计类别";
 "nav.reports" = "报表";
+"nav.products" = "商品 / 服务项目";
 
 "overview.income" = "收入合计";
 "overview.expense" = "支出合计";
@@ -38,7 +39,7 @@
 "legacy.notice.message" = "它们完整保存在账本文件中，没有丢失。本 App 目前只显示「流水」，因此这里看不到它们。现在可以先查看把其中符合条件的旧记录转换为流水会做什么，确认后再开始；在你确认之前不会写入任何内容。";
 "legacy.banner" = "另有 {count} 条旧版销售 / 采购记录未在此显示。";
 "legacy.other.title" = "此账本包含本 App 尚未显示的记录";
-"legacy.other.message" = "账本文件中存在发票、产品、固定资产等类型的记录。它们完整保存在文件中，没有丢失；本 App 目前只显示「流水」。";
+"legacy.other.message" = "账本文件中存在发票、固定资产等类型的记录。它们完整保存在文件中，没有丢失；本 App 目前只显示「流水」。";
 "txn.col.date" = "日期";
 "txn.col.type" = "类型";
 "txn.col.category" = "类别";

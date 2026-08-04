@@ -70,7 +70,7 @@ final class LegacyConversionWizardTests: XCTestCase {
         }
     }
 
-    /// `legacy.other.*` describes invoices, products and fixed assets. `LegacyConversionPlan`
+    /// `legacy.other.*` describes invoices, fixed assets and the rest. `LegacyConversionPlan`
     /// never scans those tables and the runner cannot carry them, so an entry point there could
     /// only ever report that there is nothing to convert.
     func testW02TheOtherRecordsBranchNeverOffersAConversion() {

@@ -105,16 +105,43 @@ final class LegacyLedgerProbeTests: LedgerTestCase {
     }
 
     func testOtherElectronTablesAlsoCountAsHiddenRecords() throws {
-        // A ledger whose records are invoices/products/fixed assets — no transactions
-        // and no legacy sales — is just as non-empty, and must never be offered a
-        // demo-data seed nor be told "you have no records".
+        // A ledger whose records are invoices/fixed assets — no transactions and no legacy
+        // sales — is just as non-empty, and must never be offered a demo-data seed nor be
+        // told "you have no records". The fixture uses a table this app still does not show;
+        // `products` used to serve here and no longer can — see the test below.
         let store = try makeStore()
-        try store.db.run("INSERT INTO products (id, name) VALUES (?, ?)", [.text("p-1"), .text("Widget")])
+        try store.db.run("INSERT INTO fixed_assets (id, name) VALUES (?, ?)",
+                         [.text("fa-1"), .text("Van")])
 
         let summary = try store.legacyLedgerSummary()
         XCTAssertFalse(summary.hasUnconverted, "no legacy sales/purchases here")
         XCTAssertEqual(summary.otherRecords, 1)
         XCTAssertTrue(summary.holdsHiddenRecords)
+    }
+
+    /// 2b-A4. `products` is no longer a hidden record, because the app now has a page that shows
+    /// it. Leaving it in `otherRecordTables` would have told a user who had just created their
+    /// first product that this ledger holds records the app does not show — while showing them.
+    ///
+    /// A positive claim rather than an absence: the row really is there, the probe really does
+    /// see the table, and it still answers zero.
+    func testAProductRowIsNotAHiddenRecordBecauseTheAppShowsProducts() throws {
+        let store = try makeStore()
+        try store.db.run("INSERT INTO products (id, name) VALUES (?, ?)",
+                         [.text("p-1"), .text("Widget")])
+        XCTAssertEqual(try store.db.query("SELECT COUNT(*) AS c FROM products").first?.int("c"), 1,
+                       "fixture assumption: the row is really in the file")
+
+        let summary = try store.legacyLedgerSummary()
+        XCTAssertEqual(summary.otherRecords, 0, "a visible record is not a hidden one")
+        XCTAssertFalse(summary.holdsHiddenRecords,
+                       "a ledger holding only products is not one whose records are out of reach")
+        XCTAssertFalse(summary.hasUnconverted)
+        // And the table is out of the list by name, so a re-added entry fails here too.
+        XCTAssertFalse(LegacyLedgerSummary.otherRecordTables.contains("products"))
+        XCTAssertEqual(LegacyLedgerSummary.otherRecordTables.count, 11)
+        XCTAssertTrue(LegacyLedgerSummary.otherRecordTables.contains("fixed_assets"),
+                      "the tables this app still does not show must stay counted")
     }
 
     func testInfrastructureAndSingletonRowsDoNotCountAsRecords() throws {

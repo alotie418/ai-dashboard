@@ -567,7 +567,7 @@ final class ReportPresenterTests: XCTestCase {
     /// proves it is the same string as the page's own title.
     func testTheReportPageHasItsEntryPoint() {
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
-                       ["overview", "transactions", "categories", "reports"])
+                       ["overview", "transactions", "categories", "products", "reports"])
         XCTAssertEqual(SidebarSection(rawValue: "reports"), .reports)
         XCTAssertEqual(SidebarSection.reports.titleKey, "nav.reports")
         for section in SidebarSection.allCases {

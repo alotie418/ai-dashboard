@@ -17,6 +17,7 @@
 "nav.transactions" = "Transactions";
 "nav.categories" = "Categories";
 "nav.reports" = "Reports";
+"nav.products" = "Products & Services";
 
 "overview.income" = "Total income";
 "overview.expense" = "Total expense";
@@ -38,7 +39,7 @@
 "legacy.notice.message" = "They are stored intact in the ledger file — nothing was lost. This app currently shows only transactions, so they are not listed here. You can now review what converting the eligible legacy records into transactions would do, and start only after you confirm; nothing is written before you do.";
 "legacy.banner" = "Legacy sales / purchase records not shown here: {count}";
 "legacy.other.title" = "This ledger holds records this app does not show yet";
-"legacy.other.message" = "The file contains records such as invoices, products and fixed assets. They are stored intact — nothing was lost. This app currently shows only transactions.";
+"legacy.other.message" = "The file contains records such as invoices and fixed assets. They are stored intact — nothing was lost. This app currently shows only transactions.";
 "txn.col.date" = "Date";
 "txn.col.type" = "Type";
 "txn.col.category" = "Category";

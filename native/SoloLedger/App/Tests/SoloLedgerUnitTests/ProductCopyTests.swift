@@ -104,11 +104,11 @@ final class ProductCopyTests: XCTestCase {
 
     // MARK: - P2 · the whole universe, and six identical key sets
 
-    func testP2EverySixLocaleFileHoldsFiveHundredThirtySixKeys() throws {
+    func testP2EverySixLocaleFileHoldsFiveHundredThirtySevenKeys() throws {
         var keySets: [Set<String>] = []
         for language in languages {
             let table = try sourceTable(language)
-            XCTAssertEqual(table.count, 536, "\(language) has \(table.count) keys")
+            XCTAssertEqual(table.count, 537, "\(language) has \(table.count) keys")
             keySets.append(Set(table.keys.filter { $0.hasPrefix("product.") }))
         }
         XCTAssertEqual(Set(keySets).count, 1, "the six locales do not agree on the product.* key set")

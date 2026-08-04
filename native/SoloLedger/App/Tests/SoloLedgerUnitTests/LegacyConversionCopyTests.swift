@@ -91,13 +91,16 @@ final class LegacyConversionCopyTests: XCTestCase {
             "ko": "이 장부에는 이 앱이 아직 표시하지 않는 기록이 있습니다",
             "fr": "Cette comptabilité contient des enregistrements que cette app n'affiche pas encore",
         ],
+        // The product example left this sentence in 2b-A4, when the products page landed: an
+        // example of what the app does NOT show cannot be a thing it shows. Invoices and fixed
+        // assets are still hidden, so the sentence keeps its point and loses only that item.
         "legacy.other.message": [
-            "zh-Hans": "账本文件中存在发票、产品、固定资产等类型的记录。它们完整保存在文件中，没有丢失；本 App 目前只显示「流水」。",
-            "zh-Hant": "帳本檔案中存在發票、產品、固定資產等類型的紀錄。它們完整保存在檔案中，沒有遺失；本 App 目前只顯示「流水」。",
-            "en": "The file contains records such as invoices, products and fixed assets. They are stored intact — nothing was lost. This app currently shows only transactions.",
-            "ja": "台帳ファイルには請求書・商品・固定資産などの記録が保存されています。これらはそのまま保存されており、失われていません。本アプリは現在「取引」のみを表示します。",
-            "ko": "장부 파일에는 청구서·상품·고정자산 등의 기록이 저장되어 있습니다. 그대로 보관되어 있으며 사라지지 않았습니다. 이 앱은 현재 '거래'만 표시합니다.",
-            "fr": "Le fichier contient des enregistrements tels que factures, produits et immobilisations. Ils sont conservés intacts — rien n'a été perdu. Cette app n'affiche pour l'instant que les écritures.",
+            "zh-Hans": "账本文件中存在发票、固定资产等类型的记录。它们完整保存在文件中，没有丢失；本 App 目前只显示「流水」。",
+            "zh-Hant": "帳本檔案中存在發票、固定資產等類型的紀錄。它們完整保存在檔案中，沒有遺失；本 App 目前只顯示「流水」。",
+            "en": "The file contains records such as invoices and fixed assets. They are stored intact — nothing was lost. This app currently shows only transactions.",
+            "ja": "台帳ファイルには請求書・固定資産などの記録が保存されています。これらはそのまま保存されており、失われていません。本アプリは現在「取引」のみを表示します。",
+            "ko": "장부 파일에는 청구서·고정자산 등의 기록이 저장되어 있습니다. 그대로 보관되어 있으며 사라지지 않았습니다. 이 앱은 현재 '거래'만 표시합니다.",
+            "fr": "Le fichier contient des enregistrements tels que factures et immobilisations. Ils sont conservés intacts — rien n'a été perdu. Cette app n'affiche pour l'instant que les écritures.",
         ],
     ]
 
@@ -347,7 +350,7 @@ final class LegacyConversionCopyTests: XCTestCase {
                            "\(language): the report namespace must not have moved")
             XCTAssertEqual(table.keys.filter { $0.hasPrefix("settings.") }.count, 36,
                            "\(language): the settings namespace must not have moved")
-            XCTAssertEqual(table.count, 536, "\(language): 496 on base + 40")
+            XCTAssertEqual(table.count, 537, "\(language): 496 + 40 + 1")
         }
         XCTAssertEqual(Set(Self.conversionCopyKeys).count, 97,
                        "the declared key list has a duplicate")
@@ -755,8 +758,8 @@ final class LegacyConversionCopyTests: XCTestCase {
 
     // MARK: - T8 — the other-records notice promises nothing
 
-    /// `legacy.other.*` renders when `hasUnconverted` is FALSE — invoices, products, fixed
-    /// assets. `LegacyConversionPlan` does not scan those tables and the runner cannot carry
+    /// `legacy.other.*` renders when `hasUnconverted` is FALSE — invoices, fixed assets and
+    /// the rest. `LegacyConversionPlan` does not scan those tables and the runner cannot carry
     /// them, so a conversion entry point there would be a button that can only ever report
     /// "nothing to convert". Keeping the promise out of the copy is the half of that this stage
     /// can enforce.

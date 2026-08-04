@@ -6,6 +6,9 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     case overview
     case transactions
     case categories
+    /// Master data, next to the categories it sits beside conceptually. Reports stay last:
+    /// they are the output of everything above them.
+    case products
     case reports
     var id: String { rawValue }
     var titleKey: String { "nav.\(rawValue)" }
@@ -14,6 +17,9 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         case .overview: return "chart.bar.doc.horizontal"
         case .transactions: return "list.bullet.rectangle"
         case .categories: return "tag"
+        // The same symbol the products page's own empty state uses, so the sidebar row and
+        // the page it opens are one visual thing.
+        case .products: return "shippingbox"
         case .reports: return "doc.text.magnifyingglass"
         }
     }
@@ -818,9 +824,18 @@ final class AppModel: ObservableObject {
     ///   - no transactions this app can see;
     ///   - no legacy records it cannot see. A ledger migrated from Electron can hold real
     ///     records this app never reads and still look empty;
-    ///   - the legacy probe succeeded, because otherwise "empty" is unproven.
+    ///   - the legacy probe succeeded, because otherwise "empty" is unproven;
+    ///   - no products. Asked SEPARATELY rather than through the probe, and that separation is
+    ///     the point. `products` left `otherRecordTables` when the products page landed, because
+    ///     that list means "records the user cannot see here" — a question about VISIBILITY. This
+    ///     predicate asks a different question, whether the ledger is provably NEW, and a ledger
+    ///     carrying a product catalogue is not, however visible it now is. Reading the two
+    ///     through one flag would have quietly loosened this one the moment the other changed.
+    ///     Unreadable rows count too: a catalogue this app could not decode is not an absent one.
     ///
-    /// The last two are the pair `canLoadDemoData` already uses, for the same reason.
+    /// The probe pair is the one `canLoadDemoData` already uses, for the same reason. That
+    /// predicate is deliberately NOT given the products conjunct: it guards a DEBUG-only seed of
+    /// demo transactions, which no product row conflicts with.
     ///
     /// The value is the chosen regime's existing `AccountingProfile` currency — the one the
     /// screen displayed and the one `applyRegimeSwitch` would have written. No currency is
@@ -832,7 +847,11 @@ final class AppModel: ObservableObject {
               case .configured = accountingLocaleState,
               transactions.isEmpty,
               !legacyLedger.holdsHiddenRecords,
-              !legacyProbeFailed
+              !legacyProbeFailed,
+              // A read that FAILS is not "no products", for the same reason a failed probe is not
+              // "no legacy records": `nil` here means the catalogue could not be inspected, and a
+              // ledger this app could not inspect is not one it may write into.
+              productCatalogIsProvablyEmpty(store) == true
         else { return }
         do {
             try store.settings.setString(AccountingProfile.profile(for: accountingLocale).currency,
@@ -842,6 +861,16 @@ final class AppModel: ObservableObject {
             // report page states its refusal, which is a true statement about a real state.
             actionError = "\(error)"
         }
+    }
+
+    /// Whether the product catalogue is provably empty: no decoded rows AND none that failed to
+    /// decode. `nil` when the catalogue could not be read at all.
+    ///
+    /// Internal rather than private so the hosted test can isolate this one conjunct without
+    /// driving the other four.
+    func productCatalogIsProvablyEmpty(_ store: LedgerStore) -> Bool? {
+        guard let page = try? store.productCatalog() else { return nil }
+        return page.products.isEmpty && page.unreadableCount == 0
     }
 
     // MARK: - Reports (R8 P3a state model; reached from the `.reports` sidebar section since P3e)

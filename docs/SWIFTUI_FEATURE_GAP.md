@@ -37,7 +37,7 @@
 | Electron 功能 | 状态 | 备注 |
 | --- | --- | --- |
 | 发票 / 报价单 / 商业单据（`business_documents`） | ⏸️ | 暂缓（Phase 3） |
-| 产品 / 服务项（`products`） | ⏸️ | 暂缓 |
+| 产品 / 服务项（`products`） | ✅（阶段 2b） | `ProductsView` + `ProductPageComposition` + `Inventory/ProductCatalog.swift`（逐行镜像 `electron/handlers/products.js`）。侧栏「商品 / 服务项目」可达。**仅主数据**：`default_unit_cost` 只登记，不参与任何计算——库存计价（`inventory.js` 的加权平均）仍未做 |
 | 客户 / 供应商 | 🟡 | 目前 `counterparty` 为自由文本 |
 | 现金/银行账户、负债、固定资产、权益、税费台账（策略中立） | ⏸️ | 暂缓 |
 

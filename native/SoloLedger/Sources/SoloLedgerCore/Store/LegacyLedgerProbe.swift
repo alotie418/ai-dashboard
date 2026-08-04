@@ -50,11 +50,17 @@ extension LegacyLedgerSummary {
     /// (`alerts`, `assistant_*`, `ecommerce_*`, `ai_providers`) and the `home_office`
     /// singleton, which schema v6 seeds on every ledger — counting it would put a
     /// "you have hidden records" notice on a brand-new empty ledger.
+    ///
+    /// `products` left this list when the products page landed (2b-A4), for exactly the
+    /// reason `home_office` was never in it: this list means "records the user cannot see
+    /// here", and product rows are now on screen with their own page. Leaving it in would
+    /// have told a user who had just added their first product that the ledger holds records
+    /// this app does not show — while showing them.
     /// Table names are fixed literals here, never interpolated from input.
     static let otherRecordTables = [
         "accounts", "business_document_items", "business_documents", "equity",
         "fixed_assets", "liabilities", "mileage_logs", "price_history",
-        "products", "purchase_items", "sales_items", "tax_payments",
+        "purchase_items", "sales_items", "tax_payments",
     ]
 }
 
