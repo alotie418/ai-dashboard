@@ -374,7 +374,7 @@ final class ReportStructuralCopyTests: XCTestCase {
     /// is an ambiguity the user has no way to resolve.
     func testTheEntryPointResolvesInEveryLanguage() {
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
-                       ["overview", "transactions", "categories", "reports"])
+                       ["overview", "transactions", "categories", "products", "reports"])
         for language in languages {
             var labels: [String] = []
             for section in SidebarSection.allCases {

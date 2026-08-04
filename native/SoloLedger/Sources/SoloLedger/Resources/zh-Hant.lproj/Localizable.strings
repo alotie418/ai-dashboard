@@ -38,7 +38,7 @@
 "legacy.notice.message" = "它們完整保存在帳本檔案中，沒有遺失。本 App 目前只顯示「流水」，因此這裡看不到它們。現在可以先查看把其中符合條件的舊紀錄轉換為流水會做什麼，確認後再開始；在你確認之前不會寫入任何內容。";
 "legacy.banner" = "另有 {count} 筆舊版銷售 / 採購紀錄未在此顯示。";
 "legacy.other.title" = "此帳本包含本 App 尚未顯示的紀錄";
-"legacy.other.message" = "帳本檔案中存在發票、產品、固定資產等類型的紀錄。它們完整保存在檔案中，沒有遺失；本 App 目前只顯示「流水」。";
+"legacy.other.message" = "帳本檔案中存在發票、固定資產等類型的紀錄。它們完整保存在檔案中，沒有遺失；本 App 目前只顯示「流水」。";
 "txn.noResults.title" = "無相符結果";
 "txn.noResults.message" = "沒有符合目前搜尋或篩選條件的流水。請清除條件後再試。";
 "txn.searchPrompt" = "搜尋往來對象、備註、發票號";
@@ -100,6 +100,7 @@
 "nav.transactions" = "收支流水";
 "nav.categories" = "會計類別";
 "nav.reports" = "報表";
+"nav.products" = "商品 / 服務項目";
 
 "type.income" = "收入";
 "type.expense" = "支出";

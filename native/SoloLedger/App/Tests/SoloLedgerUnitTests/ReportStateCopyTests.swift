@@ -460,11 +460,25 @@ final class ReportStateCopyTests: XCTestCase {
     /// sidebar row and window title disagree.
     func testTheSidebarLabelMatchesThePageTitleVerbatim() {
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
-                       ["overview", "transactions", "categories", "reports"])
+                       ["overview", "transactions", "categories", "products", "reports"])
         for language in languages {
             XCTAssertEqual(value(language, "nav.reports"),
                            value(language, "report.page.title"),
                            "\(language): the sidebar entry and the page title must be identical")
+        }
+    }
+
+    /// 2b-A4 adds the second section built this way, and it follows the same rule for the same
+    /// reason: one key for the sidebar row, one for the window title, and the two carry the
+    /// identical string. A separate proposition from the one above — the two sections can break
+    /// independently, and a single test covering both would report only the first.
+    func testTheProductsSidebarLabelMatchesItsPageTitleVerbatim() {
+        for language in languages {
+            XCTAssertEqual(value(language, "nav.products"),
+                           value(language, "product.page.title"),
+                           "\(language): the sidebar entry and the page title must be identical")
+            XCTAssertNotEqual(value(language, "nav.products"), "nav.products",
+                              "\(language): nav.products leaks the raw key")
         }
     }
 }

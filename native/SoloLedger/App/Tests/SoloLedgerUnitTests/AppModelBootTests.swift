@@ -573,6 +573,58 @@ final class AppModelBootTests: XCTestCase {
         try store.db.close()
     }
 
+    // T5b ───────────────────────────────────────────────────────────────────────────────
+    /// Isolates the `products` conjunct that 2b-A4 added, and it is the only one this fixture
+    /// lets speak: the transactions table is empty, there are no legacy rows, the probe works,
+    /// and `holdsHiddenRecords` is FALSE — because the products page now shows product rows, so
+    /// they stopped being hidden records the moment that page landed.
+    ///
+    /// That is exactly why the conjunct had to be asked separately. The probe answers a question
+    /// about VISIBILITY; this predicate asks whether the ledger is provably NEW. A ledger with a
+    /// product catalogue is not, however visible it now is — and reading both through one flag
+    /// would have loosened this one silently when the other changed.
+    func testT5bALedgerHoldingProductsIsNotProvablyNewEvenThoughTheyAreNoLongerHidden() async throws {
+        let store = try freshStore("t5b.db")
+        _ = try store.createProduct(name: "Steel plate", unit: "kg")
+        let model = await booted(store)
+
+        XCTAssertTrue(model.transactions.isEmpty)
+        XCTAssertFalse(model.legacyProbeFailed)
+        XCTAssertFalse(model.legacyLedger.holdsHiddenRecords,
+                       "the fixture must isolate the new conjunct: every OTHER one passes here")
+        XCTAssertEqual(model.productCatalogIsProvablyEmpty(store), false)
+
+        finishOnboarding(model, regime: .CN)
+        XCTAssertEqual(currencyRow(store), .some(.none),
+                       "a ledger carrying a product catalogue is not one this app may write into")
+        try store.db.close()
+    }
+
+    /// The other direction, so T5b is not merely "the seed never runs": remove the product and
+    /// the very same path seeds. An unreadable row counts as a product too — a catalogue this
+    /// app could not decode is not an absent one.
+    func testT5cAnEmptyCatalogueSeedsAndAnUnreadableRowStillCounts() async throws {
+        let empty = try freshStore("t5c-empty.db")
+        let emptyModel = await booted(empty)
+        XCTAssertEqual(emptyModel.productCatalogIsProvablyEmpty(empty), true)
+        finishOnboarding(emptyModel, regime: .CN)
+        XCTAssertEqual(currencyRow(empty), .some("\"CNY\""), "the seed still runs when it should")
+        try empty.db.close()
+
+        let damaged = try freshStore("t5c-damaged.db")
+        // A row with no text reading for its id: counted, never decoded — see `ProductCatalogPage`.
+        try damaged.db.run("INSERT INTO products (id, name) VALUES (?, ?)",
+                           [.blob(Data([0x00, 0x01])), .text("Widget")])
+        let damagedModel = await booted(damaged)
+        XCTAssertEqual(try damaged.productCatalog().products.count, 0)
+        XCTAssertEqual(try damaged.productCatalog().unreadableCount, 1)
+        XCTAssertEqual(damagedModel.productCatalogIsProvablyEmpty(damaged), false)
+        finishOnboarding(damagedModel, regime: .CN)
+        XCTAssertEqual(currencyRow(damaged), .some(.none),
+                       "a catalogue that could not be decoded is not an empty one")
+        try damaged.db.close()
+    }
+
     // T6 ────────────────────────────────────────────────────────────────────────────────
     /// The seed writes the currency and nothing else. Asserted on the CN path, because that is
     /// the one where no cascade runs — on a regime CHANGE the three rates are written on

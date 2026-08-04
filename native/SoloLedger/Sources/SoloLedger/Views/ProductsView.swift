@@ -137,6 +137,20 @@ private struct ProductErrorBanner: View {
 
 // MARK: - The list
 
+/// ## Why the cells below take plain values
+///
+/// Every one of them used to be an `@EnvironmentObject` view of its own, and that crashed the
+/// app. `Table` materialises its cell views again, outside the render pass, when an
+/// accessibility client walks the page — VoiceOver, the Accessibility Inspector, any UI
+/// automation — and in that context the environment is not attached, so the lookup traps with
+/// `Fatal error: No ObservableObject of type AppModel found`. It took a ledger holding a product
+/// row this app cannot decode (so the notice is on screen) plus an accessibility traversal to
+/// reproduce; neither alone does it.
+///
+/// So the model is read HERE, once, while the environment is guaranteed, and the cells receive
+/// resolved text and intent closures. That is what `TransactionListView` and `CategoriesView`
+/// have always done — their cells are closures over the enclosing view's model, and neither has
+/// ever had this defect. `ProductMountingTests` keeps the rule as a source guard.
 private struct ProductTable: View {
     @EnvironmentObject var model: AppModel
     let block: ProductPageComposition.ListBlock
@@ -147,7 +161,7 @@ private struct ProductTable: View {
                 Text(row.product.name)
             }
             TableColumn(model.t(block.unitHeaderKey)) { row in
-                ProductUnitCell(unit: row.unit)
+                ProductUnitCell(text: unitText(row.unit))
             }
             .width(min: 60, ideal: 80)
 
@@ -157,56 +171,71 @@ private struct ProductTable: View {
             .width(min: 56, ideal: 72)
 
             TableColumn(model.t(block.costHeaderKey)) { row in
-                ProductCostCell(cost: row.cost)
+                ProductCostCell(amountText: amountText(row.cost))
             }
             .width(min: 90, ideal: 120)
 
             TableColumn(model.t(block.statusHeaderKey)) { row in
-                ProductStatusCell(row: row)
+                ProductStatusCell(label: model.t(row.statusKey),
+                                  hint: model.t(row.toggleHintKey),
+                                  isDisabled: model.productWriteIsPending,
+                                  toggle: { model.toggleProductActive(row.product) })
             }
             .width(min: 66, ideal: 84)
 
             // The other app's list has an unlabelled action column, and so does this one.
             TableColumn("") { row in
-                ProductRowActions(row: row)
+                ProductRowActions(editLabel: model.t(row.editActionKey),
+                                  deleteLabel: model.t(row.deleteActionKey),
+                                  isDisabled: model.productWriteIsPending,
+                                  edit: { model.editProduct(row.product) },
+                                  delete: { model.requestProductDelete(row.product) })
             }
             .width(min: 96, ideal: 116)
         }
         .accessibilityIdentifier("products.table")
     }
-}
 
-/// `getProductUnitLabel`'s three answers. A unit that was never on the whitelist is shown as it
-/// stands — naming it would be claiming to know a unit this app does not know.
-private struct ProductUnitCell: View {
-    @EnvironmentObject var model: AppModel
-    let unit: ProductPageComposition.UnitDisplay
-
-    var body: some View {
+    /// `getProductUnitLabel`'s three answers. A unit that was never on the whitelist is shown as
+    /// it stands — naming it would be claiming to know a unit this app does not know — and a
+    /// cell with no text reading draws nothing, exactly as the other app does.
+    private func unitText(_ unit: ProductPageComposition.UnitDisplay) -> String {
         switch unit {
-        case .key(let key):        Text(model.t(key)).foregroundStyle(.secondary)
-        case .verbatim(let text):  Text(text).foregroundStyle(.secondary)
-        case .none:                Text("")
+        case .key(let key):       return model.t(key)
+        case .verbatim(let text): return text
+        case .none:               return ""
         }
+    }
+
+    /// `nil` for the em dash. No currency symbol: the `products` table records no currency, so
+    /// putting one here would state something the ledger never said.
+    private func amountText(_ cost: ProductPageComposition.CostDisplay) -> String? {
+        guard case .amount(let value) = cost else { return nil }
+        return ReportFormat.money(value, language: model.language)
     }
 }
 
-/// A positive price, or an em dash. No currency symbol: the `products` table records no
-/// currency, so putting one here would state something the ledger never said.
-private struct ProductCostCell: View {
-    @EnvironmentObject var model: AppModel
-    let cost: ProductPageComposition.CostDisplay
+private struct ProductUnitCell: View {
+    let text: String
 
     var body: some View {
-        switch cost {
-        case .dash:
-            Text("—").foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-        case .amount(let value):
-            Text(ReportFormat.money(value, language: model.language))
-                .monospacedDigit()
-                .frame(maxWidth: .infinity, alignment: .trailing)
+        Text(text).foregroundStyle(.secondary)
+    }
+}
+
+private struct ProductCostCell: View {
+    /// `nil` draws the em dash.
+    let amountText: String?
+
+    var body: some View {
+        Group {
+            if let amountText {
+                Text(amountText).monospacedDigit()
+            } else {
+                Text("—").foregroundStyle(.secondary)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 }
 
@@ -214,30 +243,33 @@ private struct ProductCostCell: View {
 /// pressing it flips the row. The hint names the state it would move to, so the button says what
 /// it does without a fourteenth status string.
 private struct ProductStatusCell: View {
-    @EnvironmentObject var model: AppModel
-    let row: ProductPageComposition.RowBlock
+    let label: String
+    let hint: String
+    let isDisabled: Bool
+    let toggle: () -> Void
 
     var body: some View {
-        Button(model.t(row.statusKey)) { model.toggleProductActive(row.product) }
+        Button(label) { toggle() }
             .buttonStyle(.link)
-            .disabled(model.productWriteIsPending)
-            .accessibilityHint(Text(model.t(row.toggleHintKey)))
+            .disabled(isDisabled)
+            .accessibilityHint(Text(hint))
     }
 }
 
 private struct ProductRowActions: View {
-    @EnvironmentObject var model: AppModel
-    let row: ProductPageComposition.RowBlock
+    let editLabel: String
+    let deleteLabel: String
+    let isDisabled: Bool
+    let edit: () -> Void
+    let delete: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
-            Button(model.t(row.editActionKey)) { model.editProduct(row.product) }
-            Button(model.t(row.deleteActionKey), role: .destructive) {
-                model.requestProductDelete(row.product)
-            }
+            Button(editLabel) { edit() }
+            Button(deleteLabel, role: .destructive) { delete() }
         }
         .buttonStyle(.link)
-        .disabled(model.productWriteIsPending)
+        .disabled(isDisabled)
     }
 }
 

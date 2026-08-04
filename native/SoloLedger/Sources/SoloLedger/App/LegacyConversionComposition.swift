@@ -18,7 +18,7 @@ enum LegacyConversionComposition {
     // MARK: - The entry points
     //
     // `LegacyLedgerNotice` renders one of two different notices; only one of them may offer a
-    // conversion. `legacy.other.*` describes invoices, products and fixed assets —
+    // conversion. `legacy.other.*` describes invoices, fixed assets and the rest —
     // `LegacyConversionPlan` never scans those tables and `LegacyConversionRunner` cannot
     // carry them, so an entry point there would be a button that can only ever report
     // "nothing to convert". That is why the branch is decided HERE, once, rather than in a

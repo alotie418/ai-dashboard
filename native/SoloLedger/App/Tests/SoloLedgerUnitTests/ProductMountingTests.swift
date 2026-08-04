@@ -274,31 +274,35 @@ final class ProductMountingTests: XCTestCase {
     // MARK: - PM8 — the page is not reachable, from anywhere
     // ==============================================================================================
 
-    /// The whole contract of this stage. `ReportsView`'s own D19 asserts exactly ONE call site;
-    /// this asserts NONE, and the sidebar enum and the detail switch are checked separately so a
-    /// route added by either half fails here rather than in a review.
-    func testPM8NothingConstructsTheProductsPageAndTheSidebarHasNoEntry() throws {
+    /// 2b-A3 asserted NONE. 2b-A4 makes the page reachable, so this becomes exactly ONE — the
+    /// shape `ReportsView`'s own D19 has had since P3e.
+    ///
+    /// Split into four assertions below, each carrying its own proposition rather than four
+    /// restatements of one: there IS a route, it is the ONLY one, the sidebar half exists, and
+    /// the composition is still consumed by nobody new.
+    func testPM8TheProductsPageIsConstructedExactlyOnceAndByTheDetailSwitch() throws {
         let sources = try Self.appSources()
         XCTAssertGreaterThan(sources.count, 10, "the scan must have seen the app target")
-        XCTAssertEqual(Self.mentions(of: "ProductsView(", in: sources), [],
-                       "2b-A3 lands the page unreachable; the sidebar entry is the next stage")
+        XCTAssertEqual(Self.mentions(of: "ProductsView(", in: sources),
+                       ["Views/RootView.swift"],
+                       "the products page must be constructed exactly once, by the detail switch")
+
+        // …and that one construction is the `.products` branch, not a stray call elsewhere in
+        // the file.
+        let root = try Self.appSource("Views/RootView.swift")
+        XCTAssertEqual(Self.occurrences(of: "case .products: ProductsView()", inCodeOf: root), 1,
+                       "the one call site must be the `.products` branch of the detail switch")
+        XCTAssertEqual(Self.occurrences(of: "ProductsView(", inCodeOf: root), 1)
 
         // The composition is consumed by the page and driven by the model, and by nothing else.
-        // Its own file is in the list because it declares the type.
+        // Its own file is in the list because it declares the type. RootView is NOT: it builds
+        // the view and never touches the composition.
         XCTAssertEqual(Self.mentions(of: "ProductPageComposition", in: sources),
                        ["App/AppModel.swift", "App/ProductPageComposition.swift",
                         "Views/ProductsView.swift"])
 
-        // Neither half of a route exists.
-        XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
-                       ["overview", "transactions", "categories", "reports"])
-        XCTAssertNil(SidebarSection(rawValue: "products"))
-        let root = try Self.appSource("Views/RootView.swift")
-        XCTAssertFalse(root.contains("ProductsView"), "the detail switch must have no branch")
-        XCTAssertFalse(root.contains(".products"))
-
-        // The scanner is proved on synthetic text: "no hits" and "the scanner is broken" look the
-        // same otherwise.
+        // The scanner is proved on synthetic text: a hit that is really there, one that is only
+        // a comment, and a longer identifier that must not match.
         XCTAssertEqual(Self.mentions(of: "ProductsView(",
                                      in: [("X.swift", "  ProductsView()")]), ["X.swift"])
         XCTAssertEqual(Self.mentions(of: "ProductsView(",
@@ -306,6 +310,38 @@ final class ProductMountingTests: XCTestCase {
         XCTAssertEqual(Self.mentions(of: "ProductsView(",
                                      in: [("X.swift", "  ProductsViewModel()")]), [],
                        "whole-prefix matching only")
+    }
+
+    /// The sidebar half of the route, and its own proposition: the case exists, in the
+    /// adjudicated position, and carries the copy key the enum's own convention implies.
+    ///
+    /// Position is asserted as an ORDERED list because it is what the user sees: the sidebar
+    /// list and the menu-bar picker both iterate `allCases` in declaration order.
+    func testPM8bTheSidebarCarriesTheProductsEntryInItsAdjudicatedPlace() {
+        XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
+                       ["overview", "transactions", "categories", "products", "reports"],
+                       "master data sits beside categories; reports stay last")
+        XCTAssertEqual(SidebarSection(rawValue: "products"), .products)
+        XCTAssertEqual(SidebarSection.products.titleKey, "nav.products")
+        XCTAssertEqual(SidebarSection.products.systemImage, "shippingbox",
+                       "the same symbol the page's own empty state draws")
+        XCTAssertTrue(try! Self.appSource("Views/ProductsView.swift")
+            .contains("systemImage: \"shippingbox\""),
+                      "the page and the sidebar row must not drift apart")
+    }
+
+    /// The label the sidebar row draws, in all six languages, and its relationship to the page
+    /// it opens: the same string, verbatim. The other sections use ONE key for both; reports
+    /// established the two-key form and pinned them equal, and this follows it.
+    func testPM8cTheSidebarLabelResolvesEverywhereAndMatchesThePageTitle() {
+        for language in languages {
+            let label = value(language, SidebarSection.products.titleKey)
+            XCTAssertNotEqual(label, SidebarSection.products.titleKey,
+                              "\(language): the sidebar entry leaks the raw key")
+            XCTAssertFalse(label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            XCTAssertEqual(label, value(language, ProductPageComposition.pageTitleKey),
+                           "\(language): the sidebar entry and the page title must be identical")
+        }
     }
 
     // MARK: - PM9 — no spinner, and no comment the scanners cannot see
@@ -330,6 +366,50 @@ final class ProductMountingTests: XCTestCase {
         }
         XCTAssertFalse(view.contains("\"product."),
                        "ProductsView holds a literal in the copy's namespace")
+    }
+
+    // ==============================================================================================
+    // MARK: - PM13 — no cell of the table may look the model up for itself
+    // ==============================================================================================
+
+    /// A defect found by the 2b-A4 walkthrough, kept out by construction from here on.
+    ///
+    /// `Table` materialises its cell views AGAIN, outside the render pass, when an accessibility
+    /// client walks the page. The environment is not attached there, so an `@EnvironmentObject`
+    /// inside a cell traps: `Fatal error: No ObservableObject of type AppModel found`. It killed
+    /// the app on a ledger holding one undecodable product row, under an accessibility traversal
+    /// — VoiceOver's own code path — and neither condition alone reproduced it.
+    ///
+    /// The rule is therefore structural: the enclosing `ProductTable` reads the model once, while
+    /// the environment is guaranteed, and hands the cells resolved text and intent closures. That
+    /// is what `TransactionListView` and `CategoriesView` have always done.
+    func testPM13NoTableCellViewLooksUpTheEnvironmentObject() throws {
+        let source = try Self.appSource("Views/ProductsView.swift")
+        let cells = ["ProductUnitCell", "ProductCostCell", "ProductStatusCell", "ProductRowActions"]
+        for cell in cells {
+            let body = try Self.structBody(named: cell, in: source)
+            XCTAssertFalse(Self.namesIdentifier("EnvironmentObject", in: body), """
+                \(cell) looks the model up for itself. A table cell is rebuilt outside the \
+                environment during an accessibility traversal, where that lookup is fatal — \
+                take resolved values from ProductTable instead.
+                """)
+            // …and it really is a cell, i.e. the table still builds it.
+            XCTAssertTrue(Self.occurrences(of: "\(cell)(", inCodeOf: source) >= 1,
+                          "\(cell) is no longer constructed — is this list stale?")
+        }
+        // The enclosing table is where the one lookup belongs, so the guard is not satisfied by a
+        // file that simply stopped reading the model at all.
+        XCTAssertTrue(Self.namesIdentifier("EnvironmentObject",
+                                           in: try Self.structBody(named: "ProductTable", in: source)),
+                      "ProductTable is the one place the cells' text may be resolved")
+
+        // The parser is proved on synthetic text, or "no hits" and "it cannot see them" look the
+        // same. Whole-identifier matching: `EnvironmentObjectish` is not a hit.
+        XCTAssertTrue(Self.namesIdentifier("EnvironmentObject",
+                                           in: "  @EnvironmentObject var model: AppModel"))
+        XCTAssertFalse(Self.namesIdentifier("EnvironmentObject", in: "  let x = EnvironmentObjectish"))
+        XCTAssertEqual(try Self.structBody(named: "Probe", in: "struct Probe: View { let a = 1 }"),
+                       " let a = 1 ")
     }
 
     // ==============================================================================================
@@ -669,6 +749,44 @@ final class ProductMountingTests: XCTestCase {
             out.append((relative, text))
         }
         return out.sorted { $0.0 < $1.0 }
+    }
+
+    /// The brace-matched body of `struct <name>`, comments and all.
+    private static func structBody(named name: String, in source: String) throws -> String {
+        let start = try XCTUnwrap(source.range(of: "struct \(name)"), "no struct named \(name)")
+        let open = try XCTUnwrap(source.range(of: "{", range: start.upperBound..<source.endIndex))
+        var depth = 1
+        var index = open.upperBound
+        while index < source.endIndex, depth > 0 {
+            if source[index] == "{" { depth += 1 }
+            if source[index] == "}" { depth -= 1; if depth == 0 { break } }
+            index = source.index(after: index)
+        }
+        XCTAssertEqual(depth, 0, "\(name) is unbalanced")
+        return String(source[open.upperBound..<index])
+    }
+
+    /// Whether `identifier` appears as a WHOLE identifier on a non-comment line.
+    private static func namesIdentifier(_ identifier: String, in source: String) -> Bool {
+        let pattern = "(^|[^A-Za-z0-9_])\(identifier)([^A-Za-z0-9_]|$)"
+        return source.split(separator: "\n", omittingEmptySubsequences: false).contains { line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.hasPrefix("//"), !trimmed.hasPrefix("*"), !trimmed.hasPrefix("/*") else {
+                return false
+            }
+            return line.range(of: pattern, options: .regularExpression) != nil
+        }
+    }
+
+    /// How many times `needle` appears on non-comment lines of one file.
+    private static func occurrences(of needle: String, inCodeOf source: String) -> Int {
+        source.split(separator: "\n", omittingEmptySubsequences: false).reduce(0) { total, line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.hasPrefix("//"), !trimmed.hasPrefix("*"), !trimmed.hasPrefix("/*") else {
+                return total
+            }
+            return total + (line.components(separatedBy: needle).count - 1)
+        }
     }
 
     /// Which files mention `needle` on a non-comment line. Comment lines are skipped so a
