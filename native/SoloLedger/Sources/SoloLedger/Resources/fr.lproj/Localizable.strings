@@ -580,3 +580,68 @@
 "legacy.convert.failed.busy" = "Une autre opération écrit dans ce livre ; cette conversion a donc été entièrement annulée. Aucune écriture n’a été créée et le fichier du livre n’a pas été modifié. Terminez l’opération qui utilise le livre, puis réessayez.";
 "legacy.convert.failed.internal" = "La conversion s'est arrêtée à l'une de ses propres vérifications de cohérence et a été entièrement annulée. Aucune écriture n'a été écrite et le fichier de comptes n'a pas été modifié. Relancez le contrôle préalable, puis réessayez.";
 "legacy.convert.failed.retryNote" = "Si l'échec est survenu après l'écriture de la sauvegarde, celle-ci est toujours dans le dossier Backups. Une nouvelle tentative en écrit une autre à côté et n'écrase jamais la précédente.";
+
+/* ── 商品 / 服务项目（2b-A2）──────────────────────────────────────────
+   基础资料页的文案。default_unit_cost 只登记不参与计算，页内 note 对用户
+   如实说明这一点；凡「不进入库存统计」一类的说法一律用将来时，因为本 App
+   目前还没有库存统计。此处只有文案，没有任何视图消费它们。 */
+
+/* A 页面 chrome（3 键） */
+"product.page.title" = "Produits et services";
+"product.page.subtitle" = "Gérez les produits et services et leurs unités.";
+"product.page.note" = "Cette page ne consigne que des données de base. Le prix unitaire par défaut est enregistré à titre indicatif ; l’application ne s’en sert pas pour calculer un coût de stock ni un chiffre de rapport.";
+
+/* B 列表列头（5 键） */
+"product.col.name" = "Nom";
+"product.col.unit" = "Unité";
+"product.col.cost" = "Prix unitaire par défaut (HT)";
+"product.col.type" = "Type";
+"product.col.status" = "Statut";
+
+/* C 类型与状态（4 键） */
+"product.type.product" = "Produit";
+"product.type.service" = "Service";
+"product.status.active" = "Actif";
+"product.status.inactive" = "Inactif";
+
+/* D 单位显示名，逐字取自 components/accountingHelpers.ts:190-203（11 键） */
+"product.unit.piece" = "pièces";
+"product.unit.box" = "cartons";
+"product.unit.bag" = "sacs";
+"product.unit.kg" = "kg";
+"product.unit.ton" = "tonnes";
+"product.unit.liter" = "L";
+"product.unit.bottle" = "bouteilles";
+"product.unit.pack" = "paquets";
+"product.unit.session" = "fois";
+"product.unit.hour" = "heures";
+"product.unit.month" = "mois";
+
+/* E 表单（5 键） */
+"product.form.newTitle" = "Nouvel élément";
+"product.form.editTitle" = "Modifier l’élément";
+"product.form.namePlaceholder" = "ex. : Boîte type A / Conseil";
+"product.form.isService" = "Article de service";
+"product.form.isServiceHint" = "Les articles de service seront exclus des quantités en stock lorsque celles-ci existeront.";
+
+/* F 操作（1 键） */
+"product.action.add" = "Ajouter un produit / service";
+
+/* G 删除确认，按钮复用 common.delete / common.cancel（2 键） */
+"product.delete.confirmTitle" = "Supprimer « {name} » ?";
+"product.delete.confirmMessage" = "Cette fiche de base est retirée du livre et l’action est irréversible dans l’application. Les enregistrements qui y faisaient déjà référence ne sont ni supprimés ni modifiés.";
+
+/* H 空态（2 键） */
+"product.empty.title" = "Aucun produit ni service";
+"product.empty.message" = "Ajoutez un premier produit ou service et il apparaîtra ici.";
+
+/* I ProductCatalogError 六个 case 各一句（6 键） */
+"product.error.invalidID" = "Aucun élément n’a été indiqué.";
+"product.error.nameRequired" = "Le nom ne peut pas être vide.";
+"product.error.unitNotRecognized" = "Cette unité ne fait pas partie des options disponibles.";
+"product.error.notFound" = "Cet élément n’est plus dans le livre ; il a peut-être été supprimé.";
+"product.error.idCollision" = "L’identifiant généré est entré en conflit avec un élément existant. Veuillez réessayer.";
+"product.error.storageFailure" = "Le livre n’a pas pu enregistrer cette modification.";
+
+/* J 读不出的行：Core 的 unreadableCount 在界面上的落点（1 键） */
+"product.unreadable.notice" = "{count} fiches produit de ce livre n’ont pas pu être lues et ne figurent pas ci-dessus. Elles restent intactes dans le fichier ; l’application ne les a pas modifiées.";
