@@ -1,20 +1,49 @@
 import Foundation
 
-/// Faithful Swift port of `electron/db/index.js`'s migration ladder.
+/// The migration ladder: v1…v23 are a faithful Swift port of `electron/db/index.js`,
+/// and v24 onwards are native-only rungs Electron has no counterpart for.
 ///
-/// Reproducing the FULL 23-version ladder (not just the Phase-1 tables) means a
-/// database this migrator creates is byte-schema-compatible with the Electron
-/// app: same 26 tables, same indexes, same `PRAGMA user_version = 23`. That is
-/// the strongest possible compatibility claim for the data layer, and lets the
-/// same file be opened by either app in a later phase.
+/// Reproducing the FULL 23-version shared ladder (not just the Phase-1 tables) means the
+/// v1…v23 prefix of a database this migrator creates is byte-schema-compatible with the
+/// Electron app: same 26 tables, same indexes, same `PRAGMA user_version = 23`.
+///
+/// **The ladder is now two segments, and the difference is load-bearing.**
+/// ``sharedLadderVersion`` is the last rung Electron also has; ``nativeOnlyVersions`` lists
+/// every rung above it, one by one. `SchemaVersionParityTests` compares the SHARED segment
+/// against Electron's authoritative `SCHEMA_VERSION` — comparing the head against it, which
+/// is what it used to do, would now report drift on every native-only rung and would have to
+/// be deleted, taking the real protection (a native head BEHIND Electron rejects every real
+/// production DB as `.unknownVersion`) with it.
+///
+/// A v24 ledger is NOT refused by Electron: its `runMigrations` loop simply runs zero times
+/// (`for (let v = 24; v < 23; v++)`) and it reads and writes the v23 tables as usual, unaware
+/// of the inventory ones. The one-way property is a convention, not an enforcement — see the
+/// declaration in `docs/SWIFTUI_FEATURE_GAP.md` §4, which states it in those terms.
 ///
 /// Versioning mechanism is identical to the JS app: the SQLite `user_version`
 /// pragma, no migrations table. Each migration runs in its own transaction and
 /// bumps `user_version` in the same transaction.
 public enum SchemaMigrator {
 
-    /// Must equal the JS app's `SCHEMA_VERSION` (= MIGRATIONS.length).
-    public static let schemaVersion = 23
+    /// The native head — what a fully-migrated database reaches. Equals
+    /// ``sharedLadderVersion`` + ``nativeOnlyVersions``.count, asserted in
+    /// `SchemaVersionParityTests`.
+    public static let schemaVersion = 24
+
+    /// The last rung the native ladder SHARES with Electron. MUST equal the JS app's
+    /// `SCHEMA_VERSION` (= MIGRATIONS.length); `SchemaVersionParityTests` reads that value
+    /// from the real module and fails closed if the two drift. Electron adding a migration
+    /// means porting it into the shared segment and bumping this — NOT appending it above
+    /// the native-only rungs, which would silently renumber them.
+    public static let sharedLadderVersion = 23
+
+    /// The rungs that exist ONLY natively, listed explicitly so none can appear by accident.
+    /// `SchemaVersionParityTests` asserts this equals both the literal declared list and the
+    /// contiguous range `(sharedLadderVersion + 1) … schemaVersion`.
+    ///
+    /// * **v24** — the native inventory ledger (`inventory_movements` / `inventory_balances`
+    ///   / `inventory_exceptions`). Purely additive; nothing in v1…v23 is touched.
+    public static let nativeOnlyVersions = [24]
 
     public enum MigrationError: Error, CustomStringConvertible {
         case newerThanSupported(found: Int, supported: Int)
@@ -35,11 +64,16 @@ public enum SchemaMigrator {
     /// The complete set of tables a fully-migrated (head) database must contain — the
     /// authoritative list, defined ONCE. A consumer that needs to prove a database reached
     /// head verifies every one of these, not an ad-hoc subset. Kept in lockstep with the
-    /// ladder (one CREATE TABLE per name at v23) by `testRequiredTablesMatchLadder`.
+    /// ladder (one CREATE TABLE per name at head) by `testRequiredTablesMatchLadder`.
+    ///
+    /// The three `inventory_*` names arrived with v24, so `PreparedImportRunner`'s schema gate
+    /// (which filters this list against the prepared database) now refuses a prepared library
+    /// that claims head but lacks them.
     public static let requiredTables: [String] = [
         "accounts", "ai_providers", "alerts", "assistant_conversations", "assistant_messages",
         "business_document_items", "business_documents", "categories", "ecommerce_connections",
         "ecommerce_staged_orders", "ecommerce_sync_log", "equity", "fixed_assets", "home_office",
+        "inventory_balances", "inventory_exceptions", "inventory_movements",
         "legacy_migrations", "liabilities", "mileage_logs", "price_history", "products",
         "purchase_items", "purchases", "sales", "sales_items", "settings", "tax_payments",
         "transactions",
@@ -73,7 +107,11 @@ public enum SchemaMigrator {
         }
     }
 
-    // MARK: - The ladder (v1 … v23), one closure per version
+    // MARK: - The ladder (v1 … v24), one closure per version
+    //
+    // v1…v23 are the SHARED segment — a faithful port of `electron/db/index.js`. Nothing
+    // below this line may be edited to accommodate a native-only rung; v24 exists precisely
+    // so that it does not have to be.
 
     private static let migrations: [(SQLiteDatabase) throws -> Void] = [
         // v1: initial schema
@@ -431,6 +469,96 @@ public enum SchemaMigrator {
                   WHERE ecommerce_connection_id IS NOT NULL AND external_order_id IS NOT NULL;
                 CREATE INDEX IF NOT EXISTS idx_sales_platform_source ON sales(platform_source);
                 """)
+        },
+
+        // ── v24 — FIRST NATIVE-ONLY RUNG ──────────────────────────────────────────────────
+        //
+        // The native inventory ledger. Electron has no counterpart: its `runMigrations` loop
+        // over a v24 file runs zero times and it keeps reading and writing the v23 tables,
+        // unaware these exist. See the one-way declaration in FEATURE_GAP §4.
+        //
+        // PURELY ADDITIVE, and that is a hard constraint rather than a happy accident: no
+        // v1…v23 object is created, altered or dropped here, which is exactly what makes the
+        // rollback form complete and mechanical —
+        //
+        //     DROP TABLE inventory_movements; DROP TABLE inventory_balances;
+        //     DROP TABLE inventory_exceptions; PRAGMA user_version = 23;
+        //
+        // (indexes go with their tables) and leaves a database Electron opens as before.
+        // `InventorySchemaTests` G3 performs that round trip rather than asserting it in prose.
+        //
+        // STRICT on all three. The audited Electron inventory read stored costs in REAL/TEXT
+        // affinity columns where a corrupt value converts silently; STRICT makes the same
+        // write fail at the point it happens. Note the documented carve-out STRICT does NOT
+        // close: a value that is LOSSLESSLY convertible is still accepted (TEXT '5' into an
+        // INTEGER column stores 5). `'abc'`, `1.5` and `'1.5'` are refused — measured, and
+        // pinned by `InventorySchemaTests` H1/H2 in both directions.
+        //
+        // Integer scaling (N-8: money is stored as integers): quantity ×1e3, unit cost ×1e6,
+        // line cost in minor currency units. Overflow handling for `quantity_milli ×
+        // unit_cost_micro` belongs to the posting engine, not to the schema.
+        { db in
+            try db.execute("""
+                CREATE TABLE IF NOT EXISTS inventory_movements (
+                  id                TEXT    PRIMARY KEY,
+                  product_id        TEXT    NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+                  occurred_on       TEXT    NOT NULL,
+                  seq               INTEGER NOT NULL,
+                  movement_type     TEXT    NOT NULL CHECK (movement_type IN (
+                                       'purchase_in','sale_out','sale_return_in','purchase_return_out',
+                                       'count_gain','count_loss','manual_adjust','opening')),
+                  quantity_milli    INTEGER NOT NULL,
+                  unit_cost_micro   INTEGER,
+                  total_cost_minor  INTEGER,
+                  currency          TEXT    NOT NULL,
+                  source_type       TEXT,
+                  source_id         TEXT,
+                  reverses_id       TEXT,
+                  note              TEXT,
+                  created_at        TEXT    NOT NULL DEFAULT (datetime('now'))
+                ) STRICT;
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_invm_product_order
+                  ON inventory_movements(product_id, occurred_on, seq);
+                CREATE INDEX IF NOT EXISTS idx_invm_product ON inventory_movements(product_id);
+                CREATE INDEX IF NOT EXISTS idx_invm_source  ON inventory_movements(source_type, source_id);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_invm_reverses
+                  ON inventory_movements(reverses_id) WHERE reverses_id IS NOT NULL;
+
+                CREATE TABLE IF NOT EXISTS inventory_balances (
+                  product_id         TEXT    PRIMARY KEY,
+                  quantity_milli     INTEGER NOT NULL DEFAULT 0,
+                  cost_balance_minor INTEGER NOT NULL DEFAULT 0,
+                  unit_cost_micro    INTEGER NOT NULL DEFAULT 0,
+                  currency           TEXT,
+                  last_movement_id   TEXT,
+                  last_occurred_on   TEXT,
+                  last_seq           INTEGER,
+                  updated_at         TEXT    NOT NULL DEFAULT (datetime('now'))
+                ) STRICT;
+
+                CREATE TABLE IF NOT EXISTS inventory_exceptions (
+                  id            TEXT    PRIMARY KEY,
+                  product_id    TEXT,
+                  movement_id   TEXT,
+                  kind          TEXT    NOT NULL CHECK (kind IN (
+                                   'return_origin_not_found','manual_adjust','opening_seeded')),
+                  detail        TEXT,
+                  created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+                ) STRICT;
+                CREATE INDEX IF NOT EXISTS idx_invx_product  ON inventory_exceptions(product_id);
+                CREATE INDEX IF NOT EXISTS idx_invx_movement ON inventory_exceptions(movement_id);
+                CREATE INDEX IF NOT EXISTS idx_invx_kind     ON inventory_exceptions(kind);
+                """)
+
+            // The evidence row. Electron's settings handler whitelists the keys it returns, so
+            // this one is invisible to today's Electron UI — it is a marker a future Electron
+            // build (or a support session reading the file) can act on, and the reason the
+            // one-way declaration is phrased as "a hook exists" and not "Electron will warn".
+            // OR REPLACE, not OR IGNORE: the rollback round trip re-runs this rung.
+            try db.run("""
+                INSERT OR REPLACE INTO settings (key, value, updated_at)
+                VALUES ('native_inventory_active', ?, datetime('now'))
+                """, [.text("\"24\"")])   // JSON-encoded, matching every other settings value
         },
     ]
 }

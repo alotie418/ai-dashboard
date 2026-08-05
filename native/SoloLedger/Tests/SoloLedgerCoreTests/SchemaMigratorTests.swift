@@ -5,35 +5,37 @@ final class SchemaMigratorTests: LedgerTestCase {
 
     func testMigratesToHead() throws {
         let store = try makeStore()
-        XCTAssertEqual(try store.schemaVersion(), 23)
-        XCTAssertEqual(SchemaMigrator.schemaVersion, 23)
+        XCTAssertEqual(try store.schemaVersion(), 24)
+        XCTAssertEqual(SchemaMigrator.schemaVersion, 24)
     }
 
     func testAllExpectedTablesExist() throws {
         let store = try makeStore()
         let names = try store.db.query("SELECT name FROM sqlite_master WHERE type='table'")
             .compactMap { $0.string("name") }
+        // Ladder order: v1…v23 (the segment shared with Electron), then the v24 native-only rung.
         let expected = ["purchases", "sales", "settings", "price_history", "alerts", "ai_providers",
                         "categories", "transactions", "legacy_migrations", "mileage_logs", "home_office",
                         "products", "business_documents", "business_document_items",
                         "assistant_conversations", "assistant_messages", "accounts", "liabilities",
                         "fixed_assets", "equity", "tax_payments", "purchase_items", "sales_items",
-                        "ecommerce_connections", "ecommerce_staged_orders", "ecommerce_sync_log"]
+                        "ecommerce_connections", "ecommerce_staged_orders", "ecommerce_sync_log",
+                        "inventory_movements", "inventory_balances", "inventory_exceptions"]
         for table in expected {
             XCTAssertTrue(names.contains(table), "missing table \(table)")
         }
-        XCTAssertEqual(expected.count, 26)
+        XCTAssertEqual(expected.count, 29)
     }
 
     func testReopenIsIdempotent() throws {
         let url = try tempDatabaseURL()
         do {
             let store = try LedgerStore(databaseURL: url)
-            XCTAssertEqual(try store.schemaVersion(), 23)
+            XCTAssertEqual(try store.schemaVersion(), 24)
         }
         // Reopen the same file: no re-migration, no duplicate seed.
         let store2 = try LedgerStore(databaseURL: url)
-        XCTAssertEqual(try store2.schemaVersion(), 23)
+        XCTAssertEqual(try store2.schemaVersion(), 24)
         let count = try store2.db.query("SELECT COUNT(*) AS c FROM categories").first?.int("c")
         XCTAssertEqual(count, 78)
     }

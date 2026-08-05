@@ -7,13 +7,15 @@ import XCTest
 final class FixtureReadTests: LedgerTestCase {
 
     private func openFixture() throws -> LedgerStore {
-        // Open a writable copy so LedgerStore's open-time PRAGMAs/migrator (a no-op
-        // at v23) don't touch the committed fixture.
+        // Open a writable COPY: since v24 the open-time migrator is no longer a no-op on this
+        // fixture — it runs the native-only rung — and the committed v23 file must not move.
         try LedgerStore(databaseURL: electronFixtureCopy())
     }
 
+    /// The fixture is a v23 file; opening it runs the ladder to the NATIVE head, which is 24.
+    /// The committed fixture itself stays at 23 — the copy-on-open above is what keeps it there.
     func testSchemaVersion() throws {
-        XCTAssertEqual(try openFixture().schemaVersion(), 23)
+        XCTAssertEqual(try openFixture().schemaVersion(), 24)
     }
 
     func testTablesAndIndexes() throws {
