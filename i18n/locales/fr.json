@@ -734,10 +734,10 @@
     "alertDeleteFailed": "Delete failed, please retry",
     "recognitionMode": "Mode de reconnaissance",
     "loading": "Chargement...",
-    "inventoryCurrent": "Stock actuel",
+    "inventoryCurrent": "Achats moins ventes sur la période (quantités additionnées toutes unités confondues)",
     "inventoryTon": "",
     "inventoryBag": "bags",
-    "inventoryLow": "Stock faible — la vente entraînera un stock négatif",
+    "inventoryLow": "L'écart n'est pas supérieur à zéro. Ce chiffre n'est pas un niveau de stock : consultez les quantités en stock par produit.",
     "inventoryTotalPurchase": "Total acheté",
     "inventoryTotalSales": "Total vendu",
     "formValidation": "Veuillez remplir le client et la quantité",
@@ -1044,6 +1044,7 @@
     "balanceIncomeTaxPayable": "Impôt sur le revenu à payer (estimation)",
     "balanceIncomeTaxPrepaid": "Impôt sur le revenu prépayé (estimation)",
     "balanceIncomeTaxHint": "Monnaie fonctionnelle · compensation même impôt / même période · estimation de gestion",
+    "balanceInventoryHint": "Estimation au prix d'achat moyen cumulé · non transférée au coût des ventes",
     "balanceIncomeTaxLossCaveat": "L'impôt sur le revenu calculé est négatif (estimation en période de perte) ; la ligne prépayé ne représente pas un paiement anticipé réel"
   },
   "usSchedule": {
@@ -1332,7 +1333,7 @@
     "name": "Nom",
     "namePlaceholder": "ex. : Boîte type A / Conseil",
     "unit": "Unité",
-    "cost": "Prix unitaire par défaut (HT)",
+    "cost": "Prix unitaire par défaut (HT · sert aussi à l'estimation du stock)",
     "type": "Type",
     "product": "Produit",
     "service": "Service",
@@ -1348,11 +1349,12 @@
   },
   "inventory": {
     "inStockCount": "Produits en stock",
-    "totalCost": "Coût total du stock (HT)",
-    "detailTitle": "Détail du stock",
+    "totalCost": "Valeur de stock estimée (HT)",
+    "detailTitle": "Détail de la valeur de stock estimée",
     "colProduct": "Produit",
     "colQty": "En stock",
-    "colCost": "Coût"
+    "colCost": "Valeur est.",
+    "estimateNote": "Calculé à partir des données d'achat cumulées et des estimations saisies manuellement. À titre indicatif de gestion uniquement : il ne s'agit pas d'une valeur de stock officielle et ce montant n'est pas rapproché du coût des ventes des rapports."
   },
   "documents": {
     "title": "Documents commerciaux",

@@ -132,6 +132,9 @@ const REQUIRED_I18N_KEYS = [
   'finance.balanceAssets', 'finance.balanceLiabilities', 'finance.balanceCurrentAssets',
   'finance.balanceNonCurrentAssets', 'finance.balanceCurrentLiabilities',
   'finance.balanceEquity', 'finance.balanceTotalAssets',
+  // E-PR-1: the inventory row's basis hint — the balance-overview estimate rows all carry one
+  // (fixedAssets / retainedEarnings / incomeTax*); inventory was the only one without.
+  'finance.balanceInventoryHint',
   // finance tabs
   'finance.tabBalance', 'finance.tabCashflow', 'finance.tabPl',
   // cashflow empty state
@@ -2251,6 +2254,10 @@ async function main() {
         'products.selectLabel', 'products.unassigned',
         'inventory.inStockCount', 'inventory.totalCost', 'inventory.detailTitle',
         'inventory.colProduct', 'inventory.colQty', 'inventory.colCost',
+        // E-PR-1: the basis disclosure rendered under the dashboard inventory detail table.
+        // Governed here rather than in a group of its own so it is held to the same
+        // "no tax/regime wording" rule as the six labels it explains.
+        'inventory.estimateNote',
       ];
       const TAX_WORDS = /增值税|增值稅|营业税|營業稅|消费税|消費稅|Sales Tax|进项|進項|销项|銷項|VAT|Schedule C/;
       for (const lang of UI_LANGUAGES) {

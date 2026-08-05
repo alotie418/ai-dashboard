@@ -397,6 +397,7 @@ tr.section td{font-weight:700;padding-top:16px;border-bottom:2px solid #e0ddd5;}
                       {(l.key === 'incomeTaxPayable' || l.key === 'incomeTaxPrepaid') && (
                         <div className="mt-0.5 text-[10px] text-[#a3a3a1] leading-snug">{t('finance.balanceIncomeTaxHint')}</div>
                       )}
+                      {l.key === 'inventory' && (<div className="mt-0.5 text-[10px] text-[#a3a3a1] leading-snug">{t('finance.balanceInventoryHint')}</div>)}
                     </div>
                   );
                   // 分区内小标题（流动 / 非流动）：结构性标签，加黑加粗保证清晰。
