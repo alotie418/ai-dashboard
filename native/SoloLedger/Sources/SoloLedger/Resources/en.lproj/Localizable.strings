@@ -151,6 +151,8 @@
 "recovery.blankConfirmTitle" = "Start with a blank ledger?";
 "recovery.blankConfirm" = "Create blank ledger";
 "recovery.blankConfirmMessage" = "This starts an empty ledger and does NOT import your earlier data (the original stays on disk, undeleted). Only choose this if you're sure you don't need the old data.";
+"recovery.snapshotFailed.write" = "The ledger must be backed up before it can be upgraded, and the backup could not be written — most often because the disk is full. Your ledger has not been upgraded and its contents are unchanged. Free some space and try again.";
+"recovery.snapshotFailed.verify" = "The pre-upgrade backup was written but did not pass its check. Your ledger has not been upgraded and its contents are unchanged. Try again; if it keeps happening, export a backup by hand from Settings → Data first.";
 
 "common.duplicate" = "Duplicate";
 

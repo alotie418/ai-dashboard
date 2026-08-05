@@ -222,6 +222,8 @@
 "recovery.blankConfirm" = "空の帳簿を作成";
 "recovery.safeNote" = "元のデータベースは読み取り専用のまま変更されていないため、いつでも再試行できます。";
 "recovery.viewError" = "エラーの詳細を表示";
+"recovery.snapshotFailed.write" = "帳簿を更新する前にバックアップが必要ですが、書き出せませんでした（多くはディスクの空き容量不足です）。帳簿は更新されておらず、内容も変更されていません。空き容量を確保してからもう一度お試しください。";
+"recovery.snapshotFailed.verify" = "更新前のバックアップは書き出せましたが、検証を通りませんでした。帳簿は更新されておらず、内容も変更されていません。もう一度お試しください。繰り返す場合は、「設定 → データ」から手動でバックアップを書き出してください。";
 "settings.general" = "一般";
 "settings.accounting" = "会計";
 "settings.data" = "データ";

@@ -242,7 +242,7 @@ final class AppModel: ObservableObject {
         if let runner {
             activeRunner = runner
         } else {
-            do { let built = try Self.makeProductionRunner(); runner = built; activeRunner = built }
+            do { let built = try makeProductionRunner(); runner = built; activeRunner = built }
             catch {
                 migrationUIState = .retriable(MigrationBlock(code: .ioTransient, classification: .retriable,
                                                              params: ["op": "bootConfig"]))
@@ -363,11 +363,50 @@ final class AppModel: ObservableObject {
 
     /// The production runner: wraps the coordinator and the real off-main / main-actor
     /// boundaries. Built lazily so a fresh install never derives paths until boot.
-    private static func makeProductionRunner() throws -> BootChainRunner {
+    ///
+    /// The snapshot plan's two directories are derived from the config PURELY — the same base
+    /// `Config.standard()` uses — rather than through `AppPaths.backupsDirectory()`, which
+    /// CREATES its directory. `Config.standard()` documents that it creates nothing so a
+    /// probe-first boot mints no empty migration directories, and resolving the backups path the
+    /// creating way here would break exactly that: every boot, including ones with no migration
+    /// pending, would leave a `Backups/` behind. `PreMigrationSnapshot` creates it if and only if
+    /// it actually writes a snapshot.
+    ///
+    /// An instance method (not `static`) so the snapshot-failure callback can reach `self` and put
+    /// a localized, actionable message on screen; the store-open failure itself still travels the
+    /// unchanged typed path into the retriable chain-recovery UI, which is where the retry lives.
+    private func makeProductionRunner() throws -> BootChainRunner {
         let config = try MigrationCoordinator.Config.standard()
-        return makeBootChainRunner(coordinator: MigrationCoordinator(config: config),
-                                   autoSourceCandidate: .masContainer,
-                                   activeURL: config.activeDestination)
+        let dataRoot = config.activeDestination.deletingLastPathComponent()
+        let plan = PreMigrationSnapshotPlan(
+            backupsDirectory: dataRoot.appendingPathComponent("Backups", isDirectory: true),
+            attachmentsDirectory: config.activeAttachmentsDir,
+            timestamp: Self.fileTimestamp(),
+            retention: Self.preMigrationSnapshotRetention)
+        return Self.makeBootChainRunner(coordinator: MigrationCoordinator(config: config),
+                                        autoSourceCandidate: .masContainer,
+                                        activeURL: config.activeDestination,
+                                        snapshot: plan,
+                                        onSnapshotFailure: { [weak self] error in
+                                            self?.reportSnapshotFailure(error)
+                                        })
+    }
+
+    /// How many pre-migration snapshots are kept. Three covers "upgraded three rungs in a row"
+    /// and "rolled back then upgraded again"; beyond that a pre-migration snapshot is dead weight,
+    /// because its only use is the upgrade that has by then succeeded.
+    static let preMigrationSnapshotRetention = 3
+
+    /// Put the snapshot failure on screen as an ACTIONABLE alert, without changing where the boot
+    /// routes. `actionError` is rendered by an alert attached to the whole root view, so it shows
+    /// ON TOP of the retriable chain-recovery screen — the user gets both the explanation and the
+    /// retry button. Setting `bootError` instead would win the routing priority and replace that
+    /// screen with a dead-end that has no retry.
+    private func reportSnapshotFailure(_ error: PreMigrationSnapshotError) {
+        switch error {
+        case .writeFailed:        actionError = t("recovery.snapshotFailed.write")
+        case .verificationFailed: actionError = t("recovery.snapshotFailed.verify")
+        }
     }
 
     /// The ONE intent → coordinator mapping the app ships — `makeProductionRunner` above is
@@ -379,7 +418,10 @@ final class AppModel: ObservableObject {
     /// `DormantSourceChoiceBootTests` pin each arm behaviorally.
     static func makeBootChainRunner(coordinator: MigrationCoordinator,
                                     autoSourceCandidate auto: MigrationSource?,
-                                    activeURL: URL) -> ProductionBootChainRunner {
+                                    activeURL: URL,
+                                    snapshot: PreMigrationSnapshotPlan? = nil,
+                                    onSnapshotFailure: (@MainActor (PreMigrationSnapshotError) -> Void)? = nil)
+    -> ProductionBootChainRunner {
         ProductionBootChainRunner(
             resolveWork: { intent in
                 switch intent {
@@ -397,7 +439,18 @@ final class AppModel: ObservableObject {
             // The auto candidate is handed to EVERY confirm; the coordinator itself only
             // consults it for a createFresh authorization (where it can revoke → reResolve).
             confirm: { coordinator.confirmOpenAuthorization($0, autoSourceCandidate: auto) },
-            openStore: { try Self.openStoreForPlan($0, activeURL: activeURL) })
+            // `openStore` is invoked on the main actor (`MigrationBootDriver.attemptOpen` is
+            // `@MainActor`), so the failure callback can touch the model directly. It REPORTS and
+            // RETHROWS: the typed error still travels the unchanged path into the retriable
+            // chain-recovery state, so the retry button is exactly where it was.
+            openStore: { plan in
+                do {
+                    return try Self.openStoreForPlan(plan, activeURL: activeURL, snapshot: snapshot)
+                } catch let error as PreMigrationSnapshotError {
+                    MainActor.assumeIsolated { onSnapshotFailure?(error) }
+                    throw error
+                }
+            })
     }
 
     /// The REAL production plan → store dispatch, extracted (internal, NOT an injected test double)
@@ -405,13 +458,18 @@ final class AppModel: ObservableObject {
     /// plan MUST take the C12x hardened open, never a plain `existingOnly`. Reverting the
     /// `.existing` branch to `LedgerStore(open: .existingOnly)` is what the production-wiring guard
     /// test in `AppModelBootTests` catches.
-    static func openStoreForPlan(_ plan: ConfirmedOpenPlan, activeURL: URL) throws -> LedgerStore {
+    /// `.createFresh` takes NO snapshot plan and that is structural, not an oversight: a ledger
+    /// being created has nothing to roll back to, and `createFreshReservedHardened` never enters
+    /// the hardened EXISTING open where the snapshot lives.
+    static func openStoreForPlan(_ plan: ConfirmedOpenPlan, activeURL: URL,
+                                 snapshot: PreMigrationSnapshotPlan? = nil) throws -> LedgerStore {
         switch plan {
         case .createFresh:
             // C12x-A2: exclusive descriptor reservation + NOFOLLOW/HAS_MOVED/fingerprint before adopt.
             return try LedgerStore.createFreshReservedHardened(databaseURL: activeURL)
         case .existing(let evidence):
-            return try LedgerStore.openActiveExistingHardened(databaseURL: activeURL, expect: evidence)
+            return try LedgerStore.openActiveExistingHardened(databaseURL: activeURL, expect: evidence,
+                                                              snapshot: snapshot)
         }
     }
 
