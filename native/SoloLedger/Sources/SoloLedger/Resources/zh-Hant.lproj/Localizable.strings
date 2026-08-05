@@ -222,6 +222,8 @@
 "recovery.blankConfirm" = "建立空白帳本";
 "recovery.safeNote" = "原始資料庫始終保持唯讀、未被修改，可隨時重試。";
 "recovery.viewError" = "檢視錯誤詳情";
+"recovery.snapshotFailed.write" = "升級帳本前需要先備份，但備份沒能寫出來（常見原因是磁碟空間不足）。本 App 沒有升級你的帳本，帳本內容未被修改。請清理磁碟空間後重試。";
+"recovery.snapshotFailed.verify" = "升級前的備份寫出來了，但沒能通過校驗。本 App 沒有升級你的帳本，帳本內容未被修改。請重試；若反覆出現，請先在「設定 → 資料」裡手動匯出一份備份。";
 "settings.general" = "一般";
 "settings.accounting" = "會計";
 "settings.data" = "資料";

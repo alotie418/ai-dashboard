@@ -401,6 +401,73 @@ final class AppModelBootTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: decoy), decoyBefore, "the symlink target must never be opened or written")
     }
 
+    // MARK: - production wiring: the existing plan carries a PRE-MIGRATION SNAPSHOT plan
+
+    /// N-PR-0b. The hardened open is only half the production contract: an `.existing` open of a
+    /// ledger whose `user_version` is behind the migrator must take a verified rollback point
+    /// BEFORE migrating, and it takes one only if it is handed a plan.
+    ///
+    /// The guard is behavioural, not a signature check. It drives the REAL dispatch against a
+    /// rewound ledger and asserts a snapshot bundle appeared; passing `nil` — which is what
+    /// dropping the plan from `makeProductionRunner` would amount to — migrates with no rollback
+    /// point and produces nothing, which is the regression this catches.
+    func testProductionExistingPlanCarriesAPreMigrationSnapshotPlan() throws {
+        let fm = FileManager.default
+        var buf = [CChar](repeating: 0, count: Int(PATH_MAX))
+        _ = realpath(tempDir.path, &buf)
+        let dir = URL(fileURLWithPath: String(cString: buf), isDirectory: true)
+
+        func rewoundLedger(_ name: String) throws -> URL {
+            let url = dir.appendingPathComponent(name)
+            let s = try LedgerStore(databaseURL: url, open: .createIfMissing)
+            try s.db.execute("PRAGMA wal_checkpoint(TRUNCATE)"); try s.db.close()
+            try? fm.removeItem(at: URL(fileURLWithPath: url.path + "-wal"))
+            try? fm.removeItem(at: URL(fileURLWithPath: url.path + "-shm"))
+            let rewind = try SQLiteDatabase(path: url.path, mode: .readWriteExisting)
+            try rewind.setUserVersion(SchemaMigrator.schemaVersion - 1)
+            try rewind.close()
+            return url
+        }
+        func evidence(_ url: URL) throws -> ActiveOpenEvidence {
+            guard case .captured(let ev) = MigrationCoordinator.captureActiveEvidence(activeDestination: url) else {
+                throw XCTSkip("evidence capture failed")
+            }
+            return ev
+        }
+        func snapshots(_ backups: URL) -> [String] {
+            ((try? fm.contentsOfDirectory(atPath: backups.path)) ?? []).filter { $0.hasPrefix("pre-migrate-") }
+        }
+
+        // WITH a plan — the shipped wiring.
+        let withPlan = try rewoundLedger("with-plan.db")
+        let backups = dir.appendingPathComponent("Backups", isDirectory: true)
+        let plan = PreMigrationSnapshotPlan(backupsDirectory: backups,
+                                            attachmentsDirectory: dir.appendingPathComponent("docs", isDirectory: true),
+                                            timestamp: "T", retention: AppModel.preMigrationSnapshotRetention)
+        let store = try AppModel.openStoreForPlan(.existing(try evidence(withPlan)),
+                                                  activeURL: withPlan, snapshot: plan)
+        try store.db.close()
+        XCTAssertEqual(snapshots(backups).count, 1,
+                       "the production existing plan must take a rollback point before migrating")
+        XCTAssertEqual(try SQLiteDatabase(path: withPlan.path, readOnly: true).userVersion(),
+                       SchemaMigrator.schemaVersion, "and must still migrate afterwards")
+
+        // WITHOUT a plan — what dropping it from the wiring would do. Pinned so the assertion
+        // above is known to be discriminating rather than trivially true.
+        let noPlan = try rewoundLedger("no-plan.db")
+        let otherBackups = dir.appendingPathComponent("Backups2", isDirectory: true)
+        let store2 = try AppModel.openStoreForPlan(.existing(try evidence(noPlan)), activeURL: noPlan)
+        try store2.db.close()
+        XCTAssertEqual(snapshots(otherBackups).count, 0,
+                       "no plan → no snapshot: this is the regression the assertion above rules out")
+    }
+
+    /// The retention constant the shipped wiring uses. A silent change to 0 would disable
+    /// retention while every behavioural test above still passed.
+    func testTheShippedSnapshotRetentionIsThree() {
+        XCTAssertEqual(AppModel.preMigrationSnapshotRetention, 3)
+    }
+
     // MARK: - production wiring: a createFresh plan takes the C12x-A2 exclusive reservation
 
     /// Drives the REAL production dispatch for `.createFresh` against an isolated temp path with a

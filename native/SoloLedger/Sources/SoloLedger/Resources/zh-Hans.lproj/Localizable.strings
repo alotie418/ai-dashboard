@@ -151,6 +151,8 @@
 "recovery.blankConfirmTitle" = "确认创建空白账本？";
 "recovery.blankConfirm" = "创建空白账本";
 "recovery.blankConfirmMessage" = "这将以空账本启动，不导入旧数据（原始数据仍保留在磁盘上、未删除）。仅在确认无需迁移旧数据时选择。";
+"recovery.snapshotFailed.write" = "升级账本前需要先备份，但备份没能写出来（常见原因是磁盘空间不足）。本 App 没有升级你的账本，账本内容未被修改。请清理磁盘空间后重试。";
+"recovery.snapshotFailed.verify" = "升级前的备份写出来了，但没能通过校验。本 App 没有升级你的账本，账本内容未被修改。请重试；若反复出现，请先在「设置 → 数据」里手动导出一份备份。";
 
 "common.duplicate" = "复制";
 

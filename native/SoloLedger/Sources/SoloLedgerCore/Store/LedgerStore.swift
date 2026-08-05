@@ -110,13 +110,23 @@ public final class LedgerStore {
     /// NONE proves the blessed inode was the one opened — a same-inode-at-both-ends race between
     /// the checks remains residual R1; this is a CURRENT-PATH identity check, not a proof of the
     /// opened inode. The SHIPPING entry takes ONLY `databaseURL` + `expect`; no test hook is exposed.
+    ///
+    /// `snapshot` is the pre-migration rollback point. When it is non-nil AND the file's
+    /// `user_version` is behind the migrator, a verified backup bundle is written BEFORE any
+    /// migration runs, and a failure to write or verify it aborts the open without migrating —
+    /// see ``PreMigrationSnapshot``. `nil` means "this caller needs no snapshot", which is true of
+    /// every path that has nothing to lose; the production `.existing` boot always passes one.
     public static func openActiveExistingHardened(databaseURL url: URL,
-                                                  expect: ActiveOpenEvidence) throws -> LedgerStore {
-        try openActiveExistingHardened(databaseURL: url, expect: expect, hooks: HardenedOpenHooks())
+                                                  expect: ActiveOpenEvidence,
+                                                  snapshot: PreMigrationSnapshotPlan? = nil) throws -> LedgerStore {
+        try openActiveExistingHardened(databaseURL: url, expect: expect, snapshot: snapshot,
+                                       hooks: HardenedOpenHooks())
     }
 
     /// INTERNAL overload carrying the test seams; not reachable from the App.
     static func openActiveExistingHardened(databaseURL url: URL, expect: ActiveOpenEvidence,
+                                           snapshot: PreMigrationSnapshotPlan? = nil,
+                                           snapshotHooks: PreMigrationSnapshot.Hooks = .init(),
                                            hooks: HardenedOpenHooks) throws -> LedgerStore {
         // (1) Refuse when the CONFIRM-TIME evidence leaf size is zero. This guards a
         //     confirmed-empty active only; a LATE zero-length swap (evidence still > 0) is NOT
@@ -143,6 +153,45 @@ public final class LedgerStore {
             do { try db.close(); closed = true } catch { closed = false }
             hooks.observeClose?(closed)
             throw error
+        }
+
+        // PRE-MIGRATION SNAPSHOT — the rollback point, taken on the connection the four checks
+        // above just verified and BEFORE `init(adopting:)` runs its first PRAGMA.
+        //
+        // The position is load-bearing in three ways:
+        //  * BEFORE `applyPragmas` on purpose. Moving it after adoption would mean four PRAGMA
+        //    writes had already touched the file the snapshot claims to predate.
+        //  * NOT inside `init(adopting:)`, which is also STAGE 2 of `createFreshReservedHardened`
+        //    — a brand-new ledger reads `user_version == 0`, would satisfy the guard, and would
+        //    have an empty file snapshotted; and STAGE 2's error domain is deliberately kept
+        //    separate from STAGE 1's reservation cleanup.
+        //  * The three paths that need no snapshot are exempt STRUCTURALLY, not by a condition:
+        //    createFresh never enters this function, and `PreparedImportRunner` migrates a private
+        //    copy with `SchemaMigrator` directly rather than through `LedgerStore`.
+        //
+        // FAIL-CLOSED: a snapshot that cannot be written or verified aborts the open. Nothing has
+        // been written to the active file at this point — the only SQL run so far is the
+        // `user_version` read below — so the ledger is byte-for-byte what it was.
+        if let snapshot {
+            let from: Int
+            do { from = try db.userVersion() }
+            catch {
+                var closed = false
+                do { try db.close(); closed = true } catch { closed = false }
+                hooks.observeClose?(closed)
+                throw PreMigrationSnapshotError.verificationFailed
+            }
+            if from < SchemaMigrator.schemaVersion {
+                do {
+                    try PreMigrationSnapshot.take(database: db, fromVersion: from,
+                                                  plan: snapshot, hooks: snapshotHooks)
+                } catch {
+                    var closed = false
+                    do { try db.close(); closed = true } catch { closed = false }
+                    hooks.observeClose?(closed)
+                    throw error
+                }
+            }
         }
 
         // Adopt the SAME verified connection; only now do pragmas + migration (writes) run.

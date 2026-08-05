@@ -222,6 +222,8 @@
 "recovery.blankConfirm" = "Créer un livre vierge";
 "recovery.safeNote" = "La base de données d'origine reste en lecture seule et non modifiée — vous pouvez réessayer à tout moment.";
 "recovery.viewError" = "Voir les détails de l'erreur";
+"recovery.snapshotFailed.write" = "Le livre doit être sauvegardé avant sa mise à niveau, et la sauvegarde n'a pas pu être écrite — le plus souvent parce que le disque est plein. Votre livre n'a pas été mis à niveau et son contenu est inchangé. Libérez de l'espace puis réessayez.";
+"recovery.snapshotFailed.verify" = "La sauvegarde préalable a été écrite mais n'a pas passé sa vérification. Votre livre n'a pas été mis à niveau et son contenu est inchangé. Réessayez ; si cela persiste, exportez d'abord une sauvegarde depuis Réglages → Données.";
 "settings.general" = "Général";
 "settings.accounting" = "Comptabilité";
 "settings.data" = "Données";
