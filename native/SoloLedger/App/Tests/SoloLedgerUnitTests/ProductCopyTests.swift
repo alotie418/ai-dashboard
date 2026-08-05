@@ -63,7 +63,8 @@ final class ProductCopyTests: XCTestCase {
     /// The list is kept honest by ``localizationKey(for:)`` below, whose switch is exhaustive and
     /// has no `default`: a new case stops this file compiling instead of quietly going unmapped.
     private static let allErrors: [ProductCatalogError] = [
-        .invalidID, .nameRequired, .unitNotRecognized, .notFound, .idCollision, .storageFailure,
+        .invalidID, .nameRequired, .unitNotRecognized, .notFound, .idCollision,
+        .hasInventoryMovements, .storageFailure,
     ]
 
     /// The one place a `ProductCatalogError` is turned into a key. Exhaustive on purpose.
@@ -74,6 +75,7 @@ final class ProductCopyTests: XCTestCase {
         case .unitNotRecognized:  return "product.error.unitNotRecognized"
         case .notFound:           return "product.error.notFound"
         case .idCollision:        return "product.error.idCollision"
+        case .hasInventoryMovements: return "product.error.hasInventoryMovements"
         case .storageFailure:     return "product.error.storageFailure"
         }
     }
@@ -89,11 +91,11 @@ final class ProductCopyTests: XCTestCase {
     // MARK: - P1 · the absolute count
 
     func testP1TheProductNamespaceIsExactlyFortyKeys() throws {
-        XCTAssertEqual(Self.adjudicatedKeys.count, 40, "the adjudicated table itself must be forty")
-        XCTAssertEqual(Set(Self.adjudicatedKeys).count, 40, "the adjudicated table has a duplicate")
+        XCTAssertEqual(Self.adjudicatedKeys.count, 41, "the adjudicated table itself must be forty-one")
+        XCTAssertEqual(Set(Self.adjudicatedKeys).count, 41, "the adjudicated table has a duplicate")
         for language in languages {
             let landed = try sourceTable(language).keys.filter { $0.hasPrefix("product.") }
-            XCTAssertEqual(landed.count, 40, "\(language) landed \(landed.count) product.* keys")
+            XCTAssertEqual(landed.count, 41, "\(language) landed \(landed.count) product.* keys")
             XCTAssertEqual(Set(landed), Set(Self.adjudicatedKeys), """
                 \(language): landed set differs from the adjudicated table.
                 extra:   \(Set(landed).subtracting(Self.adjudicatedKeys).sorted())
@@ -104,11 +106,11 @@ final class ProductCopyTests: XCTestCase {
 
     // MARK: - P2 · the whole universe, and six identical key sets
 
-    func testP2EverySixLocaleFileHoldsFiveHundredThirtySevenKeys() throws {
+    func testP2EverySixLocaleFileHoldsSixHundredNineKeys() throws {
         var keySets: [Set<String>] = []
         for language in languages {
             let table = try sourceTable(language)
-            XCTAssertEqual(table.count, 539, "\(language) has \(table.count) keys")
+            XCTAssertEqual(table.count, 609, "\(language) has \(table.count) keys")
             keySets.append(Set(table.keys.filter { $0.hasPrefix("product.") }))
         }
         XCTAssertEqual(Set(keySets).count, 1, "the six locales do not agree on the product.* key set")

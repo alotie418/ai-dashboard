@@ -18,6 +18,7 @@
 "nav.categories" = "Categories";
 "nav.reports" = "Reports";
 "nav.products" = "Products & Services";
+"nav.inventory" = "Inventory";
 
 "overview.income" = "Total income";
 "overview.expense" = "Total expense";
@@ -641,13 +642,109 @@
 "product.empty.title" = "No products or services yet";
 "product.empty.message" = "Add your first product or service item and it will appear here.";
 
-/* I ProductCatalogError 六个 case 各一句（6 键） */
+/* I ProductCatalogError 七个 case 各一句（7 键） */
 "product.error.invalidID" = "No item was specified.";
 "product.error.nameRequired" = "The name cannot be empty.";
 "product.error.unitNotRecognized" = "That unit is not one of the available options.";
 "product.error.notFound" = "This item is no longer in the ledger; it may have been deleted.";
 "product.error.idCollision" = "The generated identifier collided with an existing item. Please try again.";
 "product.error.storageFailure" = "The ledger could not save this change.";
+"product.error.hasInventoryMovements" = "This product has stock movements and cannot be deleted. Set it inactive if you no longer use it.";
 
 /* J 读不出的行：Core 的 unreadableCount 在界面上的落点（1 键） */
 "product.unreadable.notice" = "{count} product records in this ledger could not be read and are not listed above. They remain in the ledger file intact; this app has not changed them.";
+
+/* ── 库存（N-PR-3）────────────────────────────────────────────────────
+   全部不可达：本轮只落文案，UI / 路由 / 激活归 N-PR-4 与 N-PR-6。
+   不镜像 Electron 的 inventory.*：那一套是「累计采购均价估算」的口径，
+   原生引擎是移动加权平均，逐字抄过来就是假话。文案原创。
+   数量、金额、均价都不进句子，只作为单元格的值由展示层格式化，
+   所以整个命名空间里没有一个数字，展示舍入也就只在一处。 ── */
+
+/* A 页面 chrome（5 键） */
+"inventory.page.title" = "Inventory";
+"inventory.page.subtitle" = "Records stock movements per product and computes quantity and cost from them.";
+"inventory.page.basisNote" = "Costing method: moving weighted average. Each receipt recomputes the average; each issue is costed at the average in force before it. Amounts exclude tax.";
+"inventory.page.reportNote" = "The issue costs computed here are for stock management only. They are not carried into the cost of sales in any report.";
+"inventory.page.unitNote" = "Quantity units come from the product record. This version performs no unit conversion and never adds quantities across products.";
+
+/* B 流水表列头，录入表单复用同一批（8 键） */
+"inventory.col.date" = "Date";
+"inventory.col.type" = "Type";
+"inventory.col.quantity" = "Quantity";
+"inventory.col.unitCost" = "Unit cost (excl. tax)";
+"inventory.col.cost" = "Cost";
+"inventory.col.source" = "Source";
+"inventory.col.note" = "Note";
+"inventory.col.status" = "Status";
+
+/* C 行状态：已过账 / 已撤销 / 撤销记录本身（3 键） */
+"inventory.status.posted" = "Posted";
+"inventory.status.reversed" = "Reversed";
+"inventory.status.reversal" = "Reversal";
+
+/* D InventoryMovementType 八值闭集，一 case 一键（8 键） */
+"inventory.type.purchaseIn" = "Purchase in";
+"inventory.type.saleOut" = "Sale out";
+"inventory.type.saleReturnIn" = "Sale return in";
+"inventory.type.purchaseReturnOut" = "Purchase return out";
+"inventory.type.countGain" = "Count gain";
+"inventory.type.countLoss" = "Count loss";
+"inventory.type.manualAdjust" = "Cost adjustment";
+"inventory.type.opening" = "Opening stock";
+
+/* E 余额区（5 键） */
+"inventory.balance.title" = "Stock for “{name}”";
+"inventory.balance.quantity" = "On hand";
+"inventory.balance.cost" = "Cost balance";
+"inventory.balance.unitCost" = "Current average";
+"inventory.balance.currencyNote" = "The currency is fixed by this product's first receipt. A later receipt in another currency is refused; this version performs no conversion.";
+
+/* F 录入表单，字段标签复用 B，取消复用 common.cancel（7 键） */
+"inventory.form.title" = "New movement";
+"inventory.form.quantityPlaceholder" = "e.g. 10";
+"inventory.form.unitCostHint" = "Tax-exclusive unit cost. Enter 0 for a free sample; leaving it empty is refused.";
+"inventory.form.costDelta" = "Cost change";
+"inventory.form.costDeltaHint" = "Changes the cost only, never the quantity. May be negative — for correcting a mis-keyed purchase price.";
+"inventory.form.sourcePlaceholder" = "Document number or note";
+"inventory.form.submit" = "Post";
+
+/* G InventoryPostingError 十八个 case 各一句（18 键） */
+"inventory.error.netAmountRequired" = "A receipt needs its tax-exclusive unit cost. A missing amount is never replaced by a tax-inclusive one.";
+"inventory.error.unitCostMustNotBeNegative" = "The unit cost cannot be negative.";
+"inventory.error.quantityMustBePositive" = "The quantity must be greater than zero.";
+"inventory.error.manualAdjustMustNotMoveQuantity" = "A cost adjustment cannot move the quantity. Use a count gain or count loss for that.";
+"inventory.error.manualAdjustRequiresStock" = "This product has nothing on hand, so there is no cost to adjust.";
+"inventory.error.costBalanceWouldGoNegative" = "This adjustment would push the cost balance below zero.";
+"inventory.error.insufficientStock" = "The issue is larger than what is on hand. This version allows no negative stock and makes no estimate.";
+"inventory.error.backdatedNotSupported" = "The date is earlier than the last posted movement. This version does not accept back-dated entries.";
+"inventory.error.currencyMismatch" = "The currency differs from the one this product's stock is held in. This version performs no conversion.";
+"inventory.error.openingMustBeFirst" = "This product already has movements, so an opening stock can no longer be set.";
+"inventory.error.returnExceedsOrigin" = "The return is larger than the original document allows.";
+"inventory.error.onlyTheLastMovementCanBeReversed" = "Only the last movement can be reversed. Correct anything earlier by posting a new movement.";
+"inventory.error.movementAlreadyReversed" = "This movement has already been reversed.";
+"inventory.error.reversalTargetNotFound" = "The movement to reverse could not be found.";
+"inventory.error.productNotFound" = "This product could not be found; it may have been deleted.";
+"inventory.error.arithmeticOverflow" = "The amount or quantity is too large to compute; nothing was posted.";
+"inventory.error.ledgerInconsistent" = "The stored stock records do not add up, so the operation was stopped.";
+"inventory.error.storageFailure" = "The ledger could not save this change.";
+
+/* H 三种空态（6 键） */
+"inventory.empty.noProduct.title" = "No products yet";
+"inventory.empty.noProduct.message" = "Add a product under Products & Services first, then come back here to record movements.";
+"inventory.empty.noMovement.title" = "No movements for this product";
+"inventory.empty.noMovement.message" = "Record a first receipt or set an opening stock, and the quantity and cost will appear here.";
+"inventory.empty.noOpening.title" = "No opening stock set";
+"inventory.empty.noOpening.message" = "If stock existed before you moved to this app, set the opening quantity and amount first, then record what happened after.";
+
+/* I 冲销：只能撤销最后一笔，原行永不删除（4 键） */
+"inventory.reverse.action" = "Reverse";
+"inventory.reverse.confirmTitle" = "Reverse this movement?";
+"inventory.reverse.confirmMessage" = "The original row stays in the list and a reversal row is added beside it. The quantity and cost return to what they were before it was posted.";
+"inventory.reverse.onlyLastNote" = "Only the last movement can be reversed.";
+
+/* J InventoryExceptionKind 三类标注 + 区标题（4 键） */
+"inventory.exception.title" = "Records worth a second look";
+"inventory.exception.returnOriginNotFound" = "The original document was not found, so this return was costed at the average in force at the time.";
+"inventory.exception.manualAdjust" = "The cost was adjusted by hand.";
+"inventory.exception.openingSeeded" = "The opening stock was entered by hand.";

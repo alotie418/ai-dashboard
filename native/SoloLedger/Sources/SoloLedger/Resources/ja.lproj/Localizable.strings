@@ -101,6 +101,7 @@
 "nav.categories" = "勘定科目";
 "nav.reports" = "レポート";
 "nav.products" = "商品・サービス";
+"nav.inventory" = "在庫";
 
 "type.income" = "収入";
 "type.expense" = "支出";
@@ -638,13 +639,109 @@
 "product.empty.title" = "商品・サービスがありません";
 "product.empty.message" = "最初の商品・サービス項目を追加すると、ここに表示されます。";
 
-/* I ProductCatalogError 六个 case 各一句（6 键） */
+/* I ProductCatalogError 七个 case 各一句（7 键） */
 "product.error.invalidID" = "対象の項目が指定されていません。";
 "product.error.nameRequired" = "名称は空にできません。";
 "product.error.unitNotRecognized" = "この単位は選択できる範囲にありません。";
 "product.error.notFound" = "この項目は帳簿にありません。すでに削除された可能性があります。";
 "product.error.idCollision" = "生成された識別子が既存の項目と重複しました。もう一度お試しください。";
 "product.error.storageFailure" = "帳簿はこの変更を保存できませんでした。";
+"product.error.hasInventoryMovements" = "この商品には入出庫の記録があるため削除できません。使わない場合は無効にしてください。";
 
 /* J 读不出的行：Core 的 unreadableCount 在界面上的落点（1 键） */
 "product.unreadable.notice" = "この帳簿には読み取れない商品レコードが {count} 件あり、上には表示されていません。帳簿ファイル内にはそのまま保存されており、本アプリは変更していません。";
+
+/* ── 库存（N-PR-3）────────────────────────────────────────────────────
+   全部不可达：本轮只落文案，UI / 路由 / 激活归 N-PR-4 与 N-PR-6。
+   不镜像 Electron 的 inventory.*：那一套是「累计采购均价估算」的口径，
+   原生引擎是移动加权平均，逐字抄过来就是假话。文案原创。
+   数量、金额、均价都不进句子，只作为单元格的值由展示层格式化，
+   所以整个命名空间里没有一个数字，展示舍入也就只在一处。 ── */
+
+/* A 页面 chrome（5 键） */
+"inventory.page.title" = "在庫";
+"inventory.page.subtitle" = "商品ごとに入出庫を記録し、そこから在庫数量と原価を計算します。";
+"inventory.page.basisNote" = "原価計算は移動平均法です。入庫のたびに平均単価を計算し直し、出庫は直前の平均単価で原価を振り替えます。金額はすべて税抜です。";
+"inventory.page.reportNote" = "ここで計算する出庫原価は在庫管理のためだけに使い、どの帳票の売上原価にも反映しません。";
+"inventory.page.unitNote" = "数量の単位は商品情報から取ります。このバージョンでは単位換算を行わず、異なる商品の数量を合計することもありません。";
+
+/* B 流水表列头，录入表单复用同一批（8 键） */
+"inventory.col.date" = "日付";
+"inventory.col.type" = "種別";
+"inventory.col.quantity" = "数量";
+"inventory.col.unitCost" = "単価（税抜）";
+"inventory.col.cost" = "原価";
+"inventory.col.source" = "取引元";
+"inventory.col.note" = "備考";
+"inventory.col.status" = "状態";
+
+/* C 行状态：已过账 / 已撤销 / 撤销记录本身（3 键） */
+"inventory.status.posted" = "記帳済み";
+"inventory.status.reversed" = "取消済み";
+"inventory.status.reversal" = "取消記録";
+
+/* D InventoryMovementType 八值闭集，一 case 一键（8 键） */
+"inventory.type.purchaseIn" = "仕入入庫";
+"inventory.type.saleOut" = "販売出庫";
+"inventory.type.saleReturnIn" = "売上返品入庫";
+"inventory.type.purchaseReturnOut" = "仕入返品出庫";
+"inventory.type.countGain" = "棚卸増";
+"inventory.type.countLoss" = "棚卸減";
+"inventory.type.manualAdjust" = "原価調整";
+"inventory.type.opening" = "期首在庫";
+
+/* E 余额区（5 键） */
+"inventory.balance.title" = "「{name}」の在庫";
+"inventory.balance.quantity" = "在庫数量";
+"inventory.balance.cost" = "在庫原価残高";
+"inventory.balance.unitCost" = "現在の平均単価";
+"inventory.balance.currencyNote" = "通貨はこの商品の最初の入庫で確定します。以降、別の通貨での入庫は受け付けません。換算は行いません。";
+
+/* F 录入表单，字段标签复用 B，取消复用 common.cancel（7 键） */
+"inventory.form.title" = "入出庫を追加";
+"inventory.form.quantityPlaceholder" = "例：10";
+"inventory.form.unitCostHint" = "税抜の単価です。無償サンプルは 0 を入力できます。空欄のままでは受け付けません。";
+"inventory.form.costDelta" = "原価の増減額";
+"inventory.form.costDeltaHint" = "数量は動かさず原価だけを変更します。マイナスも入力できます。仕入単価の入力誤りの訂正に使います。";
+"inventory.form.sourcePlaceholder" = "伝票番号など";
+"inventory.form.submit" = "記帳する";
+
+/* G InventoryPostingError 十八个 case 各一句（18 键） */
+"inventory.error.netAmountRequired" = "入庫には税抜の単価が必要です。金額が無い入庫は原価計算せず、税込金額で代用することもありません。";
+"inventory.error.unitCostMustNotBeNegative" = "単価にマイナスは入力できません。";
+"inventory.error.quantityMustBePositive" = "数量は 0 より大きい必要があります。";
+"inventory.error.manualAdjustMustNotMoveQuantity" = "原価調整では数量を動かせません。数量の増減は棚卸増または棚卸減で行ってください。";
+"inventory.error.manualAdjustRequiresStock" = "この商品には在庫が無いため、調整できる原価がありません。";
+"inventory.error.costBalanceWouldGoNegative" = "この調整では在庫原価残高がマイナスになります。";
+"inventory.error.insufficientStock" = "出庫数量が在庫数量を超えています。このバージョンではマイナス在庫を認めず、見積りもしません。";
+"inventory.error.backdatedNotSupported" = "日付が最後の記録より前です。このバージョンでは過去に遡った登録はできません。";
+"inventory.error.currencyMismatch" = "この商品の在庫が持つ通貨と一致しません。このバージョンでは換算しません。";
+"inventory.error.openingMustBeFirst" = "この商品には既に記録があるため、期首在庫を設定できません。";
+"inventory.error.returnExceedsOrigin" = "返品数量が元の伝票の数量を超えています。";
+"inventory.error.onlyTheLastMovementCanBeReversed" = "取り消せるのは最後の 1 件だけです。それより前の誤りは新しい記録で訂正してください。";
+"inventory.error.movementAlreadyReversed" = "この記録は既に取り消されています。";
+"inventory.error.reversalTargetNotFound" = "取り消す対象の記録が見つかりません。";
+"inventory.error.productNotFound" = "この商品が見つかりません。削除された可能性があります。";
+"inventory.error.arithmeticOverflow" = "金額または数量が大きすぎて計算できません。この記録は登録されていません。";
+"inventory.error.ledgerInconsistent" = "保存されている在庫の記録が整合しないため、処理を中止しました。";
+"inventory.error.storageFailure" = "帳簿はこの変更を保存できませんでした。";
+
+/* H 三种空态（6 键） */
+"inventory.empty.noProduct.title" = "商品がまだありません";
+"inventory.empty.noProduct.message" = "先に「商品 / サービス」で商品を追加してから、ここで入出庫を記録してください。";
+"inventory.empty.noMovement.title" = "この商品には記録がありません";
+"inventory.empty.noMovement.message" = "最初の入庫を記録するか期首在庫を設定すると、数量と原価がここに表示されます。";
+"inventory.empty.noOpening.title" = "期首在庫が未設定です";
+"inventory.empty.noOpening.message" = "このアプリに移る前から在庫があった場合は、先に期首の数量と金額を設定してから、その後の入出庫を記録してください。";
+
+/* I 冲销：只能撤销最后一笔，原行永不删除（4 键） */
+"inventory.reverse.action" = "この記録を取り消す";
+"inventory.reverse.confirmTitle" = "この記録を取り消しますか？";
+"inventory.reverse.confirmMessage" = "元の記録は一覧に残り、取消記録が別に追加されます。数量と原価はこの記録より前の状態に戻ります。";
+"inventory.reverse.onlyLastNote" = "取り消せるのは最後の 1 件だけです。";
+
+/* J InventoryExceptionKind 三类标注 + 区标题（4 键） */
+"inventory.exception.title" = "確認が必要な記録";
+"inventory.exception.returnOriginNotFound" = "元の伝票が見つからなかったため、この返品はその時点の平均単価で計上しました。";
+"inventory.exception.manualAdjust" = "原価を手作業で調整しました。";
+"inventory.exception.openingSeeded" = "期首在庫は手作業で入力しました。";

@@ -118,6 +118,7 @@ enum ProductPageComposition {
         "product.error.unitNotRecognized": [.errorBanner],
         "product.error.notFound": [.errorBanner],
         "product.error.idCollision": [.errorBanner],
+        "product.error.hasInventoryMovements": [.errorBanner],
         "product.error.storageFailure": [.errorBanner],
         // MARK: unreadable (1)
         "product.unreadable.notice": [.unreadable],
@@ -144,7 +145,7 @@ enum ProductPageComposition {
 
     /// The one place a `ProductCatalogError` becomes a sentence.
     ///
-    /// Exhaustive with no `default`: a seventh case stops this file compiling instead of
+    /// Exhaustive with no `default`: an eighth case stops this file compiling instead of
     /// silently falling into a bucket. `ProductCatalogError` carries no payload, so there is
     /// nothing here that could print a statement, a path or the driver's own wording even by
     /// accident — the leak is impossible in the type, and this switch keeps it impossible in
@@ -156,6 +157,7 @@ enum ProductPageComposition {
         case .unitNotRecognized:  return "product.error.unitNotRecognized"
         case .notFound:           return "product.error.notFound"
         case .idCollision:        return "product.error.idCollision"
+        case .hasInventoryMovements: return "product.error.hasInventoryMovements"
         case .storageFailure:     return "product.error.storageFailure"
         }
     }
