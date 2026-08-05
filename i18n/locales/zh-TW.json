@@ -734,10 +734,10 @@
     "alertDeleteFailed": "刪除失敗，請重試",
     "recognitionMode": "識別模式",
     "loading": "正在載入資料...",
-    "inventoryCurrent": "當前庫存",
+    "inventoryCurrent": "本期採購減銷售數量差（跨單位合計）",
     "inventoryTon": "",
     "inventoryBag": "袋",
-    "inventoryLow": "庫存不足，銷售將導致庫存為負",
+    "inventoryLow": "數量差不大於零；本數字不是庫存水準，請依商品查看在庫數量",
     "inventoryTotalPurchase": "總採購",
     "inventoryTotalSales": "總銷售",
     "formValidation": "請填寫客戶名稱及數量",
@@ -1044,6 +1044,7 @@
     "balanceIncomeTaxPayable": "應交稅費（所得稅·估算）",
     "balanceIncomeTaxPrepaid": "預繳稅款（所得稅·估算）",
     "balanceIncomeTaxHint": "本位幣 · 同稅種同期間對沖 · 管理估算",
+    "balanceInventoryHint": "累計採購均價估算 · 未與銷售成本結轉",
     "balanceIncomeTaxLossCaveat": "應計所得稅為負（虧損期估算），預繳列不代表真實預繳"
   },
   "usSchedule": {
@@ -1332,7 +1333,7 @@
     "name": "名稱",
     "namePlaceholder": "例如：A 型包裝盒 / 諮詢服務",
     "unit": "單位",
-    "cost": "預設單價（不含稅）",
+    "cost": "預設單價（不含稅·也用於庫存估值）",
     "type": "類型",
     "product": "商品",
     "service": "服務",
@@ -1348,11 +1349,12 @@
   },
   "inventory": {
     "inStockCount": "庫存商品數",
-    "totalCost": "庫存總成本（不含稅）",
-    "detailTitle": "庫存明細",
+    "totalCost": "庫存參考估值（不含稅·估算）",
+    "detailTitle": "庫存參考估值明細",
     "colProduct": "商品",
     "colQty": "在庫數量",
-    "colCost": "庫存成本"
+    "colCost": "參考估值",
+    "estimateNote": "依歷史累計採購資料與手動估值設定計算，僅供經營參考，不代表正式帳面庫存成本，且不與報表銷售成本勾稽。"
   },
   "documents": {
     "title": "業務單據",

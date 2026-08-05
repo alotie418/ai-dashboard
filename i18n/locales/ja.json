@@ -734,10 +734,10 @@
     "alertDeleteFailed": "Delete failed, please retry",
     "recognitionMode": "認識モード",
     "loading": "読み込み中...",
-    "inventoryCurrent": "現在の在庫",
+    "inventoryCurrent": "当期の仕入−販売の数量差（単位をまたいで合計）",
     "inventoryTon": "",
     "inventoryBag": "bags",
-    "inventoryLow": "在庫不足 — 販売すると在庫がマイナスになります",
+    "inventoryLow": "数量差はゼロ以下です。この数字は在庫水準ではありません。商品ごとの在庫数をご確認ください。",
     "inventoryTotalPurchase": "総仕入",
     "inventoryTotalSales": "総売上",
     "formValidation": "顧客名と数量を入力してください",
@@ -1044,6 +1044,7 @@
     "balanceIncomeTaxPayable": "未払法人税等（概算）",
     "balanceIncomeTaxPrepaid": "前払法人税等（概算）",
     "balanceIncomeTaxHint": "機能通貨 · 同一税目・同一期間の相殺 · 管理用概算",
+    "balanceInventoryHint": "累計仕入平均単価による概算 · 売上原価への振替なし",
     "balanceIncomeTaxLossCaveat": "計上法人税がマイナス（赤字期の概算）。前払行は実際の前払を表しません"
   },
   "usSchedule": {
@@ -1332,7 +1333,7 @@
     "name": "名称",
     "namePlaceholder": "例：A型梱包箱 / コンサルティング",
     "unit": "単位",
-    "cost": "既定単価（税抜）",
+    "cost": "既定単価（税抜・在庫の参考評価にも使用）",
     "type": "種別",
     "product": "商品",
     "service": "サービス",
@@ -1348,11 +1349,12 @@
   },
   "inventory": {
     "inStockCount": "在庫商品数",
-    "totalCost": "在庫総原価（税抜）",
-    "detailTitle": "在庫明細",
+    "totalCost": "在庫参考評価額（税抜・推定）",
+    "detailTitle": "在庫参考評価額の明細",
     "colProduct": "商品",
     "colQty": "在庫数",
-    "colCost": "在庫原価"
+    "colCost": "参考評価額",
+    "estimateNote": "過去の累計仕入データと手動で設定した見積単価から算出しています。経営管理の参考用であり、正式な帳簿上の在庫原価ではなく、レポートの売上原価とも整合しません。"
   },
   "documents": {
     "title": "業務帳票",

@@ -734,10 +734,10 @@
     "alertDeleteFailed": "删除失败，请重试",
     "recognitionMode": "识别模式",
     "loading": "正在加载数据...",
-    "inventoryCurrent": "当前库存",
+    "inventoryCurrent": "本期采购减销售数量差（跨单位合计）",
     "inventoryTon": "",
     "inventoryBag": "袋",
-    "inventoryLow": "库存不足，销售将导致库存为负",
+    "inventoryLow": "数量差不大于零；本数字不是库存水平，请按商品查看在库数量",
     "inventoryTotalPurchase": "总采购",
     "inventoryTotalSales": "总销售",
     "formValidation": "请填写必要的客户和数量信息",
@@ -1044,6 +1044,7 @@
     "balanceIncomeTaxPayable": "应交税费（所得税·估算）",
     "balanceIncomeTaxPrepaid": "预缴税款（所得税·估算）",
     "balanceIncomeTaxHint": "本位币 · 同税种同期间对冲 · 管理估算",
+    "balanceInventoryHint": "累计采购均价估算 · 未与销售成本结转",
     "balanceIncomeTaxLossCaveat": "应计所得税为负（亏损期估算），预缴行不代表真实预缴"
   },
   "usSchedule": {
@@ -1332,7 +1333,7 @@
     "name": "名称",
     "namePlaceholder": "例如：A 型包装盒 / 咨询服务",
     "unit": "单位",
-    "cost": "默认单价（不含税）",
+    "cost": "默认单价（不含税·也用于库存估值）",
     "type": "类型",
     "product": "商品",
     "service": "服务",
@@ -1348,11 +1349,12 @@
   },
   "inventory": {
     "inStockCount": "库存商品数",
-    "totalCost": "库存总成本（不含税）",
-    "detailTitle": "库存明细",
+    "totalCost": "库存参考估值（不含税·估算）",
+    "detailTitle": "库存参考估值明细",
     "colProduct": "商品",
     "colQty": "在库数量",
-    "colCost": "库存成本"
+    "colCost": "参考估值",
+    "estimateNote": "按历史累计采购数据及手工估值设置计算，仅供经营参考，不代表正式账面库存成本，且不与报表销售成本勾稽。"
   },
   "documents": {
     "title": "业务单据",

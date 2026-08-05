@@ -734,10 +734,10 @@
     "alertDeleteFailed": "Delete failed, please retry",
     "recognitionMode": "Recognition Mode",
     "loading": "Loading...",
-    "inventoryCurrent": "Current Inventory",
+    "inventoryCurrent": "Purchases minus sales this period (quantities added across units)",
     "inventoryTon": "",
     "inventoryBag": "bags",
-    "inventoryLow": "Low inventory — sales will cause negative stock",
+    "inventoryLow": "The difference is not above zero. This figure is not a stock level — check on-hand quantities per product.",
     "inventoryTotalPurchase": "Total Purchased",
     "inventoryTotalSales": "Total Sold",
     "formValidation": "Please fill in customer and quantity",
@@ -1044,6 +1044,7 @@
     "balanceIncomeTaxPayable": "Income tax payable (estimate)",
     "balanceIncomeTaxPrepaid": "Prepaid income tax (estimate)",
     "balanceIncomeTaxHint": "Functional currency · same-tax-same-period offset · management estimate",
+    "balanceInventoryHint": "Cumulative purchase-average estimate · not carried to cost of sales",
     "balanceIncomeTaxLossCaveat": "Accrued income tax is negative (loss-period estimate); the prepaid line does not represent an actual prepayment"
   },
   "usSchedule": {
@@ -1332,7 +1333,7 @@
     "name": "Name",
     "namePlaceholder": "e.g. Type-A packing box / Consulting",
     "unit": "Unit",
-    "cost": "Default Unit Price (excl. tax)",
+    "cost": "Default Unit Price (excl. tax · also used for the inventory estimate)",
     "type": "Type",
     "product": "Product",
     "service": "Service",
@@ -1348,11 +1349,12 @@
   },
   "inventory": {
     "inStockCount": "Products in Stock",
-    "totalCost": "Total Inventory Cost (excl. tax)",
-    "detailTitle": "Inventory Detail",
+    "totalCost": "Inventory Reference Estimate (excl. tax)",
+    "detailTitle": "Inventory Reference Estimate — Detail",
     "colProduct": "Product",
     "colQty": "On Hand",
-    "colCost": "Cost"
+    "colCost": "Est. value",
+    "estimateNote": "Calculated from cumulative historical purchase data and manually entered estimates. For business reference only — not a formal book inventory cost, and not reconciled with the cost of sales shown in reports."
   },
   "documents": {
     "title": "Business Documents",

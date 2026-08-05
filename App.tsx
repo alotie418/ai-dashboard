@@ -420,6 +420,7 @@ const AppContent: React.FC = () => {
                   </table>
                 </div>
               )}
+              {data.inventory && data.inventory.details.length > 0 && (<p className="text-[11px] text-[#5c5c5a] leading-snug px-1"><i className="fas fa-circle-info mr-1.5"></i>{t('inventory.estimateNote')}</p>)}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch [grid-auto-rows:1fr]">
                 {/* US: Schedule C + Deductions + SE Tax + Margins */}
                 {sections.includes('schedule_c_summary') ? (

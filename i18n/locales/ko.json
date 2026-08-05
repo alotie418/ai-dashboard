@@ -734,10 +734,10 @@
     "alertDeleteFailed": "Delete failed, please retry",
     "recognitionMode": "인식 모드",
     "loading": "불러오는 중...",
-    "inventoryCurrent": "현재 재고",
+    "inventoryCurrent": "당기 매입 − 매출 수량 차이 (단위 구분 없이 합산)",
     "inventoryTon": "",
     "inventoryBag": "bags",
-    "inventoryLow": "재고 부족 — 판매 시 재고가 마이너스가 됩니다",
+    "inventoryLow": "수량 차이가 0 이하입니다. 이 숫자는 재고 수준이 아니므로 상품별 재고 수량을 확인하세요.",
     "inventoryTotalPurchase": "총 매입",
     "inventoryTotalSales": "총 매출",
     "formValidation": "고객명과 수량을 입력하세요",
@@ -1044,6 +1044,7 @@
     "balanceIncomeTaxPayable": "미지급 법인세(추정)",
     "balanceIncomeTaxPrepaid": "선급 법인세(추정)",
     "balanceIncomeTaxHint": "기능통화 · 동일 세목·동일 기간 상계 · 관리용 추정",
+    "balanceInventoryHint": "누적 매입 평균단가 추정 · 매출원가로 대체하지 않음",
     "balanceIncomeTaxLossCaveat": "발생 법인세가 음수(손실기 추정)이며, 선급 항목은 실제 선급을 의미하지 않습니다"
   },
   "usSchedule": {
@@ -1332,7 +1333,7 @@
     "name": "이름",
     "namePlaceholder": "예: A형 포장 상자 / 컨설팅",
     "unit": "단위",
-    "cost": "기본 단가(부가세 제외)",
+    "cost": "기본 단가(부가세 제외 · 재고 추정에도 사용)",
     "type": "유형",
     "product": "상품",
     "service": "서비스",
@@ -1348,11 +1349,12 @@
   },
   "inventory": {
     "inStockCount": "재고 상품 수",
-    "totalCost": "재고 총원가 (세금 제외)",
-    "detailTitle": "재고 명세",
+    "totalCost": "재고 참고 추정액 (세금 제외)",
+    "detailTitle": "재고 참고 추정액 명세",
     "colProduct": "상품",
     "colQty": "재고 수량",
-    "colCost": "재고 원가"
+    "colCost": "참고 추정액",
+    "estimateNote": "과거 누적 매입 데이터와 수동으로 설정한 추정 단가로 계산합니다. 경영 참고용이며 정식 장부상 재고 원가가 아니고, 보고서의 매출원가와도 대사되지 않습니다."
   },
   "documents": {
     "title": "업무 문서",
