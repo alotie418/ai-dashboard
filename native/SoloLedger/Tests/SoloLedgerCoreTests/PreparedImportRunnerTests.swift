@@ -3,7 +3,7 @@ import XCTest
 
 /// Staging-sourced prepared-DB runner (Phase 2B-3 C3): copy the gated staged DB/WAL through
 /// the gate descriptor into a private attempt, normalize (checkpoint→DELETE→quick_check),
-/// gate the version, migrate to head, verify integrity/FK/all-26-tables, then compute the
+/// gate the version, migrate to head, verify integrity/FK/all-29-tables, then compute the
 /// identity on a closed, sidecar-free file and publish it atomically. Real SQLite fixtures.
 final class PreparedImportRunnerTests: LedgerTestCase {
 
@@ -104,12 +104,12 @@ final class PreparedImportRunnerTests: LedgerTestCase {
         XCTAssertEqual(try db.userVersion(), SchemaMigrator.schemaVersion)
     }
 
-    func testRunEmptyDatabaseMigratesFullLadderToHeadWithAll26Tables() throws {
+    func testRunEmptyDatabaseMigratesFullLadderToHeadWithAll29Tables() throws {
         let (gated, id) = try gatedFixture(sourceDB: try makeSQLiteDB(userVersion: 0)); defer { cleanStaging(id) }
         let prepared = try PreparedImportRunner().run(gated, workingDirectory: try workingRoot(), preparedRoot: try preparedRoot())
 
         let db = try SQLiteDatabase(path: prepared.preparedDatabaseURL.path, readOnly: true)
-        XCTAssertEqual(try db.userVersion(), 23, "the full ladder must reach head")
+        XCTAssertEqual(try db.userVersion(), 24, "the full ladder must reach head")
         let present = Set(try db.query("SELECT name FROM sqlite_master WHERE type='table'").compactMap { $0.string("name") })
         for t in SchemaMigrator.requiredTables { XCTAssertTrue(present.contains(t), "missing table \(t)") }
         XCTAssertEqual(prepared.transactionsMigrated, 0)
@@ -128,13 +128,17 @@ final class PreparedImportRunnerTests: LedgerTestCase {
 
     // MARK: - Version gates
 
+    /// "Newer than head" is expressed RELATIVE to the head, not as a literal. It used to be a
+    /// literal 24, which stopped meaning "newer" the moment 24 became head — the test then failed
+    /// on the schema gate instead of the version gate, still red but for the wrong reason.
     func testUnknownNewerUserVersionRejected() throws {
+        let newer = SchemaMigrator.schemaVersion + 1
         let src = try electronFixtureCopy()
-        try setUserVersion(src, 24)
+        try setUserVersion(src, newer)
         let (gated, id) = try gatedFixture(sourceDB: src); defer { cleanStaging(id) }
         XCTAssertThrowsError(try PreparedImportRunner().run(gated, workingDirectory: try workingRoot(), preparedRoot: try preparedRoot())) { e in
             guard case PreparedRunFailure.unsupportedUserVersion(let v) = e else { return XCTFail("got \(e)") }
-            XCTAssertEqual(v, 24)
+            XCTAssertEqual(v, newer)
         }
     }
 

@@ -29,7 +29,7 @@
 | VAT / GST / 销售税汇总 | ✅ | `CNReportEngine.swift:183` `vatSummary`、`EUReportEngine.swift:93` `vatReturn`、`KRReportEngine.swift:98` `vatSummary`；JP 消费税 / TW 营业税同批镜像。**估算汇总，不是申报数据，不接税控/税局** |
 | 所得税 / 附加税估算 | ✅ | 所得税与附加税链已镜像（`CNReportEngine.swift:77-84`），US 自雇税同批。税率缺失或损坏一律**拒算不回退**（`ReportRateSetting.swift:46-88` 的四态契约）。**估算值，预设税率可能随政策调整，须自行核对最新官方税率** |
 | 现金流 / 资产负债（PR-7B） | 现金流 ✅ ／ 资产负债 🟡 | 经营活动现金流已镜像 `_cashflow.js`（`Reports/Cashflow.swift`）；投资 / 筹资 / 期初期末与 Electron 一样不可从本数据模型推导，**如实说明而不显示为 0**。`electron/handlers/balanceOverview.js`（246 行，管理口径概览、非法定资产负债表）**尚未镜像** |
-| COGS / `_expenseSplit` / 库存成本 | COGS ✅ ／ 库存成本 🟡 | `Reports/ExpenseSplit.swift` 逐行镜像 `_expenseSplit.js`（`:3` 声明镜像、`:16` `isCogsRow`、`:41` `splitExpenses`，均标注对位行号）。**库存成本（`electron/handlers/inventory.js` 89 行的加权平均）未做** |
+| COGS / `_expenseSplit` / 库存成本 | COGS ✅ ／ 库存 **原生新引擎（非镜像）·建设中** | `Reports/ExpenseSplit.swift` 逐行镜像 `_expenseSplit.js`（`:3` 声明镜像、`:16` `isCogsRow`、`:41` `splitExpenses`，均标注对位行号）。**库存不镜像 Electron**：`electron/handlers/inventory.js` 经实测审计确认产出的是「建账以来累计采购净额 ÷ 累计采购数量 × 当前净在库量」，销售不冲减均价（买 10@100 → 卖光 → 再买 10@200，真实剩余成本 2000，该算法给 1500），**不是加权平均法**，故不作为镜像对象。原生按 N0 口径确认书新写移动加权平均引擎，schema 已落地（v24 三表，见 §4）。**该引擎的出库成本流水不接入任何报表 COGS**——是否接入正式报表属另行裁定的独立事项，在裁定前 `Reports/**` 与库存引擎之间无任何调用出口 |
 | 折旧预览 / 里程 / 家庭办公室 | ⏸️ | 特定制度，暂缓 |
 
 ## 3. 单据 / 主数据
@@ -37,7 +37,7 @@
 | Electron 功能 | 状态 | 备注 |
 | --- | --- | --- |
 | 发票 / 报价单 / 商业单据（`business_documents`） | ⏸️ | 暂缓（Phase 3） |
-| 产品 / 服务项（`products`） | ✅（阶段 2b） | `ProductsView` + `ProductPageComposition` + `Inventory/ProductCatalog.swift`（逐行镜像 `electron/handlers/products.js`）。侧栏「商品 / 服务项目」可达。**仅主数据**：`default_unit_cost` 只登记，不参与任何计算——库存计价（`inventory.js` 的加权平均）仍未做 |
+| 产品 / 服务项（`products`） | ✅（阶段 2b） | `ProductsView` + `ProductPageComposition` + `Inventory/ProductCatalog.swift`（逐行镜像 `electron/handlers/products.js`）。侧栏「商品 / 服务项目」可达。**仅主数据**：`default_unit_cost` 只登记，不参与任何计算——它在 Electron 里同时被用作采购行、销售行与单据行的默认单价，语义不唯一，因此**原生库存引擎不迁移、不读取该列**（N-11）；库存计价走 v24 起的原生新引擎，见 §2 与 §4 |
 | 客户 / 供应商 | 🟡 | 目前 `counterparty` 为自由文本 |
 | 现金/银行账户、负债、固定资产、权益、税费台账（策略中立） | ⏸️ | 暂缓 |
 
@@ -52,6 +52,8 @@
 | **旧进程检测硬化** | ✅（沙箱内正解已达成） | 生产 ingest 用**强指纹稳定性**检测（前后指纹 + 3 次尝试，`StagingIngest`）——旧版仍在写则拒，映射为**可重试态** `.retriable(.sourceBusy)`（`MigrationCoordinator.swift:1104`）并显示引导消息 `migration.msg.sourceBusy`（"请退出旧版 SoloLedger 后重试"，6 语齐全）+ Retry 动作。**App Sandbox 内无法枚举进程 / 取跨进程锁**，指纹 + 引导退出即该环境下的正解。原 🛑 标记已过时 |
 | **Release 数据路径验证** | 🛑 **Release 前必须** | `SoloLedgerNative`（Release）已加路径隔离单测；需在**真实 Release 沙箱**端到端验证 |
 | **DMG（非沙箱）用户数据迁移入口** | ✅（N7.2 已闭合） | 源选择入口已全链路接线并测试：coordinator `.requiresSourceChoice`（`MigrationCoordinator.swift:668`）→ `.awaitingSourceChoice` → RootView `.chooseSource`（`RootView.swift:97`）→ 目录面板（`FilePanels.swift:59`）→ `.migrateFromUserDir(.userSelectedDataDir)`（`AppModel.swift:221`，intent 映射 `:388`）。single-grant-window、无 bookmark entitlement（`MigrationSource.withAccess`）。测试：`DormantSourceChoiceBootTests`、`ElectronFixtureProductionOpenTests`。**原 🛑 P0 标记已过时** |
+| **schema v24 单向性**（原生梯子首次高于 Electron） | ⚠️ **约定，非技术强制** | v24 是原生独有的一级（库存三表），Electron 侧没有对应实现。**三条实测事实，逐条如实说明**：①**Electron 照常打开 v24 账本、照常读写 v23 表**——`electron/db/index.js:860-869` 的 `for (let v = 24; v < 23; v++)` 零次迭代、不抛错，`:63` 的 `pendingMigration` 为 false（该账本连 Electron 自己的迁移前自动备份都不会触发）；不存在「Electron 打不开」这条路径。②因此**在 Electron 里录一笔采购，原生库存引擎不知道**——原生引擎只读自己的流水表——**两套库存事实源会静默分叉**，这正是新引擎要消灭的东西。③**唯一真正会拒绝的是备份恢复路径**：`electron/handlers/index.js:232` 的 `uv > SCHEMA_VERSION → 'NEWER_VERSION'`，六语文案已存在（`settings.dataBackup.newerVersion`）。⇒ **升级到 v24 后请不要再用 Electron 打开同一个账本。** 迁移时向 `settings` 写一行证据 `native_inventory_active`（JSON `"24"`），供将来 Electron 侧加读取即可提示——**注意今天的 Electron 读不到它**：`handlers/settings.js` 的 `SETTINGS_ALLOWED_KEYS` 白名单会把它过滤掉，所以这是给未来留的钩子，不是现在就有的提示。Electron 侧启动提示 PR 属独立事项，需单独授权（会改 `electron/**`） |
+| **迁移前快照与两条恢复语义**（就地升级的回滚点） | ✅（N-PR-0b / #451） | 已有原生 active 账本在就地迁移前会写一份经校验的 `pre-migrate-v<from>-<ts>` bundle，写不出或读不回则**不迁移、开库失败**（fail-closed，`PreMigrationSnapshot.swift`）。v23→v24 升级因此自动获得回滚点（`InventorySchemaTests` L1 端到端验证）。两条容易读反的语义：①**快照恢复的是「升级前的数据」，不是「升级前的 schema」**——bundle 里的库是 v23，但恢复链重开时梯子会再跑一遍，结果仍是 v24；想回到 v23 需要的是 schema 回滚（`DROP` 三表 + `PRAGMA user_version = 23`），不是恢复快照。②**这份 v23 快照拿去 Electron 恢复是会被放行的**（`uv = 23 ≤ SCHEMA_VERSION = 23`，不触发 `NEWER_VERSION`）——它是升级前的库，Electron 读它完全正常；被拒的是 v24 备份 |
 | 加密列（`ai_providers`/`ecommerce_connections`，safeStorage 密文） | ❌ | 跨应用不可移植；原生无 AI/电商，不迁移 |
 
 ## 5. 打包 / 发布（Phase 4）

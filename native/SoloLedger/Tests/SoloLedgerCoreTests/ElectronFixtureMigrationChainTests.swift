@@ -212,8 +212,10 @@ final class ElectronFixtureMigrationChainTests: LedgerTestCase {
         XCTAssertEqual(s.expenseTotal, 1750.74, accuracy: 0.001, file: file, line: line)
         XCTAssertEqual(s.net, 2850.01, accuracy: 0.001, file: file, line: line)
 
-        XCTAssertEqual(try store.db.query("SELECT COUNT(*) AS c FROM settings").first?.int("c"), 4,
+        // 4 rows from the Electron fixture + the v24 rung's `native_inventory_active` evidence row.
+        XCTAssertEqual(try store.db.query("SELECT COUNT(*) AS c FROM settings").first?.int("c"), 5,
                        file: file, line: line)
+        XCTAssertEqual(try store.settings.string("native_inventory_active"), "24", file: file, line: line)
         XCTAssertEqual(try store.settings.string("accounting_locale"), "CN", file: file, line: line)
         XCTAssertEqual(try store.settings.string("currency"), "CNY", file: file, line: line)
         XCTAssertEqual(try store.settings.string("company_name"), "示例商贸有限公司", file: file, line: line)

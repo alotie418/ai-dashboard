@@ -51,8 +51,10 @@ final class ReportGoldenFixtureTests: LedgerTestCase {
     func testFixtureDatabaseShipsInTheTestBundle() throws {
         XCTAssertTrue(FileManager.default.fileExists(atPath: try bundledFixtureURL().path),
                       "reports-base.db must ship")
+        // Opened on a COPY, so the ladder running to the native head (24 since v24) never
+        // moves the committed v23 fixture the goldens were generated from.
         let store = try LedgerStore(databaseURL: try fixtureCopy())
-        XCTAssertEqual(try store.schemaVersion(), 23)
+        XCTAssertEqual(try store.schemaVersion(), 24)
     }
 
     func testGoldenMatrixIsComplete() throws {

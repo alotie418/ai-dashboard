@@ -97,7 +97,7 @@ final class SQLiteHardeningTests: LedgerTestCase {
     /// The central required-table list must be exactly the tables the ladder builds at head,
     /// so the runner's completeness check can never drift from the schema.
     func testRequiredTablesMatchLadderHead() throws {
-        XCTAssertEqual(SchemaMigrator.requiredTables.count, 26, "26 tables at head")
+        XCTAssertEqual(SchemaMigrator.requiredTables.count, 29, "29 tables at head (26 shared with Electron + 3 from v24)")
         let url = try trackedTempDir().appendingPathComponent("head.db")
         let db = try SQLiteDatabase(path: url.path, mode: .readWriteCreate)
         try SchemaMigrator.migrate(db)
