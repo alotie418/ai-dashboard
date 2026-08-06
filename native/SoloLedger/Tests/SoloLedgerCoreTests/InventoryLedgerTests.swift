@@ -332,22 +332,51 @@ final class InventoryLedgerTests: LedgerTestCase {
                        "p1 selling out says nothing about p2")
     }
 
-    // MARK: - L8 · unreachable from the App
+    // MARK: - L8 · exactly which App files may name the engine
 
-    /// The engine is Core-only at this stage: no view, no composition, no `AppModel` state. Asserted
-    /// per symbol over the whole production tree so this fails on the first accidental wiring —
-    /// whole-identifier matching, and `//` comments are not uses.
+    /// Until N-PR-4 the answer was "nobody". It is now a CLOSED SET rather than an empty one: the
+    /// inventory page's model reaches the store, the page's composition names the model types, and
+    /// no third file names either.
     ///
-    /// Same shape as `ProductCatalogTests`' scan, for the same reason: an "it is not reachable yet"
-    /// claim in a PR description decays; a test does not.
-    func testNothingInTheProductionTreeNamesTheInventoryEngine() throws {
-        let symbols = ["InventoryPosting", "InventoryPostedMovement", "InventoryBalance",
-                       "InventoryMovementType", "InventoryMovementDirection", "InventoryException",
-                       "InventoryExceptionKind", "InventoryPostingError", "InventoryPostingRequest",
-                       "InventoryPostingContext", "InventoryPostingPlan", "InventoryOriginFacts",
-                       "inventoryBalance", "inventoryMovements", "liveInventoryMovements",
-                       "inventoryExceptions", "postInventoryMovement", "reverseInventoryMovement"]
-        var offenders: [String: [String]] = [:]
+    /// Asserted per symbol and in both directions, so this fails on a use that appears somewhere
+    /// new AND on a use that quietly disappears from where it belongs. Whole-identifier matching,
+    /// and `//` comments are not uses — the three declaring files name these symbols constantly
+    /// and are excluded by path, not by pattern.
+    ///
+    /// Three groups worth reading as claims rather than as a table:
+    ///
+    ///  * the row, balance and refusal TYPES cross into both App files, because the model holds
+    ///    them and the composition turns them into what the page draws;
+    ///  * the six store METHODS reach `AppModel` and stop there — the view is handed composed
+    ///    values and names no engine symbol at all, which is the same discipline that keeps it
+    ///    free of copy literals;
+    ///  * the pure state machine and its three input types reach NOBODY. `InventoryPosting.apply`
+    ///    traps on a reversal row by precondition, and the audit list the page draws is full of
+    ///    them; the App has no business calling any of it, and this is where that is enforced.
+    func testTheInventoryEngineIsNamedOnlyByTheInventoryPagesModelAndItsComposition() throws {
+        let model = "SoloLedger/App/AppModel.swift"
+        let composition = "SoloLedger/App/InventoryPageComposition.swift"
+        let expected: [String: [String]] = [
+            "InventoryPostedMovement":    [model, composition],
+            "InventoryBalance":           [model, composition],
+            "InventoryMovementType":      [model, composition],
+            "InventoryException":         [model, composition],
+            "InventoryPostingError":      [model, composition],
+            "InventoryExceptionKind":     [composition],
+            "InventoryPostingRequest":    [composition],
+            "InventoryMovementDirection": [],
+            "InventoryPosting":           [],
+            "InventoryPostingContext":    [],
+            "InventoryPostingPlan":       [],
+            "InventoryOriginFacts":       [],
+            "inventoryBalance":           [model],
+            "inventoryMovements":         [model],
+            "liveInventoryMovements":     [model],
+            "inventoryExceptions":        [model],
+            "postInventoryMovement":      [model],
+            "reverseInventoryMovement":   [model],
+        ]
+        var found: [String: [String]] = [:]
         for (path, text) in try Self.productionSources() {
             let code = text
                 .split(separator: "\n", omittingEmptySubsequences: false)
@@ -356,17 +385,22 @@ final class InventoryLedgerTests: LedgerTestCase {
                     return String(line[line.startIndex..<comment.lowerBound])
                 }
                 .joined(separator: "\n")
-            for symbol in symbols {
+            for symbol in expected.keys {
                 let pattern = "(^|[^A-Za-z0-9_])\(symbol)([^A-Za-z0-9_]|$)"
                 if code.range(of: pattern, options: .regularExpression) != nil {
-                    offenders[symbol, default: []].append(path)
+                    found[symbol, default: []].append(path)
                 }
             }
         }
-        XCTAssertEqual(offenders, [:], """
-            The inventory engine is named outside its own three files. This stage has no UI and no \
-            App wiring; the entry point lands in a later PR with its copy and its mounting test.
-            """)
+        for (symbol, paths) in expected {
+            XCTAssertEqual((found[symbol] ?? []).sorted(), paths.sorted(), """
+                \(symbol) is named by a different set of files than this stage allows.
+                unexpected: \(Set(found[symbol] ?? []).subtracting(paths).sorted())
+                missing:    \(Set(paths).subtracting(found[symbol] ?? []).sorted())
+                """)
+        }
+        // No view names the engine, and no file outside the two above does either.
+        XCTAssertEqual(Set(found.values.flatMap { $0 }), [model, composition])
     }
 
     /// The scan must actually read files and must be able to see a use, or an empty offender list

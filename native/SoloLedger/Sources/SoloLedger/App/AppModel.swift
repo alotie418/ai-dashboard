@@ -1262,6 +1262,214 @@ final class AppModel: ObservableObject {
         return true
     }
 
+    // MARK: - Inventory (N-PR-4 page state; nothing reaches this page yet)
+
+    /// The products a movement can be recorded against.
+    ///
+    /// Loaded LAZILY, for the same two reasons the catalogue above is: until the sidebar gains
+    /// its entry there is no way to open that page, and the reads behind it are heavier — a
+    /// product's whole movement history, with no paging under it.
+    ///
+    /// Rows that could not be decoded are not here and are not counted here. An undecodable row
+    /// is not something a movement can be recorded against, and the one page that reports such
+    /// rows is the products page — which is exactly where the empty state sends the user.
+    @Published private(set) var inventoryProducts: [InventoryPageComposition.ProductChoice] = []
+
+    /// The product whose movements are on screen. Never `nil` while any product exists: the copy
+    /// has no sentence for "nothing is selected", so every sentence this page owns would be
+    /// false in that state.
+    @Published private(set) var inventoryProductID: String?
+
+    /// How that product's unit reads, classified ONCE by the products page's own three-armed
+    /// rule and carried here as a value.
+    @Published private(set) var inventoryUnit: InventoryPageComposition.UnitLabel = .none
+
+    @Published private(set) var inventoryBalanceRow: InventoryBalance?
+
+    /// The audit view: reversed rows and their reversals included, in the ledger's own order.
+    @Published private(set) var inventoryRows: [InventoryPostedMovement] = []
+
+    /// The ids of the rows that still count, in the engine's order. Kept as the engine's answer
+    /// rather than re-derived here, so "what a reversed pair is" has exactly one definition.
+    @Published private(set) var inventoryLiveIDs: [String] = []
+
+    @Published private(set) var inventoryExceptionRows: [InventoryException] = []
+
+    /// The last refused write, as a case and never as text. `InventoryPostingError` has no
+    /// payload, so nothing the engine or the database said can travel from here to the screen.
+    @Published private(set) var inventoryError: InventoryPostingError?
+
+    /// The new-movement panel's state, or `nil` when it is closed.
+    @Published var inventoryForm: InventoryFormDraft?
+
+    /// The movement a reversal is awaiting confirmation for. The ledger is NOT touched until
+    /// `confirmInventoryReversal()`.
+    @Published private(set) var pendingInventoryReversal: InventoryPostedMovement?
+
+    /// One undecided write at a time, for the reason the products page has the same rule:
+    /// confirming one thing while looking at another is how a user reverses the wrong row.
+    var inventoryWriteIsPending: Bool {
+        inventoryForm != nil || pendingInventoryReversal != nil
+    }
+
+    /// The currency a new movement is posted in: the one this product's stock is already held
+    /// in, or — for a product with no stock yet — the accounting regime's own. Never read from
+    /// the settings row, so a ledger missing that row does not turn into a refusal here, and
+    /// never empty, which the engine would refuse outright.
+    var inventoryCurrency: String {
+        if let held = inventoryBalanceRow?.currency, !held.isEmpty { return held }
+        return defaultCurrency
+    }
+
+    /// The panel's selected kind, as the picker's tag. A raw string so the view never has to
+    /// name an engine type of its own.
+    var inventoryFormTypeRawValue: String { inventoryForm?.type.rawValue ?? "" }
+
+    /// What the page draws, assembled from the state above and nothing else.
+    var inventoryInput: InventoryPageComposition.Input {
+        InventoryPageComposition.Input(products: inventoryProducts,
+                                       selectedProductID: inventoryProductID,
+                                       unit: inventoryUnit,
+                                       balance: inventoryBalanceRow,
+                                       movements: inventoryRows,
+                                       liveIDs: inventoryLiveIDs,
+                                       exceptions: inventoryExceptionRows,
+                                       form: inventoryForm,
+                                       pendingReversal: pendingInventoryReversal,
+                                       error: inventoryError)
+    }
+
+    /// Re-read everything this page shows, in one place.
+    ///
+    /// The balance, the movements, the live set and the exceptions move together or not at all:
+    /// a card showing three figures the list does not account for is the same defect class as a
+    /// list that still holds a deleted row.
+    func reloadInventory() {
+        guard let store else { return }
+        do {
+            let catalog = try store.productCatalog()
+            inventoryProducts = catalog.products.map {
+                InventoryPageComposition.ProductChoice(id: $0.id, name: $0.name)
+            }
+            let selected = catalog.products.first { $0.id == inventoryProductID }
+                ?? catalog.products.first
+            inventoryProductID = selected?.id
+            inventoryUnit = Self.inventoryUnitLabel(for: selected)
+            guard let selected else {
+                inventoryBalanceRow = nil
+                inventoryRows = []
+                inventoryLiveIDs = []
+                inventoryExceptionRows = []
+                return
+            }
+            inventoryBalanceRow = try store.inventoryBalance(productID: selected.id)
+            inventoryRows = try store.inventoryMovements(productID: selected.id)
+            inventoryLiveIDs = try store.liveInventoryMovements(productID: selected.id).map(\.id)
+            inventoryExceptionRows = try store.inventoryExceptions(productID: selected.id)
+        } catch let error as InventoryPostingError {
+            // A stored row that does not decode is `ledgerInconsistent`, which is a different
+            // statement from "the ledger could not be read" and has its own sentence.
+            inventoryError = error
+        } catch {
+            inventoryError = .storageFailure
+        }
+    }
+
+    func selectInventoryProduct(_ id: String) {
+        guard !inventoryWriteIsPending, id != inventoryProductID else { return }
+        inventoryProductID = id
+        inventoryError = nil
+        reloadInventory()
+    }
+
+    func newInventoryMovement() {
+        guard !inventoryWriteIsPending, inventoryProductID != nil else { return }
+        inventoryForm = InventoryFormDraft(occurredOn: DateFormat.today())
+    }
+
+    func cancelInventoryForm() { inventoryForm = nil }
+
+    /// Switch the panel's kind. An unknown raw value changes nothing — the picker offers only
+    /// the eight the engine knows, so this can only be reached by something that is not it.
+    func selectInventoryFormType(_ rawValue: String) {
+        guard inventoryForm != nil, let type = InventoryMovementType(rawValue: rawValue) else {
+            return
+        }
+        inventoryForm?.type = type
+    }
+
+    /// Post what the panel holds, and close it only if the ledger accepted it.
+    func submitInventoryForm() {
+        guard let store, let draft = inventoryForm, let productID = inventoryProductID else {
+            return
+        }
+        guard let request = draft.request(productID: productID, currency: inventoryCurrency) else {
+            return
+        }
+        let posted = performInventoryWrite { try store.postInventoryMovement(request) }
+        if posted { inventoryForm = nil }
+    }
+
+    func requestInventoryReversal(_ id: String) {
+        guard !inventoryWriteIsPending else { return }
+        pendingInventoryReversal = inventoryRows.first { $0.id == id }
+    }
+
+    func cancelInventoryReversal() { pendingInventoryReversal = nil }
+
+    /// Reverse the confirmed movement, dated on the movement's own day.
+    ///
+    /// Not "today": the engine accepts any date at or after the target's, so today would be
+    /// refused outright for a movement dated in the future and leave the control with nothing it
+    /// can do. The reversal has no economic date of its own either — it cancels its target and
+    /// the balance is rebuilt by replaying what remains — so the target's day is both always
+    /// legal and the one that keeps the pair together in the list.
+    func confirmInventoryReversal() {
+        guard let store, let target = pendingInventoryReversal else { return }
+        pendingInventoryReversal = nil
+        performInventoryWrite {
+            try store.reverseInventoryMovement(id: target.id, occurredOn: target.occurredOn)
+        }
+    }
+
+    func dismissInventoryError() { inventoryError = nil }
+
+    /// Run one inventory write and land its outcome.
+    ///
+    /// On success the read model is refreshed HERE, so no caller can forget: a balance card that
+    /// still shows the figures from before the posting is the same defect the conversion
+    /// wizard's M14 mutation exposed. On failure nothing is reloaded and the page stays exactly
+    /// as it was, because a refused posting writes nothing at all.
+    @discardableResult
+    private func performInventoryWrite(_ work: () throws -> Void) -> Bool {
+        do {
+            try work()
+        } catch let error as InventoryPostingError {
+            inventoryError = error
+            return false
+        } catch {
+            // Anything the store raises that is not one of the eighteen adjudicated refusals.
+            // Mapped rather than printed: its text carries the statement.
+            inventoryError = .storageFailure
+            return false
+        }
+        inventoryError = nil
+        reloadInventory()
+        return true
+    }
+
+    /// The products page's three-armed unit rule, called rather than reimplemented — a unit the
+    /// whitelist does not know is shown as it stands on both pages, and a cell with no text
+    /// reading draws nothing on both.
+    private static func inventoryUnitLabel(for product: Product?) -> InventoryPageComposition.UnitLabel {
+        guard let product else { return InventoryPageComposition.UnitLabel.none }
+        switch ProductPageComposition.unit(product.unit) {
+        case .key(let key):       return .key(key)
+        case .verbatim(let text): return .verbatim(text)
+        case .none:               return InventoryPageComposition.UnitLabel.none
+        }
+    }
+
     // MARK: - CSV
 
     func exportCSV(to url: URL) {

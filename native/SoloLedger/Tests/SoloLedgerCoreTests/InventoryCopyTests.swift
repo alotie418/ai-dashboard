@@ -305,25 +305,42 @@ final class InventoryCopyTests: XCTestCase {
         XCTAssertEqual(LocalizationWordingGuardTests.sanctionedUses.count, 40)
     }
 
-    // MARK: - IC11 · dormancy
+    // MARK: - IC11 · exactly one file names the copy
 
-    /// Nothing in the production tree names an inventory copy key yet. The page, its composition
-    /// and the sidebar entry are later rounds; this one lands the vocabulary only.
-    func testIC11TheCopyIsDormantAcrossTheWholeProductionTree() throws {
+    /// N-PR-3 landed these sixty-eight strings dormant and this test asserted that nobody named
+    /// them. N-PR-4 gives them a page, so the assertion becomes a CLOSED SET rather than an empty
+    /// one: every key is named by `InventoryPageComposition.swift` and by nothing else.
+    ///
+    /// Both directions matter. A key named nowhere is copy the page cannot reach; a key named in a
+    /// second file means the page has grown a source of strings the composition does not know
+    /// about, which is precisely what makes the placement proof in `InventoryMountingTests`
+    /// meaningful.
+    ///
+    /// `nav.inventory` is the one that stays at ZERO. The sidebar entry is N-PR-6, and even then
+    /// `SidebarSection.titleKey` is computed from the raw value, so no production file will spell
+    /// that string out — a hit on it means someone wrote a literal that the enum already derives.
+    func testIC11TheCopyIsNamedByTheCompositionAndByNothingElse() throws {
         let sources = try Self.productionSources()
         XCTAssertGreaterThan(sources.count, 40, "the scan is not reading the tree")
         XCTAssertTrue(sources.contains { $0.path.hasSuffix("App/ProductPageComposition.swift") },
                       "the neighbouring composition is in scope")
 
-        var offenders: [String: [String]] = [:]
+        var named: [String: [String]] = [:]
         for (path, text) in sources {
             for key in Self.adjudicatedKeys + ["nav.inventory"] where text.contains("\"\(key)\"") {
-                offenders[key, default: []].append(path)
+                named[key, default: []].append(path)
             }
         }
-        XCTAssertEqual(offenders, [:], """
-            An inventory copy key is already referenced in production. This round lands the copy \
-            only — the view, the composition and the sidebar entry are N-PR-4 and N-PR-6.
+        let composition = ["SoloLedger/App/InventoryPageComposition.swift"]
+        for key in Self.adjudicatedKeys {
+            XCTAssertEqual((named[key] ?? []).sorted(), composition, """
+                \(key) is named by \((named[key] ?? []).sorted()) — every inventory string belongs \
+                to the page's composition and to no other file.
+                """)
+        }
+        XCTAssertNil(named["nav.inventory"], """
+            nav.inventory is written out somewhere in production. The sidebar entry is N-PR-6, and \
+            SidebarSection derives that key from its raw value rather than naming it.
             """)
     }
 
