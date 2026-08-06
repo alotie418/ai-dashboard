@@ -146,17 +146,26 @@ public enum ProductCatalogError: Error, Equatable, Sendable, CustomStringConvert
     /// The generated id was already taken. Unreachable with a UUID, kept so the write path has
     /// somewhere honest to land instead of surfacing a raw SQLite constraint failure.
     case idCollision
+    /// The product still has inventory movements, and schema v24's
+    /// `inventory_movements.product_id … ON DELETE RESTRICT` refuses to orphan them.
+    ///
+    /// This is the ONE refusal on this type that does not come from the mirrored handler: Electron
+    /// has no such foreign key, and deletes the row. The native ledger keeps the stock history and
+    /// refuses instead — a product whose movements outlived it would report a quantity nobody can
+    /// trace, which is the defect the inventory engine exists to not have.
+    case hasInventoryMovements
     /// Any other refusal from the database.
     case storageFailure
 
     public var description: String {
         switch self {
-        case .invalidID:          return "invalidID"
-        case .nameRequired:       return "nameRequired"
-        case .unitNotRecognized:  return "unitNotRecognized"
-        case .notFound:           return "notFound"
-        case .idCollision:        return "idCollision"
-        case .storageFailure:     return "storageFailure"
+        case .invalidID:              return "invalidID"
+        case .nameRequired:           return "nameRequired"
+        case .unitNotRecognized:      return "unitNotRecognized"
+        case .notFound:               return "notFound"
+        case .idCollision:            return "idCollision"
+        case .hasInventoryMovements:  return "hasInventoryMovements"
+        case .storageFailure:         return "storageFailure"
         }
     }
 }
@@ -228,13 +237,23 @@ private func newProductID() -> String {
 ///
 /// The constraint code is matched as a delimiter-bearing token, never as a bare substring: the
 /// message is assembled as `"… (code N)"` by `SQLiteDatabase.run`, and a loose search for a
-/// number would match digits belonging to the statement instead. `products` carries exactly one
-/// unique index — its primary key (`idx_products_active` is not unique) — so a constraint
-/// violation on this table can only be an id collision.
+/// number would match digits belonging to the statement instead.
+///
+/// **Code 19 stopped meaning one thing when schema v24 landed, and the foreign key is checked
+/// FIRST because of it.** This function used to reason that `products` carries exactly one unique
+/// index — its primary key, `idx_products_active` not being unique — and therefore that a
+/// constraint failure here could only be an id collision. v24 added
+/// `inventory_movements.product_id … ON DELETE RESTRICT`, `LedgerStore.applyPragmas` has
+/// `foreign_keys = ON`, and `sqlite3_step` reports a foreign-key refusal with the SAME primary
+/// code, `SQLITE_CONSTRAINT` = 19. Deleting a product that has stock movements therefore mapped
+/// to `.idCollision` — a sentence about duplicate identifiers, telling the user to try again,
+/// where trying again fails identically. The FK text is what distinguishes them; `products` has
+/// exactly one inbound foreign key, so the discrimination is unambiguous.
 private func mapWriteFailure(_ error: Error) -> ProductCatalogError {
     guard let sqlite = error as? SQLiteError, case .step(let message) = sqlite else {
         return .storageFailure
     }
+    if message.contains("FOREIGN KEY") { return .hasInventoryMovements }
     return message.contains("(code 19)") ? .idCollision : .storageFailure
 }
 
@@ -359,19 +378,25 @@ public extension LedgerStore {
 
     /// `DELETE /api/products/:id` — `electron/handlers/products.js:80-88`.
     ///
-    /// A bare delete, mirrored as-is: no cascade, no reference check, no cleanup of the
-    /// `product_id` columns on `purchases` / `sales` / `purchase_items` / `sales_items` /
+    /// Still a bare delete for the MIRRORED tables: no cascade, no reference check, no cleanup of
+    /// the `product_id` columns on `purchases` / `sales` / `purchase_items` / `sales_items` /
     /// `business_document_items`. Those columns are plain TEXT on purpose — `electron/db/index.js`
     /// records at `:390-392` and `:679-682` that an enforced foreign key would make exactly this
     /// statement fail, since `foreign_keys` is ON — so a dangling reference is the accepted
     /// outcome on both sides rather than an accident.
     ///
-    /// Two consequences are worth naming because they are invisible from here. Once inventory
-    /// exists, a deleted product takes its on-hand quantity and cost with it: Electron's summary
-    /// is anchored `FROM products` with the movements LEFT JOINed on, so the row simply stops
-    /// being produced while its purchases and sales remain in the file. And telling the user what
-    /// a delete will orphan is a screen, not a store — that decision belongs to the slice that
-    /// builds the screen.
+    /// **Inventory is the one exception, and it is deliberate.** Schema v24 gives
+    /// `inventory_movements.product_id` a real foreign key with `ON DELETE RESTRICT`, so a product
+    /// that has stock movements is REFUSED here rather than deleted — `.hasInventoryMovements`.
+    /// The earlier note in this doc said the opposite (that a deleted product would take its
+    /// on-hand quantity and cost with it, the way Electron's `FROM products` anchor makes the row
+    /// stop being produced); that was written before the engine existed and is no longer what
+    /// happens. Losing quantity and cost silently is precisely the defect the native engine was
+    /// written to not have, which is why the refusal lives in the schema and not in a check here
+    /// that a future caller could route around.
+    ///
+    /// Telling the user what a delete will orphan among the MIRRORED tables is still a screen, not
+    /// a store — that decision belongs to the slice that builds the screen.
     func deleteProduct(id: String) throws {
         guard !id.isEmpty else { throw ProductCatalogError.invalidID }
         guard try productRowExists(id) else { throw ProductCatalogError.notFound }

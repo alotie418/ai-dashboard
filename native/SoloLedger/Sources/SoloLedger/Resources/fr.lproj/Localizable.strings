@@ -101,6 +101,7 @@
 "nav.categories" = "Catégories";
 "nav.reports" = "Rapports";
 "nav.products" = "Produits et services";
+"nav.inventory" = "Stocks";
 
 "type.income" = "Recette";
 "type.expense" = "Dépense";
@@ -638,13 +639,109 @@
 "product.empty.title" = "Aucun produit ni service";
 "product.empty.message" = "Ajoutez un premier produit ou service et il apparaîtra ici.";
 
-/* I ProductCatalogError 六个 case 各一句（6 键） */
+/* I ProductCatalogError 七个 case 各一句（7 键） */
 "product.error.invalidID" = "Aucun élément n’a été indiqué.";
 "product.error.nameRequired" = "Le nom ne peut pas être vide.";
 "product.error.unitNotRecognized" = "Cette unité ne fait pas partie des options disponibles.";
 "product.error.notFound" = "Cet élément n’est plus dans le livre ; il a peut-être été supprimé.";
 "product.error.idCollision" = "L’identifiant généré est entré en conflit avec un élément existant. Veuillez réessayer.";
 "product.error.storageFailure" = "Le livre n’a pas pu enregistrer cette modification.";
+"product.error.hasInventoryMovements" = "Ce produit a des mouvements de stock et ne peut pas être supprimé. Rendez-le inactif si vous ne l'utilisez plus.";
 
 /* J 读不出的行：Core 的 unreadableCount 在界面上的落点（1 键） */
 "product.unreadable.notice" = "{count} fiches produit de ce livre n’ont pas pu être lues et ne figurent pas ci-dessus. Elles restent intactes dans le fichier ; l’application ne les a pas modifiées.";
+
+/* ── 库存（N-PR-3）────────────────────────────────────────────────────
+   全部不可达：本轮只落文案，UI / 路由 / 激活归 N-PR-4 与 N-PR-6。
+   不镜像 Electron 的 inventory.*：那一套是「累计采购均价估算」的口径，
+   原生引擎是移动加权平均，逐字抄过来就是假话。文案原创。
+   数量、金额、均价都不进句子，只作为单元格的值由展示层格式化，
+   所以整个命名空间里没有一个数字，展示舍入也就只在一处。 ── */
+
+/* A 页面 chrome（5 键） */
+"inventory.page.title" = "Stocks";
+"inventory.page.subtitle" = "Enregistre les mouvements de stock par produit et en calcule la quantité et le coût.";
+"inventory.page.basisNote" = "Méthode de valorisation : coût moyen pondéré mobile. Chaque entrée recalcule le coût moyen ; chaque sortie est valorisée au coût moyen en vigueur avant elle. Montants hors taxe.";
+"inventory.page.reportNote" = "Les coûts de sortie calculés ici servent uniquement à la gestion des stocks. Ils n'alimentent le coût des ventes d'aucun rapport.";
+"inventory.page.unitNote" = "L'unité de quantité provient de la fiche produit. Cette version ne convertit aucune unité et n'additionne jamais les quantités de produits différents.";
+
+/* B 流水表列头，录入表单复用同一批（8 键） */
+"inventory.col.date" = "Date";
+"inventory.col.type" = "Type";
+"inventory.col.quantity" = "Quantité";
+"inventory.col.unitCost" = "Coût unitaire (HT)";
+"inventory.col.cost" = "Coût";
+"inventory.col.source" = "Origine";
+"inventory.col.note" = "Remarque";
+"inventory.col.status" = "Statut";
+
+/* C 行状态：已过账 / 已撤销 / 撤销记录本身（3 键） */
+"inventory.status.posted" = "Comptabilisé";
+"inventory.status.reversed" = "Annulé";
+"inventory.status.reversal" = "Annulation";
+
+/* D InventoryMovementType 八值闭集，一 case 一键（8 键） */
+"inventory.type.purchaseIn" = "Entrée d'achat";
+"inventory.type.saleOut" = "Sortie de vente";
+"inventory.type.saleReturnIn" = "Retour client";
+"inventory.type.purchaseReturnOut" = "Retour fournisseur";
+"inventory.type.countGain" = "Écart d'inventaire positif";
+"inventory.type.countLoss" = "Écart d'inventaire négatif";
+"inventory.type.manualAdjust" = "Ajustement de coût";
+"inventory.type.opening" = "Stock d'ouverture";
+
+/* E 余额区（5 键） */
+"inventory.balance.title" = "Stock de « {name} »";
+"inventory.balance.quantity" = "Quantité en stock";
+"inventory.balance.cost" = "Solde de coût";
+"inventory.balance.unitCost" = "Coût moyen actuel";
+"inventory.balance.currencyNote" = "La devise est fixée par la première entrée de ce produit. Une entrée ultérieure dans une autre devise est refusée ; aucune conversion n'est effectuée.";
+
+/* F 录入表单，字段标签复用 B，取消复用 common.cancel（7 键） */
+"inventory.form.title" = "Nouveau mouvement";
+"inventory.form.quantityPlaceholder" = "ex. 10";
+"inventory.form.unitCostHint" = "Coût unitaire hors taxe. Saisissez 0 pour un échantillon gratuit ; laisser vide est refusé.";
+"inventory.form.costDelta" = "Variation de coût";
+"inventory.form.costDeltaHint" = "Modifie uniquement le coût, jamais la quantité. Peut être négatif — pour corriger un prix d'achat mal saisi.";
+"inventory.form.sourcePlaceholder" = "N° de document";
+"inventory.form.submit" = "Comptabiliser";
+
+/* G InventoryPostingError 十八个 case 各一句（18 键） */
+"inventory.error.netAmountRequired" = "Une entrée exige son coût unitaire hors taxe. Un montant absent n'est jamais remplacé par un montant taxes comprises.";
+"inventory.error.unitCostMustNotBeNegative" = "Le coût unitaire ne peut pas être négatif.";
+"inventory.error.quantityMustBePositive" = "La quantité doit être supérieure à zéro.";
+"inventory.error.manualAdjustMustNotMoveQuantity" = "Un ajustement de coût ne peut pas modifier la quantité. Utilisez un écart d'inventaire pour cela.";
+"inventory.error.manualAdjustRequiresStock" = "Ce produit n'a rien en stock : il n'y a aucun coût à ajuster.";
+"inventory.error.costBalanceWouldGoNegative" = "Cet ajustement ferait passer le solde de coût sous zéro.";
+"inventory.error.insufficientStock" = "La sortie dépasse la quantité en stock. Cette version n'autorise aucun stock négatif et ne fait aucune estimation.";
+"inventory.error.backdatedNotSupported" = "La date précède le dernier mouvement enregistré. Cette version n'accepte pas les saisies antidatées.";
+"inventory.error.currencyMismatch" = "La devise diffère de celle dans laquelle le stock de ce produit est tenu. Cette version ne convertit pas.";
+"inventory.error.openingMustBeFirst" = "Ce produit a déjà des mouvements : un stock d'ouverture ne peut plus être défini.";
+"inventory.error.returnExceedsOrigin" = "Le retour dépasse la quantité du document d'origine.";
+"inventory.error.onlyTheLastMovementCanBeReversed" = "Seul le dernier mouvement peut être annulé. Corrigez les précédents en enregistrant un nouveau mouvement.";
+"inventory.error.movementAlreadyReversed" = "Ce mouvement a déjà été annulé.";
+"inventory.error.reversalTargetNotFound" = "Le mouvement à annuler est introuvable.";
+"inventory.error.productNotFound" = "Ce produit est introuvable ; il a peut-être été supprimé.";
+"inventory.error.arithmeticOverflow" = "Le montant ou la quantité dépasse la capacité de calcul ; rien n'a été enregistré.";
+"inventory.error.ledgerInconsistent" = "Les enregistrements de stock ne concordent pas ; l'opération a été interrompue.";
+"inventory.error.storageFailure" = "Le livre n’a pas pu enregistrer cette modification.";
+
+/* H 三种空态（6 键） */
+"inventory.empty.noProduct.title" = "Aucun produit";
+"inventory.empty.noProduct.message" = "Ajoutez d'abord un produit dans Produits et services, puis revenez ici pour enregistrer les mouvements.";
+"inventory.empty.noMovement.title" = "Aucun mouvement pour ce produit";
+"inventory.empty.noMovement.message" = "Enregistrez une première entrée ou définissez un stock d'ouverture : la quantité et le coût s'afficheront ici.";
+"inventory.empty.noOpening.title" = "Stock d'ouverture non défini";
+"inventory.empty.noOpening.message" = "Si du stock existait avant votre passage à cette application, définissez d'abord la quantité et le montant d'ouverture, puis enregistrez la suite.";
+
+/* I 冲销：只能撤销最后一笔，原行永不删除（4 键） */
+"inventory.reverse.action" = "Annuler ce mouvement";
+"inventory.reverse.confirmTitle" = "Annuler ce mouvement ?";
+"inventory.reverse.confirmMessage" = "La ligne d'origine reste dans la liste et une ligne d'annulation est ajoutée à côté. La quantité et le coût reviennent à leur état antérieur.";
+"inventory.reverse.onlyLastNote" = "Seul le dernier mouvement peut être annulé.";
+
+/* J InventoryExceptionKind 三类标注 + 区标题（4 键） */
+"inventory.exception.title" = "Écritures à vérifier";
+"inventory.exception.returnOriginNotFound" = "Le document d'origine est introuvable : ce retour a été valorisé au coût moyen du moment.";
+"inventory.exception.manualAdjust" = "Le coût a été ajusté manuellement.";
+"inventory.exception.openingSeeded" = "Le stock d'ouverture a été saisi manuellement.";

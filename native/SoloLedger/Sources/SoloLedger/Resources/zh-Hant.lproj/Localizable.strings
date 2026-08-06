@@ -101,6 +101,7 @@
 "nav.categories" = "會計類別";
 "nav.reports" = "報表";
 "nav.products" = "商品 / 服務項目";
+"nav.inventory" = "庫存";
 
 "type.income" = "收入";
 "type.expense" = "支出";
@@ -638,13 +639,109 @@
 "product.empty.title" = "還沒有商品或服務項目";
 "product.empty.message" = "新增第一個商品或服務項目後，它會出現在這裡。";
 
-/* I ProductCatalogError 六个 case 各一句（6 键） */
+/* I ProductCatalogError 七个 case 各一句（7 键） */
 "product.error.invalidID" = "沒有指定要操作的項目。";
 "product.error.nameRequired" = "名稱不能為空。";
 "product.error.unitNotRecognized" = "這個單位不在可選範圍內。";
 "product.error.notFound" = "這個項目已經不在帳本裡了，可能已被刪除。";
 "product.error.idCollision" = "產生的編號與既有項目重複，請再試一次。";
 "product.error.storageFailure" = "帳本沒能儲存這次變更。";
+"product.error.hasInventoryMovements" = "這個商品有庫存流水，不能刪除。如果不再使用，可以把它停用。";
 
 /* J 读不出的行：Core 的 unreadableCount 在界面上的落点（1 键） */
 "product.unreadable.notice" = "帳本中有 {count} 條商品紀錄讀不出來，沒有顯示在上面。它們仍完整保存在帳本檔案中，本 App 沒有改動它們。";
+
+/* ── 库存（N-PR-3）────────────────────────────────────────────────────
+   全部不可达：本轮只落文案，UI / 路由 / 激活归 N-PR-4 与 N-PR-6。
+   不镜像 Electron 的 inventory.*：那一套是「累计采购均价估算」的口径，
+   原生引擎是移动加权平均，逐字抄过来就是假话。文案原创。
+   数量、金额、均价都不进句子，只作为单元格的值由展示层格式化，
+   所以整个命名空间里没有一个数字，展示舍入也就只在一处。 ── */
+
+/* A 页面 chrome（5 键） */
+"inventory.page.title" = "庫存";
+"inventory.page.subtitle" = "依商品記錄進出庫流水，並據此計算庫存數量與成本。";
+"inventory.page.basisNote" = "計價方法為移動加權平均：每次進貨重算均價，出庫依出庫前的均價結轉成本。金額一律不含稅。";
+"inventory.page.reportNote" = "這裡算出的出庫成本只用於庫存管理，不會進入任何報表的銷售成本。";
+"inventory.page.unitNote" = "數量單位取自商品資料。本版本不做單位換算，也不會把不同商品的數量相加。";
+
+/* B 流水表列头，录入表单复用同一批（8 键） */
+"inventory.col.date" = "日期";
+"inventory.col.type" = "類型";
+"inventory.col.quantity" = "數量";
+"inventory.col.unitCost" = "單價（不含稅）";
+"inventory.col.cost" = "成本";
+"inventory.col.source" = "來源";
+"inventory.col.note" = "備註";
+"inventory.col.status" = "狀態";
+
+/* C 行状态：已过账 / 已撤销 / 撤销记录本身（3 键） */
+"inventory.status.posted" = "已過帳";
+"inventory.status.reversed" = "已撤銷";
+"inventory.status.reversal" = "撤銷記錄";
+
+/* D InventoryMovementType 八值闭集，一 case 一键（8 键） */
+"inventory.type.purchaseIn" = "採購入庫";
+"inventory.type.saleOut" = "銷售出庫";
+"inventory.type.saleReturnIn" = "銷售退回";
+"inventory.type.purchaseReturnOut" = "採購退出";
+"inventory.type.countGain" = "盤盈";
+"inventory.type.countLoss" = "盤虧";
+"inventory.type.manualAdjust" = "成本調整";
+"inventory.type.opening" = "期初庫存";
+
+/* E 余额区（5 键） */
+"inventory.balance.title" = "「{name}」的庫存";
+"inventory.balance.quantity" = "在庫數量";
+"inventory.balance.cost" = "成本餘額";
+"inventory.balance.unitCost" = "目前均價";
+"inventory.balance.currencyNote" = "幣別在這個商品的第一筆進貨時確定。之後用別的幣別進貨會被拒絕，本版本不做匯率換算。";
+
+/* F 录入表单，字段标签复用 B，取消复用 common.cancel（7 键） */
+"inventory.form.title" = "新增庫存流水";
+"inventory.form.quantityPlaceholder" = "例如 10";
+"inventory.form.unitCostHint" = "不含稅單價。贈品或樣品可以填 0；留空會被拒絕。";
+"inventory.form.costDelta" = "成本增減額";
+"inventory.form.costDeltaHint" = "只改成本、不動數量，可以填負數。用於更正錄錯的進價。";
+"inventory.form.sourcePlaceholder" = "單據號或說明";
+"inventory.form.submit" = "過帳";
+
+/* G InventoryPostingError 十八个 case 各一句（18 键） */
+"inventory.error.netAmountRequired" = "進貨需要填寫不含稅單價。缺金額的進貨不會被計價，也不會拿含稅金額代替。";
+"inventory.error.unitCostMustNotBeNegative" = "單價不能是負數。";
+"inventory.error.quantityMustBePositive" = "數量必須大於 0。";
+"inventory.error.manualAdjustMustNotMoveQuantity" = "成本調整不能改動數量。數量的增減請用盤盈或盤虧。";
+"inventory.error.manualAdjustRequiresStock" = "這個商品現在沒有庫存，沒有可以調整的成本。";
+"inventory.error.costBalanceWouldGoNegative" = "這次調整會讓成本餘額變成負數。";
+"inventory.error.insufficientStock" = "出庫數量超過在庫量。本版本不允許負庫存，也不做暫估。";
+"inventory.error.backdatedNotSupported" = "日期早於最後一筆流水。本版本不支援補錄更早的交易。";
+"inventory.error.currencyMismatch" = "幣別與這個商品已有庫存的幣別不一致。本版本不做匯率換算。";
+"inventory.error.openingMustBeFirst" = "這個商品已經有流水了，不能再設期初庫存。";
+"inventory.error.returnExceedsOrigin" = "退貨數量超過原單數量。";
+"inventory.error.onlyTheLastMovementCanBeReversed" = "只能撤銷最後一筆流水。更早的差錯請用新的流水更正。";
+"inventory.error.movementAlreadyReversed" = "這筆流水已經撤銷過了。";
+"inventory.error.reversalTargetNotFound" = "找不到要撤銷的那筆流水。";
+"inventory.error.productNotFound" = "找不到這個商品，可能已經被刪除。";
+"inventory.error.arithmeticOverflow" = "金額或數量太大，超出可計算範圍，這一筆沒有過帳。";
+"inventory.error.ledgerInconsistent" = "帳本裡的庫存記錄讀出來對不上，這次操作已經停止。";
+"inventory.error.storageFailure" = "帳本沒能儲存這次變更。";
+
+/* H 三种空态（6 键） */
+"inventory.empty.noProduct.title" = "還沒有商品";
+"inventory.empty.noProduct.message" = "先在「商品 / 服務項目」裡新增商品，再回到這裡記錄進出庫。";
+"inventory.empty.noMovement.title" = "這個商品還沒有流水";
+"inventory.empty.noMovement.message" = "記錄第一筆進貨或設定期初庫存後，數量與成本會顯示在這裡。";
+"inventory.empty.noOpening.title" = "尚未設定期初庫存";
+"inventory.empty.noOpening.message" = "如果切換到本應用之前已經有存貨，建議先設定期初數量與金額，再記錄之後的進出庫。";
+
+/* I 冲销：只能撤销最后一笔，原行永不删除（4 键） */
+"inventory.reverse.action" = "撤銷這筆";
+"inventory.reverse.confirmTitle" = "撤銷這筆流水？";
+"inventory.reverse.confirmMessage" = "原來的記錄會保留在流水裡，另外記一筆撤銷記錄。數量與成本會回到這筆過帳之前的狀態。";
+"inventory.reverse.onlyLastNote" = "只有最後一筆流水可以撤銷。";
+
+/* J InventoryExceptionKind 三类标注 + 区标题（4 键） */
+"inventory.exception.title" = "需要留意的記錄";
+"inventory.exception.returnOriginNotFound" = "找不到原單，這筆退貨按當時的均價計價。";
+"inventory.exception.manualAdjust" = "人工調整了成本。";
+"inventory.exception.openingSeeded" = "期初庫存由人工錄入。";

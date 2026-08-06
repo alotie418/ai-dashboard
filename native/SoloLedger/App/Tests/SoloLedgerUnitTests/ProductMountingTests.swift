@@ -62,9 +62,10 @@ final class ProductMountingTests: XCTestCase {
     }
 
     /// Every `ProductCatalogError`. Kept honest by ``ProductPageComposition/key(for:)``, whose
-    /// switch is exhaustive: a seventh case stops the production file compiling.
+    /// switch is exhaustive: an eighth case stops the production file compiling.
     private static let allErrors: [ProductCatalogError] = [
-        .invalidID, .nameRequired, .unitNotRecognized, .notFound, .idCollision, .storageFailure,
+        .invalidID, .nameRequired, .unitNotRecognized, .notFound, .idCollision,
+        .hasInventoryMovements, .storageFailure,
     ]
 
     /// Where one key sits: the region, plus the SLOT inside it.
@@ -123,7 +124,7 @@ final class ProductMountingTests: XCTestCase {
 
     func testPM1ThePlacementTableIsExactlyTheFortyAdjudicatedKeys() throws {
         let placed = Set(ProductPageComposition.placement.keys)
-        XCTAssertEqual(placed.count, 40, "2b-A2 adjudicated forty product.* keys")
+        XCTAssertEqual(placed.count, 41, "2b-A2 adjudicated forty product.* keys; N-PR-3 adds the seventh error case")
         for language in languages {
             let landed = Set(try sourceTable(language).keys.filter { $0.hasPrefix("product.") })
             XCTAssertEqual(landed, placed, """
