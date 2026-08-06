@@ -745,3 +745,49 @@
 "inventory.exception.returnOriginNotFound" = "원래 전표를 찾지 못해 이 반품은 당시 평균 단가로 계상했습니다.";
 "inventory.exception.manualAdjust" = "원가를 수동으로 조정했습니다.";
 "inventory.exception.openingSeeded" = "기초 재고는 수동으로 입력했습니다.";
+
+/* ── 期初盘点向导（N-PR-5a）──────────────────────────────────────────
+   全部不可达：本轮只落文案，Plan / Runner、composition 与视图归 N-PR-5b。
+   逐商品原子：引擎按 product_id 分离、无跨商品聚合，所以一次批量里某个
+   商品被拒并不牵连其余——结果文案按「部分写入」如实措辞，不说整批回滚。
+   数量与金额是用户输入，单位成本是反算出来的只读列；除不尽时账本按反算
+   出的单价重算总额，roundingNote 就是那笔差额必须说出口的那句话。 ── */
+
+/* K 入口：库存页页头，与「新建流水」并列（2 键） */
+"inventory.opening.cta" = "기초 재고 등록";
+"inventory.opening.cta.hint" = "이 앱으로 옮긴 날의 재고 수량과 금액을 기록합니다.";
+
+/* L 向导框架：单页滚动，无 next/back（3 键） */
+"inventory.opening.title" = "기초 재고";
+"inventory.opening.intro" = "전환일에 각 품목이 보유하던 수량과 세금 제외 금액을 입력하세요. 각 행은 해당 품목의 첫 번째 입출고가 됩니다.";
+"inventory.opening.forwardNote" = "앞으로만 이월합니다. 전환일 이전 수치는 다시 계산하지 않으며 과거 기록도 만들지 않습니다.";
+
+/* M 两种拦阻，各自成对（4 键） */
+"inventory.opening.blocked.noProduct.title" = "기초를 설정할 품목이 없습니다";
+"inventory.opening.blocked.noProduct.message" = "먼저 「상품 및 서비스」에서 품목을 추가하세요. 기초 재고는 항상 하나의 품목에 기록됩니다.";
+"inventory.opening.blocked.noneEligible.title" = "모든 품목에 이미 입출고가 있습니다";
+"inventory.opening.blocked.noneEligible.message" = "기초 재고는 품목의 첫 번째 입출고여야 하므로 이 품목들에는 설정할 수 없습니다. 재고 실사 증감으로 차이를 기록하세요.";
+
+/* N 清单列头：前两列是输入，末列是反算出来的只读值（4 键） */
+"inventory.opening.col.product" = "품목";
+"inventory.opening.col.quantity" = "보유 수량";
+"inventory.opening.col.amount" = "금액(세금 제외)";
+"inventory.opening.col.unitCost" = "산출 단가";
+
+/* O 录入与披露：切换日的 N-6 后果、留空即跳过、零合法、截断归宿（5 键） */
+"inventory.opening.date.label" = "전환일";
+"inventory.opening.date.note" = "이후에 기록하는 입출고는 이 날짜 이후여야 합니다. 그보다 이른 날짜는 거부되며 이 버전은 과거를 다시 계산하지 않습니다.";
+"inventory.opening.quantityHint" = "품목의 수량을 비워 두면 이번에는 그 품목을 제외합니다.";
+"inventory.opening.amountHint" = "보유 수량에 해당하는 세금 제외 합계입니다. 무상으로 얻은 물품은 0도 가능하지만 빈칸은 거부됩니다.";
+"inventory.opening.roundingNote" = "장부가 보관하는 것은 단가이며 기록되는 금액은 단가 × 수량입니다. 나누어떨어지지 않으면 기록된 금액이 입력한 금액보다 낮아지지만, 차이는 해당 통화의 최소 단위보다 작으며 이 차이는 다른 곳으로 이월되지 않습니다.";
+
+/* P 确认：写入前的一屏（3 键） */
+"inventory.opening.summary" = "{count}개 품목에 기초 재고를 기록합니다.";
+"inventory.opening.currencyNote" = "이 금액이 이후 각 품목의 재고를 보유하는 통화를 확정합니다. 다른 통화의 입고는 거부됩니다.";
+"inventory.opening.action.post" = "기초 기록";
+
+/* Q 结果：全部写入 / 部分写入（4 键） */
+"inventory.opening.done.title" = "기초 재고를 기록했습니다";
+"inventory.opening.done.message" = "각 수량과 금액이 이제 해당 품목의 첫 번째 입출고입니다. 전환일 이후의 일은 여기서 계속 기록하세요.";
+"inventory.opening.partial.title" = "일부 기초 재고가 기록되지 않았습니다";
+"inventory.opening.partial.message" = "{count}개 품목은 기록되지 않았습니다. 사유는 거부된 행 옆에 표시되며 해당 품목은 변경되지 않았습니다. 나머지는 기록되었습니다.";

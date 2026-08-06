@@ -1,8 +1,12 @@
 import XCTest
 @testable import SoloLedgerCore
 
-/// N-PR-3: the inventory page's six-language copy — 68 `inventory.*` keys plus `nav.inventory`,
-/// all of it DORMANT (no view, no route, no `AppModel` state; those land in N-PR-4 and N-PR-6).
+/// The `inventory.*` six-language copy — 93 keys plus `nav.inventory`.
+///
+/// Two rounds landed it. N-PR-3 wrote the 68 the inventory PAGE draws; N-PR-4 gave those a
+/// composition, so IC11 now holds them to exactly one file. N-PR-5a adds the 25 the opening-stock
+/// WIZARD will draw, and those are still DORMANT — the wizard's plan, its composition and its view
+/// are N-PR-5b, and `nav.inventory` waits for N-PR-6.
 ///
 /// ## Why this namespace could not be borrowed
 ///
@@ -15,9 +19,17 @@ import XCTest
 /// ## The rule that shapes the numbers
 ///
 /// No quantity, amount or average appears inside a sentence. They are cell and card VALUES,
-/// formatted by the presentation layer, so the string table contains no digits at all and the
-/// display rounding (N-8's `.toNearestOrAwayFromZero`) lives in exactly one place instead of being
-/// re-decided per language. `{name}` — a product name, not a number — is the single placeholder.
+/// formatted by the presentation layer, so the display rounding (N-8's `.toNearestOrAwayFromZero`)
+/// lives in exactly one place instead of being re-decided per language.
+///
+/// That rule is about FIGURES, not about the character `0`: a handful of sentences do carry a
+/// digit where the digit is part of what is being said — "e.g. 10" as a placeholder, "enter 0 for
+/// a free sample", "only the last 1" in Japanese. An earlier draft of this comment claimed the
+/// table "contains no digits at all", which was measurably untrue and is corrected here. Nothing
+/// enforces a no-digit rule and nothing should start to without a decision of its own.
+///
+/// Placeholders are `{name}` — a product name — and `{count}`, which the wizard's two counting
+/// sentences carry. Neither is a money amount.
 final class InventoryCopyTests: XCTestCase {
 
     private let languages = ["zh-Hans", "zh-Hant", "en", "ja", "ko", "fr"]
@@ -50,10 +62,63 @@ final class InventoryCopyTests: XCTestCase {
     private static let exceptionKeys = ["inventory.exception.title"]
         + InventoryExceptionKind.allCases.map { "inventory.exception.\($0.camelName)" }
 
-    private static var adjudicatedKeys: [String] {
+    /// The sixty-eight the PAGE draws. N-PR-4 gave every one of them a placement, so IC11 holds
+    /// them to `InventoryPageComposition.swift` and to no other file.
+    private static var pageAdjudicatedKeys: [String] {
         pageKeys + columnKeys + statusKeys + typeKeys + balanceKeys + formKeys
             + errorKeys + emptyKeys + reverseKeys + exceptionKeys
     }
+
+    // MARK: - The wizard's table (N-PR-5a, dormant)
+
+    /// The opening-stock wizard's entry point, on the inventory page's header beside the control
+    /// that opens the movement panel.
+    private static let openingEntryKeys = ["inventory.opening.cta", "inventory.opening.cta.hint"]
+
+    /// One scrolling sheet, not a multi-step flow — so there are no next/back labels to write.
+    private static let openingFrameKeys = ["inventory.opening.title", "inventory.opening.intro",
+                                           "inventory.opening.forwardNote"]
+
+    /// The two ways the wizard has nothing to offer: no products at all, and every product
+    /// already carrying live movements — which D-5 makes permanent for those products.
+    private static let openingBlockedKeys = ["inventory.opening.blocked.noProduct.title",
+                                             "inventory.opening.blocked.noProduct.message",
+                                             "inventory.opening.blocked.noneEligible.title",
+                                             "inventory.opening.blocked.noneEligible.message"]
+
+    /// The list's four headings. The first three are typed; the last is derived and read-only.
+    private static let openingColumnKeys = ["inventory.opening.col.product",
+                                            "inventory.opening.col.quantity",
+                                            "inventory.opening.col.amount",
+                                            "inventory.opening.col.unitCost"]
+
+    /// What the user types, and the three things that have to be said next to it: what dating the
+    /// openings costs (N-6), how to leave a product out, that zero is a price and empty is not
+    /// (D-10 / N-7), and where the division's remainder goes (D-3).
+    private static let openingInputKeys = ["inventory.opening.date.label",
+                                           "inventory.opening.date.note",
+                                           "inventory.opening.quantityHint",
+                                           "inventory.opening.amountHint",
+                                           "inventory.opening.roundingNote"]
+
+    private static let openingConfirmKeys = ["inventory.opening.summary",
+                                             "inventory.opening.currencyNote",
+                                             "inventory.opening.action.post"]
+
+    /// Two outcomes, not three. Each product's opening is one transaction of its own — the engine
+    /// has no state that spans products — so a refusal takes that product out and leaves the rest
+    /// written. There is no all-or-nothing rollback here and the copy does not claim one.
+    private static let openingOutcomeKeys = ["inventory.opening.done.title",
+                                             "inventory.opening.done.message",
+                                             "inventory.opening.partial.title",
+                                             "inventory.opening.partial.message"]
+
+    private static var openingKeys: [String] {
+        openingEntryKeys + openingFrameKeys + openingBlockedKeys + openingColumnKeys
+            + openingInputKeys + openingConfirmKeys + openingOutcomeKeys
+    }
+
+    private static var adjudicatedKeys: [String] { pageAdjudicatedKeys + openingKeys }
 
     /// Every `InventoryPostingError`, listed once.
     ///
@@ -81,16 +146,26 @@ final class InventoryCopyTests: XCTestCase {
         .storageFailure,
     ]
 
-    private static let allowedPlaceholders: Set<String> = ["{name}"]
+    private static let allowedPlaceholders: Set<String> = ["{name}", "{count}"]
     private static let placeholderContract: [String: Set<String>] = [
         "inventory.balance.title": ["{name}"],
+        "inventory.opening.summary": ["{count}"],
+        "inventory.opening.partial.message": ["{count}"],
     ]
 
     // MARK: - IC1 · the key universe
 
-    func testIC1TheInventoryNamespaceIsExactlySixtyEightKeys() throws {
-        XCTAssertEqual(Self.adjudicatedKeys.count, 68, "the adjudicated table itself must be sixty-eight")
-        XCTAssertEqual(Set(Self.adjudicatedKeys).count, 68, "the adjudicated table has a duplicate")
+    func testIC1TheInventoryNamespaceIsExactlyNinetyThreeKeys() throws {
+        XCTAssertEqual(Self.adjudicatedKeys.count, 93, "the adjudicated table itself must be ninety-three")
+        XCTAssertEqual(Set(Self.adjudicatedKeys).count, 93, "the adjudicated table has a duplicate")
+        // The split is load-bearing: IC11 holds the page's half to one file and requires the
+        // wizard's half to be named nowhere at all, so a key moving between the two halves is a
+        // change of reachability and not a rename.
+        XCTAssertEqual(Self.pageAdjudicatedKeys.count, 68, "N-PR-3's page namespace")
+        XCTAssertEqual(Self.openingKeys.count, 25, "N-PR-5a's wizard namespace")
+        XCTAssertTrue(Set(Self.pageAdjudicatedKeys).isDisjoint(with: Set(Self.openingKeys)))
+        XCTAssertTrue(Self.openingKeys.allSatisfy { $0.hasPrefix("inventory.opening.") })
+        XCTAssertTrue(Self.pageAdjudicatedKeys.allSatisfy { !$0.hasPrefix("inventory.opening.") })
         for language in languages {
             let landed = try sourceTable(language).keys.filter { $0.hasPrefix("inventory.") }.sorted()
             XCTAssertEqual(landed, Self.adjudicatedKeys.sorted(),
@@ -100,11 +175,11 @@ final class InventoryCopyTests: XCTestCase {
 
     // MARK: - IC2 · the whole universe, and six identical key sets
 
-    func testIC2EverySixLocaleFileHoldsSixHundredNineKeys() throws {
+    func testIC2EverySixLocaleFileHoldsSixHundredThirtyFourKeys() throws {
         var inventorySets: [Set<String>] = []
         for language in languages {
             let table = try sourceTable(language)
-            XCTAssertEqual(table.count, 609, "\(language) has \(table.count) keys")
+            XCTAssertEqual(table.count, 634, "\(language) has \(table.count) keys")
             XCTAssertEqual(table.keys.filter { $0.hasPrefix("nav.") }.count, 7, "\(language) nav.*")
             XCTAssertEqual(table.keys.filter { $0.hasPrefix("product.") }.count, 41, "\(language) product.*")
             inventorySets.append(Set(table.keys.filter { $0.hasPrefix("inventory.") }))
@@ -244,6 +319,15 @@ final class InventoryCopyTests: XCTestCase {
             "empty state": Self.emptyKeys,
             "reverse dialog": Self.reverseKeys,
             "exception list": Self.exceptionKeys,
+            // The wizard is a second screen, so its regions are its own buckets: a heading there
+            // that reads like one on the page is not an ambiguity, because the two are never
+            // drawn together.
+            "wizard entry": Self.openingEntryKeys,
+            "wizard frame": Self.openingFrameKeys,
+            "wizard blocked": Self.openingBlockedKeys,
+            "wizard list header": Self.openingColumnKeys,
+            "wizard form": Self.openingInputKeys + Self.openingConfirmKeys,
+            "wizard outcome": Self.openingOutcomeKeys,
         ]
         for language in languages {
             let table = try sourceTable(language)
@@ -307,16 +391,21 @@ final class InventoryCopyTests: XCTestCase {
 
     // MARK: - IC11 · exactly one file names the copy
 
-    /// N-PR-3 landed these sixty-eight strings dormant and this test asserted that nobody named
-    /// them. N-PR-4 gives them a page, so the assertion becomes a CLOSED SET rather than an empty
-    /// one: every key is named by `InventoryPageComposition.swift` and by nothing else.
+    /// The namespace's two halves are at two different stages, and this is where that is enforced.
     ///
-    /// Both directions matter. A key named nowhere is copy the page cannot reach; a key named in a
+    /// **The page's sixty-eight.** N-PR-3 landed them dormant and this test asserted that nobody
+    /// named them. N-PR-4 gave them a page, so the assertion became a CLOSED SET rather than an
+    /// empty one: every key is named by `InventoryPageComposition.swift` and by nothing else. Both
+    /// directions matter — a key named nowhere is copy the page cannot reach; a key named in a
     /// second file means the page has grown a source of strings the composition does not know
     /// about, which is precisely what makes the placement proof in `InventoryMountingTests`
     /// meaningful.
     ///
-    /// `nav.inventory` is the one that stays at ZERO. The sidebar entry is N-PR-6, and even then
+    /// **The wizard's twenty-five.** N-PR-5a lands them dormant, so for them the assertion is
+    /// still the empty one. The wizard's plan, composition and view are N-PR-5b; the round that
+    /// writes them inverts this half exactly the way N-PR-4 inverted the other.
+    ///
+    /// `nav.inventory` stays at ZERO through both. The sidebar entry is N-PR-6, and even then
     /// `SidebarSection.titleKey` is computed from the raw value, so no production file will spell
     /// that string out — a hit on it means someone wrote a literal that the enum already derives.
     func testIC11TheCopyIsNamedByTheCompositionAndByNothingElse() throws {
@@ -332,16 +421,18 @@ final class InventoryCopyTests: XCTestCase {
             }
         }
         let composition = ["SoloLedger/App/InventoryPageComposition.swift"]
-        for key in Self.adjudicatedKeys {
+        for key in Self.pageAdjudicatedKeys {
             XCTAssertEqual((named[key] ?? []).sorted(), composition, """
-                \(key) is named by \((named[key] ?? []).sorted()) — every inventory string belongs \
-                to the page's composition and to no other file.
+                \(key) is named by \((named[key] ?? []).sorted()) — every string the inventory PAGE \
+                draws belongs to its composition and to no other file.
                 """)
         }
-        XCTAssertNil(named["nav.inventory"], """
-            nav.inventory is written out somewhere in production. The sidebar entry is N-PR-6, and \
-            SidebarSection derives that key from its raw value rather than naming it.
-            """)
+        for key in Self.openingKeys + ["nav.inventory"] {
+            XCTAssertNil(named[key], """
+                \(key) is already referenced in production by \((named[key] ?? []).sorted()). This \
+                round lands the wizard's copy only — its plan, composition and view are N-PR-5b.
+                """)
+        }
     }
 
     /// The dormancy scan must be able to see a real use, or an empty offender list proves nothing.

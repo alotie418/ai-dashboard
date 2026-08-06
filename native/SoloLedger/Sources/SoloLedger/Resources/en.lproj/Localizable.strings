@@ -748,3 +748,49 @@
 "inventory.exception.returnOriginNotFound" = "The original document was not found, so this return was costed at the average in force at the time.";
 "inventory.exception.manualAdjust" = "The cost was adjusted by hand.";
 "inventory.exception.openingSeeded" = "The opening stock was entered by hand.";
+
+/* ── 期初盘点向导（N-PR-5a）──────────────────────────────────────────
+   全部不可达：本轮只落文案，Plan / Runner、composition 与视图归 N-PR-5b。
+   逐商品原子：引擎按 product_id 分离、无跨商品聚合，所以一次批量里某个
+   商品被拒并不牵连其余——结果文案按「部分写入」如实措辞，不说整批回滚。
+   数量与金额是用户输入，单位成本是反算出来的只读列；除不尽时账本按反算
+   出的单价重算总额，roundingNote 就是那笔差额必须说出口的那句话。 ── */
+
+/* K 入口：库存页页头，与「新建流水」并列（2 键） */
+"inventory.opening.cta" = "Set opening stock";
+"inventory.opening.cta.hint" = "Record what was on hand on the day you moved to this app.";
+
+/* L 向导框架：单页滚动，无 next/back（3 键） */
+"inventory.opening.title" = "Opening stock";
+"inventory.opening.intro" = "Enter the quantity and the tax-exclusive amount each product was carrying on the switch-over date. Each line becomes that product's first movement.";
+"inventory.opening.forwardNote" = "This is carried forward only. Nothing before the switch-over date is recomputed, and no earlier record is created.";
+
+/* M 两种拦阻，各自成对（4 键） */
+"inventory.opening.blocked.noProduct.title" = "No products to open";
+"inventory.opening.blocked.noProduct.message" = "Add a product under Products & Services first. An opening balance is always recorded against one product.";
+"inventory.opening.blocked.noneEligible.title" = "Every product already has movements";
+"inventory.opening.blocked.noneEligible.message" = "An opening balance has to be a product's first movement, so none of these can take one now. Record a stock count instead.";
+
+/* N 清单列头：前两列是输入，末列是反算出来的只读值（4 键） */
+"inventory.opening.col.product" = "Product";
+"inventory.opening.col.quantity" = "Quantity on hand";
+"inventory.opening.col.amount" = "Amount (excl. tax)";
+"inventory.opening.col.unitCost" = "Implied unit cost";
+
+/* O 录入与披露：切换日的 N-6 后果、留空即跳过、零合法、截断归宿（5 键） */
+"inventory.opening.date.label" = "Switch-over date";
+"inventory.opening.date.note" = "Every movement recorded afterwards must fall on or after this day. An earlier one is refused; this version does not recompute history.";
+"inventory.opening.quantityHint" = "Leave a product's quantity empty to leave that product out.";
+"inventory.opening.amountHint" = "Tax-exclusive total for the quantity on hand. Zero is allowed for goods that cost nothing; leaving it empty is refused.";
+"inventory.opening.roundingNote" = "The ledger holds a unit cost, and the amount it records is that cost times the quantity. When the two do not divide evenly the recorded amount is lower than what you typed, by less than the smallest unit of the currency, and that difference is not carried anywhere else.";
+
+/* P 确认：写入前的一屏（3 键） */
+"inventory.opening.summary" = "{count} products will be given an opening balance.";
+"inventory.opening.currencyNote" = "These amounts fix the currency each product's stock is held in from now on. A later receipt in another currency is refused.";
+"inventory.opening.action.post" = "Record openings";
+
+/* Q 结果：全部写入 / 部分写入（4 键） */
+"inventory.opening.done.title" = "Opening stock recorded";
+"inventory.opening.done.message" = "Each quantity and amount is now that product's first movement. Record what happened after the switch-over date from here on.";
+"inventory.opening.partial.title" = "Some openings were not recorded";
+"inventory.opening.partial.message" = "{count} products were not recorded. The reason is shown beside each line that was refused, and nothing was changed for those products; the rest were written.";
