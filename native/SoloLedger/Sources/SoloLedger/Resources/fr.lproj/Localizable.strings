@@ -745,3 +745,49 @@
 "inventory.exception.returnOriginNotFound" = "Le document d'origine est introuvable : ce retour a été valorisé au coût moyen du moment.";
 "inventory.exception.manualAdjust" = "Le coût a été ajusté manuellement.";
 "inventory.exception.openingSeeded" = "Le stock d'ouverture a été saisi manuellement.";
+
+/* ── 期初盘点向导（N-PR-5a）──────────────────────────────────────────
+   全部不可达：本轮只落文案，Plan / Runner、composition 与视图归 N-PR-5b。
+   逐商品原子：引擎按 product_id 分离、无跨商品聚合，所以一次批量里某个
+   商品被拒并不牵连其余——结果文案按「部分写入」如实措辞，不说整批回滚。
+   数量与金额是用户输入，单位成本是反算出来的只读列；除不尽时账本按反算
+   出的单价重算总额，roundingNote 就是那笔差额必须说出口的那句话。 ── */
+
+/* K 入口：库存页页头，与「新建流水」并列（2 键） */
+"inventory.opening.cta" = "Saisir le stock d'ouverture";
+"inventory.opening.cta.hint" = "Enregistrez ce qui était en stock le jour du passage à cette application.";
+
+/* L 向导框架：单页滚动，无 next/back（3 键） */
+"inventory.opening.title" = "Stock d'ouverture";
+"inventory.opening.intro" = "Indiquez la quantité et le montant hors taxe que chaque article portait à la date de bascule. Chaque ligne devient le premier mouvement de cet article.";
+"inventory.opening.forwardNote" = "Report en avant uniquement. Rien avant la date de bascule n'est recalculé et aucun enregistrement antérieur n'est créé.";
+
+/* M 两种拦阻，各自成对（4 键） */
+"inventory.opening.blocked.noProduct.title" = "Aucun article à ouvrir";
+"inventory.opening.blocked.noProduct.message" = "Ajoutez d'abord un article dans « Articles et services ». Un stock d'ouverture est toujours rattaché à un seul article.";
+"inventory.opening.blocked.noneEligible.title" = "Chaque article a déjà des mouvements";
+"inventory.opening.blocked.noneEligible.message" = "Un stock d'ouverture doit être le premier mouvement d'un article ; aucun de ceux-ci ne peut donc en recevoir. Enregistrez plutôt un écart d'inventaire.";
+
+/* N 清单列头：前两列是输入，末列是反算出来的只读值（4 键） */
+"inventory.opening.col.product" = "Article";
+"inventory.opening.col.quantity" = "Quantité en stock";
+"inventory.opening.col.amount" = "Montant (hors taxe)";
+"inventory.opening.col.unitCost" = "Coût unitaire déduit";
+
+/* O 录入与披露：切换日的 N-6 后果、留空即跳过、零合法、截断归宿（5 键） */
+"inventory.opening.date.label" = "Date de bascule";
+"inventory.opening.date.note" = "Tout mouvement enregistré ensuite doit être daté de ce jour ou après. Un mouvement antérieur est refusé ; cette version ne recalcule pas l'historique.";
+"inventory.opening.quantityHint" = "Laissez la quantité vide pour exclure cet article de cette saisie.";
+"inventory.opening.amountHint" = "Total hors taxe correspondant à la quantité en stock. Zéro est permis pour des biens obtenus sans coût ; un champ vide est refusé.";
+"inventory.opening.roundingNote" = "Le registre conserve un coût unitaire, et le montant enregistré est ce coût multiplié par la quantité. Lorsque la division ne tombe pas juste, le montant enregistré est inférieur à celui que vous avez saisi, d'un écart inférieur à la plus petite unité de la devise, et cet écart n'est reporté nulle part ailleurs.";
+
+/* P 确认：写入前的一屏（3 键） */
+"inventory.opening.summary" = "{count} articles recevront un stock d'ouverture.";
+"inventory.opening.currencyNote" = "Ces montants fixent la devise dans laquelle le stock de chaque article sera tenu. Une entrée ultérieure dans une autre devise est refusée.";
+"inventory.opening.action.post" = "Enregistrer les stocks d'ouverture";
+
+/* Q 结果：全部写入 / 部分写入（4 键） */
+"inventory.opening.done.title" = "Stock d'ouverture enregistré";
+"inventory.opening.done.message" = "Chaque quantité et montant est désormais le premier mouvement de son article. Enregistrez ici ce qui s'est passé après la date de bascule.";
+"inventory.opening.partial.title" = "Certains stocks d'ouverture n'ont pas été enregistrés";
+"inventory.opening.partial.message" = "{count} articles n'ont pas été enregistrés. La raison est indiquée à côté de chaque ligne refusée et rien n'a été modifié pour ces articles ; les autres ont été écrits.";

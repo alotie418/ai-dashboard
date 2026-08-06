@@ -745,3 +745,49 @@
 "inventory.exception.returnOriginNotFound" = "元の伝票が見つからなかったため、この返品はその時点の平均単価で計上しました。";
 "inventory.exception.manualAdjust" = "原価を手作業で調整しました。";
 "inventory.exception.openingSeeded" = "期首在庫は手作業で入力しました。";
+
+/* ── 期初盘点向导（N-PR-5a）──────────────────────────────────────────
+   全部不可达：本轮只落文案，Plan / Runner、composition 与视图归 N-PR-5b。
+   逐商品原子：引擎按 product_id 分离、无跨商品聚合，所以一次批量里某个
+   商品被拒并不牵连其余——结果文案按「部分写入」如实措辞，不说整批回滚。
+   数量与金额是用户输入，单位成本是反算出来的只读列；除不尽时账本按反算
+   出的单价重算总额，roundingNote 就是那笔差额必须说出口的那句话。 ── */
+
+/* K 入口：库存页页头，与「新建流水」并列（2 键） */
+"inventory.opening.cta" = "期首在庫を登録";
+"inventory.opening.cta.hint" = "このアプリに切り替えた日の在庫数量と金額を記録します。";
+
+/* L 向导框架：单页滚动，无 next/back（3 键） */
+"inventory.opening.title" = "期首在庫";
+"inventory.opening.intro" = "切替日に各商品が持っていた数量と税抜金額を入力します。各行がその商品の最初の入出庫になります。";
+"inventory.opening.forwardNote" = "前向きの引き継ぎのみです。切替日より前の数値は再計算されず、過去の記録も作成されません。";
+
+/* M 两种拦阻，各自成对（4 键） */
+"inventory.opening.blocked.noProduct.title" = "期首を設定できる商品がありません";
+"inventory.opening.blocked.noProduct.message" = "先に「商品とサービス」で商品を追加してください。期首在庫は必ず一つの商品に紐づけて記録されます。";
+"inventory.opening.blocked.noneEligible.title" = "すべての商品にすでに入出庫があります";
+"inventory.opening.blocked.noneEligible.message" = "期首在庫は商品の最初の入出庫でなければならないため、これらの商品には設定できません。棚卸の増減で差異を記録してください。";
+
+/* N 清单列头：前两列是输入，末列是反算出来的只读值（4 键） */
+"inventory.opening.col.product" = "商品";
+"inventory.opening.col.quantity" = "在庫数量";
+"inventory.opening.col.amount" = "金額（税抜）";
+"inventory.opening.col.unitCost" = "算出単価";
+
+/* O 录入与披露：切换日的 N-6 后果、留空即跳过、零合法、截断归宿（5 键） */
+"inventory.opening.date.label" = "切替日";
+"inventory.opening.date.note" = "以後に記録する入出庫はこの日以降でなければなりません。それより前は受け付けず、本バージョンは過去を再計算しません。";
+"inventory.opening.quantityHint" = "商品の数量を空欄にすると、その商品は今回の対象から外れます。";
+"inventory.opening.amountHint" = "在庫数量に対応する税抜合計です。無償で入手した品はゼロでも構いませんが、空欄は受け付けません。";
+"inventory.opening.roundingNote" = "帳簿が保持するのは単価であり、記録される金額は単価×数量です。割り切れない場合、記録される金額は入力した額より低くなりますが、差はその通貨の最小単位未満で、この差はどこにも繰り越されません。";
+
+/* P 确认：写入前的一屏（3 键） */
+"inventory.opening.summary" = "{count} 件の商品に期首在庫を記録します。";
+"inventory.opening.currencyNote" = "これらの金額が、以後その商品の在庫を保持する通貨を確定します。別の通貨での入庫は受け付けません。";
+"inventory.opening.action.post" = "期首を記録";
+
+/* Q 结果：全部写入 / 部分写入（4 键） */
+"inventory.opening.done.title" = "期首在庫を記録しました";
+"inventory.opening.done.message" = "各数量と金額が、それぞれの商品の最初の入出庫になりました。切替日より後の出来事はここから記録してください。";
+"inventory.opening.partial.title" = "一部の期首在庫が記録されませんでした";
+"inventory.opening.partial.message" = "{count} 件の商品は記録されませんでした。理由は拒否された行の横に表示され、それらの商品は変更されていません。残りは記録済みです。";

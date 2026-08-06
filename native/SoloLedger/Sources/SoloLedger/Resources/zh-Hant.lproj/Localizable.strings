@@ -745,3 +745,49 @@
 "inventory.exception.returnOriginNotFound" = "找不到原單，這筆退貨按當時的均價計價。";
 "inventory.exception.manualAdjust" = "人工調整了成本。";
 "inventory.exception.openingSeeded" = "期初庫存由人工錄入。";
+
+/* ── 期初盘点向导（N-PR-5a）──────────────────────────────────────────
+   全部不可达：本轮只落文案，Plan / Runner、composition 与视图归 N-PR-5b。
+   逐商品原子：引擎按 product_id 分离、无跨商品聚合，所以一次批量里某个
+   商品被拒并不牵连其余——结果文案按「部分写入」如实措辞，不说整批回滚。
+   数量与金额是用户输入，单位成本是反算出来的只读列；除不尽时账本按反算
+   出的单价重算总额，roundingNote 就是那笔差额必须说出口的那句话。 ── */
+
+/* K 入口：库存页页头，与「新建流水」并列（2 键） */
+"inventory.opening.cta" = "設定期初庫存";
+"inventory.opening.cta.hint" = "記錄切換到本應用當天的在手數量與金額。";
+
+/* L 向导框架：单页滚动，无 next/back（3 键） */
+"inventory.opening.title" = "期初庫存";
+"inventory.opening.intro" = "填寫每個商品在切換日的在手數量與不含稅金額。每一行都會成為該商品的第一筆流水。";
+"inventory.opening.forwardNote" = "本操作只向前結轉。切換日之前的資料不會被重算，也不會補建更早的紀錄。";
+
+/* M 两种拦阻，各自成对（4 键） */
+"inventory.opening.blocked.noProduct.title" = "沒有可設期初的商品";
+"inventory.opening.blocked.noProduct.message" = "請先在「商品與服務」中新增商品。期初庫存總是記在某一個商品名下。";
+"inventory.opening.blocked.noneEligible.title" = "所有商品都已有流水";
+"inventory.opening.blocked.noneEligible.message" = "期初必須是某個商品的第一筆流水，因此這些商品都不能再設期初。請改用盤盈或盤虧記錄差異。";
+
+/* N 清单列头：前两列是输入，末列是反算出来的只读值（4 键） */
+"inventory.opening.col.product" = "商品";
+"inventory.opening.col.quantity" = "在手數量";
+"inventory.opening.col.amount" = "金額（不含稅）";
+"inventory.opening.col.unitCost" = "推算單位成本";
+
+/* O 录入与披露：切换日的 N-6 后果、留空即跳过、零合法、截断归宿（5 键） */
+"inventory.opening.date.label" = "切換日";
+"inventory.opening.date.note" = "此後錄入的每一筆流水都必須不早於這一天。更早的會被拒絕，本版不做歷史重算。";
+"inventory.opening.quantityHint" = "把某個商品的數量留空，就表示這次不給它設期初。";
+"inventory.opening.amountHint" = "在手數量對應的不含稅總額。零是允許的（無成本取得的貨品），留空則會被拒絕。";
+"inventory.opening.roundingNote" = "帳本保存的是單位成本，入帳金額由單位成本乘以數量得出。兩者除不盡時，入帳金額會比你填寫的低，差額小於該幣種的最小單位，且這個差額不會結轉到別處。";
+
+/* P 确认：写入前的一屏（3 键） */
+"inventory.opening.summary" = "將為 {count} 個商品寫入期初庫存。";
+"inventory.opening.currencyNote" = "這些金額將確定各商品庫存此後所用的幣種。之後以其他幣種入庫會被拒絕。";
+"inventory.opening.action.post" = "寫入期初";
+
+/* Q 结果：全部写入 / 部分写入（4 键） */
+"inventory.opening.done.title" = "期初庫存已寫入";
+"inventory.opening.done.message" = "每個數量與金額現在都是對應商品的第一筆流水。切換日之後發生的事，從此處繼續錄入。";
+"inventory.opening.partial.title" = "部分期初未寫入";
+"inventory.opening.partial.message" = "有 {count} 個商品沒有寫入。原因顯示在被拒絕的那一行旁邊，這些商品未被改動；其餘商品已寫入。";

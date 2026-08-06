@@ -218,12 +218,26 @@ final class InventoryMountingTests: XCTestCase {
         let placed = Set(InventoryPageComposition.placement.keys)
         XCTAssertEqual(placed.count, 68, "N-PR-3 adjudicated sixty-eight inventory.* keys")
         for language in languages {
-            let landed = Set(try sourceTable(language).keys.filter { $0.hasPrefix("inventory.") })
+            // `inventory.opening.*` belongs to the opening-stock wizard, not to this page:
+            // N-PR-5a landed that copy dormant and N-PR-5b gives it a composition of its own.
+            // Excluding it keeps THIS a two-way equality over the keys the page actually owns.
+            // The other half is not unguarded — `InventoryCopyTests` IC11 holds every one of the
+            // wizard's keys to zero references until that round. Two guards, one half each, and
+            // between them still the whole namespace.
+            let table = try sourceTable(language)
+            let landed = Set(table.keys.filter {
+                $0.hasPrefix("inventory.") && !$0.hasPrefix("inventory.opening.")
+            })
             XCTAssertEqual(landed, placed, """
                 \(language): the copy and the page's placement table disagree.
                 written but never drawn: \(landed.subtracting(placed).sorted())
                 drawn but never written: \(placed.subtracting(landed).sorted())
                 """)
+            // An exclusion filter with nothing checking it is how a guard rots: a later round
+            // could widen the prefix and swallow a page key with it, and the equality above would
+            // go on passing. So the excluded half is counted too.
+            XCTAssertEqual(table.keys.filter { $0.hasPrefix("inventory.opening.") }.count, 25,
+                           "\(language): the excluded half must be the wizard's twenty-five keys and nothing else")
         }
         // The closure above is an EQUALITY, not `placement ∪ exemptions`. Asserting the exemption
         // table is empty is what keeps it one: a later round that needs an exemption has to change
