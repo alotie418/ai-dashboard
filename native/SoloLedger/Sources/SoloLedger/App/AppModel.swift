@@ -1470,6 +1470,103 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: - Opening-stock wizard (N-PR-5b; nothing reaches it yet)
+
+    /// The wizard's whole state. `private(set)` — only the four intents below move it.
+    @Published private(set) var inventoryOpening: InventoryOpeningState = .idle
+
+    /// The sheet's presentation, mounted once, inside `InventoryView`.
+    @Published var showingInventoryOpening = false
+
+    /// What the user has typed so far, or `nil` when the wizard is not on its editing page.
+    var inventoryOpeningDraft: InventoryOpeningDraft? {
+        if case .editing(let draft) = inventoryOpening { return draft }
+        return nil
+    }
+
+    /// Read the ledger for what can still be opened, then show the sheet.
+    ///
+    /// The preflight is synchronous and writes nothing — it runs inside one read snapshot so the
+    /// N+1 eligibility reads describe one ledger. A read that fails does NOT open the sheet: the
+    /// page's own banner says so instead, because a wizard that opens onto an empty list would be
+    /// claiming the catalogue is empty when it is only unreadable.
+    func beginInventoryOpening() {
+        guard let store, case .idle = inventoryOpening else { return }
+        do {
+            switch try store.inventoryOpeningPreflight() {
+            case .blocked(let blocker):
+                inventoryOpening = .blocked(blocker)
+            case .plan(let plan):
+                inventoryOpening = .editing(InventoryOpeningDraft(plan: plan,
+                                                                  occurredOn: DateFormat.today()))
+            }
+        } catch let error as InventoryPostingError {
+            inventoryError = error
+            return
+        } catch {
+            inventoryError = .storageFailure
+            return
+        }
+        showingInventoryOpening = true
+    }
+
+    func setInventoryOpeningDate(_ occurredOn: String) {
+        guard case .editing(var draft) = inventoryOpening else { return }
+        draft.occurredOn = occurredOn
+        inventoryOpening = .editing(draft)
+    }
+
+    func setInventoryOpeningQuantity(_ text: String, at index: Int) {
+        guard case .editing(var draft) = inventoryOpening, draft.lines.indices.contains(index)
+        else { return }
+        draft.lines[index].quantityText = text
+        inventoryOpening = .editing(draft)
+    }
+
+    func setInventoryOpeningAmount(_ text: String, at index: Int) {
+        guard case .editing(var draft) = inventoryOpening, draft.lines.indices.contains(index)
+        else { return }
+        draft.lines[index].amountText = text
+        inventoryOpening = .editing(draft)
+    }
+
+    /// Post the openings, one product at a time, and land what happened.
+    ///
+    /// `guard case .editing` is the double-submit gate: the state leaves that case before the
+    /// screen can offer the button again. Each product is its own transaction — see
+    /// `runInventoryOpening` — so a refusal on one leaves the others in the ledger, and the
+    /// outcome page names every line that was refused rather than claiming a rollback.
+    ///
+    /// The currency is the accounting regime's, once, for the whole batch. An eligible product
+    /// has no live movement and therefore no frozen currency to disagree with, so there is nothing
+    /// per-product to resolve here — and these amounts are what freeze it (D-1).
+    func confirmInventoryOpening() {
+        guard let store, case .editing(let draft) = inventoryOpening else { return }
+        guard let request = draft.request(currency: defaultCurrency) else { return }
+
+        let outcome = store.runInventoryOpening(request)
+        let names = Dictionary(draft.lines.map { ($0.productID, $0.name) },
+                               uniquingKeysWith: { first, _ in first })
+        let refusals = outcome.refusals.map { result in
+            InventoryOpeningRefusal(
+                productName: names[result.productID] ?? result.productID,
+                messageKey: InventoryPageComposition.key(for: result.refusal ?? .storageFailure))
+        }
+        inventoryOpening = refusals.isEmpty ? .done : .partial(refusals)
+        // The page behind the sheet is now wrong in three places at once — the balance card, the
+        // movement list and the opening advice all depend on what was just written.
+        reloadInventory()
+    }
+
+    /// The one way out, for every state. A system dismissal writes `false` straight into the
+    /// presentation binding without coming through here, which is why the sheet disables it: the
+    /// state would stay on an outcome page and the next press of the entry point would hit the
+    /// `guard case .idle` above and do nothing at all.
+    func dismissInventoryOpening() {
+        showingInventoryOpening = false
+        inventoryOpening = .idle
+    }
+
     // MARK: - CSV
 
     func exportCSV(to url: URL) {

@@ -782,7 +782,7 @@
 "inventory.opening.date.note" = "Every movement recorded afterwards must fall on or after this day. An earlier one is refused; this version does not recompute history.";
 "inventory.opening.quantityHint" = "Leave a product's quantity empty to leave that product out.";
 "inventory.opening.amountHint" = "Tax-exclusive total for the quantity on hand. Zero is allowed for goods that cost nothing; leaving it empty is refused.";
-"inventory.opening.roundingNote" = "The ledger holds a unit cost, and the amount it records is that cost times the quantity. When the two do not divide evenly the recorded amount is lower than what you typed, by less than the smallest unit of the currency, and that difference is not carried anywhere else.";
+"inventory.opening.roundingNote" = "The ledger holds a unit cost, not the amount you type. The amount it records can come out a little lower, and the difference is not carried anywhere else. The implied unit cost beside each line is the figure the ledger actually uses.";
 
 /* P 确认：写入前的一屏（3 键） */
 "inventory.opening.summary" = "{count} products will be given an opening balance.";

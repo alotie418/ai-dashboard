@@ -50,6 +50,10 @@ enum InventoryPageComposition {
         case note
         /// The one control that opens the new-movement panel.
         case action
+        /// The control that opens the opening-stock wizard, and its hint. The wizard's own copy
+        /// belongs to `InventoryOpeningComposition`; these two are placed HERE because this
+        /// page's header is what draws them, and what draws a key decides where it is placed.
+        case openingAction
         /// The single sentence a refused write leaves behind.
         case errorBanner
         /// On hand / cost balance / current average, plus the currency declaration.
@@ -79,8 +83,11 @@ enum InventoryPageComposition {
 
     /// Every `inventory.*` key this page can draw, and the regions it belongs to.
     ///
-    /// Total over the `inventory.*` namespace by construction, and asserted to be — the
-    /// sixty-eight keys N-PR-3 landed, no more and no fewer. See ``exemptKeys``.
+    /// Seventy: the sixty-eight N-PR-3 landed for the page itself, plus the two the opening-stock
+    /// wizard's entry point needs — that control lives in this page's header, so this page draws
+    /// it. The rest of `inventory.opening.*` belongs to `InventoryOpeningComposition`, and
+    /// `InventoryMountingTests` asserts the two tables PARTITION the ninety-three: disjoint, and
+    /// together the whole namespace. See ``exemptKeys``.
     static let placement: [String: Set<Region>] = [
         // MARK: header (2)
         "inventory.page.title": [.header],
@@ -156,6 +163,9 @@ enum InventoryPageComposition {
         "inventory.reverse.confirmTitle": [.reverseDialog],
         "inventory.reverse.confirmMessage": [.reverseDialog],
         "inventory.reverse.onlyLastNote": [.listNote],
+        // MARK: openingAction (2) — the wizard's entry point, drawn by this page's header
+        "inventory.opening.cta": [.openingAction],
+        "inventory.opening.cta.hint": [.openingAction],
         // MARK: exception (4)
         "inventory.exception.title": [.exception],
         "inventory.exception.returnOriginNotFound": [.exception],
@@ -646,6 +656,11 @@ enum InventoryPageComposition {
         let headerKeys: [String]
         let noteKeys: [String]
         let actionKeys: [String]
+        /// The opening-stock wizard's entry point. Always drawn: a ledger with no products still
+        /// gets the button, because the wizard's own `noProduct` page is a better answer than a
+        /// disabled control with nothing to explain it.
+        let openingActionKey: String
+        let openingHintKey: String
         /// One sentence, or none.
         let errorKeys: [String]
         let products: [ProductChoice]
@@ -669,6 +684,8 @@ enum InventoryPageComposition {
             keys.formUnion(headerKeys)
             keys.formUnion(noteKeys)
             keys.formUnion(actionKeys)
+            keys.insert(openingActionKey)
+            keys.insert(openingHintKey)
             keys.formUnion(errorKeys)
             keys.formUnion(balance?.allKeys ?? [])
             keys.formUnion(list?.allKeys ?? [])
@@ -694,6 +711,8 @@ enum InventoryPageComposition {
                         headerKeys: Self.headerKeys,
                         noteKeys: Self.noteKeys,
                         actionKeys: Self.actionKeys,
+                        openingActionKey: Self.openingActionKey,
+                        openingHintKey: Self.openingHintKey,
                         errorKeys: errorKeys,
                         products: [],
                         selectedProductID: nil,
@@ -740,6 +759,8 @@ enum InventoryPageComposition {
                     headerKeys: Self.headerKeys,
                     noteKeys: Self.noteKeys,
                     actionKeys: Self.actionKeys,
+                    openingActionKey: Self.openingActionKey,
+                    openingHintKey: Self.openingHintKey,
                     errorKeys: errorKeys,
                     products: input.products,
                     selectedProductID: selected.id,
@@ -761,6 +782,9 @@ enum InventoryPageComposition {
     /// The control that opens the panel borrows the panel's own heading — the copy has no
     /// separate action key, and inventing one would be a sixty-ninth string.
     private static let actionKeys = ["inventory.form.title"]
+    /// The opening-stock wizard's entry point, beside it.
+    private static let openingActionKey = "inventory.opening.cta"
+    private static let openingHintKey = "inventory.opening.cta.hint"
 
     private static func balanceBlock(_ input: Input, product: ProductChoice) -> BalanceBlock {
         let balance = input.balance

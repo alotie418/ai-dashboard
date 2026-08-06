@@ -779,7 +779,7 @@
 "inventory.opening.date.note" = "Tout mouvement enregistré ensuite doit être daté de ce jour ou après. Un mouvement antérieur est refusé ; cette version ne recalcule pas l'historique.";
 "inventory.opening.quantityHint" = "Laissez la quantité vide pour exclure cet article de cette saisie.";
 "inventory.opening.amountHint" = "Total hors taxe correspondant à la quantité en stock. Zéro est permis pour des biens obtenus sans coût ; un champ vide est refusé.";
-"inventory.opening.roundingNote" = "Le registre conserve un coût unitaire, et le montant enregistré est ce coût multiplié par la quantité. Lorsque la division ne tombe pas juste, le montant enregistré est inférieur à celui que vous avez saisi, d'un écart inférieur à la plus petite unité de la devise, et cet écart n'est reporté nulle part ailleurs.";
+"inventory.opening.roundingNote" = "Le registre conserve un coût unitaire, et non le montant que vous saisissez. Le montant enregistré peut être légèrement inférieur, et cet écart n'est reporté nulle part ailleurs. Le coût unitaire déduit affiché sur chaque ligne est le chiffre que le registre utilise réellement.";
 
 /* P 确认：写入前的一屏（3 键） */
 "inventory.opening.summary" = "{count} articles recevront un stock d'ouverture.";
