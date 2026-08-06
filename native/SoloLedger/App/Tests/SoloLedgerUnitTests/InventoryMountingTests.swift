@@ -169,6 +169,8 @@ final class InventoryMountingTests: XCTestCase {
         out += page.headerKeys.map { ($0, slot(.header)) }
         out += page.noteKeys.map { ($0, slot(.note)) }
         out += page.actionKeys.map { ($0, slot(.action)) }
+        out.append((page.openingActionKey, slot(.openingAction)))
+        out.append((page.openingHintKey, slot(.openingAction)))
         out += page.errorKeys.map { ($0, slot(.errorBanner)) }
         out += page.emptyKeys.map { ($0, slot(.empty)) }
         out += page.openingHintKeys.map { ($0, slot(.openingHint)) }
@@ -214,31 +216,34 @@ final class InventoryMountingTests: XCTestCase {
     // MARK: - IM1 — the placement table is the adjudicated namespace, in both directions
     // ==============================================================================================
 
-    func testIM1ThePlacementTableIsExactlyTheSixtyEightAdjudicatedKeys() throws {
+    func testIM1ThePlacementTablesPartitionTheAdjudicatedNamespace() throws {
         let placed = Set(InventoryPageComposition.placement.keys)
-        XCTAssertEqual(placed.count, 68, "N-PR-3 adjudicated sixty-eight inventory.* keys")
+        let wizard = Set(InventoryOpeningComposition.placement.keys)
+        XCTAssertEqual(placed.count, 70, "N-PR-3's sixty-eight, plus the wizard's two entry keys")
+        XCTAssertEqual(wizard.count, 23, "N-PR-5a's twenty-five, less those two")
+
+        // N-PR-5a excluded the wizard's half by PREFIX, which needed a second assertion to keep
+        // the filter from silently widening. Now that the wizard has a table of its own, the
+        // exclusion is replaced by the stronger statement it was standing in for: the two tables
+        // PARTITION the namespace. Nothing is placed twice, nothing is placed nowhere, and there
+        // is no filter left to widen.
+        XCTAssertTrue(placed.isDisjoint(with: wizard), """
+            a key is placed by both tables: \(placed.intersection(wizard).sorted())
+            """)
         for language in languages {
-            // `inventory.opening.*` belongs to the opening-stock wizard, not to this page:
-            // N-PR-5a landed that copy dormant and N-PR-5b gives it a composition of its own.
-            // Excluding it keeps THIS a two-way equality over the keys the page actually owns.
-            // The other half is not unguarded — `InventoryCopyTests` IC11 holds every one of the
-            // wizard's keys to zero references until that round. Two guards, one half each, and
-            // between them still the whole namespace.
-            let table = try sourceTable(language)
-            let landed = Set(table.keys.filter {
-                $0.hasPrefix("inventory.") && !$0.hasPrefix("inventory.opening.")
-            })
-            XCTAssertEqual(landed, placed, """
-                \(language): the copy and the page's placement table disagree.
-                written but never drawn: \(landed.subtracting(placed).sorted())
-                drawn but never written: \(placed.subtracting(landed).sorted())
+            let landed = Set(try sourceTable(language).keys.filter { $0.hasPrefix("inventory.") })
+            XCTAssertEqual(landed, placed.union(wizard), """
+                \(language): the copy and the two placement tables disagree.
+                written but never drawn: \(landed.subtracting(placed.union(wizard)).sorted())
+                drawn but never written: \(placed.union(wizard).subtracting(landed).sorted())
                 """)
-            // An exclusion filter with nothing checking it is how a guard rots: a later round
-            // could widen the prefix and swallow a page key with it, and the equality above would
-            // go on passing. So the excluded half is counted too.
-            XCTAssertEqual(table.keys.filter { $0.hasPrefix("inventory.opening.") }.count, 25,
-                           "\(language): the excluded half must be the wizard's twenty-five keys and nothing else")
+            XCTAssertEqual(landed.count, 93)
         }
+        // The two entry keys are the whole of the overlap in SUBJECT — they are `inventory.opening.*`
+        // strings placed by the page — so they are named here rather than left implicit.
+        XCTAssertEqual(placed.filter { $0.hasPrefix("inventory.opening.") }.sorted(),
+                       ["inventory.opening.cta", "inventory.opening.cta.hint"],
+                       "the page draws the wizard's entry point and nothing else of it")
         // The closure above is an EQUALITY, not `placement ∪ exemptions`. Asserting the exemption
         // table is empty is what keeps it one: a later round that needs an exemption has to change
         // this line first, in the open, instead of quietly growing a list.
@@ -443,11 +448,23 @@ final class InventoryMountingTests: XCTestCase {
         XCTAssertGreaterThan(sources.count, 10, "the scan must have seen the app target")
         XCTAssertEqual(Self.mentions(of: "InventoryView(", in: sources), [],
                        "nothing may construct the inventory page yet")
+        // The wizard IS constructed — by the page, once. That does not make it reachable: the page
+        // itself is constructed by nobody, so the whole chain is still dormant. Mounting the sheet
+        // inside the page is what makes it one mount rather than a second entry point to keep in
+        // step, and the assertion above is what keeps the chain broken at the top.
+        XCTAssertEqual(Self.mentions(of: "InventoryOpeningView(", in: sources),
+                       ["Views/InventoryView.swift"],
+                       "the wizard is mounted exactly once, by the page it belongs to")
 
-        // The composition is consumed by the page and driven by the model, and by nothing else.
-        // Its own file is in the list because it declares the type.
+        // The composition is consumed by the page and driven by the model. Since N-PR-5b the
+        // wizard's two files name it too — deliberately, and for one reason: that type owns the
+        // three integer scales and the single display rounding N-8 requires to live in one place.
+        // A second copy of `ticksAwayFromZero` would break that rule in the way that is hardest to
+        // notice, so the coupling is declared here rather than avoided. The wizard's composition
+        // uses the text PARSER, its view uses the FORMATTER, and neither has a copy of either.
         XCTAssertEqual(Self.mentions(of: "InventoryPageComposition", in: sources),
-                       ["App/AppModel.swift", "App/InventoryPageComposition.swift",
+                       ["App/AppModel.swift", "App/InventoryOpeningComposition.swift",
+                        "App/InventoryPageComposition.swift", "Views/InventoryOpeningView.swift",
                         "Views/InventoryView.swift"])
         XCTAssertEqual(Self.mentions(of: "InventoryFormDraft", in: sources),
                        ["App/AppModel.swift", "App/InventoryPageComposition.swift"])

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		02C780D3E5976FB07EF40D24 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F110EF8BC57063D90D62A40 /* ReportsView.swift */; };
+		08D3B5F62A71C4E093561AB7 /* InventoryOpeningState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C41E8A97350BD26EF0A87D14 /* InventoryOpeningState.swift */; };
 		0A17E9C4B2D5F30861794C21 /* ProductsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C4F80B6D3A29E57104B6D22 /* ProductsView.swift */; };
 		15A3EEB41D6BE4F941CD6AAA /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 588305D83F4594A1B09F7922 /* AppModel.swift */; };
 		1605DEC62488C3F12D00F073 /* ProductCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1523D7846E9667AD9188F900 /* ProductCopyTests.swift */; };
@@ -27,14 +28,17 @@
 		53DDD42D8672616C8446F88C /* AppLaunchUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F9696FACAA53B62F93D9F79 /* AppLaunchUITests.swift */; };
 		59D0AE5F94FC8EFCC793ED61 /* SoloLedgerCore in Frameworks */ = {isa = PBXBuildFile; productRef = F78D967BE4643CB328B2FE25 /* SoloLedgerCore */; };
 		5A7569EAC381F20AA1C87605 /* ReportFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4323D99BE6E1DDD816B2F77 /* ReportFormatterTests.swift */; };
+		5B2C7E019D4A38F6C7120EB5 /* InventoryOpeningComposition.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3F1D6482C05E97B14BD03A6 /* InventoryOpeningComposition.swift */; };
 		5CF19061FD2C6CC044546D9D /* MigrationPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D726F1EA2EFB26D0EC1C8C /* MigrationPresenter.swift */; };
 		62D492187E0709CCDE35A2D3 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B5F727B2FCC9722A8ED0BA70 /* Localizable.strings */; };
 		63119B5E9FE1CED374DA19AA /* electron-v23.db in Resources */ = {isa = PBXBuildFile; fileRef = 27BD91B41FDD42EFA4279AEE /* electron-v23.db */; };
 		69565B6FA9364E0DAB27862D /* Localizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57643709AC4EFC756514CDFB /* Localizer.swift */; };
 		6A982113067463F4D56E8AF0 /* ReportPresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32F7AEA186843814FE43EBD4 /* ReportPresenterTests.swift */; };
+		6F9A1E3B84C0752DA6E31F98 /* InventoryOpeningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7B04C2D183F6A95BD2E4071 /* InventoryOpeningView.swift */; };
 		796BFA1219B88259D75D9BFB /* SoloLedgerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CF6B7860B1C57D6E8C83448 /* SoloLedgerApp.swift */; };
 		821321D467EC23E204FF19DF /* AppUnitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C26549A6E2C20DB2210C445 /* AppUnitTests.swift */; };
 		8EF2EB828C9A67864E3A8688 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BEF6A5527E30DC74D9E644C /* OverviewView.swift */; };
+		93E5A0148C6D2FB704A1E837 /* InventoryOpeningWizardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D6B90C7F41E5A38B70C29D5 /* InventoryOpeningWizardTests.swift */; };
 		97AEF67CC908A92C5D00FFBE /* ReportFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C55F715C81A53197D609954 /* ReportFormatters.swift */; };
 		9AC176B879A8BF1E63B846CE /* ReportStateCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35826F8E473E8A7F8A74323 /* ReportStateCopyTests.swift */; };
 		9BA808EA5B2F89B63F49B30C /* Appearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = D82184B119B98CDA23C5BA52 /* Appearance.swift */; };
@@ -95,6 +99,7 @@
 		27BD91B41FDD42EFA4279AEE /* electron-v23.db */ = {isa = PBXFileReference; path = "electron-v23.db"; sourceTree = "<group>"; };
 		2873BF2E3463020F4E8DB20F /* ReportYear.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportYear.swift; sourceTree = "<group>"; };
 		2AD21BE4ACA9B11160FEA828 /* SoloLedger */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SoloLedger; path = ..; sourceTree = SOURCE_ROOT; };
+		2D6B90C7F41E5A38B70C29D5 /* InventoryOpeningWizardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryOpeningWizardTests.swift; sourceTree = "<group>"; };
 		2F9696FACAA53B62F93D9F79 /* AppLaunchUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLaunchUITests.swift; sourceTree = "<group>"; };
 		32F7AEA186843814FE43EBD4 /* ReportPresenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportPresenterTests.swift; sourceTree = "<group>"; };
 		33831A278AD14FFA53FA9E92 /* ReportPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportPresenter.swift; sourceTree = "<group>"; };
@@ -129,11 +134,13 @@
 		9C55F715C81A53197D609954 /* ReportFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportFormatters.swift; sourceTree = "<group>"; };
 		9CECAC57D1DFBD07FE47679B /* AppCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCommands.swift; sourceTree = "<group>"; };
 		9E1A6C3D5B074F28A1C0D742 /* InventoryMountingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryMountingTests.swift; sourceTree = "<group>"; };
+		A3F1D6482C05E97B14BD03A6 /* InventoryOpeningComposition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryOpeningComposition.swift; sourceTree = "<group>"; };
 		A8AEA06C0F0AE1B9F7F46A3C /* SoloLedger.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SoloLedger.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A97DD55EB0104219FF307363 /* LegacyConversionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyConversionState.swift; sourceTree = "<group>"; };
 		ACB926A2FFE353E39A4E4CF9 /* ResourceCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourceCheck.swift; sourceTree = "<group>"; };
 		AE7D2A8E11270134F8559041 /* SoloLedgerUnitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SoloLedgerUnitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B3E1C14A7B1D4C96643BA5AF /* BootChainRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BootChainRunner.swift; sourceTree = "<group>"; };
+		C41E8A97350BD26EF0A87D14 /* InventoryOpeningState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryOpeningState.swift; sourceTree = "<group>"; };
 		C6E06B4A5CA57442D4A19219 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoriesView.swift; sourceTree = "<group>"; };
 		C874DBE1DF702C16F4F2BFE7 /* ReportMountingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportMountingTests.swift; sourceTree = "<group>"; };
 		CCB750FF82EF07F831211105 /* ReportPageComposition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportPageComposition.swift; sourceTree = "<group>"; };
@@ -142,6 +149,7 @@
 		D7B2857631FF436AE05BA8FF /* InventoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryView.swift; sourceTree = "<group>"; };
 		D82184B119B98CDA23C5BA52 /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
 		E2B463DA7F521AA1997C4DA4 /* ReportPageState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportPageState.swift; sourceTree = "<group>"; };
+		E7B04C2D183F6A95BD2E4071 /* InventoryOpeningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InventoryOpeningView.swift; sourceTree = "<group>"; };
 		E802A306ACFF9A0EC2FC18C3 /* TransactionEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEditor.swift; sourceTree = "<group>"; };
 		F408B9B8AAC12E3E626C7E54 /* LegacyConversionWizardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyConversionWizardTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -224,6 +232,7 @@
 				C6E06B4A5CA57442D4A19219 /* CategoriesView.swift */,
 				3DB1C974CA1B7406275DC2F7 /* Components.swift */,
 				52BEB2DA46EDB5F3166A8803 /* Formatters.swift */,
+				E7B04C2D183F6A95BD2E4071 /* InventoryOpeningView.swift */,
 				D7B2857631FF436AE05BA8FF /* InventoryView.swift */,
 				22F261F63E3EFEFECD968D6B /* LegacyConversionView.swift */,
 				0D60ABA9FBFAC02C8A7872FA /* OnboardingView.swift */,
@@ -256,6 +265,7 @@
 				3E562DD88E7D26BED7D6DD42 /* DormantSourceChoiceBootTests.swift */,
 				5592CBD647AF371A1D160A7C /* ElectronFixtureProductionOpenTests.swift */,
 				9E1A6C3D5B074F28A1C0D742 /* InventoryMountingTests.swift */,
+				2D6B90C7F41E5A38B70C29D5 /* InventoryOpeningWizardTests.swift */,
 				74568FEF2DF4A81900AB8190 /* LegacyConversionCopyTests.swift */,
 				F408B9B8AAC12E3E626C7E54 /* LegacyConversionWizardTests.swift */,
 				831C1CE39028B1C1EF6BFB11 /* MigrationCopyParityTests.swift */,
@@ -288,6 +298,8 @@
 				B3E1C14A7B1D4C96643BA5AF /* BootChainRunner.swift */,
 				6B16C5235D85C8A57104E169 /* CoreTypes.swift */,
 				3A72C1BBF0F2B3F19DC44767 /* FilePanels.swift */,
+				A3F1D6482C05E97B14BD03A6 /* InventoryOpeningComposition.swift */,
+				C41E8A97350BD26EF0A87D14 /* InventoryOpeningState.swift */,
 				7C7A0AD86F82354BE587126E /* InventoryPageComposition.swift */,
 				6BD8F491BF931D51F78A1157 /* LegacyConversionComposition.swift */,
 				A97DD55EB0104219FF307363 /* LegacyConversionState.swift */,
@@ -504,6 +516,7 @@
 				EE1B48EDB26A061CD1B3E584 /* DormantSourceChoiceBootTests.swift in Sources */,
 				319B70CB0DBEC47627D1F71C /* ElectronFixtureProductionOpenTests.swift in Sources */,
 				4C8D2F91A3E7B05614DA8CB3 /* InventoryMountingTests.swift in Sources */,
+				93E5A0148C6D2FB704A1E837 /* InventoryOpeningWizardTests.swift in Sources */,
 				FFF7B402438816464EC609EC /* LegacyConversionCopyTests.swift in Sources */,
 				BB802E0EEBC744479B72910A /* LegacyConversionWizardTests.swift in Sources */,
 				2E23D9B87533B5497111ABB3 /* MigrationCopyParityTests.swift in Sources */,
@@ -531,6 +544,9 @@
 				21CA4755C217A17128658F82 /* CoreTypes.swift in Sources */,
 				EAB737C2FDECFF65B696C0BD /* FilePanels.swift in Sources */,
 				ECA6CFDC1E3E3522747C2B4D /* Formatters.swift in Sources */,
+				5B2C7E019D4A38F6C7120EB5 /* InventoryOpeningComposition.swift in Sources */,
+				08D3B5F62A71C4E093561AB7 /* InventoryOpeningState.swift in Sources */,
+				6F9A1E3B84C0752DA6E31F98 /* InventoryOpeningView.swift in Sources */,
 				1EE3C44A5AFB2DE5461F2FFC /* InventoryPageComposition.swift in Sources */,
 				B66AFB2DF60316BFECAE8754 /* InventoryView.swift in Sources */,
 				D6ABA9AA8A580522AAE25F5E /* LegacyConversionComposition.swift in Sources */,

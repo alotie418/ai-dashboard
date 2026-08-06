@@ -401,11 +401,12 @@ final class InventoryCopyTests: XCTestCase {
     /// about, which is precisely what makes the placement proof in `InventoryMountingTests`
     /// meaningful.
     ///
-    /// **The wizard's twenty-five.** N-PR-5a lands them dormant, so for them the assertion is
-    /// still the empty one. The wizard's plan, composition and view are N-PR-5b; the round that
-    /// writes them inverts this half exactly the way N-PR-4 inverted the other.
+    /// **The wizard's twenty-five, split two ways since N-PR-5b.** Twenty-three are its own and
+    /// belong to `InventoryOpeningComposition.swift`; the two entry keys are drawn by the
+    /// inventory page's header, so they belong with the page's sixty-eight. What DRAWS a key
+    /// decides which table places it, and this is where that stops being a convention.
     ///
-    /// `nav.inventory` stays at ZERO through both. The sidebar entry is N-PR-6, and even then
+    /// `nav.inventory` stays at ZERO through all of it. The sidebar entry is N-PR-6, and even then
     /// `SidebarSection.titleKey` is computed from the raw value, so no production file will spell
     /// that string out — a hit on it means someone wrote a literal that the enum already derives.
     func testIC11TheCopyIsNamedByTheCompositionAndByNothingElse() throws {
@@ -420,19 +421,25 @@ final class InventoryCopyTests: XCTestCase {
                 named[key, default: []].append(path)
             }
         }
-        let composition = ["SoloLedger/App/InventoryPageComposition.swift"]
-        for key in Self.pageAdjudicatedKeys {
-            XCTAssertEqual((named[key] ?? []).sorted(), composition, """
+        let page = ["SoloLedger/App/InventoryPageComposition.swift"]
+        let wizard = ["SoloLedger/App/InventoryOpeningComposition.swift"]
+        for key in Self.pageAdjudicatedKeys + Self.openingEntryKeys {
+            XCTAssertEqual((named[key] ?? []).sorted(), page, """
                 \(key) is named by \((named[key] ?? []).sorted()) — every string the inventory PAGE \
-                draws belongs to its composition and to no other file.
+                draws, its own sixty-eight and the wizard's two entry keys, belongs to its \
+                composition and to no other file.
                 """)
         }
-        for key in Self.openingKeys + ["nav.inventory"] {
-            XCTAssertNil(named[key], """
-                \(key) is already referenced in production by \((named[key] ?? []).sorted()). This \
-                round lands the wizard's copy only — its plan, composition and view are N-PR-5b.
+        for key in Self.openingKeys where !Self.openingEntryKeys.contains(key) {
+            XCTAssertEqual((named[key] ?? []).sorted(), wizard, """
+                \(key) is named by \((named[key] ?? []).sorted()) — every string the opening-stock \
+                WIZARD draws belongs to its own composition and to no other file.
                 """)
         }
+        XCTAssertNil(named["nav.inventory"], """
+            nav.inventory is written out somewhere in production. The sidebar entry is N-PR-6, and \
+            SidebarSection derives that key from its raw value rather than naming it.
+            """)
     }
 
     /// The dormancy scan must be able to see a real use, or an empty offender list proves nothing.

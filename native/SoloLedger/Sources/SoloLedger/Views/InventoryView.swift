@@ -55,6 +55,17 @@ struct InventoryView: View {
                 InventoryFormSheet(block: block).environmentObject(model)
             }
         }
+        // The opening-stock wizard's ONE mount. `interactiveDismissDisabled()` is UNCONDITIONAL
+        // and that is the point: a system dismissal — Escape, a swipe, the window's own close —
+        // writes `false` straight into the presentation binding without going through
+        // `dismissInventoryOpening()`, so the sheet would vanish while the state stayed on a
+        // blocked or outcome page. The next press of the entry point then hits its
+        // `guard case .idle` and does nothing at all: a button that has silently stopped working.
+        .sheet(isPresented: $model.showingInventoryOpening) {
+            InventoryOpeningView()
+                .environmentObject(model)
+                .interactiveDismissDisabled()
+        }
         .confirmationDialog(reverseTitle(page.reverse), isPresented: Binding(
             get: { page.reverse != nil },
             set: { if !$0 { model.cancelInventoryReversal() } }
@@ -136,6 +147,13 @@ private struct InventoryPageHeader: View {
                         .disabled(model.inventoryWriteIsPending || page.products.isEmpty)
                         .accessibilityIdentifier(key)
                 }
+                // The opening-stock wizard's entry point. Enabled even on an empty catalogue: the
+                // wizard's own `noProduct` page says what to do about it, which is more use than
+                // a disabled button with nothing to explain it.
+                Button(model.t(page.openingActionKey)) { model.beginInventoryOpening() }
+                    .disabled(model.inventoryWriteIsPending)
+                    .help(model.t(page.openingHintKey))
+                    .accessibilityIdentifier("inventoryPage.openingCTA")
             }
         }
     }

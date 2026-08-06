@@ -782,7 +782,7 @@
 "inventory.opening.date.note" = "此后录入的每一笔流水都必须不早于这一天。更早的会被拒绝，本版不做历史重算。";
 "inventory.opening.quantityHint" = "把某个商品的数量留空，就表示这次不给它设期初。";
 "inventory.opening.amountHint" = "在手数量对应的不含税总额。零是允许的（无成本取得的货品），留空则会被拒绝。";
-"inventory.opening.roundingNote" = "账本保存的是单位成本，入账金额由单位成本乘以数量得出。两者除不尽时，入账金额会比你填写的低，差额小于该币种的最小单位，且这个差额不会结转到别处。";
+"inventory.opening.roundingNote" = "账本保存的是单位成本，不是你填写的金额。入账金额可能略低于你填写的金额，差额不会结转到别处。每一行旁边的推算单位成本，就是账本实际使用的数字。";
 
 /* P 确认：写入前的一屏（3 键） */
 "inventory.opening.summary" = "将为 {count} 个商品写入期初库存。";

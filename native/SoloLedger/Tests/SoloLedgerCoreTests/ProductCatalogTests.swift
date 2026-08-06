@@ -515,7 +515,12 @@ final class ProductCatalogTests: LedgerTestCase {
                                     "SoloLedger/App/ProductPageComposition.swift"],
             "ProductCatalogError": ["SoloLedger/App/AppModel.swift",
                                     "SoloLedger/App/ProductPageComposition.swift"],
-            "productCatalog":      ["SoloLedger/App/AppModel.swift"],
+            // The opening-stock wizard's preflight reads the catalogue too, from Core, because it
+            // has to ask every candidate's eligibility inside one read snapshot. It calls this
+            // function rather than writing its own SELECT — the lenient decode and the SQL-side
+            // ordering above are decisions, and a second reader would drift from them.
+            "productCatalog":      ["SoloLedger/App/AppModel.swift",
+                                    "SoloLedgerCore/Inventory/InventoryOpeningPlan.swift"],
             "createProduct":       ["SoloLedger/App/AppModel.swift"],
             "updateProduct":       ["SoloLedger/App/AppModel.swift"],
             "deleteProduct":       ["SoloLedger/App/AppModel.swift"],

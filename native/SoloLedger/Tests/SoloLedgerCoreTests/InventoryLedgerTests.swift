@@ -353,17 +353,23 @@ final class InventoryLedgerTests: LedgerTestCase {
     ///  * the pure state machine and its three input types reach NOBODY. `InventoryPosting.apply`
     ///    traps on a reversal row by precondition, and the audit list the page draws is full of
     ///    them; the App has no business calling any of it, and this is where that is enforced.
+    ///
+    /// N-PR-5b adds a fourth file to the map and it is in CORE, not the App: the opening-stock
+    /// wizard's preflight has to read every candidate's live movements inside one snapshot, and
+    /// `readSnapshot` is internal to this module on purpose. It consumes the engine the same way
+    /// the App does — through the public posting API — and names nothing private to it.
     func testTheInventoryEngineIsNamedOnlyByTheInventoryPagesModelAndItsComposition() throws {
         let model = "SoloLedger/App/AppModel.swift"
         let composition = "SoloLedger/App/InventoryPageComposition.swift"
+        let opening = "SoloLedgerCore/Inventory/InventoryOpeningPlan.swift"
         let expected: [String: [String]] = [
             "InventoryPostedMovement":    [model, composition],
             "InventoryBalance":           [model, composition],
             "InventoryMovementType":      [model, composition],
             "InventoryException":         [model, composition],
-            "InventoryPostingError":      [model, composition],
+            "InventoryPostingError":      [model, composition, opening],
             "InventoryExceptionKind":     [composition],
-            "InventoryPostingRequest":    [composition],
+            "InventoryPostingRequest":    [composition, opening],
             "InventoryMovementDirection": [],
             "InventoryPosting":           [],
             "InventoryPostingContext":    [],
@@ -371,9 +377,9 @@ final class InventoryLedgerTests: LedgerTestCase {
             "InventoryOriginFacts":       [],
             "inventoryBalance":           [model],
             "inventoryMovements":         [model],
-            "liveInventoryMovements":     [model],
+            "liveInventoryMovements":     [model, opening],
             "inventoryExceptions":        [model],
-            "postInventoryMovement":      [model],
+            "postInventoryMovement":      [model, opening],
             "reverseInventoryMovement":   [model],
         ]
         var found: [String: [String]] = [:]
@@ -399,8 +405,8 @@ final class InventoryLedgerTests: LedgerTestCase {
                 missing:    \(Set(paths).subtracting(found[symbol] ?? []).sorted())
                 """)
         }
-        // No view names the engine, and no file outside the two above does either.
-        XCTAssertEqual(Set(found.values.flatMap { $0 }), [model, composition])
+        // No view names the engine, and no file outside the three above does either.
+        XCTAssertEqual(Set(found.values.flatMap { $0 }), [model, composition, opening])
     }
 
     /// The scan must actually read files and must be able to see a use, or an empty offender list
