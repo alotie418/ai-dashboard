@@ -791,3 +791,15 @@
 "inventory.opening.done.message" = "각 수량과 금액이 이제 해당 품목의 첫 번째 입출고입니다. 전환일 이후의 일은 여기서 계속 기록하세요.";
 "inventory.opening.partial.title" = "일부 기초 재고가 기록되지 않았습니다";
 "inventory.opening.partial.message" = "{count}개 품목은 기록되지 않았습니다. 사유는 거부된 행 옆에 표시되며 해당 품목은 변경되지 않았습니다. 나머지는 기록되었습니다.";
+
+/* d1-2 개요 페이지 전월 대비·전년 동월 대비 블록(10개 키, 휴면: 이번 라운드에서는 아무도 그리지 않음) */
+"overview.metrics.title" = "전월 대비·전년 동월 대비";
+"overview.metrics.revenue" = "매출";
+"overview.metrics.mom" = "전월 대비";
+"overview.metrics.yoy" = "전년 동월 대비";
+"overview.metrics.momCaption" = "직전 달과 비교";
+"overview.metrics.yoyCaption" = "작년 같은 달과 비교";
+"overview.metrics.basisNote" = "두 항목은 매출로 계산합니다. 각 거래는 세금 제외 금액이 기록되어 있으면 그 금액을, 없으면 전액을 반영합니다. 해당 거래에 「세전 금액」을 입력하면 이 블록의 기준이 일치합니다. 위의 「월별 수입·지출」은 수입·지출 합계로 세금 포함이므로 기준이 달라 그대로 비교할 수 없습니다.";
+"overview.metrics.noBaseNote" = "기준 기간에 데이터가 없거나 0이면 0.0%로 표시하지 않고 비워 둡니다. 비교할 대상이 없는데 비율을 내면 오해를 부르기 때문입니다.";
+"overview.metrics.empty.title" = "아직 비교할 수 없습니다";
+"overview.metrics.empty.message" = "전월 대비에는 최소 두 달치 거래가 필요하며, 전년 동월 대비에는 작년 같은 달의 데이터도 필요합니다.";
