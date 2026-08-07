@@ -33,11 +33,12 @@ import SoloLedgerCore
 /// `ReportFormat.money`, whose two fixed decimals would flatten a three-decimal quantity and a
 /// four-decimal average.
 ///
-/// ## Nothing constructs `InventoryView` yet
+/// ## `InventoryView` is constructed once, by the detail switch
 ///
-/// This stage lands the page compiled, tested and unreachable: no `SidebarSection` case, no
-/// `RootView` branch, and `InventoryMountingTests` asserts the absence of every construction
-/// site. The sidebar entry is a later stage.
+/// N-PR-6 gave the page its `SidebarSection` case and its `RootView` branch — one enum case
+/// serving both the sidebar list and the menu-bar picker — and `InventoryMountingTests` pins
+/// that single construction site. Until it existed the page shipped compiled, tested and
+/// unreachable, which is why every intermediate `main` shipped the product unchanged.
 enum InventoryPageComposition {
 
     // MARK: - Regions

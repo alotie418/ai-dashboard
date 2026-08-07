@@ -3,7 +3,7 @@ import XCTest
 import SoloLedgerCore
 
 /// N-PR-5b — what the opening-stock wizard puts on each of its states, what it refuses to say,
-/// and the fact that nothing can open it yet.
+/// and the fact that the inventory page is the only thing that can open it.
 ///
 /// XCUITest is not available here, so "is it on screen" is answered structurally: the sheet is
 /// built from ``InventoryOpeningComposition`` and nothing else, and `InventoryOpeningView.swift`
@@ -244,15 +244,16 @@ final class InventoryOpeningWizardTests: XCTestCase {
     }
 
     // ==============================================================================================
-    // MARK: - IW8 — the wizard is reachable from the page, and the page from nowhere
+    // MARK: - IW8 — the wizard is reachable from the page, and the page from the sidebar
     // ==============================================================================================
 
-    func testIW8TheWizardIsMountedOnceByThePageAndThePageByNobody() throws {
+    func testIW8TheWizardIsMountedOnceByThePageAndThePageOnceByTheDetailSwitch() throws {
         let sources = try Self.appSources()
         XCTAssertGreaterThan(sources.count, 10, "the scan must have seen the app target")
 
-        XCTAssertEqual(Self.mentions(of: "InventoryView(", in: sources), [],
-                       "the inventory page must still be constructed nowhere")
+        XCTAssertEqual(Self.mentions(of: "InventoryView(", in: sources),
+                       ["Views/RootView.swift"],
+                       "the inventory page is constructed once, by the detail switch")
         XCTAssertEqual(Self.mentions(of: "InventoryOpeningView(", in: sources),
                        ["Views/InventoryView.swift"],
                        "the wizard is mounted exactly once, by the page it belongs to")
@@ -269,12 +270,15 @@ final class InventoryOpeningWizardTests: XCTestCase {
                        ["App/AppModel.swift", "App/InventoryOpeningComposition.swift",
                         "App/InventoryOpeningState.swift"])
 
-        // The route's two halves are still absent: mounting the wizard inside an unreachable page
-        // leaves the whole chain unreachable, which is what this stage ships.
+        // The route's two halves, both present since N-PR-6. Restated here rather than left to
+        // `InventoryMountingTests`: this suite's proposition is that the wizard reaches the user
+        // through the page and through nothing else, and that claim is only worth anything while
+        // the page itself has exactly one route.
         let root = try Self.appSource("Views/RootView.swift")
-        XCTAssertEqual(Self.occurrences(of: "case .inventory", inCodeOf: root), 0)
+        XCTAssertEqual(Self.occurrences(of: "case .inventory", inCodeOf: root), 1)
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
-                       ["overview", "transactions", "categories", "products", "reports"])
+                       ["overview", "transactions", "categories", "products", "inventory",
+                        "reports"])
 
         XCTAssertEqual(Self.mentions(of: "InventoryOpeningView(",
                                      in: [("X.swift", "  InventoryOpeningView()")]), ["X.swift"])

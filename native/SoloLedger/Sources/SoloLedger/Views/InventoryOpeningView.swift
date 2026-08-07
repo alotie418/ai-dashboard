@@ -8,9 +8,9 @@ import SoloLedgerCore
 /// legacy-conversion wizard has, and for the same reason.
 ///
 /// **Nothing outside `InventoryView` constructs this**, and `InventoryView` itself is constructed
-/// by nobody — the sidebar has no case for the inventory page and the detail switch has no branch.
-/// So the whole chain is unreachable, which is what this stage ships. `InventoryMountingTests`
-/// asserts both halves of that.
+/// exactly once — by the `.inventory` branch of the split view's detail switch, since N-PR-6. So
+/// the sheet has one mount and the page one route, and `InventoryMountingTests` asserts both
+/// halves of that. Before that branch existed the whole chain was unreachable.
 ///
 /// Every key comes from ``InventoryOpeningComposition``; there is not one literal in the copy's
 /// namespace in this file. The accessibility identifiers are spelled `inventoryOpening.…` rather
