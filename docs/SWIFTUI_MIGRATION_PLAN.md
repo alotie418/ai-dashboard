@@ -29,6 +29,10 @@
 
 ### 0.2 发布前 P0：DMG（非沙箱）用户数据当前不可达
 
+> **状态更新（2026-08-07）：本节所述缺口已闭合，以下原文保留为写作时的记录。**
+> N7.2 已上线并测试：`MigrationSourceChoiceView` → 目录选择器 → `.migrateFromUserDir(.userSelectedDataDir)` 全链路接线，`.userSelectedDataDir` 不再是零调用方。
+> 因此本节的「当前不可达」「发布前 P0」与 §8 风险表对应行均已过时；现状以 `SWIFTUI_FEATURE_GAP.md` §4「DMG（非沙箱）用户数据迁移入口」行为准（其中已注明「原 🛑 P0 标记已过时」）。
+
 `.userSelectedDataDir(URL)` 这个来源**管道齐备**（路径解析、`MigrationCoordinator.runImport(source:)` 接受它），但**零生产调用方**，也没有任何目录选择入口（`FilePanels.swift` 只有 CSV / `.db` 文件 / 诊断的选择器，无 `canChooseDirectories` 的目录选择器）。
 
 - **Electron MAS 版**数据在共享沙箱容器内，`.masContainer` 已能自动迁移。
@@ -546,7 +550,7 @@ Phase 1 **完整翻译 zh-Hans + en**；架构上**声明全部 6 语言**（`.l
 | **会计敏感性**：原生**镜像**而非**重造**税务/COGS/报表逻辑 | 高 | 中 | Phase 1 **故意排除**报表/税务/COGS（CLAUDE.md 要求）；任何会计公式须会计师确认后才实现 |
 | 生成列 / TEXT tax_rate 等既定不一致被「顺手修正」 | 中 | 中 | §4.5 明确「照抄不修正」；guard 测试锁定 |
 | 误触 / 损坏生产账本 | 高 | 低 | **状态更新（§0）**：生产 App 现在会开库真实活动库，但仅经 C12 协调器授权 + C12x hardened open（NOFOLLOW / HAS_MOVED / 身份指纹 / 独占 reservation）+ fail-closed 迁移；失败从不用空库遮盖 |
-| **DMG（非沙箱）用户数据不可达（发布前 P0）** | 高 | 高（确定存在） | `.masContainer` 只覆盖 Electron-MAS 容器；DMG 数据在容器外的 `~/Library/Application Support/SoloLedger/`，MAS 沙箱无授权够不到。`.userSelectedDataDir` 管道齐备但无 UI 入口。须 N7（先设计经确认）在 createFresh **之前**加 single-grant-window 目录授权，不加 bookmark entitlement。见 §0.2 / §0.3 |
+| ~~**DMG（非沙箱）用户数据不可达（发布前 P0）**~~ **已闭合（N7.2）** | 高 | ~~高（确定存在）~~ 已消除 | `.masContainer` 只覆盖 Electron-MAS 容器；DMG 数据在容器外的 `~/Library/Application Support/SoloLedger/`，MAS 沙箱无授权够不到。`.userSelectedDataDir` 管道齐备但无 UI 入口。须 N7（先设计经确认）在 createFresh **之前**加 single-grant-window 目录授权，不加 bookmark entitlement。见 §0.2 / §0.3 |
 
 > 关于会计敏感性的红线：原生版**不得发明会计政策**。CLAUDE.md 明列不可擅改的清单（`electron/reports/*`、税率默认值、所得税 / VAT / GST / 销售税公式、COGS、`_expenseSplit`、库存成本、加权平均成本、资产负债 / 现金流公式等）。Phase 1 通过**不实现报表**来规避这类风险；后续实现时须先只读分析并经会计师 / 用户确认。
 

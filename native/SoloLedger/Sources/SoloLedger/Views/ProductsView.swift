@@ -3,10 +3,11 @@ import SoloLedgerCore
 
 /// The products / service-items page — master data only.
 ///
-/// **Nothing constructs this view yet.** The sidebar has no case for it and the detail switch
-/// has no branch, so this stage ships the page compiled, tested and unreachable, exactly as the
-/// report page did before its own activation. `ProductMountingTests` asserts the absence of
-/// every construction site by scanning the tree.
+/// **Reached from the `.products` sidebar section** (2b-A4) through the split view's detail
+/// switch — one enum case serving both the sidebar list and the menu-bar picker. The entry point
+/// was a separate change, deliberately: until that case existed this page was compiled, tested
+/// and unreachable, exactly as the report page was before its own activation.
+/// `ProductMountingTests` pins the single construction site by scanning the tree.
 ///
 /// Every key drawn below comes from ``ProductPageComposition``: the subviews take their slice of
 /// that value and render exactly what the slice names. There is not one `product.*` literal in
@@ -38,7 +39,7 @@ struct ProductsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .navigationTitle(model.t(page.titleKey))
         // Lazy on purpose: the catalogue is read when this page appears and never as part of
-        // the app-wide refresh, so an unreachable page costs no query.
+        // the app-wide refresh, so a session that never opens this page pays no query for it.
         .task { model.reloadProducts() }
         .confirmationDialog(deleteTitle(page.delete), isPresented: Binding(
             get: { page.delete != nil },
@@ -110,7 +111,7 @@ private struct ProductPageHeader: View {
 
 // MARK: - The refusal
 
-/// One of six sentences, and never anything else. The store's own words cannot get here:
+/// One of seven sentences, and never anything else. The store's own words cannot get here:
 /// `ProductCatalogError` has no associated values to print.
 private struct ProductErrorBanner: View {
     @EnvironmentObject var model: AppModel

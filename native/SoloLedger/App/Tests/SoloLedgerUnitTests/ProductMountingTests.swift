@@ -2,8 +2,8 @@ import XCTest
 @testable import SoloLedger
 import SoloLedgerCore
 
-/// Stage 2b-A3 — where the products page puts things, what it refuses to say, and the fact that
-/// nothing can open it yet.
+/// Stage 2b-A3 — where the products page puts things, what it refuses to say, and the single
+/// route that opens it (2b-A4).
 ///
 /// XCUITest is not available here (the runner hangs enabling automation mode in a headless
 /// session), so "is it on screen" is answered structurally: the page is built from
@@ -272,7 +272,7 @@ final class ProductMountingTests: XCTestCase {
     }
 
     // ==============================================================================================
-    // MARK: - PM8 — the page is not reachable, from anywhere
+    // MARK: - PM8 — the page is reachable, by exactly one route
     // ==============================================================================================
 
     /// 2b-A3 asserted NONE. 2b-A4 makes the page reachable, so this becomes exactly ONE — the
@@ -358,10 +358,11 @@ final class ProductMountingTests: XCTestCase {
             XCTAssertFalse(source.contains("ProgressView"), "\(relative) must not show a spinner")
             XCTAssertFalse(source.contains("/*"), "\(relative): block comments hide code from the guards")
         }
-        // And the view really does hold no copy of its own — not one of the forty, and not any
-        // other literal in that namespace either. The wider form is the one that matters: an
-        // accessibility identifier written as `"product.form.isService"` IS one of the forty, and
-        // reads to every scanner as the view having grown its own source of strings.
+        // And the view really does hold no copy of its own — not one of the forty-one, and not
+        // any other literal in that namespace either. The wider form is the one that matters: an
+        // accessibility identifier written as `"product.form.isService"` IS one of the
+        // forty-one, and reads to every scanner as the view having grown its own source of
+        // strings.
         let view = try Self.appSource("Views/ProductsView.swift")
         for key in ProductPageComposition.placement.keys {
             XCTAssertFalse(view.contains("\"\(key)\""), "ProductsView names \(key) directly")

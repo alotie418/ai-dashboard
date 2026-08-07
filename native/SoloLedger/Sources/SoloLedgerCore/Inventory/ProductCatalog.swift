@@ -7,8 +7,10 @@ import Foundation
 /// slice and is blocked pending accountant confirmation of its four accounting choices. Nothing
 /// in this file reads or writes any other table, joins anything, or produces a total.
 ///
-/// Nothing in this file is reachable from the App target yet — the read/write layer lands
-/// before the copy and the view, and a test asserts the absence of every construction site.
+/// Reached from the App target since 2b-A3: the model holds the catalogue page and the refusal
+/// case, and drives create / update / delete through the `LedgerStore` extension below. The
+/// read/write layer landed before the copy and the view, which is why this file shipped for two
+/// stages with no caller at all.
 ///
 /// Mirror boundaries worth stating once, because they are decisions and not oversights:
 ///

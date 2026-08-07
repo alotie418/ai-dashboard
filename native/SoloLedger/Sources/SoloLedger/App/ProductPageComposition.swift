@@ -6,8 +6,8 @@ import SoloLedgerCore
 /// ## Why this exists
 ///
 /// The same reason `ReportPageComposition` and `LegacyConversionComposition` do: the claims
-/// that matter here — that all forty adjudicated strings have a render that uses them, that a
-/// refusal reaches the screen as one of six sentences and never as the driver's own words,
+/// that matter here — that all forty-one adjudicated strings have a render that uses them, that a
+/// refusal reaches the screen as one of seven sentences and never as the driver's own words,
 /// that the "records that could not be read" notice appears on exactly the ledgers that have
 /// such records — have to be provable without driving the UI, and XCUITest cannot run in a
 /// headless session.
@@ -26,9 +26,11 @@ import SoloLedgerCore
 /// fourteen new keys. The map is therefore `[String: Set<Region>]`, and everything that reads
 /// it — the closure test, the region-coverage test, the same-slot ambiguity test — reads a set.
 ///
-/// Nothing constructs `ProductsView` yet: this stage lands the page compiled, tested and
-/// unreachable, and `ProductMountingTests` asserts the absence of every construction site.
-/// The sidebar entry is the next stage.
+/// `ProductsView` is constructed once, by the detail switch: 2b-A4 gave the page its
+/// `SidebarSection` case and its `RootView` branch — one enum case serving both the sidebar list
+/// and the menu-bar picker — and `ProductMountingTests` pins that single construction site.
+/// Until it existed the page shipped compiled, tested and unreachable, which is why every
+/// intermediate `main` shipped the product unchanged.
 enum ProductPageComposition {
 
     // MARK: - Regions
