@@ -62,7 +62,8 @@ xcodegen generate
 
 ```bash
 swift build     # builds SoloLedgerCore
-swift test      # 31 XCTest: schema / seed / CRUD / CSV round-trip
+swift test      # SoloLedgerCore 的 XCTest 套件：schema / seed / CRUD / CSV round-trip /
+                # 报表镜像 parity / 库存引擎性质测试
 ```
 
 ## Safety / scope
@@ -70,8 +71,11 @@ swift test      # 31 XCTest: schema / seed / CRUD / CSV round-trip
 - **Never writes the production database.** Uses an isolated file at
   `Application Support/SoloLedgerNativePreview/sololedger.db` (or the sandbox
   container), never the Electron app's `Application Support/SoloLedger/sololedger.db`.
-- Schema + migrations are a faithful port of `electron/db/index.js` (`user_version`
-  reaches 23, all 26 tables), so a file this app creates is schema-compatible.
+- Schema + migrations are a faithful port of `electron/db/index.js` up to `user_version`
+  23, so a file this app creates is schema-compatible with the Electron app. From v24 the
+  ladder is native-only (the three inventory tables): the Electron app still opens such a
+  file and still reads and writes its v23 tables, so the two inventory fact sources would
+  diverge silently — see `docs/SWIFTUI_FEATURE_GAP.md` for the three measured facts.
 - **No AI, no API key, no OCR, no network, no StoreKit, no paid unlock.** Entitlements
   are only App Sandbox + user-selected file read/write (Debug also has get-task-allow
   for the debugger / UI-test runner).

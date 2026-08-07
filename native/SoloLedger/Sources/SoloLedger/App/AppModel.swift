@@ -437,10 +437,11 @@ final class AppModel: ObservableObject {
                 case .boot: return coordinator.bootResolve(autoSourceCandidate: auto)
                 case .acknowledgement(let ack): return coordinator.bootResolve(autoSourceCandidate: auto, acknowledgement: ack)
                 case .selection(let id): return coordinator.resolveSelectedImport(importID: id)
-                // N7.1 DORMANT mappings — no UI emits these intents until N7.2. The confirmed
-                // create-fresh goes to the coordinator's dedicated strong-typed entry (which
-                // takes NO auto candidate by construction); an explicit user source goes 1:1
-                // to `runImport`, never mixed with the auto candidate.
+                // The two intents the source-choice screen emits since N7.2 (they landed dormant
+                // in N7.1, one stage before any UI could emit them). The confirmed create-fresh
+                // goes to the coordinator's dedicated strong-typed entry (which takes NO auto
+                // candidate by construction); an explicit user source goes 1:1 to `runImport`,
+                // never mixed with the auto candidate.
                 case .confirmCreateFresh: return coordinator.confirmCreateFresh()
                 case .migrateFromUserDir(let source): return coordinator.runImport(source: source)
                 }
@@ -1146,15 +1147,14 @@ final class AppModel: ObservableObject {
                                                 isDirectory: true)
     }
 
-    // MARK: - Products / service items (2b-A3 page state; nothing reaches this page yet)
+    // MARK: - Products / service items (2b-A3 page state; reachable from the sidebar since 2b-A4)
 
     /// The product catalogue as last read, together with the rows that could not be decoded.
     ///
     /// Loaded LAZILY — `ProductsView` asks for it when it appears, and `reloadAll()` deliberately
-    /// does not. Until the sidebar gains its entry there is no way to open that page, and a
-    /// query nobody can see the result of should not be run on every refresh of every other
-    /// screen. It also keeps this stage's shipped behaviour byte-for-byte identical to the
-    /// stage before it.
+    /// does not. A session that never opens that page must not pay for its query on every refresh
+    /// of every other screen. Before 2b-A4 gave the sidebar its entry, the same laziness also kept
+    /// each intermediate `main` byte-for-byte identical to the one before it.
     @Published private(set) var products = ProductCatalogPage(products: [], unreadableCount: 0)
 
     /// The last refused write, as a case and never as text. `ProductCatalogError` has no

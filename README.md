@@ -29,7 +29,7 @@ SoloLedger 是一个**经营管理估算工具**,帮助小微经营者把日常�
 |---|---|---|
 | **GitHub 直分发 DMG**(Developer ID) | ✅ **1.0.0 已发布**(2026-07-08) | **已签名 + 已公证 + 已 staple** 的 Apple Silicon 构建,离线可通过 Gatekeeper。见 [Releases](https://github.com/alotie418/ai-dashboard/releases) 与 [`CHANGELOG.md`](CHANGELOG.md) |
 | **Mac App Store(MAS)构建** | 🟡 构建配置已就绪,**上架状态本文件不做断言** | 独立配置 `electron-builder.mas.yml`(App Sandbox + provisioning profile),与 DMG 线的签名方式不同。审核/上架进度不在仓库内可查证,见 [`docs/MAS_SUBMISSION.md`](docs/MAS_SUBMISSION.md) |
-| **原生 SwiftUI 重写版**(`native/SoloLedger`) | 🚧 **开发中,未发布** | 与上面两条线并行的重写,尚不可供用户使用。当前进度:报表引擎镜像 R0–R5 已合并,R6–R8 未开工,见 [`docs/SWIFTUI_REPORTS_MIRROR_PLAN.md`](docs/SWIFTUI_REPORTS_MIRROR_PLAN.md) |
+| **原生 SwiftUI 重写版**(`native/SoloLedger`) | 🚧 **开发中,未发布** | 与上面两条线并行的重写,尚不可供用户使用。当前进度:报表引擎镜像 R2–R8 已全线合并并激活入口,原生库存引擎与库存页已上线(N 章 #452–#458),见 [`docs/SWIFTUI_REPORTS_MIRROR_PLAN.md`](docs/SWIFTUI_REPORTS_MIRROR_PLAN.md) |
 
 下文的功能与技术栈描述,除非另有说明,均指**已发布的 Electron 桌面版**。
 
@@ -182,7 +182,7 @@ npm run test:locale-ui        # vite build + Playwright 六语言界面验收
 - `npm run test:locale-ui`(`playwright.config.ts` → `e2e/`)——**界面层**验收,Playwright 驱动 vite preview,`electronAPI` 被 mock,不启动 Electron 运行时。
 - `npm run test:electron`(`playwright.electron.config.ts` → `e2e-electron/`)——**真主进程**验收,经 `_electron.launch` 启动真实 Electron,走真实 IPC 路由与真实 better-sqlite3(附件 IPC、附件文件系统、备份恢复闭环)。它需要 better-sqlite3 按 **Electron ABI** 重建,与守卫脚本所需的 node ABI 相反,因此**有意不并入 `check:all`**。
 
-> CI 现状(`.github/workflows/ci.yml`,仓库唯一 workflow):守卫 + 迁移测试 + 构建、界面 e2e、报表黄金可复现三个 job 在 **PR 与 push 到 `main`** 时自动运行（feature 分支的 push 不触发);**真 Electron e2e 有独立 job,但目前仅 `workflow_dispatch` 手动触发**,尚未放开到每次 PR。所以"真 Electron e2e 存在"与"每次 PR 都跑"是两回事——前者成立,后者不成立。
+> CI 现状(`.github/workflows/ci.yml`,仓库唯一 workflow):守卫 + 迁移测试 + 构建、界面 e2e、报表黄金可复现、原生 SwiftUI(xcodebuild 单测)四个 job 在 **PR 与 push 到 `main`** 时自动运行（feature 分支的 push 不触发),这四个也就是 `main` 的四项必需检查;**真 Electron e2e 有独立 job,但目前仅 `workflow_dispatch` 手动触发**,尚未放开到每次 PR。所以"真 Electron e2e 存在"与"每次 PR 都跑"是两回事——前者成立,后者不成立。
 
 ---
 

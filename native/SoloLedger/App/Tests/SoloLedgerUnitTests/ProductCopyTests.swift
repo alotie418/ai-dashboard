@@ -2,8 +2,8 @@ import XCTest
 @testable import SoloLedger
 import SoloLedgerCore
 
-/// Stage 2b-A2 — the forty `product.*` strings the products page will need, landed in all six
-/// languages and reachable by nothing.
+/// Stage 2b-A2 — the forty-one `product.*` strings the products page needs, landed in all six
+/// languages one stage before anything could reach them.
 ///
 /// ## What this file adds, given how much the tree already guards
 ///
@@ -13,16 +13,18 @@ import SoloLedgerCore
 /// what this stage can actually get wrong:
 ///
 ///  * **A miscount.** Key parity is satisfied by all six locales missing the same key. Only an
-///    absolute count catches "the adjudicated table said forty and thirty-nine landed".
-///  * **An unmapped case.** `ProductCatalogError` has six cases and `ProductUnit` eleven; a copy
+///    absolute count catches "the adjudicated table said forty-one and forty landed".
+///  * **An unmapped case.** `ProductCatalogError` has seven cases and `ProductUnit` eleven; a copy
 ///    set that is internally consistent but one short of either is invisible to every parity
 ///    check in the tree. Both are asserted in BOTH directions.
 ///  * **A quiet re-translation.** The eleven unit names are not new wording — they are the labels
 ///    the Electron app has been showing for these same keys. Re-typing them here would fork a
 ///    vocabulary that nothing would ever reconcile, so they are compared against that table.
 ///  * **A claim the app cannot keep.** Electron says service items *are* excluded from inventory.
-///    This app has no inventory yet, so the present tense would be false; the copy says *will be*
-///    and a ratchet keeps the retired sentences out.
+///    When this copy landed the app had no inventory, so the present tense would have been false;
+///    the copy says *will be* and a ratchet keeps the retired sentences out. The N chapter has
+///    since shipped the engine, but the wording is deliberately unchanged: whether a service item
+///    is excluded is an accounting decision this round does not make.
 ///  * **Reachability.** 2b-A2's whole contract is that the copy lands dormant — the view, the
 ///    composition and the error mapping are 2b-A3.
 ///
@@ -349,7 +351,7 @@ final class ProductCopyTests: XCTestCase {
 
     // MARK: - P12 · exactly one file names the copy
 
-    /// 2b-A2 landed these forty strings dormant and this test asserted nobody named them. 2b-A3
+    /// 2b-A2 landed these forty-one strings dormant and this test asserted nobody named them. 2b-A3
     /// gives them a page, so the assertion becomes a CLOSED SET rather than an empty one: every
     /// key is named by `ProductPageComposition.swift` and by nothing else.
     ///

@@ -157,9 +157,9 @@ jobs:
   # runner 打开 automation mode，实测在无 GUI 会话下会挂住（2026-07-21：GUI 会话 12/12
   # 通过，headless 超时）。UITests 是否能进 CI 另开探索性 job 验证，不在本 job 范围内。
   #
-  # 本 job 暂不进 required checks —— 按 CLAUDE.md「Required status checks」，workflow
-  # 必须先合入 main 并在 main 上跑成功，之后才配置为必需；反过来会让每个 PR 永久卡在
-  # "Expected"。
+  # 本 job 已在 required checks 内（四项之一，与 checks / e2e / report-goldens 并列）。
+  # 它是按 CLAUDE.md「Required status checks」的顺序落地的：workflow 先合入 main、在
+  # main 上跑成功，之后才配置为必需；反过来会让每个 PR 永久卡在 "Expected"。
   #
   # 不做 paths 过滤，与 report-goldens 同理：一个被路径过滤掉的必需检查根本不会上报。
   native-app:

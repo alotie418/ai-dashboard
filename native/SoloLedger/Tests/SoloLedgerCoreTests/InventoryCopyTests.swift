@@ -3,10 +3,10 @@ import XCTest
 
 /// The `inventory.*` six-language copy — 93 keys plus `nav.inventory`.
 ///
-/// Two rounds landed it. N-PR-3 wrote the 68 the inventory PAGE draws; N-PR-4 gave those a
-/// composition, so IC11 now holds them to exactly one file. N-PR-5a adds the 25 the opening-stock
-/// WIZARD will draw, and those are still DORMANT — the wizard's plan, its composition and its view
-/// are N-PR-5b, and `nav.inventory` waits for N-PR-6.
+/// Four rounds landed it. N-PR-3 wrote the 68 the inventory PAGE draws; N-PR-4 gave those a
+/// composition, so IC11 now holds them to exactly one file. N-PR-5a added the 25 the opening-stock
+/// WIZARD draws, N-PR-5b built that wizard's plan, composition and view, and N-PR-6 gave the page
+/// its sidebar entry — which is what `nav.inventory` had been waiting for.
 ///
 /// ## Why this namespace could not be borrowed
 ///
@@ -69,7 +69,7 @@ final class InventoryCopyTests: XCTestCase {
             + errorKeys + emptyKeys + reverseKeys + exceptionKeys
     }
 
-    // MARK: - The wizard's table (N-PR-5a, dormant)
+    // MARK: - The wizard's table (N-PR-5a; drawn by the wizard since N-PR-5b)
 
     /// The opening-stock wizard's entry point, on the inventory page's header beside the control
     /// that opens the movement panel.
