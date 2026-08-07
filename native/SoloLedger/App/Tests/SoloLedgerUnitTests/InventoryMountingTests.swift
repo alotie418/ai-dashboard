@@ -3,7 +3,7 @@ import XCTest
 import SoloLedgerCore
 
 /// N-PR-4 — where the inventory page puts things, what it refuses to say, what it computes out of
-/// the engine's integers, and the fact that nothing can open it yet.
+/// the engine's integers, and the single route that opens it (N-PR-6).
 ///
 /// XCUITest is not available here (the runner hangs enabling automation mode in a headless
 /// session), so "is it on screen" is answered structurally: the page is built from
@@ -437,21 +437,23 @@ final class InventoryMountingTests: XCTestCase {
     }
 
     // ==============================================================================================
-    // MARK: - IM8 — the page is not reachable, from anywhere
+    // MARK: - IM8 — the page is reachable, by exactly one route
     // ==============================================================================================
 
-    /// This stage lands the page compiled, tested and DORMANT: no construction site at all, which
-    /// is the shape `ProductsView` had before its own activation. The sidebar entry and the detail
-    /// branch are a later round, and this fails the moment either appears without its own test.
-    func testIM8TheInventoryPageIsConstructedNowhereAtAll() throws {
+    /// N-PR-4 asserted NONE. N-PR-6 makes the page reachable, so this becomes exactly ONE — the
+    /// shape `ProductsView`'s PM8 has had since 2b-A4 and `ReportsView`'s D19 since P3e.
+    ///
+    /// Split in two, each carrying its own proposition rather than two restatements of one: the
+    /// route half is here, the sidebar half is `IM8b` below.
+    func testIM8TheInventoryPageIsConstructedExactlyOnceAndByTheDetailSwitch() throws {
         let sources = try Self.appSources()
         XCTAssertGreaterThan(sources.count, 10, "the scan must have seen the app target")
-        XCTAssertEqual(Self.mentions(of: "InventoryView(", in: sources), [],
-                       "nothing may construct the inventory page yet")
-        // The wizard IS constructed — by the page, once. That does not make it reachable: the page
-        // itself is constructed by nobody, so the whole chain is still dormant. Mounting the sheet
-        // inside the page is what makes it one mount rather than a second entry point to keep in
-        // step, and the assertion above is what keeps the chain broken at the top.
+        XCTAssertEqual(Self.mentions(of: "InventoryView(", in: sources),
+                       ["Views/RootView.swift"],
+                       "the inventory page must be constructed exactly once, by the detail switch")
+        // The wizard is constructed by the page, once. Mounting the sheet inside the page is what
+        // makes it one mount rather than a second entry point to keep in step — and now that the
+        // page has a route of its own, that single mount is what carries the wizard to the user.
         XCTAssertEqual(Self.mentions(of: "InventoryOpeningView(", in: sources),
                        ["Views/InventoryView.swift"],
                        "the wizard is mounted exactly once, by the page it belongs to")
@@ -469,23 +471,50 @@ final class InventoryMountingTests: XCTestCase {
         XCTAssertEqual(Self.mentions(of: "InventoryFormDraft", in: sources),
                        ["App/AppModel.swift", "App/InventoryPageComposition.swift"])
 
-        // The route's two halves, both still absent.
+        // …and that one construction is the `.inventory` branch, not a stray call elsewhere in
+        // the file. Both counts are asserted: the branch text pins WHERE, the bare needle pins
+        // that there is no second call the branch text would not have seen.
         let root = try Self.appSource("Views/RootView.swift")
-        XCTAssertEqual(Self.occurrences(of: "case .inventory", inCodeOf: root), 0)
-        XCTAssertEqual(Self.occurrences(of: "InventoryView(", inCodeOf: root), 0)
-        XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
-                       ["overview", "transactions", "categories", "products", "reports"],
-                       "the sidebar is untouched by this round")
+        XCTAssertEqual(Self.occurrences(of: "case .inventory: InventoryView()", inCodeOf: root), 1,
+                       "the one call site must be the `.inventory` branch of the detail switch")
+        XCTAssertEqual(Self.occurrences(of: "case .inventory", inCodeOf: root), 1)
+        XCTAssertEqual(Self.occurrences(of: "InventoryView(", inCodeOf: root), 1)
 
         // The scanner is proved on synthetic text: a hit that is really there, one that is only a
         // comment, and a longer identifier that must not match.
         XCTAssertEqual(Self.mentions(of: "InventoryView(",
                                      in: [("X.swift", "  InventoryView()")]), ["X.swift"])
         XCTAssertEqual(Self.mentions(of: "InventoryView(",
-                                     in: [("X.swift", "  // InventoryView() lands later")]), [])
+                                     in: [("X.swift", "  // InventoryView() in a comment")]), [])
         XCTAssertEqual(Self.mentions(of: "InventoryView(",
                                      in: [("X.swift", "  InventoryViewModel()")]), [],
                        "whole-prefix matching only")
+    }
+
+    /// The sidebar half of the route, and its own proposition: the case exists, in the adjudicated
+    /// position, and carries the copy key the enum's own convention implies.
+    ///
+    /// Position is asserted as an ORDERED list because it is what the user sees: the sidebar list
+    /// and the menu-bar picker both iterate `allCases` in declaration order, so one case is both
+    /// entry points at once.
+    ///
+    /// The icon is pinned as a LITERAL, and this is the one place the inventory entry departs from
+    /// `ProductMountingTests` PM8b: that test pins the sidebar symbol equal to the products page's
+    /// own empty state. This page's empty state draws `tray.full` — the empty shelf — while the
+    /// sidebar symbol is adjudicated separately (N1 §7.1). Asserting them equal would state
+    /// something false, so what is pinned here is the adjudicated value itself.
+    ///
+    /// The label behind `titleKey` is owned elsewhere: `InventoryCopyTests` IC13 proves it resolves
+    /// in six languages, equals the page's own title verbatim, and reads unlike every other sidebar
+    /// row — which is why there is no six-language loop here.
+    func testIM8bTheSidebarCarriesTheInventoryEntryInItsAdjudicatedPlace() {
+        XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
+                       ["overview", "transactions", "categories", "products", "inventory",
+                        "reports"],
+                       "stock reads after the products it counts; reports stay last")
+        XCTAssertEqual(SidebarSection(rawValue: "inventory"), .inventory)
+        XCTAssertEqual(SidebarSection.inventory.titleKey, "nav.inventory")
+        XCTAssertEqual(SidebarSection.inventory.systemImage, "shippingbox.and.arrow.backward")
     }
 
     // MARK: - IM9 — no spinner, no comment the scanners cannot see, no copy of its own

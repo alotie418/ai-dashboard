@@ -9,6 +9,9 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     /// Master data, next to the categories it sits beside conceptually. Reports stay last:
     /// they are the output of everything above them.
     case products
+    /// The stock those products carry, so it reads straight after the master data it counts
+    /// and before the reports that summarise everything above.
+    case inventory
     case reports
     var id: String { rawValue }
     var titleKey: String { "nav.\(rawValue)" }
@@ -20,6 +23,12 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         // The same symbol the products page's own empty state uses, so the sidebar row and
         // the page it opens are one visual thing.
         case .products: return "shippingbox"
+        // Adjudicated, rather than derived from the page the way the row above is: the
+        // inventory page's empty state draws `tray.full`, which is the empty SHELF and would
+        // say nothing about movement here. This is the products box carrying an arrow —
+        // recognisably the same goods as the row above, and recognisably not a second
+        // products row.
+        case .inventory: return "shippingbox.and.arrow.backward"
         case .reports: return "doc.text.magnifyingglass"
         }
     }
@@ -1262,13 +1271,13 @@ final class AppModel: ObservableObject {
         return true
     }
 
-    // MARK: - Inventory (N-PR-4 page state; nothing reaches this page yet)
+    // MARK: - Inventory (N-PR-4 page state; reachable from the sidebar since N-PR-6)
 
     /// The products a movement can be recorded against.
     ///
-    /// Loaded LAZILY, for the same two reasons the catalogue above is: until the sidebar gains
-    /// its entry there is no way to open that page, and the reads behind it are heavier — a
-    /// product's whole movement history, with no paging under it.
+    /// Loaded LAZILY rather than with the app-wide refresh, for two reasons: the page is one
+    /// section of six and a session that never opens it must not pay for it, and the reads
+    /// behind it are heavier — a product's whole movement history, with no paging under it.
     ///
     /// Rows that could not be decoded are not here and are not counted here. An undecodable row
     /// is not something a movement can be recorded against, and the one page that reports such
@@ -1470,7 +1479,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    // MARK: - Opening-stock wizard (N-PR-5b; nothing reaches it yet)
+    // MARK: - Opening-stock wizard (N-PR-5b; reached from the inventory page since N-PR-6)
 
     /// The wizard's whole state. `private(set)` — only the four intents below move it.
     @Published private(set) var inventoryOpening: InventoryOpeningState = .idle

@@ -4,10 +4,11 @@ import SoloLedgerCore
 /// The inventory page — one product's stock movements, its running balance, and the panel that
 /// records a new movement.
 ///
-/// **Nothing constructs this view yet.** The sidebar has no case for it and the detail switch has
-/// no branch, so this stage ships the page compiled, tested and unreachable, exactly as the
-/// products page did before its own activation. `InventoryMountingTests` asserts the absence of
-/// every construction site by scanning the tree.
+/// **Reached from the `.inventory` sidebar section** (N-PR-6) through the split view's detail
+/// switch — one enum case serving both the sidebar list and the menu-bar picker. The entry point
+/// was a separate change, deliberately: until that case existed this page was compiled, tested and
+/// unreachable, exactly as the products page was before its own activation.
+/// `InventoryMountingTests` pins the single construction site by scanning the tree.
 ///
 /// Every key drawn below comes from ``InventoryPageComposition``: the subviews take their slice of
 /// that value and render exactly what the slice names. There is not one literal in the copy's
@@ -44,8 +45,8 @@ struct InventoryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .navigationTitle(model.t(page.titleKey))
         // Lazy on purpose: this product's movements are read when the page appears and never as
-        // part of the app-wide refresh, so an unreachable page costs no query — and the read is
-        // a whole history with no paging behind it.
+        // part of the app-wide refresh, so the five sections that are not this one cost no query
+        // — and the read is a whole history with no paging behind it.
         .task { model.reloadInventory() }
         .sheet(isPresented: Binding(
             get: { page.form != nil },
