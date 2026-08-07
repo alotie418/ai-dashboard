@@ -791,3 +791,15 @@
 "inventory.opening.done.message" = "Chaque quantité et montant est désormais le premier mouvement de son article. Enregistrez ici ce qui s'est passé après la date de bascule.";
 "inventory.opening.partial.title" = "Certains stocks d'ouverture n'ont pas été enregistrés";
 "inventory.opening.partial.message" = "{count} articles n'ont pas été enregistrés. La raison est indiquée à côté de chaque ligne refusée et rien n'a été modifié pour ces articles ; les autres ont été écrits.";
+
+/* d1-2 Bloc variation mensuelle / annuelle de la page Aperçu (10 clés, dormantes : rien ne les dessine ce tour-ci) */
+"overview.metrics.title" = "Variation mensuelle et annuelle";
+"overview.metrics.revenue" = "Chiffre d'affaires";
+"overview.metrics.mom" = "Variation mensuelle";
+"overview.metrics.yoy" = "Variation annuelle";
+"overview.metrics.momCaption" = "Par rapport au mois précédent";
+"overview.metrics.yoyCaption" = "Par rapport au même mois de l’année précédente";
+"overview.metrics.basisNote" = "Les deux sont calculées sur le chiffre d’affaires. Chaque opération y entre pour son montant hors taxe lorsqu’il a été saisi, et pour son montant total sinon ; renseigner « Montant HT » sur ces opérations aligne la base de ce bloc. Le graphique ci-dessus additionne recettes et dépenses taxes comprises : la base est différente, les deux ne sont donc pas directement comparables.";
+"overview.metrics.noBaseNote" = "Lorsque la période de référence est absente ou nulle, la case reste vide au lieu d’afficher 0,0 % : sans base de comparaison, tout pourcentage induirait en erreur.";
+"overview.metrics.empty.title" = "Rien à comparer pour l’instant";
+"overview.metrics.empty.message" = "La variation mensuelle demande au moins deux mois d’opérations ; la variation annuelle exige en plus le même mois de l’année précédente.";

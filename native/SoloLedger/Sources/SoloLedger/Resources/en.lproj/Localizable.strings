@@ -794,3 +794,15 @@
 "inventory.opening.done.message" = "Each quantity and amount is now that product's first movement. Record what happened after the switch-over date from here on.";
 "inventory.opening.partial.title" = "Some openings were not recorded";
 "inventory.opening.partial.message" = "{count} products were not recorded. The reason is shown beside each line that was refused, and nothing was changed for those products; the rest were written.";
+
+/* d1-2 Overview month-on-month / year-on-year block (10 keys, dormant: nothing draws them this round) */
+"overview.metrics.title" = "Month on month & year on year";
+"overview.metrics.revenue" = "Revenue";
+"overview.metrics.mom" = "Month on month";
+"overview.metrics.yoy" = "Year on year";
+"overview.metrics.momCaption" = "Compared with the previous month";
+"overview.metrics.yoyCaption" = "Compared with the same month last year";
+"overview.metrics.basisNote" = "Both are computed on revenue. Each transaction contributes its tax-exclusive amount where one was recorded, and its full amount where none was; filling in “Amount (excl. tax)” on those transactions makes this block consistent. The chart above totals income and expenses with tax included — a different basis, so the two are not directly comparable.";
+"overview.metrics.noBaseNote" = "When the base period has no data or is zero, this is left blank rather than shown as 0.0% — with nothing to compare against, any percentage would mislead.";
+"overview.metrics.empty.title" = "Nothing to compare yet";
+"overview.metrics.empty.message" = "Month on month needs at least two months of transactions; year on year also needs the same month last year.";
