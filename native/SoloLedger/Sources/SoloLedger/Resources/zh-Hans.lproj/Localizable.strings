@@ -806,4 +806,4 @@
 "overview.metrics.basisNoteUS" = "这两项按营业收入计算。美国会计制度的报表按每笔流水的记账全额计算，「不含税金额」不影响这里的数字。上面的「按月收支」是所选时段的收支合计；本块只看营业收入，且固定为上方标注的整年。";
 "overview.metrics.noBaseNote" = "基期没有数据或为零时，这里留空而不显示 0.0%——没有可比的基数，任何百分比都会是误导。";
 "overview.metrics.empty.title" = "还不能比较";
-"overview.metrics.empty.message" = "至少要有两个月的流水，才能算出环比；同比还需要去年同月的数据。";
+"overview.metrics.empty.message" = "这两项都按营业收入计算：环比要求上一个月有营业收入，同比要求去年同月有营业收入。只记支出的账本两者都算不出。";

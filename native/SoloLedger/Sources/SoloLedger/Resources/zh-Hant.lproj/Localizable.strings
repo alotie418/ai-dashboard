@@ -803,4 +803,4 @@
 "overview.metrics.basisNoteUS" = "這兩項按營業收入計算。美國會計制度的報表按每筆流水的記帳全額計算，「不含稅金額」不影響這裡的數字。上面的「每月收支」是所選時段的收支合計；本區塊只看營業收入，且固定為上方標註的整年。";
 "overview.metrics.noBaseNote" = "基期沒有資料或為零時，這裡留空而不顯示 0.0%——沒有可比的基數，任何百分比都會是誤導。";
 "overview.metrics.empty.title" = "還不能比較";
-"overview.metrics.empty.message" = "至少要有兩個月的流水，才能算出「較上月」；「較去年同期」還需要去年同月的資料。";
+"overview.metrics.empty.message" = "這兩項都按營業收入計算：「較上月」需要上一個月有營業收入，「較去年同期」需要去年同月有營業收入。只記支出的帳本兩者都算不出。";

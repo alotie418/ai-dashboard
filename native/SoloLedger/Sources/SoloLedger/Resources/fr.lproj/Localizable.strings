@@ -803,4 +803,4 @@
 "overview.metrics.basisNoteUS" = "Les deux sont calculées sur le chiffre d’affaires. Sous le régime comptable des États-Unis, les rapports utilisent le montant total enregistré de chaque opération : le champ « Montant HT » n’influe donc pas sur ces chiffres. Le graphique ci-dessus additionne recettes et dépenses sur la période sélectionnée ; ce bloc n’affiche que le chiffre d’affaires, pour l’année entière indiquée ci-dessus.";
 "overview.metrics.noBaseNote" = "Lorsque la période de référence est absente ou nulle, la case reste vide au lieu d’afficher 0,0 % : sans base de comparaison, tout pourcentage induirait en erreur.";
 "overview.metrics.empty.title" = "Rien à comparer pour l’instant";
-"overview.metrics.empty.message" = "La variation mensuelle demande au moins deux mois d’opérations ; la variation annuelle exige en plus le même mois de l’année précédente.";
+"overview.metrics.empty.message" = "Les deux sont calculées sur le chiffre d’affaires : la variation mensuelle exige un chiffre d’affaires le mois précédent, et la variation annuelle un chiffre d’affaires le même mois l’an dernier. Un livre ne contenant que des dépenses n’en produit aucune.";

@@ -219,15 +219,62 @@ final class MetricsCopyTests: XCTestCase {
         }
     }
 
-    /// `empty.message` promises month-on-month needs at least two months. The engine's first row
-    /// is unconditionally `nil`, which is exactly that claim.
-    func testMC7bTheTwoMonthClaimMatchesTheEngine() {
-        let one = MonthlyComparisons.compute([.init(revenue: 100, salesTons: 0)])
-        XCTAssertNil(one[0].mom, "one month can have no month-on-month")
-        let two = MonthlyComparisons.compute([.init(revenue: 100, salesTons: 0),
-                                              .init(revenue: 120, salesTons: 0)])
-        XCTAssertNil(two[0].mom)
-        XCTAssertEqual(two[1].mom, 20, "the second month is the first that can have one")
+    /// `empty.message` states two necessary conditions and one consequence. All three are checked
+    /// here AT THE SHAPE THE BLOCK ACTUALLY PRODUCES — twelve rows, always.
+    ///
+    /// ## Why the shape is the whole point
+    ///
+    /// The sentence this replaces promised "at least two months of transactions", and the oracle
+    /// that passed it drove the engine with a one-row and a two-row array. Both are true
+    /// statements about the engine's array semantics and neither is a shape this block can hand
+    /// it: the report's monthly breakdown is twelve calendar months whatever the ledger holds. A
+    /// walkthrough on a ledger with twelve months of EXPENSES showed the empty state with
+    /// "Entries: 12" on the same screen, telling a user who had twelve months of transactions
+    /// that he needed two.
+    ///
+    /// So the oracle is now written over twelve-row years, and the quantity it talks about is
+    /// revenue rather than transactions — because revenue is what the engine compares.
+    func testMC7bTheEmptyStateSentenceMatchesTheEngineAtTheBlocksOwnShape() throws {
+        func year(_ revenue: [Double]) -> [MonthlyComparisons.Row] {
+            XCTAssertEqual(revenue.count, 12, "the block never hands the engine another length")
+            return revenue.map { .init(revenue: $0) }
+        }
+        let noPriorYear = [Double?](repeating: nil, count: 12)
+
+        // Claim 1 — month on month needs THE MONTH BEFORE IT to have revenue.
+        var marchOnly = [Double](repeating: 0, count: 12)
+        marchOnly[2] = 300
+        let one = MonthlyComparisons.compute(year(marchOnly), priorRevenue: noPriorYear)
+        XCTAssertNil(one[2].mom, "March's own base is a revenue-free February")
+        XCTAssertEqual(one[3].mom, -100, "April compares — the month before it had revenue")
+
+        // Claim 2 — year on year needs THE SAME MONTH LAST YEAR to have revenue.
+        var lastMarch = [Double?](repeating: nil, count: 12)
+        lastMarch[2] = 200
+        let two = MonthlyComparisons.compute(year(marchOnly), priorRevenue: lastMarch)
+        XCTAssertEqual(two[2].yoy, 50, "March has last March to compare against")
+        XCTAssertNil(two[1].yoy, "February has no last February")
+
+        // Claim 3 — a ledger with expenses only produces neither. This IS the empty state.
+        let expensesOnly = MonthlyComparisons.compute(year(Array(repeating: 0, count: 12)),
+                                                      priorRevenue: noPriorYear)
+        XCTAssertEqual(expensesOnly.count, 12)
+        XCTAssertTrue(expensesOnly.allSatisfy { $0.mom == nil && $0.yoy == nil },
+                      "no revenue in any month means nothing to compare, in either direction")
+
+        // And the sentence must not grow a month COUNT back. Each language's old threshold is
+        // banned by name — a targeted guard for a wording defect that reached a user's screen.
+        let retiredThresholds = ["en": "two months", "zh-Hans": "两个月", "zh-Hant": "兩個月",
+                                 "ja": "2 か月分", "ko": "두 달치", "fr": "deux mois"]
+        for language in languages {
+            let message = try XCTUnwrap(sourceTable(language)["overview.metrics.empty.message"])
+            let retired = try XCTUnwrap(retiredThresholds[language])
+            XCTAssertFalse(message.contains(retired), """
+                \(language): the empty-state sentence is back to counting months. The condition \
+                is about REVENUE in specific months, and a ledger can satisfy any month count \
+                while producing none.
+                """)
+        }
     }
 
     /// The basis sentences are answerable to the ENGINE that produces the figures, not to the

@@ -806,4 +806,4 @@
 "overview.metrics.basisNoteUS" = "Both are computed on revenue. Under the US accounting profile, reports use each transaction’s full recorded amount, so the “Amount (excl. tax)” field does not affect these figures. The chart above totals income and expenses over the period you selected; this block shows revenue only, for the whole year shown above.";
 "overview.metrics.noBaseNote" = "When the base period has no data or is zero, this is left blank rather than shown as 0.0% — with nothing to compare against, any percentage would mislead.";
 "overview.metrics.empty.title" = "Nothing to compare yet";
-"overview.metrics.empty.message" = "Month on month needs at least two months of transactions; year on year also needs the same month last year.";
+"overview.metrics.empty.message" = "Both are computed on revenue: month on month needs the month before it to have some, and year on year needs the same month last year to have some. A ledger with expenses only produces neither.";
