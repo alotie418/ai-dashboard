@@ -2,7 +2,7 @@ import Foundation
 
 /// The inputs the engines read.
 ///
-/// A DELIBERATELY SMALL subset of the dispatcher's context (`index.js:80-84`). The
+/// A DELIBERATELY SMALL subset of the dispatcher's context (`index.js categories`). The
 /// plan's batching seam is "does this field read a `settings` value" (§2), and
 /// batch 1 was the largest set that reads none — which is why this type carried no
 /// tax rate at all through R2–R5, and why adding one "for later" would have erased
@@ -22,11 +22,11 @@ import Foundation
 /// `malformed-CN-2025.json` come from that row. A4-2 is the correction.
 ///
 /// `vatRate` stays absent, for an unrelated reason: the dispatcher loads it
-/// (`index.js:86`, `:105`) and NO engine reads it (plan Appendix A6). Porting it as
+/// (`index.js vatRate`, `:105`) and NO engine reads it (plan Appendix A6). Porting it as
 /// a live parameter would mirror a bug.
 ///
 /// `adminExpense` is here and is not an exception: `admin_expense_annual` falls
-/// back to 0 regardless of regime (`index.js:100`), so it needs no fallback policy,
+/// back to 0 regardless of regime (`index.js adminExpense`), so it needs no fallback policy,
 /// no empty state and no confirmation prompt. It is **not** a tax rate and scheme A
 /// deliberately does not gate on it — a missing admin-expense row still means 0,
 /// and operating profit is therefore unaffected by everything above.
@@ -74,12 +74,13 @@ struct ReportContext: Equatable, Sendable {
 
 /// The batch-1 income-statement fields shared by CN / JP / KR / TW.
 ///
-/// The absent fields are absent, not `nil`. `operatingProfit` for China,
-/// `incomeTax`, `netProfit` and `netMargin` for everyone are batch 5 — declaring
-/// them as `Double?` now would make "not yet mirrored" and "computed to nothing"
-/// the same value, which is the exact confusion plan §6.2 spends four variants
-/// keeping apart. A later batch adds the field and every call site that must learn
-/// about it fails to compile.
+/// The absent fields are absent, not `nil`. `operatingProfit` for China, and
+/// `incomeTax`, `netProfit` and `netMargin` for everyone, are carried by the later
+/// batches' own types rather than by this one — declaring them as `Double?` here
+/// would make "not carried by this type" and "computed to nothing" the same value,
+/// which is the exact confusion plan §6.2 spends four variants keeping apart. A type
+/// that gains a field makes every call site that must learn about it fail to compile;
+/// a type full of optionals lets them all keep quiet.
 struct BatchOneIncomeStatement: Equatable, Sendable {
     let salesRevenue: Double
     let costOfSales: Double
@@ -93,7 +94,7 @@ struct BatchOneIncomeStatement: Equatable, Sendable {
 /// China's batch-1 block.
 ///
 /// Separate from ``BatchOneIncomeStatement`` for one reason: `shippingFee`. China
-/// is the only engine with it (`cn.js:61`), and China is also the only engine that
+/// is the only engine with it (`cn.js shippingFee`), and China is also the only engine that
 /// CANNOT reach operating profit without a tax rate — `operatingProfit` at
 /// `cn.js:57` holds `profitBeforeTax`, which consumes `surchargeRate`. So China
 /// stops at gross profit in batch 1 while the others do not. That asymmetry is
@@ -110,11 +111,11 @@ struct CNBatchOneIncomeStatement: Equatable, Sendable {
 
     // MARK: - Batch 5 (R7) — the estimate layer
 
-    /// `cn.js:76`. **The key holds pre-tax profit**, not operating profit — the name
+    /// `cn.js operatingProfit`. **The key holds pre-tax profit**, not operating profit — the name
     /// is the source's and plan §1.2 forbids tidying it. Refused when the SURCHARGE
     /// is unusable, because it is subtracted here.
     let operatingProfit: EstimatedValue
-    /// `cn.js:79` — 城建/教育/地方教育附加 on the clamped VAT payable.
+    /// `cn.js taxSurcharge` — 城建/教育/地方教育附加 on the clamped VAT payable.
     let taxSurcharge: EstimatedValue
     let incomeTax: EstimatedValue
     let netProfit: EstimatedValue
@@ -144,7 +145,7 @@ struct BatchOneIncomeStatementWithOperatingProfit: Equatable, Sendable {
 /// The EU block.
 ///
 /// Named `profitLoss` upstream, and its revenue field is `revenue`, not
-/// `salesRevenue` (`eu.js:36-37`). The plan forbids "tidying" that (§1.2), and the
+/// `salesRevenue` (`eu.js profitLoss`). The plan forbids "tidying" that (§1.2), and the
 /// naming is not cosmetic: it has already caused two Electron downstream handlers
 /// to read 0, because they only know `incomeStatement` (Appendix A7). Keeping the
 /// name here keeps the mirror honest about what it is mirroring; the Electron-side

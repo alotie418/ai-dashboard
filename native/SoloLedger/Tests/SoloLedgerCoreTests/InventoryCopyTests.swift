@@ -175,7 +175,7 @@ final class InventoryCopyTests: XCTestCase {
 
     // MARK: - IC2 · the whole universe, and six identical key sets
 
-    func testIC2EverySixLocaleFileHoldsSixHundredThirtyFourKeys() throws {
+    func testIC2EverySixLocaleFileHoldsTheSameKeyCount() throws {
         var inventorySets: [Set<String>] = []
         for language in languages {
             let table = try sourceTable(language)

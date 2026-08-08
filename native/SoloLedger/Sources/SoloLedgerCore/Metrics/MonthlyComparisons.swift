@@ -19,13 +19,13 @@ import Foundation
 /// ## The JS↔Swift value mapping
 ///
 /// JS `null` ⇄ Swift `nil`; a JS number ⇄ `.some(Double)`. That distinction carries real
-/// behaviour: `pct` returns the NUMBER `NaN` for a `NaN` base (`_metrics.js:10` tests
+/// behaviour: `pct` returns the NUMBER `NaN` for a `NaN` base (`_metrics.js pct` tests
 /// `base == null` and `base === 0`, and `NaN` is neither), which is `.some(.nan)` here — not
 /// `nil`. A caller that collapses the two loses a case the JS keeps apart.
 ///
 /// ## What this file deliberately does NOT reproduce
 ///
-/// `_metrics.js:24` spreads the input row into the output (`...m`), so the JS result carries
+/// `_metrics.js computeMonthlyComparisons` spreads the input row into the output (`...m`), so the JS result carries
 /// every field the caller put in. Swift has no equivalent, and inventing a dictionary to fake
 /// one would mirror the syntax rather than the semantics. ``compute(_:priorRevenue:)`` returns
 /// the three computed values in input order; the caller keeps its own rows and zips. All three
@@ -35,7 +35,7 @@ import Foundation
 /// ## `deflator` is mirrored, and under this app's data model it is always `nil`
 ///
 /// The price index divides revenue by `salesTons`, which in Electron comes only from the legacy
-/// `sales` table (`dashboard.js:111-115`); the report-engine branch carries it over from that
+/// `sales` table (`dashboard.js monthlySales`); the report-engine branch carries it over from that
 /// same array. This app never reads that column — the legacy converter copies `tons` into the
 /// description text and not into a numeric column, and `transactions` has no quantity column at
 /// all. So every row this app can build has `salesTons == 0`, `unitRevs` is empty, `avgUnitRev`
@@ -124,7 +124,7 @@ public enum MonthlyComparisons {
 
     /// Percentage change to one decimal place; `nil` when the base period is missing or zero.
     ///
-    /// Mirrors `_metrics.js:9-12`:
+    /// Mirrors `_metrics.js pct`:
     ///
     /// ```js
     /// if (base == null || base === 0) return null;
@@ -147,10 +147,10 @@ public enum MonthlyComparisons {
 
     // MARK: - `computeMonthlyComparisons`
 
-    /// Mirrors `_metrics.js:16-31`.
+    /// Mirrors `_metrics.js computeMonthlyComparisons`.
     ///
     /// - Parameters:
-    ///   - monthly: the rows, in month order. `_metrics.js:25` reads `monthly[i - 1].revenue`
+    ///   - monthly: the rows, in month order. `_metrics.js mom` reads `monthly[i - 1].revenue`
     ///     from the INPUT array, so a row's `mom` is against its predecessor's original
     ///     revenue, never against a value this function produced.
     ///   - priorRevenue: last year's revenue aligned by index. An index past the end is
@@ -187,7 +187,7 @@ public enum MonthlyComparisons {
     }
 
     /// `value || 0` for a number: everything falsy in JS — `undefined`, `null`, `0`, `-0` and
-    /// `NaN` — becomes `0`. Used at `_metrics.js:19` and `:27`.
+    /// `NaN` — becomes `0`. Used at `_metrics.js computeMonthlyComparisons` and `:27`.
     ///
     /// The `NaN` arm is not observable through ``compute(_:priorRevenue:)``: every caller
     /// immediately asks `> 0`, and that is false for `NaN` whether or not it was folded. It is
