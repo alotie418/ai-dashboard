@@ -146,7 +146,7 @@ enum ReportPresenter {
 
     /// The China-only note that two of its five turnover-tax lines repeat two others.
     ///
-    /// `cn.js:70-73` computes `certifiedInput` from the SAME expression as `cumulativeInput`
+    /// `cn.js generate` computes `certifiedInput` from the SAME expression as `cumulativeInput`
     /// and `invoicedOutput` from the same one as `cumulativeOutput`, so those pairs are equal
     /// by construction. All five are shown, because dropping a line the model carries would
     /// be the view deciding what the report says — and this note is how the repetition is

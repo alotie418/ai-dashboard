@@ -9,11 +9,11 @@ import Foundation
 ///
 /// | engine | block | fields |
 /// | --- | --- | --- |
-/// | `cn.js:69-75` | `vatSummary` | cumulativeInput, cumulativeOutput, certifiedInput, invoicedOutput, estimatedPayable |
-/// | `jp.js:46-49` | `consumptionTax` | collected, paid, payable |
-/// | `eu.js:44-46` | `vatReturn` | outputVAT, inputVAT, vatPayable |
-/// | `kr.js:41-43` | `vatSummary` | outputVAT, inputVAT, vatPayable |
-/// | `tw.js:41-43` | `businessTax` | collected, paid, payable |
+/// | `cn.js vatSummary` | `vatSummary` | cumulativeInput, cumulativeOutput, certifiedInput, invoicedOutput, estimatedPayable |
+/// | `jp.js consumptionTax` | `consumptionTax` | collected, paid, payable |
+/// | `eu.js vatReturn` | `vatReturn` | outputVAT, inputVAT, vatPayable |
+/// | `kr.js vatSummary` | `vatSummary` | outputVAT, inputVAT, vatPayable |
+/// | `tw.js businessTax` | `businessTax` | collected, paid, payable |
 ///
 /// EU and KR are field-for-field identical and still get separate types, as do JP
 /// and TW. Plan §1.2 forbids unifying the names, and the reason is not tidiness:
@@ -52,11 +52,11 @@ import Foundation
 /// re-introducing any form of it requires a separate, explicitly approved
 /// non-mirror PR.
 
-/// `cn.js:69-75` — 增值税统计.
+/// `cn.js vatSummary` — 增值税统计.
 ///
 /// **Two of these five fields are duplicates of two others, by construction.**
 /// `cumulativeInput` and `certifiedInput` are both `r(totalExpenseTax)`
-/// (`cn.js:70` and `:72`); `cumulativeOutput` and `invoicedOutput` are both
+/// (`cn.js cumulativeInput` and `:72`); `cumulativeOutput` and `invoicedOutput` are both
 /// `r(totalIncomeTax)` (`:71`, `:73`). No input can separate them — verified over
 /// 200 random draws against the real `cn.js`, and every committed CN golden shows
 /// the pair equal.
@@ -74,30 +74,30 @@ struct CNVATSummary: Equatable, Sendable {
     let certifiedInput: Double
     /// Equal to ``cumulativeOutput`` for every possible input — see the type note.
     let invoicedOutput: Double
-    /// `r(Math.max(0, totalIncomeTax - totalExpenseTax))` (`cn.js:32`, `:74`).
+    /// `r(Math.max(0, totalIncomeTax - totalExpenseTax))` (`cn.js vatPayable`, `:74`).
     let estimatedPayable: Double
 }
 
-/// `jp.js:46-49` — 消費税（仕入税額控除方式）.
+/// `jp.js consumptionTax` — 消費税（仕入税額控除方式）.
 struct JPConsumptionTax: Equatable, Sendable {
     let collected: Double
     let paid: Double
-    /// `r(Math.max(0, collected - paid))` — `jp.js:34`, already rounded when it is
+    /// `r(Math.max(0, collected - paid))` — `jp.js consumptionTaxPayable`, already rounded when it is
     /// placed into the block at `:48` rather than rounded a second time.
     let payable: Double
 }
 
-/// `eu.js:44-46` — VAT return summary.
+/// `eu.js vatReturn` — VAT return summary.
 struct EUVATReturn: Equatable, Sendable {
     /// Output VAT is listed FIRST here, where China lists input first. Field order
     /// is not semantics, but it is what a reader comparing the two files sees.
     let outputVAT: Double
     let inputVAT: Double
-    /// `r(Math.max(0, vatCollected - vatDeductible))` — `eu.js:32`.
+    /// `r(Math.max(0, vatCollected - vatDeductible))` — `eu.js vatPayable`.
     let vatPayable: Double
 }
 
-/// `kr.js:41-43` — 부가가치세 요약.
+/// `kr.js vatSummary` — 부가가치세 요약.
 ///
 /// Field-for-field identical to ``EUVATReturn`` and deliberately a separate type;
 /// the block is even named differently upstream (`vatSummary`, the same key China
@@ -106,14 +106,14 @@ struct EUVATReturn: Equatable, Sendable {
 struct KRVATSummary: Equatable, Sendable {
     let outputVAT: Double
     let inputVAT: Double
-    /// `r(Math.max(0, totalIncomeTax - totalExpenseTax))` — `kr.js:29`.
+    /// `r(Math.max(0, totalIncomeTax - totalExpenseTax))` — `kr.js vatPayable`.
     let vatPayable: Double
 }
 
-/// `tw.js:41-43` — 營業稅.
+/// `tw.js businessTax` — 營業稅.
 struct TWBusinessTax: Equatable, Sendable {
     let collected: Double
     let paid: Double
-    /// `r(Math.max(0, totalIncomeTax - totalExpenseTax))` — `tw.js:29`.
+    /// `r(Math.max(0, totalIncomeTax - totalExpenseTax))` — `tw.js businessTaxPayable`.
     let payable: Double
 }

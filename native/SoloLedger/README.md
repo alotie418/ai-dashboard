@@ -19,8 +19,8 @@ Sources/SoloLedgerCore/          data layer (SQLite, migrations, seed, store, CS
 Sources/SoloLedger/              SwiftUI app code (compiled by the Xcode app target)
 Tests/SoloLedgerCoreTests/       XCTest for the Core (run via `swift test`)
 App/
-  project.yml                    XcodeGen spec (regenerates the project)
-  SoloLedger.xcodeproj           the Xcode project (App + Unit-Test + UI-Test targets)
+  project.yml                    XcodeGen spec — historical, NOT a build input (see below)
+  SoloLedger.xcodeproj           the Xcode project, and the source of truth for the App target
   Support/                       Info.plist, Debug/Release entitlements, Assets.xcassets (AppIcon, AccentColor)
   Tests/SoloLedgerUnitTests/     Xcode unit tests (public Core API)
   Tests/SoloLedgerUITests/       Xcode UI launch test
@@ -31,8 +31,8 @@ App/
 - macOS 13.0+ (deployment target)
 - Xcode 26.x. If `xcode-select` points at the Command Line Tools, prefix commands
   with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
-- To regenerate the project: `xcodegen` (`brew install xcodegen`). The committed
-  `.xcodeproj` opens directly — xcodegen is only needed to regenerate from `project.yml`.
+- xcodegen is NOT needed and must not be run — see "Adding a file to an App target" below.
+  The committed `.xcodeproj` opens and builds directly, and CI builds from it.
 
 ## Build, test, run (Xcode project)
 
@@ -48,9 +48,23 @@ xcodebuild -project SoloLedger.xcodeproj -scheme SoloLedger -configuration Debug
 xcodebuild test    -project SoloLedger.xcodeproj -scheme SoloLedger -configuration Debug -destination 'platform=macOS'
 xcodebuild archive -project SoloLedger.xcodeproj -scheme SoloLedger -configuration Debug -destination 'generic/platform=macOS' -archivePath build/SoloLedger-Debug.xcarchive
 
-# Regenerate the project after editing project.yml:
-xcodegen generate
 ```
+
+### Adding a file to an App target
+
+`project.pbxproj` is the source of truth, and it is edited BY HAND. Running
+`xcodegen generate` would rewrite it from `project.yml` and silently drop those hand
+edits — measured: on a tree with no source changes at all, xcodegen 2.45.4 still
+reissued object IDs for four already-committed files. CI never runs it.
+
+Each new file needs exactly four lines: a `PBXBuildFile`, a `PBXFileReference`, an entry
+in its group's `children`, and an entry in the target's `PBXSourcesBuildPhase.files`. The
+two list entries sort case-insensitively by file name; the two object entries sort by
+their 24-hex id, which you mint yourself and grep to confirm is unused.
+
+Nothing reads `project.yml` at build time, so a file missing from `project.pbxproj` does
+not fail — it is simply never compiled. For a test file that shows up as a test count
+that did not go up, with no error anywhere.
 
 - **Debug** builds as Bundle ID `com.alotie418.sololedger.dev`; **Release** as
   `com.alotie418.sololedger`. Only Debug is built for now — no production signing.

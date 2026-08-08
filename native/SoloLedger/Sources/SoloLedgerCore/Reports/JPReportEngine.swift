@@ -1,6 +1,6 @@
 import Foundation
 
-/// 日本報表引擎 —— batch-1 fields only. Mirror of `electron/reports/jp.js`.
+/// 日本報表引擎 —— batch-1 的損益核心，加上流轉稅與月度區塊。Mirror of `electron/reports/jp.js`.
 ///
 /// Japan, the EU, Korea and Taiwan reach OPERATING PROFIT without any configured
 /// rate, because their operating profit carries no surcharge. China cannot
@@ -19,63 +19,63 @@ enum JPReportEngine {
     static func batchOne(_ ctx: ReportContext) -> BatchOneIncomeStatementWithOperatingProfit {
         let split = ExpenseSplit.splitExpenses(ctx.expenseRows, ctx.categories)
 
-        // jp.js:14 — `const r = (v) => Math.round((v || 0) * 100) / 100`.
-        // Japan HAS the `|| 0` guard that cn.js:43 lacks, so a NaN becomes 0 here
+        // jp.js generate — `const r = (v) => Math.round((v || 0) * 100) / 100`.
+        // Japan HAS the `|| 0` guard that cn.js generate lacks, so a NaN becomes 0 here
         // where China would emit null.
         let r = ReportMath.round2OrZero
 
-        // jp.js:17
+        // jp.js totalIncomeNet
         var totalIncomeNet = 0.0
         for row in ctx.incomeRows { totalIncomeNet += ReportMath.netAmount(row.amountNet, row.amount) }
 
-        let salesRevenue = totalIncomeNet                     // jp.js:23
-        let costOfSales = split.cogsNet                       // jp.js:24 — COGS only
-        let grossProfit = salesRevenue - costOfSales          // jp.js:25
+        let salesRevenue = totalIncomeNet                     // jp.js salesRevenue
+        let costOfSales = split.cogsNet                       // jp.js costOfSales — COGS only
+        let grossProfit = salesRevenue - costOfSales          // jp.js grossProfit
 
-        // jp.js:26 — `salesRevenue > 0 ? r(grossProfit / salesRevenue * 100) : 0`.
+        // jp.js grossMargin — `salesRevenue > 0 ? r(grossProfit / salesRevenue * 100) : 0`.
         // Multiply by 100, then the rounder multiplies by 100 again. China instead
-        // multiplies by 10000 once (cn.js:30); the two are algebraically equal and
+        // multiplies by 10000 once (cn.js grossMargin); the two are algebraically equal and
         // measurably different in binary64, so this must not be "unified" with it.
         let grossMargin = salesRevenue > 0 ? r(grossProfit / salesRevenue * 100) : 0
 
-        // jp.js:27 — operating expenses and admin expense come off here. Not
-        // rounded before being emitted; the emit at jp.js:42 rounds it once.
+        // jp.js operatingProfit — operating expenses and admin expense come off here. Not
+        // rounded before being emitted; the emit at jp.js adminExpense rounds it once.
         let operatingProfit = grossProfit - split.operatingExpensesNet - ctx.adminExpense
 
-        // jp.js:30-33 — the estimate layer. `refusal` is the ONLY path to a refusal:
+        // jp.js generate — the estimate layer. `refusal` is the ONLY path to a refusal:
         // asking `ctx.incomeTaxRate.rate` and defaulting to `.notConfigured` would
         // render a corrupt value as "go configure one".
         let refusal = EstimatedValue.refusal(for: ctx.incomeTaxRate, parameter: .incomeTaxRate)
         let rate = ctx.incomeTaxRate.rate
-        // jp.js:31 — clamped at 0, so a loss period pays no income tax and netProfit
+        // jp.js rateMissing — clamped at 0, so a loss period pays no income tax and netProfit
         // equals operatingProfit. Rounded ONCE here…
         let taxPayable = rate.map { r(ReportMath.max(0, operatingProfit) * ($0 / 100)) }
-        // …and NOT rounded again at the emit (jp.js:47 passes `taxPayable` straight
+        // …and NOT rounded again at the emit (jp.js incomeTax passes `taxPayable` straight
         // through), unlike China which rounds it twice.
         let incomeTax = refusal ?? .computed(taxPayable ?? 0)
-        // jp.js:32 — the UNROUNDED operating profit minus the ROUNDED tax.
+        // jp.js taxPayable — the UNROUNDED operating profit minus the ROUNDED tax.
         let netProfitRaw = taxPayable.map { operatingProfit - $0 }
         let netProfit = refusal ?? .computed(r(netProfitRaw ?? 0))
-        // jp.js:48 — ×100 then the rounder's ×100 again. China multiplies by 10000
-        // once (cn.js:60); algebraically equal, measurably different in binary64,
+        // jp.js netMargin — ×100 then the rounder's ×100 again. China multiplies by 10000
+        // once (cn.js generate); algebraically equal, measurably different in binary64,
         // so the two must not be "unified".
         let netMargin = refusal ?? .computed(
             salesRevenue > 0 ? r((netProfitRaw ?? 0) / salesRevenue * 100) : 0)
 
         return BatchOneIncomeStatementWithOperatingProfit(
-            salesRevenue: r(salesRevenue),                     // jp.js:39
-            costOfSales: r(costOfSales),                       // jp.js:39
-            costOfGoodsSold: r(split.cogsNet),                 // jp.js:40
-            operatingExpenses: r(split.operatingExpensesNet),  // jp.js:40
-            grossProfit: r(grossProfit),                       // jp.js:41
-            grossMargin: grossMargin,                          // jp.js:41 — already rounded
-            adminExpense: r(ctx.adminExpense),                 // jp.js:42
-            operatingProfit: r(operatingProfit),               // jp.js:42
+            salesRevenue: r(salesRevenue),                     // jp.js salesRevenue
+            costOfSales: r(costOfSales),                       // jp.js salesRevenue
+            costOfGoodsSold: r(split.cogsNet),                 // jp.js costOfGoodsSold
+            operatingExpenses: r(split.operatingExpensesNet),  // jp.js costOfGoodsSold
+            grossProfit: r(grossProfit),                       // jp.js grossProfit
+            grossMargin: grossMargin,                          // jp.js grossProfit — already rounded
+            adminExpense: r(ctx.adminExpense),                 // jp.js adminExpense
+            operatingProfit: r(operatingProfit),               // jp.js incomeStatement
 
             // ── Batch 5 (R7) — the estimate layer ──────────────────────────────
             //
             // Reads the UNROUNDED `operatingProfit` local, not the rounded field
-            // emitted above: jp.js:31 multiplies the local. Taking the struct's value
+            // emitted above: jp.js rateMissing multiplies the local. Taking the struct's value
             // back out would round twice.
             incomeTax: incomeTax,
             netProfit: netProfit,
@@ -88,10 +88,10 @@ enum JPReportEngine {
 
 extension JPReportEngine {
 
-    /// `jp.js:50-53` — the tax-inclusive summary.
+    /// `jp.js taxInclusiveSummary` — the tax-inclusive summary.
     ///
     /// TAX-INCLUSIVE sums, not the net ones the P&L uses. This engine's rounder
-    /// HAS the `|| 0` guard (`jp.js:14`), unlike China's — so a NaN becomes 0 here
+    /// HAS the `|| 0` guard (`jp.js generate`), unlike China's — so a NaN becomes 0 here
     /// and `null` there.
     static func taxInclusiveSummary(_ ctx: ReportContext) -> TaxInclusiveSummary {
         let r = ReportMath.round2OrZero
@@ -106,10 +106,10 @@ extension JPReportEngine {
             difference: r(totalIncome - totalExpense))
     }
 
-    /// `jp.js:32-34`, `:46-49` — 消費税（仕入税額控除方式）.
+    /// `jp.js consumptionTaxCollected`, `:46-49` — 消費税（仕入税額控除方式）.
     ///
     /// Note the shape difference from China's: the payable is rounded ONCE, at
-    /// `jp.js:34`, and placed into the block already rounded (`:48`). China clamps
+    /// `jp.js consumptionTaxPayable`, and placed into the block already rounded (`:48`). China clamps
     /// at `:32` and rounds at the emit (`:74`). Same result, different line — and
     /// the JS is what is being mirrored, so the rounding stays where the source
     /// puts it.
@@ -120,23 +120,23 @@ extension JPReportEngine {
     /// context exactly as under CNY. Mirrored, not repaired.
     static func consumptionTax(_ ctx: ReportContext) -> JPConsumptionTax {
         let r = ReportMath.round2OrZero
-        // jp.js:18 / :21
+        // jp.js totalIncomeTax / :21
         var totalIncomeTax = 0.0
         for row in ctx.incomeRows { totalIncomeTax += ReportMath.orZero(row.taxAmount) }
         var totalExpenseTax = 0.0
         for row in ctx.expenseRows { totalExpenseTax += ReportMath.orZero(row.taxAmount) }
 
-        let collected = totalIncomeTax                                  // jp.js:32
-        let paid = totalExpenseTax                                      // jp.js:33
-        let payable = r(ReportMath.max(0, collected - paid))            // jp.js:34
+        let collected = totalIncomeTax                                  // jp.js consumptionTaxCollected
+        let paid = totalExpenseTax                                      // jp.js consumptionTaxPaid
+        let payable = r(ReportMath.max(0, collected - paid))            // jp.js consumptionTaxPayable
 
         return JPConsumptionTax(
-            collected: r(collected),                                    // jp.js:47
-            paid: r(paid),                                              // jp.js:47
-            payable: payable)                                           // jp.js:48 — NOT re-rounded
+            collected: r(collected),                                    // jp.js collected
+            paid: r(paid),                                              // jp.js collected
+            payable: payable)                                           // jp.js payable — NOT re-rounded
     }
 
-    /// `jp.js:59-69` — the monthly breakdown.
+    /// `jp.js buildMonthly` — the monthly breakdown.
     ///
     /// Twelve entries keyed on `ctx.year`, never on the reporting period
     /// (Appendix A9). Uses the optional-chained date spelling and the guarded

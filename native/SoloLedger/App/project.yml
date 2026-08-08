@@ -5,7 +5,14 @@
 # so `SoloLedgerCore` is linked without copying source. The app target compiles the
 # existing SwiftUI sources in ../Sources/SoloLedger (also not copied).
 #
-# Regenerate after editing this file:  cd native/SoloLedger/App && xcodegen generate
+# DO NOT RUN `xcodegen generate`. This file is kept for reference only; it is NOT the
+# source of truth and nothing reads it at build time. `SoloLedger.xcodeproj/project.pbxproj`
+# is the truth source and is edited BY HAND — regenerating would rewrite it from this spec
+# and drop those hand edits. Measured: with zero source changes, xcodegen 2.45.4 still
+# reissued object IDs for four already-committed files. CI does not run xcodegen.
+#
+# To add a file to an App target, edit project.pbxproj directly: four lines per file.
+# See ../README.md, "Adding a file to an App target".
 name: SoloLedger
 
 options:

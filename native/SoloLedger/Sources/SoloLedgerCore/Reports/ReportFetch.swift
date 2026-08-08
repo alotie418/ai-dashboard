@@ -37,7 +37,7 @@ enum ReportFetch {
     /// it there would silently widen the read for nothing.
     static let rowColumns = "amount_net, amount, tax_amount, category_id, date"
 
-    /// `index.js:47-52` — income and expense rows for the period.
+    /// `index.js generate` — income and expense rows for the period.
     ///
     /// `ORDER BY date` is part of the answer, not a nicety: floating-point
     /// addition is not associative, so the accumulation order changes the last
@@ -49,11 +49,11 @@ enum ReportFetch {
         "AND date >= ? AND date <= ? ORDER BY date"
     }
 
-    /// `_cashflow.js:52-58` — realized-cash rows.
+    /// `_cashflow.js rows` — realized-cash rows.
     ///
     /// A DIFFERENT window over the same table: rows are selected by
     /// `COALESCE(payment_date, date)` here, while the source decision counts on
-    /// plain `date` (`_cashflow.js:43`). The two disagree for a row dated inside
+    /// plain `date` (`_cashflow.js computeOperatingCashflow`). The two disagree for a row dated inside
     /// the period but paid outside it, or vice versa. That inconsistency is in the
     /// source and is mirrored, not repaired.
     ///
@@ -68,7 +68,7 @@ enum ReportFetch {
             AND COALESCE(payment_date, date) <= ?
         """
 
-    /// `index.js:43` — how many transactions fall in the period, which decides the
+    /// `index.js generate` — how many transactions fall in the period, which decides the
     /// source. Counted on `date`, NOT on the cash date.
     static func periodTransactionCount(_ db: SQLiteDatabase,
                                               from: String, to: String) throws -> Int {
@@ -107,7 +107,7 @@ enum ReportFetch {
         }
     }
 
-    /// `index.js:68-71` — categories for the regime.
+    /// `index.js categories` — categories for the regime.
     ///
     /// `WHERE locale = ?` is why a row whose category belongs to another regime
     /// matches nothing and falls to operating expenses. The whole read is wrapped

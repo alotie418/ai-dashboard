@@ -13,13 +13,13 @@ enum ExpenseSplit {
         let operatingExpensesNet: Double
     }
 
-    /// `isCogsRow` — `_expenseSplit.js:17-21`.
+    /// `isCogsRow` — `_expenseSplit.js isCogsRow`.
     ///
     /// Three steps, in this order: a missing `category_id` is not COGS; the
     /// category is found by the FIRST id match (`find`, strict `===`); the found
     /// row's `is_cogs` is read through JS truthiness. A `category_id` that matches
     /// nothing yields `undefined` and therefore false — which is what happens to a
-    /// row whose category belongs to a different locale, because `index.js:70`
+    /// row whose category belongs to a different locale, because `index.js generate`
     /// fetches categories `WHERE locale = ?`. That row silently becomes an
     /// operating expense. Mirrored, not repaired (plan Appendix A: 类别在切换记账
     /// 制度后被"孤立").
@@ -29,7 +29,7 @@ enum ExpenseSplit {
         return category.isCogsTruthy
     }
 
-    /// `net(row)` — `_expenseSplit.js:23-25`, i.e. `amount_net || amount || 0`.
+    /// `net(row)` — `_expenseSplit.js net`, i.e. `amount_net || amount || 0`.
     ///
     /// `ReportMath.netAmount` is the exact match. `??` is NOT: a row whose
     /// `amount_net` is exactly 0 falls back to the TAX-INCLUSIVE `amount` in JS,
@@ -38,7 +38,7 @@ enum ExpenseSplit {
         ReportMath.netAmount(row.amountNet, row.amount)
     }
 
-    /// `splitExpenses` — `_expenseSplit.js:27-33`.
+    /// `splitExpenses` — `_expenseSplit.js splitExpenses`.
     ///
     /// TWO separate left-to-right accumulations over the rows in SQL order, then a
     /// SUBTRACTION. Not one pass with two accumulators, and above all not a second
@@ -66,7 +66,7 @@ enum ExpenseSplit {
     /// washing out.
     ///
     /// Addition is not associative in binary64 either, so the row order is part of
-    /// the answer: `ORDER BY date` in `index.js:47-52` is what fixes it.
+    /// the answer: `ORDER BY date` in `index.js generate` is what fixes it.
     static func splitExpenses(_ expenseRows: [ReportRow]?,
                                      _ categories: [ReportCategory]) -> Result {
         let rows = expenseRows ?? []          // `expenseRows || []` (line 28)

@@ -23,7 +23,7 @@ enum ReportSource: String, Equatable, Sendable {
     case legacy
 }
 
-/// `selectReportSource` — `_reportSource.js:15-18`.
+/// `selectReportSource` — `_reportSource.js selectReportSource`.
 func selectReportSource(hasTransactionsTable: Bool, periodTxnCount: Int) -> ReportSource {
     if hasTransactionsTable && periodTxnCount > 0 { return .transactions }
     return .legacy

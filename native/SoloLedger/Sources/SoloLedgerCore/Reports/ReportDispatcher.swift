@@ -4,7 +4,7 @@ import Foundation
 /// regional engine, append cash flow.
 ///
 /// **The legacy fallback branch is not mirrored** (plan §1.1 / §6.1, per #395).
-/// `index.js:56-65` falls back to the old `sales` / `purchases` tables when a
+/// `index.js generate` falls back to the old `sales` / `purchases` tables when a
 /// period holds no transactions; the native app does not read those tables at all.
 /// No symbol in this file — or anywhere in `Sources/` — names them, and a test
 /// asserts that.
@@ -20,7 +20,7 @@ enum ReportDispatcher {
         var description: String {
             switch self {
             case .unsupportedLocale(let l):
-                // index.js:30's message, kept recognisable.
+                // index.js generate's message, kept recognisable.
                 return "Unsupported accounting locale: \(l). Supported: CN/US/JP/EU/KR/TW"
             }
         }
@@ -53,9 +53,9 @@ enum ReportDispatcher {
         let cashflowStatement: CashflowStatement
     }
 
-    /// `index.js:26-91`, minus the legacy branch.
+    /// `index.js generate`, minus the legacy branch.
     ///
-    /// - Parameter year: pass explicitly. `index.js:33` falls back to
+    /// - Parameter year: pass explicitly. `index.js year` falls back to
     ///   `new Date().getFullYear()`, which would make output depend on the wall
     ///   clock; the goldens are generated with an explicit year for that reason
     ///   (plan §4.2 item 4) and callers here should do the same.
@@ -65,15 +65,15 @@ enum ReportDispatcher {
                                 from explicitFrom: String? = nil,
                                 to explicitTo: String? = nil) throws -> BatchTwo {
 
-        // index.js:27 — the opts value wins, else the stored setting, else 'CN'.
+        // index.js locale — the opts value wins, else the stored setting, else 'CN'.
         let locale = try resolveLocale(db, explicitLocale)
 
         let year = explicitYear ?? String(Calendar(identifier: .gregorian)
-            .component(.year, from: Date()))                       // index.js:33
-        let from = explicitFrom ?? "\(year)-01-01"                  // index.js:34
-        let to = explicitTo ?? "\(year)-12-31"                      // index.js:35
+            .component(.year, from: Date()))                       // index.js year
+        let from = explicitFrom ?? "\(year)-01-01"                  // index.js from
+        let to = explicitTo ?? "\(year)-12-31"                      // index.js generate
 
-        // index.js:41-46 — the source decision, counted on `date`.
+        // index.js hasTransactionsTable — the source decision, counted on `date`.
         let hasTable = try ReportFetch.hasTransactionsTable(db)
         let periodTxnCount = hasTable
             ? try ReportFetch.periodTransactionCount(db, from: from, to: to) : 0
@@ -104,7 +104,7 @@ enum ReportDispatcher {
             locale: locale, year: year, from: from, to: to, currency: ctx.currency,
             taxInclusiveSummary: taxInclusive, monthlyBreakdown: monthly,
             warnings: [],
-            // index.js:90 — appended LAST, after the engine has run.
+            // index.js generate — appended LAST, after the engine has run.
             cashflowStatement: try cashflow(db, source: source, from: from, to: to))
     }
 
@@ -118,12 +118,12 @@ enum ReportDispatcher {
     static func resolveLocale(_ db: SQLiteDatabase, _ explicit: String?) throws -> String {
         let locale = explicit ?? ReportSettings.string(db, "accounting_locale", fallback: "CN")
         guard ["CN", "US", "JP", "EU", "KR", "TW"].contains(locale) else {
-            throw Failure.unsupportedLocale(locale)      // index.js:29-31
+            throw Failure.unsupportedLocale(locale)      // index.js settingRowExists
         }
         return locale
     }
 
-    /// `index.js:47-102` — the rows, the categories and the settings the engines see.
+    /// `index.js generate` — the rows, the categories and the settings the engines see.
     ///
     /// Split out of ``batchTwo(_:locale:year:from:to:)`` for one reason: the
     /// income-tax rate's three states (plan §6.2) are decided HERE, from the
@@ -134,7 +134,7 @@ enum ReportDispatcher {
     ///
     /// The legacy branch is absent, per §6.1: rows are read only when the source is
     /// `transactions`; otherwise the engines see nothing, which is the honest
-    /// consequence of not mirroring `index.js:56-65` rather than a bug.
+    /// consequence of not mirroring `index.js generate` rather than a bug.
     ///
     /// - Parameter locale: already resolved and validated by ``resolveLocale(_:_:)``.
     ///   The rate gate reads it, so handing it the stored setting where an explicit
@@ -145,7 +145,7 @@ enum ReportDispatcher {
             ? try ReportFetch.rows(db, type: "income", from: from, to: to) : []
         let expenseRows = source == .transactions
             ? try ReportFetch.rows(db, type: "expense", from: from, to: to) : []
-        // index.js:79-83 — the categories read is wrapped in a swallowing catch
+        // index.js generate — the categories read is wrapped in a swallowing catch
         // because the table may not exist on an early-schema database.
         let categories = (try? ReportFetch.categories(db, locale: locale)) ?? []
 
@@ -162,7 +162,7 @@ enum ReportDispatcher {
             year: year, from: from, to: to)
     }
 
-    /// `_cashflow.js:40-97`, transactions branch only.
+    /// `_cashflow.js computeOperatingCashflow`, transactions branch only.
     ///
     /// When the period has no transactions the operating block is
     /// `.notConfigured`, NOT `{0, 0, 0}` — see ``OperatingCashflowSection``. The

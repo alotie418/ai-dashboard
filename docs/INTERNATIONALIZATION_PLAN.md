@@ -11,7 +11,7 @@
 > | 界面语言 | **6 种**：简体中文 / 繁體中文 / English / 日本語 / 한국어 / Français | — |
 > | 记账口径 | **6 套**：CN / US / JP / KR / EU / TW，各有独立报表引擎 | `electron/reports/` |
 > | Electron 侧文案 | JSON，每种语言 **1516 个叶子键**（六语等长） | `i18n/locales/{en,fr,ja,ko,zh-CN,zh-TW}.json` |
-> | 原生 SwiftUI 侧文案 | `.strings`，每种语言 **227 个键**（六语等长） | `native/SoloLedger/Sources/SoloLedger/Resources/*.lproj/Localizable.strings` |
+> | 原生 SwiftUI 侧文案 | `.strings`，每种语言 **645 个键**（六语等长） | `native/SoloLedger/Sources/SoloLedger/Resources/*.lproj/Localizable.strings` |
 > | ⚠️ 两侧语言代码拼写**不同** | Electron 用 `zh-CN` / `zh-TW`；原生用 Apple 的 `zh-Hans` / `zh-Hant` | 同上 |
 >
 > **上表的键数是某一天的计数，不是契约。** 判断"六语是否齐备"请跑守卫，**不要引用这里的数字**：`npm run check:locale-matrix`、`npm run check:raw-keys`（脚本文件是 `scripts/check-raw-key-leaks.mjs`，**npm script 名不同**）、`npm run check:i18n-keys`、`npm run check:i18n-placeholders`、`npm run test:locale-ui`。前两个另有合并入口 `npm run check:locale`。
