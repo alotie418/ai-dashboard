@@ -13,6 +13,8 @@ struct OverviewView: View {
                 Divider()
                 chartSection
                 Divider()
+                metricsSection
+                Divider()
                 recentSection
                 LegacyLedgerBanner()
                 Text(model.t("overview.dataSourceNote"))
@@ -36,7 +38,10 @@ struct OverviewView: View {
         HStack {
             Picker(model.t("overview.period"), selection: Binding(
                 get: { model.overviewPeriod },
-                set: { model.overviewPeriod = $0; model.reloadAll() }
+                // The metrics block below always describes a whole calendar year, so this
+                // control cannot change it. Rebuilding it here would run two full reports for
+                // a value already on screen — see `AppModel.reloadAll(rebuildingMetrics:)`.
+                set: { model.overviewPeriod = $0; model.reloadAll(rebuildingMetrics: false) }
             )) {
                 ForEach(OverviewPeriod.allCases) { Text(model.t($0.titleKey)).tag($0) }
             }
@@ -161,6 +166,80 @@ struct OverviewView: View {
             .chartLegend(position: .top, alignment: .leading)
             .frame(height: 240)
         }
+    }
+
+    // MARK: - Month on month / year on year (fixed calendar year)
+
+    /// Drawn from `OverviewPageComposition`, and only when the model has an input for it —
+    /// every reason the block cannot be trusted (no regime, no currency, a period holding more
+    /// than one, a failed read) leaves that input `nil` and this section empty. The block's own
+    /// copy cannot describe those situations, and borrowing a sentence that describes something
+    /// else would be worse than saying nothing.
+    ///
+    /// Deliberately NOT a `Table`: its cells are rebuilt outside the environment during an
+    /// accessibility traversal, where an `@EnvironmentObject` lookup is fatal. This follows the
+    /// report page's monthly table instead, which is a stack of rows and has no such second
+    /// materialisation.
+    ///
+    /// The year is drawn as a bare numeral beside the heading, the way the chart above already
+    /// draws its currency code. It is data, not copy — which is why it needs no key, and why
+    /// the block can say which year it means without inventing a sentence to do it.
+    @ViewBuilder private var metricsSection: some View {
+        if let input = model.overviewMetrics {
+            let page = OverviewPageComposition.compose(input)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Text(model.t(page.titleKey)).font(.headline)
+                    Text("· \(page.year)").font(.subheadline)
+                        .foregroundStyle(.secondary).monospacedDigit()
+                    Spacer()
+                }
+                if page.rows.isEmpty {
+                    if page.emptyKeys.count == 2 {
+                        EmptyStateView(systemImage: "percent",
+                                       title: model.t(page.emptyKeys[0]),
+                                       message: model.t(page.emptyKeys[1]))
+                        .frame(maxWidth: .infinity)
+                    }
+                } else {
+                    metricsTable(page, currency: input.currency)
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(page.captionKeys, id: \.self) { key in
+                            Text(model.t(key)).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    ForEach(page.noteKeys, id: \.self) { key in
+                        Text(model.t(key)).font(.footnote).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("overviewMetrics.block")
+        }
+    }
+
+    private func metricsTable(_ page: OverviewPageComposition.Page, currency: String) -> some View {
+        Grid(alignment: .trailing, horizontalSpacing: 22, verticalSpacing: 4) {
+            GridRow {
+                Text(model.t("overview.month")).gridColumnAlignment(.leading)
+                ForEach(page.columnHeaderKeys, id: \.self) { Text(model.t($0)) }
+            }
+            .font(.caption).foregroundStyle(.secondary)
+            ForEach(page.rows) { row in
+                GridRow {
+                    Text("\(row.month)").monospacedDigit().gridColumnAlignment(.leading)
+                    Text(OverviewPageComposition.revenueText(row.revenue, currency: currency) ?? "—")
+                        .monospacedDigit()
+                    Text(OverviewPageComposition.percentText(row.mom, language: model.language) ?? "—")
+                        .monospacedDigit()
+                    Text(OverviewPageComposition.percentText(row.yoy, language: model.language) ?? "—")
+                        .monospacedDigit()
+                }
+                .font(.caption)
+            }
+        }
+        .accessibilityIdentifier("overviewMetrics.table")
     }
 
     // MARK: - Recent transactions

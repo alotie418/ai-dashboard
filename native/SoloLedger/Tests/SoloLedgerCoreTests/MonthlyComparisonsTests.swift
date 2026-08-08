@@ -314,15 +314,25 @@ final class MonthlyComparisonsTests: XCTestCase {
     }
 
     // ==============================================================================================
-    // MARK: - M14 — nothing calls this yet
+    // MARK: - M14 — exactly one file calls this
     // ==============================================================================================
 
-    /// This round lands the engine compiled, tested and with no caller: no view, no composition,
-    /// no report engine reaches it. The copy is d1-2 and the page is d1-3.
+    /// The engine landed with no caller at all (d1-1) and acquired exactly one in d1-3: the
+    /// Overview block's composition. Nothing else may reach it — not the view, not the app
+    /// model, not a report engine.
+    ///
+    /// Keeping it at one is the point. The model assembles the block's input and hands over
+    /// plain numbers; the arithmetic happens in one place, so there is one file to read when a
+    /// percentage looks wrong.
     ///
     /// Asserted by scanning the tree rather than trusted, in the shape `InventoryMountingTests`
-    /// and `ProductMountingTests` use for their own pages.
-    func testM14TheEngineIsCalledByNobodyYet() throws {
+    /// and `ProductMountingTests` use for their own pages. Unlike MC4's scanner this one SKIPS
+    /// comment lines — the two halves of this chapter differ on that, deliberately: a key named
+    /// in a comment has been chosen, while a type named in a comment has only been discussed.
+    ///
+    /// Sorted before comparing, because `FileManager`'s enumerator has no defined order and a
+    /// multi-element expectation would otherwise pass or fail by luck.
+    func testM14TheCompositionIsTheOnlyCaller() throws {
         let root = Self.packageRoot().appendingPathComponent("Sources")
         let walker = try XCTUnwrap(FileManager.default.enumerator(atPath: root.path))
         var scanned = 0
@@ -340,7 +350,10 @@ final class MonthlyComparisonsTests: XCTestCase {
             if named { callers.append(relative) }
         }
         XCTAssertGreaterThan(scanned, 40, "the scan is not reading the tree")
-        XCTAssertEqual(callers, [], "the metrics engine has a caller before its view round")
+        XCTAssertEqual(callers.sorted(), ["SoloLedger/App/OverviewPageComposition.swift"], """
+            the metrics engine must be reached from the Overview block's composition and \
+            nowhere else.
+            """)
 
         // And the scanner can see a real use, or the empty list above proves nothing.
         XCTAssertTrue(try String(contentsOf: root.appendingPathComponent(

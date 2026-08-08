@@ -792,7 +792,7 @@
 "inventory.opening.partial.title" = "部分期初未寫入";
 "inventory.opening.partial.message" = "有 {count} 個商品沒有寫入。原因顯示在被拒絕的那一行旁邊，這些商品未被改動；其餘商品已寫入。";
 
-/* d1-2 概覽頁與上月、去年同期比較區塊（10 鍵，休眠：本輪無人繪製） */
+/* d1-3 概覽頁與上月、去年同期比較區塊（11 鍵，由 OverviewPageComposition 認領繪製） */
 "overview.metrics.title" = "與上月、去年同期比較";
 "overview.metrics.revenue" = "營業收入";
 "overview.metrics.mom" = "較上月";
@@ -800,6 +800,7 @@
 "overview.metrics.momCaption" = "與上個月的營業收入相比";
 "overview.metrics.yoyCaption" = "與去年同一個月的營業收入相比";
 "overview.metrics.basisNote" = "這兩項按營業收入計算。每筆流水優先取它的不含稅金額，沒有記不含稅金額的流水按全額計入；為這些流水補記「不含稅金額」，可讓此處口徑一致。上面的「每月收支」是收支合計、含稅，兩者口徑不同，不能直接對照。";
+"overview.metrics.basisNoteUS" = "這兩項按營業收入計算。美國會計制度的報表按每筆流水的記帳全額計算，「不含稅金額」不影響這裡的數字。上面的「每月收支」是所選時段的收支合計；本區塊只看營業收入，且固定為上方標註的整年。";
 "overview.metrics.noBaseNote" = "基期沒有資料或為零時，這裡留空而不顯示 0.0%——沒有可比的基數，任何百分比都會是誤導。";
 "overview.metrics.empty.title" = "還不能比較";
 "overview.metrics.empty.message" = "至少要有兩個月的流水，才能算出「較上月」；「較去年同期」還需要去年同月的資料。";

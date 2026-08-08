@@ -795,7 +795,7 @@
 "inventory.opening.partial.title" = "部分期初未写入";
 "inventory.opening.partial.message" = "有 {count} 个商品没有写入。原因显示在被拒绝的那一行旁边，这些商品未被改动；其余商品已写入。";
 
-/* d1-2 概览页环比/同比块（10 键，休眠：本轮无人绘制） */
+/* d1-3 概览页环比/同比块（11 键，由 OverviewPageComposition 认领绘制） */
 "overview.metrics.title" = "环比与同比";
 "overview.metrics.revenue" = "营业收入";
 "overview.metrics.mom" = "环比";
@@ -803,6 +803,7 @@
 "overview.metrics.momCaption" = "与上月相比";
 "overview.metrics.yoyCaption" = "与去年同月相比";
 "overview.metrics.basisNote" = "这两项按营业收入计算。每笔流水优先取它的不含税金额，没有记不含税金额的流水按全额计入；为这些流水补记「不含税金额」，可让此处口径一致。上面的「按月收支」是收支合计、含税，两者口径不同，不能直接对照。";
+"overview.metrics.basisNoteUS" = "这两项按营业收入计算。美国会计制度的报表按每笔流水的记账全额计算，「不含税金额」不影响这里的数字。上面的「按月收支」是所选时段的收支合计；本块只看营业收入，且固定为上方标注的整年。";
 "overview.metrics.noBaseNote" = "基期没有数据或为零时，这里留空而不显示 0.0%——没有可比的基数，任何百分比都会是误导。";
 "overview.metrics.empty.title" = "还不能比较";
 "overview.metrics.empty.message" = "至少要有两个月的流水，才能算出环比；同比还需要去年同月的数据。";
