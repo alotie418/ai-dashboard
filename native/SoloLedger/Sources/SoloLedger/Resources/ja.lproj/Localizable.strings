@@ -792,7 +792,7 @@
 "inventory.opening.partial.title" = "一部の期首在庫が記録されませんでした";
 "inventory.opening.partial.message" = "{count} 件の商品は記録されませんでした。理由は拒否された行の横に表示され、それらの商品は変更されていません。残りは記録済みです。";
 
-/* d1-2 概要ページの前月比・前年同月比ブロック（10 キー、休眠：本ラウンドでは誰も描画しない） */
+/* d1-3 概要ページの前月比・前年同月比ブロック（11 キー、OverviewPageComposition が配置） */
 "overview.metrics.title" = "前月比・前年同月比";
 "overview.metrics.revenue" = "売上";
 "overview.metrics.mom" = "前月比";
@@ -800,6 +800,7 @@
 "overview.metrics.momCaption" = "前月との比較";
 "overview.metrics.yoyCaption" = "前年同月との比較";
 "overview.metrics.basisNote" = "この 2 つは売上で計算します。各取引は税抜金額が記録されていればその金額を、記録が無ければ全額を計上します。該当する取引に「税抜金額」を入力すると、この欄の基準がそろいます。上の「月別収支」は収支合計で税込のため、基準が異なり、そのまま比べることはできません。";
+"overview.metrics.basisNoteUS" = "この 2 つは売上で計算します。米国の会計方式では、レポートは各取引の記録された全額で計算するため、「税抜金額」はここの数値に影響しません。上の「月別収支」は選択した期間の収支合計です。この欄は売上のみを、上に示した年の 1 年分で表示します。";
 "overview.metrics.noBaseNote" = "基準となる期間にデータが無い、または 0 の場合は 0.0% とは表示せず空欄にします。比べる相手が無いのに割合を出せば誤解を招くためです。";
 "overview.metrics.empty.title" = "まだ比較できません";
-"overview.metrics.empty.message" = "前月比には少なくとも 2 か月分の取引が必要です。前年同月比にはさらに前年同月のデータが必要です。";
+"overview.metrics.empty.message" = "この 2 つはどちらも売上で計算します。前月比には前の月の売上が、前年同月比には去年の同じ月の売上が必要です。支出だけを記録した台帳では、どちらも算出できません。";

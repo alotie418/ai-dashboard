@@ -81,6 +81,9 @@ final class AppModel: ObservableObject {
     @Published private(set) var currencySummaries: [CurrencySummary] = []
     @Published private(set) var monthly: [MonthlyTotal] = []
     @Published private(set) var recent: [Transaction] = []
+    /// The Overview metrics block's input, or `nil` when the block must not be drawn at all.
+    /// Assembled by ``rebuildOverviewMetrics()``; see that method for what `nil` covers.
+    @Published private(set) var overviewMetrics: OverviewPageComposition.Input?
 
     // Overview + transaction-list filters
     @Published var overviewPeriod: OverviewPeriod = .all
@@ -576,7 +579,14 @@ final class AppModel: ObservableObject {
 
     // MARK: - Loading
 
-    func reloadAll() {
+    /// Reload everything the pages read.
+    ///
+    /// `rebuildingMetrics` exists for exactly one caller: the Overview period selector. That
+    /// block always describes a whole calendar year, so moving the selector cannot change it —
+    /// and rebuilding it anyway would run the ledger's two most expensive reads for a value
+    /// that is already correct. Every other path here follows a change to the DATA, where the
+    /// block really can have moved, so the default rebuilds.
+    func reloadAll(rebuildingMetrics: Bool = true) {
         guard let store else { return }
         do {
             categories = try store.categories(locale: accountingLocale)
@@ -595,7 +605,91 @@ final class AppModel: ObservableObject {
         } catch {
             actionError = "\(error)"
         }
+        if rebuildingMetrics { rebuildOverviewMetrics() }
         reloadLegacySummary()
+    }
+
+    /// Assemble the Overview metrics block's input: two report builds, no cache.
+    ///
+    /// ## The year is read off the data, not off the clock
+    ///
+    /// The block is anchored on the most recent calendar year that holds a transaction. Two
+    /// things follow that a clock-anchored year gets wrong. A ledger nobody has written to
+    /// since last year keeps showing its last full picture instead of a permanently empty
+    /// block. And the first of January is not a cliff: a year with no rows yet is refused by
+    /// the report builder before any engine runs, which would blank the block for every user
+    /// until their first entry of the new year.
+    ///
+    /// ## Why `nil` rather than a sentence
+    ///
+    /// Every refusal below leaves the block undrawn. The copy for this block can state what it
+    /// computes and why a cell is blank; it cannot name a regime that was never configured, a
+    /// currency the period disagrees about, or a failed read — and inventing a sentence out of
+    /// the ones it does have would describe the wrong problem. A block that is not there claims
+    /// nothing, which is the honest option when there is nothing true to say.
+    ///
+    /// ## The prior year is allowed to fail
+    ///
+    /// Its absence is the ORDINARY case — a ledger in its first year has no prior report at all,
+    /// and the builder answers that in microseconds because it stops before reading any rows.
+    /// An empty `priorRevenue` yields a `nil` year-on-year for every month, which is exactly
+    /// what the no-base sentence promises. The mirrored source swallows this failure too.
+    ///
+    /// Synchronous on the main actor, for the same reason ``buildReport()`` is.
+    private func rebuildOverviewMetrics() {
+        overviewMetrics = nil
+        guard let store else { return }
+        let db = store.db
+
+        let year: String
+        let report: PresentedReport
+        do {
+            guard let latest = try store.listTransactions(limit: 1).first,
+                  latest.date.count >= 4 else { return }
+            year = String(latest.date.prefix(4))
+            guard case .report(let built) = try ReportBuilder.build(db, period: ReportPeriod(year: year))
+            else { return }
+            report = built
+        } catch {
+            ReportDiagnostics.buildFailed(year: "", error: error)
+            return
+        }
+
+        // The regime comes off the REPORT, never off `accountingLocale`: that property is the
+        // display fallback and answers CN for a ledger that names no regime, which would pick
+        // the wrong basis sentence without anything going wrong visibly.
+        guard let regime = AccountingLocale(rawValue: report.locale) else { return }
+
+        var priorRevenue: [Double?] = []
+        // Integer arithmetic with an explicit domain check, deliberately not the report page's
+        // year stepper: that one returns its input unchanged at the bounds, so year 0001 would
+        // be compared against ITSELF and every month would read 0.0% — the one figure the
+        // no-base sentence promises never to show.
+        if let numeric = Int(year), numeric > 1 {
+            let priorYear = String(format: "%04d", numeric - 1)
+            do {
+                if case .report(let prior) = try ReportBuilder.build(db, period: ReportPeriod(year: priorYear)) {
+                    priorRevenue = prior.monthlyBreakdown.map(Self.amount)
+                }
+            } catch {
+                ReportDiagnostics.buildFailed(year: priorYear, error: error)
+            }
+        }
+
+        overviewMetrics = OverviewPageComposition.Input(
+            regime: regime,
+            year: year,
+            currency: report.currency,
+            revenue: report.monthlyBreakdown.map(Self.amount),
+            priorRevenue: priorRevenue)
+    }
+
+    /// A month's revenue as a number, or `nil` when the report refused to classify it as one.
+    /// A month that could not be classified must not be silently read as a zero: zero is a
+    /// figure, and this is the absence of one.
+    private static func amount(_ month: PresentedMonth) -> Double? {
+        if case .amount(let value) = month.revenue { return value }
+        return nil
     }
 
     /// Read-only count of the records this app cannot display, so an empty ledger is

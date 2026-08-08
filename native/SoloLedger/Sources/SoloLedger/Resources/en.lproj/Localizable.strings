@@ -795,7 +795,7 @@
 "inventory.opening.partial.title" = "Some openings were not recorded";
 "inventory.opening.partial.message" = "{count} products were not recorded. The reason is shown beside each line that was refused, and nothing was changed for those products; the rest were written.";
 
-/* d1-2 Overview month-on-month / year-on-year block (10 keys, dormant: nothing draws them this round) */
+/* d1-3 Overview month-on-month / year-on-year block (11 keys; placed by OverviewPageComposition) */
 "overview.metrics.title" = "Month on month & year on year";
 "overview.metrics.revenue" = "Revenue";
 "overview.metrics.mom" = "Month on month";
@@ -803,6 +803,7 @@
 "overview.metrics.momCaption" = "Compared with the previous month";
 "overview.metrics.yoyCaption" = "Compared with the same month last year";
 "overview.metrics.basisNote" = "Both are computed on revenue. Each transaction contributes its tax-exclusive amount where one was recorded, and its full amount where none was; filling in “Amount (excl. tax)” on those transactions makes this block consistent. The chart above totals income and expenses with tax included — a different basis, so the two are not directly comparable.";
+"overview.metrics.basisNoteUS" = "Both are computed on revenue. Under the US accounting profile, reports use each transaction’s full recorded amount, so the “Amount (excl. tax)” field does not affect these figures. The chart above totals income and expenses over the period you selected; this block shows revenue only, for the whole year shown above.";
 "overview.metrics.noBaseNote" = "When the base period has no data or is zero, this is left blank rather than shown as 0.0% — with nothing to compare against, any percentage would mislead.";
 "overview.metrics.empty.title" = "Nothing to compare yet";
-"overview.metrics.empty.message" = "Month on month needs at least two months of transactions; year on year also needs the same month last year.";
+"overview.metrics.empty.message" = "Both are computed on revenue: month on month needs the month before it to have some, and year on year needs the same month last year to have some. A ledger with expenses only produces neither.";
