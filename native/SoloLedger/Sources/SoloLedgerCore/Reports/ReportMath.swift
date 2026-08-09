@@ -162,10 +162,13 @@ enum ReportMath {
     /// other five flatten it to a confident zero. The mirror must reproduce that
     /// asymmetry rather than tidy it (plan §9, row "cn.js 遇不可解析税率时产出 NaN").
     ///
-    /// It is no longer visible in the `malformed` goldens, and that is not a
-    /// regression: a rate the dispatcher judges unusable is refused before any rounder
-    /// sees it, so those files now record `null` on BOTH sides. The rounders' asymmetry
-    /// survives only on the path where a rate never arrives at all.
+    /// It is no longer visible in the `malformed` goldens, and that is not a regression:
+    /// a rate the dispatcher judges unusable is refused before any rounder sees it, so
+    /// those files now record `null` on BOTH sides. The asymmetry itself is untouched —
+    /// it fires on every `NaN` that reaches a rounder by some other route. A corrupt
+    /// `admin_expense_annual` is one such route and is pinned as one:
+    /// `ReportBatch1BlindSpotTests.testOnlyChinaPropagatesANaNAdminExpense` drives the
+    /// same `NaN` through all six and asserts China alone keeps it.
     @inlinable
     static func round2(_ x: Double) -> Double {
         round(x * 100) / 100
@@ -208,9 +211,11 @@ enum ReportMath {
     ///   judged unusable now arrives as `null`, and `cn.js incomeTax` refuses before
     ///   any arithmetic runs — `malformed-CN-2025.json` still records `incomeTax: null`,
     ///   but by that explicit refusal rather than by a `NaN` travelling down the chain.
-    ///   `NaN` still reaches here when a caller passes no rate at all (`undefined`),
-    ///   which `_missingRate.js` documents as a separate case it deliberately does not
-    ///   touch: the pure-function guards and any test driving an engine directly.
+    ///   `NaN` still reaches here by other routes. One is a caller passing no rate at
+    ///   all (`undefined`), which `_missingRate.js` documents as a separate case it
+    ///   deliberately does not touch — the pure-function guards, and any test driving an
+    ///   engine directly. Another is a figure that is not a rate: a corrupt
+    ///   `admin_expense_annual` travels the same chain and is never rate-gated.
     /// - **Signed zero is ordered.** JS treats `+0` as greater than `-0`, so
     ///   `Math.max(0, -0)` is `+0`; `Swift.max(0.0, -0.0)` returns `-0`.
     static func max(_ a: Double, _ b: Double) -> Double {

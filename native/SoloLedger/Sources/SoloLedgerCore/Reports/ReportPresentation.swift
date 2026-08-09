@@ -149,8 +149,10 @@ enum ReportPresentation {
     /// a caller render an empty picker for a ledger that should have been rejected.
     ///
     /// Not justified by the source throwing: `index.js generate` does throw on an unknown
-    /// locale, but `index.js getAvailableReports` does not — it falls back to the Chinese
-    /// table. The reason to keep `nil` is the one above, which holds either way.
+    /// locale, but `index.js getAvailableReports` does not. It answers `[]` for an unknown
+    /// non-empty locale, and reaches the Chinese table only when the argument is falsy —
+    /// so the source DOES produce the empty array this function refuses to produce. That
+    /// divergence is deliberate, and the reason to keep `nil` is the one above.
     static func reportTypes(locale: String) -> [ReportTypePresentation]? {
         guard let table = ReportTypes.table(for: locale) else { return nil }
         return table.map {

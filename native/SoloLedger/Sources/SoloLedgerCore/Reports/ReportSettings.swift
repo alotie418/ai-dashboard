@@ -76,11 +76,15 @@ enum ReportSettings {
     /// const incomeTaxRate = resolveRate(db, 'income_tax_rate', locale, 25);
     /// ```
     ///
-    /// The quoted call is what the dispatcher runs TODAY. An earlier form gated only on
-    /// whether the row existed and then took whatever `readSetting` returned; a row that
-    /// existed but held unusable text therefore fell back to the Chinese 25 and priced a
-    /// report nobody had configured. `resolveRate` decides on the row AND on its stored
-    /// bytes, and answers `null` for either failure.
+    /// The quoted call is what the dispatcher runs TODAY, and it separates three things
+    /// an earlier form ran together. That form asked only whether the row existed and
+    /// then took `Number(readSetting(...))`, so a row holding unusable bytes produced
+    /// whatever that pipeline happened to yield: bare `25%` fails `JSON.parse` and falls
+    /// back to the Chinese 25; the JSON string `"25%"` parses and coerces to `NaN`;
+    /// `null` coerces to a confident `0`. `resolveRate` asks about the row, then about
+    /// its stored bytes, and answers `null` whenever the bytes are unusable — while a
+    /// MISSING row still yields the Chinese fallback under CN and `null` elsewhere,
+    /// which is a different question with a different answer.
     ///
     /// - Parameter locale: the ALREADY-RESOLVED accounting locale — the one the
     ///   dispatcher will route on (`index.js locale`), not whatever is in `settings`.
@@ -97,8 +101,9 @@ enum ReportSettings {
     /// ```
     ///
     /// Both rates go through that one resolution. The earlier form applied the 12
-    /// fallback unconditionally, to every regime and to an unusable stored value alike —
-    /// which is the behaviour the four states exist to replace.
+    /// fallback to every regime, with no row check at all — so a ledger that had never
+    /// configured a surcharge was priced as if it had. What an unusable stored value did
+    /// under it depended on the bytes, exactly as for the income-tax rate above.
     ///
     /// **Only China's engine reads it** (`cn.js taxSurcharge`), so outside China this answers
     /// ``ReportRateSetting/notConfigured`` for a missing row and R7 must simply not
