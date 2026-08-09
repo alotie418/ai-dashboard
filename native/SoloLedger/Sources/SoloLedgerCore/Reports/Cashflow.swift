@@ -10,7 +10,7 @@ import Foundation
 
 /// A section that can never carry a number.
 ///
-/// `_cashflow.js:92-96` returns `null` for investing / financing / beginningCash /
+/// `_cashflow.js computeOperatingCashflow` returns `null` for investing / financing / beginningCash /
 /// endingCash, and `:5-8` states the obligation this creates: *the UI must render
 /// those nulls as "未配置 / 不适用", never as 0.*
 ///
@@ -62,14 +62,14 @@ enum OperatingCashflowSection: Equatable, Sendable {
     case notConfigured
 }
 
-/// The block `index.js:90` appends to every engine's output.
+/// The block `index.js generate` appends to every engine's output.
 struct CashflowStatement: Equatable, Sendable {
-    /// `'cash'` — 收付实现制 (`_cashflow.js:84`).
+    /// `'cash'` — 收付实现制 (`_cashflow.js basis`).
     let basis: String
-    /// Always `false` (`_cashflow.js:85`). Carried, not asserted away: it is the
+    /// Always `false` (`_cashflow.js statutory`). Carried, not asserted away: it is the
     /// machine-readable half of the disclaimer.
     let statutory: Bool
-    /// `'transactions' | 'legacy'` (`_cashflow.js:86`).
+    /// `'transactions' | 'legacy'` (`_cashflow.js computeOperatingCashflow`).
     let source: ReportSource
     let operating: OperatingCashflowSection
     let investing: CashflowSection
@@ -89,7 +89,7 @@ struct CashflowStatement: Equatable, Sendable {
     }
 }
 
-/// The four columns `_cashflow.js:53` projects.
+/// The four columns `_cashflow.js rows` projects.
 ///
 /// Deliberately NOT ``ReportRow``. That type mirrors the P&L path's `SELECT *`;
 /// this one mirrors a four-column projection over the same table, chosen by a
@@ -97,7 +97,7 @@ struct CashflowStatement: Equatable, Sendable {
 /// them would hide that two different questions are being asked of one table.
 ///
 /// No `date` and no `payment_date`: all windowing stays in SQL
-/// (`_cashflow.js:56-57`), so a Swift-side date comparison cannot drift from it.
+/// (`_cashflow.js rows`), so a Swift-side date comparison cannot drift from it.
 struct CashflowRow: Equatable, Sendable {
     /// `'income' | 'expense'` — and anything else is silently dropped, see
     /// ``Cashflow/operating(rows:)``.
@@ -116,7 +116,7 @@ struct CashflowRow: Equatable, Sendable {
 
 enum Cashflow {
 
-    /// `txnCashAmount` — `_cashflow.js:31-34`.
+    /// `txnCashAmount` — `_cashflow.js txnCashAmount`.
     ///
     /// ```js
     /// if (row && row.paid_amount && row.paid_amount > 0) return row.paid_amount;
@@ -133,7 +133,7 @@ enum Cashflow {
     ///   truthiness alone does not.
     /// * This helper does NOT filter by status. The
     ///   `payment_status IN ('paid','partial')` exclusion lives only in the SQL
-    ///   (`_cashflow.js:55`), so calling this on an `unpaid` row with a positive
+    ///   (`_cashflow.js rows`), so calling this on an `unpaid` row with a positive
     ///   `paid_amount` returns that amount. The two are separate gates and the
     ///   mirror keeps them separate.
     static func txnCashAmount(_ row: CashflowRow) -> Double {
@@ -141,7 +141,7 @@ enum Cashflow {
         return row.paymentStatus == "paid" ? ReportMath.orZero(row.amount) : 0
     }
 
-    /// `_cashflow.js:59-64` — the accumulation, given rows the SQL already
+    /// `_cashflow.js computeOperatingCashflow` — the accumulation, given rows the SQL already
     /// filtered and windowed.
     ///
     /// `if (cashAmt <= 0) continue` is kept in that exact polarity. Inverting it to
@@ -165,7 +165,7 @@ enum Cashflow {
                                  net: round2(inflow - outflow))
     }
 
-    /// `_cashflow.js:26` — `Math.round((Number(n) || 0) * 100) / 100`.
+    /// `_cashflow.js round2` — `Math.round((Number(n) || 0) * 100) / 100`.
     ///
     /// Composed from the R1 primitives so the `Number()` is not quietly dropped.
     /// At both call sites the argument is already a `Double`, so the coercion is

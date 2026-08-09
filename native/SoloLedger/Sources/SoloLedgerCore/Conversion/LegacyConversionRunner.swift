@@ -8,7 +8,7 @@ import Foundation
 /// **All or nothing.** Every write happens inside ONE transaction. There is no per-row error
 /// handling and there is deliberately no `catch` around a row: the Electron converter this
 /// replaces wraps each row in `try { … } catch { skipped++ }` inside its transaction
-/// (`electron/handlers/migrations.js:106-130`), which commits whatever survived and leaves an
+/// (`electron/handlers/migrations.js migrateAll`), which commits whatever survived and leaves an
 /// orphan `transactions` row behind whenever the mapping insert is the half that failed —
 /// after which the legacy row still looks unconverted and a second run duplicates it. Removing
 /// the swallow removes that whole class; the ordering fix the gap table proposed is then moot.
@@ -354,7 +354,7 @@ extension LedgerStore {
                 let mappingsBefore = try rowCount("legacy_migrations")
 
                 // 9 — the first database WRITE happens here and nowhere earlier. Per row: the
-                // transaction first, then its mapping, matching `migrations.js:116-125`. With
+                // transaction first, then its mapping, matching `migrations.js migrateAll`. With
                 // no per-row catch the order carries no meaning: either both land or neither.
                 for identity in expectedFresh.sorted() {
                     guard let source = try readLegacySourceRow(identity) else {
@@ -544,7 +544,7 @@ enum LegacyConversionRunner {
             invoiceStatus: mapInvoiceStatus(source.invoiceStatus),
             // The conservative correction: an empty or absent status carries over as `unpaid`
             // — the legacy column's own DEFAULT — and NOT as Electron's optimistic `paid`
-            // (`migrations.js:121,158`). Any other string is graded `needsAdjudication` and
+            // (`migrations.js migrateAll`). Any other string is graded `needsAdjudication` and
             // cannot arrive, so there is no third branch to guess at.
             paymentStatus: PaymentStatus(rawValue: g.paymentStatus.stringValue ?? "") ?? .unpaid,
             paidAmount: usable(g.paidAmount),
@@ -562,7 +562,7 @@ enum LegacyConversionRunner {
         // `source_meta` rather than forged into a column that means something else.
     }
 
-    /// `migrations.js:94`, verbatim. The four recognised values are Chinese because the
+    /// `migrations.js mapInvoiceStatus`, verbatim. The four recognised values are Chinese because the
     /// legacy screens were; every other value — including the English an EU or US ledger
     /// would hold — maps to `n/a`. Mirrored rather than widened: inventing a mapping for a
     /// status this app never wrote would be inventing a fact about the user's invoicing.
@@ -574,7 +574,7 @@ enum LegacyConversionRunner {
         }
     }
 
-    /// `migrations.js:110-114` / `:148-151` — language-neutral, and only the segments the
+    /// `migrations.js desc@f472f6e` / `:148-151` — language-neutral, and only the segments the
     /// legacy row actually has. `purchases` has no shipping column, so it never gets that
     /// segment (the SELECT binds `NULL` there).
     ///
@@ -632,7 +632,7 @@ enum LegacyConversionRunner {
             "default_income_category_id": request.defaultIncomeCategoryID ?? NSNull(),
             "default_expense_category_id": request.defaultExpenseCategoryID ?? NSNull(),
         ]
-        // Sales only, exactly as `migrations.js:123` versus `:160`.
+        // Sales only, exactly as `migrations.js migrateAll` versus `:160`.
         if identity.table == .sales { object["shippingCost"] = auditValue(source.shippingCost) }
 
         guard let data = try? JSONSerialization.data(withJSONObject: object,

@@ -166,7 +166,7 @@ npm run build:dmg
 
 ## 质量守卫与测试
 
-仓库内置数十个 `check:*` 守卫脚本(截至 2026-07-28 为 44 个:报表口径不变量、COGS 拆分、税额标签、免责声明挂载、AI 语气、服务商 registry 一致性、离线资源、国际化 key 矩阵、CSP、报表黄金可复现等)与两套 Playwright 验收。常用:
+仓库内置数十个 `check:*` 守卫脚本(截至 2026-08-08 为 50 个:报表口径不变量、COGS 拆分、税额标签、免责声明挂载、AI 语气、服务商 registry 一致性、离线资源、国际化 key 矩阵、CSP、报表黄金可复现等)与两套 Playwright 验收。常用:
 
 ```bash
 npm run check:cogs-split      # 报表 COGS/经营费用拆分 + 净利不变量

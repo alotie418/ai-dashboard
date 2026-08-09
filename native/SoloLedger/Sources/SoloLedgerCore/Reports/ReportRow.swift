@@ -11,9 +11,9 @@ import Foundation
 /// Only the columns batches 1–4 read are carried.
 ///
 /// `date` was absent in batch 1 — the period filter happens in SQL
-/// (`index.js:47-52`), so the engines never needed it. Batch 2 changed that:
-/// `monthlyBreakdown` re-filters the SAME rows by month IN SWIFT (`cn.js:96`,
-/// `jp.js:64`, `us.js:135`), against a prefix built from `ctx.year`. So the column
+/// (`index.js generate`), so the engines never needed it. Batch 2 changed that:
+/// `monthlyBreakdown` re-filters the SAME rows by month IN SWIFT (`cn.js mIncome`,
+/// `jp.js revenue`, `us.js income`), against a prefix built from `ctx.year`. So the column
 /// is now read twice for two different purposes, and the second one is the reason
 /// Appendix A9 exists — see ``ReportMonth``.
 struct ReportRow: Equatable, Sendable {
@@ -27,9 +27,9 @@ struct ReportRow: Equatable, Sendable {
     /// `tax_amount` — the tax carried on the row, read by batch 4 alone.
     ///
     /// The turnover-tax blocks are the ONLY place this column is used, and they use
-    /// it through `(row.tax_amount || 0)` (`cn.js:20`, `:23` and the same pair in
+    /// it through `(row.tax_amount || 0)` (`cn.js totalIncomeTax`, `:23` and the same pair in
     /// jp/eu/kr/tw). That guard is why a NaN here contributes 0 rather than
-    /// poisoning the sum — so China's unguarded rounder (`cn.js:43`) cannot emit
+    /// poisoning the sum — so China's unguarded rounder (`cn.js generate`) cannot emit
     /// `null` from this path, even though it can from others. Measured in node: a
     /// `NaN` tax on one row of two yields the other row's tax, under every engine.
     ///
@@ -39,9 +39,9 @@ struct ReportRow: Equatable, Sendable {
     /// `category_id`.
     ///
     /// SQL NULL and "this query never selected the column" collapse to the SAME
-    /// `nil`, on purpose. `_expenseSplit.js:18` tests `row.category_id == null`
+    /// `nil`, on purpose. `_expenseSplit.js isCogsRow` tests `row.category_id == null`
     /// with LOOSE equality, which is true for JS `null` AND `undefined` — and the
-    /// legacy query (`index.js:60-63`) selects 24 columns, none of them
+    /// legacy query (`index.js generate`) selects 24 columns, none of them
     /// `category_id`, so every legacy row hits the `undefined` side. That is the
     /// mechanism behind the quirk that COGS is structurally 0 on every legacy
     /// period, and it is preserved rather than repaired.
@@ -50,7 +50,7 @@ struct ReportRow: Equatable, Sendable {
     ///
     /// The `transactions` table HAS NO SUCH COLUMN (verified against the fixture
     /// schema), so on the transactions path this is always nil and China's
-    /// shipping deduction at `cn.js:24` is structurally 0. Mirrored, not fixed —
+    /// shipping deduction at `cn.js totalShipping` is structurally 0. Mirrored, not fixed —
     /// plan Appendix A4 records the correction as needing a schema decision.
     let shippingCost: Double?
     /// `date`, as STORED — never parsed.
@@ -78,23 +78,23 @@ struct ReportCategory: Equatable, Sendable {
     let id: String
     /// `is_cogs`, kept in its RAW SQLite storage class rather than as a `Bool`.
     ///
-    /// `index.js:70` fetches categories with `SELECT *`, so the value reaching
-    /// `_expenseSplit.js:20` is whatever better-sqlite3 returns for the stored
+    /// `index.js generate` fetches categories with `SELECT *`, so the value reaching
+    /// `_expenseSplit.js isCogsRow` is whatever better-sqlite3 returns for the stored
     /// cell — it does NOT pass through the `is_cogs: !!r.is_cogs` coercion in
-    /// `electron/handlers/categories.js:51`, which is a different code path.
+    /// `electron/handlers/categories.js is_cogs`, which is a different code path.
     /// Decoding to `Bool` here would silently pick one interpretation; keeping the
     /// storage class lets ``isCogsTruthy`` apply JS's `!!` to the same value the
     /// engine sees.
     let isCogs: SQLiteValue
 
-    /// `slug`, also in its RAW storage class and for the same reason: `index.js:70`
+    /// `slug`, also in its RAW storage class and for the same reason: `index.js generate`
     /// is `SELECT *`, so the value reaching `us.js`'s category lookups is whatever
     /// the cell holds, not a decoded `String`.
     ///
     /// Batch 3 uses it in TWO different ways, and they are not the same rule:
     /// the income side compares it with `===` against a literal
-    /// (`us.js:121`), while the expense side uses it as an OBJECT KEY
-    /// (`us.js:29-30`) after a `|| 'other'` fallback. See ``slugKeyOrOther`` and
+    /// (`us.js matchCategory`), while the expense side uses it as an OBJECT KEY
+    /// (`us.js slug`) after a `|| 'other'` fallback. See ``slugKeyOrOther`` and
     /// ``slugEquals(_:)``.
     let slug: SQLiteValue
 
@@ -104,7 +104,7 @@ struct ReportCategory: Equatable, Sendable {
         self.slug = slug
     }
 
-    /// `cat.slug === literal` — the INCOME side (`us.js:121`).
+    /// `cat.slug === literal` — the INCOME side (`us.js matchCategory`).
     ///
     /// Strict equality against a string literal, so only a TEXT cell can ever
     /// match: a numeric or null slug is simply not equal to `"returns"`.
@@ -114,7 +114,7 @@ struct ReportCategory: Equatable, Sendable {
     }
 
     /// `findCategorySlug(row, categories) || 'other'` — the EXPENSE side
-    /// (`us.js:29`), as the object key it becomes at `us.js:30`.
+    /// (`us.js slug`), as the object key it becomes at `us.js generate`.
     ///
     /// The `|| 'other'` is JS truthiness on the slug value, so an empty string and
     /// a null slug BOTH fall to `other` and land on line 27a — the same bucket as a
@@ -137,7 +137,7 @@ struct ReportCategory: Equatable, Sendable {
     }
 
     /// JS `!!value` over a SQLite storage class — the `!!(cat && cat.is_cogs)`
-    /// at `_expenseSplit.js:20`.
+    /// at `_expenseSplit.js isCogsRow`.
     ///
     /// Defensive rather than load-bearing today: every `is_cogs` cell in the
     /// fixture is `typeof = integer`, and `categories.js` writes `is_cogs ? 1 : 0`

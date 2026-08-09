@@ -76,7 +76,7 @@ enum EstimatedValue: Equatable, Sendable {
     /// that mistake un-writable.
     /// When more than one rate could block a value, the caller must ask in the
     /// engine's own order. China's `incomeTax` is gated by
-    /// `cannotPrice = surchargeMissing || rateMissing` (`cn.js:53`), and `||`
+    /// `cannotPrice = surchargeMissing || rateMissing` (`cn.js cannotPrice`), and `||`
     /// short-circuits — so with BOTH rows unusable the blocker is the SURCHARGE, and
     /// the refusal must name it. That order is a fact about the JS, not a preference,
     /// and `ReportBatch5BlindSpotTests` pins it; deriving it afterwards from which
@@ -94,15 +94,15 @@ enum EstimatedValue: Equatable, Sendable {
     }
 }
 
-/// `us.js:91-99` — the Self-Employment Tax estimate.
+/// `us.js scheduleC` — the Self-Employment Tax estimate.
 ///
 /// Seven fields, mirrored verbatim. Two of them are duplicates that NO input can
 /// separate, and saying so is cheaper than letting a green run imply otherwise:
 ///
-/// * `netEarnings` is `scheduleC.line31_netProfit` — the same variable (`us.js:66`),
+/// * `netEarnings` is `scheduleC.line31_netProfit` — the same variable (`us.js netProfit`),
 ///   so these ten golden cells re-assert a number batch 3 already pinned;
 /// * `totalSETax` is `estimatedTax.annualSETax` — again the same variable
-///   (`us.js:74`), so wiring either to the other is undetectable by any golden.
+///   (`us.js totalSETax`), so wiring either to the other is undetectable by any golden.
 ///
 /// A third measured gap: `additionalMedicare` is **0 in all ten US goldens**, and the
 /// social-security wage cap never binds (the largest `seEarnings` in the fixture is
@@ -122,9 +122,9 @@ struct SelfEmploymentTax: Equatable, Sendable {
     let paramYear: Int
 }
 
-/// `us.js:101-107` — the quarterly estimated-tax block.
+/// `us.js medicareTax` — the quarterly estimated-tax block.
 ///
-/// `totalAnnual` is `annualIncomeTax + totalSETax` and is **NOT rounded** (`us.js:82`).
+/// `totalAnnual` is `annualIncomeTax + totalSETax` and is **NOT rounded** (`us.js estimatedAnnualTax`).
 /// Two committed goldens carry the float tail that proves it — `base-US-2024` records
 /// `1542.6599999999999` and `base-US-2026` records `14590.380000000001` — so an
 /// implementation that adds a tidy `round2` here fails on exactly those two cells.

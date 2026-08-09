@@ -1,10 +1,10 @@
 import Foundation
 
-/// `scheduleC` — the US batch-3 block (`us.js:34-59`, `:85-89`).
+/// `scheduleC` — the US batch-3 block (`us.js scheduleC`, `:85-89`).
 ///
 /// Twenty-five fields in the SOURCE's order, which is not the form's order:
 /// `line30_homeOffice` sits before `line28_totalExpenses` and `line31_netProfit`
-/// because those two are spread in afterwards (`us.js:86-88`). The order is
+/// because those two are spread in afterwards (`us.js scheduleC`). The order is
 /// preserved because it is the order a reader comparing this file to the JS will
 /// scan, not because anything depends on it.
 ///
@@ -26,12 +26,12 @@ import Foundation
 /// 3. **A negative `returns` row makes `line2` negative** and leaves `line7`
 ///    unchanged in sign. Unreachable from the fixture, so no golden constrains it.
 struct ScheduleC: Equatable, Sendable {
-    // Part I — income (us.js:35-38)
+    // Part I — income (us.js line1_grossReceipts)
     let line1_grossReceipts: Double
     let line2_returns: Double
     let line6_otherIncome: Double
     let line7_grossIncome: Double
-    // Part II — expenses (us.js:40-58)
+    // Part II — expenses (us.js line8_advertising)
     let line8_advertising: Double
     let line9_car: Double
     let line10_commissions: Double
@@ -51,11 +51,11 @@ struct ScheduleC: Equatable, Sendable {
     let line26_wages: Double
     let line27a_other: Double
     let line30_homeOffice: Double
-    // Spread in after the literal (us.js:86-88)
+    // Spread in after the literal (us.js scheduleC)
     let line28_totalExpenses: Double
     let line31_netProfit: Double
 
-    /// Unrounded intermediates the estimate layer consumes (`us.js:65` feeds
+    /// Unrounded intermediates the estimate layer consumes (`us.js netProfit` feeds
     /// `:68`, `:76`, `:92`, `:102`). Carried so batch 5 does not have to re-mirror
     /// the whole mapping to get at them; not part of the golden comparison.
     let unroundedGrossIncome: Double

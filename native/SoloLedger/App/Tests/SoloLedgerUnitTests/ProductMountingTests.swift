@@ -122,7 +122,7 @@ final class ProductMountingTests: XCTestCase {
     // MARK: - PM1 — the placement table is the adjudicated namespace, in both directions
     // ==============================================================================================
 
-    func testPM1ThePlacementTableIsExactlyTheFortyAdjudicatedKeys() throws {
+    func testPM1ThePlacementTableIsExactlyTheAdjudicatedNamespace() throws {
         let placed = Set(ProductPageComposition.placement.keys)
         XCTAssertEqual(placed.count, 41, "2b-A2 adjudicated forty product.* keys; N-PR-3 adds the seventh error case")
         for language in languages {

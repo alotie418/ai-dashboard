@@ -67,7 +67,7 @@ final class AppUnitTests: XCTestCase {
 
     private static let languages = ["zh-Hans", "zh-Hant", "en", "ja", "ko", "fr"]
 
-    /// The four keys P4c-2 adds, and — for the three that are deliberate verbatim reuse —
+    /// The keys P4c-2 and P4d add, and — for those that are deliberate verbatim reuse —
     /// the already-approved key whose value they must equal in every language.
     private static let newKeys: [(key: String, mirrors: String?)] = [
         ("settings.accountingLocale.unreadable.title", "report.blocker.accountingLocaleInvalid.title"),
@@ -90,7 +90,7 @@ final class AppUnitTests: XCTestCase {
     }
 
     // S1 ────────────────────────────────────────────────────────────────────────────────
-    func testS1TheFourNewKeysExistAndAreNotBlankInEveryLanguage() throws {
+    func testS1EveryNewKeyExistsAndIsNotBlankInEveryLanguage() throws {
         for language in Self.languages {
             let table = try strings(language)
             for (key, _) in Self.newKeys {
@@ -104,8 +104,8 @@ final class AppUnitTests: XCTestCase {
 
     // S2 ────────────────────────────────────────────────────────────────────────────────
     /// The point of P4c is that the two screens stop saying different things about one row.
-    /// Three of the four keys therefore carry the report page's wording VERBATIM, and that
-    /// is a guard rather than a coincidence: editing one side alone fails here.
+    /// The keys that name a mirror therefore carry the report page's wording VERBATIM, and
+    /// that is a guard rather than a coincidence: editing one side alone fails here.
     func testS2TheReusedKeysMatchTheirReportCounterpartsVerbatim() throws {
         for language in Self.languages {
             let table = try strings(language)

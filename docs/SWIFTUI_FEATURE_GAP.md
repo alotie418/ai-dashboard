@@ -16,8 +16,8 @@
 | 金额与货币显示 | ✅（Phase 2A 完善） | 按币种格式化；**多币种不再显示无说明总数** |
 | 会计类别浏览（78 预置） | ✅（只读） | `CategoriesView`，可切会计制度 |
 | CSV 导入 / 导出（交易） | ✅ | RFC-4180 + BOM + 注入防护；导入纯追加 |
-| Electron → SwiftUI 数据升级 | ✅ | 生产启动路径为 C12 coordinator 链（`AppModel.startChain(.boot)` → `MigrationCoordinator`）；`DatabaseUpgrade` 仅保留为 legacy 恢复分支（`AppModel.swift:459-464`），不在启动路径上 |
-| 6 语言 UI | ✅ | 六语各 **634 键、键集完全一致**（`Sources/SoloLedger/Resources/*.lproj/Localizable.strings`）；guard 强制「恰好六个 `.lproj`」（`LocalizationWordingGuardTests.swift:861`）、「各语键数相等」（`:870`、`:879-880`）、「无空值」（`:903`）、「值不得等于键」（`:913`）。缺键仍回退 **zh-Hans**（非 en；`Package.swift:19`、`Localizer.swift:40`）；仍为 `.strings`（无 `.xcstrings`）。**残留**：guard 只比较键「数量」不比较键「集合」（`:879-880`），等量互换的错键可漏网 |
+| Electron → SwiftUI 数据升级 | ✅ | 生产启动路径为 C12 coordinator 链（`AppModel.startChain(.boot)` → `MigrationCoordinator`）；`DatabaseUpgrade` 仅保留为 legacy 恢复分支（`AppModel` 的 legacy `DatabaseUpgrade` 恢复分支），不在启动路径上 |
+| 6 语言 UI | ✅ | 六语各 **645 键、键集完全一致**（`Sources/SoloLedger/Resources/*.lproj/Localizable.strings`）；guard 强制「恰好六个 `.lproj`」（`LocalizationWordingGuardTests.swift:861`）、「各语键数相等」（`:870`、`:879-880`）、「无空值」（`:903`）、「值不得等于键」（`:913`）。缺键仍回退 **zh-Hans**（非 en；`Package.swift:19`、`Localizer.swift:40`）；仍为 `.strings`（无 `.xcstrings`）；键**集合**相等由 `MigrationCopyParityTests` 的 `testFullLocaleKeyUniverseRatchet` 严格比对（六语与 zh-Hans 全集互为子集），等量互换的错键无法漏网 |
 | 深色模式 | ✅ | 原生新增（Electron 仅浅色） |
 | 类别管理（增删改） | 🟡 | 目前只读浏览 |
 
@@ -78,13 +78,13 @@
 ## Release 前阻塞项清单（汇总）
 
 1. ✅ 附件文件迁移（DB 之外的 `attachments/`）——主/自动 `.masContainer`、用户选目录、**以及 restore-from-backup** 三条链均迁附件（`BackupRestore.swift:7-9`），Core + **App 层端到端**测试均覆盖（`BackupRestoreTests.swift:132`）。**G1 已闭合**。
-2. ✅ legacy `sales`/`purchases`：只读探针 + 诚实提示已上线（零写入），**转换器（2a-1…2a-4）亦已上线**。三处口径均按保守修正实现，报表口径切换等 9 条后果在转换前逐条明示（`Localizable.strings:543-551`），转换前强制生成可读备份，旧行零删改（见 §4 该行）。
+2. ✅ legacy `sales`/`purchases`：只读探针 + 诚实提示已上线（零写入），**转换器（2a-1…2a-4）亦已上线**。三处口径均按保守修正实现，报表口径切换等 9 条后果在转换前逐条明示（zh-Hans `legacy.convert.consequence.*` 的九条后果句），转换前强制生成可读备份，旧行零删改（见 §4 该行）。
 3. ✅ 旧进程检测硬化：强指纹稳定性检测（前后指纹 + 3 次尝试）+ 可重试引导态"请退出旧版并重试"（`migration.msg.sourceBusy`，6 语）；App Sandbox 内进程枚举 / 取锁不可行，此为该环境下的正解。原 🛑 已过时。
 4. 🛑 真实 Release 沙箱下的数据路径 / 升级端到端验证。
 5. ✅ **DMG（非沙箱）用户数据迁移入口**：N7.2 源选择入口已全链路接线（RootView → FilePanels → AppModel → coordinator `.requiresSourceChoice` / `.migrateFromUserDir` / `.userSelectedDataDir`）、single-grant-window 无 bookmark，Core + App-hosted 测试覆盖。**原 P0 已闭合**。
 6. ✅ 用户可见的备份 / 恢复 UI——「设置 → 数据」的导出备份与从备份恢复已上线（`SettingsView` 的「设置 → 数据」按钮），恢复前先快照当前账本，legacy 转换进行中一律拒绝（`AppModel` 的恢复入口守卫）。
-7. ✅ 完整 6 语言——六语各 634 键、键集完全一致，guard 强制恰好六个 `.lproj` 且各语键数相等（`LocalizationWordingGuardTests` 的 `testDiscoveredLocalesAreExactlyTheSixShippedLanguages` 与键数相等断言）。`.xcstrings` parity 仍推迟（`.strings` 对 MAS 可用，非阻塞）。**残留**：guard 只比键数不比键集。
+7. ✅ 完整 6 语言——六语各 645 键、键集完全一致，guard 强制恰好六个 `.lproj` 且各语键数相等（`LocalizationWordingGuardTests` 的 `testDiscoveredLocalesAreExactlyTheSixShippedLanguages` 与键数相等断言）。`.xcstrings` parity 仍推迟（`.strings` 对 MAS 可用，非阻塞）。键集合相等另由 `MigrationCopyParityTests.testFullLocaleKeyUniverseRatchet` 严格比对。
 8. 🛑 MAS 签名 / 打包 / App Store Connect（Phase 4）。
 9. ✅ 损益 / VAT / 所得税 / 现金流 / COGS 等敏感报表——已逐字**镜像** `electron/reports/*` 上线，入口已激活（`RootView` detail switch 的 `.reports` 分支）。**残留 🟡**：`electron/handlers/balanceOverview.js`（资产负债概览，246 行）尚未镜像。`electron/handlers/inventory.js`（库存成本，89 行）**不是残留**——按 §2 的实测审计它不是加权平均法，已裁定不作为镜像对象，原生另写新引擎（N 章已收官）。
 
-> 本表随每个阶段更新。**截至 2026-08-07**：生产启动链（C12a / C12b）+ 两条 active-store hardened open（C12x-A1 existing / A2 createFresh）+ DMG 源选择入口（N7.2）+ 附件文件迁移（三条链，G1 已闭合）均已落地；**报表引擎已全线镜像并激活入口**（逐字镜像 `electron/reports/*` 共 **930 行**敏感逻辑，非早前记载的 808 行）；**legacy `sales`/`purchases` 转换器（2a-1…2a-4）已上线**；**用户可见备份 / 恢复 UI 已上线**；六语文案已达成 634 键 parity；**原生库存引擎与库存页已上线（N 章 #452–#458 收官，侧栏入口已激活）**。**剩余发布阻塞项收敛为两条：#4 真实 Release 沙箱下的数据路径 / 升级端到端验证，#8 MAS 签名 / 打包 / App Store Connect。** 报表与转换器输出一律为管理分析口径的估算，不是法定财务报表，也不构成申报依据。
+> 本表随每个阶段更新。**截至 2026-08-07**：生产启动链（C12a / C12b）+ 两条 active-store hardened open（C12x-A1 existing / A2 createFresh）+ DMG 源选择入口（N7.2）+ 附件文件迁移（三条链，G1 已闭合）均已落地；**报表引擎已全线镜像并激活入口**（逐字镜像 `electron/reports/*` 共 **930 行**敏感逻辑，非早前记载的 808 行）；**legacy `sales`/`purchases` 转换器（2a-1…2a-4）已上线**；**用户可见备份 / 恢复 UI 已上线**；六语文案已达成 645 键 parity；**原生库存引擎与库存页已上线（N 章 #452–#458 收官，侧栏入口已激活）**。**剩余发布阻塞项收敛为两条：#4 真实 Release 沙箱下的数据路径 / 升级端到端验证，#8 MAS 签名 / 打包 / App Store Connect。** 报表与转换器输出一律为管理分析口径的估算，不是法定财务报表，也不构成申报依据。

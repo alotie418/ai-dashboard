@@ -42,10 +42,10 @@ enum ReportMath {
 
     // MARK: - `||` — JS truthiness
     //
-    // Call sites: `r.amount_net || r.amount || 0` (cn.js:19,22, _expenseSplit.js:24,
+    // Call sites: `r.amount_net || r.amount || 0` (cn.js totalIncomeNet / totalExpenseNet, _expenseSplit.js net,
     // and the same line in jp/eu/kr/tw), `(v || 0)` inside the rounders
-    // (us.js:142, jp.js:14, eu.js:14, kr.js:14, tw.js:14), `expenseBySlug[slug] || 0`
-    // (us.js:40-58), `row.paid_amount && row.paid_amount > 0` (_cashflow.js:32).
+    // (us.js:142, jp.js generate, eu.js generate, kr.js generate, tw.js generate), `expenseBySlug[slug] || 0`
+    // (us.js line8_advertising), `row.paid_amount && row.paid_amount > 0` (_cashflow.js txnCashAmount).
 
     /// JS `ToBoolean` restricted to the values a numeric column can hold.
     ///
@@ -82,7 +82,7 @@ enum ReportMath {
     }
 
     /// JS `row.amount_net || row.amount || 0` — the engines' net-amount convention,
-    /// named because it appears in every engine and in `_expenseSplit.js:24`.
+    /// named because it appears in every engine and in `_expenseSplit.js net`.
     ///
     /// The interesting input is `amount_net == 0`, which JS treats as falsy and
     /// therefore falls back to the TAX-INCLUSIVE `amount`. Swift's `??` would
@@ -97,9 +97,9 @@ enum ReportMath {
 
     // MARK: - `Math.round`
     //
-    // Call sites: every `r()` helper (cn.js:43, us.js:142, jp.js:14, eu.js:14,
-    // kr.js:14, tw.js:14), the margin lines (cn.js:30,41), the tax lines
-    // (cn.js:33,39) and `_cashflow.js:26`.
+    // Call sites: every `r()` helper (cn.js generate, us.js:142, jp.js generate, eu.js generate,
+    // kr.js generate, tw.js generate), the margin lines (cn.js grossMargin / netMargin), the tax lines
+    // (cn.js:33,39) and `_cashflow.js round2`.
 
     /// JS `Math.round(x)`.
     ///
@@ -155,7 +155,7 @@ enum ReportMath {
         return (x - f) >= 0.5 ? f + 1 : f
     }
 
-    /// JS `Math.round(x * 100) / 100` — `cn.js:43`'s `r`.
+    /// JS `Math.round(x * 100) / 100` — `cn.js generate`'s `r`.
     ///
     /// NOTE the missing `|| 0`: China's rounder is the only one without it, so a
     /// `NaN` flows straight through and `JSON.stringify` writes it as `null`. That
@@ -167,15 +167,15 @@ enum ReportMath {
         round(x * 100) / 100
     }
 
-    /// JS `Math.round((v || 0) * 100) / 100` — the `r` in us.js:142, jp.js:14,
-    /// eu.js:14, kr.js:14, tw.js:14. Identical to ``round2(_:)`` except that a
+    /// JS `Math.round((v || 0) * 100) / 100` — the `r` in us.js:142, jp.js generate,
+    /// eu.js generate, kr.js generate, tw.js generate. Identical to ``round2(_:)`` except that a
     /// falsy input (including `NaN`) is flattened to `0` first.
     @inlinable
     static func round2OrZero(_ v: Double?) -> Double {
         round2(orZero(v))
     }
 
-    /// JS `Math.round(x * 10000) / 100` — `cn.js:30` and `cn.js:41`, the margin
+    /// JS `Math.round(x * 10000) / 100` — `cn.js grossMargin` and `cn.js:41`, the margin
     /// percentages. Scaling by 10000 rather than composing `round2` with `* 100`
     /// is what the source does, and the two are NOT interchangeable: they round at
     /// different magnitudes and overflow to `Infinity` 100× sooner.
@@ -186,10 +186,10 @@ enum ReportMath {
 
     // MARK: - `Math.max` / `Math.min`
     //
-    // Call sites: `Math.max(0, totalIncomeTax - totalExpenseTax)` (cn.js:32 and the
+    // Call sites: `Math.max(0, totalIncomeTax - totalExpenseTax)` (cn.js vatPayable and the
     // VAT line in jp/eu/kr/tw), `Math.max(0, profitBeforeTax)` (cn.js:39) and the
     // same clamp before every income-tax line, `Math.min(seEarnings, ssTaxCap)`
-    // (us.js:70).
+    // (us.js ssTax).
 
     /// JS `Math.max(a, b)`.
     ///
@@ -224,11 +224,11 @@ enum ReportMath {
 
     // MARK: - `Number(v)`
     //
-    // Call site: `Number(readSetting(db, key, fallback))` — index.js:74-78, for
+    // Call site: `Number(readSetting(db, key, fallback))` — index.js vatRate, for
     // vat_rate / surcharge_rate / income_tax_rate / admin_expense_annual.
 
     /// A `JSON.parse` result, which is exactly the domain `Number()` is applied to
-    /// at `index.js:74-78`: `readSetting` returns `JSON.parse(row.value)` when the
+    /// at `index.js vatRate`: `readSetting` returns `JSON.parse(row.value)` when the
     /// row exists and a numeric literal when it does not.
     enum JSValue: Equatable, Sendable {
         /// No such settings row at all. `readSetting` substitutes its fallback
@@ -476,7 +476,7 @@ enum ReportMath {
     /// JS `Number.prototype.toLocaleString()` with NO arguments, under the locale the
     /// goldens pin (`en-US`).
     ///
-    /// `us.js:120` builds a user-visible warning with it:
+    /// `us.js warnings` builds a user-visible warning with it:
     /// ``Estimated quarterly tax payment: $${quarterlyPayment.toLocaleString()}``.
     /// This is the ONLY ICU-dependent expression in `electron/reports/*`, which is why
     /// the goldens pin `LC_ALL` — measured, the same call emits `$298.41` under en_US

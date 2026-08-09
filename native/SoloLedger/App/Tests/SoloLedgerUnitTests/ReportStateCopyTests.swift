@@ -2,15 +2,17 @@ import XCTest
 @testable import SoloLedger
 import SoloLedgerCore
 
-/// R8 P3c — the 79 state and parameter-disclosure copy keys: seven blockers, the three
+/// R8 P3c — the state and parameter-disclosure copy keys: seven blockers, the three
 /// non-numeric field states, the four parameter axes, cash flow, the monthly table, notes and
 /// warnings, and the page chrome.
 ///
 /// ## Why this file carries a literal key list and `ReportStructuralCopyTests` did not
 ///
-/// P3b's 82 keys were all emitted by `ReportPresenter`, so the test could DERIVE them from the
-/// mapping functions and no hand-written list was needed. P3c is half that: 37 keys the
-/// presenter emits, and 42 the VIEW will ask for — and the view does not exist yet (P3d).
+/// P3b's keys were all emitted by `ReportPresenter`, so that test could DERIVE them from the
+/// mapping functions and no hand-written list was needed. This half is split: some keys the
+/// presenter emits, and the rest the VIEW asks for directly — those the presenter never sees,
+/// so nothing here can derive them. The two counts are asserted in `testStateKeyUniverse…`
+/// rather than restated here, where they would rot.
 ///
 /// A predicted key set fails in two directions and neither is caught by anything already in
 /// the tree. A key P3d turns out to need but nobody wrote makes P3d add copy, which is not
@@ -41,8 +43,8 @@ final class ReportStateCopyTests: XCTestCase {
         return ReportPresenter.allEmittableKeys().subtracting(structural)
     }
 
-    /// The 42 keys the report VIEW will ask for and the presenter never emits. Declared, not
-    /// derived — see the type's note.
+    /// The keys the report VIEW asks for and the presenter never emits. Declared, not derived —
+    /// see the type's note; the count is asserted, not written down twice.
     static let viewLayerKeys: Set<String> = [
         // page chrome
         "report.page.title", "report.year.label", "report.year.invalid", "report.action.build",
@@ -102,7 +104,7 @@ final class ReportStateCopyTests: XCTestCase {
 
     // MARK: - C2 — the universe is exactly 83, split 37 / 46
 
-    func testStateKeyUniverseIsExactlySeventyNine() {
+    func testStateKeyUniverseIsExactlyTheTwoDisjointHalves() {
         XCTAssertEqual(presenterStateKeys().count, 37)
         XCTAssertEqual(Self.viewLayerKeys.count, 46)
         XCTAssertEqual(stateKeys().count, 83, "37 presenter-emitted + 46 view-layer")

@@ -172,7 +172,7 @@ public enum PresentedCashflowSection: Equatable, Sendable {
 
 /// The engine's warnings as FACTS, not as its hardcoded English strings.
 ///
-/// `us.js:112` builds its first warning with `toLocaleString()`, producing e.g.
+/// `us.js dueDates` builds its first warning with `toLocaleString()`, producing e.g.
 /// `"Estimated quarterly tax payment: $3,647.6"` — English, ICU-dependent, and missing a
 /// trailing zero (Appendix A3). Handing that to a Japanese UI is not an option, so the
 /// amount travels classified and the wording is supplied by the presentation layer.

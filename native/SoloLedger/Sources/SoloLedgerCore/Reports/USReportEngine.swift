@@ -1,24 +1,25 @@
 import Foundation
 
-/// 美国报表引擎 — **batch-2 fields only**. Mirror of `electron/reports/us.js`.
+/// 美国报表引擎 —— 月度块、Schedule C、自雇税、预估税与警告。Mirror of `electron/reports/us.js`.
 ///
 /// The US is the odd one out twice over, and R3 touches both oddities:
 ///
 /// * **No `taxInclusiveSummary`.** Not an empty block — the key does not exist in
 ///   `us.js`'s output at all, which is why the golden field count for that block
 ///   is 3 × 45 rather than 3 × 54.
-/// * **`monthlyBreakdown` sums the TAX-INCLUSIVE `amount`** (`us.js:135-136`),
+/// * **`monthlyBreakdown` sums the TAX-INCLUSIVE `amount`** (`us.js income`),
 ///   where the five VAT engines sum `amount_net || amount || 0`. Schedule C works
 ///   in gross receipts throughout, so this is consistent with its own model — and
 ///   it means the same ledger produces different monthly figures under the US
 ///   regime than under any other. Mirrored, not reconciled.
 ///
-/// Everything else in `us.js` — Schedule C, self-employment tax, estimated tax and
-/// the warnings derived from them — is batch 3 / batch 5 and is deliberately not
-/// here. That is also why this type has no P&L block: the US engine has none.
+/// The rest of `us.js` — Schedule C, self-employment tax, estimated tax and the
+/// warnings derived from them — landed in later batches and is mirrored below. What
+/// this type still has no member for is a P&L block, and that is not an omission:
+/// the US engine has none.
 enum USReportEngine {
 
-    /// `us.js:130-140` — the monthly breakdown.
+    /// `us.js buildMonthly` — the monthly breakdown.
     ///
     /// Twelve entries keyed on `ctx.year` regardless of the reporting period
     /// (Appendix A9), the optional-chained date spelling, and `r()` — which for
@@ -26,7 +27,7 @@ enum USReportEngine {
     static func monthlyBreakdown(_ ctx: ReportContext) -> [ReportMonth] {
         let r = ReportMath.round2OrZero
         return ReportMonth.prefixes(year: ctx.year).enumerated().map { index, prefix in
-            // us.js:135-136 — `r.amount`, the TAX-INCLUSIVE column. The other five
+            // us.js income — `r.amount`, the TAX-INCLUSIVE column. The other five
             // engines use `amount_net || amount || 0` here.
             var income = 0.0
             for row in ctx.incomeRows where MonthMatch.optionalChained(row.date, prefix) {
@@ -37,7 +38,7 @@ enum USReportEngine {
                 expense += ReportMath.orZero(row.amount)
             }
             return ReportMonth(month: index + 1, revenue: r(income), cost: r(expense),
-                               profit: r(income - expense))   // us.js:137
+                               profit: r(income - expense))   // us.js buildMonthly
         }
     }
 }
@@ -46,7 +47,7 @@ enum USReportEngine {
 
 extension USReportEngine {
 
-    /// `us.js:14-65` and `:85-89` — the Schedule C mapping.
+    /// `us.js generate` and `:85-89` — the Schedule C mapping.
     ///
     /// Reads NO tax rate. `incomeTaxRate` never touches these fields, which is why
     /// this batch could land before the estimate layer; the parity test proves it
@@ -54,9 +55,9 @@ extension USReportEngine {
     /// rate variants.
     static func scheduleC(_ ctx: ReportContext) -> ScheduleC {
         let r = ReportMath.round2OrZero                     // us.js:142 — guarded
-        let meals = USTaxParams.resolve(year: ctx.year)     // us.js:12
+        let meals = USTaxParams.resolve(year: ctx.year)     // us.js generate
 
-        // --- Part I (us.js:15-24) ---------------------------------------------
+        // --- Part I (us.js grossReceipts) ---------------------------------------------
         // Line 1 sums EVERY income row…
         var grossReceipts = 0.0
         for row in ctx.incomeRows { grossReceipts += ReportMath.orZero(row.amount) }
@@ -65,15 +66,15 @@ extension USReportEngine {
         // so an other-income row is counted twice. Defect 1; mirrored.
         var returns = 0.0, otherIncome = 0.0
         for row in ctx.incomeRows {
-            guard let categoryID = row.categoryID, !categoryID.isEmpty,   // us.js:119
+            guard let categoryID = row.categoryID, !categoryID.isEmpty,   // us.js matchCategory
                   let category = ctx.categories.first(where: { $0.id == categoryID })
             else { continue }
             if category.slugEquals("returns") { returns += ReportMath.orZero(row.amount) }
             if category.slugEquals("other-income") { otherIncome += ReportMath.orZero(row.amount) }
         }
-        let grossIncome = grossReceipts - returns + otherIncome            // us.js:24
+        let grossIncome = grossReceipts - returns + otherIncome            // us.js grossIncome
 
-        // --- Part II (us.js:27-31) --------------------------------------------
+        // --- Part II (us.js expenseBySlug) --------------------------------------------
         // Every expense row lands in exactly one bucket keyed by its slug. A slug
         // no line reads means the money is in NO line — and therefore not in line
         // 28 either. Pinned by a test rather than left to be discovered.
@@ -84,14 +85,14 @@ extension USReportEngine {
                let category = ctx.categories.first(where: { $0.id == categoryID }) {
                 key = category.slugKeyOrOther
             } else {
-                key = "other"                                              // us.js:125
+                key = "other"                                              // us.js findCategorySlug
             }
             bySlug[key, default: 0] += ReportMath.orZero(row.amount)
         }
         func line(_ slug: String) -> Double { r(bySlug[slug]) }
 
         let rawMeals = bySlug["meals"] ?? 0
-        // us.js:54 — the `|| 0` is INSIDE, before the multiply, so an absent meals
+        // us.js line24b_meals — the `|| 0` is INSIDE, before the multiply, so an absent meals
         // bucket multiplies 0 rather than flooring the product afterwards.
         let line24b = r(ReportMath.orZero(bySlug["meals"]) * meals.params.mealsDeductiblePct)
 
@@ -105,8 +106,8 @@ extension USReportEngine {
         let line25 = line("utilities"), line26 = line("wages")
         let line27a = line("other"), line30 = line("home-office")
 
-        // us.js:61-63 — a SUM OF ALREADY-ROUNDED values, then rounded again at
-        // us.js:87. Not a rounding of the raw sum: ten 0.005 rows each round to
+        // us.js totalExpenses — a SUM OF ALREADY-ROUNDED values, then rounded again at
+        // us.js line28_totalExpenses. Not a rounding of the raw sum: ten 0.005 rows each round to
         // 0.01 and total 0.10, where the raw sum would be 0.05.
         //
         // Written as an explicit ordered list rather than by filtering the output
@@ -120,7 +121,7 @@ extension USReportEngine {
                              line17, line18, line20, line21, line22, line23, line24a,
                              line24b, line25, line26, line27a, line30]
             .reduce(0, +)
-        let netProfit = grossIncome - totalExpenses                        // us.js:65
+        let netProfit = grossIncome - totalExpenses                        // us.js netProfit
 
         return ScheduleC(
             line1_grossReceipts: r(grossReceipts), line2_returns: r(returns),
@@ -142,11 +143,11 @@ extension USReportEngine {
 
 extension USReportEngine {
 
-    /// `us.js:68-74`, `:91-99` — the Self-Employment Tax estimate.
+    /// `us.js generate`, `:91-99` — the Self-Employment Tax estimate.
     ///
     /// Reads the **unrounded** Line 31 (`ScheduleC.unroundedGrossIncome −
     /// unroundedTotalExpenses`), not the rounded `line31_netProfit` the block emits:
-    /// `us.js:66` computes the local and `us.js:69` multiplies it. Taking the
+    /// `us.js netProfit` computes the local and `us.js seEarnings` multiplies it. Taking the
     /// rounded field back out would round twice.
     ///
     /// Nothing here reads the income-tax rate, so nothing here can refuse — that is
@@ -162,38 +163,38 @@ extension USReportEngine {
     static func selfEmploymentTax(_ ctx: ReportContext) -> SelfEmploymentTax {
         let r = ReportMath.round2OrZero                        // us.js:150 — guarded
         let c = scheduleC(ctx)
-        let resolved = USTaxParams.resolve(year: ctx.year)     // us.js:12
+        let resolved = USTaxParams.resolve(year: ctx.year)     // us.js generate
         let se = resolved.params
 
-        let netProfit = c.unroundedGrossIncome - c.unroundedTotalExpenses   // us.js:66
-        let seEarnings = netProfit * se.seEarningsFactor                    // us.js:69
-        // us.js:71 — `Math.min`, NOT Swift.min: the two disagree on NaN and on the
+        let netProfit = c.unroundedGrossIncome - c.unroundedTotalExpenses   // us.js netProfit
+        let seEarnings = netProfit * se.seEarningsFactor                    // us.js seEarnings
+        // us.js ssTax — `Math.min`, NOT Swift.min: the two disagree on NaN and on the
         // sign of zero, and this is `ReportMath.min`'s first production caller.
         let ssTax = ReportMath.min(seEarnings, se.ssWageCap) * se.ssRate
-        let medicareTax = seEarnings * se.medicareRate                      // us.js:72
-        // us.js:73 — strictly GREATER than the threshold, and no clamp on the
+        let medicareTax = seEarnings * se.medicareRate                      // us.js medicareTax
+        // us.js additionalMedicare — strictly GREATER than the threshold, and no clamp on the
         // negative side because the comparison already excludes it.
         let additionalMedicare = seEarnings > se.addlMedicareThreshold
             ? (seEarnings - se.addlMedicareThreshold) * se.addlMedicareRate
             : 0
-        // us.js:74 — the raw sum rounded ONCE. Rounding the three parts first and
+        // us.js totalSETax — the raw sum rounded ONCE. Rounding the three parts first and
         // adding them differs: measured, 1,641,186 divergences in 4,000,000
         // one-cent steps.
         let totalSETax = r(ssTax + medicareTax + additionalMedicare)
 
         return SelfEmploymentTax(
-            netEarnings: r(netProfit),                 // us.js:92
-            seEarnings: r(seEarnings),                 // us.js:93
-            socialSecurityTax: r(ssTax),               // us.js:94
+            netEarnings: r(netProfit),                 // us.js scheduleC
+            seEarnings: r(seEarnings),                 // us.js line28_totalExpenses
+            socialSecurityTax: r(ssTax),               // us.js line31_netProfit
             medicareTax: r(medicareTax),               // us.js:95
             additionalMedicare: r(additionalMedicare), // us.js:96
-            totalSETax: totalSETax,                    // us.js:97 — already rounded
-            paramYear: resolved.year)                  // us.js:98
+            totalSETax: totalSETax,                    // us.js selfEmploymentTax — already rounded
+            paramYear: resolved.year)                  // us.js netEarnings
     }
 
-    /// `us.js:76-83`, `:101-107` — the quarterly estimated-tax block.
+    /// `us.js generate`, `:101-107` — the quarterly estimated-tax block.
     ///
-    /// `totalAnnual` is **not rounded** (`us.js:82`), and that is the sharpest
+    /// `totalAnnual` is **not rounded** (`us.js estimatedAnnualTax`), and that is the sharpest
     /// discriminator in the batch: `base-US-2024` records `1542.6599999999999` and
     /// `base-US-2026` records `14590.380000000001`. A tidy `round2` here produces
     /// `1542.66` / `14590.38` and fails on exactly those two cells — which is also
@@ -211,21 +212,21 @@ extension USReportEngine {
         let totalSETax = selfEmploymentTax(ctx).totalSETax
 
         let refusal = EstimatedValue.refusal(for: ctx.incomeTaxRate, parameter: .incomeTaxRate)
-        let annualIncomeTaxRaw = ctx.incomeTaxRate.rate.map { r(netProfit * ($0 / 100)) } // us.js:81
-        let totalAnnualRaw = annualIncomeTaxRaw.map { $0 + totalSETax }                    // us.js:82
+        let annualIncomeTaxRaw = ctx.incomeTaxRate.rate.map { r(netProfit * ($0 / 100)) } // us.js annualIncomeTax
+        let totalAnnualRaw = annualIncomeTaxRaw.map { $0 + totalSETax }                    // us.js estimatedAnnualTax
 
         return EstimatedTax(
             annualIncomeTax: refusal ?? .computed(annualIncomeTaxRaw ?? 0),
-            annualSETax: totalSETax,                                    // us.js:103
+            annualSETax: totalSETax,                                    // us.js selfEmploymentTax
             totalAnnual: refusal ?? .computed(totalAnnualRaw ?? 0),      // NOT rounded
-            quarterlyPayment: refusal ?? .computed(r((totalAnnualRaw ?? 0) / 4)), // us.js:83
+            quarterlyPayment: refusal ?? .computed(r((totalAnnualRaw ?? 0) / 4)), // us.js quarterlyPayment
             // us.js:106 — `${Number(year) + 1}` for the January date, so the year
             // goes through JS number coercion and back to a string.
             dueDates: ["\(ctx.year)-04-15", "\(ctx.year)-06-15", "\(ctx.year)-09-15",
                        "\(ReportMath.jsNumberToString(ReportMath.number(.string(ctx.year)) + 1))-01-15"])
     }
 
-    /// `us.js:117-122` — the warnings array.
+    /// `us.js warnings` — the warnings array.
     ///
     /// The WHOLE array belongs to this batch, not just its first entry, and the plan
     /// says why: it is a `.filter(Boolean)` literal, so when net profit is ≤ 0 the
@@ -248,12 +249,12 @@ extension USReportEngine {
         let estimate = estimatedTax(ctx)
 
         var out: [String] = []
-        // us.js:119 — `!rateMissing` is the A4-3 guard: a payment that cannot be
+        // us.js warnings — `!rateMissing` is the A4-3 guard: a payment that cannot be
         // computed is not announced, rather than announced as "$null".
         if netProfit > 0, totalSETax > 0, case .computed(let quarterly) = estimate.quarterlyPayment {
             out.append("Estimated quarterly tax payment: $\(ReportMath.toLocaleString(quarterly))")
         }
-        if ReportMath.isTruthy(c.rawMealsTotal) {                       // us.js:121
+        if ReportMath.isTruthy(c.rawMealsTotal) {                       // us.js warnings
             out.append("Meals expense is automatically limited to 50% deductible (Line 24b)")
         }
         return out

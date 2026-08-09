@@ -1,7 +1,7 @@
 import Foundation
 
 /// One entry of `reportTypes` — every engine's fourth top-level key
-/// (`cn.js:4-8`, `jp.js:3-6`, `eu.js:3-6`, `kr.js:3-6`, `tw.js:3-6`, `us.js:3-6`).
+/// (`cn.js reportTypes`, `jp.js reportTypes`, `eu.js reportTypes`, `kr.js reportTypes`, `tw.js reportTypes`, `us.js reportTypes`).
 ///
 /// The `id` is a stable identifier. The `name` map is HISTORICAL COPY and is
 /// mirrored verbatim, gaps and all — see ``ReportTypeEntry/name``.
@@ -80,7 +80,7 @@ enum ReportTypeAvailability: Equatable, Sendable {
 /// The six engines' `reportTypes` arrays, mirrored verbatim.
 enum ReportTypes {
 
-    /// `cn.js:4-8`.
+    /// `cn.js reportTypes`.
     static let cn: [ReportTypeEntry] = [
         ReportTypeEntry(id: "income-statement",
                         name: ["zh-CN": "损益表（利润表）", "en": "Income Statement (P&L)"]),
@@ -93,7 +93,7 @@ enum ReportTypes {
                         name: ["zh-CN": "含税金额汇总", "en": "Tax-Inclusive Summary"]),
     ]
 
-    /// `jp.js:3-6`. Both `zh-CN` values are the `ja` value — defect 2 above.
+    /// `jp.js reportTypes`. Both `zh-CN` values are the `ja` value — defect 2 above.
     static let jp: [ReportTypeEntry] = [
         ReportTypeEntry(id: "income-statement",
                         name: ["zh-CN": "損益計算書", "en": "Income Statement (P&L)", "ja": "損益計算書"]),
@@ -101,7 +101,7 @@ enum ReportTypes {
                         name: ["zh-CN": "消費税概要", "en": "Consumption Tax Summary", "ja": "消費税概要"]),
     ]
 
-    /// `eu.js:3-6`. `vat-return`'s `zh-CN` carries 申报 — defect 3 above.
+    /// `eu.js reportTypes`. `vat-return`'s `zh-CN` carries 申报 — defect 3 above.
     static let eu: [ReportTypeEntry] = [
         ReportTypeEntry(id: "profit-loss",
                         name: ["zh-CN": "损益表", "en": "Profit & Loss", "fr": "Compte de résultat"]),
@@ -109,7 +109,7 @@ enum ReportTypes {
                         name: ["zh-CN": "VAT 申报概要", "en": "VAT Return Summary", "fr": "Déclaration TVA"]),
     ]
 
-    /// `kr.js:3-6`.
+    /// `kr.js reportTypes`.
     static let kr: [ReportTypeEntry] = [
         ReportTypeEntry(id: "income-statement",
                         name: ["zh-CN": "损益计算书", "en": "Income Statement", "ko": "손익계산서"]),
@@ -117,7 +117,7 @@ enum ReportTypes {
                         name: ["zh-CN": "附加价值税概要", "en": "VAT Summary", "ko": "부가가치세 요약"]),
     ]
 
-    /// `tw.js:3-6`.
+    /// `tw.js reportTypes`.
     static let tw: [ReportTypeEntry] = [
         ReportTypeEntry(id: "income-statement",
                         name: ["zh-CN": "损益表", "en": "Income Statement", "zh-TW": "損益表"]),
@@ -125,7 +125,7 @@ enum ReportTypes {
                         name: ["zh-CN": "营业税概要", "en": "Business Tax Summary", "zh-TW": "營業稅概要"]),
     ]
 
-    /// `us.js:3-6`. The `zh-CN` strings use FULLWIDTH parentheses (U+FF08/U+FF09).
+    /// `us.js reportTypes`. The `zh-CN` strings use FULLWIDTH parentheses (U+FF08/U+FF09).
     static let us: [ReportTypeEntry] = [
         ReportTypeEntry(id: "schedule-c",
                         name: ["zh-CN": "Schedule C（个体经营损益）", "en": "Schedule C (Profit or Loss)"]),
@@ -135,7 +135,7 @@ enum ReportTypes {
 
     /// The table for an accounting locale, or `nil` for one no engine serves.
     ///
-    /// `nil` rather than an empty array: `index.js:29-31` THROWS on an unknown
+    /// `nil` rather than an empty array: `index.js generate` THROWS on an unknown
     /// locale, so "no report types" is not a state the source can reach, and
     /// returning `[]` would let a caller render an empty picker for a ledger that
     /// should have been rejected.

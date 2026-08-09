@@ -3,7 +3,7 @@ import Foundation
 /// Product / service-item master data — a faithful mirror of `electron/handlers/products.js`.
 ///
 /// **Scope is master data ONLY.** `defaultUnitCost` is *stored*, never *computed with*: the
-/// weighted-average inventory valuation in `electron/handlers/inventory.js:67-72` is a later
+/// weighted-average inventory valuation in `electron/handlers/inventory.js qtyOnHand` is a later
 /// slice and is blocked pending accountant confirmation of its four accounting choices. Nothing
 /// in this file reads or writes any other table, joins anything, or produces a total.
 ///
@@ -14,7 +14,7 @@ import Foundation
 ///
 /// Mirror boundaries worth stating once, because they are decisions and not oversights:
 ///
-///  * The read path performs **no validation**. `electron/handlers/products.js:11-18` selects
+///  * The read path performs **no validation**. `electron/handlers/products.js list` selects
 ///    and returns whatever is stored; the unit whitelist is enforced on write only (`:26`,
 ///    `:61`). A row holding an out-of-vocabulary unit therefore reads back verbatim on both
 ///    sides rather than being repaired on the way out.
@@ -26,7 +26,7 @@ import Foundation
 
 // MARK: - Units
 
-/// The write-side unit whitelist — `VALID_UNITS` at `electron/handlers/products.js:8`, which
+/// The write-side unit whitelist — `VALID_UNITS` at `electron/handlers/products.js VALID_UNITS`, which
 /// that file's own header requires to mirror `PRODUCT_UNIT_KEYS`
 /// (`components/accountingHelpers.ts:206`). Same eleven keys, same order.
 ///
@@ -60,7 +60,7 @@ public struct Product: Identifiable, Hashable, Sendable {
     public let isService: Bool
     public let isActive: Bool
 
-    /// A stored REAL such as `1.5` — reachable, because `electron/handlers/products.js:40` binds
+    /// A stored REAL such as `1.5` — reachable, because `electron/handlers/products.js create` binds
     /// the caller's raw `Number` and NUMERIC affinity only demotes losslessly-integral floats —
     /// truncates toward zero here, since the model types this as an integer.
     public let sortOrder: Int
@@ -137,13 +137,13 @@ public struct ProductCatalogPage: Equatable, Sendable {
 /// `description` below is an exhaustive switch over fixed literals — a new case fails to compile
 /// here instead of falling into a bucket someone would fill with the offending value.
 public enum ProductCatalogError: Error, Equatable, Sendable, CustomStringConvertible {
-    /// An empty id was supplied — `electron/handlers/products.js:49`, `:83` (`'Invalid ID'`).
+    /// An empty id was supplied — `electron/handlers/products.js update`, `:83` (`'Invalid ID'`).
     case invalidID
-    /// The name was empty, or whitespace only — `products.js:24`, `:57`.
+    /// The name was empty, or whitespace only — `products.js create`, `:57`.
     case nameRequired
-    /// The unit is not one of ``ProductUnit`` — `products.js:26`, `:61`.
+    /// The unit is not one of ``ProductUnit`` — `products.js create`, `:61`.
     case unitNotRecognized
-    /// No such product — `products.js:51`, `:85` (`'Product not found'`).
+    /// No such product — `products.js update`, `:85` (`'Product not found'`).
     case notFound
     /// The generated id was already taken. Unreachable with a UUID, kept so the write path has
     /// somewhere honest to land instead of surfacing a raw SQLite constraint failure.
@@ -174,7 +174,7 @@ public enum ProductCatalogError: Error, Equatable, Sendable, CustomStringConvert
 
 // MARK: - Coercion rules
 
-/// JS `!!value` over a SQLite storage class — the rule `electron/handlers/products.js:17`
+/// JS `!!value` over a SQLite storage class — the rule `electron/handlers/products.js list`
 /// applies to `is_service` / `is_active` on the way out.
 ///
 /// Written for the values that COULD arrive rather than the ones that do, which is the shape
@@ -183,7 +183,7 @@ public enum ProductCatalogError: Error, Equatable, Sendable, CustomStringConvert
 /// reports guard's scope and means "is this category a cost of goods sold", which is not what is
 /// being asked here.
 ///
-/// Every Electron write path binds an integer (`products.js:38-39`, `:68-69`), so on a ledger
+/// Every Electron write path binds an integer (`products.js create`, `:68-69`), so on a ledger
 /// only ever touched by that app the `.integer` arm is the only one taken. The other four exist
 /// because a migrated, imported or externally-edited file can hold anything, and on those values
 /// the two apps must still agree.
@@ -216,7 +216,7 @@ private func jsTruthy(_ value: SQLiteValue, storedType: String?) -> Bool {
 /// the same property that made it worth escaping on the settings screen.)
 private let jsTrimSet = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\u{FEFF}"))
 
-/// `products.js:27` + `:37` / `:66` — `Number(v)`, then `isFinite(n) && n >= 0 ? n : 0`.
+/// `products.js cost` + `:37` / `:66` — `Number(v)`, then `isFinite(n) && n >= 0 ? n : 0`.
 /// An omitted field is `Number(undefined)`, i.e. `NaN`, which fails the finite test and lands on
 /// zero; `nil` here means the same thing and takes the same branch.
 private func normalizedUnitCost(_ value: Double?) -> Double {
@@ -224,7 +224,7 @@ private func normalizedUnitCost(_ value: Double?) -> Double {
     return value
 }
 
-/// Mirrors the ROLE of `products.js:29` (`prod-<base36 ts>-<4 random chars>`), not its FORMAT.
+/// Mirrors the ROLE of `products.js create` (`prod-<base36 ts>-<4 random chars>`), not its FORMAT.
 /// The random suffix there exists solely to break same-millisecond `Date.now()` collisions — a
 /// window a UUID does not have, and one Electron has a dedicated 50-create burst test for. Both
 /// sides only ever store and compare this as opaque TEXT; nothing on either side parses it, so
@@ -263,7 +263,7 @@ private func mapWriteFailure(_ error: Error) -> ProductCatalogError {
 
 public extension LedgerStore {
 
-    /// `GET /api/products` — `electron/handlers/products.js:11-18`.
+    /// `GET /api/products` — `electron/handlers/products.js list`.
     ///
     /// Same explicit column list and same `ORDER BY` as the handler; no filter and no row cap, so
     /// inactive and service items are included exactly as they are there.
@@ -287,7 +287,7 @@ public extension LedgerStore {
         return ProductCatalogPage(products: decoded, unreadableCount: unreadable)
     }
 
-    /// `POST /api/products` — `electron/handlers/products.js:21-43`. Returns the new id.
+    /// `POST /api/products` — `electron/handlers/products.js create`. Returns the new id.
     ///
     /// The defaults reproduce the handler's, including the two places where it treats a missing
     /// field differently from `update`: an omitted `sortOrder` becomes **999** here and **0**
@@ -325,7 +325,7 @@ public extension LedgerStore {
         return id
     }
 
-    /// `PUT /api/products/:id` — `electron/handlers/products.js:46-77`.
+    /// `PUT /api/products/:id` — `electron/handlers/products.js update`.
     ///
     /// Strictly partial: `nil` means *omitted*, and an omitted field is neither written nor
     /// cleared, which is what the handler's `!== undefined` test achieves. When nothing at all is
@@ -378,7 +378,7 @@ public extension LedgerStore {
         }
     }
 
-    /// `DELETE /api/products/:id` — `electron/handlers/products.js:80-88`.
+    /// `DELETE /api/products/:id` — `electron/handlers/products.js remove`.
     ///
     /// Still a bare delete for the MIRRORED tables: no cascade, no reference check, no cleanup of
     /// the `product_id` columns on `purchases` / `sales` / `purchase_items` / `sales_items` /
@@ -411,7 +411,7 @@ public extension LedgerStore {
 }
 
 private extension LedgerStore {
-    /// The handler's own existence probe — `electron/handlers/products.js:50`, `:84`.
+    /// The handler's own existence probe — `electron/handlers/products.js existing`, `:84`.
     /// Not-found is decided by a read, never by a changes count, which is how `update` already
     /// decides it for transactions.
     func productRowExists(_ id: String) throws -> Bool {

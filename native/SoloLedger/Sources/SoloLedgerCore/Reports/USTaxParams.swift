@@ -14,12 +14,13 @@ import Foundation
 ///
 /// ## What is mirrored, and what is deliberately absent
 ///
-/// Batch 3 needs exactly one field: `mealsDeductiblePct`, the 50% limit applied to
-/// Line 24b (`us.js:54`). The SE-tax constants that live in the same JS table —
+/// Schedule C needs exactly one field: `mealsDeductiblePct`, the 50% limit applied to
+/// Line 24b (`us.js line24b_meals`). The SE-tax constants that live in the same JS table —
 /// `seEarningsFactor`, `ssRate`, `ssWageCap`, `medicareRate`,
-/// `addlMedicareThreshold`, `addlMedicareRate` — belong to the estimate layer and
-/// arrive with batch 5. They are not copied here "ready for later", because a
-/// mirrored tax constant with no caller is a number nobody is checking.
+/// `addlMedicareThreshold`, `addlMedicareRate` — belong to the estimate layer, and they
+/// are mirrored below now that that layer has a caller. The rule they were held back
+/// under still stands: a mirrored tax constant with no caller is a number nobody is
+/// checking, so none of them is copied ahead of the code that reads it.
 ///
 /// The year-keyed SHAPE is mirrored even though the one value it currently holds is
 /// the same for every year. That is not redundancy: the table is year-keyed because
@@ -44,11 +45,11 @@ import Foundation
 enum USTaxParams {
 
     struct Year: Equatable, Sendable {
-        /// The share of meal expense that Line 24b may deduct (`us.js:54`).
+        /// The share of meal expense that Line 24b may deduct (`us.js line24b_meals`).
         let mealsDeductiblePct: Double
-        /// Schedule SE's net-earnings factor (`us.js:69`).
+        /// Schedule SE's net-earnings factor (`us.js seEarnings`).
         let seEarningsFactor: Double
-        /// Social-security rate on the capped earnings (`us.js:71`).
+        /// Social-security rate on the capped earnings (`us.js ssTax`).
         let ssRate: Double
         /// The SSA Contribution and Benefit Base — the only figure that differs
         /// between the three keyed years, and the one the fixture never reaches.
@@ -58,7 +59,7 @@ enum USTaxParams {
         let addlMedicareRate: Double
     }
 
-    /// `US_SE_TAX_PARAMS_BY_YEAR` — `usTaxParams.js:17-21`, now complete.
+    /// `US_SE_TAX_PARAMS_BY_YEAR` — `usTaxParams.js US_SE_TAX_PARAMS_BY_YEAR`, now complete.
     ///
     /// Batch 3 copied one field and said why the rest were absent: "a mirrored tax
     /// constant with no caller is a number nobody is checking". R7 is that caller,
@@ -86,14 +87,14 @@ enum USTaxParams {
                    addlMedicareThreshold: 200000, addlMedicareRate: 0.009),
     ]
 
-    /// `LATEST_YEAR` — `Math.max(...YEARS)` at `usTaxParams.js:23-24`.
+    /// `LATEST_YEAR` — `Math.max(...YEARS)` at `usTaxParams.js YEARS`.
     ///
     /// Derived from the table rather than written as a literal, exactly as the
     /// source derives it. A literal would silently stop tracking the table the
     /// first time a year is added.
     static let latestYear: Int = byYear.keys.max() ?? 0
 
-    /// `resolveSeTaxParams(year)` — `usTaxParams.js:28-32`.
+    /// `resolveSeTaxParams(year)` — `usTaxParams.js resolveSeTaxParams`.
     ///
     /// Unknown, unparseable and future years all fall back to the latest keyed
     /// year, and it never throws. The year arrives as a String from the report

@@ -92,7 +92,7 @@ final class ProductCopyTests: XCTestCase {
 
     // MARK: - P1 · the absolute count
 
-    func testP1TheProductNamespaceIsExactlyFortyKeys() throws {
+    func testP1TheProductNamespaceIsExactlyTheAdjudicatedTable() throws {
         XCTAssertEqual(Self.adjudicatedKeys.count, 41, "the adjudicated table itself must be forty-one")
         XCTAssertEqual(Set(Self.adjudicatedKeys).count, 41, "the adjudicated table has a duplicate")
         for language in languages {
@@ -108,7 +108,7 @@ final class ProductCopyTests: XCTestCase {
 
     // MARK: - P2 · the whole universe, and six identical key sets
 
-    func testP2EverySixLocaleFileHoldsSixHundredThirtyFourKeys() throws {
+    func testP2EverySixLocaleFileHoldsTheSameKeyCount() throws {
         var keySets: [Set<String>] = []
         for language in languages {
             let table = try sourceTable(language)

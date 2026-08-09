@@ -8,7 +8,7 @@ import Foundation
 /// ## Why a separate, write-free stage exists at all
 ///
 /// Converting a legacy row does not merely move it: it CHANGES WHAT THE REPORT ENGINES
-/// COMPUTE for that period, because `_reportSource.js:15-18` picks the source per period
+/// COMPUTE for that period, because `_reportSource.js selectReportSource` picks the source per period
 /// from the transaction count inside it. A period with zero transactions reads the legacy
 /// tables; one transaction flips the whole period onto `transactions`, where the legacy
 /// `shippingCost` column does not exist and every row now carries a `category_id`. That is
@@ -38,7 +38,7 @@ public enum LegacyTable: String, CaseIterable, Equatable, Sendable {
 
     /// The `transactions.type` a converted row of this table would carry.
     /// `sales` → income, `purchases` → expense — mirrored from
-    /// `electron/handlers/migrations.js:117,154`, not reinvented.
+    /// `electron/handlers/migrations.js migrateAll`, not reinvented.
     public var transactionType: TransactionType {
         switch self {
         case .sales: return .income
@@ -75,9 +75,9 @@ public enum LegacyRowIssue: String, CaseIterable, Equatable, Sendable {
     ///
     /// `id TEXT PRIMARY KEY` does NOT imply NOT NULL in SQLite: only an INTEGER PRIMARY KEY
     /// gets that treatment, so both storage classes are accepted by the real DDL (measured
-    /// against `electron/db/index.js:103` and `SchemaMigrator.swift:88`). Nothing in the
-    /// Electron product writes such a row — `sales.js:34` throws `id required` and
-    /// `batch.js:47` backfills one — but a hand-edited or damaged ledger can hold one, and
+    /// against `electron/db/index.js generate` and `SchemaMigrator.swift:88`). Nothing in the
+    /// Electron product writes such a row — `sales.js createWithItems` throws `id required` and
+    /// `batch.js prepared@cf802c8` backfills one — but a hand-edited or damaged ledger can hold one, and
     /// the anti-join returns it, so this stage has to have an answer for it.
     ///
     /// It is `unconvertible` rather than adjudicable: `legacy_migrations.legacy_id` is
@@ -107,7 +107,7 @@ public enum LegacyRowIssue: String, CaseIterable, Equatable, Sendable {
     case dateNotACalendarDay
 
     /// `payment_date` is present but its first ten characters are not a calendar day.
-    /// It selects rows for the realized-cash window (`_cashflow.js:52-58`), so a value that
+    /// It selects rows for the realized-cash window (`_cashflow.js rows`), so a value that
     /// sorts nowhere silently drops the row out of cash flow.
     case paymentDateNotACalendarDay
 
@@ -118,7 +118,7 @@ public enum LegacyRowIssue: String, CaseIterable, Equatable, Sendable {
     ///
     /// `transactions.amount` is `REAL NOT NULL`: there is no way to store "absent", so
     /// carrying this row would mean writing a number the ledger never held. Electron writes
-    /// `0` here (`migrations.js:118,155`) and that is exactly the optimistic coercion this
+    /// `0` here (`migrations.js migrateAll`) and that is exactly the optimistic coercion this
     /// preflight exists to stop.
     case totalAmountNotANumber
 
@@ -135,7 +135,7 @@ public enum LegacyRowIssue: String, CaseIterable, Equatable, Sendable {
     ///
     /// Note what is NOT here: an ABSENT `amountWithoutTax` is fine and is carried as SQL
     /// NULL. That is not a coercion — `transactions.amount_net` is nullable and the engines'
-    /// own convention is `amount_net || amount || 0` (`_expenseSplit.js:24`), so NULL means
+    /// own convention is `amount_net || amount || 0` (`_expenseSplit.js net`), so NULL means
     /// "fall back to the gross amount" in both places. Only a value that is present and
     /// unreadable is an issue.
     case amountWithoutTaxNotANumber
@@ -143,7 +143,7 @@ public enum LegacyRowIssue: String, CaseIterable, Equatable, Sendable {
     /// `payment_status` holds a string that is none of `paid` / `partial` / `unpaid` and is
     /// not empty.
     ///
-    /// The column has no CHECK constraint and `batch.js:85,91,150,156` writes
+    /// The column has no CHECK constraint and `batch.js batchSales / batchPurchases` writes
     /// `d.payment_status || 'paid'` straight from a CSV field it never validates, so an
     /// arbitrary string is reachable. Carrying it verbatim would be worse than dropping the
     /// row: `Transaction.from` maps an unknown value to `.paid`, which silently promotes an
@@ -729,7 +729,7 @@ extension LegacyConversionPlan {
         }
 
         // — the four columns Electron coerces with `|| 0`: `totalAmount`, `taxAmount`,
-        //   `taxRate`, `paid_amount` (`migrations.js:118,121,155,158`). Absent or
+        //   `taxRate`, `paid_amount` (`migrations.js migrateAll`). Absent or
         //   unreadable, all four are an issue — writing 0 would state a number the ledger
         //   never held. `amountWithoutTax` is deliberately NOT in this family, and the line
         //   is Electron's own: it is the one money column `migrations.js` guards with
@@ -853,7 +853,7 @@ extension LedgerStore {
     }
 
     /// The work set is picked by the SAME anti-join the Electron converter uses to pick its
-    /// own (`migrations.js:98-102,138-142`) and `LegacyLedgerProbe` uses to count it, so
+    /// own (`migrations.js rows@f472f6e,138-142`) and `LegacyLedgerProbe` uses to count it, so
     /// "rows a conversion would carry" is one question with one answer across all three.
     ///
     /// When `legacy_migrations` is absent there is nothing to anti-join against and every

@@ -2,8 +2,8 @@ import Foundation
 
 /// Batch-2 output shapes: the tax-inclusive summary and the monthly breakdown.
 
-/// `taxInclusiveSummary` — the five VAT engines (`cn.js:78-82`, `jp.js:50-53`,
-/// `eu.js:47-49`, `kr.js:44-46`, `tw.js:44-46`).
+/// `taxInclusiveSummary` — the five VAT engines (`cn.js taxInclusiveSummary`, `jp.js taxInclusiveSummary`,
+/// `eu.js taxInclusiveSummary`, `kr.js taxInclusiveSummary`, `tw.js taxInclusiveSummary`).
 ///
 /// **The US has no such block at all.** Not an empty one — the key is absent from
 /// `us.js`'s output entirely, which is why the golden field count is 3 × 45 rather
@@ -62,13 +62,13 @@ struct ReportMonth: Equatable, Sendable {
 /// exists to not make — and because a future divergence in one engine would then
 /// show up as a change to one function instead of a change to a shared one.
 enum MonthMatch {
-    /// `cn.js:96` — `r.date && r.date.startsWith(prefix)`.
+    /// `cn.js mIncome` — `r.date && r.date.startsWith(prefix)`.
     static func cn(_ date: String?, _ prefix: String) -> Bool {
         guard let date, !date.isEmpty else { return false }   // JS: "" is falsy
         return date.hasPrefix(prefix)
     }
 
-    /// `jp.js:64`, `eu.js:60`, `kr.js:57`, `tw.js:57`, `us.js:135` —
+    /// `jp.js revenue`, `eu.js revenue@3d7138b`, `kr.js revenue@3d7138b`, `tw.js revenue@3d7138b`, `us.js income` —
     /// `x.date?.startsWith(p)`.
     static func optionalChained(_ date: String?, _ prefix: String) -> Bool {
         guard let date else { return false }

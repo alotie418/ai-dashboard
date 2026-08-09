@@ -1,6 +1,6 @@
 import Foundation
 
-/// `readSetting` — mirror of `electron/reports/index.js:16-21`.
+/// `readSetting` — mirror of `electron/reports/index.js readSetting`.
 ///
 /// ```js
 /// function readSetting(db, key, fallback) {
@@ -14,7 +14,7 @@ import Foundation
 /// Two details that a reasonable-looking Swift version gets wrong:
 ///
 /// 1. **A missing row returns the FALLBACK LITERAL, not null.** So the coercion
-///    that follows (`Number(...)` at `index.js:74-78`) never sees the absence.
+///    that follows (`Number(...)` at `index.js vatRate`) never sees the absence.
 ///    This is the mechanism behind plan §6.2's hard constraint: "not configured"
 ///    cannot be inferred from the computed value, because a missing rate row
 ///    produces a perfectly ordinary number.
@@ -35,7 +35,7 @@ enum ReportSettings {
     /// absent. The caller applies the fallback, exactly as the JS does.
     static func rawValue(_ db: SQLiteDatabase, _ key: String) -> String? {
         // The catch is load-bearing: `settings` may not exist at all on an
-        // early-schema database, and index.js:20 swallows that too.
+        // early-schema database, and index.js readSetting swallows that too.
         guard let rows = try? db.query("SELECT value FROM settings WHERE key = ?", [.text(key)])
         else { return nil }
         return rows.first?.string("value")
@@ -59,7 +59,7 @@ enum ReportSettings {
     /// stays correct if that column ever loosens.
     ///
     /// The `catch` is load-bearing for the same reason it is in ``rawValue``: on an
-    /// early-schema database the `settings` table may not exist, and `index.js:31`
+    /// early-schema database the `settings` table may not exist, and `index.js settingRowExists`
     /// swallows that too. "Cannot ask" answers false, which for a non-Chinese
     /// regime means not-configured — the honest reading, since a ledger with no
     /// settings table has certainly not configured a tax rate.

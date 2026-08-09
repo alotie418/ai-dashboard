@@ -84,7 +84,7 @@ public enum ReportBuilder {
                                                   from: period.from, to: period.to)
             let expenseRows = try ReportFetch.rows(db, type: "expense",
                                                    from: period.from, to: period.to)
-            // `index.js:79-83` wraps the categories read in a swallowing catch because the
+            // `index.js locale` wraps the categories read in a swallowing catch because the
             // table may not exist on an early-schema ledger.
             let categories = (try? ReportFetch.categories(db, locale: locale)) ?? []
 
@@ -201,20 +201,20 @@ public enum ReportBuilder {
                 return rateParameter(key, setting: ctx.incomeTaxRate,
                                      parameter: .incomeTaxRate, consumption: .consumed)
             case .surchargeRate:
-                // Only `cn.js:33` reads it. Elsewhere a missing row must not read as a
+                // Only `cn.js vatPayable` reads it. Elsewhere a missing row must not read as a
                 // problem: a Japanese report is not blocked by a rate no Japanese line uses.
                 return rateParameter(key, setting: ctx.surchargeRate, parameter: .surchargeRate,
                                      consumption: locale == "CN" ? .consumed : .storedButUnread)
             case .vatRate:
-                // `index.js:126` — `Number(readSetting(db, 'vat_rate', 13))`. An UNGATED
+                // `index.js vatRate` — `Number(readSetting(db, 'vat_rate', 13))`. An UNGATED
                 // coercion with a fallback, exactly like the admin expense and NOT like the
-                // two rates: scheme A never gates it (`index.js:130` says so), so it has no
+                // two rates: scheme A never gates it (`index.js generate` says so), so it has no
                 // refusal state and modelling it with the rate's four states would report a
                 // refusal Electron never performs. Read by no engine (Appendix A6).
                 return ungatedNumericParameter(db, key: key, fallback: 13,
                                                consumption: .storedButUnread)
             case .adminExpenseAnnual:
-                // `index.js:133` — the same shape, fallback 0, and consumed by every engine.
+                // `index.js adminExpense` — the same shape, fallback 0, and consumed by every engine.
                 return ungatedNumericParameter(db, key: key, fallback: 0,
                                                consumption: .consumed)
             }
@@ -343,7 +343,7 @@ public enum ReportBuilder {
                     line("netMargin", .percent, money(b.netMargin))]
         case ("EU", "profit-loss"):
             let b = EUReportEngine.batchOne(ctx)
-            // `revenue`, not `salesRevenue` — the source's own naming (`eu.js:36-37`).
+            // `revenue`, not `salesRevenue` — the source's own naming (`eu.js vatPayable`).
             return [line("revenue", .money, money(b.revenue)),
                     line("costOfSales", .money, money(b.costOfSales)),
                     line("costOfGoodsSold", .money, money(b.costOfGoodsSold)),
@@ -495,7 +495,7 @@ public enum ReportBuilder {
                                  endingCash: .notDerivableFromThisDataModel)
     }
 
-    /// The US warnings, as facts. The predicates are `us.js:119` and `:121` — the same two
+    /// The US warnings, as facts. The predicates are `us.js warnings` and `:121` — the same two
     /// the engine uses — and `ReportBuilderTests.testPresentedWarningsMatchTheEnginesArray`
     /// asserts the result corresponds one-to-one with `USReportEngine.warnings(ctx)`, so the
     /// two spellings cannot drift.
