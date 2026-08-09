@@ -137,6 +137,6 @@ struct EstimatedTax: Equatable, Sendable {
     let annualSETax: Double
     let totalAnnual: EstimatedValue
     let quarterlyPayment: EstimatedValue
-    /// Calendar dates, so likewise never refused (`us.js:106`).
+    /// Calendar dates, so likewise never refused (`us.js dueDates`).
     let dueDates: [String]
 }

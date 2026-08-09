@@ -62,7 +62,7 @@ enum ExpenseSplit {
     /// It is still a subtraction, for two reasons that do not depend on being
     /// caught: it is what the source does, which is the entire standard for this
     /// phase; and later batches consume the UNROUNDED value down a longer chain
-    /// (`cn.js:38` → `:39` → `:40`), where nothing guarantees the difference keeps
+    /// (`cn.js profitBeforeTax` → `incomeTax` → `netProfit`), where nothing guarantees the difference keeps
     /// washing out.
     ///
     /// Addition is not associative in binary64 either, so the row order is part of

@@ -23,7 +23,7 @@ enum USReportEngine {
     ///
     /// Twelve entries keyed on `ctx.year` regardless of the reporting period
     /// (Appendix A9), the optional-chained date spelling, and `r()` — which for
-    /// the US is the guarded rounder (`us.js:142`, `Math.round((v || 0) * 100) / 100`).
+    /// the US is the guarded rounder (`us.js r`, `Math.round((v || 0) * 100) / 100`).
     static func monthlyBreakdown(_ ctx: ReportContext) -> [ReportMonth] {
         let r = ReportMath.round2OrZero
         return ReportMonth.prefixes(year: ctx.year).enumerated().map { index, prefix in
@@ -54,7 +54,7 @@ extension USReportEngine {
     /// by asserting the block is identical across the base/unset/zero/malformed
     /// rate variants.
     static func scheduleC(_ ctx: ReportContext) -> ScheduleC {
-        let r = ReportMath.round2OrZero                     // us.js:142 — guarded
+        let r = ReportMath.round2OrZero                     // us.js r — guarded
         let meals = USTaxParams.resolve(year: ctx.year)     // us.js generate
 
         // --- Part I (us.js grossReceipts) ---------------------------------------------
@@ -161,7 +161,7 @@ extension USReportEngine {
     /// `additionalMedicare` is 0 in all ten US goldens. `ReportBatch5BlindSpotTests`
     /// exercises both directly.
     static func selfEmploymentTax(_ ctx: ReportContext) -> SelfEmploymentTax {
-        let r = ReportMath.round2OrZero                        // us.js:150 — guarded
+        let r = ReportMath.round2OrZero                        // us.js r — guarded
         let c = scheduleC(ctx)
         let resolved = USTaxParams.resolve(year: ctx.year)     // us.js generate
         let se = resolved.params
@@ -186,8 +186,8 @@ extension USReportEngine {
             netEarnings: r(netProfit),                 // us.js scheduleC
             seEarnings: r(seEarnings),                 // us.js line28_totalExpenses
             socialSecurityTax: r(ssTax),               // us.js line31_netProfit
-            medicareTax: r(medicareTax),               // us.js:95
-            additionalMedicare: r(additionalMedicare), // us.js:96
+            medicareTax: r(medicareTax),               // us.js selfEmploymentTax.medicareTax
+            additionalMedicare: r(additionalMedicare), // us.js selfEmploymentTax.additionalMedicare
             totalSETax: totalSETax,                    // us.js selfEmploymentTax — already rounded
             paramYear: resolved.year)                  // us.js netEarnings
     }
@@ -220,7 +220,7 @@ extension USReportEngine {
             annualSETax: totalSETax,                                    // us.js selfEmploymentTax
             totalAnnual: refusal ?? .computed(totalAnnualRaw ?? 0),      // NOT rounded
             quarterlyPayment: refusal ?? .computed(r((totalAnnualRaw ?? 0) / 4)), // us.js quarterlyPayment
-            // us.js:106 — `${Number(year) + 1}` for the January date, so the year
+            // us.js dueDates — `${Number(year) + 1}` for the January date, so the year
             // goes through JS number coercion and back to a string.
             dueDates: ["\(ctx.year)-04-15", "\(ctx.year)-06-15", "\(ctx.year)-09-15",
                        "\(ReportMath.jsNumberToString(ReportMath.number(.string(ctx.year)) + 1))-01-15"])

@@ -108,7 +108,7 @@ enum ReportDispatcher {
             cashflowStatement: try cashflow(db, source: source, from: from, to: to))
     }
 
-    /// `index.js:27-31` — the effective accounting locale, or a throw.
+    /// `index.js generate` — the effective accounting locale, or a throw.
     ///
     /// Extracted so that anything else needing the locale (``context(_:locale:source:year:from:to:)``
     /// resolves the income-tax rate against it) asks the SAME question. Note this is
@@ -152,7 +152,7 @@ enum ReportDispatcher {
         return ReportContext(
             incomeRows: incomeRows, expenseRows: expenseRows, categories: categories,
             adminExpense: ReportSettings.number(db, "admin_expense_annual", fallback: 0),
-            // index.js:87-99 — schemes A and A-4. Decided by whether the ROW exists
+            // index.js resolveRate — schemes A and A-4. Decided by whether the ROW exists
             // (A-3) and then by its stored BYTES (A-4), never by the number it would
             // have produced. Both rates go through the same resolution; only China's
             // engine may consume the surcharge.

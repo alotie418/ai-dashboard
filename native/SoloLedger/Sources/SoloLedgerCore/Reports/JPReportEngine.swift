@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Japan, the EU, Korea and Taiwan reach OPERATING PROFIT without any configured
 /// rate, because their operating profit carries no surcharge. China cannot
-/// (`cn.js:38` needs `surchargeRate`), which is the whole reason the batch cut
+/// (`cn.js profitBeforeTax` needs `surchargeRate`), which is the whole reason the batch cut
 /// falls where it does.
 ///
 /// Batch-1 arithmetic is currently identical across JP / KR / TW. They are

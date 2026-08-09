@@ -41,7 +41,7 @@ enum ReportSettings {
         return rows.first?.string("value")
     }
 
-    /// `settingRowExists` — mirror of `electron/reports/index.js:23-33` (the function itself is `:29-33`).
+    /// `settingRowExists` — mirror of `electron/reports/index.js settingRowExists`.
     ///
     /// ```js
     /// function settingRowExists(db, key) {
@@ -70,29 +70,37 @@ enum ReportSettings {
         return !rows.isEmpty
     }
 
-    /// `index.js:88-99` — the income-tax rate, as the four states of plan §6.2 / §6.4.
+    /// `index.js resolveRate` — the income-tax rate, as the four states of plan §6.2 / §6.4.
     ///
     /// ```js
-    /// const incomeTaxRate = (locale === 'CN' || settingRowExists(db, 'income_tax_rate'))
-    ///   ? Number(readSetting(db, 'income_tax_rate', 25))
-    ///   : null;
+    /// const incomeTaxRate = resolveRate(db, 'income_tax_rate', locale, 25);
     /// ```
     ///
+    /// The quoted call is what the dispatcher runs TODAY. An earlier form gated only on
+    /// whether the row existed and then took whatever `readSetting` returned; a row that
+    /// existed but held unusable text therefore fell back to the Chinese 25 and priced a
+    /// report nobody had configured. `resolveRate` decides on the row AND on its stored
+    /// bytes, and answers `null` for either failure.
+    ///
     /// - Parameter locale: the ALREADY-RESOLVED accounting locale — the one the
-    ///   dispatcher will route on (`index.js:27`), not whatever is in `settings`.
+    ///   dispatcher will route on (`index.js locale`), not whatever is in `settings`.
     ///   Passing the stored value where an explicit `opts.locale` overrode it would
     ///   gate on one regime and compute under another.
     static func incomeTaxRate(_ db: SQLiteDatabase, locale: String) -> ReportRateSetting {
         rate(db, "income_tax_rate", locale: locale, chinaFallback: 25)
     }
 
-    /// `index.js:87` — the surcharge rate, in the same four states.
+    /// `index.js resolveRate` — the surcharge rate, in the same four states.
     ///
     /// ```js
-    /// const surchargeRate = Number(readSetting(db, 'surcharge_rate', 12));
+    /// const surchargeRate = resolveRate(db, 'surcharge_rate', locale, 12);
     /// ```
     ///
-    /// **Only China's engine reads it** (`cn.js:33`), so outside China this answers
+    /// Both rates go through that one resolution. The earlier form applied the 12
+    /// fallback unconditionally, to every regime and to an unusable stored value alike —
+    /// which is the behaviour the four states exist to replace.
+    ///
+    /// **Only China's engine reads it** (`cn.js taxSurcharge`), so outside China this answers
     /// ``ReportRateSetting/notConfigured`` for a missing row and R7 must simply not
     /// look — a Japanese report must NOT be blocked because a rate no Japanese line
     /// consumes has no row. Modelled anyway, and not skipped, because the state that

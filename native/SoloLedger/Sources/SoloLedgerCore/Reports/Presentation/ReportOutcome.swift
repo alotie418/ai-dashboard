@@ -47,7 +47,7 @@ public enum ReportBlocker: Equatable, Sendable {
     /// `settings.accounting_locale` has no row.
     ///
     /// Deliberately NOT the `"CN"` fallback `ReportSettings.string` applies. That fallback
-    /// is faithful to `index.js:27` and it silently picks Chinese accounting policy for a
+    /// is faithful to `index.js locale` and it silently picks Chinese accounting policy for a
     /// ledger that never chose one — which CLAUDE.md forbids and which the safe façade
     /// exists to stop. Reachable only when the row was removed externally or the ledger
     /// predates schema v3, which seeds it (`SchemaMigrator` v3).

@@ -94,7 +94,7 @@ public enum ReportLineUnit: Equatable, Sendable {
 /// A non-numeric fact. Kept out of `lines` so the numeric funnel stays uniform and no view
 /// has to special-case a "line" holding a date.
 public enum PresentedNote: Equatable, Sendable {
-    /// `us.js:106` — calendar dates, never refused.
+    /// `us.js dueDates` — calendar dates, never refused.
     case estimatedTaxDueDates([String])
     /// The year whose SE-tax constants were applied, after `resolveSeTaxParams`'s
     /// unknown-year fallback.

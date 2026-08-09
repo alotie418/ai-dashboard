@@ -13,7 +13,7 @@ import Foundation
 /// file with no rollback point anywhere — `LedgerStore.init(adopting:)` goes straight from
 /// `applyPragmas()` to `SchemaMigrator.migrate(db)`.
 ///
-/// Electron has had the equivalent protection since v1 (`electron/db/index.js:63-68` forces an
+/// Electron has had the equivalent protection since v1 (`electron/db/index.js initDatabase` forces an
 /// `autoBackup` whenever `user_version < MIGRATIONS.length`). The native app had no equivalent.
 ///
 /// ## The two properties everything else serves
