@@ -42,7 +42,7 @@ enum ReportMath {
 
     // MARK: - `||` — JS truthiness
     //
-    // Call sites: `r.amount_net || r.amount || 0` (cn.js totalIncomeNet,22, _expenseSplit.js net,
+    // Call sites: `r.amount_net || r.amount || 0` (cn.js totalIncomeNet / totalExpenseNet, _expenseSplit.js net,
     // and the same line in jp/eu/kr/tw), `(v || 0)` inside the rounders
     // (us.js:142, jp.js generate, eu.js generate, kr.js generate, tw.js generate), `expenseBySlug[slug] || 0`
     // (us.js line8_advertising), `row.paid_amount && row.paid_amount > 0` (_cashflow.js txnCashAmount).
@@ -98,7 +98,7 @@ enum ReportMath {
     // MARK: - `Math.round`
     //
     // Call sites: every `r()` helper (cn.js generate, us.js:142, jp.js generate, eu.js generate,
-    // kr.js generate, tw.js generate), the margin lines (cn.js grossMargin,41), the tax lines
+    // kr.js generate, tw.js generate), the margin lines (cn.js grossMargin / netMargin), the tax lines
     // (cn.js:33,39) and `_cashflow.js round2`.
 
     /// JS `Math.round(x)`.

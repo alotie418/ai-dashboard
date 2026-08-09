@@ -83,7 +83,7 @@
 4. 🛑 真实 Release 沙箱下的数据路径 / 升级端到端验证。
 5. ✅ **DMG（非沙箱）用户数据迁移入口**：N7.2 源选择入口已全链路接线（RootView → FilePanels → AppModel → coordinator `.requiresSourceChoice` / `.migrateFromUserDir` / `.userSelectedDataDir`）、single-grant-window 无 bookmark，Core + App-hosted 测试覆盖。**原 P0 已闭合**。
 6. ✅ 用户可见的备份 / 恢复 UI——「设置 → 数据」的导出备份与从备份恢复已上线（`SettingsView` 的「设置 → 数据」按钮），恢复前先快照当前账本，legacy 转换进行中一律拒绝（`AppModel` 的恢复入口守卫）。
-7. ✅ 完整 6 语言——六语各 645 键、键集完全一致，guard 强制恰好六个 `.lproj` 且各语键数相等（`LocalizationWordingGuardTests` 的 `testDiscoveredLocalesAreExactlyTheSixShippedLanguages` 与键数相等断言）。`.xcstrings` parity 仍推迟（`.strings` 对 MAS 可用，非阻塞）。**残留**：guard 只比键数不比键集。
+7. ✅ 完整 6 语言——六语各 645 键、键集完全一致，guard 强制恰好六个 `.lproj` 且各语键数相等（`LocalizationWordingGuardTests` 的 `testDiscoveredLocalesAreExactlyTheSixShippedLanguages` 与键数相等断言）。`.xcstrings` parity 仍推迟（`.strings` 对 MAS 可用，非阻塞）。键集合相等另由 `MigrationCopyParityTests.testFullLocaleKeyUniverseRatchet` 严格比对。
 8. 🛑 MAS 签名 / 打包 / App Store Connect（Phase 4）。
 9. ✅ 损益 / VAT / 所得税 / 现金流 / COGS 等敏感报表——已逐字**镜像** `electron/reports/*` 上线，入口已激活（`RootView` detail switch 的 `.reports` 分支）。**残留 🟡**：`electron/handlers/balanceOverview.js`（资产负债概览，246 行）尚未镜像。`electron/handlers/inventory.js`（库存成本，89 行）**不是残留**——按 §2 的实测审计它不是加权平均法，已裁定不作为镜像对象，原生另写新引擎（N 章已收官）。
 

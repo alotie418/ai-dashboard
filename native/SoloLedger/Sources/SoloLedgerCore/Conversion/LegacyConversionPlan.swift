@@ -38,7 +38,7 @@ public enum LegacyTable: String, CaseIterable, Equatable, Sendable {
 
     /// The `transactions.type` a converted row of this table would carry.
     /// `sales` → income, `purchases` → expense — mirrored from
-    /// `electron/handlers/migrations.js migrateAll,154`, not reinvented.
+    /// `electron/handlers/migrations.js migrateAll`, not reinvented.
     public var transactionType: TransactionType {
         switch self {
         case .sales: return .income
@@ -118,7 +118,7 @@ public enum LegacyRowIssue: String, CaseIterable, Equatable, Sendable {
     ///
     /// `transactions.amount` is `REAL NOT NULL`: there is no way to store "absent", so
     /// carrying this row would mean writing a number the ledger never held. Electron writes
-    /// `0` here (`migrations.js migrateAll,155`) and that is exactly the optimistic coercion this
+    /// `0` here (`migrations.js migrateAll`) and that is exactly the optimistic coercion this
     /// preflight exists to stop.
     case totalAmountNotANumber
 
@@ -143,7 +143,7 @@ public enum LegacyRowIssue: String, CaseIterable, Equatable, Sendable {
     /// `payment_status` holds a string that is none of `paid` / `partial` / `unpaid` and is
     /// not empty.
     ///
-    /// The column has no CHECK constraint and `batch.js batchSales,91,150,156` writes
+    /// The column has no CHECK constraint and `batch.js batchSales / batchPurchases` writes
     /// `d.payment_status || 'paid'` straight from a CSV field it never validates, so an
     /// arbitrary string is reachable. Carrying it verbatim would be worse than dropping the
     /// row: `Transaction.from` maps an unknown value to `.paid`, which silently promotes an
@@ -729,7 +729,7 @@ extension LegacyConversionPlan {
         }
 
         // — the four columns Electron coerces with `|| 0`: `totalAmount`, `taxAmount`,
-        //   `taxRate`, `paid_amount` (`migrations.js migrateAll,121,155,158`). Absent or
+        //   `taxRate`, `paid_amount` (`migrations.js migrateAll`). Absent or
         //   unreadable, all four are an issue — writing 0 would state a number the ledger
         //   never held. `amountWithoutTax` is deliberately NOT in this family, and the line
         //   is Electron's own: it is the one money column `migrations.js` guards with

@@ -544,7 +544,7 @@ enum LegacyConversionRunner {
             invoiceStatus: mapInvoiceStatus(source.invoiceStatus),
             // The conservative correction: an empty or absent status carries over as `unpaid`
             // — the legacy column's own DEFAULT — and NOT as Electron's optimistic `paid`
-            // (`migrations.js migrateAll,158`). Any other string is graded `needsAdjudication` and
+            // (`migrations.js migrateAll`). Any other string is graded `needsAdjudication` and
             // cannot arrive, so there is no third branch to guess at.
             paymentStatus: PaymentStatus(rawValue: g.paymentStatus.stringValue ?? "") ?? .unpaid,
             paidAmount: usable(g.paidAmount),
