@@ -119,7 +119,7 @@ public enum ReportBuilder {
     /// The stored regime, classified from its RAW row.
     ///
     /// Deliberately not `ReportSettings.string(db, "accounting_locale", fallback: "CN")`.
-    /// That fallback mirrors `index.js:27` faithfully and silently runs Chinese accounting
+    /// That fallback mirrors `index.js locale` faithfully and silently runs Chinese accounting
     /// policy for a ledger that never chose it — and it does so for a BOM-prefixed row too,
     /// where `SettingsStore` reads `US` and the engines would run `CN`. Measured, and
     /// pinned by `testBOMPrefixedAccountingLocaleIsBlockedAsInvalidAndNeverSilentlyRunsChina`.

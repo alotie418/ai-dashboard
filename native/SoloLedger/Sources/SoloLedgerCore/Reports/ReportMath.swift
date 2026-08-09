@@ -44,7 +44,7 @@ enum ReportMath {
     //
     // Call sites: `r.amount_net || r.amount || 0` (cn.js totalIncomeNet / totalExpenseNet, _expenseSplit.js net,
     // and the same line in jp/eu/kr/tw), `(v || 0)` inside the rounders
-    // (us.js:142, jp.js generate, eu.js generate, kr.js generate, tw.js generate), `expenseBySlug[slug] || 0`
+    // (us.js r, jp.js generate, eu.js generate, kr.js generate, tw.js generate), `expenseBySlug[slug] || 0`
     // (us.js line8_advertising), `row.paid_amount && row.paid_amount > 0` (_cashflow.js txnCashAmount).
 
     /// JS `ToBoolean` restricted to the values a numeric column can hold.
@@ -97,9 +97,9 @@ enum ReportMath {
 
     // MARK: - `Math.round`
     //
-    // Call sites: every `r()` helper (cn.js generate, us.js:142, jp.js generate, eu.js generate,
+    // Call sites: every `r()` helper (cn.js generate, us.js r, jp.js generate, eu.js generate,
     // kr.js generate, tw.js generate), the margin lines (cn.js grossMargin / netMargin), the tax lines
-    // (cn.js:33,39) and `_cashflow.js round2`.
+    // (cn.js taxSurcharge / incomeTax) and `_cashflow.js round2`.
 
     /// JS `Math.round(x)`.
     ///
@@ -158,16 +158,23 @@ enum ReportMath {
     /// JS `Math.round(x * 100) / 100` — `cn.js generate`'s `r`.
     ///
     /// NOTE the missing `|| 0`: China's rounder is the only one without it, so a
-    /// `NaN` flows straight through and `JSON.stringify` writes it as `null`. That
-    /// asymmetry is pinned by `malformed-CN-2025.json` (five null fields) against
-    /// `malformed-US-2025.json` (zeros), and the mirror must reproduce it rather
-    /// than tidy it (plan §9, row "cn.js 遇不可解析税率时产出 NaN").
+    /// `NaN` flows straight through and `JSON.stringify` writes it as `null`, while the
+    /// other five flatten it to a confident zero. The mirror must reproduce that
+    /// asymmetry rather than tidy it (plan §9, row "cn.js 遇不可解析税率时产出 NaN").
+    ///
+    /// It is no longer visible in the `malformed` goldens, and that is not a regression:
+    /// a rate the dispatcher judges unusable is refused before any rounder sees it, so
+    /// those files now record `null` on BOTH sides. The asymmetry itself is untouched —
+    /// it fires on every `NaN` that reaches a rounder by some other route. A corrupt
+    /// `admin_expense_annual` is one such route and is pinned as one:
+    /// `ReportBatch1BlindSpotTests.testOnlyChinaPropagatesANaNAdminExpense` drives the
+    /// same `NaN` through all six and asserts China alone keeps it.
     @inlinable
     static func round2(_ x: Double) -> Double {
         round(x * 100) / 100
     }
 
-    /// JS `Math.round((v || 0) * 100) / 100` — the `r` in us.js:142, jp.js generate,
+    /// JS `Math.round((v || 0) * 100) / 100` — the `r` in us.js r, jp.js generate,
     /// eu.js generate, kr.js generate, tw.js generate. Identical to ``round2(_:)`` except that a
     /// falsy input (including `NaN`) is flattened to `0` first.
     @inlinable
@@ -175,7 +182,7 @@ enum ReportMath {
         round2(orZero(v))
     }
 
-    /// JS `Math.round(x * 10000) / 100` — `cn.js grossMargin` and `cn.js:41`, the margin
+    /// JS `Math.round(x * 10000) / 100` — `cn.js grossMargin` and `cn.js netMargin`, the margin
     /// percentages. Scaling by 10000 rather than composing `round2` with `* 100`
     /// is what the source does, and the two are NOT interchangeable: they round at
     /// different magnitudes and overflow to `Infinity` 100× sooner.
@@ -187,7 +194,7 @@ enum ReportMath {
     // MARK: - `Math.max` / `Math.min`
     //
     // Call sites: `Math.max(0, totalIncomeTax - totalExpenseTax)` (cn.js vatPayable and the
-    // VAT line in jp/eu/kr/tw), `Math.max(0, profitBeforeTax)` (cn.js:39) and the
+    // VAT line in jp/eu/kr/tw), `Math.max(0, profitBeforeTax)` (cn.js incomeTax) and the
     // same clamp before every income-tax line, `Math.min(seEarnings, ssTaxCap)`
     // (us.js ssTax).
 
@@ -197,11 +204,18 @@ enum ReportMath {
     /// it two behaviours JS does not have:
     ///
     /// - **NaN is swallowed.** `Swift.max(0, .nan)` is `0`; `Math.max(0, NaN)` is
-    ///   `NaN`. This one is load-bearing. `malformed-CN-2025.json` records
-    ///   `incomeTax: null`, which only happens because `Math.max(0, profitBeforeTax)`
-    ///   propagates the `NaN` from the unparseable surcharge rate into
-    ///   `cn.js:39`. A comparison-based max would answer `0` there and the mirror
-    ///   would print a plausible tax figure where the engine prints nothing.
+    ///   `NaN`. A comparison-based max would answer `0` where the engine answers
+    ///   nothing, and print a plausible tax figure for a period that was never priced.
+    ///
+    ///   The path this guards is narrower than it once was. A rate the DISPATCHER
+    ///   judged unusable now arrives as `null`, and `cn.js incomeTax` refuses before
+    ///   any arithmetic runs — `malformed-CN-2025.json` still records `incomeTax: null`,
+    ///   but by that explicit refusal rather than by a `NaN` travelling down the chain.
+    ///   `NaN` still reaches here by other routes. One is a caller passing no rate at
+    ///   all (`undefined`), which `_missingRate.js` documents as a separate case it
+    ///   deliberately does not touch — the pure-function guards, and any test driving an
+    ///   engine directly. Another is a figure that is not a rate: a corrupt
+    ///   `admin_expense_annual` travels the same chain and is never rate-gated.
     /// - **Signed zero is ordered.** JS treats `+0` as greater than `-0`, so
     ///   `Math.max(0, -0)` is `+0`; `Swift.max(0.0, -0.0)` returns `-0`.
     static func max(_ a: Double, _ b: Double) -> Double {
@@ -437,7 +451,7 @@ enum ReportMath {
     /// come back NEGATIVE zero where JS gives `+0`, and the infinities print "inf",
     /// which is not a JS numeric literal at all.
     /// JS `String(number)`, for the one place the engines interpolate a computed
-    /// year (`us.js:106`'s `${Number(year) + 1}`). Same function the array-to-string
+    /// year (`us.js dueDates`'s `${Number(year) + 1}`). Same function the array-to-string
     /// path uses; exposed because batch 5 needs it directly.
     static func jsNumberToString(_ d: Double) -> String { numberToString(d) }
 
@@ -451,7 +465,7 @@ enum ReportMath {
         // re-parsed. Measured:
         //
         //     value    Swift        V8
-        //     2026     "2026.0"     "2026"     ← `us.js:106`'s `${Number(year) + 1}`
+        //     2026     "2026.0"     "2026"     ← `us.js dueDates`'s `${Number(year) + 1}`
         //     1e-7     "1e-07"      "1e-7"
         //     1e21     "1e+21"      "1e+21"    ← agree
         //

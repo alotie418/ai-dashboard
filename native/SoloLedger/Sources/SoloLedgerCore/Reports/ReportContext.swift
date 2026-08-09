@@ -46,7 +46,7 @@ struct ReportContext: Equatable, Sendable {
     let incomeTaxRate: ReportRateSetting
     /// `surcharge_rate`, in the same four states.
     ///
-    /// **Only China's engine may consume it** (`cn.js:33`). Outside China a missing
+    /// **Only China's engine may consume it** (`cn.js taxSurcharge`). Outside China a missing
     /// row answers `.notConfigured` and R7 must simply not look: a Japanese report
     /// must not be blocked because a rate no Japanese line reads has no row.
     let surchargeRate: ReportRateSetting
@@ -96,7 +96,7 @@ struct BatchOneIncomeStatement: Equatable, Sendable {
 /// Separate from ``BatchOneIncomeStatement`` for one reason: `shippingFee`. China
 /// is the only engine with it (`cn.js shippingFee`), and China is also the only engine that
 /// CANNOT reach operating profit without a tax rate — `operatingProfit` at
-/// `cn.js:57` holds `profitBeforeTax`, which consumes `surchargeRate`. So China
+/// `cn.js operatingProfit` holds `profitBeforeTax`, which consumes `surchargeRate`. So China
 /// stops at gross profit in batch 1 while the others do not. That asymmetry is
 /// forced by the dependency chain, not chosen (plan §0).
 struct CNBatchOneIncomeStatement: Equatable, Sendable {

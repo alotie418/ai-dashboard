@@ -500,9 +500,15 @@ final class ReportMathTests: XCTestCase {
         XCTAssertEqual(ReportMath.number(.string("15")), 15)
     }
 
-    /// `us.js:142` and the rounders in jp/eu/kr/tw carry `|| 0`; `cn.js:43` does
-    /// NOT. That single difference is why `malformed-US-2025.json` records
-    /// `annualIncomeTax: 0` where `malformed-CN-2025.json` records `null`.
+    /// `us.js r` and the rounders in jp/eu/kr/tw carry `|| 0`; `cn.js r` does NOT. That
+    /// single difference decides what each engine prints for a `NaN` it is handed: a
+    /// confident zero on five of them, `null` on China.
+    ///
+    /// It is no longer what separates the two `malformed` goldens. Both now record `null`
+    /// for the rate-derived fields, because a rate the dispatcher judges unusable is
+    /// refused before any rounder runs. What this test pins is the rounders themselves,
+    /// which still differ, and which still decide the answer on the path where a `NaN`
+    /// does reach them.
     func testOnlyChinasRounderLetsNaNThrough() {
         XCTAssertTrue(ReportMath.round2(.nan).isNaN, "cn.js:43 — no guard, NaN → JSON null")
         XCTAssertEqual(ReportMath.round2OrZero(.nan), 0, "us.js:142 — `|| 0` flattens it")

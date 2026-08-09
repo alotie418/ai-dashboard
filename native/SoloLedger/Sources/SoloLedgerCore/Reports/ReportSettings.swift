@@ -41,7 +41,7 @@ enum ReportSettings {
         return rows.first?.string("value")
     }
 
-    /// `settingRowExists` — mirror of `electron/reports/index.js:23-33` (the function itself is `:29-33`).
+    /// `settingRowExists` — mirror of `electron/reports/index.js settingRowExists`.
     ///
     /// ```js
     /// function settingRowExists(db, key) {
@@ -70,29 +70,42 @@ enum ReportSettings {
         return !rows.isEmpty
     }
 
-    /// `index.js:88-99` — the income-tax rate, as the four states of plan §6.2 / §6.4.
+    /// `index.js resolveRate` — the income-tax rate, as the four states of plan §6.2 / §6.4.
     ///
     /// ```js
-    /// const incomeTaxRate = (locale === 'CN' || settingRowExists(db, 'income_tax_rate'))
-    ///   ? Number(readSetting(db, 'income_tax_rate', 25))
-    ///   : null;
+    /// const incomeTaxRate = resolveRate(db, 'income_tax_rate', locale, 25);
     /// ```
     ///
+    /// The quoted call is what the dispatcher runs TODAY, and it separates three things
+    /// an earlier form ran together. That form asked only whether the row existed and
+    /// then took `Number(readSetting(...))`, so a row holding unusable bytes produced
+    /// whatever that pipeline happened to yield: bare `25%` fails `JSON.parse` and falls
+    /// back to the Chinese 25; the JSON string `"25%"` parses and coerces to `NaN`;
+    /// `null` coerces to a confident `0`. `resolveRate` asks about the row, then about
+    /// its stored bytes, and answers `null` whenever the bytes are unusable — while a
+    /// MISSING row still yields the Chinese fallback under CN and `null` elsewhere,
+    /// which is a different question with a different answer.
+    ///
     /// - Parameter locale: the ALREADY-RESOLVED accounting locale — the one the
-    ///   dispatcher will route on (`index.js:27`), not whatever is in `settings`.
+    ///   dispatcher will route on (`index.js locale`), not whatever is in `settings`.
     ///   Passing the stored value where an explicit `opts.locale` overrode it would
     ///   gate on one regime and compute under another.
     static func incomeTaxRate(_ db: SQLiteDatabase, locale: String) -> ReportRateSetting {
         rate(db, "income_tax_rate", locale: locale, chinaFallback: 25)
     }
 
-    /// `index.js:87` — the surcharge rate, in the same four states.
+    /// `index.js resolveRate` — the surcharge rate, in the same four states.
     ///
     /// ```js
-    /// const surchargeRate = Number(readSetting(db, 'surcharge_rate', 12));
+    /// const surchargeRate = resolveRate(db, 'surcharge_rate', locale, 12);
     /// ```
     ///
-    /// **Only China's engine reads it** (`cn.js:33`), so outside China this answers
+    /// Both rates go through that one resolution. The earlier form applied the 12
+    /// fallback to every regime, with no row check at all — so a ledger that had never
+    /// configured a surcharge was priced as if it had. What an unusable stored value did
+    /// under it depended on the bytes, exactly as for the income-tax rate above.
+    ///
+    /// **Only China's engine reads it** (`cn.js taxSurcharge`), so outside China this answers
     /// ``ReportRateSetting/notConfigured`` for a missing row and R7 must simply not
     /// look — a Japanese report must NOT be blocked because a rate no Japanese line
     /// consumes has no row. Modelled anyway, and not skipped, because the state that

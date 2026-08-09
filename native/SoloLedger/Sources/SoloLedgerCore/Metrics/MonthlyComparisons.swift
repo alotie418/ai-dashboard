@@ -6,7 +6,17 @@ import Foundation
 /// > 口径（PR-A）：mom/yoy 按「营收 revenue（不含税）」计算。
 /// > **基期缺失或为 0 一律返回 null**（绝不返回 0，避免误导用户的 0.0% 假同比/环比）。
 ///
-/// That basis is NOT this file's to choose. `_metrics.js:2-6` fixes it, and the mirror copies it.
+/// That header is quoted as the SOURCE's own statement of intent, and the mirror copies the
+/// arithmetic it describes; neither is this file's to choose.
+///
+/// **The header is not, however, an accurate description of the figures that reach these
+/// functions**, and the copy that fronts this block says so instead of repeating it. Monthly
+/// revenue is decided per transaction, not per ledger: the five VAT engines take the
+/// tax-exclusive amount where one was recorded and fall back to the full amount where none was
+/// — and a recorded zero counts as none — while the United States engine sums the full recorded
+/// amount always and never reads the tax-exclusive field at all. So "不含税" holds for some rows
+/// under five regimes and for none under the sixth. See `overview.metrics.basisNote` and
+/// `basisNoteUS`, whose split exists for exactly this reason.
 ///
 /// ## What "mirror" means here, precisely
 ///

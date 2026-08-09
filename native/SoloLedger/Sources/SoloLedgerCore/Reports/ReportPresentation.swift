@@ -142,10 +142,17 @@ enum ReportPresentation {
     /// carries no `name`. A view that uses this function has nothing to render the
     /// historical copy FROM.
     ///
-    /// `nil` rather than `[]`, matching `ReportTypes.table(for:)`: `index.js:29-31`
-    /// throws on an unknown locale, so "no report types" is not a state the source can
-    /// reach, and an empty array would let a caller render an empty picker for a ledger
-    /// that should have been rejected outright.
+    /// `nil` rather than `[]`, matching `ReportTypes.table(for:)`. The two answers must
+    /// stay distinguishable: `nil` is "this locale is not one we support", an empty array
+    /// would be "supported, and it has no report types". Only the first is reachable —
+    /// every supported locale declares at least one type — and collapsing them would let
+    /// a caller render an empty picker for a ledger that should have been rejected.
+    ///
+    /// Not justified by the source throwing: `index.js generate` does throw on an unknown
+    /// locale, but `index.js getAvailableReports` does not. It answers `[]` for an unknown
+    /// non-empty locale, and reaches the Chinese table only when the argument is falsy —
+    /// so the source DOES produce the empty array this function refuses to produce. That
+    /// divergence is deliberate, and the reason to keep `nil` is the one above.
     static func reportTypes(locale: String) -> [ReportTypePresentation]? {
         guard let table = ReportTypes.table(for: locale) else { return nil }
         return table.map {
