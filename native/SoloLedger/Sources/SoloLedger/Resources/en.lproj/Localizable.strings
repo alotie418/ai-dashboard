@@ -172,6 +172,11 @@
 "txn.noResults.title" = "No matches";
 "txn.noResults.message" = "No transactions match the current search or filters. Try clearing them.";
 "txn.searchPrompt" = "Search counterparty, note, invoice #";
+"txn.error.amountNotFinite" = "The amount is not a number this ledger can record; the record cannot be saved until it is replaced.";
+"txn.error.amountNetNotFinite" = "The amount excluding tax is not a number this ledger can record; the record cannot be saved until it is replaced.";
+"txn.error.taxAmountNotFinite" = "The tax amount is not a number this ledger can record; the record cannot be saved until it is replaced.";
+"txn.error.taxRateNotFinite" = "The tax rate is not a number this ledger can record; the record cannot be saved until it is replaced.";
+"txn.error.paidAmountNotFinite" = "The amount paid or received is not a number this ledger can record; the record cannot be saved until it is replaced.";
 "date.all" = "All dates";
 "date.thisMonth" = "This month";
 "date.thisYear" = "This year";

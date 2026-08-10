@@ -1,12 +1,18 @@
 import Foundation
 
-public enum LedgerError: Error, CustomStringConvertible {
+public enum LedgerError: Error, Equatable, CustomStringConvertible {
     case validation([String])
     case notFound(String)
+    /// One or more money fields hold a value this ledger cannot record. Carries the fields
+    /// rather than a message, so the App layer can say which one in the user's language —
+    /// `validation`'s payload is English source strings and is not fit to show anybody.
+    case nonFiniteAmounts([TransactionAmountField])
     public var description: String {
         switch self {
         case .validation(let errs): return errs.joined(separator: "; ")
         case .notFound(let id): return "Transaction not found: \(id)"
+        case .nonFiniteAmounts(let fields):
+            return "not a recordable number: \(fields.map(\.rawValue).joined(separator: ", "))"
         }
     }
 }
@@ -586,6 +592,7 @@ public final class LedgerStore {
     }
 
     public func create(_ input: Transaction) throws {
+        try refuseNonFiniteAmounts(in: input)
         let t = input.normalized()
         let errors = t.validationErrors()
         guard errors.isEmpty else { throw LedgerError.validation(errors) }
@@ -600,6 +607,7 @@ public final class LedgerStore {
     }
 
     public func update(_ input: Transaction) throws {
+        try refuseNonFiniteAmounts(in: input)
         let t = input.normalized()
         let errors = t.validationErrors()
         guard errors.isEmpty else { throw LedgerError.validation(errors) }
@@ -613,6 +621,22 @@ public final class LedgerStore {
               updated_at = datetime('now')
             WHERE id = ?
             """, Array(bindings(for: t).dropFirst()) + [.text(t.id)])
+    }
+
+    /// The write boundary's gate on non-finite money.
+    ///
+    /// **Called on the RAW input, before ``Transaction/normalized()``.** That order is the
+    /// whole gate: `normalized()` replaces every non-finite number with `0` (and `amountNet`
+    /// with `nil`), so a check placed after it can never see one. `validationErrors()`'s own
+    /// `!amount.isFinite` line is exactly that mistake, shipped since the first prototype and
+    /// never once reached — which is why the mutation test that moves this call below
+    /// `normalized()` has to go red.
+    ///
+    /// Deliberately NOT folded into `validationErrors()`: that returns English source strings
+    /// the UI shows verbatim, and this refusal has to name a field in the user's language.
+    private func refuseNonFiniteAmounts(in input: Transaction) throws {
+        let offending = input.nonFiniteAmountFields()
+        guard offending.isEmpty else { throw LedgerError.nonFiniteAmounts(offending) }
     }
 
     public func delete(id: String) throws {

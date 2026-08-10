@@ -784,6 +784,12 @@ final class AppModel: ObservableObject {
         do {
             if isNew { try store.create(transaction) } else { try store.update(transaction) }
             reloadAll()
+        } catch LedgerError.nonFiniteAmounts(let fields) {
+            // Named in the user's language, one sentence per field. The editor's own gate
+            // normally catches this first; the path that reaches here is a write with no
+            // editor open — `duplicate(id:)` on a row Electron wrote a non-finite value into.
+            actionError = fields.map { t(TransactionAmountCopy.key(for: $0)) }
+                .joined(separator: "\n")
         } catch { actionError = "\(error)" }
     }
 

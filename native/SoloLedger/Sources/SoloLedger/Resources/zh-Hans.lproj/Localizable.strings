@@ -172,6 +172,11 @@
 "txn.noResults.title" = "无匹配结果";
 "txn.noResults.message" = "没有符合当前搜索或筛选条件的流水。清除条件再试。";
 "txn.searchPrompt" = "搜索往来对象、备注、发票号";
+"txn.error.amountNotFinite" = "金额不是本账本能记录的数字，替换为数字后才能保存。";
+"txn.error.amountNetNotFinite" = "不含税金额不是本账本能记录的数字，替换为数字后才能保存。";
+"txn.error.taxAmountNotFinite" = "税额不是本账本能记录的数字，替换为数字后才能保存。";
+"txn.error.taxRateNotFinite" = "税率不是本账本能记录的数字，替换为数字后才能保存。";
+"txn.error.paidAmountNotFinite" = "已收/付金额不是本账本能记录的数字，替换为数字后才能保存。";
 "date.all" = "全部日期";
 "date.thisMonth" = "本月";
 "date.thisYear" = "本年";

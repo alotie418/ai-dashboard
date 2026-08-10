@@ -42,6 +42,11 @@
 "txn.noResults.title" = "일치하는 결과 없음";
 "txn.noResults.message" = "현재 검색 또는 필터 조건에 맞는 거래가 없습니다. 조건을 지우고 다시 시도하세요.";
 "txn.searchPrompt" = "거래처, 메모, 청구서 번호 검색";
+"txn.error.amountNotFinite" = "금액이 이 장부가 기록할 수 있는 숫자가 아닙니다. 숫자로 바꾸기 전에는 저장할 수 없습니다.";
+"txn.error.amountNetNotFinite" = "세전 금액이 이 장부가 기록할 수 있는 숫자가 아닙니다. 숫자로 바꾸기 전에는 저장할 수 없습니다.";
+"txn.error.taxAmountNotFinite" = "세액이 이 장부가 기록할 수 있는 숫자가 아닙니다. 숫자로 바꾸기 전에는 저장할 수 없습니다.";
+"txn.error.taxRateNotFinite" = "세율이 이 장부가 기록할 수 있는 숫자가 아닙니다. 숫자로 바꾸기 전에는 저장할 수 없습니다.";
+"txn.error.paidAmountNotFinite" = "수금/지급 금액이 이 장부가 기록할 수 있는 숫자가 아닙니다. 숫자로 바꾸기 전에는 저장할 수 없습니다.";
 "delete.confirmTitle" = "삭제 확인";
 "delete.confirmButton" = "{count}개 삭제";
 "delete.confirmMessage" = "선택한 {count}개 거래를 삭제할까요? 실행 취소할 수 있습니다.";

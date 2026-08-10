@@ -61,9 +61,9 @@ public enum TransactionCSV {
         public var skipped: Int
     }
 
-    /// Parse CSV into transactions. Rows missing a valid type/date/amount are
-    /// skipped (counted). DB-managed timestamps are ignored; a blank `id` gets a
-    /// fresh generated id.
+    /// Parse CSV into transactions. Rows missing a valid type/date/amount — or carrying a
+    /// money value this ledger cannot record — are skipped (counted). DB-managed timestamps
+    /// are ignored; a blank `id` gets a fresh generated id.
     public static func parse(_ csv: String) -> ParseResult {
         let rows = CSVReader.parse(csv)
         guard let header = rows.first else { return ParseResult(transactions: [], skipped: 0) }
@@ -79,9 +79,21 @@ public enum TransactionCSV {
                 let v = unguard(dataRow[i])
                 return v.isEmpty ? nil : v
             }
+            // Money is parsed up front so a non-finite cell can be judged HERE. `Double(_:)`
+            // accepts "1e400", "inf" and "nan" — it follows strtod — so a hand-edited file can
+            // carry one, and the storage gate would then throw. Import runs every row inside a
+            // single transaction with no per-row catch, so one bad cell would roll back the
+            // WHOLE file. Skipping it instead keeps the existing partial-import contract: the
+            // row is not imported, it is counted, and the rest of the file lands.
+            let amountNet = field("amount_net").flatMap(Double.init)
+            let taxAmount = field("tax_amount").flatMap(Double.init) ?? 0
+            let taxRate = field("tax_rate").flatMap(Double.init) ?? 0
+            let paidAmount = field("paid_amount").flatMap(Double.init) ?? 0
             guard let typeRaw = field("type"), let type = TransactionType(rawValue: typeRaw),
                   let date = field("date"),
-                  let amountStr = field("amount"), let amount = Double(amountStr) else {
+                  let amountStr = field("amount"), let amount = Double(amountStr),
+                  amount.isFinite, amountNet.map(\.isFinite) ?? true,
+                  taxAmount.isFinite, taxRate.isFinite, paidAmount.isFinite else {
                 skipped += 1
                 continue
             }
@@ -93,16 +105,16 @@ public enum TransactionCSV {
                 type: type,
                 date: date,
                 amount: amount,
-                amountNet: field("amount_net").flatMap(Double.init),
-                taxAmount: field("tax_amount").flatMap(Double.init) ?? 0,
-                taxRate: field("tax_rate").flatMap(Double.init) ?? 0,
+                amountNet: amountNet,
+                taxAmount: taxAmount,
+                taxRate: taxRate,
                 currency: field("currency") ?? "CNY",
                 categoryID: field("category_id"),
                 counterparty: field("counterparty") ?? "",
                 invoiceNo: field("invoice_no") ?? "",
                 invoiceStatus: InvoiceStatus(rawValue: field("invoice_status") ?? "n/a") ?? .na,
                 paymentStatus: PaymentStatus(rawValue: field("payment_status") ?? "paid") ?? .paid,
-                paidAmount: field("paid_amount").flatMap(Double.init) ?? 0,
+                paidAmount: paidAmount,
                 paymentDate: field("payment_date"),
                 dueDate: field("due_date"),
                 description: field("description") ?? "",

@@ -48,6 +48,7 @@ struct TransactionEditor: View {
 
                 TextField(model.t("editor.amount"), value: $amount, format: .number)
                     .multilineTextAlignment(.trailing)
+                nonFiniteNote(.amount, amount)
 
                 TextField(model.t("editor.currency"), text: $currency)
 
@@ -76,6 +77,7 @@ struct TransactionEditor: View {
                 Section(model.t("editor.paymentSection")) {
                     TextField(model.t("editor.paidAmount"), value: $paidAmount, format: .number)
                         .multilineTextAlignment(.trailing)
+                    nonFiniteNote(.paidAmount, paidAmount)
                     OptionalDateRow(label: model.t("editor.paymentDate"), date: $paymentDate,
                                     unparsedValue: OptionalDateEdit.unparsedFallback(original: existing?.paymentDate, initial: initialPaymentDate, current: paymentDate))
                     OptionalDateRow(label: model.t("editor.dueDate"), date: $dueDate,
@@ -91,10 +93,13 @@ struct TransactionEditor: View {
                     TextField(model.t("editor.invoiceNo"), text: $invoiceNo)
                     TextField(model.t("editor.amountNet"), value: $amountNet, format: .number)
                         .multilineTextAlignment(.trailing)
+                    nonFiniteNote(.amountNet, amountNet)
                     TextField(model.t("editor.taxAmount"), value: $taxAmount, format: .number)
                         .multilineTextAlignment(.trailing)
+                    nonFiniteNote(.taxAmount, taxAmount)
                     TextField(model.t("editor.taxRate"), value: $taxRate, format: .number)
                         .multilineTextAlignment(.trailing)
+                    nonFiniteNote(.taxRate, taxRate)
                 }
             }
             .formStyle(.grouped)
@@ -106,7 +111,7 @@ struct TransactionEditor: View {
                     .keyboardShortcut(.cancelAction)
                 Button(model.t("common.save")) { save() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(!amount.isFinite)
+                    .disabled(!nonFiniteFields.isEmpty)
             }
             .padding(16)
         }
@@ -158,6 +163,38 @@ struct TransactionEditor: View {
         categoryID = options.first?.id
     }
 
+    /// The money fields currently holding a value this ledger cannot record.
+    ///
+    /// Derived from the SAME primitive the write boundary uses, over the values on screen, so
+    /// the button and the store cannot disagree about what is refusable. A row that arrived
+    /// this way — Electron writes ±Infinity into four of these five columns, its `validate`
+    /// only checks `amount` — is not locked: typing a number into the flagged field clears the
+    /// note and re-enables Save, which is how such a row gets repaired.
+    private var nonFiniteFields: [TransactionAmountField] {
+        var t = Transaction()
+        t.amount = amount
+        t.amountNet = amountNet
+        t.taxAmount = taxAmount
+        t.taxRate = taxRate
+        t.paidAmount = paidAmount ?? 0
+        return t.nonFiniteAmountFields()
+    }
+
+    /// The per-field explanation, shown only while that field is the problem.
+    ///
+    /// Same sentence the storage refusal maps to, deliberately: a user who hits the disabled
+    /// button and a user whose duplicate was refused are being told the same fact, and two
+    /// wordings for one fact is how they drift apart.
+    @ViewBuilder
+    private func nonFiniteNote(_ field: TransactionAmountField, _ value: Double?) -> some View {
+        if let value, !value.isFinite {
+            Text(model.t(TransactionAmountCopy.key(for: field)))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("editor.nonFinite.\(field.rawValue)")
+        }
+    }
+
     private func save() {
         var t = existing ?? Transaction()
         t.type = type
@@ -178,6 +215,24 @@ struct TransactionEditor: View {
         t.dueDate = OptionalDateEdit.persisted(original: existing?.dueDate, initial: initialDueDate, edited: dueDate)
         model.save(t, isNew: isNew)
         dismiss()
+    }
+}
+
+/// The one place a refused money field becomes a sentence.
+///
+/// Exhaustive with no `default`: a sixth money column stops this file compiling instead of
+/// falling into a bucket someone would fill with the field's raw name. The same key serves the
+/// editor's inline note and the alert raised when a write is refused from somewhere with no
+/// editor open — duplicating a row, for instance — so the two can never drift.
+enum TransactionAmountCopy {
+    static func key(for field: TransactionAmountField) -> String {
+        switch field {
+        case .amount:     return "txn.error.amountNotFinite"
+        case .amountNet:  return "txn.error.amountNetNotFinite"
+        case .taxAmount:  return "txn.error.taxAmountNotFinite"
+        case .taxRate:    return "txn.error.taxRateNotFinite"
+        case .paidAmount: return "txn.error.paidAmountNotFinite"
+        }
     }
 }
 
