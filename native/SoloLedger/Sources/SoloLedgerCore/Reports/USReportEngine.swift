@@ -47,7 +47,7 @@ enum USReportEngine {
 
 extension USReportEngine {
 
-    /// `us.js generate` and `:85-89` — the Schedule C mapping.
+    /// `us.js scheduleC` (the local literal and the emitted block) — the Schedule C mapping.
     ///
     /// Reads NO tax rate. `incomeTaxRate` never touches these fields, which is why
     /// this batch could land before the estimate layer; the parity test proves it
@@ -143,7 +143,7 @@ extension USReportEngine {
 
 extension USReportEngine {
 
-    /// `us.js generate`, `:91-99` — the Self-Employment Tax estimate.
+    /// `us.js selfEmploymentTax` — the Self-Employment Tax estimate.
     ///
     /// Reads the **unrounded** Line 31 (`ScheduleC.unroundedGrossIncome −
     /// unroundedTotalExpenses`), not the rounded `line31_netProfit` the block emits:
@@ -183,16 +183,16 @@ extension USReportEngine {
         let totalSETax = r(ssTax + medicareTax + additionalMedicare)
 
         return SelfEmploymentTax(
-            netEarnings: r(netProfit),                 // us.js scheduleC
-            seEarnings: r(seEarnings),                 // us.js line28_totalExpenses
-            socialSecurityTax: r(ssTax),               // us.js line31_netProfit
+            netEarnings: r(netProfit),                 // us.js netEarnings
+            seEarnings: r(seEarnings),                 // us.js seEarnings
+            socialSecurityTax: r(ssTax),               // us.js socialSecurityTax
             medicareTax: r(medicareTax),               // us.js selfEmploymentTax.medicareTax
             additionalMedicare: r(additionalMedicare), // us.js selfEmploymentTax.additionalMedicare
-            totalSETax: totalSETax,                    // us.js selfEmploymentTax — already rounded
-            paramYear: resolved.year)                  // us.js netEarnings
+            totalSETax: totalSETax,                    // us.js totalSETax — already rounded
+            paramYear: resolved.year)                  // us.js paramYear
     }
 
-    /// `us.js generate`, `:101-107` — the quarterly estimated-tax block.
+    /// `us.js estimatedTax` — the quarterly estimated-tax block.
     ///
     /// `totalAnnual` is **not rounded** (`us.js estimatedAnnualTax`), and that is the sharpest
     /// discriminator in the batch: `base-US-2024` records `1542.6599999999999` and
@@ -217,7 +217,7 @@ extension USReportEngine {
 
         return EstimatedTax(
             annualIncomeTax: refusal ?? .computed(annualIncomeTaxRaw ?? 0),
-            annualSETax: totalSETax,                                    // us.js selfEmploymentTax
+            annualSETax: totalSETax,                                    // us.js annualSETax
             totalAnnual: refusal ?? .computed(totalAnnualRaw ?? 0),      // NOT rounded
             quarterlyPayment: refusal ?? .computed(r((totalAnnualRaw ?? 0) / 4)), // us.js quarterlyPayment
             // us.js dueDates — `${Number(year) + 1}` for the January date, so the year

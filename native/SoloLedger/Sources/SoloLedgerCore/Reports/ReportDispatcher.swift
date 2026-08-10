@@ -118,7 +118,7 @@ enum ReportDispatcher {
     static func resolveLocale(_ db: SQLiteDatabase, _ explicit: String?) throws -> String {
         let locale = explicit ?? ReportSettings.string(db, "accounting_locale", fallback: "CN")
         guard ["CN", "US", "JP", "EU", "KR", "TW"].contains(locale) else {
-            throw Failure.unsupportedLocale(locale)      // index.js settingRowExists
+            throw Failure.unsupportedLocale(locale)      // index.js generate — the `if (!engine)` throw
         }
         return locale
     }

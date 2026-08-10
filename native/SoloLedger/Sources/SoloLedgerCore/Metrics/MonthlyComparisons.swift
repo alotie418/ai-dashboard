@@ -62,7 +62,7 @@ public enum MonthlyComparisons {
     ///
     /// Both are optional because the JS reads them off a plain object where a missing property
     /// is `undefined`, and the two paths treat that differently: `revenue` goes into arithmetic
-    /// (so `undefined` becomes `NaN`), while `salesTons` goes through `|| 0` (`:19`, `:27`),
+    /// (so `undefined` becomes `NaN`), while `salesTons` goes through `|| 0` (`unitRevs`, `deflator`),
     /// which folds `undefined`, `null`, `0`, `-0` and `NaN` alike to `0`.
     public struct Row: Equatable, Sendable {
         /// `m.revenue`. `nil` mirrors a missing property, which JS arithmetic turns into `NaN`.
@@ -165,12 +165,14 @@ public enum MonthlyComparisons {
     ///     revenue, never against a value this function produced.
     ///   - priorRevenue: last year's revenue aligned by index. An index past the end is
     ///     `undefined` in the JS and `nil` here, which `pct` turns into `nil`. Passing an empty
-    ///     array is the JS default (`:16`) and yields `nil` for every `yoy` — note the JS
+    ///     array is the JS default (`_metrics.js computeMonthlyComparisons`) and yields `nil`
+    ///     for every `yoy` — note the JS
     ///     guard `priorRevenue ? … : null` cannot distinguish that from an omitted argument,
     ///     because `[]` is truthy.
     public static func compute(_ monthly: [Row],
                                priorRevenue: [Double?] = []) -> [Comparison] {
-        // `:18-21` — the price-index base: the mean unit revenue over months that sold anything.
+        // `_metrics.js unitRevs` / `avgUnitRev` — the price-index base: the mean unit revenue
+        // over months that sold anything.
         let unitRevs: [Double] = monthly.compactMap { row in
             let tons = truthyOrZero(row.salesTons)
             guard tons > 0 else { return nil }
@@ -181,11 +183,11 @@ public enum MonthlyComparisons {
         return monthly.enumerated().map { index, row in
             let tons = truthyOrZero(row.salesTons)
             return Comparison(
-                // `:25` — the first month has no predecessor, so it is `null` rather than 0%.
+                // `_metrics.js mom` — the first month has no predecessor, so it is `null` rather than 0%.
                 mom: index > 0 ? pct(row.revenue, monthly[index - 1].revenue) : nil,
-                // `:26`
+                // `_metrics.js yoy`
                 yoy: pct(row.revenue, index < priorRevenue.count ? priorRevenue[index] : nil),
-                // `:27-29`. Both guards matter: a month with no volume has no unit revenue, and
+                // `_metrics.js deflator`. Both guards matter: a month with no volume has no unit revenue, and
                 // a non-positive mean would invert the index. `avgUnitRev` is also `NaN` when
                 // any qualifying month has no revenue, and `NaN > 0` is false, so the whole
                 // column falls back to `null` — the JS behaves the same way for the same reason.
@@ -197,7 +199,7 @@ public enum MonthlyComparisons {
     }
 
     /// `value || 0` for a number: everything falsy in JS — `undefined`, `null`, `0`, `-0` and
-    /// `NaN` — becomes `0`. Used at `_metrics.js computeMonthlyComparisons` and `:27`.
+    /// `NaN` — becomes `0`. Used at `_metrics.js unitRevs` and `deflator`.
     ///
     /// The `NaN` arm is not observable through ``compute(_:priorRevenue:)``: every caller
     /// immediately asks `> 0`, and that is false for `NaN` whether or not it was folded. It is

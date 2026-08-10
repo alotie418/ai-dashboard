@@ -3,7 +3,7 @@ import Foundation
 /// Product / service-item master data — a faithful mirror of `electron/handlers/products.js`.
 ///
 /// **Scope is master data ONLY.** `defaultUnitCost` is *stored*, never *computed with*: the
-/// weighted-average inventory valuation in `electron/handlers/inventory.js qtyOnHand` is a later
+/// weighted-average inventory valuation in `electron/handlers/inventory.js computeSummary` is a later
 /// slice and is blocked pending accountant confirmation of its four accounting choices. Nothing
 /// in this file reads or writes any other table, joins anything, or produces a total.
 ///
@@ -15,10 +15,10 @@ import Foundation
 /// Mirror boundaries worth stating once, because they are decisions and not oversights:
 ///
 ///  * The read path performs **no validation**. `electron/handlers/products.js list` selects
-///    and returns whatever is stored; the unit whitelist is enforced on write only (`:26`,
-///    `:61`). A row holding an out-of-vocabulary unit therefore reads back verbatim on both
+///    and returns whatever is stored; the unit whitelist is enforced on write only (`create`,
+///    `update`). A row holding an out-of-vocabulary unit therefore reads back verbatim on both
 ///    sides rather than being repaired on the way out.
-///  * Ordering happens **in SQL** (`:15`), never in Swift. SQLite orders by storage class
+///  * Ordering happens **in SQL** (`list`), never in Swift. SQLite orders by storage class
 ///    (NULL < numeric < TEXT < BLOB); no in-memory comparison over the decoded model
 ///    reproduces that, so re-sorting here would silently diverge from Electron on any ledger
 ///    holding a mistyped cell.
@@ -137,13 +137,15 @@ public struct ProductCatalogPage: Equatable, Sendable {
 /// `description` below is an exhaustive switch over fixed literals — a new case fails to compile
 /// here instead of falling into a bucket someone would fill with the offending value.
 public enum ProductCatalogError: Error, Equatable, Sendable, CustomStringConvertible {
-    /// An empty id was supplied — `electron/handlers/products.js update`, `:83` (`'Invalid ID'`).
+    /// An empty id was supplied — `electron/handlers/products.js update` / `products.js remove`
+    /// (`'Invalid ID'` in both).
     case invalidID
-    /// The name was empty, or whitespace only — `products.js create`, `:57`.
+    /// The name was empty, or whitespace only — `products.js create` (`'name required'`) /
+    /// `products.js update` (`'name cannot be empty'`).
     case nameRequired
-    /// The unit is not one of ``ProductUnit`` — `products.js create`, `:61`.
+    /// The unit is not one of ``ProductUnit`` — `products.js create` / `products.js update`.
     case unitNotRecognized
-    /// No such product — `products.js update`, `:85` (`'Product not found'`).
+    /// No such product — `products.js update` / `products.js remove` (`'Product not found'` in both).
     case notFound
     /// The generated id was already taken. Unreachable with a UUID, kept so the write path has
     /// somewhere honest to land instead of surfacing a raw SQLite constraint failure.
@@ -183,7 +185,7 @@ public enum ProductCatalogError: Error, Equatable, Sendable, CustomStringConvert
 /// reports guard's scope and means "is this category a cost of goods sold", which is not what is
 /// being asked here.
 ///
-/// Every Electron write path binds an integer (`products.js create`, `:68-69`), so on a ledger
+/// Every Electron write path binds an integer (`products.js create` / `products.js update`), so on a ledger
 /// only ever touched by that app the `.integer` arm is the only one taken. The other four exist
 /// because a migrated, imported or externally-edited file can hold anything, and on those values
 /// the two apps must still agree.
@@ -216,7 +218,8 @@ private func jsTruthy(_ value: SQLiteValue, storedType: String?) -> Bool {
 /// the same property that made it worth escaping on the settings screen.)
 private let jsTrimSet = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\u{FEFF}"))
 
-/// `products.js cost` + `:37` / `:66` — `Number(v)`, then `isFinite(n) && n >= 0 ? n : 0`.
+/// `products.js cost` and the same clamp bound in `create` / `update` — `Number(v)`, then
+/// `isFinite(n) && n >= 0 ? n : 0`.
 /// An omitted field is `Number(undefined)`, i.e. `NaN`, which fails the finite test and lands on
 /// zero; `nil` here means the same thing and takes the same branch.
 private func normalizedUnitCost(_ value: Double?) -> Double {
@@ -291,7 +294,7 @@ public extension LedgerStore {
     ///
     /// The defaults reproduce the handler's, including the two places where it treats a missing
     /// field differently from `update`: an omitted `sortOrder` becomes **999** here and **0**
-    /// there (`:40` vs `:70`), and `is_active` is defaulted true. Electron reaches that second
+    /// there (`create` vs `update`), and `is_active` is defaulted true. Electron reaches that second
     /// default through `is_active === false ? 0 : 1`, which also lets `0`, `null` and `"no"`
     /// through as *active*; typing the parameter `Bool` removes those inputs from the domain
     /// rather than reproducing the quirk, and on the values both sides can express the two agree.
@@ -329,7 +332,7 @@ public extension LedgerStore {
     ///
     /// Strictly partial: `nil` means *omitted*, and an omitted field is neither written nor
     /// cleared, which is what the handler's `!== undefined` test achieves. When nothing at all is
-    /// supplied the row is not touched and `updated_at` does not move (`:71`) — the same "a write
+    /// supplied the row is not touched and `updated_at` does not move — the same "a write
     /// that would change nothing is not a write" rule the settings screen already follows.
     func updateProduct(id: String,
                        name: String? = nil,
@@ -383,7 +386,7 @@ public extension LedgerStore {
     /// Still a bare delete for the MIRRORED tables: no cascade, no reference check, no cleanup of
     /// the `product_id` columns on `purchases` / `sales` / `purchase_items` / `sales_items` /
     /// `business_document_items`. Those columns are plain TEXT on purpose — `electron/db/index.js`
-    /// records at `:390-392` and `:679-682` that an enforced foreign key would make exactly this
+    /// records in its `MIGRATIONS` v11 and v20 notes that an enforced foreign key would make exactly this
     /// statement fail, since `foreign_keys` is ON — so a dangling reference is the accepted
     /// outcome on both sides rather than an accident.
     ///
@@ -411,7 +414,8 @@ public extension LedgerStore {
 }
 
 private extension LedgerStore {
-    /// The handler's own existence probe — `electron/handlers/products.js existing`, `:84`.
+    /// The handler's own existence probe — `electron/handlers/products.js existing` and the same
+    /// probe in `products.js remove`.
     /// Not-found is decided by a read, never by a changes count, which is how `update` already
     /// decides it for transactions.
     func productRowExists(_ id: String) throws -> Bool {

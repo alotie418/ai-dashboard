@@ -437,8 +437,8 @@ struct ProductFormDraft: Equatable {
 
     /// Seed from a row, or from `create`'s own defaults.
     ///
-    /// The defaults are the handler's — `piece`, zero, not a service (`products.js create`, `:27`,
-    /// `:38`). `is_active` is deliberately absent from the whole draft: it is not a form field
+    /// The defaults are the handler's — `piece`, zero, not a service (`products.js create`).
+    /// `is_active` is deliberately absent from the whole draft: it is not a form field
     /// on either side, it is the row's own inline control.
     init(editing: Product?) {
         self.editing = editing

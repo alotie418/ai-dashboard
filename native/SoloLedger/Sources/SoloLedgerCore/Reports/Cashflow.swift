@@ -11,7 +11,7 @@ import Foundation
 /// A section that can never carry a number.
 ///
 /// `_cashflow.js computeOperatingCashflow` returns `null` for investing / financing / beginningCash /
-/// endingCash, and `:5-8` states the obligation this creates: *the UI must render
+/// endingCash, and its module header states the obligation this creates: *the UI must render
 /// those nulls as "未配置 / 不适用", never as 0.*
 ///
 /// That obligation is carried by a zero-payload enum rather than by `Double?`,

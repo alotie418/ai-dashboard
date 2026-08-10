@@ -2,7 +2,7 @@ import Foundation
 
 /// The inputs the engines read.
 ///
-/// A DELIBERATELY SMALL subset of the dispatcher's context (`index.js categories`). The
+/// A DELIBERATELY SMALL subset of the dispatcher's context (`index.js context`). The
 /// plan's batching seam is "does this field read a `settings` value" (§2), and
 /// batch 1 was the largest set that reads none — which is why this type carried no
 /// tax rate at all through R2–R5, and why adding one "for later" would have erased
@@ -22,7 +22,7 @@ import Foundation
 /// `malformed-CN-2025.json` come from that row. A4-2 is the correction.
 ///
 /// `vatRate` stays absent, for an unrelated reason: the dispatcher loads it
-/// (`index.js vatRate`, `:105`) and NO engine reads it (plan Appendix A6). Porting it as
+/// (`index.js vatRate`, carried in `index.js context`) and NO engine reads it (plan Appendix A6). Porting it as
 /// a live parameter would mirror a bug.
 ///
 /// `adminExpense` is here and is not an exception: `admin_expense_annual` falls

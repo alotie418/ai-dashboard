@@ -17,7 +17,7 @@ enum KRReportEngine {
         var totalIncomeNet = 0.0
         for row in ctx.incomeRows { totalIncomeNet += ReportMath.netAmount(row.amountNet, row.amount) }
 
-        let revenue = totalIncomeNet                          // kr.js revenue@3d7138b
+        let revenue = totalIncomeNet                          // kr.js generate revenue
         let cogs = split.cogsNet                              // kr.js cogs — COGS only
         let grossProfit = revenue - cogs                      // kr.js grossProfit
         let operatingProfit = grossProfit - split.operatingExpensesNet - ctx.adminExpense // kr.js operatingProfit
@@ -37,21 +37,21 @@ enum KRReportEngine {
         let netProfitRaw = taxPayable.map { operatingProfit - $0 }
         let netProfit = refusal ?? .computed(r(netProfitRaw ?? 0))
         // kr.js netMargin — ×100 then the rounder's ×100 again. China multiplies by
-        // 10000 once (cn.js generate); algebraically equal, measurably different in
+        // 10000 once (cn.js netMargin); algebraically equal, measurably different in
         // binary64, so the two must not be "unified".
         let netMargin = refusal ?? .computed(
             revenue > 0 ? r((netProfitRaw ?? 0) / revenue * 100) : 0)
 
         return BatchOneIncomeStatementWithOperatingProfit(
             salesRevenue: r(revenue),                         // kr.js salesRevenue
-            costOfSales: r(cogs),                             // kr.js salesRevenue
+            costOfSales: r(cogs),                             // kr.js costOfSales
             costOfGoodsSold: r(split.cogsNet),                // kr.js costOfGoodsSold
-            operatingExpenses: r(split.operatingExpensesNet), // kr.js costOfGoodsSold
+            operatingExpenses: r(split.operatingExpensesNet), // kr.js operatingExpenses
             grossProfit: r(grossProfit),                      // kr.js grossProfit
-            // kr.js grossProfit — inline, scaled by 100 twice (not 10000 once, as CN does).
+            // kr.js grossMargin — inline, scaled by 100 twice (not 10000 once, as CN does).
             grossMargin: revenue > 0 ? r(grossProfit / revenue * 100) : 0,
             adminExpense: r(ctx.adminExpense),                // kr.js adminExpense
-            operatingProfit: r(operatingProfit),               // kr.js incomeStatement
+            operatingProfit: r(operatingProfit),               // kr.js operatingProfit
             // ── Batch 5 (R7) — the estimate layer ──────────────────────────────
             //
             // Reads the UNROUNDED `operatingProfit` local, not the rounded field
@@ -86,7 +86,7 @@ extension KRReportEngine {
             difference: r(totalIncome - totalExpense))
     }
 
-    /// `kr.js vatPayable`, `:41-43` — 부가가치세 요약.
+    /// `kr.js vatPayable` and its emit block `kr.js vatSummary` — 부가가치세 요약.
     ///
     /// Korea emits this under the key `vatSummary` — the same key China uses for a
     /// FIVE-field block with different field names. Nothing in the JSON says which
@@ -97,7 +97,7 @@ extension KRReportEngine {
     /// `kr.js vatPayable` reads `totalIncomeTax` / `totalExpenseTax` directly.
     static func vatSummary(_ ctx: ReportContext) -> KRVATSummary {
         let r = ReportMath.round2OrZero
-        // kr.js totalIncomeTax / :21
+        // kr.js totalIncomeTax / totalExpenseTax
         var totalIncomeTax = 0.0
         for row in ctx.incomeRows { totalIncomeTax += ReportMath.orZero(row.taxAmount) }
         var totalExpenseTax = 0.0
@@ -107,8 +107,8 @@ extension KRReportEngine {
 
         return KRVATSummary(
             outputVAT: r(totalIncomeTax),                                // kr.js outputVAT
-            inputVAT: r(totalExpenseTax),                                // kr.js outputVAT
-            vatPayable: vatPayable)                                      // kr.js outputVAT — NOT re-rounded
+            inputVAT: r(totalExpenseTax),                                // kr.js inputVAT
+            vatPayable: vatPayable)                                      // kr.js vatPayable — NOT re-rounded
     }
 
     /// `kr.js buildMonthly` — the monthly breakdown.

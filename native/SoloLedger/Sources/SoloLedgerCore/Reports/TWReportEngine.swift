@@ -17,7 +17,7 @@ enum TWReportEngine {
         var totalIncomeNet = 0.0
         for row in ctx.incomeRows { totalIncomeNet += ReportMath.netAmount(row.amountNet, row.amount) }
 
-        let revenue = totalIncomeNet                          // tw.js revenue@3d7138b
+        let revenue = totalIncomeNet                          // tw.js generate revenue
         let cogs = split.cogsNet                              // tw.js cogs — COGS only
         let grossProfit = revenue - cogs                      // tw.js grossProfit
         let operatingProfit = grossProfit - split.operatingExpensesNet - ctx.adminExpense // tw.js operatingProfit
@@ -37,21 +37,21 @@ enum TWReportEngine {
         let netProfitRaw = taxPayable.map { operatingProfit - $0 }
         let netProfit = refusal ?? .computed(r(netProfitRaw ?? 0))
         // tw.js netMargin — ×100 then the rounder's ×100 again. China multiplies by
-        // 10000 once (cn.js generate); algebraically equal, measurably different in
+        // 10000 once (cn.js netMargin); algebraically equal, measurably different in
         // binary64, so the two must not be "unified".
         let netMargin = refusal ?? .computed(
             revenue > 0 ? r((netProfitRaw ?? 0) / revenue * 100) : 0)
 
         return BatchOneIncomeStatementWithOperatingProfit(
             salesRevenue: r(revenue),                         // tw.js salesRevenue
-            costOfSales: r(cogs),                             // tw.js salesRevenue
+            costOfSales: r(cogs),                             // tw.js costOfSales
             costOfGoodsSold: r(split.cogsNet),                // tw.js costOfGoodsSold
-            operatingExpenses: r(split.operatingExpensesNet), // tw.js costOfGoodsSold
+            operatingExpenses: r(split.operatingExpensesNet), // tw.js operatingExpenses
             grossProfit: r(grossProfit),                      // tw.js grossProfit
-            // tw.js grossProfit — inline, scaled by 100 twice (not 10000 once, as CN does).
+            // tw.js grossMargin — inline, scaled by 100 twice (not 10000 once, as CN does).
             grossMargin: revenue > 0 ? r(grossProfit / revenue * 100) : 0,
             adminExpense: r(ctx.adminExpense),                // tw.js adminExpense
-            operatingProfit: r(operatingProfit),               // tw.js incomeStatement
+            operatingProfit: r(operatingProfit),               // tw.js operatingProfit
             // ── Batch 5 (R7) — the estimate layer ──────────────────────────────
             //
             // Reads the UNROUNDED `operatingProfit` local, not the rounded field
@@ -86,14 +86,14 @@ extension TWReportEngine {
             difference: r(totalIncome - totalExpense))
     }
 
-    /// `tw.js businessTaxPayable`, `:41-43` — 營業稅.
+    /// `tw.js businessTaxPayable` and its emit block `tw.js businessTax` — 營業稅.
     ///
     /// Field-for-field identical to Japan's block and named differently
     /// (`businessTax` vs `consumptionTax`) for a different tax. Kept as its own
     /// type for the same reason Korea's is.
     static func businessTax(_ ctx: ReportContext) -> TWBusinessTax {
         let r = ReportMath.round2OrZero
-        // tw.js totalIncomeTax / :21
+        // tw.js totalIncomeTax / totalExpenseTax
         var totalIncomeTax = 0.0
         for row in ctx.incomeRows { totalIncomeTax += ReportMath.orZero(row.taxAmount) }
         var totalExpenseTax = 0.0
@@ -104,8 +104,8 @@ extension TWReportEngine {
 
         return TWBusinessTax(
             collected: r(totalIncomeTax),                                // tw.js collected
-            paid: r(totalExpenseTax),                                    // tw.js collected
-            payable: businessTaxPayable)                                 // tw.js collected — NOT re-rounded
+            paid: r(totalExpenseTax),                                    // tw.js paid
+            payable: businessTaxPayable)                                 // tw.js payable — NOT re-rounded
     }
 
     /// `tw.js buildMonthly` — the monthly breakdown.

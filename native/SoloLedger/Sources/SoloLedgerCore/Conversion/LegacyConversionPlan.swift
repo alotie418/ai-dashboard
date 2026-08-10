@@ -75,9 +75,9 @@ public enum LegacyRowIssue: String, CaseIterable, Equatable, Sendable {
     ///
     /// `id TEXT PRIMARY KEY` does NOT imply NOT NULL in SQLite: only an INTEGER PRIMARY KEY
     /// gets that treatment, so both storage classes are accepted by the real DDL (measured
-    /// against `electron/db/index.js generate` and `SchemaMigrator.swift:88`). Nothing in the
+    /// against `electron/db/index.js MIGRATIONS` and `SchemaMigrator.swift:88`). Nothing in the
     /// Electron product writes such a row — `sales.js createWithItems` throws `id required` and
-    /// `batch.js prepared@cf802c8` backfills one — but a hand-edited or damaged ledger can hold one, and
+    /// `batch.js batchSales prepared` backfills one — but a hand-edited or damaged ledger can hold one, and
     /// the anti-join returns it, so this stage has to have an answer for it.
     ///
     /// It is `unconvertible` rather than adjudicable: `legacy_migrations.legacy_id` is
@@ -853,7 +853,7 @@ extension LedgerStore {
     }
 
     /// The work set is picked by the SAME anti-join the Electron converter uses to pick its
-    /// own (`migrations.js rows@f472f6e,138-142`) and `LegacyLedgerProbe` uses to count it, so
+    /// own (the purchases `rows` query in `migrations.js migrateAll`) and `LegacyLedgerProbe` uses to count it, so
     /// "rows a conversion would carry" is one question with one answer across all three.
     ///
     /// When `legacy_migrations` is absent there is nothing to anti-join against and every

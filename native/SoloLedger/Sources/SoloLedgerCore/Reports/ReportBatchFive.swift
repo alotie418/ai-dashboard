@@ -94,7 +94,7 @@ enum EstimatedValue: Equatable, Sendable {
     }
 }
 
-/// `us.js scheduleC` — the Self-Employment Tax estimate.
+/// `us.js selfEmploymentTax` — the Self-Employment Tax estimate.
 ///
 /// Seven fields, mirrored verbatim. Two of them are duplicates that NO input can
 /// separate, and saying so is cheaper than letting a green run imply otherwise:
@@ -122,7 +122,7 @@ struct SelfEmploymentTax: Equatable, Sendable {
     let paramYear: Int
 }
 
-/// `us.js medicareTax` — the quarterly estimated-tax block.
+/// `us.js estimatedTax` — the quarterly estimated-tax block.
 ///
 /// `totalAnnual` is `annualIncomeTax + totalSETax` and is **NOT rounded** (`us.js estimatedAnnualTax`).
 /// Two committed goldens carry the float tail that proves it — `base-US-2024` records

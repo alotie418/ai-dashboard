@@ -10,7 +10,7 @@ public struct ReportPeriod: Equatable, Sendable {
     public let from: String
     public let to: String
 
-    /// A full calendar year — `index.js settingRowExists`'s own default, spelled explicitly.
+    /// A full calendar year — `index.js from` / `to`'s own default, spelled explicitly.
     public init(year: String) {
         self.year = year
         self.from = "\(year)-01-01"
