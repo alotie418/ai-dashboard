@@ -97,8 +97,10 @@ final class ReportBatch2ParityTests: LedgerTestCase {
     // MARK: - TEST-ONLY legacy reads
     //
     // Mirrors of index.js:60-63 and _cashflow.js:67-80. These exist ONLY here.
-    // `testNoProductionSymbolReadsTheLegacyTables` asserts that Sources/ contains
-    // no reference to either table, so this cannot quietly become a product path.
+    // `testNoProductionSymbolReadsTheLegacyTables` asserts that no production line under
+    // Sources/SoloLedgerCore/Reports names either table, so this cannot quietly become a
+    // report path. Elsewhere in Sources/ they ARE read, deliberately — the probe and the
+    // conversion path both do — so the guard's scope is that one directory, not Sources/.
 
     private func legacyRows(_ db: SQLiteDatabase, table: String,
                             from: String, to: String) throws -> [ReportRow] {

@@ -219,11 +219,19 @@ enum ReportSettings {
     static func string(_ db: SQLiteDatabase, _ key: String, fallback: String) -> String {
         guard let raw = rawValue(db, key) else { return fallback }
         guard case .string(let s)? = jsonFragment(raw) else {
-            // JSON.parse succeeded but the value is not a string, or it threw.
-            // Either way index.js hands the raw parsed value straight on; for the
-            // two string keys R3 reads, anything non-string is out of contract and
-            // the fallback is the honest answer. Recorded rather than invented:
-            // no fixture and no golden exercises it.
+            // Two different inputs land here, and `index.js readSetting` treats them
+            // differently — so this branch is exact parity on one of them and a declared
+            // divergence on the other.
+            //
+            // `JSON.parse` THREW: its catch returns the fallback, so returning the fallback
+            // here is parity, not a choice. Pinned by
+            // `ReportRateSettingTests.testTheBOMFixAlsoAlignsTheOtherSettingsReaders`.
+            //
+            // `JSON.parse` SUCCEEDED with a non-string: over there that value is handed
+            // straight on, while this returns the fallback. For the two string keys R3
+            // reads, anything non-string is out of contract and the fallback is the honest
+            // answer — but it is a DIVERGENCE, not parity, and is written down as one.
+            // Recorded rather than invented: no fixture and no golden exercises it.
             return fallback
         }
         return s

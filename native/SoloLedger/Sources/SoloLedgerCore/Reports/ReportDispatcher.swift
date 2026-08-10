@@ -5,9 +5,13 @@ import Foundation
 ///
 /// **The legacy fallback branch is not mirrored** (plan §1.1 / §6.1, per #395).
 /// `index.js generate` falls back to the old `sales` / `purchases` tables when a
-/// period holds no transactions; the native app does not read those tables at all.
-/// No symbol in this file — or anywhere in `Sources/` — names them, and a test
-/// asserts that.
+/// period holds no transactions; nothing on the report path here reads them. No
+/// production line under `Sources/SoloLedgerCore/Reports` names either table, and
+/// `ReportBatch2ParityTests.testNoProductionSymbolReadsTheLegacyTables` pins exactly
+/// that scope — that one directory, non-comment lines, the two literals. It says
+/// nothing about the rest of `Sources/`, which reads those tables on purpose and
+/// always has: `LegacyLedgerProbe` counts them by name, and the conversion path
+/// selects from them through an interpolated table name.
 ///
 /// What that decision costs is stated rather than hidden: for a period whose rows
 /// live only in the legacy tables, Electron reports real money and this reports

@@ -238,8 +238,10 @@ enum ReportMath {
 
     // MARK: - `Number(v)`
     //
-    // Call site: `Number(readSetting(db, key, fallback))` — index.js vatRate, for
-    // vat_rate / surcharge_rate / income_tax_rate / admin_expense_annual.
+    // Call sites: `Number(readSetting(db, key, fallback))` — `index.js vatRate` and
+    // `index.js adminExpense`, and only those two. The two tax rates read this way until
+    // A4-3; they now go through `index.js resolveRate`, which judges the STORED TEXT and
+    // never coerces, so this coercion table no longer describes them.
 
     /// A `JSON.parse` result, which is exactly the domain `Number()` is applied to
     /// at `index.js vatRate`: `readSetting` returns `JSON.parse(row.value)` when the
