@@ -63,7 +63,7 @@
 | --- | --- | --- |
 | 真正的 Xcode 工程 | ✅ | `native/SoloLedger/App/SoloLedger.xcodeproj`（Phase 1.5）。CI 已有独立 job「Native SwiftUI app (xcodebuild + unit tests)」：编译（`.github/workflows/ci.yml:177`）+ App-hosted 单测（`:186`，仅 `SoloLedgerUnitTests`，显式排除 UITests） |
 | **MAS 签名**（Apple/Mac App Distribution + Mac Installer Distribution + MAS provisioning profile） | 🛑 **Release 前必须** | **缺的不是证书**（2026-08-10 实测：Apple Distribution 与 3rd Party Mac Developer Installer 两张证书均在钥匙串，MAS provisioning profile 在 `build/embedded.provisionprofile`，三者同于 2027-07-15 到期）。缺的是把它们接进工程的配置：Release 的 `CODE_SIGN_IDENTITY` 仍是 `"-"`、`DEVELOPMENT_TEAM` 为空、无 `PROVISIONING_PROFILE_SPECIFIER`、共享 scheme 的 `ArchiveAction` 仍是 **Debug**（照现成命令归档会打出 `.dev` bundle id + 带 `get-task-allow` 的包，必被拒收）、且无 `ExportOptions.plist` 与归档脚本。**MAS 不需 notarization**（Developer ID + notarization 属店外通道） |
-| App Store Connect 元数据 / 截图 / 审核 | 🛑 **Release 前必须** | ASC App 记录已存在，1.0 于 2026-07-09 提交并被拒（五条 Guideline），此后未重提；元数据、截图、隐私标签、出口合规、年龄分级全部未完成。详见 [`MAS_SUBMISSION.md`](MAS_SUBMISSION.md) 的状态节 |
+| App Store Connect 元数据 / 截图 / 审核 | 🛑 **Release 前必须** | ASC App 记录已存在，1.0 于 2026-07-09 提交并被拒（五条 Guideline），此后未重提。**元数据 / 截图 / 隐私标签 / 出口合规 / 年龄分级在 1.0 提审时曾达可提交状态**（推论，非实查：未达则提交不会进入审核）；**它们在 ASC 的现状、以及原生重提所需的更新，本轮均未逐项实查**——描述 / 副标题 / 关键词 / 截图 / 隐私标签的口径都随「无 AI、无网络」而变，重提前须逐项核对，且只有维护者查得到。清单与两个核对维度见 [`MAS_SUBMISSION.md`](MAS_SUBMISSION.md) §4 |
 
 ## 6. 已移除 / 不做
 

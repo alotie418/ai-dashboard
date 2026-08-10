@@ -39,7 +39,13 @@ npm run build:mas
 
 ## 4. App Store Connect 准备清单
 
-- [ ] ASC 新建 App（名称 SoloLedger · 类别 Finance · Bundle ID 关联）
+> **本清单写于首次提交前，它的勾选状态与「今天 ASC 里是什么样」不是一回事。** 仓库能给的只有两条：**ASC App 记录已创建**（与文首状态节同源，均为维护者实查，故首项已勾）；**1.0 于 2026-07-09 通过了提交这一步并进入审核**（被拒的是内容，不是提交本身）。**由此可推**——这是推论，不是实查——当时下列各项曾达到可提交状态，否则提交不会进入审核。
+>
+> **但两件事本轮都没有做，别把上面的推论当成它们**：①各项在 ASC 里的**现状**未逐项实查；②**原生版重提要改的不止一处**——描述 / 副标题 / 关键词 / 截图 / 隐私标签的口径都随「无 AI、无网络、无 OCR、无电商」而变，首次提审时填的那一版对原生版基本不适用。
+>
+> 所以下面每一项都要按两个维度分别核对：**「首次提审时已完成」** 与 **「原生重提前仍需更新」**——前者成立不代表后者不用做。逐项核对只能由维护者在 ASC 完成；在核对之前，请不要把本清单的勾选状态当作 ASC 的现状。
+
+- [x] ASC 新建 App（名称 SoloLedger · 类别 Finance · Bundle ID 关联）—— 已创建（维护者实查；本条不随原生重提而变）
 - [x] 隐私政策 **URL** + 支持 URL：✅ 已托管于独立 public 仓库 `sololedger-legal` 的 GitHub Pages（与主仓库可见性解耦，四 URL 均验证 200·2026-07-09）——
   **Privacy Policy URL** = `https://alotie418.github.io/sololedger-legal/privacy/`（中文 `…/privacy/zh/`）
   **Support URL** = `https://alotie418.github.io/sololedger-legal/support/`
