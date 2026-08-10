@@ -83,7 +83,7 @@ enum CNReportEngine {
         // afterwards from which number came out.
         let cannotPrice = surchargeRefusal ?? rateRefusal
 
-        // cn.js totalIncomeNet / :23 — the tax-amount sums. Recomputed here rather than read
+        // cn.js totalIncomeTax / totalExpenseTax — the tax-amount sums. Recomputed here rather than read
         // back out of ``vatSummary(_:)``: that block emits them ROUNDED, and the
         // surcharge multiplies the raw clamped difference.
         var totalIncomeTax = 0.0
@@ -127,7 +127,7 @@ enum CNReportEngine {
             grossProfit: r(grossProfit),                 // cn.js grossProfit
             grossMargin: grossMargin,                    // cn.js incomeStatement — raw, not rounded again
             shippingFee: r(totalShipping),               // cn.js shippingFee
-            adminExpense: r(ctx.adminExpense),            // cn.js generate
+            adminExpense: r(ctx.adminExpense),            // cn.js adminExpense
 
             // ── Batch 5 (R7) ──────────────────────────────────────────────────
             // `operatingProfit` carries PRE-TAX profit — the source's own naming
@@ -147,7 +147,7 @@ extension CNReportEngine {
 
     /// `cn.js taxInclusiveSummary` — 含税金额汇总.
     ///
-    /// TAX-INCLUSIVE sums (`cn.js totalIncome`, `:21`), not the net ones the P&L uses.
+    /// TAX-INCLUSIVE sums (`cn.js totalIncome` / `totalExpense`), not the net ones the P&L uses.
     ///
     /// China's rounder is `round2`, the one WITHOUT `|| 0` (`cn.js generate`). Stated
     /// honestly: here that is a FIDELITY choice and not a behavioural one, because
@@ -176,12 +176,12 @@ extension CNReportEngine {
     ///
     /// `round2` (not `round2OrZero`) because `cn.js generate` is the rounder without the
     /// `|| 0`. Stated honestly, as in ``taxInclusiveSummary(_:)``: here that is a
-    /// FIDELITY choice, not a behavioural one. `cn.js totalIncomeTax` and `:23` already guard
+    /// FIDELITY choice, not a behavioural one. `cn.js totalIncomeTax` and `totalExpenseTax` already guard
     /// each term with `(r.tax_amount || 0)`, so a NaN tax contributes 0 and no NaN
     /// can reach the rounder. Measured in node — a NaN tax on one of two rows gives
     /// `{20, 50, 20, 50, 30}` under China exactly as it does under Japan.
     static func vatSummary(_ ctx: ReportContext) -> CNVATSummary {
-        // cn.js totalIncomeTax / :23
+        // cn.js totalIncomeTax / totalExpenseTax
         var totalIncomeTax = 0.0
         for row in ctx.incomeRows { totalIncomeTax += ReportMath.orZero(row.taxAmount) }
         var totalExpenseTax = 0.0
@@ -196,8 +196,8 @@ extension CNReportEngine {
         return CNVATSummary(
             cumulativeInput: r(totalExpenseTax),        // cn.js cumulativeInput
             cumulativeOutput: r(totalIncomeTax),        // cn.js cumulativeOutput
-            certifiedInput: r(totalExpenseTax),         // cn.js certifiedInput — the SAME expression as :70
-            invoicedOutput: r(totalIncomeTax),          // cn.js invoicedOutput — the SAME expression as :71
+            certifiedInput: r(totalExpenseTax),         // cn.js certifiedInput — the SAME expression as cumulativeInput
+            invoicedOutput: r(totalIncomeTax),          // cn.js invoicedOutput — the SAME expression as cumulativeOutput
             estimatedPayable: r(vatPayable))            // cn.js estimatedPayable
     }
 

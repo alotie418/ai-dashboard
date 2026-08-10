@@ -56,8 +56,8 @@ import Foundation
 ///
 /// **Two of these five fields are duplicates of two others, by construction.**
 /// `cumulativeInput` and `certifiedInput` are both `r(totalExpenseTax)`
-/// (`cn.js cumulativeInput` and `:72`); `cumulativeOutput` and `invoicedOutput` are both
-/// `r(totalIncomeTax)` (`:71`, `:73`). No input can separate them — verified over
+/// (`cn.js cumulativeInput` and `certifiedInput`); `cumulativeOutput` and `invoicedOutput` are both
+/// `r(totalIncomeTax)` (`cn.js cumulativeOutput` and `invoicedOutput`). No input can separate them — verified over
 /// 200 random draws against the real `cn.js`, and every committed CN golden shows
 /// the pair equal.
 ///
@@ -74,7 +74,8 @@ struct CNVATSummary: Equatable, Sendable {
     let certifiedInput: Double
     /// Equal to ``cumulativeOutput`` for every possible input — see the type note.
     let invoicedOutput: Double
-    /// `r(Math.max(0, totalIncomeTax - totalExpenseTax))` (`cn.js vatPayable`, `:74`).
+    /// `r(Math.max(0, totalIncomeTax - totalExpenseTax))` (`cn.js vatPayable`, emitted at
+    /// `cn.js estimatedPayable`).
     let estimatedPayable: Double
 }
 
@@ -83,7 +84,7 @@ struct JPConsumptionTax: Equatable, Sendable {
     let collected: Double
     let paid: Double
     /// `r(Math.max(0, collected - paid))` — `jp.js consumptionTaxPayable`, already rounded when it is
-    /// placed into the block at `:48` rather than rounded a second time.
+    /// placed into the block at `jp.js payable` rather than rounded a second time.
     let payable: Double
 }
 

@@ -21,7 +21,7 @@ enum EUReportEngine {
         var totalIncomeNet = 0.0
         for row in ctx.incomeRows { totalIncomeNet += ReportMath.netAmount(row.amountNet, row.amount) }
 
-        let revenue = totalIncomeNet                          // eu.js revenue@3d7138b
+        let revenue = totalIncomeNet                          // eu.js generate revenue
         let costs = split.cogsNet                             // eu.js costs — COGS only
         let grossProfit = revenue - costs                     // eu.js grossProfit
         let operatingProfit = grossProfit - split.operatingExpensesNet - ctx.adminExpense // eu.js operatingProfit
@@ -29,31 +29,31 @@ enum EUReportEngine {
         // eu.js generate — the estimate layer. `refusal` is the ONLY path to a refusal.
         let refusal = EstimatedValue.refusal(for: ctx.incomeTaxRate, parameter: .incomeTaxRate)
         let rate = ctx.incomeTaxRate.rate
-        // eu.js rateMissing — clamped at 0; rounded ONCE here and NOT again at the emit
+        // eu.js tax — clamped at 0; rounded ONCE here and NOT again at the emit
         // (eu.js incomeTax passes it straight through), unlike China's double round.
         let tax = rate.map { r(ReportMath.max(0, operatingProfit) * ($0 / 100)) }
         let incomeTax = refusal ?? .computed(tax ?? 0)
-        // eu.js tax — UNROUNDED operating profit minus the ROUNDED tax.
+        // eu.js netProfit — UNROUNDED operating profit minus the ROUNDED tax.
         let netProfitRaw = tax.map { operatingProfit - $0 }
         let netProfit = refusal ?? .computed(r(netProfitRaw ?? 0))
-        // eu.js netMargin — ×100 then the rounder's ×100 again (cn.js generate does ×10000 once).
+        // eu.js netMargin — ×100 then the rounder's ×100 again (cn.js netMargin does ×10000 once).
         let netMargin = refusal ?? .computed(
             revenue > 0 ? r((netProfitRaw ?? 0) / revenue * 100) : 0)
 
         return EUBatchOneProfitLoss(
-            revenue: r(revenue),                              // eu.js revenue@3d7138b
-            costOfSales: r(costs),                            // eu.js revenue@3d7138b
+            revenue: r(revenue),                              // eu.js generate revenue
+            costOfSales: r(costs),                            // eu.js costOfSales
             costOfGoodsSold: r(split.cogsNet),                // eu.js costOfGoodsSold
-            operatingExpenses: r(split.operatingExpensesNet), // eu.js costOfGoodsSold
+            operatingExpenses: r(split.operatingExpensesNet), // eu.js operatingExpenses
             grossProfit: r(grossProfit),                      // eu.js grossProfit
-            // eu.js grossProfit — the margin is computed INLINE in the object literal, and
+            // eu.js grossMargin — the margin is computed INLINE in the object literal, and
             // like Japan's it scales by 100 twice rather than by 10000 once.
             grossMargin: revenue > 0 ? r(grossProfit / revenue * 100) : 0,
             adminExpense: r(ctx.adminExpense),                // eu.js adminExpense
-            operatingProfit: r(operatingProfit),               // eu.js profitLoss
+            operatingProfit: r(operatingProfit),               // eu.js operatingProfit
 
             // ── Batch 5 (R7) ──────────────────────────────────────────────────
-            // Reads the UNROUNDED `operatingProfit` local (eu.js rateMissing multiplies the
+            // Reads the UNROUNDED `operatingProfit` local (eu.js tax multiplies the
             // local); taking the struct's rounded field back out would round twice.
             incomeTax: incomeTax,
             netProfit: netProfit,
@@ -84,15 +84,15 @@ extension EUReportEngine {
             difference: r(totalIncome - totalExpense))
     }
 
-    /// `eu.js vatCollected`, `:44-46` — the VAT return summary.
+    /// `eu.js vatCollected` and its emit block `eu.js vatReturn` — the VAT return summary.
     ///
     /// The block is named `vatReturn`, and its two component names are
     /// `vatCollected` / `vatDeductible` inside the function (`eu.js vatCollected`) but
-    /// `outputVAT` / `inputVAT` in the emitted object (`:45`). Both spellings are
+    /// `outputVAT` / `inputVAT` in the emitted object (`eu.js vatReturn`). Both spellings are
     /// kept where the source puts them.
     static func vatReturn(_ ctx: ReportContext) -> EUVATReturn {
         let r = ReportMath.round2OrZero
-        // eu.js totalIncomeTax / :21
+        // eu.js totalIncomeTax / totalExpenseTax
         var totalIncomeTax = 0.0
         for row in ctx.incomeRows { totalIncomeTax += ReportMath.orZero(row.taxAmount) }
         var totalExpenseTax = 0.0
@@ -104,8 +104,8 @@ extension EUReportEngine {
 
         return EUVATReturn(
             outputVAT: r(vatCollected),                                  // eu.js outputVAT
-            inputVAT: r(vatDeductible),                                  // eu.js outputVAT
-            vatPayable: vatPayable)                                      // eu.js outputVAT — NOT re-rounded
+            inputVAT: r(vatDeductible),                                  // eu.js inputVAT
+            vatPayable: vatPayable)                                      // eu.js vatPayable — NOT re-rounded
     }
 
     /// `eu.js buildMonthly` — the monthly breakdown.

@@ -1,6 +1,6 @@
 import Foundation
 
-/// `scheduleC` — the US batch-3 block (`us.js scheduleC`, `:85-89`).
+/// `scheduleC` — the US batch-3 block (`us.js scheduleC` — the local literal and the emitted key).
 ///
 /// Twenty-five fields in the SOURCE's order, which is not the form's order:
 /// `line30_homeOffice` sits before `line28_totalExpenses` and `line31_netProfit`
@@ -56,7 +56,8 @@ struct ScheduleC: Equatable, Sendable {
     let line31_netProfit: Double
 
     /// Unrounded intermediates the estimate layer consumes (`us.js netProfit` feeds
-    /// `:68`, `:76`, `:92`, `:102`). Carried so batch 5 does not have to re-mirror
+    /// `us.js seEarnings`, `estimatedAnnualTax`, `netEarnings`, `annualIncomeTax`). Carried so
+    /// batch 5 does not have to re-mirror
     /// the whole mapping to get at them; not part of the golden comparison.
     let unroundedGrossIncome: Double
     let unroundedTotalExpenses: Double

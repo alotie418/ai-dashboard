@@ -87,7 +87,7 @@ enum USTaxParams {
                    addlMedicareThreshold: 200000, addlMedicareRate: 0.009),
     ]
 
-    /// `LATEST_YEAR` — `Math.max(...YEARS)` at `usTaxParams.js YEARS`.
+    /// `usTaxParams.js LATEST_YEAR` — `Math.max(...YEARS)`.
     ///
     /// Derived from the table rather than written as a literal, exactly as the
     /// source derives it. A literal would silently stop tracking the table the

@@ -574,7 +574,7 @@ enum LegacyConversionRunner {
         }
     }
 
-    /// `migrations.js desc@f472f6e` / `:148-151` — language-neutral, and only the segments the
+    /// the sales and purchases `desc` arrays in `migrations.js migrateAll` — language-neutral, and only the segments the
     /// legacy row actually has. `purchases` has no shipping column, so it never gets that
     /// segment (the SELECT binds `NULL` there).
     ///
@@ -632,7 +632,7 @@ enum LegacyConversionRunner {
             "default_income_category_id": request.defaultIncomeCategoryID ?? NSNull(),
             "default_expense_category_id": request.defaultExpenseCategoryID ?? NSNull(),
         ]
-        // Sales only, exactly as `migrations.js migrateAll` versus `:160`.
+        // Sales only, exactly as `migrations.js migrateAll`'s sales branch versus its purchases branch.
         if identity.table == .sales { object["shippingCost"] = auditValue(source.shippingCost) }
 
         guard let data = try? JSONSerialization.data(withJSONObject: object,

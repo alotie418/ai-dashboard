@@ -68,7 +68,8 @@ enum MonthMatch {
         return date.hasPrefix(prefix)
     }
 
-    /// `jp.js revenue`, `eu.js revenue@3d7138b`, `kr.js revenue@3d7138b`, `tw.js revenue@3d7138b`, `us.js income` —
+    /// `jp.js revenue`, `eu.js buildMonthly revenue`, `kr.js buildMonthly revenue`,
+    /// `tw.js buildMonthly revenue`, `us.js income` —
     /// `x.date?.startsWith(p)`.
     static func optionalChained(_ date: String?, _ prefix: String) -> Bool {
         guard let date else { return false }

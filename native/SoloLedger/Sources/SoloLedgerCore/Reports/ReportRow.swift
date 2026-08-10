@@ -27,7 +27,7 @@ struct ReportRow: Equatable, Sendable {
     /// `tax_amount` — the tax carried on the row, read by batch 4 alone.
     ///
     /// The turnover-tax blocks are the ONLY place this column is used, and they use
-    /// it through `(row.tax_amount || 0)` (`cn.js totalIncomeTax`, `:23` and the same pair in
+    /// it through `(row.tax_amount || 0)` (`cn.js totalIncomeTax` / `totalExpenseTax` and the same pair in
     /// jp/eu/kr/tw). That guard is why a NaN here contributes 0 rather than
     /// poisoning the sum — so China's unguarded rounder (`cn.js generate`) cannot emit
     /// `null` from this path, even though it can from others. Measured in node: a

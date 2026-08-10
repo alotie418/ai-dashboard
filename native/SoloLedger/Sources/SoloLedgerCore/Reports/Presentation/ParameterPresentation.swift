@@ -83,7 +83,7 @@ public enum ParameterEffect: Equatable, Sendable {
     /// `FiniteRate` makes it structurally impossible for a rate.
     case appliedNonFinite
     /// The estimate layer computed nothing. Rates only; `adminExpenseAnnual` never refuses,
-    /// because `index.js generate` falls back to 0 regardless of regime.
+    /// because `index.js adminExpense` falls back to 0 regardless of regime.
     case refused(ReportRateParameter)
 }
 
@@ -94,15 +94,15 @@ public enum EffectOrigin: Equatable, Sendable {
     /// user did not choose it, and `EstimatedValue` cannot say so because
     /// `EstimatedValue.refusal` maps `.configured` and `.chinaFallback` through one arm.
     case regimeDefault
-    /// `index.js generate`'s 0 for the admin expense — row absent, or `JSON.parse` threw and
+    /// `index.js adminExpense`'s 0 for the admin expense — row absent, or `JSON.parse` threw and
     /// `readSetting`'s catch returned the fallback. A real zero, not a refusal.
     case dispatcherFallback
 }
 
 public enum ParameterConsumption: Equatable, Sendable {
     case consumed
-    /// `vat_rate` in every regime — the dispatcher loads it (`index.js from`) and no engine
-    /// reads it (Appendix A6) — and `surcharge_rate` outside China, where only `cn.js vatPayable`
+    /// `vat_rate` in every regime — the dispatcher loads it (`index.js vatRate`) and no engine
+    /// reads it (Appendix A6) — and `surcharge_rate` outside China, where only `cn.js taxSurcharge`
     /// consumes it. A view must be able to say "unset, and nothing here reads it" rather
     /// than prompting for a value that would change no number.
     case storedButUnread
