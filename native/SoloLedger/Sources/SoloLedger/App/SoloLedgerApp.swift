@@ -1,6 +1,46 @@
 import SwiftUI
 import SoloLedgerCore
 
+/// App identity read from the SHIPPED `Info.plist`, never from a literal.
+///
+/// The About tab used to print `"1.0.0 (prototype)"` and `"macOS 13.0+"` as string literals,
+/// so raising `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` / the deployment target changed
+/// the package while the app kept telling the user the old numbers — and kept calling a
+/// shipped build a prototype. All three values are `$(…)` substitutions in
+/// `App/Support/Info.plist`, so reading them here means the screen follows the build settings
+/// with no edit in this file.
+///
+/// `lookup` is injectable for one reason: without it a test could only compare
+/// `Bundle.main`-derived output against `Bundle.main`, which is a tautology and would pass
+/// just as well over a hardcoded string. Feeding a dictionary the code cannot know is what
+/// actually proves the value came from the dictionary.
+enum AppBundleInfo {
+    /// Shown in place of a value the bundle does not carry. Never reached in a real build —
+    /// all three keys are present in the shipped `Info.plist` — so it exists to avoid
+    /// inventing a version number, not to be read.
+    static let unknown = "?"
+
+    static func infoValue(_ key: String) -> String? {
+        Bundle.main.object(forInfoDictionaryKey: key) as? String
+    }
+
+    /// `1.1.0 (2)` — the marketing version, plus the build number that identifies the upload.
+    static func versionText(_ lookup: (String) -> String? = infoValue) -> String {
+        let short = lookup("CFBundleShortVersionString") ?? unknown
+        let build = lookup("CFBundleVersion") ?? unknown
+        return "\(short) (\(build))"
+    }
+
+    /// `macOS 13.0+` — `LSMinimumSystemVersion` is `$(MACOSX_DEPLOYMENT_TARGET)`, so a change
+    /// of deployment target reaches the screen on its own.
+    static func minimumSystemText(_ lookup: (String) -> String? = infoValue) -> String {
+        guard let version = lookup("LSMinimumSystemVersion"), !version.isEmpty else {
+            return unknown
+        }
+        return "macOS \(version)+"
+    }
+}
+
 @main
 struct SoloLedgerApp: App {
     @StateObject private var model = AppModel()
