@@ -261,8 +261,8 @@ private struct AboutSettingsTab: View {
     var body: some View {
         Form {
             LabeledContent(model.t("about.name"), value: model.t("app.name"))
-            LabeledContent(model.t("about.version"), value: "1.0.0 (prototype)")
-            LabeledContent(model.t("about.minOS"), value: "macOS 13.0+")
+            LabeledContent(model.t("about.version"), value: AppBundleInfo.versionText())
+            LabeledContent(model.t("about.minOS"), value: AppBundleInfo.minimumSystemText())
             Section {
                 Text(model.t("about.positioning"))
                     .font(.callout)

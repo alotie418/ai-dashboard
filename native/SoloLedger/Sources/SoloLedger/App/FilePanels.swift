@@ -105,7 +105,7 @@ extension AppModel {
             state: migrationUIState,
             schemaVersion: schemaVersionText,
             databasePath: databasePath,
-            appVersion: Self.appVersionString,
+            appVersion: AppBundleInfo.versionText(),
             osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
             homeDirectory: NSHomeDirectory())
         do {
@@ -113,12 +113,6 @@ extension AppModel {
         } catch {
             actionError = t("migration.diagnostics.writeFailed")
         }
-    }
-
-    private static var appVersionString: String {
-        let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
-        let b = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
-        return "\(v) (\(b))"
     }
 
     // MARK: - Backup export (Settings → Data)
