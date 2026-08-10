@@ -205,6 +205,110 @@ final class ReportParameterMatrixTests: XCTestCase {
         XCTAssertEqual(try parameter(db, .incomeTaxRate, locale: "JP").consumption, .consumed)
     }
 
+    /// The WHOLE consumption axis, all 6 regimes × 4 parameters, pinned as one table.
+    ///
+    /// The test above samples five of these twenty-four cells, which is how
+    /// `admin_expense_annual` could claim `.consumed` under the US — where `us.js` does not
+    /// name it — for as long as it did. A sample cannot say "and nothing else moved"; this
+    /// table can, and that is the property a regime-conditional answer needs.
+    ///
+    /// Written out rather than computed from the same `locale == …` expressions the subject
+    /// uses, because a table derived from the implementation would agree with it by
+    /// construction. The independent derivation lives in the test below, from the engines'
+    /// own source.
+    func testTheFullSixByFourConsumptionMatrixIsPinned() throws {
+        let keys: [ReportParameterKey] = [.vatRate, .surchargeRate, .incomeTaxRate,
+                                          .adminExpenseAnnual]
+        var actual: [String] = []
+        for locale in ["CN", "EU", "JP", "KR", "TW", "US"] {
+            let db = try ledger(nil)
+            for key in keys {
+                let mark = try parameter(db, key, locale: locale).consumption == .consumed
+                    ? "consumed" : "storedButUnread"
+                actual.append("\(locale) \(key.rawValue) \(mark)")
+            }
+        }
+        XCTAssertEqual(actual, [
+            "CN vat_rate storedButUnread",
+            "CN surcharge_rate consumed",
+            "CN income_tax_rate consumed",
+            "CN admin_expense_annual consumed",
+            "EU vat_rate storedButUnread",
+            "EU surcharge_rate storedButUnread",
+            "EU income_tax_rate consumed",
+            "EU admin_expense_annual consumed",
+            "JP vat_rate storedButUnread",
+            "JP surcharge_rate storedButUnread",
+            "JP income_tax_rate consumed",
+            "JP admin_expense_annual consumed",
+            "KR vat_rate storedButUnread",
+            "KR surcharge_rate storedButUnread",
+            "KR income_tax_rate consumed",
+            "KR admin_expense_annual consumed",
+            "TW vat_rate storedButUnread",
+            "TW surcharge_rate storedButUnread",
+            "TW income_tax_rate consumed",
+            "TW admin_expense_annual consumed",
+            "US vat_rate storedButUnread",
+            "US surcharge_rate storedButUnread",
+            "US income_tax_rate consumed",
+            // The one cell this round moves. `us.js` — and `USReportEngine` — never name the
+            // admin expense; Schedule C has no such line.
+            "US admin_expense_annual storedButUnread",
+        ], "the consumption matrix moved: 23 of these cells are other regimes and must not")
+    }
+
+    /// The consumption axis is a claim about what the ENGINES read, so derive it from their
+    /// source instead of restating the presenter's own condition.
+    ///
+    /// This is the guard the defect it pins did not have: `.consumed` for
+    /// `admin_expense_annual` was a sentence somebody wrote, and nothing ever compared it to
+    /// `USReportEngine`, which does not mention `ctx.adminExpense` at all. A regime that stops
+    /// reading a parameter — or starts — now fails here instead of shipping a report screen
+    /// that tells the user the opposite.
+    ///
+    /// `Reports/Presentation` is deliberately NOT scanned: `ReportBuilder` names
+    /// `ctx.incomeTaxRate` and `ctx.surchargeRate` while BUILDING this very answer, so
+    /// including it would let the subject satisfy its own oracle. Comment lines are dropped
+    /// for the same reason — a mirror note naming a field is not a read of it.
+    func testConsumptionAgreesWithWhatTheEngineSourcesActuallyRead() throws {
+        var dir = URL(fileURLWithPath: #filePath)
+        dir.deleteLastPathComponent()                       // …/SoloLedgerCoreTests
+        dir.deleteLastPathComponent()                       // …/Tests
+        dir.deleteLastPathComponent()                       // …/SoloLedger
+        let engines = dir.appendingPathComponent("Sources/SoloLedgerCore/Reports")
+
+        // `vat_rate` has no `ReportContext` field at all, so no engine can read it — the
+        // absent field is itself the mirror of Appendix A6.
+        let field: [ReportParameterKey: String] = [
+            .vatRate: "ctx.vatRate",
+            .surchargeRate: "ctx.surchargeRate",
+            .incomeTaxRate: "ctx.incomeTaxRate",
+            .adminExpenseAnnual: "ctx.adminExpense",
+        ]
+
+        for locale in ["CN", "EU", "JP", "KR", "TW", "US"] {
+            let file = engines.appendingPathComponent("\(locale)ReportEngine.swift")
+            let text = try String(contentsOf: file, encoding: .utf8)
+            let code = text.split(separator: "\n")
+                .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+                .joined(separator: "\n")
+            // A rename that emptied the scan would make every regime look like a
+            // non-consumer and pass silently.
+            XCTAssertGreaterThan(code.count, 2000, "\(locale): the engine source did not resolve")
+
+            let db = try ledger(nil)
+            for (key, ctxField) in field {
+                let reads = code.contains(ctxField)
+                XCTAssertEqual(try parameter(db, key, locale: locale).consumption,
+                               reads ? .consumed : .storedButUnread,
+                               "\(locale) / \(key.rawValue): the engine "
+                               + (reads ? "reads \(ctxField) but the parameter says nothing does"
+                                        : "never names \(ctxField) but the parameter says it is read"))
+            }
+        }
+    }
+
     /// `vat_rate` is an UNGATED `Number(readSetting(db,'vat_rate',13))` (`index.js:126`), so
     /// it never refuses — modelling it with the rates' four states would report a refusal
     /// Electron does not perform.

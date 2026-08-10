@@ -302,9 +302,10 @@ enum ReportPresenter {
     }
 
     /// `storedButUnread` must read as "nothing here reads this", NOT as "you have not
-    /// configured it": `surcharge_rate` outside China and `vat_rate` everywhere are loaded by
-    /// the dispatcher and consumed by no engine, so prompting for a value would be asking the
-    /// user to change a number that changes nothing.
+    /// configured it": `surcharge_rate` outside China, `vat_rate` everywhere, and
+    /// `admin_expense_annual` under the US are all loaded by the dispatcher and read by the
+    /// engine that regime routes to in none of those cases, so prompting for a value would be
+    /// asking the user to change a number that changes nothing.
     static func consumptionKey(for consumption: ParameterConsumption) -> String {
         switch consumption {
         case .consumed:        return "\(keyPrefix)param.consumption.consumed"
