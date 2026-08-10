@@ -14,7 +14,7 @@
 > | 「公证 + stapler + hardened runtime — Blocker」 | ✅ `hardenedRuntime: true` · `notarize: true` · `gatekeeperAssess: false`；真机执行成功 | `electron-builder.dmg.yml` · [`RELEASE.md`](RELEASE.md) §9 |
 > | 「仓库无 entitlements 文件」 | ✅ `build/entitlements.mac.plist`（DMG 线）+ `entitlements.mas.plist` / `.mas.inherit.plist`（MAS 线） | `build/` |
 > | 「`build:mas` 是坏的（死 script）」 | ⚠️ **快照与 2026-07-07 更新都已失真**：MAS 线已**重建**——`electron-builder.mas.yml` 存在，`build:mas` 是可用脚本。2026-07-07 那句「`build:mas` 已删」也已过期 | `electron-builder.mas.yml` · `package.json` |
-> | 「完全没有 CI」 | ✅ `.github/workflows/ci.yml`（仓库唯一 workflow）四个 job | `.github/workflows/ci.yml` |
+> | 「完全没有 CI」 | ✅ `.github/workflows/ci.yml`（仓库唯一 workflow）**五个 job**：四个自动跑且恰为 main 的四项必需检查（`checks` / `e2e` / `report-goldens` / `native-app`），第五个 `electron-e2e` 仅 `workflow_dispatch` 手动触发、不入必需列表 | `.github/workflows/ci.yml` |
 > | 「无 CSP」 | ✅ 构建期注入 10 条 directive + `check:csp` 守卫；源 `index.html` 仍**故意**无 CSP（dev/HMR） | `vite.config.ts` · `scripts/check-csp.mjs` |
 > | 「无 LICENSE — 动作:加 MIT」 | ⚠️ LICENSE 已存在，但采用的是**专有许可**，**不是 MIT**。README 许可证章节与之一致 | `LICENSE` · `README.md` |
 > | 「无隐私声明」 | ✅ 根目录有 `PRIVACY.md` / `PRIVACY.en.md`；⚠️ 但**应用内仍无隐私/法律页** | 仓库根 |
@@ -31,7 +31,7 @@
 >
 > ### 无法从仓库判定的
 >
-> App Store 审核 / 上架状态。本文件与本仓库任何文档都**不对此作断言**。
+> App Store 审核 / 上架状态**仍然无法从仓库判定**（ASC 侧凭据不入库）。但「本仓库任何文档都不对此作断言」这半句自 2026-08-10 起**不再成立**：[`docs/MAS_SUBMISSION.md`](MAS_SUBMISSION.md) 的状态节已按维护者在 ASC 的实查记录了结论（记录已存在、1.0 被拒、未重提、最高已上传构建 1.0.0）。本文件本身仍不作断言，要看状态请去那里。
 
 
 > 来源:2026-06-15 全项目只读审计(8 个并行 agent 覆盖 构建/分发、双架构、测试/CI、会计口径、AI·OCR、数据安全、安全、文档·i18n·UX)。

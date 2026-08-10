@@ -106,9 +106,10 @@ Phase 1 是一个**可运行的技术原型**，用于验证「原生栈能忠�
 
 ### 2.3 最低系统版本
 
-- 现有 Electron 线最低系统版本 = **macOS 12.0**（Monterey），由 Electron 运行时决定（builder 配置未显式覆写 `minimumSystemVersion`）
+- 现有 Electron 线最低系统版本 = **macOS 12.0**（Monterey）。原为「由 Electron 运行时决定」的推断，2026-08-10 已实测坐实：`release/mas-arm64/SoloLedger.app` 的 `Info.plist` 里 `LSMinimumSystemVersion = 12.0`（两份 builder 配置均未显式覆写 `minimumSystemVersion`）
 - 原生版**在用户明确批准下**提升至 **macOS 13.0**（Ventura）——`NavigationSplitView` + Swift Charts 需要 13.0
-- 权衡（tradeoff）：**macOS 12（Monterey）用户继续使用现有 Electron 构建**，原生版不向下兼容 12
+- ~~权衡（tradeoff）：**macOS 12（Monterey）用户继续使用现有 Electron 构建**，原生版不向下兼容 12~~
+  **本条已于 2026-08-10 作废，因为它与同一份决策的另一半冲突。** 原生 Release 沿用 `com.alotie418.sololedger`（与 Electron MAS 线同一个 bundle id、同一条 App Store 记录，这正是 `.masContainer` 就地升级路径的前提），因此原生版一旦上架就是**取代**而非并存：macOS 12 用户**拿不到这次更新**，也不会经由商店拿到任何「继续使用现有 Electron 构建」的路径。维护者 2026-08-10 已裁定接受这一取舍（D3）。Electron DMG 直分发线不受此影响，但它是店外通道，不构成商店更新。
 
 ### 2.4 数据安全（最高优先级）
 
@@ -199,6 +200,8 @@ native/SoloLedger/
         ├── CSVRoundTripTests.swift
         └── LocaleMatrixTests.swift
 ```
+
+> 这份树是 Phase-1 的规划布局，不是今天的目录。其中三个测试名从未以该名落地——对应关系见 [§10.2 的命名订正](#102-guard-测试镜像-js-仓库的安全主题)。
 
 ### 3.3 数据层：系统 libsqlite3 vs GRDB
 
@@ -668,6 +671,15 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 
 ### 10.2 Guard 测试（镜像 JS 仓库的安全主题）
 
+> **命名订正（2026-08-10）——下表是 Phase-1 的规划名，其中三个从未以该名落地。** 本节按「计划快照不翻新」保留原表，但必须先说清楚它不是今天的测试清单，否则读者会去找三个不存在的文件（`grep -rl` 这三个名字，`native/` 下零命中；全仓唯一命中的文件就是本文档）。今天的对应物：
+>
+> * `SchemaParityTests` → **`SchemaMigratorTests`**（梯子与 `user_version`）+ **`SchemaVersionParityTests`**（fail-closed 实读 `electron/db/index.js` 的 `SCHEMA_VERSION`，逐字对齐 v1–v23）。注意表中「`user_version=23`」也已过期：原生自 v24 起独有一级（库存三表），Electron 侧仍是 23。
+> * `TransactionCRUDTests` → **`LedgerStoreTests`** 与 **`QueryAndSummaryTests`**。
+> * `LocaleMatrixTests` → **`LocalizationWordingGuardTests`**（`.lproj` 闭集、各语键数相等、无空值、值不得等于键）+ **`MigrationCopyParityTests.testFullLocaleKeyUniverseRatchet`**（键集合互为子集）。表中「键集与 JS `i18n/locales/*.json`（1516 键）对齐」是**规划目标，从未成立且已放弃**：实测 JS 侧六语各 **1518** 叶子键、原生侧六语各 **650** 键，两者根本不是同一个键集，原生侧只钉「六语彼此相等 + 三条绝对值棘轮」。
+> * `CSVRoundTripTests` 是四个里唯一按原名落地的。
+>
+> 下面 §10.3 的对应关系同受此订正约束。
+
 | 测试 | 目标 |
 | --- | --- |
 | `SchemaParityTests` | 建库后逐字段比对 `PRAGMA table_info` + 索引 + `user_version=23`，防 schema 漂移 |
@@ -678,10 +690,10 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 
 ### 10.3 与 CLAUDE.md 测试原则的对应
 
-- Locale 矩阵不回退 → `LocaleMatrixTests`
-- Raw i18n key 不泄漏 → `LocaleMatrixTests`
+- Locale 矩阵不回退 → ~~`LocaleMatrixTests`~~ → 实为 `LocalizationWordingGuardTests` + `MigrationCopyParityTests`（见 §10.2 的命名订正）
+- Raw i18n key 不泄漏 → ~~`LocaleMatrixTests`~~ → 实为 `LocalizationWordingGuardTests.testNoValueLooksLikeARawKey`
 - 类型检查通过 → `swift build` 严格模式（Swift 6 并发检查）
-- Handler 往返保护本地 SQLite 路由 → `TransactionCRUDTests`（Repository 层往返）
+- Handler 往返保护本地 SQLite 路由 → ~~`TransactionCRUDTests`~~ → 实为 `LedgerStoreTests` + `QueryAndSummaryTests`（Repository 层往返）
 - 错误信息可操作且本地化 → editor / import 校验错误走本地化文案
 - UI 不显示 raw 后端枚举 / 技术错误串 → enum leak 守卫
 

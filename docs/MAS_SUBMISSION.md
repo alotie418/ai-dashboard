@@ -1,6 +1,8 @@
 # Mac App Store 上架 Runbook（MAS 线）
 
-> 状态：**MAS-1 构建骨架已接线（entitlements ×2 + `electron-builder.mas.yml` + `build:mas`）；未创建 App Store Connect App、未上传、未提审。**
+> 状态（**2026-08-10 由维护者在 App Store Connect 实查后改写**）：MAS-1 构建骨架已接线（entitlements ×2 + `electron-builder.mas.yml` + `build:mas`）。**ASC App 记录已创建**；**1.0 已于 2026-07-09 提交审核并被拒**（五条 Guideline：5.2.5 / 1.5 / 3.1.1 / 2.1(a) / 4，整改答复稿见 [`MAS_RESUBMISSION_1.0.1.md`](MAS_RESUBMISSION_1.0.1.md)）；**此后未重新提交**。**已成功上传的最高构建号 = `1.0.0`**——仓库工作区里 2026-07-15 产出的 `1.0.1` 产物**从未上传**。
+>
+> 本行原写「未创建 App Store Connect App、未上传、未提审」，停更于 2026-07-09，与同仓库 07-15 的重新提审文档直接矛盾。ASC 侧的事实无法从仓库判定（凭据按下方铁律不入库），故以维护者实查为准；仓库内不记录 Apple ID 等账号标识。
 > 定位：**GitHub / Developer ID 直分发是正式主线**（runbook 见 [`RELEASE.md`](RELEASE.md)）；MAS 是独立上架线，两条线的配置与证书完全隔离、互不影响。
 > 铁律：任何证书、密码、Team ID、provisioning profile 不入库、不出现在日志/汇报里。
 
@@ -44,7 +46,7 @@ npm run build:mas
 - [ ] App 隐私标签问卷（如实：不收集数据 · 全本地存储 · BYOK 出网是用户主动配置第三方服务）
 - [ ] 出口合规（仅标准 HTTPS 加密 → 豁免声明）
 - [ ] 截图（≥1 张，1280×800 / 2560×1600 等规格）+ 描述/副标题/关键词（**电商 Beta 口径与 README 一致，不夸大**）
-- [ ] 年龄分级问卷 + 定价（免费/付费属产品决策）/ 地区
+- [ ] 年龄分级问卷 + 定价（免费/付费属产品决策）/ 地区 —— **销售地区已裁定（2026-08-10）：首版不在欧盟分发**，提审前在 ASC 的销售地区中去掉全部欧盟成员国（DSA 交易商信息暂不提供）。该操作只能由维护者本人在 ASC 完成
 - [ ] TestFlight 内测组（强烈建议先 TestFlight 再提审）
 
 ## 5. MAS 沙箱 QA 必测清单（TestFlight 或 mas-dev 本地构建）
@@ -61,4 +63,4 @@ npm run build:mas
 ## 6. 边界
 
 - 本文件与 MAS-1 配置**不改动** Developer ID 线（`electron-builder.dmg.yml` / `build/entitlements.mac.plist` / RELEASE.md 流程零变化）。
-- 未创建 ASC App、未上传、未提审；何时推进由维护者决策。
+- 上架状态见文首状态节（ASC 记录已存在、1.0 被拒、未重提、最高已上传构建 1.0.0）。本行原写「未创建 ASC App、未上传、未提审」，与实查不符，已作废。何时推进由维护者决策。

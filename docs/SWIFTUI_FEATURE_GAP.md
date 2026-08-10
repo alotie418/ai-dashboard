@@ -17,7 +17,7 @@
 | 会计类别浏览（78 预置） | ✅（只读） | `CategoriesView`，可切会计制度 |
 | CSV 导入 / 导出（交易） | ✅ | RFC-4180 + BOM + 注入防护；导入纯追加 |
 | Electron → SwiftUI 数据升级 | ✅ | 生产启动路径为 C12 coordinator 链（`AppModel.startChain(.boot)` → `MigrationCoordinator`）；`DatabaseUpgrade` 仅保留为 legacy 恢复分支（`AppModel` 的 legacy `DatabaseUpgrade` 恢复分支），不在启动路径上 |
-| 6 语言 UI | ✅ | 六语各 **645 键、键集完全一致**（`Sources/SoloLedger/Resources/*.lproj/Localizable.strings`）；guard 强制「恰好六个 `.lproj`」（`LocalizationWordingGuardTests.swift:861`）、「各语键数相等」（`:870`、`:879-880`）、「无空值」（`:903`）、「值不得等于键」（`:913`）。缺键仍回退 **zh-Hans**（非 en；`Package.swift:19`、`Localizer.swift:40`）；仍为 `.strings`（无 `.xcstrings`）；键**集合**相等由 `MigrationCopyParityTests` 的 `testFullLocaleKeyUniverseRatchet` 严格比对（六语与 zh-Hans 全集互为子集），等量互换的错键无法漏网 |
+| 6 语言 UI | ✅ | 六语各 **650 键、键集完全一致**（`Sources/SoloLedger/Resources/*.lproj/Localizable.strings`）；guard 强制「恰好六个 `.lproj`」（`LocalizationWordingGuardTests.swift:861`）、「各语键数相等」（`:870`、`:879-880`）、「无空值」（`:903`）、「值不得等于键」（`:913`）。**绝对键数由另外三条棘轮钉住**（`LegacyConversionCopyTests` / `ProductCopyTests` / `InventoryCopyTests` 各一条 `XCTAssertEqual(table.count, 650)`）——`LocalizationWordingGuardTests` 本身只钉「各语相等」与「每语 > 200」，所以本行的数字必须跟着那三条棘轮走，而不是反过来。缺键仍回退 **zh-Hans**（非 en；`Package.swift:19`、`Localizer.swift:40`）；仍为 `.strings`（无 `.xcstrings`）；键**集合**相等由 `MigrationCopyParityTests` 的 `testFullLocaleKeyUniverseRatchet` 严格比对（六语与 zh-Hans 全集互为子集），等量互换的错键无法漏网 |
 | 深色模式 | ✅ | 原生新增（Electron 仅浅色） |
 | 类别管理（增删改） | 🟡 | 目前只读浏览 |
 
@@ -62,8 +62,8 @@
 | 功能 | 状态 | 备注 |
 | --- | --- | --- |
 | 真正的 Xcode 工程 | ✅ | `native/SoloLedger/App/SoloLedger.xcodeproj`（Phase 1.5）。CI 已有独立 job「Native SwiftUI app (xcodebuild + unit tests)」：编译（`.github/workflows/ci.yml:177`）+ App-hosted 单测（`:186`，仅 `SoloLedgerUnitTests`，显式排除 UITests） |
-| **MAS 签名**（Apple/Mac App Distribution + Mac Installer Distribution + MAS provisioning profile） | 🛑 **Release 前必须** | 目前仅 Debug ad-hoc；无生产证书。**MAS 不需 notarization**（Developer ID + notarization 属店外通道） |
-| App Store Connect 元数据 / 截图 / 审核 | 🛑 **Release 前必须** | 未做 |
+| **MAS 签名**（Apple/Mac App Distribution + Mac Installer Distribution + MAS provisioning profile） | 🛑 **Release 前必须** | **缺的不是证书**（2026-08-10 实测：Apple Distribution 与 3rd Party Mac Developer Installer 两张证书均在钥匙串，MAS provisioning profile 在 `build/embedded.provisionprofile`，三者同于 2027-07-15 到期）。缺的是把它们接进工程的配置：Release 的 `CODE_SIGN_IDENTITY` 仍是 `"-"`、`DEVELOPMENT_TEAM` 为空、无 `PROVISIONING_PROFILE_SPECIFIER`、共享 scheme 的 `ArchiveAction` 仍是 **Debug**（照现成命令归档会打出 `.dev` bundle id + 带 `get-task-allow` 的包，必被拒收）、且无 `ExportOptions.plist` 与归档脚本。**MAS 不需 notarization**（Developer ID + notarization 属店外通道） |
+| App Store Connect 元数据 / 截图 / 审核 | 🛑 **Release 前必须** | ASC App 记录已存在，1.0 于 2026-07-09 提交并被拒（五条 Guideline），此后未重提；元数据、截图、隐私标签、出口合规、年龄分级全部未完成。详见 [`MAS_SUBMISSION.md`](MAS_SUBMISSION.md) 的状态节 |
 
 ## 6. 已移除 / 不做
 
@@ -83,8 +83,10 @@
 4. 🛑 真实 Release 沙箱下的数据路径 / 升级端到端验证。
 5. ✅ **DMG（非沙箱）用户数据迁移入口**：N7.2 源选择入口已全链路接线（RootView → FilePanels → AppModel → coordinator `.requiresSourceChoice` / `.migrateFromUserDir` / `.userSelectedDataDir`）、single-grant-window 无 bookmark，Core + App-hosted 测试覆盖。**原 P0 已闭合**。
 6. ✅ 用户可见的备份 / 恢复 UI——「设置 → 数据」的导出备份与从备份恢复已上线（`SettingsView` 的「设置 → 数据」按钮），恢复前先快照当前账本，legacy 转换进行中一律拒绝（`AppModel` 的恢复入口守卫）。
-7. ✅ 完整 6 语言——六语各 645 键、键集完全一致，guard 强制恰好六个 `.lproj` 且各语键数相等（`LocalizationWordingGuardTests` 的 `testDiscoveredLocalesAreExactlyTheSixShippedLanguages` 与键数相等断言）。`.xcstrings` parity 仍推迟（`.strings` 对 MAS 可用，非阻塞）。键集合相等另由 `MigrationCopyParityTests.testFullLocaleKeyUniverseRatchet` 严格比对。
+7. ✅ 完整 6 语言——六语各 650 键、键集完全一致，guard 强制恰好六个 `.lproj` 且各语键数相等（`LocalizationWordingGuardTests` 的 `testDiscoveredLocalesAreExactlyTheSixShippedLanguages` 与键数相等断言）。`.xcstrings` parity 仍推迟（`.strings` 对 MAS 可用，非阻塞）。键集合相等另由 `MigrationCopyParityTests.testFullLocaleKeyUniverseRatchet` 严格比对。
 8. 🛑 MAS 签名 / 打包 / App Store Connect（Phase 4）。
 9. ✅ 损益 / VAT / 所得税 / 现金流 / COGS 等敏感报表——已逐字**镜像** `electron/reports/*` 上线，入口已激活（`RootView` detail switch 的 `.reports` 分支）。**残留 🟡**：`electron/handlers/balanceOverview.js`（资产负债概览，246 行）尚未镜像。`electron/handlers/inventory.js`（库存成本，89 行）**不是残留**——按 §2 的实测审计它不是加权平均法，已裁定不作为镜像对象，原生另写新引擎（N 章已收官）。
 
-> 本表随每个阶段更新。**截至 2026-08-07**：生产启动链（C12a / C12b）+ 两条 active-store hardened open（C12x-A1 existing / A2 createFresh）+ DMG 源选择入口（N7.2）+ 附件文件迁移（三条链，G1 已闭合）均已落地；**报表引擎已全线镜像并激活入口**（逐字镜像 `electron/reports/*` 共 **930 行**敏感逻辑，非早前记载的 808 行）；**legacy `sales`/`purchases` 转换器（2a-1…2a-4）已上线**；**用户可见备份 / 恢复 UI 已上线**；六语文案已达成 645 键 parity；**原生库存引擎与库存页已上线（N 章 #452–#458 收官，侧栏入口已激活）**。**剩余发布阻塞项收敛为两条：#4 真实 Release 沙箱下的数据路径 / 升级端到端验证，#8 MAS 签名 / 打包 / App Store Connect。** 报表与转换器输出一律为管理分析口径的估算，不是法定财务报表，也不构成申报依据。
+> 本表随每个阶段更新。**截至 2026-08-07**：生产启动链（C12a / C12b）+ 两条 active-store hardened open（C12x-A1 existing / A2 createFresh）+ DMG 源选择入口（N7.2）+ 附件文件迁移（三条链，G1 已闭合）均已落地；**报表引擎已全线镜像并激活入口**（逐字镜像 `electron/reports/*` 共 **930 行**敏感逻辑，非早前记载的 808 行）；**legacy `sales`/`purchases` 转换器（2a-1…2a-4）已上线**；**用户可见备份 / 恢复 UI 已上线**；六语文案已达成 650 键 parity；**原生库存引擎与库存页已上线（N 章 #452–#458 收官，侧栏入口已激活）**。**剩余发布阻塞项收敛为两条：#4 真实 Release 沙箱下的数据路径 / 升级端到端验证，#8 MAS 签名 / 打包 / App Store Connect。** 报表与转换器输出一律为管理分析口径的估算，不是法定财务报表，也不构成申报依据。
+>
+> **2026-08-10 定点订正**（只订正下列三项，本段其余论断未重新核验，故 08-07 的日期保留）：六语键数由 645 改为实测的 **650**（三处，本表 §1、本清单第 7 条与本段各一）；§5「MAS 签名」一行原写「无生产证书」，与实测相反，已改写为「证书与 profile 均在位，缺的是工程配置」；§5「App Store Connect」一行原写「未做」，已按 ASC 实查补上「记录已存在、1.0 被拒、未重提」。

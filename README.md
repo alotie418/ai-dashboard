@@ -28,7 +28,7 @@ SoloLedger 是一个**经营管理估算工具**,帮助小微经营者把日常�
 | 产品线 | 状态 | 说明 |
 |---|---|---|
 | **GitHub 直分发 DMG**(Developer ID) | ✅ **1.0.0 已发布**(2026-07-08) | **已签名 + 已公证 + 已 staple** 的 Apple Silicon 构建,离线可通过 Gatekeeper。见 [Releases](https://github.com/alotie418/ai-dashboard/releases) 与 [`CHANGELOG.md`](CHANGELOG.md) |
-| **Mac App Store(MAS)构建** | 🟡 构建配置已就绪,**上架状态本文件不做断言** | 独立配置 `electron-builder.mas.yml`(App Sandbox + provisioning profile),与 DMG 线的签名方式不同。审核/上架进度不在仓库内可查证,见 [`docs/MAS_SUBMISSION.md`](docs/MAS_SUBMISSION.md) |
+| **Mac App Store(MAS)构建** | 🟡 构建配置已就绪,**未上架** | 独立配置 `electron-builder.mas.yml`(App Sandbox + provisioning profile),与 DMG 线的签名方式不同。1.0 曾于 2026-07-09 提交审核并被拒,此后未重新提交;审核/上架状态本身不在仓库内可查证,以 [`docs/MAS_SUBMISSION.md`](docs/MAS_SUBMISSION.md) 的状态节(维护者实查后记录)为准 |
 | **原生 SwiftUI 重写版**(`native/SoloLedger`) | 🚧 **开发中,未发布** | 与上面两条线并行的重写,尚不可供用户使用。当前进度:报表引擎镜像 R2–R8 已全线合并并激活入口,原生库存引擎与库存页已上线(N 章 #452–#458),见 [`docs/SWIFTUI_REPORTS_MIRROR_PLAN.md`](docs/SWIFTUI_REPORTS_MIRROR_PLAN.md) |
 
 下文的功能与技术栈描述,除非另有说明,均指**已发布的 Electron 桌面版**。
