@@ -42,6 +42,11 @@
 "txn.noResults.title" = "一致する結果なし";
 "txn.noResults.message" = "現在の検索または絞り込み条件に一致する取引はありません。条件をクリアしてお試しください。";
 "txn.searchPrompt" = "取引先・メモ・請求書番号で検索";
+"txn.error.amountNotFinite" = "金額はこの台帳が記録できる数値ではありません。数値に置き換えるまで保存できません。";
+"txn.error.amountNetNotFinite" = "税抜金額はこの台帳が記録できる数値ではありません。数値に置き換えるまで保存できません。";
+"txn.error.taxAmountNotFinite" = "税額はこの台帳が記録できる数値ではありません。数値に置き換えるまで保存できません。";
+"txn.error.taxRateNotFinite" = "税率はこの台帳が記録できる数値ではありません。数値に置き換えるまで保存できません。";
+"txn.error.paidAmountNotFinite" = "受取/支払済み金額はこの台帳が記録できる数値ではありません。数値に置き換えるまで保存できません。";
 "delete.confirmTitle" = "削除の確認";
 "delete.confirmButton" = "{count} 件を削除";
 "delete.confirmMessage" = "選択した {count} 件の取引を削除しますか？この操作は取り消せます。";

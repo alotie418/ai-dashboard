@@ -179,7 +179,7 @@ final class InventoryCopyTests: XCTestCase {
         var inventorySets: [Set<String>] = []
         for language in languages {
             let table = try sourceTable(language)
-            XCTAssertEqual(table.count, 645, "\(language) has \(table.count) keys")
+            XCTAssertEqual(table.count, 650, "\(language) has \(table.count) keys")
             XCTAssertEqual(table.keys.filter { $0.hasPrefix("nav.") }.count, 7, "\(language) nav.*")
             XCTAssertEqual(table.keys.filter { $0.hasPrefix("product.") }.count, 41, "\(language) product.*")
             inventorySets.append(Set(table.keys.filter { $0.hasPrefix("inventory.") }))

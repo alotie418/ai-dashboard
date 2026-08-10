@@ -70,12 +70,21 @@ final class LedgerStoreTests: LedgerTestCase {
         XCTAssertThrowsError(try store.create(t))
     }
 
-    func testValidationRejectsNonFiniteAmount() throws {
+    /// Renamed, and flipped, because the BEHAVIOUR changed — not because the test was wrong
+    /// about the old one. It used to be called `testValidationRejectsNonFiniteAmount` while
+    /// asserting the opposite: `normalized()` replaced the value with `0`, `create` succeeded,
+    /// and the ledger recorded a number the user never entered. That substitution is now
+    /// refused at the write boundary; see `NonFiniteWriteGateTests` for why silently recording
+    /// a different figure is the worse of the two outcomes.
+    func testANonFiniteAmountIsRefusedRatherThanRecordedAsZero() throws {
         let store = try makeStore()
-        // normalized() coerces non-finite to 0, which is valid — verify it doesn't crash and stores 0.
         let t = Transaction(type: .expense, date: "2026-01-01", amount: .nan)
-        try store.create(t)
-        XCTAssertEqual(try store.summary().expenseTotal, 0)
+        XCTAssertThrowsError(try store.create(t)) { error in
+            XCTAssertEqual(error as? LedgerError, .nonFiniteAmounts([.amount]))
+        }
+        XCTAssertEqual(try store.listTransactions().count, 0, "and no row was written")
+        XCTAssertEqual(try store.summary().expenseTotal, 0,
+                       "0 here is the empty ledger, no longer a substituted amount")
     }
 
     func testNormalizationClampsStrings() throws {

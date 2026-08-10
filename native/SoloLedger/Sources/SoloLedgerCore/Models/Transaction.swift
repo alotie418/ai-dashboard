@@ -69,8 +69,14 @@ public struct Transaction: Identifiable, Hashable, Sendable {
 
     public var isValid: Bool { validationErrors().isEmpty }
 
-    /// Apply the same normalization the JS handler does before persisting:
-    /// clamp string lengths, default the currency, coerce non-finite numbers.
+    /// Clamp string lengths and default the currency, mirroring `transactions.js normalize`.
+    ///
+    /// The non-finite coercion below is NOT part of that mirror. `transactions.js normalize`
+    /// writes `Number(x) || 0`, which flattens NaN but lets ±Infinity through — Infinity is
+    /// truthy — and its `amount_net` carries no guard at all; this flattens both. The
+    /// divergence no longer decides anything on the write path: ``LedgerStore/create(_:)`` and
+    /// ``LedgerStore/update(_:)`` refuse a non-finite value BEFORE this runs, so what is left
+    /// here is a floor for callers that build a `Transaction` without going through the store.
     public func normalized() -> Transaction {
         var t = self
         t.currency = String(currency.isEmpty ? "CNY" : currency).prefix(8).description

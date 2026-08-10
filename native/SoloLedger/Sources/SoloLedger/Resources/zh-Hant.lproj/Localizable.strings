@@ -42,6 +42,11 @@
 "txn.noResults.title" = "無相符結果";
 "txn.noResults.message" = "沒有符合目前搜尋或篩選條件的流水。請清除條件後再試。";
 "txn.searchPrompt" = "搜尋往來對象、備註、發票號";
+"txn.error.amountNotFinite" = "金額不是本帳本能記錄的數字，替換為數字後才能儲存。";
+"txn.error.amountNetNotFinite" = "不含稅金額不是本帳本能記錄的數字，替換為數字後才能儲存。";
+"txn.error.taxAmountNotFinite" = "稅額不是本帳本能記錄的數字，替換為數字後才能儲存。";
+"txn.error.taxRateNotFinite" = "稅率不是本帳本能記錄的數字，替換為數字後才能儲存。";
+"txn.error.paidAmountNotFinite" = "已收/付金額不是本帳本能記錄的數字，替換為數字後才能儲存。";
 "delete.confirmTitle" = "確認刪除";
 "delete.confirmButton" = "刪除 {count} 筆";
 "delete.confirmMessage" = "確定刪除選取的 {count} 筆流水？刪除後可復原。";

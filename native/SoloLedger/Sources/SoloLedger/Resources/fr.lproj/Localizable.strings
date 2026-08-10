@@ -42,6 +42,11 @@
 "txn.noResults.title" = "Aucun résultat";
 "txn.noResults.message" = "Aucune opération ne correspond à la recherche ou aux filtres actuels. Essayez de les effacer.";
 "txn.searchPrompt" = "Rechercher tiers, note, n° de facture";
+"txn.error.amountNotFinite" = "Le montant n'est pas un nombre que ce registre peut enregistrer ; il doit être remplacé par un nombre pour pouvoir enregistrer.";
+"txn.error.amountNetNotFinite" = "Le montant HT n'est pas un nombre que ce registre peut enregistrer ; il doit être remplacé par un nombre pour pouvoir enregistrer.";
+"txn.error.taxAmountNotFinite" = "Le montant de la taxe n'est pas un nombre que ce registre peut enregistrer ; il doit être remplacé par un nombre pour pouvoir enregistrer.";
+"txn.error.taxRateNotFinite" = "Le taux de taxe n'est pas un nombre que ce registre peut enregistrer ; il doit être remplacé par un nombre pour pouvoir enregistrer.";
+"txn.error.paidAmountNotFinite" = "Le montant réglé n'est pas un nombre que ce registre peut enregistrer ; il doit être remplacé par un nombre pour pouvoir enregistrer.";
 "delete.confirmTitle" = "Confirmer la suppression";
 "delete.confirmButton" = "Supprimer ({count})";
 "delete.confirmMessage" = "Supprimer la sélection ({count}) ? Cette action pourra être annulée.";
