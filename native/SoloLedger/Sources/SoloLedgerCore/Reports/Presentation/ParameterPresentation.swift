@@ -101,9 +101,11 @@ public enum EffectOrigin: Equatable, Sendable {
 
 public enum ParameterConsumption: Equatable, Sendable {
     case consumed
-    /// `vat_rate` in every regime — the dispatcher loads it (`index.js vatRate`) and no engine
-    /// reads it (Appendix A6) — and `surcharge_rate` outside China, where only `cn.js taxSurcharge`
-    /// consumes it. A view must be able to say "unset, and nothing here reads it" rather
+    /// Three cases today: `vat_rate` in every regime — the dispatcher loads it
+    /// (`index.js vatRate`) and no engine reads it (Appendix A6); `surcharge_rate` outside
+    /// China, where only `cn.js taxSurcharge` consumes it; and `admin_expense_annual` under
+    /// the US, the one regime whose engine never names it (Schedule C has no such line).
+    /// A view must be able to say "unset, and nothing here reads it" rather
     /// than prompting for a value that would change no number.
     case storedButUnread
 }

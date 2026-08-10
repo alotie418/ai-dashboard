@@ -214,9 +214,14 @@ public enum ReportBuilder {
                 return ungatedNumericParameter(db, key: key, fallback: 13,
                                                consumption: .storedButUnread)
             case .adminExpenseAnnual:
-                // `index.js adminExpense` — the same shape, fallback 0, and consumed by every engine.
+                // `index.js adminExpense` — the same shape, fallback 0. The dispatcher loads it
+                // for everyone, but **US is the only regime that never reads it**: Schedule C has
+                // no admin-expense line, and neither `us.js` nor ``USReportEngine`` names it.
+                // Same shape as the surcharge, mirrored: there China is the only consumer, here
+                // the US is the only non-consumer. Named as the exception rather than by listing
+                // the other five, so a seventh regime does not silently inherit a claim about it.
                 return ungatedNumericParameter(db, key: key, fallback: 0,
-                                               consumption: .consumed)
+                                               consumption: locale == "US" ? .storedButUnread : .consumed)
             }
         }
     }
