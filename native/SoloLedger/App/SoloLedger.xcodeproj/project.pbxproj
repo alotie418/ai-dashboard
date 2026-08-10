@@ -38,6 +38,7 @@
 		796BFA1219B88259D75D9BFB /* SoloLedgerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CF6B7860B1C57D6E8C83448 /* SoloLedgerApp.swift */; };
 		821321D467EC23E204FF19DF /* AppUnitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C26549A6E2C20DB2210C445 /* AppUnitTests.swift */; };
 		8EF2EB828C9A67864E3A8688 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BEF6A5527E30DC74D9E644C /* OverviewView.swift */; };
+		90D4DFE80445F0825BA3ED8A /* AboutVersionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 199E59FCC7BEFDA87FF752AD /* AboutVersionTests.swift */; };
 		93E5A0148C6D2FB704A1E837 /* InventoryOpeningWizardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D6B90C7F41E5A38B70C29D5 /* InventoryOpeningWizardTests.swift */; };
 		97AEF67CC908A92C5D00FFBE /* ReportFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C55F715C81A53197D609954 /* ReportFormatters.swift */; };
 		9AC176B879A8BF1E63B846CE /* ReportStateCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35826F8E473E8A7F8A74323 /* ReportStateCopyTests.swift */; };
@@ -97,6 +98,7 @@
 		12B64B934345AAD8AFE2DAB1 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		1523D7846E9667AD9188F900 /* ProductCopyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductCopyTests.swift; sourceTree = "<group>"; };
 		1C4F80B6D3A29E57104B6D22 /* ProductsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductsView.swift; sourceTree = "<group>"; };
+		199E59FCC7BEFDA87FF752AD /* AboutVersionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutVersionTests.swift; sourceTree = "<group>"; };
 		22F261F63E3EFEFECD968D6B /* LegacyConversionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyConversionView.swift; sourceTree = "<group>"; };
 		27BD91B41FDD42EFA4279AEE /* electron-v23.db */ = {isa = PBXFileReference; path = "electron-v23.db"; sourceTree = "<group>"; };
 		2873BF2E3463020F4E8DB20F /* ReportYear.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportYear.swift; sourceTree = "<group>"; };
@@ -264,6 +266,7 @@
 		868E3CD698EF32D9C4586DC2 /* SoloLedgerUnitTests */ = {
 			isa = PBXGroup;
 			children = (
+				199E59FCC7BEFDA87FF752AD /* AboutVersionTests.swift */,
 				6830222C9FA6F31E6BE497E2 /* AppModelBootTests.swift */,
 				8C26549A6E2C20DB2210C445 /* AppUnitTests.swift */,
 				3E562DD88E7D26BED7D6DD42 /* DormantSourceChoiceBootTests.swift */,
@@ -517,6 +520,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				90D4DFE80445F0825BA3ED8A /* AboutVersionTests.swift in Sources */,
 				47AED20762FB91EC3DC2344F /* AppModelBootTests.swift in Sources */,
 				821321D467EC23E204FF19DF /* AppUnitTests.swift in Sources */,
 				EE1B48EDB26A061CD1B3E584 /* DormantSourceChoiceBootTests.swift in Sources */,
