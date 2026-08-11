@@ -19,7 +19,6 @@ Sources/SoloLedgerCore/          data layer (SQLite, migrations, seed, store, CS
 Sources/SoloLedger/              SwiftUI app code (compiled by the Xcode app target)
 Tests/SoloLedgerCoreTests/       XCTest for the Core (run via `swift test`)
 App/
-  project.yml                    XcodeGen spec — historical, NOT a build input (see below)
   SoloLedger.xcodeproj           the Xcode project, and the source of truth for the App target
   Support/                       Info.plist, Debug/Release entitlements, Assets.xcassets (AppIcon, AccentColor)
   Tests/SoloLedgerUnitTests/     Xcode unit tests (public Core API)
@@ -31,8 +30,10 @@ App/
 - macOS 13.0+ (deployment target)
 - Xcode 26.x. If `xcode-select` points at the Command Line Tools, prefix commands
   with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
-- xcodegen is NOT needed and must not be run — see "Adding a file to an App target" below.
-  The committed `.xcodeproj` opens and builds directly, and CI builds from it.
+- No project generator. There is no XcodeGen spec in this repo (the historical
+  `App/project.yml` was deleted in 2c-2); `project.pbxproj` is the source of truth and is
+  edited by hand — see "Adding a file to an App target" below. The committed `.xcodeproj`
+  opens and builds directly, and CI builds from it.
 
 ## Build, test, run (Xcode project)
 
@@ -52,19 +53,28 @@ xcodebuild archive -project SoloLedger.xcodeproj -scheme SoloLedger -configurati
 
 ### Adding a file to an App target
 
-`project.pbxproj` is the source of truth, and it is edited BY HAND. Running
-`xcodegen generate` would rewrite it from `project.yml` and silently drop those hand
-edits — measured: on a tree with no source changes at all, xcodegen 2.45.4 still
-reissued object IDs for four already-committed files. CI never runs it.
+`project.pbxproj` is the source of truth, and it is edited BY HAND. Do not introduce a
+generator: the repo used to carry an XcodeGen spec, and running `xcodegen generate` would
+have rewritten the project from it and silently dropped those hand edits — measured, on a
+tree with no source changes at all, xcodegen 2.45.4 still reissued object IDs for four
+already-committed files. The spec was deleted in 2c-2 precisely because a file that looks
+like the source of truth but is read by nothing is worse than no file at all.
 
-Each new file needs exactly four lines: a `PBXBuildFile`, a `PBXFileReference`, an entry
-in its group's `children`, and an entry in the target's `PBXSourcesBuildPhase.files`. The
-two list entries sort case-insensitively by file name; the two object entries sort by
-their 24-hex id, which you mint yourself and grep to confirm is unused.
+Each new **`.swift`** file needs exactly four lines: a `PBXBuildFile`, a
+`PBXFileReference`, an entry in its group's `children`, and an entry in the target's
+`PBXSourcesBuildPhase.files`. The two list entries sort case-insensitively by file name;
+the two object entries sort by their 24-hex id, which you mint yourself and grep to
+confirm is unused. (Other file kinds are NOT four lines — a seventh `.lproj`, for example,
+joins the existing `PBXVariantGroup` and `knownRegions` and adds no `PBXBuildFile` of its
+own. The guard below covers `.swift` only.)
 
-Nothing reads `project.yml` at build time, so a file missing from `project.pbxproj` does
-not fail — it is simply never compiled. For a test file that shows up as a test count
-that did not go up, with no error anywhere.
+Get it wrong and **nothing reports it**: a file missing from `project.pbxproj` does not
+fail the build, it is simply never compiled. For a test file that shows up as a test count
+that did not go up, with no error anywhere. That silence is what
+`Tests/SoloLedgerCoreTests/AppTargetRegistrationGuardTests.swift` exists to break — it
+compares the disk against `project.pbxproj` in both directions, per target, and checks the
+project against itself (group children ↔ Sources phases, and all four lines per file). It
+runs in `swift test`, inside the required `Guards + migrations + build` check.
 
 - **Debug** builds as Bundle ID `com.alotie418.sololedger.dev`; **Release** as
   `com.alotie418.sololedger`. Only Debug is built for now — no production signing.
