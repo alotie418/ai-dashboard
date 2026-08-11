@@ -3,7 +3,9 @@
 > **状态(v3):设计定稿。全部设计决策已决、实施前设计阻断归零;N7.0 测试门禁已完成(PR #369 + #370,零生产行为变化);N7.1 尚未开始,本文档 PR 不实现任何代码。**
 > 本文档仅做设计与取舍分析,**不包含任何实现代码**(无 Swift 片段、无 diff),全部以文字、表格、状态/时序描述表达。所有涉及"实现时会改动"的内容均标注为**前瞻性、当前不改动**。
 >
-> **状态注记(D-债 2a 追加,不翻新本文正文):** 本文两处记载 `project.pbxproj` 由 `xcodegen generate` 再生(§前置核查的「App/project.yml 与 pbxproj」条、文件影响清单末行)。那是 N7.0 当时的事实,予以保留;但此后工程文件的维护方式已改变——`project.pbxproj` 是真值源、逐文件手工登记,`xcodegen generate` 不得再运行(见 `native/SoloLedger/README.md` 的「Adding a file to an App target」与 `App/project.yml` 头部)。
+> **状态注记(D-债 2a 追加,不翻新本文正文):** 本文两处记载 `project.pbxproj` 由 `xcodegen generate` 再生(§前置核查的「App/project.yml 与 pbxproj」条、文件影响清单末行)。那是 N7.0 当时的事实,予以保留;但此后工程文件的维护方式已改变——`project.pbxproj` 是真值源、逐文件手工登记,`xcodegen generate` 不得再运行(见 `native/SoloLedger/README.md` 的「Adding a file to an App target」)。
+>
+> **状态注记(2c-2 追加,同样不翻新正文):`App/project.yml` 已删除。** 本文正文对它的三处引用一律按下述改读,原文予以保留:①§前置核查的「App/project.yml 与 pbxproj」条与②文件影响清单里的 `App/project.yml` 行——所述 N7.0 事实不变,但该文件今天已不存在,新增文件改为手工登记 `project.pbxproj`;③§Sendable 分析里以 `project.yml` 的 `SWIFT_VERSION: 5.0` 作为「包处于 Swift 5 语言模式」的凭据——**该凭据改指 `project.pbxproj` 的两处 `SWIFT_VERSION = 5.0;`(工程级 Debug / Release 各一)**,结论不变。删除理由与替代守门见 `native/SoloLedger/Tests/SoloLedgerCoreTests/AppTargetRegistrationGuardTests.swift` 的文件头。
 >
 > 依据:初始调查基于 `main`(`7d7101c`,已含 C12x-A2)生产代码的**只读**核查(启动状态机、open-plan/active-slot 守卫、`runImport` 管线、`MigrationSource`/预检/安全边界、UI/i18n/entitlements、测试与 fixture);**v3 已针对 `main = 1c12fbb`(含 N7.0)逐点重新核对关键设计支点**(见 v3 修订记录),而非机械替换 hash。关联:`SWIFTUI_MIGRATION_PLAN.md` §0.2 / §0.3、`SWIFTUI_FEATURE_GAP.md` 第 4 节的 DMG P0。
 
