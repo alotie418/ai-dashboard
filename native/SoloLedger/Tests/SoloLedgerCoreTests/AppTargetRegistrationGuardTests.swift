@@ -23,6 +23,19 @@ import XCTest
 /// already globbed. It was deleted; this guard is what replaces it, and unlike the spec it
 /// fails when it is wrong.
 ///
+/// ## The join key is the object ID, never the comment
+///
+/// pbxproj annotates every reference with a `/* Foo.swift */` comment, and it is tempting to
+/// read those and be done. **They are decoration.** Xcode resolves `PBXBuildFile.fileRef` and
+/// `children` entries by 24-hex object ID, so a hand edit that copies a line, updates the
+/// comment and forgets the `fileRef` produces a project whose comments all agree and whose
+/// compiler input is wrong — the new file is never built and some other file is built twice.
+/// Measured: a comment-keyed version of this guard passed all fourteen of its own tests against
+/// exactly that mutation. Everything below therefore resolves IDs and compares the
+/// `PBXFileReference.path` values it lands on; ``testEveryReferenceCommentMatchesItsResolvedPath``
+/// then pins the decoration to the meaning, because a lying comment is a trap for the next
+/// person editing by hand even when the wiring underneath happens to be right.
+///
 /// ## Why the comparisons are name-based
 ///
 /// Every `.swift` basename is unique within each target's directory —
@@ -38,18 +51,25 @@ import XCTest
 /// asserted in a comment.
 final class AppTargetRegistrationGuardTests: XCTestCase {
 
-    // MARK: - What the project file says
+    // MARK: - What the project file says, after resolving IDs
 
-    /// The `.swift` populations of the four places a registration has to appear.
     struct Registration: Equatable {
-        /// Declared files (`PBXFileReference`).
+        /// Declared files (`PBXFileReference.path`).
         var fileReferences: Set<String> = []
-        /// Compile wirings (`PBXBuildFile`, the `… in Sources` ones).
+        /// What the `… in Sources` `PBXBuildFile`s resolve to.
         var buildFiles: Set<String> = []
-        /// Everything named in some `PBXGroup.children` — i.e. visible in the navigator.
+        /// What some `PBXGroup.children` entry resolves to — i.e. visible in the navigator.
         var groupChildren: Set<String> = []
-        /// Per native target: what its `PBXSourcesBuildPhase` actually compiles.
+        /// Per native target: what its `PBXSourcesBuildPhase` actually hands the compiler.
         var sourcesByTarget: [String: Set<String>] = [:]
+
+        /// `PBXBuildFile`s whose `fileRef` names no declared reference — Xcode would fail to
+        /// open the project, and a comment-keyed reader would never notice.
+        var danglingBuildFiles: [String] = []
+        /// Target → files its Sources phase compiles more than once.
+        var duplicateCompiles: [String: [String]] = [:]
+        /// `id: comment ≠ resolved path` — decoration that disagrees with meaning.
+        var commentMismatches: [String] = []
 
         var allCompiled: Set<String> { sourcesByTarget.values.reduce(into: []) { $0.formUnion($1) } }
     }
@@ -76,9 +96,16 @@ final class AppTargetRegistrationGuardTests: XCTestCase {
         return Array(lines[(begin + 1)..<end])
     }
 
-    /// The FIRST `/* … */` comment on a line. pbxproj puts the human-readable name there, and
-    /// on a `PBXBuildFile` line the first one is the wiring (`Foo.swift in Sources`) while the
-    /// second is the plain file — taking the first is what distinguishes them.
+    /// The object ID a line starts with.
+    static func leadingID(of line: Substring) -> String? {
+        let token = line.trimmingCharacters(in: .whitespaces)
+            .prefix { $0 != " " && $0 != "," }
+        let id = String(token)
+        return id.count == 24 && id.allSatisfy(\.isHexDigit) ? id : nil
+    }
+
+    /// The FIRST `/* … */` comment on a line — the human-readable label, which this guard
+    /// treats as a claim to be checked, never as the key to join on.
     static func firstComment(in line: Substring) -> String? {
         guard let open = line.range(of: "/* "),
               let close = line.range(of: " */", range: open.upperBound..<line.endIndex)
@@ -86,44 +113,67 @@ final class AppTargetRegistrationGuardTests: XCTestCase {
         return String(line[open.upperBound..<close.lowerBound])
     }
 
+    /// `key = value;` → `value`, unquoted.
+    static func setting(_ key: String, in line: Substring) -> String? {
+        guard let start = line.range(of: "\(key) = "),
+              let end = line.range(of: ";", range: start.upperBound..<line.endIndex)
+        else { return nil }
+        var value = String(line[start.upperBound..<end.lowerBound])
+        if value.hasPrefix("\"") && value.hasSuffix("\"") { value = String(value.dropFirst().dropLast()) }
+        return value
+    }
+
     static func parse(_ text: String) -> Registration {
         var out = Registration()
 
+        // id → the path it declares, and the comment it advertises.
+        var refPath: [String: String] = [:]
+        var refLabel: [String: String] = [:]
+        var refComment: [String: String] = [:]
         for line in section("PBXFileReference", of: text) {
-            if let name = firstComment(in: line), name.hasSuffix(".swift") {
-                out.fileReferences.insert(name)
-            }
+            guard let id = leadingID(of: line), let path = setting("path", in: line) else { continue }
+            refPath[id] = path
+            refLabel[id] = setting("name", in: line) ?? path
+            refComment[id] = Self.firstComment(in: line)
+            if path.hasSuffix(".swift") { out.fileReferences.insert(path) }
         }
 
+        // build-file id → the reference it wires. `… in Sources` only; Resources are not ours.
+        var wiring: [String: String] = [:]
         for line in section("PBXBuildFile", of: text) {
-            guard let name = firstComment(in: line), name.hasSuffix(" in Sources") else { continue }
-            let file = String(name.dropLast(" in Sources".count))
-            if file.hasSuffix(".swift") { out.buildFiles.insert(file) }
+            guard let id = leadingID(of: line),
+                  let comment = Self.firstComment(in: line), comment.hasSuffix(" in Sources"),
+                  let ref = setting("fileRef", in: line)?.prefix(24).description
+            else { continue }
+            wiring[id] = ref
+            guard let path = refPath[ref] else {
+                out.danglingBuildFiles.append("\(id) → \(ref) (no such PBXFileReference)")
+                continue
+            }
+            if path.hasSuffix(".swift") { out.buildFiles.insert(path) }
         }
 
         for line in section("PBXGroup", of: text) {
-            // A children entry is `\t\t\t\tID /* Name */,` — the trailing comma is what separates
-            // it from the group's own header line, which ends in ` = {`.
-            guard line.hasSuffix(",") , let name = firstComment(in: line), name.hasSuffix(".swift")
+            guard line.hasSuffix(","), let id = leadingID(of: line), let path = refPath[id],
+                  path.hasSuffix(".swift")
             else { continue }
-            out.groupChildren.insert(name)
+            out.groupChildren.insert(path)
         }
 
         // Sources phases are keyed by object id; native targets name them. Read both, then join.
-        var filesByPhase: [String: Set<String>] = [:]
+        var buildFilesByPhase: [String: [String]] = [:]
         var currentPhase: String?
         for line in section("PBXSourcesBuildPhase", of: text) {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasSuffix("= {"), let id = trimmed.split(separator: " ").first {
-                currentPhase = String(id)
-                filesByPhase[String(id)] = []
+            if trimmed.hasSuffix("= {"), let id = leadingID(of: line) {
+                currentPhase = id
+                buildFilesByPhase[id] = []
                 continue
             }
             if trimmed == "};" { currentPhase = nil; continue }
-            guard let phase = currentPhase, line.hasSuffix(","),
-                  let name = firstComment(in: line), name.hasSuffix(".swift in Sources")
+            guard let phase = currentPhase, line.hasSuffix(","), let id = leadingID(of: line)
             else { continue }
-            filesByPhase[phase, default: []].insert(String(name.dropLast(" in Sources".count)))
+            buildFilesByPhase[phase, default: []].append(id)
         }
 
         var currentTargetPhases: [String] = []
@@ -133,20 +183,35 @@ final class AppTargetRegistrationGuardTests: XCTestCase {
             if trimmed == "buildPhases = (" { inBuildPhases = true; continue }
             if inBuildPhases {
                 if trimmed == ");" { inBuildPhases = false; continue }
-                if firstComment(in: line) == "Sources", let id = trimmed.split(separator: " ").first {
-                    currentTargetPhases.append(String(id))
+                if Self.firstComment(in: line) == "Sources", let id = leadingID(of: line) {
+                    currentTargetPhases.append(id)
                 }
                 continue
             }
-            if trimmed.hasPrefix("name = "), trimmed.hasSuffix(";") {
-                let name = String(trimmed.dropFirst("name = ".count).dropLast())
-                let compiled = currentTargetPhases.reduce(into: Set<String>()) {
-                    $0.formUnion(filesByPhase[$1] ?? [])
-                }
-                out.sourcesByTarget[name] = compiled
-                currentTargetPhases = []
-            }
+            guard trimmed.hasPrefix("name = "), trimmed.hasSuffix(";") else { continue }
+            let target = String(trimmed.dropFirst("name = ".count).dropLast())
+            let compiled = currentTargetPhases
+                .flatMap { buildFilesByPhase[$0] ?? [] }
+                .compactMap { wiring[$0].flatMap { refPath[$0] } }
+                .filter { $0.hasSuffix(".swift") }
+            out.sourcesByTarget[target] = Set(compiled)
+            let repeated = Dictionary(grouping: compiled, by: { $0 }).filter { $0.value.count > 1 }
+            if !repeated.isEmpty { out.duplicateCompiles[target] = repeated.keys.sorted() }
+            currentTargetPhases = []
         }
+
+        // The label a reference advertises is its `name` when it declares one, otherwise its
+        // `path` — that is the real pbxproj convention, and getting it wrong here produces
+        // false positives on perfectly correct objects. Measured while writing this: a naive
+        // `comment == path` rule fired on all six `.lproj` variant children (comment is the
+        // language, `zh-Hans`, while the path is `zh-Hans.lproj/Localizable.strings`) and on
+        // the local package folder (`name = SoloLedger`, `path = ..`). A `.swift` reference
+        // declares no `name`, so for the files this guard is about the rule still reduces to
+        // "the comment must be the file name".
+        out.commentMismatches = refLabel.compactMap { id, label in
+            guard let comment = refComment[id], comment != label else { return nil }
+            return "\(id): comment says \(comment), object declares \(label)"
+        }.sorted()
 
         return out
     }
@@ -159,9 +224,7 @@ final class AppTargetRegistrationGuardTests: XCTestCase {
         /// Registered, but no such file — a build break waiting for a clean checkout.
         var phantom: [String] = []
         var isEmpty: Bool { unregistered.isEmpty && phantom.isEmpty }
-        var description: String {
-            "unregistered=\(unregistered) phantom=\(phantom)"
-        }
+        var description: String { "unregistered=\(unregistered) phantom=\(phantom)" }
     }
 
     /// Family (a): disk ↔ pbxproj, BOTH directions. One direction alone is half a guard —
@@ -260,10 +323,7 @@ final class AppTargetRegistrationGuardTests: XCTestCase {
             """)
     }
 
-    /// The "exactly four lines per file" rule, machine-checked. `PBXFileReference` ↔ group
-    /// children and `PBXBuildFile` ↔ Sources phase are the two id-level pairings the previous
-    /// test's name-level comparison rides on; pinning them means a half-written registration
-    /// cannot pass by being half-written in both places at once.
+    /// The "exactly four lines per file" rule, machine-checked.
     func testEveryRegisteredSwiftFileHasAllFourLines() throws {
         let r = Self.parse(try Self.projectText())
         XCTAssertEqual(r.fileReferences.sorted(), r.groupChildren.sorted(), """
@@ -275,6 +335,36 @@ final class AppTargetRegistrationGuardTests: XCTestCase {
             compile wirings and Sources phases disagree: \
             wired-not-compiled=\(r.buildFiles.subtracting(r.allCompiled).sorted()), \
             compiled-not-wired=\(r.allCompiled.subtracting(r.buildFiles).sorted())
+            """)
+    }
+
+    // MARK: - The ID layer the comments sit on top of
+
+    func testEveryBuildFileResolvesToADeclaredFileReference() throws {
+        let r = Self.parse(try Self.projectText())
+        XCTAssertEqual(r.danglingBuildFiles, [], """
+            a PBXBuildFile points at an object that is not a PBXFileReference. Xcode cannot \
+            open this project, and a reader that trusted the /* comments */ would call it fine.
+            """)
+    }
+
+    func testNoTargetCompilesTheSameFileTwice() throws {
+        let r = Self.parse(try Self.projectText())
+        XCTAssertEqual(r.duplicateCompiles, [:], """
+            a Sources phase hands the compiler the same file more than once. The usual cause is \
+            a hand-copied PBXBuildFile whose fileRef was never repointed — which also means the \
+            file that line was supposed to wire is not being compiled at all.
+            """)
+    }
+
+    /// The decoration must match the meaning. A `/* Foo.swift */` comment on a reference whose
+    /// `path` is `Bar.swift` compiles correctly TODAY and misleads every hand edit after it.
+    func testEveryReferenceCommentMatchesItsResolvedPath() throws {
+        let r = Self.parse(try Self.projectText())
+        XCTAssertEqual(r.commentMismatches, [], """
+            a /* comment */ disagrees with the path its object declares. pbxproj comments are \
+            decoration — Xcode joins on the 24-hex id — so a mismatch is a trap laid for the \
+            next person editing this file by hand.
             """)
     }
 
@@ -310,40 +400,52 @@ final class AppTargetRegistrationGuardTests: XCTestCase {
     // MARK: - Reverse proof: each defect shape, reproduced
 
     /// A minimal project with one file wired through all four places, plus knobs to remove
-    /// exactly one of them. Synthetic, so no violating file is ever committed.
+    /// exactly one of them — or to misroute the wiring while leaving every comment truthful.
+    /// Synthetic, so no violating file is ever committed.
+    /// 24-hex object ids, spelled out so the fixture reads like the real file.
+    private static let wiringID = "BB1100000000000000000001"   // the PBXBuildFile
+    private static let widgetID = "FA2200000000000000000002"   // Widget.swift's PBXFileReference
+    private static let neighbourID = "FA3300000000000000000003" // an innocent bystander
+    private static let deadID = "DEAD0000000000000000000F"     // names no object at all
+
     static func fixture(fileReference: Bool = true, buildFile: Bool = true,
                         groupChild: Bool = true, phaseEntry: Bool = true,
+                        misroutedFileRef: Bool = false, danglingFileRef: Bool = false,
                         name: String = "Widget.swift") -> String {
-        """
+        // Only the `fileRef` moves. Every `/* Widget.swift */` comment stays truthful — which
+        // is exactly the shape a comment-keyed reader cannot see.
+        let ref = danglingFileRef ? deadID : (misroutedFileRef ? neighbourID : widgetID)
+        return """
         /* Begin PBXBuildFile section */
-        \(buildFile ? "\t\tBB1 /* \(name) in Sources */ = {isa = PBXBuildFile; fileRef = FR1 /* \(name) */; };" : "")
+        \(buildFile ? "\t\t\(wiringID) /* \(name) in Sources */ = {isa = PBXBuildFile; fileRef = \(ref) /* \(name) */; };" : "")
         /* End PBXBuildFile section */
         /* Begin PBXFileReference section */
-        \(fileReference ? "\t\tFR1 /* \(name) */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = \(name); sourceTree = \"<group>\"; };" : "")
+        \(fileReference ? "\t\t\(widgetID) /* \(name) */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = \(name); sourceTree = \"<group>\"; };" : "")
+        \t\t\(neighbourID) /* Neighbour.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Neighbour.swift; sourceTree = "<group>"; };
         /* End PBXFileReference section */
         /* Begin PBXGroup section */
-        \t\tG1 /* App */ = {
+        \t\t6A4400000000000000000004 /* App */ = {
         \t\t\tisa = PBXGroup;
         \t\t\tchildren = (
-        \(groupChild ? "\t\t\t\tFR1 /* \(name) */," : "")
+        \(groupChild ? "\t\t\t\t\(widgetID) /* \(name) */," : "")
         \t\t\t);
         \t\t\tpath = App;
         \t\t};
         /* End PBXGroup section */
         /* Begin PBXNativeTarget section */
-        \t\tT1 /* SoloLedger */ = {
+        \t\t7A5500000000000000000005 /* SoloLedger */ = {
         \t\t\tisa = PBXNativeTarget;
         \t\t\tbuildPhases = (
-        \t\t\t\tP1 /* Sources */,
+        \t\t\t\t8A6600000000000000000006 /* Sources */,
         \t\t\t);
         \t\t\tname = SoloLedger;
         \t\t};
         /* End PBXNativeTarget section */
         /* Begin PBXSourcesBuildPhase section */
-        \t\tP1 /* Sources */ = {
+        \t\t8A6600000000000000000006 /* Sources */ = {
         \t\t\tisa = PBXSourcesBuildPhase;
         \t\t\tfiles = (
-        \(phaseEntry ? "\t\t\t\tBB1 /* \(name) in Sources */," : "")
+        \(phaseEntry ? "\t\t\t\t\(wiringID) /* \(name) in Sources */," : "")
         \t\t\t);
         \t\t};
         /* End PBXSourcesBuildPhase section */
@@ -355,8 +457,11 @@ final class AppTargetRegistrationGuardTests: XCTestCase {
         XCTAssertEqual(r.sourcesByTarget["SoloLedger"], ["Widget.swift"])
         XCTAssertTrue(Self.groupPhaseDrift(r).isEmpty)
         XCTAssertTrue(Self.drift(disk: ["Widget.swift"], compiled: r.allCompiled).isEmpty)
-        XCTAssertEqual(r.fileReferences, r.groupChildren)
-        XCTAssertEqual(r.buildFiles, r.allCompiled)
+        XCTAssertEqual(r.fileReferences, ["Widget.swift", "Neighbour.swift"])
+        XCTAssertEqual(r.buildFiles, ["Widget.swift"])
+        XCTAssertEqual(r.danglingBuildFiles, [])
+        XCTAssertEqual(r.duplicateCompiles, [:])
+        XCTAssertEqual(r.commentMismatches, [])
     }
 
     /// (a) The forgotten registration — the file exists, nothing compiles it.
@@ -389,14 +494,57 @@ final class AppTargetRegistrationGuardTests: XCTestCase {
         XCTAssertEqual(d.phantom, ["Widget.swift"])
     }
 
-    /// The four-line rule, each half missing in turn.
-    func testAMissingFileReferenceOrBuildFileLineIsReported() {
+    /// The four-line rule, each half broken in turn.
+    ///
+    /// Note the second shape is "wired but in no phase", NOT "no `PBXBuildFile`". Once
+    /// resolution follows ids, deleting the `PBXBuildFile` makes the phase entry resolve to
+    /// nothing, so BOTH sides of that equality go empty and agree — the defect surfaces as a
+    /// dangling wiring and as family (a) instead, which is what the other two assertions here
+    /// pin. An equality that cannot distinguish "both empty" from "both correct" is not the
+    /// place to catch it.
+    func testAHalfWrittenRegistrationIsReported() {
         let noRef = Self.parse(Self.fixture(fileReference: false))
         XCTAssertNotEqual(noRef.fileReferences, noRef.groupChildren,
                           "a missing PBXFileReference must not read as consistent")
-        let noWiring = Self.parse(Self.fixture(buildFile: false))
-        XCTAssertNotEqual(noWiring.buildFiles, noWiring.allCompiled,
-                          "a missing PBXBuildFile must not read as consistent")
+        XCTAssertEqual(noRef.danglingBuildFiles.count, 1,
+                       "the wiring now points at an object that does not exist")
+        XCTAssertEqual(Self.drift(disk: ["Widget.swift"], compiled: noRef.allCompiled).unregistered,
+                       ["Widget.swift"], "and nothing compiles the file")
+
+        let notInAnyPhase = Self.parse(Self.fixture(phaseEntry: false))
+        XCTAssertNotEqual(notInAnyPhase.buildFiles, notInAnyPhase.allCompiled,
+                          "a PBXBuildFile that no phase lists must not read as consistent")
+    }
+
+    /// **The shape a comment-keyed guard cannot see.** Every `/* Widget.swift */` comment is
+    /// still truthful; only the `fileRef` points elsewhere. Xcode compiles `Neighbour.swift`
+    /// and never compiles `Widget.swift`.
+    func testAMisroutedFileRefIsReportedEvenThoughEveryCommentStillSaysWidget() {
+        let text = Self.fixture(misroutedFileRef: true)
+        XCTAssertTrue(text.contains("/* Widget.swift in Sources */"),
+                      "the fixture must keep the misleading comment, or it proves nothing")
+        let r = Self.parse(text)
+        XCTAssertEqual(r.sourcesByTarget["SoloLedger"], ["Neighbour.swift"],
+                       "resolution must follow the id, not the comment")
+        XCTAssertEqual(Self.drift(disk: ["Widget.swift"], compiled: r.allCompiled).unregistered,
+                       ["Widget.swift"], "family (a) must see that Widget is not compiled")
+        XCTAssertEqual(Self.groupPhaseDrift(r), Drift(unregistered: ["Widget.swift"],
+                                                      phantom: ["Neighbour.swift"]))
+    }
+
+    func testABuildFilePointingAtNothingIsReported() {
+        let r = Self.parse(Self.fixture(danglingFileRef: true))
+        XCTAssertEqual(r.danglingBuildFiles.count, 1, "a dangling fileRef must be named")
+        XCTAssertTrue(r.allCompiled.isEmpty, "a dangling wiring compiles nothing")
+    }
+
+    func testACommentThatDisagreesWithItsPathIsReported() {
+        let text = Self.fixture()
+            .replacingOccurrences(of: "/* Neighbour.swift */ = {isa = PBXFileReference",
+                                  with: "/* Widget.swift */ = {isa = PBXFileReference")
+        let r = Self.parse(text)
+        XCTAssertEqual(r.commentMismatches.count, 1,
+                       "a comment that disagrees with its own path must be reported")
     }
 
     /// The guard must fail loudly on an unreadable project rather than passing over empty sets —
