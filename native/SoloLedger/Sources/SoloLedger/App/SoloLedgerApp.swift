@@ -24,7 +24,11 @@ enum AppBundleInfo {
         Bundle.main.object(forInfoDictionaryKey: key) as? String
     }
 
-    /// `1.1.0 (2)` — the marketing version, plus the build number that identifies the upload.
+    /// `<marketing> (<build>)` — the marketing version, plus the build number that identifies
+    /// the upload. Deliberately not spelled with real numbers: this comment carried a concrete
+    /// pair from the day it was written, and that pair was already wrong (the project declared
+    /// something else). The numbers live in `project.pbxproj` and are pinned by
+    /// `AppVersionGuardTests`; a copy here could only rot.
     static func versionText(_ lookup: (String) -> String? = infoValue) -> String {
         let short = lookup("CFBundleShortVersionString") ?? unknown
         let build = lookup("CFBundleVersion") ?? unknown
