@@ -1,6 +1,8 @@
 # Mac App Store 上架 Runbook（MAS 线）
 
-> 状态：**MAS-1 构建骨架已接线（entitlements ×2 + `electron-builder.mas.yml` + `build:mas`）；未创建 App Store Connect App、未上传、未提审。**
+> 状态（**2026-08-10 由维护者在 App Store Connect 实查后改写**）：MAS-1 构建骨架已接线（entitlements ×2 + `electron-builder.mas.yml` + `build:mas`）。**ASC App 记录已创建**；**1.0 已于 2026-07-09 提交审核并被拒**（五条 Guideline：5.2.5 / 1.5 / 3.1.1 / 2.1(a) / 4，整改答复稿见 [`MAS_RESUBMISSION_1.0.1.md`](MAS_RESUBMISSION_1.0.1.md)）；**此后未重新提交**。**已成功上传的最高构建号 = `1.0.0`**——仓库工作区里 2026-07-15 产出的 `1.0.1` 产物**从未上传**。
+>
+> 本行原写「未创建 App Store Connect App、未上传、未提审」，停更于 2026-07-09，与同仓库 07-15 的重新提审文档直接矛盾。ASC 侧的事实无法从仓库判定（凭据按下方铁律不入库），故以维护者实查为准；仓库内不记录 Apple ID 等账号标识。
 > 定位：**GitHub / Developer ID 直分发是正式主线**（runbook 见 [`RELEASE.md`](RELEASE.md)）；MAS 是独立上架线，两条线的配置与证书完全隔离、互不影响。
 > 铁律：任何证书、密码、Team ID、provisioning profile 不入库、不出现在日志/汇报里。
 
@@ -37,14 +39,20 @@ npm run build:mas
 
 ## 4. App Store Connect 准备清单
 
-- [ ] ASC 新建 App（名称 SoloLedger · 类别 Finance · Bundle ID 关联）
+> **本清单写于首次提交前，它的勾选状态与「今天 ASC 里是什么样」不是一回事。** 仓库能给的只有两条：**ASC App 记录已创建**（与文首状态节同源，均为维护者实查，故首项已勾）；**1.0 于 2026-07-09 通过了提交这一步并进入审核**（被拒的是内容，不是提交本身）。**由此可推**——这是推论，不是实查——当时下列各项曾达到可提交状态，否则提交不会进入审核。
+>
+> **但两件事本轮都没有做，别把上面的推论当成它们**：①各项在 ASC 里的**现状**未逐项实查；②**原生版重提要改的不止一处**——描述 / 副标题 / 关键词 / 截图 / 隐私标签的口径都随「无 AI、无网络、无 OCR、无电商」而变，首次提审时填的那一版对原生版基本不适用。
+>
+> 所以下面每一项都要按两个维度分别核对：**「首次提审时已完成」** 与 **「原生重提前仍需更新」**——前者成立不代表后者不用做。逐项核对只能由维护者在 ASC 完成；在核对之前，请不要把本清单的勾选状态当作 ASC 的现状。
+
+- [x] ASC 新建 App（名称 SoloLedger · 类别 Finance · Bundle ID 关联）—— 已创建（维护者实查；本条不随原生重提而变）
 - [x] 隐私政策 **URL** + 支持 URL：✅ 已托管于独立 public 仓库 `sololedger-legal` 的 GitHub Pages（与主仓库可见性解耦，四 URL 均验证 200·2026-07-09）——
   **Privacy Policy URL** = `https://alotie418.github.io/sololedger-legal/privacy/`（中文 `…/privacy/zh/`）
   **Support URL** = `https://alotie418.github.io/sololedger-legal/support/`
 - [ ] App 隐私标签问卷（如实：不收集数据 · 全本地存储 · BYOK 出网是用户主动配置第三方服务）
 - [ ] 出口合规（仅标准 HTTPS 加密 → 豁免声明）
 - [ ] 截图（≥1 张，1280×800 / 2560×1600 等规格）+ 描述/副标题/关键词（**电商 Beta 口径与 README 一致，不夸大**）
-- [ ] 年龄分级问卷 + 定价（免费/付费属产品决策）/ 地区
+- [ ] 年龄分级问卷 + 定价（免费/付费属产品决策）/ 地区 —— **销售地区已裁定（2026-08-10）：首版不在欧盟分发**，提审前在 ASC 的销售地区中去掉全部欧盟成员国（DSA 交易商信息暂不提供）。该操作只能由维护者本人在 ASC 完成
 - [ ] TestFlight 内测组（强烈建议先 TestFlight 再提审）
 
 ## 5. MAS 沙箱 QA 必测清单（TestFlight 或 mas-dev 本地构建）
@@ -61,4 +69,4 @@ npm run build:mas
 ## 6. 边界
 
 - 本文件与 MAS-1 配置**不改动** Developer ID 线（`electron-builder.dmg.yml` / `build/entitlements.mac.plist` / RELEASE.md 流程零变化）。
-- 未创建 ASC App、未上传、未提审；何时推进由维护者决策。
+- 上架状态见文首状态节（ASC 记录已存在、1.0 被拒、未重提、最高已上传构建 1.0.0）。本行原写「未创建 ASC App、未上传、未提审」，与实查不符，已作废。何时推进由维护者决策。

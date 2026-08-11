@@ -4,14 +4,14 @@
 >
 > **§7 路线图中的核心数据与报表产物已落地：D / E / F 已完成；C 的 `transactions` 表、迁移、CRUD 与 `TransactionsPage` 已实现，但「替代 Sales/Purchase 页面」的原目标仅部分完成，旧销售/采购页面仍并存**（`App.tsx:455` `SalesAndOutputPage`、`:456` `PurchaseAndInputPage`、`:463` `TransactionsPage` 三者同时注册）。已落地部分随 v1.0.0 发布。
 >
-> ### 当前的语言与资源事实（本节数字截至 **2026-07-28**，会随开发变动）
+> ### 当前的语言与资源事实（本节数字截至 **2026-08-10**，会随开发变动）
 >
 > | 维度 | 事实 | 出处 |
 > |---|---|---|
 > | 界面语言 | **6 种**：简体中文 / 繁體中文 / English / 日本語 / 한국어 / Français | — |
 > | 记账口径 | **6 套**：CN / US / JP / KR / EU / TW，各有独立报表引擎 | `electron/reports/` |
-> | Electron 侧文案 | JSON，每种语言 **1516 个叶子键**（六语等长） | `i18n/locales/{en,fr,ja,ko,zh-CN,zh-TW}.json` |
-> | 原生 SwiftUI 侧文案 | `.strings`，每种语言 **645 个键**（六语等长） | `native/SoloLedger/Sources/SoloLedger/Resources/*.lproj/Localizable.strings` |
+> | Electron 侧文案 | JSON，每种语言 **1518 个叶子键**（六语等长） | `i18n/locales/{en,fr,ja,ko,zh-CN,zh-TW}.json` |
+> | 原生 SwiftUI 侧文案 | `.strings`，每种语言 **650 个键**（六语等长；绝对值由 `LegacyConversionCopyTests` / `ProductCopyTests` / `InventoryCopyTests` 三条棘轮钉住） | `native/SoloLedger/Sources/SoloLedger/Resources/*.lproj/Localizable.strings` |
 > | ⚠️ 两侧语言代码拼写**不同** | Electron 用 `zh-CN` / `zh-TW`；原生用 Apple 的 `zh-Hans` / `zh-Hant` | 同上 |
 >
 > **上表的键数是某一天的计数，不是契约。** 判断"六语是否齐备"请跑守卫，**不要引用这里的数字**：`npm run check:locale-matrix`、`npm run check:raw-keys`（脚本文件是 `scripts/check-raw-key-leaks.mjs`，**npm script 名不同**）、`npm run check:i18n-keys`、`npm run check:i18n-placeholders`、`npm run test:locale-ui`。前两个另有合并入口 `npm run check:locale`。
