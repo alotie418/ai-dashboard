@@ -44,12 +44,25 @@ cd App
 # Open in Xcode and press Run (⌘R):
 open SoloLedger.xcodeproj
 
-# Or from the command line — build / test / archive (Debug):
+# Or from the command line — build / test (Debug):
 xcodebuild -project SoloLedger.xcodeproj -scheme SoloLedger -configuration Debug -destination 'platform=macOS' build
 xcodebuild test    -project SoloLedger.xcodeproj -scheme SoloLedger -configuration Debug -destination 'platform=macOS'
-xcodebuild archive -project SoloLedger.xcodeproj -scheme SoloLedger -configuration Debug -destination 'generic/platform=macOS' -archivePath build/SoloLedger-Debug.xcarchive
+
+# Archive. The scheme's ArchiveAction is Release, so this needs no -configuration:
+xcodebuild archive -project SoloLedger.xcodeproj -scheme SoloLedger -destination 'generic/platform=macOS' -archivePath build/SoloLedger.xcarchive
 
 ```
+
+**Run and test stay on Debug on purpose.** Release carries the production bundle id
+`com.alotie418.sololedger`, so a sandboxed process built from it resolves `Application Support`
+into `~/Library/Containers/com.alotie418.sololedger` — the real container, shared with the
+Electron MAS line. Debug's `.dev` id lands in an isolated preview container. Do not "simplify"
+by passing `-configuration Release` to `xcodebuild test`: that points the app-hosted tests at
+live user data. `Tests/SoloLedgerCoreTests/SchemeConfigurationGuardTests.swift` pins both sides.
+
+The archive is **not submittable yet**: Release still signs ad-hoc (`CODE_SIGN_IDENTITY = "-"`,
+no team, no provisioning profile) and there is no `ExportOptions.plist`. Production signing and
+the export step are a separate round.
 
 ### Adding a file to an App target
 
