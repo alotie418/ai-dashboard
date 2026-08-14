@@ -192,6 +192,36 @@ jobs:
             -destination 'platform=macOS' \
             -derivedDataPath "$RUNNER_TEMP/SoloLedgerDerivedData" \
             -only-testing:SoloLedgerUnitTests
+      # 2c-6 / D10 —— Release 构型的编译门。
+      #
+      # 到这一步为止，仓里没有任何东西编译 Release：CI 两处都是 -configuration Debug，
+      # `swift test` 根本看不见 App 目标。而两个构型不是同一份代码 —— `#if DEBUG`
+      # 决定数据夹名、Powerbox 面板覆写与调试脚手架 —— 所以一个只在 Release 下才
+      # 报的编译错误可以在 main 里躺任意久，第一次现形是在归档上传那一刻，也就是
+      # 最不该发现它的地方。
+      #
+      # **只 build。不 test、不 archive、不启动。** Release 带的是生产 bundle id
+      # com.alotie418.sololedger，任何从它「运行」起来的东西都会把 Application Support
+      # 解析进与 Electron MAS 线共用的真实容器 —— 这正是 SchemeConfigurationGuardTests
+      # 在 scheme 那一侧钉住的同一条红线。编译不碰任何容器。
+      #
+      # CODE_SIGNING_ALLOWED=NO：2c-5 起 Release 用 `Apple Distribution` + 手动
+      # provisioning profile 签名，runner 两样都没有。分发身份只落 App 目标，所以这里
+      # 也没有别的东西需要证书。少了这一项，门会因为与代码无关的理由变红，而「修好它」
+      # 最省事的办法是把证书搬上 CI —— 那不是本轮想要的结果。
+      #
+      # 自带 derived data：这一步产出的 .app 带生产 bundle id，把它放在 Debug 两步用的
+      # 目录之外，后面就不可能有哪一步误把它当成测试宿主捡起来。
+      - name: Release-configuration compile gate (build only, unsigned)
+        run: |
+          xcodebuild \
+            -project native/SoloLedger/App/SoloLedger.xcodeproj \
+            -scheme SoloLedger \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/SoloLedgerReleaseDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
 
   # 真 Electron e2e（PR-1 #176 documents fs 分支 + PR-2 #177 attachment IPC）。
   # 仅 workflow_dispatch 手动触发：push/PR 一律不跑、永不作为 merge 门、不入 required checks。
