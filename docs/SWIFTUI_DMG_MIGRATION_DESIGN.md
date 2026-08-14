@@ -7,6 +7,8 @@
 >
 > **状态注记(2c-2 追加,同样不翻新正文):`App/project.yml` 已删除。** 本文正文对它的三处引用一律按下述改读,原文予以保留:①§前置核查的「App/project.yml 与 pbxproj」条与②文件影响清单里的 `App/project.yml` 行——所述 N7.0 事实不变,但该文件今天已不存在,新增文件改为手工登记 `project.pbxproj`;③§Sendable 分析里以 `project.yml` 的 `SWIFT_VERSION: 5.0` 作为「包处于 Swift 5 语言模式」的凭据——**该凭据改指 `project.pbxproj` 的两处 `SWIFT_VERSION = 5.0;`(工程级 Debug / Release 各一)**,结论不变。删除理由与替代守门见 `native/SoloLedger/Tests/SoloLedgerCoreTests/AppTargetRegistrationGuardTests.swift` 的文件头。
 >
+> **状态注记(2c-7 追加,同样不翻新正文):entitlements 的「不变」与「无 bookmark」现由守门钉住,不再只靠 grep。** 本文三处以人工 `grep` 或「已确认」记载 entitlements 现状(「修订记录(v3)」里的 **entitlements(未变)** 条、§0.2 已决约束第 2 条的不新增 bookmark、文件影响清单里 `SoloLedger.entitlements` / `SoloLedger-Debug.entitlements` 的「不改」行)——所述事实**至今仍成立且未变**,原文予以保留;变的是核验方式:`native/SoloLedger/Tests/SoloLedgerCoreTests/EntitlementsClosedSetGuardTests.swift` 把两个文件钉成闭集(Release 恰两键、Debug 恰 Release + `get-task-allow`、共同键值相等)并钉住 pbxproj 两处接线,所以再加任何一个 key(含 `bookmarks.app-scope`)会直接变红。**R9 不受影响**:该行说的是沙箱**运行时**行为无 headless 覆盖,静态读文件给不了它覆盖,仍需第 10 节的手动签名沙箱门。
+>
 > 依据:初始调查基于 `main`(`7d7101c`,已含 C12x-A2)生产代码的**只读**核查(启动状态机、open-plan/active-slot 守卫、`runImport` 管线、`MigrationSource`/预检/安全边界、UI/i18n/entitlements、测试与 fixture);**v3 已针对 `main = 1c12fbb`(含 N7.0)逐点重新核对关键设计支点**(见 v3 修订记录),而非机械替换 hash。关联:`SWIFTUI_MIGRATION_PLAN.md` §0.2 / §0.3、`SWIFTUI_FEATURE_GAP.md` 第 4 节的 DMG P0。
 
 ---

@@ -168,6 +168,21 @@ swift test      # SoloLedgerCore 的 XCTest 套件：schema / seed / CRUD / CSV 
   diverge silently — see `docs/SWIFTUI_FEATURE_GAP.md` for the three measured facts.
 - **No AI, no API key, no OCR, no network, no StoreKit, no paid unlock.** Entitlements
   are only App Sandbox + user-selected file read/write (Debug also has get-task-allow
-  for the debugger / UI-test runner).
+  for the debugger / UI-test runner). Since 2c-7 the **sandbox entitlement posture** is
+  pinned as a closed set by `Tests/SoloLedgerCoreTests/EntitlementsClosedSetGuardTests.swift`
+  — Release is exactly those two keys, Debug is exactly Release plus `get-task-allow`,
+  values compared too, plus which file each configuration signs against and a refusal of
+  condition-qualified overrides. **Read what that proves:**
+  - **"No network" is anchored by it.** Under App Sandbox an outbound connection needs
+    `com.apple.security.network.client`; without that key the sandboxed build cannot reach
+    the network whatever the code attempts. This is the half the export-compliance answer
+    may cite.
+  - **"No AI / no OCR / no StoreKit" is not.** A bundled local model, on-device Vision text
+    recognition and StoreKit purchases all need no extra entitlement, so that guard would
+    stay green through any of them. Their oracle is the source. Measured: the native sources
+    import only AppKit, CSQLite, Charts, CryptoKit, Foundation, OSLog, SoloLedgerCore,
+    SwiftUI and UniformTypeIdentifiers, with zero hits for `URLSession` / `Network` /
+    `Vision` / `CoreML` / `StoreKit` — but **no check pins that**, and saying so is the point
+    of this bullet.
 - Reports, tax, COGS, and other accounting-policy logic are deliberately **out of
   scope** — the native app must mirror, never reinvent, that logic.
