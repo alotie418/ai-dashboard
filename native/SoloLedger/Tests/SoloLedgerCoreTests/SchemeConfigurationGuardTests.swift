@@ -15,19 +15,27 @@ import XCTest
 /// Release on every pull request (build only, unsigned — see ``ReleaseCompileGateGuardTests``).
 /// It still archives nothing, which is why the configuration itself has to be pinned here.
 ///
-/// `TestAction` and `LaunchAction` stay **Debug**, and that is a data-safety constraint rather
-/// than an oversight left behind. The Release configuration's bundle id is the production one,
-/// so a sandboxed process launched or tested under it resolves
+/// `TestAction`, `LaunchAction` and `ProfileAction` stay **Debug**, and that is a data-safety
+/// constraint rather than an oversight left behind. The Release configuration's bundle id is the
+/// production one, so a sandboxed process launched, tested or profiled under it resolves
 /// `Application Support` into `~/Library/Containers/com.alotie418.sololedger` — the real
 /// container, shared with the Electron MAS line and measured to exist on the maintainer's
 /// machine. Debug's `.dev` bundle id lands in an isolated preview container instead. Running
 /// the app-hosted tests under Release would point them at live user data; the split is the
 /// protection, so this file pins BOTH sides. Raising the archive configuration without holding
-/// the other two down would trade one defect for a worse one.
+/// the others down would trade one defect for a worse one.
 ///
-/// `ProfileAction` is left as it is (already Release) and `AnalyzeAction` likewise (Debug):
-/// neither produces a shippable artifact nor opens a store container, so neither is pinned —
-/// stated so a future reader does not mistake the omission for an oversight.
+/// **`ProfileAction` was Release until 2c-7b** — Xcode's own default, not something this
+/// repository chose, and 2c-4 recorded it as undecided rather than pinning a value it had no
+/// ruling for. It is the same hazard: Product ▸ Profile (⌘I) LAUNCHES the app, so under Release it
+/// launched with the production bundle id straight into the real container. Instruments profiles
+/// whatever it is given, so there is nothing it can measure under Release that Debug cannot also
+/// be pointed at — and where an optimised build genuinely is the subject, that is the Core
+/// package, which profiles through `swift test -c release` without an app bundle at all. Pinned
+/// Debug alongside Test and Launch for exactly their reason.
+///
+/// `AnalyzeAction` remains unpinned (Debug): the static analyser builds but launches nothing and
+/// opens no container. Stated so a future reader does not mistake the omission for an oversight.
 ///
 /// ## Why the scheme FILE list is part of the guard
 ///
@@ -50,7 +58,12 @@ final class SchemeConfigurationGuardTests: XCTestCase {
         "Archive": "Release",   // a Debug archive is unsubmittable: .dev id + get-task-allow
         "Test": "Debug",        // Release would run app-hosted tests in the production container
         "Launch": "Debug",      // …same container hazard for Product ▸ Run
+        "Profile": "Debug",     // …and for Product ▸ Profile, which launches the app too (2c-7b)
     ]
+
+    /// The actions that make Xcode LAUNCH a process built from the configuration. These are the
+    /// ones the container hazard applies to, and the ones test (b) holds down.
+    static let actionsThatLaunchTheApp = ["Test", "Launch", "Profile"]
 
     // MARK: - Reading the scheme
 
@@ -124,27 +137,41 @@ final class SchemeConfigurationGuardTests: XCTestCase {
             """)
     }
 
-    /// (b) The trade this round must not make. Promoting run or test to Release would "fix"
-    /// archiving in the worst possible way.
-    func testRunningAndTestingStayOnDebug() throws {
+    /// (b) The trade this round must not make. Promoting run, test or profile to Release would
+    /// "fix" archiving in the worst possible way.
+    ///
+    /// All three are asserted here rather than split up: they fail for one and the same reason —
+    /// a process launched from the Release configuration opens the production container — so a
+    /// reader who fixes one has to see the other two. The message names the offending action, so
+    /// the failure still says which of them broke and how each one gets there.
+    func testEverythingThatLaunchesTheAppStaysOnDebug() throws {
         let actions = try requireActions()
-        for action in ["Test", "Launch"] {
+        for action in Self.actionsThatLaunchTheApp {
+            let entryPoint: String
+            switch action {
+            case "Test": entryPoint = "the app-hosted tests (⌘U) would run"
+            case "Launch": entryPoint = "Product ▸ Run (⌘R) would launch"
+            default: entryPoint = "Product ▸ Profile (⌘I) would launch Instruments against"
+            }
             XCTAssertEqual(actions[action], Self.pinnedConfigurations[action], """
-                \(action)Action builds \(actions[action] ?? "nothing") but must build Debug. \
-                Release resolves Application Support into the PRODUCTION container \
-                (com.alotie418.sololedger, shared with the Electron line and holding real user \
-                data). Debug's .dev bundle id keeps run/test in an isolated preview container. \
-                This is a data-safety constraint, not a leftover default.
+                \(action)Action builds \(actions[action] ?? "nothing") but must build Debug, so \
+                \(entryPoint) the production bundle id. Release resolves Application Support into \
+                the PRODUCTION container (com.alotie418.sololedger, shared with the Electron line \
+                and holding real user data). Debug's .dev bundle id keeps all three in an isolated \
+                preview container. This is a data-safety constraint, not a leftover default.
                 """)
         }
     }
 
-    /// The two unpinned actions, recorded rather than asserted-away: if a later round wants to
-    /// change either, this is where it should notice that nothing was holding it.
+    /// The remaining unpinned action, recorded rather than asserted-away: if a later round wants
+    /// to change it, this is where it should notice that nothing was holding it.
+    ///
+    /// It was two until 2c-7b; `Profile` moved into the pinned set, which is what this assertion
+    /// existed to make happen. `Analyze` stays out because the analyser launches nothing.
     func testTheUnpinnedActionsAreTheOnesThisRoundDeliberatelyLeftAlone() throws {
         let actions = Self.actionConfigurations(in: try Self.schemeText("SoloLedger.xcscheme"))
         let unpinned = Set(actions.keys).subtracting(Self.pinnedConfigurations.keys)
-        XCTAssertEqual(unpinned.sorted(), ["Analyze", "Profile"], """
+        XCTAssertEqual(unpinned.sorted(), ["Analyze"], """
             the scheme has an action this guard neither pins nor knows about: \
             \(unpinned.sorted()). Every action that builds something deserves a decision \
             about which configuration it builds.
@@ -173,7 +200,7 @@ final class SchemeConfigurationGuardTests: XCTestCase {
     // MARK: - Reverse proof: each defect shape, on synthetic text
 
     static func fixture(archive: String = "Release", test: String = "Debug",
-                        launch: String = "Debug") -> String {
+                        launch: String = "Debug", profile: String = "Debug") -> String {
         """
         <?xml version="1.0" encoding="UTF-8"?>
         <Scheme LastUpgradeVersion = "1430" version = "1.7">
@@ -190,7 +217,7 @@ final class SchemeConfigurationGuardTests: XCTestCase {
               launchStyle = "0">
            </LaunchAction>
            <ProfileAction
-              buildConfiguration = "Release"
+              buildConfiguration = "\(profile)"
               shouldUseLaunchSchemeArgsEnv = "YES">
            </ProfileAction>
            <AnalyzeAction
@@ -221,17 +248,42 @@ final class SchemeConfigurationGuardTests: XCTestCase {
         // …and only that one moved.
         XCTAssertEqual(actions["Test"], "Debug")
         XCTAssertEqual(actions["Launch"], "Debug")
+        XCTAssertEqual(actions["Profile"], "Debug")
     }
 
-    /// (b) The trade this round must not make: fixing archiving by promoting run/test.
-    func testATestOrLaunchActionPromotedToReleaseIsReported() {
+    /// (b) The trade this round must not make: fixing archiving by promoting run/test/profile.
+    /// Each of the three is shown separately, and each leaves the other two — and archiving —
+    /// intact, so a failure can only be read as "this action moved".
+    func testATestLaunchOrProfileActionPromotedToReleaseIsReported() {
         let promotedTest = Self.actionConfigurations(in: Self.fixture(test: "Release"))
         XCTAssertNotEqual(promotedTest["Test"], Self.pinnedConfigurations["Test"],
                           "app-hosted tests under Release would run in the production container")
         XCTAssertEqual(promotedTest["Archive"], "Release", "…while archiving stayed correct")
+        XCTAssertEqual(promotedTest["Launch"], "Debug")
+        XCTAssertEqual(promotedTest["Profile"], "Debug")
 
         let promotedLaunch = Self.actionConfigurations(in: Self.fixture(launch: "Release"))
         XCTAssertNotEqual(promotedLaunch["Launch"], Self.pinnedConfigurations["Launch"])
+        XCTAssertEqual(promotedLaunch["Test"], "Debug")
+        XCTAssertEqual(promotedLaunch["Profile"], "Debug")
+    }
+
+    /// (b′) 2c-7b's own defect shape: the value the scheme actually carried until this round.
+    /// Kept as its own test because it is the one an existing project reproduces by default —
+    /// Xcode writes `ProfileAction buildConfiguration = "Release"` into every new scheme, so this
+    /// is what a regenerated or hand-copied scheme will come back as.
+    func testAProfileActionBackOnReleaseIsReported() {
+        let actions = Self.actionConfigurations(in: Self.fixture(profile: "Release"))
+        XCTAssertEqual(actions["Profile"], "Release")
+        XCTAssertNotEqual(actions["Profile"], Self.pinnedConfigurations["Profile"], """
+            ⌘I under Release launches the app with the production bundle id, into the container \
+            the Electron MAS line's real data lives in — Instruments profiles whatever it is \
+            given, so there is nothing here Debug cannot measure.
+            """)
+        // …and it is distinguishable from the other two launching actions breaking.
+        XCTAssertEqual(actions["Test"], "Debug")
+        XCTAssertEqual(actions["Launch"], "Debug")
+        XCTAssertEqual(actions["Archive"], "Release")
     }
 
     /// (c) A second shared scheme is what the file-set assertion is for. Proven on the pure
