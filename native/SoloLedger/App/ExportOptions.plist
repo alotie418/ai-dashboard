@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Export options for the Mac App Store package (2c-5).
+
+     THIS FILE IS A TEMPLATE AND IS NEVER PASSED TO xcodebuild AS-IS.
+     `teamID` holds the placeholder __TEAM_ID__; `scripts/archive-mas.sh` renders a copy into a
+     temporary directory with the real value substituted from the environment, and passes THAT
+     copy to -exportArchive. The Team ID is deliberately absent from this repository — see the
+     script's header and docs/MAS_SUBMISSION.md's rule about credentials never being committed.
+
+     Signing is manual and matches the app target's Release configuration in project.pbxproj:
+     `CODE_SIGN_IDENTITY = "Apple Distribution"` and
+     `PROVISIONING_PROFILE_SPECIFIER = "SoloLedger MAS 1.0.1"`. Those two names are not secrets;
+     the Team ID is the only value held out.
+
+     NOT YET EXERCISED. No archive or export has been run against this file — that is a separate,
+     separately-authorised round. In particular `method` has not been validated against the
+     installed Xcode: `app-store-connect` is the current spelling, and older toolchains want
+     `app-store`. If the first real export rejects it, that is the line to change. -->
+<plist version="1.0">
+<dict>
+  <key>method</key>
+  <string>app-store-connect</string>
+
+  <key>teamID</key>
+  <string>__TEAM_ID__</string>
+
+  <key>signingStyle</key>
+  <string>manual</string>
+
+  <key>signingCertificate</key>
+  <string>Apple Distribution</string>
+
+  <key>provisioningProfiles</key>
+  <dict>
+    <key>com.alotie418.sololedger</key>
+    <string>SoloLedger MAS 1.0.1</string>
+  </dict>
+
+  <!-- macOS App Store packages carry no bitcode and this app ships no dSYM-bearing
+       third-party frameworks; both are stated rather than omitted so a later reader knows
+       they were considered. -->
+  <key>uploadSymbols</key>
+  <false/>
+</dict>
+</plist>

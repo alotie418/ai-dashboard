@@ -68,7 +68,7 @@ Thank you.
 | **Apple Distribution** 证书 | 用于签名 `.app`；安装进登录钥匙串 |
 | **Mac Installer Distribution** 证书 | 用于签名 `.pkg`；安装进登录钥匙串 |
 | `build/embedded.provisionprofile` | App ID `com.alotie418.sololedger` 的 Mac App Store provisioning profile，放到该仓库相对路径（不提交入库） |
-| Team ID `6Z4W7D8JSU` | 已写入 `build/entitlements.mas.plist`，无需处理 |
+| Team ID | **不入库**。`build/entitlements.mas.plist` 里是占位符 `TEAM_ID`；真值在开发者门户 Membership 页查得，构建时经环境变量注入（原生线见 `native/SoloLedger/scripts/archive-mas.sh`）。2c-5 起由守门钉住：任何被跟踪文件重新携带真实 ID 即变红 |
 
 准备好后运行：
 

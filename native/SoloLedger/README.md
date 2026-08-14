@@ -48,10 +48,32 @@ open SoloLedger.xcodeproj
 xcodebuild -project SoloLedger.xcodeproj -scheme SoloLedger -configuration Debug -destination 'platform=macOS' build
 xcodebuild test    -project SoloLedger.xcodeproj -scheme SoloLedger -configuration Debug -destination 'platform=macOS'
 
-# Archive. The scheme's ArchiveAction is Release, so this needs no -configuration:
-xcodebuild archive -project SoloLedger.xcodeproj -scheme SoloLedger -destination 'generic/platform=macOS' -archivePath build/SoloLedger.xcarchive
-
 ```
+
+### Archiving for the Mac App Store
+
+Use the script, not `xcodebuild archive` by hand and not Xcode's Product ▸ Archive:
+
+```bash
+SOLOLEDGER_TEAM_ID=XXXXXXXXXX scripts/archive-mas.sh            # archive + export a .pkg
+SOLOLEDGER_TEAM_ID=XXXXXXXXXX scripts/archive-mas.sh --dry-run  # validate and print, build nothing
+```
+
+**The Apple Team ID is deliberately not in this repository.** Release signs manually
+(`CODE_SIGN_IDENTITY = "Apple Distribution"`, `PROVISIONING_PROFILE_SPECIFIER =
+"SoloLedger MAS 1.0.1"` — names, not secrets, both committed), and the Team ID is injected from
+`SOLOLEDGER_TEAM_ID` at build time. Find it on the Membership page of developer.apple.com. Xcode's
+Archive button has nowhere to supply it and will fail to resolve the profile; that is expected.
+`App/ExportOptions.plist` is a **template** carrying `__TEAM_ID__`; the script renders a copy into
+a private temporary directory and passes that to `-exportArchive`.
+
+`Tests/SoloLedgerCoreTests/SigningConfigurationGuardTests.swift` holds all of this: the three
+Release signing settings, that `DEVELOPMENT_TEAM` stays out of `project.pbxproj`, that the
+distribution identity reaches only the app target (project-level would make every Release build of
+the test bundles need a certificate), and that **no tracked file carries a Team-ID-shaped token**.
+
+The script uploads nothing — use Transporter.app. **No archive has been produced yet**: running it
+for real needs the certificates and the provisioning profile, and is a separately authorised step.
 
 **Run and test stay on Debug on purpose.** Release carries the production bundle id
 `com.alotie418.sololedger`, so a sandboxed process built from it resolves `Application Support`
@@ -60,9 +82,8 @@ Electron MAS line. Debug's `.dev` id lands in an isolated preview container. Do 
 by passing `-configuration Release` to `xcodebuild test`: that points the app-hosted tests at
 live user data. `Tests/SoloLedgerCoreTests/SchemeConfigurationGuardTests.swift` pins both sides.
 
-The archive is **not submittable yet**: Release still signs ad-hoc (`CODE_SIGN_IDENTITY = "-"`,
-no team, no provisioning profile) and there is no `ExportOptions.plist`. Production signing and
-the export step are a separate round.
+Debug still signs ad-hoc (`CODE_SIGN_IDENTITY = "-"`), so building and testing needs no
+certificates at all — only archiving does.
 
 ### Adding a file to an App target
 
