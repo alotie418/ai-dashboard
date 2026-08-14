@@ -89,11 +89,20 @@ live user data. `Tests/SoloLedgerCoreTests/SchemeConfigurationGuardTests.swift` 
 
 **Product ▸ Profile (⌘I) builds Debug** (since 2c-7b; it was Release, which is Xcode's default
 for new schemes and not a choice this repository made). ⌘I *launches* the app, so under Release
-it opened the production container for exactly the reason ⌘R and ⌘U would. Instruments profiles
-whatever it is handed, so the Debug binary is not a limitation — it is the same app.
+it opened the production container for exactly the reason ⌘R and ⌘U would.
 
-When an **optimised** build genuinely is the subject, that is the Core package, and it profiles
-without an app bundle at all:
+**What that costs, stated plainly.** Debug is `-Onone` with `SWIFT_ACTIVE_COMPILATION_CONDITIONS
+= DEBUG`; Release is `-O` with whole-module optimisation. The binary ⌘I now profiles is therefore
+**not** the one users get, and App-layer measurements taken from it — launch time, SwiftUI
+rendering — do not reproduce release performance. **There is currently no optimised-build
+profiling path for the App layer.** 2c-7b deliberately did not add one: a third configuration
+would have to gain a member in every closed set this chapter pins (scheme actions, entitlements
+wiring, version pins, signing scope, the CI compile gate), and there is no measured need yet.
+Registered as not done, a candidate after 2c.
+
+The Core package *does* profile optimised, without an app bundle — but it covers **only**
+`SoloLedgerCore`. `Package.swift` leaves `Sources/SoloLedger/**` out of every SwiftPM target, so
+this is not a substitute for App-layer work:
 
 ```bash
 # From the repo root. Measured: works as-is — SwiftPM builds release test bundles with

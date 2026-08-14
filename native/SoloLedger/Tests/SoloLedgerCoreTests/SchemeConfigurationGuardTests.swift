@@ -28,11 +28,18 @@ import XCTest
 /// **`ProfileAction` was Release until 2c-7b** — Xcode's own default, not something this
 /// repository chose, and 2c-4 recorded it as undecided rather than pinning a value it had no
 /// ruling for. It is the same hazard: Product ▸ Profile (⌘I) LAUNCHES the app, so under Release it
-/// launched with the production bundle id straight into the real container. Instruments profiles
-/// whatever it is given, so there is nothing it can measure under Release that Debug cannot also
-/// be pointed at — and where an optimised build genuinely is the subject, that is the Core
-/// package, which profiles through `swift test -c release` without an app bundle at all. Pinned
-/// Debug alongside Test and Launch for exactly their reason.
+/// launched with the production bundle id straight into the real container. Pinned Debug
+/// alongside Test and Launch for exactly their reason.
+///
+/// **This is a real trade, not a free one.** Debug is `-Onone` with the `DEBUG` compilation
+/// condition; Release is `-O` whole-module. So ⌘I no longer profiles the binary users get, and
+/// App-layer numbers taken from it do not reproduce release performance — **there is currently no
+/// optimised-build profiling path for the App layer at all**. Adding a third configuration that
+/// inherits Release optimisation while keeping the `.dev` bundle id was considered and deliberately
+/// not done: it would need a new member in every closed set this packaging chapter pins — this
+/// file's actions, ``AppVersionGuardTests``' version pins, ``SigningConfigurationGuardTests``'
+/// identity scope, ``ReleaseCompileGateGuardTests``' CI gate, and the entitlements wiring — with
+/// no measured need. Registered here as not done rather than papered over.
 ///
 /// `AnalyzeAction` remains unpinned (Debug): the static analyser builds but launches nothing and
 /// opens no container. Stated so a future reader does not mistake the omission for an oversight.
