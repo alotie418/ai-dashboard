@@ -48,6 +48,9 @@ open SoloLedger.xcodeproj
 xcodebuild -project SoloLedger.xcodeproj -scheme SoloLedger -configuration Debug -destination 'platform=macOS' build
 xcodebuild test    -project SoloLedger.xcodeproj -scheme SoloLedger -configuration Debug -destination 'platform=macOS'
 
+# Compile Release, unsigned — exactly what the CI gate does. BUILD ONLY: never append `test`
+# or `archive` to this, see "Run and test stay on Debug on purpose" below.
+xcodebuild -project SoloLedger.xcodeproj -scheme SoloLedger -configuration Release -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO build
 ```
 
 ### Archiving for the Mac App Store
@@ -111,7 +114,11 @@ project against itself (group children ↔ Sources phases, and all four lines pe
 runs in `swift test`, inside the required `Guards + migrations + build` check.
 
 - **Debug** builds as Bundle ID `com.alotie418.sololedger.dev`; **Release** as
-  `com.alotie418.sololedger`. Only Debug is built for now — no production signing.
+  `com.alotie418.sololedger`. CI compiles both: Debug is built and unit-tested, and since 2c-6
+  Release is compiled unsigned (`CODE_SIGNING_ALLOWED=NO`) by a build-only gate in the same
+  `native-app` job — it never tests, runs or archives. Nothing is signed anywhere in CI;
+  production signing happens only in `scripts/archive-mas.sh`. Pinned by
+  `Tests/SoloLedgerCoreTests/ReleaseCompileGateGuardTests.swift`.
 - The built app supports two headless smoke flags (used by CI / regression guards):
   `SoloLedger.app/Contents/MacOS/SoloLedger --self-test` (data-layer end-to-end) and
   `--check-resources` (packaged localization loads).

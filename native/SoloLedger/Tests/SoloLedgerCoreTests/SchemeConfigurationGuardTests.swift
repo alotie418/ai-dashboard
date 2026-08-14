@@ -10,7 +10,10 @@ import XCTest
 /// `com.alotie418.sololedger.dev` bundle id and its `com.apple.security.get-task-allow`
 /// entitlement. `get-task-allow` lets a debugger attach; App Store submissions carrying it are
 /// rejected, and the bundle id is not the one the store record is for. Archiving was therefore
-/// guaranteed to produce something unsubmittable — silently, because nothing builds Release.
+/// guaranteed to produce something unsubmittable — silently, because at the time nothing in this
+/// repository built Release at all. 2c-6 closed that half: the `native-app` job now compiles
+/// Release on every pull request (build only, unsigned — see ``ReleaseCompileGateGuardTests``).
+/// It still archives nothing, which is why the configuration itself has to be pinned here.
 ///
 /// `TestAction` and `LaunchAction` stay **Debug**, and that is a data-safety constraint rather
 /// than an oversight left behind. The Release configuration's bundle id is the production one,
@@ -116,8 +119,8 @@ final class SchemeConfigurationGuardTests: XCTestCase {
         XCTAssertEqual(actions["Archive"], Self.pinnedConfigurations["Archive"], """
             ArchiveAction builds \(actions["Archive"] ?? "nothing") but must build Release. A \
             Debug archive carries the .dev bundle id and get-task-allow, so App Store \
-            submission rejects it — and nothing else in this repository builds Release, so the \
-            mistake would surface only at upload.
+            submission rejects it. CI compiles Release (2c-6) but archives nothing, so this \
+            particular mistake still surfaces for the first time at upload.
             """)
     }
 
