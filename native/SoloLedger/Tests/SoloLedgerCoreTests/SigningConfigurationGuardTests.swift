@@ -273,6 +273,57 @@ final class SigningConfigurationGuardTests: XCTestCase {
         XCTAssertTrue(files.contains("native/SoloLedger/App/ExportOptions.plist"))
     }
 
+    // MARK: - The archive script's two hard-won properties
+
+    static func archiveScript() throws -> String {
+        let repoRoot = AppTargetRegistrationGuardTests.packageRoot()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        return try String(
+            contentsOf: repoRoot.appendingPathComponent("native/SoloLedger/scripts/archive-mas.sh"),
+            encoding: .utf8)
+    }
+
+    /// The Team ID must not travel as an `xcodebuild` command-line build setting: xcodebuild
+    /// echoes those back in its "Build settings from command line:" preamble, which would put
+    /// the value into every build log — the one place `docs/MAS_SUBMISSION.md` explicitly says
+    /// it must never appear. It goes through an xcconfig instead.
+    func testTheArchiveScriptNeverPutsTheTeamIDOnACommandLine() throws {
+        let script = try Self.archiveScript()
+        let code = script.split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("#") }
+            .joined(separator: "\n")
+
+        XCTAssertFalse(code.contains("DEVELOPMENT_TEAM=$"), """
+            archive-mas.sh passes DEVELOPMENT_TEAM as a command-line build setting again. \
+            xcodebuild reproduces command-line settings in its output, so the Team ID would be \
+            written into every archive log.
+            """)
+        XCTAssertTrue(code.contains("XCODE_XCCONFIG_FILE"),
+                      "the xcconfig injection is how the value stays out of the command line")
+        XCTAssertTrue(code.contains("umask 077"),
+                      "the file holding the Team ID must not be world-readable")
+    }
+
+    /// Putting the profile at `build/embedded.provisionprofile` — what every prerequisite list
+    /// in this repository tells you to do — is NOT enough for `xcodebuild`, which resolves
+    /// `PROVISIONING_PROFILE_SPECIFIER` by name out of Xcode's own directories. The script has
+    /// to say so up front instead of failing deep inside the build.
+    func testTheArchiveScriptRefusesWhenTheProfileIsNotInstalled() throws {
+        let script = try Self.archiveScript()
+        XCTAssertTrue(script.contains("installed_profile_path"),
+                      "the preflight that looks for an installed profile is gone")
+        XCTAssertTrue(script.contains("--install-profile"),
+                      "the script must offer a way to install the profile it demands")
+        XCTAssertTrue(script.contains(Self.expectedProfile), """
+            the script no longer names \(Self.expectedProfile); it must look for the same profile \
+            the project's PROVISIONING_PROFILE_SPECIFIER asks for.
+            """)
+        XCTAssertTrue(script.contains("build/embedded.provisionprofile"), """
+            the script must point at the documented prerequisite path, or the error message \
+            leaves the maintainer guessing where the file they were told to download went.
+            """)
+    }
+
     // MARK: - The export template stays a template
 
     func testTheExportOptionsTemplateStillCarriesItsPlaceholder() throws {

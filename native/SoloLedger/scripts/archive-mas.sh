@@ -22,10 +22,16 @@
 #
 # USAGE
 #
-#   SOLOLEDGER_TEAM_ID=XXXXXXXXXX native/SoloLedger/scripts/archive-mas.sh [--dry-run] [--output DIR]
+#   native/SoloLedger/scripts/archive-mas.sh --install-profile        # once per machine
+#   SOLOLEDGER_TEAM_ID=XXXXXXXXXX native/SoloLedger/scripts/archive-mas.sh [--dry-run]
 #
-#   --dry-run   validate inputs, render the export options, print the commands, run nothing
-#   --output    where the .xcarchive and the exported package go (default: a fresh temp dir)
+#   --dry-run         validate inputs, render the export options, print the commands, build nothing
+#   --install-profile install build/embedded.provisionprofile into Xcode's profile directory
+#   --output DIR      where the .xcarchive and the exported package go (default: a fresh temp dir)
+#
+# The profile must be INSTALLED, not merely present at build/embedded.provisionprofile: that path
+# is what electron-builder reads, while xcodebuild resolves the profile by NAME out of Xcode's own
+# directories. The script checks and refuses rather than failing later inside xcodebuild.
 #
 # The Team ID is never printed, not even in --dry-run: the rendered options file is written
 # with 600 permissions into a temporary directory and removed on exit.
@@ -34,12 +40,30 @@ set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly PACKAGE_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+readonly REPO_ROOT="$(cd -- "${PACKAGE_DIR}/../.." && pwd)"
 readonly PROJECT="${PACKAGE_DIR}/App/SoloLedger.xcodeproj"
 readonly EXPORT_TEMPLATE="${PACKAGE_DIR}/App/ExportOptions.plist"
 readonly SCHEME="SoloLedger"
 readonly TEAM_ID_PLACEHOLDER="__TEAM_ID__"
+readonly PROFILE_NAME="SoloLedger MAS 1.0.1"
+readonly REPO_PROFILE="${REPO_ROOT}/build/embedded.provisionprofile"
+
+# Where Xcode looks for manually-installed profiles. `PROVISIONING_PROFILE_SPECIFIER` resolves
+# by NAME against these directories — never against a path inside the repository, which is the
+# one place the project's own prerequisites tell you to put the file.
+# `SOLOLEDGER_PROFILE_DIR` overrides the install destination; it exists so the install path can
+# be exercised without writing into a real Xcode data directory.
+readonly INSTALL_DIR="${SOLOLEDGER_PROFILE_DIR:-${HOME}/Library/Developer/Xcode/UserData/Provisioning Profiles}"
+# The install destination is also the first place searched, so the override moves BOTH halves —
+# a seam that redirected only the write would leave the check looking at the real directory and
+# report "not installed" right after installing.
+readonly PROFILE_DIRS=(
+  "${INSTALL_DIR}"
+  "${HOME}/Library/MobileDevice/Provisioning Profiles"
+)
 
 DRY_RUN=0
+INSTALL_PROFILE=0
 OUTPUT_DIR=""
 
 die() { printf 'archive-mas: %s\n' "$*" >&2; exit 1; }
@@ -50,12 +74,59 @@ usage() {
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --dry-run) DRY_RUN=1; shift ;;
+    --dry-run)         DRY_RUN=1; shift ;;
+    --install-profile) INSTALL_PROFILE=1; shift ;;
     --output)  [ $# -ge 2 ] || die "--output needs a directory"; OUTPUT_DIR="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown argument: $1 (try --help)" ;;
   esac
 done
+
+# ── The provisioning profile has to be INSTALLED, not merely present in the repo ──────────────
+#
+# `build/embedded.provisionprofile` is where every prerequisite list in this repository tells you
+# to put the profile — because that is the path electron-builder reads. `xcodebuild` does not:
+# manual signing resolves `PROVISIONING_PROFILE_SPECIFIER` by name against Xcode's own profile
+# directories. Following the documented prerequisite and then archiving therefore used to fail
+# deep inside xcodebuild with an unhelpful message. Detect it up front instead.
+
+profile_name_of() {  # $1 = path to a .provisionprofile
+  security cms -D -i "$1" 2>/dev/null | plutil -extract Name raw - 2>/dev/null
+}
+
+installed_profile_path() {
+  local dir file
+  for dir in "${PROFILE_DIRS[@]}"; do
+    [ -d "${dir}" ] || continue
+    for file in "${dir}"/*.provisionprofile "${dir}"/*.mobileprovision; do
+      [ -f "${file}" ] || continue
+      if [ "$(profile_name_of "${file}")" = "${PROFILE_NAME}" ]; then printf '%s' "${file}"; return 0; fi
+    done
+  done
+  return 1
+}
+
+if [ "${INSTALL_PROFILE}" -eq 1 ]; then
+  [ -f "${REPO_PROFILE}" ] || die "--install-profile needs ${REPO_PROFILE}, which is not there.
+  Download the Mac App Store provisioning profile for com.alotie418.sololedger from the developer
+  portal and save it to that path (it is gitignored and must never be committed)."
+  uuid="$(security cms -D -i "${REPO_PROFILE}" 2>/dev/null | plutil -extract UUID raw - 2>/dev/null)" \
+    || die "cannot decode ${REPO_PROFILE}"
+  [ -n "${uuid}" ] || die "cannot read a UUID out of ${REPO_PROFILE}"
+  name="$(profile_name_of "${REPO_PROFILE}")"
+  [ "${name}" = "${PROFILE_NAME}" ] \
+    || die "${REPO_PROFILE} is named \"${name}\", but the project asks for \"${PROFILE_NAME}\".
+  Either install the right profile or update PROVISIONING_PROFILE_SPECIFIER in project.pbxproj
+  (a guard test pins that name, so it fails until both agree)."
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    printf 'archive-mas: DRY RUN — would install %s into %s/%s.provisionprofile\n' \
+      "${REPO_PROFILE}" "${INSTALL_DIR}" "${uuid}"
+  else
+    mkdir -p "${INSTALL_DIR}"
+    cp "${REPO_PROFILE}" "${INSTALL_DIR}/${uuid}.provisionprofile"
+    printf 'archive-mas: installed "%s" into %s\n' "${PROFILE_NAME}" "${INSTALL_DIR}"
+  fi
+fi
 
 # ── Fail closed on every prerequisite, with a message that says what to do ────────────────────
 
@@ -83,6 +154,19 @@ if [ -z "${DEVELOPER_DIR:-}" ] && ! xcode-select -p 2>/dev/null | grep -q 'Xcode
   die "xcode-select points at the Command Line Tools, which cannot archive.
   Re-run with: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer $0"
 fi
+
+if ! INSTALLED_PROFILE="$(installed_profile_path)"; then
+  die "no installed provisioning profile is named \"${PROFILE_NAME}\".
+  The project signs manually and resolves the profile BY NAME from Xcode's profile directories:
+      ${PROFILE_DIRS[0]}
+      ${PROFILE_DIRS[1]}
+  Putting the file at build/embedded.provisionprofile is not enough — that path is where
+  electron-builder reads it, not xcodebuild. Install it once with:
+      $0 --install-profile
+  (or double-click the .provisionprofile in Finder), then re-run."
+fi
+readonly INSTALLED_PROFILE
+printf 'archive-mas: profile      "%s" (installed)\n' "${PROFILE_NAME}"
 
 TMP_ROOT="${TMPDIR:-/tmp}"
 TMP_ROOT="${TMP_ROOT%/}"
@@ -133,13 +217,24 @@ printf 'archive-mas: team id      <supplied from SOLOLEDGER_TEAM_ID, not printed
 
 # ── The two commands ─────────────────────────────────────────────────────────────────────────
 
+# The Team ID goes in through an xcconfig, NOT `DEVELOPMENT_TEAM=…` on the command line.
+# xcodebuild echoes command-line build settings back in its "Build settings from command line:"
+# preamble, which would put the value into every build log — the exact thing
+# docs/MAS_SUBMISSION.md forbids, and something --dry-run redaction cannot help with because it
+# happens during the real run. `XCODE_XCCONFIG_FILE` is applied as a global xcconfig and its
+# contents are not reproduced in normal output.
+#
+# NOT YET OBSERVED against a real archive — no archive has been run. If a future log does show
+# the value, this is the line to revisit.
+readonly TEAM_XCCONFIG="${RENDERED_DIR}/team.xcconfig"
+(umask 077; printf 'DEVELOPMENT_TEAM = %s\n' "${SOLOLEDGER_TEAM_ID}" > "${TEAM_XCCONFIG}")
+
 archive_cmd=(
   xcodebuild archive
   -project "${PROJECT}"
   -scheme "${SCHEME}"
   -destination 'generic/platform=macOS'
   -archivePath "${ARCHIVE_PATH}"
-  "DEVELOPMENT_TEAM=${SOLOLEDGER_TEAM_ID}"
 )
 export_cmd=(
   xcodebuild -exportArchive
@@ -148,14 +243,18 @@ export_cmd=(
   -exportPath "${EXPORT_PATH}"
 )
 
+case "${archive_cmd[*]} ${export_cmd[*]}" in
+  *"${SOLOLEDGER_TEAM_ID}"*) die "internal error: the Team ID reached a command line — refusing to run." ;;
+esac
+
 if [ "${DRY_RUN}" -eq 1 ]; then
   printf 'archive-mas: DRY RUN — nothing is built. Commands that would run:\n'
-  printf '  %s\n' "${archive_cmd[*]//${SOLOLEDGER_TEAM_ID}/<TEAM_ID>}"
+  printf '  XCODE_XCCONFIG_FILE=%s \\\n    %s\n' "${TEAM_XCCONFIG}" "${archive_cmd[*]}"
   printf '  %s\n' "${export_cmd[*]}"
   exit 0
 fi
 
-"${archive_cmd[@]}"
+XCODE_XCCONFIG_FILE="${TEAM_XCCONFIG}" "${archive_cmd[@]}"
 "${export_cmd[@]}"
 
 printf 'archive-mas: done. Package is under %s\n' "${EXPORT_PATH}"
