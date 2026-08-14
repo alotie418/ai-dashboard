@@ -143,6 +143,12 @@ swift test      # SoloLedgerCore 的 XCTest 套件：schema / seed / CRUD / CSV 
   diverge silently — see `docs/SWIFTUI_FEATURE_GAP.md` for the three measured facts.
 - **No AI, no API key, no OCR, no network, no StoreKit, no paid unlock.** Entitlements
   are only App Sandbox + user-selected file read/write (Debug also has get-task-allow
-  for the debugger / UI-test runner).
+  for the debugger / UI-test runner). Since 2c-7 this is not just a statement: both
+  `.entitlements` files are pinned as **closed sets** — Release is exactly those two keys,
+  Debug is exactly Release plus `get-task-allow`, values compared too — along with which
+  file each configuration signs against. Adding a capability therefore has to be a decision
+  taken in `Tests/SoloLedgerCoreTests/EntitlementsClosedSetGuardTests.swift`, not a line
+  that slips through. That file is the machine-checkable form of this bullet and of the
+  export-compliance answer.
 - Reports, tax, COGS, and other accounting-policy logic are deliberately **out of
   scope** — the native app must mirror, never reinvent, that logic.
