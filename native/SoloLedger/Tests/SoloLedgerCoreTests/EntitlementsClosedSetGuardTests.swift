@@ -4,13 +4,26 @@ import XCTest
 /// 2c-7 — the two entitlements files, pinned as closed sets, and the project wiring that decides
 /// which one reaches which configuration.
 ///
-/// ## Why these two files are load-bearing
+/// ## Why these two files are load-bearing — and exactly how much they prove
 ///
-/// "No AI, no API key, no OCR, no network, no StoreKit, no paid unlock" is a product claim this
-/// repository makes in its README, in `docs/SWIFTUI_MIGRATION_PLAN.md`, and — under D7 — in what
-/// gets told to Apple about export compliance. **The Release entitlements file is the machine-
-/// checkable form of that claim.** A single added key (`com.apple.security.network.client` is the
-/// obvious one) would make all of it false, and nothing in this repository would have said so:
+/// These files are the app's **sandbox entitlement posture**, pinned as closed sets. Read what
+/// that does and does not establish, because the difference matters for what gets said publicly:
+///
+/// * **"No network" IS anchored here.** Under App Sandbox an outbound connection requires
+///   `com.apple.security.network.client`; a sandboxed build without it cannot reach the network
+///   whatever the source code attempts. That half is the one D7 export compliance may cite.
+/// * **"No AI, no OCR, no StoreKit" is NOT anchored here.** A bundled local model, on-device
+///   Vision text recognition, and StoreKit purchases all run inside the sandbox without asking
+///   for any additional entitlement, so this guard would stay green through every one of them.
+///   The oracle for those claims is **the source itself**. Measured on this branch: the native
+///   sources import only AppKit, CSQLite, Charts, CryptoKit, Foundation, OSLog, SoloLedgerCore,
+///   SwiftUI and UniformTypeIdentifiers, with zero hits for `URLSession` / `Network` / `Vision` /
+///   `CoreML` / `StoreKit`. **Nothing pins that** — no check in this repository reads the native
+///   sources for it (the `check-*` scripts that do this kind of scan are all Electron-side).
+///   Registered here as not done rather than implied by a green suite.
+///
+/// A single added key (`com.apple.security.network.client` is the obvious one) would make the
+/// network claim false, and until this round nothing in the repository would have said so:
 /// entitlements are read by `codesign`, which no check here runs. The claim was resting on a
 /// manual `grep` recorded in a design document.
 ///
@@ -67,6 +80,8 @@ final class EntitlementsClosedSetGuardTests: XCTestCase {
     /// `.xcodeproj`.
     static let releaseEntitlementsPath = "Support/SoloLedger.entitlements"
     static let debugEntitlementsPath = "Support/SoloLedger-Debug.entitlements"
+
+    static let entitlementsSetting = "CODE_SIGN_ENTITLEMENTS"
 
     // MARK: - Reading the files
 
@@ -228,6 +243,39 @@ final class EntitlementsClosedSetGuardTests: XCTestCase {
                 """)
             XCTAssertNotNil(Self.parse(try Data(contentsOf: url)),
                             "\(path) exists but is not a plist dictionary")
+        }
+    }
+
+    /// A conditional variant (`"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]"`) is a DIFFERENT key to the
+    /// parser, and Xcode gives it precedence over the plain one for every build it matches. Both
+    /// checks above read the unconditional key only, so a Release configuration carrying such a
+    /// variant — pointed at the Debug entitlements — passes every other test in this file while
+    /// the archive it produces ships `get-task-allow`. **Measured: with that exact shape planted,
+    /// this file was 17/17 green before this assertion existed.**
+    ///
+    /// Scanned across ALL configurations rather than just the app target's two, because the same
+    /// key at project level is inherited by the app target and would shadow it from there.
+    ///
+    /// ``AppVersionGuardTests/testNoConditionalVariantShadowsTheVersionKeys`` is the same
+    /// assertion for the version settings; this is the entitlements member of that family.
+    func testNoConditionalVariantShadowsTheEntitlementsSetting() throws {
+        let configs = AppVersionGuardTests.configurations(
+            in: try AppTargetRegistrationGuardTests.projectText())
+        XCTAssertGreaterThanOrEqual(configs.count, 2, """
+            the configuration scan came back with \(configs.count) entries — too few to be this \
+            project, and a `for` loop over nothing would pass this test vacuously.
+            """)
+        for config in configs {
+            let shadowed = config.settings.keys.filter {
+                $0.hasPrefix(Self.entitlementsSetting) && $0.contains("[")
+            }
+            XCTAssertEqual(shadowed.sorted(), [], """
+                \(config.name) (\(config.id)) declares a condition-qualified entitlements setting \
+                \(shadowed.sorted()). Xcode prefers it over the plain \(Self.entitlementsSetting) \
+                for matching builds, so the path pinned above would keep matching a file the \
+                build does not use — and the obvious thing to point it at is the Debug \
+                entitlements, which carry get-task-allow.
+                """)
         }
     }
 
@@ -403,9 +451,14 @@ final class EntitlementsClosedSetGuardTests: XCTestCase {
     }
 
     /// Two configurations in the shape `project.pbxproj` writes them — Debug's value quoted,
-    /// Release's not, exactly as the real file has it.
-    static func projectFixture(debug: String? = nil, release: String? = nil) -> String {
-        """
+    /// Release's not, exactly as the real file has it. `conditionalOnRelease` adds the
+    /// condition-qualified variant, which pbxproj writes with a QUOTED key.
+    static func projectFixture(debug: String? = nil, release: String? = nil,
+                               conditionalOnRelease: String? = nil) -> String {
+        let conditional = conditionalOnRelease.map {
+            "\n\t\t\t\t\"\(entitlementsSetting)[sdk=macosx*]\" = \"\($0)\";"
+        } ?? ""
+        return """
         /* Begin XCBuildConfiguration section */
         \t\tC94300000000000000000001 /* Debug */ = {
         \t\t\tisa = XCBuildConfiguration;
@@ -418,12 +471,35 @@ final class EntitlementsClosedSetGuardTests: XCTestCase {
         \t\tEB5600000000000000000002 /* Release */ = {
         \t\t\tisa = XCBuildConfiguration;
         \t\t\tbuildSettings = {
-        \t\t\t\tCODE_SIGN_ENTITLEMENTS = \(release ?? releaseEntitlementsPath);
+        \t\t\t\tCODE_SIGN_ENTITLEMENTS = \(release ?? releaseEntitlementsPath);\(conditional)
         \t\t\t\tPRODUCT_NAME = SoloLedger;
         \t\t\t};
         \t\t\tname = Release;
         \t\t};
         /* End XCBuildConfiguration section */
         """
+    }
+
+    /// (c′) The shape the P1 review comment named, on synthetic text: the plain key keeps saying
+    /// the right thing — which is precisely why every other assertion here misses it.
+    func testAConditionQualifiedEntitlementsSettingIsSeenAsSuchAKey() throws {
+        let text = Self.projectFixture(conditionalOnRelease: Self.debugEntitlementsPath)
+        let configs = AppVersionGuardTests.configurations(in: text)
+        let release = try XCTUnwrap(configs.first { $0.name == "Release" })
+
+        let shadowed = release.settings.keys.filter {
+            $0.hasPrefix(Self.entitlementsSetting) && $0.contains("[")
+        }
+        XCTAssertEqual(shadowed.sorted(), ["\(Self.entitlementsSetting)[sdk=macosx*]"], """
+            a QUOTED, condition-qualified key must arrive unquoted, or the `contains("[")` test \
+            never sees it — the same no-op 2c-3 measured for the version settings. Parsed keys: \
+            \(release.settings.keys.sorted())
+            """)
+        // …and the plain key is untouched, which is the whole trap.
+        XCTAssertEqual(release.settings[Self.entitlementsSetting], Self.releaseEntitlementsPath,
+                       "the unconditional key still points at the Release entitlements")
+        // A fixture without the variant must report none, or the test above proves nothing.
+        XCTAssertEqual(AppVersionGuardTests.configurations(in: Self.projectFixture())
+            .flatMap { $0.settings.keys.filter { $0.contains("[") } }, [])
     }
 }
