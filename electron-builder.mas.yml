@@ -1,3 +1,15 @@
+# ⚠️ 冻结（2026-08-15 / D6）——本文件保留但不再是上架路径。
+#
+# 原生 SwiftUI 版按 D1 取代式上架，沿用同一个 bundle id 与同一条 ASC 记录；同一个 App
+# 记录只能有一个当前版本，所以这条 Electron MAS 线不再推进。`build:mas` 仍能构建，
+# 冻结只加警示、不删代码（归档删除属 E-退役章）。
+#
+# 若将来真要解冻，先看 docs/MAS_SUBMISSION.md 文首冻结告示里登记的两处：产物 Info.plist
+# 带 NSAllowsArbitraryLoads = true 和五个用不到的用途声明，来自 Electron 自带的默认
+# Info.plist（本文件没有任何 extendInfo）——两者都是 App Review 会问的东西。
+#
+# 本次冻结不改本文件的任何配置语义，只加了这段注释。
+#
 # electron-builder 配置 —— Mac App Store（MAS）构建骨架（MAS-1）。
 # 与 electron-builder.dmg.yml 的 Developer ID 直分发线完全独立、互不影响：
 # GitHub/Developer ID 仍是正式主线，本文件只是 MAS 上架线的构建入口。
