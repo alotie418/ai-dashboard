@@ -59,6 +59,16 @@ npm run build:mas
 
 > 本地调试构建：临时把 `electron-builder.mas.yml` 的 target 改 `mas-dev` + `mas.type: development` + Apple Development 证书 + development profile（改动勿提交）。
 
+> **本清单是 Electron MAS 线的，勾选框一个都没动。** 2026-08-15 的 2c-8 验证矩阵跑的是**原生 SwiftUI 线**的 Release 产物，两者是不同的可执行文件、不同的功能集，拿原生的证据去勾 Electron 的格子会把清单变成假的。原生线适用的是其中三项，已单独验证（详见 [`SWIFTUI_FEATURE_GAP.md`](SWIFTUI_FEATURE_GAP.md) §4「Release 数据路径验证」行）：
+>
+> * **文件流（Powerbox）** —— 原生半径内的形态全部实测通过：导出备份（保存对话框选路径后**建文件夹写多个子文件**）、导出 CSV、导出诊断三个保存面板，迁移源目录、恢复备份两个打开面板；沙箱进程确实在容器外落盘。原生无 PDF 导出、无附件挑选 UI，那两项在这条产线上不存在。
+> * **断网启动 + 核心记账流程（容器内 SQLite 读写、启动自动快照）** —— 通过：一次性容器内完成迁移、就地升级、备份导出与恢复往返，跨版本升级写出 `pre-migrate-v23-<ts>` 快照，恢复前写出 `pre-restore-<ts>` 快照。原生**无网络能力**（Release entitlements 只有 `app-sandbox` + `files.user-selected.read-write`），所以「断网」对它不是一种运行状态而是常态。
+> * **演示模式不可进入** —— 原生的 DEBUG 演示入口在 `#if DEBUG` 内，Release 产物的「设置 → 数据」实测只有 CSV 与备份两组按钮，无 Debug 分区。
+>
+> 其余三项 —— **network.client**（AI / 电商测试连接）、**safeStorage**（AI Key 加解密）、**OCR** —— 是 Electron 独有能力，原生版永久不含（见 `SWIFTUI_FEATURE_GAP.md` §6），本轮证据与它们无关。**要勾这些格子仍然只能靠跑 Electron 的 mas-dev 构建。**
+>
+> 同样未做：真实分发签名（Apple Distribution + MAS provisioning profile）下的验证。那必然落进生产容器 `~/Library/Containers/com.alotie418.sololedger/`，2c-8 按纪律不碰它，因此原生线验的是**代码路径**，不是**签名身份**。
+
 - [ ] **文件流全链路（Powerbox）**：备份导出（⚠️ 重点：save 对话框选路径后**建文件夹写多个子文件**）→ 恢复（选文件夹/旧 .db）→ CSV 导出 → PDF 导出 → 附件挑选/打开 → Excel/CSV 导入（`/Users/Shared/sololedger-import-qa*` 四文件可复用）
 - [ ] **network.client**：AI provider 测试连接 + （如有店铺）电商测试连接/拉单
 - [ ] **safeStorage**：沙箱容器内首次保存 AI Key → 退出重开可解密；无 Keychain 弹窗异常
