@@ -15,7 +15,23 @@
   <key>LSApplicationCategoryType</key><string>public.app-category.finance</string>
   <key>NSPrincipalClass</key><string>NSApplication</string>
   <key>NSHighResolutionCapable</key><true/>
-  <key>NSHumanReadableCopyright</key><string>Local-first. No account, no network, no AI.</string>
+  <!-- 2c-9 / D8 — 版权主体不是本轮自拟的，是仓内既有声明的同一主体，四处一致：
+       LICENSE 的 "Copyright © 2026 alotie418"、README 的同句、以及 DMG 与 MAS 两条
+       electron-builder 配置的 `copyright: © 2026 alotie418`。字符串形态直接沿用
+       已产出的 MAS 产物 Info.plist 里那一份，所以两条产线的「关于」面板说同一句话。
+       本行原值是 "Local-first. No account, no network, no AI." —— 那是产品标语，
+       不是版权声明，而 macOS 标准「关于」面板把这个键当版权行显示。 -->
+  <key>NSHumanReadableCopyright</key><string>© 2026 alotie418</string>
+  <!-- 2c-9 / D7 — 出口合规豁免声明。false = 本 App 不含（也不使用）任何非豁免加密。
+       三层实证，逐条可复算：①entitlements 是闭集且没有 network.client，沙箱下代码
+       怎么写都出不了网（EntitlementsClosedSetGuardTests）；②2c-8 在真实 Release
+       沙箱跑完的验证矩阵没有任何出网行为；③本轮 CryptoKit 调用点全审计——四个生产
+       文件（LegacyConversionPlan / AttachmentApply / PreparedImportActivator /
+       StagingIngest）只用 SHA256 做完整性与身份校验，全仓零加解密符号、零
+       Security / CommonCrypto import。哈希不是出口管制意义上的加密。
+       类型是 Boolean 不是字符串：<string>false</string> 是一个非空字符串，读它的
+       工具可能当真值处理。ComplianceKeysGuardTests 钉住类型与取值两件事。 -->
+  <key>ITSAppUsesNonExemptEncryption</key><false/>
   <key>CFBundleLocalizations</key>
   <array>
     <string>zh-Hans</string>
