@@ -143,6 +143,18 @@ final class AppModel: ObservableObject {
     @Published var showingEditor = false
     @Published var editingTransaction: Transaction?
 
+    /// G4 — whether the main window currently exists. Written by `RootView`'s appear/disappear
+    /// in `SoloLedgerApp`; read by `AppCommands` to disable every command that acts on, or
+    /// reports into, that window.
+    ///
+    /// It has to be `@Published` rather than a `NSApp.windows` lookup: the menu items' enabled
+    /// state is a SwiftUI `.disabled(…)`, which only re-evaluates when something observable
+    /// changes. A poll would be correct at read time and stale on screen.
+    ///
+    /// Starts `false` — before the first window appears there is nothing to act on, and that is
+    /// also the state the app is in when the last window closes.
+    @Published var mainWindowIsOpen = false
+
     private var localizer: Localizer
     private(set) var store: LedgerStore?
 
