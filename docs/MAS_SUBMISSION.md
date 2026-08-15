@@ -1,5 +1,19 @@
 # Mac App Store 上架 Runbook（MAS 线）
 
+> # 🧊 本文描述的 Electron MAS 线已冻结（2026-08-15 / D6）
+>
+> **不要再照本文的步骤把 Electron 版推上 Mac App Store。** 本文以下全部内容保留为**历史记录与原生线的对照材料**，不是现行操作指南。冻结只加警示、不删代码，Electron MAS 构建入口（`electron-builder.mas.yml` / `build:mas`）原样保留；归档删除属 E-退役章的事。
+>
+> **冻结的三条依据**
+>
+> 1. **原生上架是取代，不是并存**（D1）。原生 SwiftUI 版沿用同一个 `com.alotie418.sololedger` 与同一条 ASC 记录。同一个 App 记录只能有一个当前版本，所以「两条线各上一版」从来就不是可选项。
+> 2. **Electron 1.0.1 重提方案已永久作废**（2c-3，用户 2026-08-11 裁定接受）。原生把构建号钉成纯整数、从 `2` 起（D2，`AppVersionGuardTests`）。**准确说法要分两层**：Apple 侧的规则只是同一 version train 内不冲突；**本仓采用的是更严的保守下限——高于该 bundle id 下一切已被接受的构建**（守门里的 `appStoreConnectHighWaterMark = "1.0.0"`）。在这条自订下限之下，`1.0.1` 低于 `2`，因此原生上传之后它再也排不上号。**这是本仓纪律的后果，不是 Apple 的硬性拒绝**；整改方案文档见 [`MAS_RESUBMISSION_1.0.1.md`](MAS_RESUBMISSION_1.0.1.md)，保留作历史记录。
+> 3. **这条线从未有过 App Store 用户**。硬事实（维护者 ASC 实查，同下方状态节）：1.0 于 2026-07-09 提交被拒、此后未重提、已成功上传的最高构建号是 `1.0.0` —— **从未通过审核，从未上架**，所以不存在从 App Store 装到该构建的用户。佐证（2c-8 实测）：维护机上的沙箱容器 `~/Library/Containers/com.alotie418.sololedger/` 是个空壳 —— 4.0K、只有 containermanagerd 的元数据 plist 与系统符号链接骨架，没有任何 SoloLedger 数据目录。**佐证只覆盖那一台机器，不能推广成全体用户的结论**；起决定作用的是「从未上架」这条硬事实。
+>
+> **冻结时如实登记、明确不修的两处**（冻结线不修；将来若真要解冻，这两处是第一批要处理的）：已产出的 MAS 产物 `Info.plist` 携带 `NSAppTransportSecurity.NSAllowsArbitraryLoads = true`，以及五个用不到的用途声明（`NSCameraUsageDescription` / `NSMicrophoneUsageDescription` / `NSAudioCaptureUsageDescription` / `NSBluetoothAlwaysUsageDescription` / `NSBluetoothPeripheralUsageDescription`）。它们**不是本仓配置写的** —— `electron-builder.mas.yml` 里没有任何 `extendInfo`，这些键来自 Electron 自带的默认 `Info.plist`。任意加载与用不到的用途声明都是 App Review 会问的东西。
+>
+> **原生线现在在哪**：工程配置、签名、entitlements、Release 编译门与真实沙箱验证矩阵见 [`SWIFTUI_FEATURE_GAP.md`](SWIFTUI_FEATURE_GAP.md) §4 / §5。
+
 > 状态（**2026-08-10 由维护者在 App Store Connect 实查后改写**）：MAS-1 构建骨架已接线（entitlements ×2 + `electron-builder.mas.yml` + `build:mas`）。**ASC App 记录已创建**；**1.0 已于 2026-07-09 提交审核并被拒**（五条 Guideline：5.2.5 / 1.5 / 3.1.1 / 2.1(a) / 4，整改答复稿见 [`MAS_RESUBMISSION_1.0.1.md`](MAS_RESUBMISSION_1.0.1.md)）；**此后未重新提交**。**已成功上传的最高构建号 = `1.0.0`**——仓库工作区里 2026-07-15 产出的 `1.0.1` 产物**从未上传**。
 >
 > 本行原写「未创建 App Store Connect App、未上传、未提审」，停更于 2026-07-09，与同仓库 07-15 的重新提审文档直接矛盾。ASC 侧的事实无法从仓库判定（凭据按下方铁律不入库），故以维护者实查为准；仓库内不记录 Apple ID 等账号标识。

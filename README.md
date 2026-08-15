@@ -28,8 +28,10 @@ SoloLedger 是一个**经营管理估算工具**,帮助小微经营者把日常�
 | 产品线 | 状态 | 说明 |
 |---|---|---|
 | **GitHub 直分发 DMG**(Developer ID) | ✅ **1.0.0 已发布**(2026-07-08) | **已签名 + 已公证 + 已 staple** 的 Apple Silicon 构建,离线可通过 Gatekeeper。见 [Releases](https://github.com/alotie418/ai-dashboard/releases) 与 [`CHANGELOG.md`](CHANGELOG.md) |
-| **Mac App Store(MAS)构建** | 🟡 构建配置已就绪,**未上架** | 独立配置 `electron-builder.mas.yml`(App Sandbox + provisioning profile),与 DMG 线的签名方式不同。1.0 曾于 2026-07-09 提交审核并被拒,此后未重新提交;审核/上架状态本身不在仓库内可查证,以 [`docs/MAS_SUBMISSION.md`](docs/MAS_SUBMISSION.md) 的状态节(维护者实查后记录)为准 |
-| **原生 SwiftUI 重写版**(`native/SoloLedger`) | 🚧 **开发中,未发布** | 与上面两条线并行的重写,尚不可供用户使用。当前进度:报表引擎镜像 R2–R8 已全线合并并激活入口,原生库存引擎与库存页已上线(N 章 #452–#458),见 [`docs/SWIFTUI_REPORTS_MIRROR_PLAN.md`](docs/SWIFTUI_REPORTS_MIRROR_PLAN.md) |
+| **Mac App Store(MAS)构建**(Electron) | 🧊 **已冻结(2026-08-15),从未上架** | 独立配置 `electron-builder.mas.yml`(App Sandbox + provisioning profile),与 DMG 线的签名方式不同。1.0 曾于 2026-07-09 提交审核并被拒,此后未重新提交,**从未通过审核**。**这条线已冻结:上架改由下面的原生版取代,不并存**(同一个 bundle id 与同一条 ASC 记录,一个 App 记录只能有一个当前版本)。构建入口保留不删,但不再是上架路径;冻结依据与 `1.0.1` 重提方案作废的说明见 [`docs/MAS_SUBMISSION.md`](docs/MAS_SUBMISSION.md) 文首冻结告示 |
+| **原生 SwiftUI 重写版**(`native/SoloLedger`) | 🚧 **开发中,未发布**;**MAS 上架的接班人** | 重写版,尚不可供用户使用。与 DMG 线并行,但**对 MAS 线是取代关系而非并行**。当前进度:报表引擎镜像 R2–R8 已全线合并并激活入口,原生库存引擎与库存页已上线(N 章 #452–#458),真实 Release 沙箱的数据路径与升级端到端验证已通过(2c-8)。见 [`docs/SWIFTUI_FEATURE_GAP.md`](docs/SWIFTUI_FEATURE_GAP.md) 与 [`docs/SWIFTUI_REPORTS_MIRROR_PLAN.md`](docs/SWIFTUI_REPORTS_MIRROR_PLAN.md) |
+
+> **2026-08-15 定点订正**(只订正本表的 MAS 与原生两行,本节其余论断未重新核验,故 07-28 的日期保留):MAS 行由「构建配置已就绪、未上架」改为「已冻结、从未上架」,原生行的「与上面两条线并行」收窄为「与 DMG 线并行,但对 MAS 线是取代关系」。冻结属 D6 裁定,依据见 [`docs/MAS_SUBMISSION.md`](docs/MAS_SUBMISSION.md) 文首。
 
 下文的功能与技术栈描述,除非另有说明,均指**已发布的 Electron 桌面版**。
 
