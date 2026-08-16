@@ -28,7 +28,7 @@
 | 损益表 / P&L | ✅（R2–R8 已镜像） | 六个制度引擎齐全（`Sources/SoloLedgerCore/Reports/` 的 CN/US/JP/EU/KR/TW），逐字镜像 `electron/reports/*`；batch1–5 parity + blind-spot 测试对冻结黄金逐字段比对。入口已激活（`RootView` detail switch 的 `.reports` 分支）。**管理分析口径，非法定财务报表** |
 | VAT / GST / 销售税汇总 | ✅ | `CNReportEngine.swift:183` `vatSummary`、`EUReportEngine.swift:93` `vatReturn`、`KRReportEngine.swift:98` `vatSummary`；JP 消费税 / TW 营业税同批镜像。**估算汇总，不是申报数据，不接税控/税局** |
 | 所得税 / 附加税估算 | ✅ | 所得税与附加税链已镜像（`CNReportEngine.swift:77-84`），US 自雇税同批。税率缺失或损坏一律**拒算不回退**（`ReportRateSetting.swift:46-88` 的四态契约）。**估算值，预设税率可能随政策调整，须自行核对最新官方税率** |
-| 现金流 / 资产负债（PR-7B） | 现金流 ✅ ／ 资产负债 🟡 | 经营活动现金流已镜像 `_cashflow.js`（`Reports/Cashflow.swift`）；投资 / 筹资 / 期初期末与 Electron 一样不可从本数据模型推导，**如实说明而不显示为 0**。`electron/handlers/balanceOverview.js`（246 行，管理口径概览、非法定资产负债表）**尚未镜像** |
+| 现金流 / 资产负债（PR-7B） | 现金流 ✅ ／ 资产负债 ⏸️（测绘完成后挂起） | 经营活动现金流已镜像 `_cashflow.js`（`Reports/Cashflow.swift`）；投资 / 筹资 / 期初期末与 Electron 一样不可从本数据模型推导，**如实说明而不显示为 0**。`electron/handlers/balanceOverview.js`（246 行，管理口径概览、非法定资产负债表）：**测绘已完成（2026-08-15），该镜像章按用户裁定挂起**。挂起的理由不是镜像技术，而是上游数据面 —— 逐字镜像它在原生账本上会得到一张**恒为空态**的报表。三条实测依据：①它 `require` 六个上游 handler（`cashPosition` / `receivables` / `inventory` / `depreciationPreview` / `retainedEarnings` / `incomeTaxPosition`，781 行），连同本体 **1027 行**，比整个报表镜像章的 930 行还大；②这条链的输入表里有**七张**（`accounts` / `liabilities` / `fixed_assets` / `equity` / `tax_payments` / `sales_items` / `purchase_items`）在原生源码里**零读零写**，另两张 `sales` / `purchases` 只被只读探针 `LegacyLedgerProbe` 读——所以现金的期初半边、应收/应付、固定资产、借款、出资行全部无源；③Electron 自己的空态文案 `finance.balanceComingSoonDesc` 写的就是「录入现金账户、资产、负债或交易数据后，将在此显示」，而那些录入页正是 §3 里 ⏸️ 的那一行。**重开这一章的前提是先做 §3 的五个录入页**，不是先写 Swift。测绘另已择定 oracle 路径（差分语料 `--verify`，循 `Fixtures/reportmath/` 先例落在黄金目录之外，与黄金冻结零交互）。**本行不表示计划中或进行中** |
 | COGS / `_expenseSplit` / 库存成本 | COGS ✅ ／ 库存 ✅ **原生新引擎（非镜像）·N 章已收官** | `Reports/ExpenseSplit.swift` 逐行镜像 `_expenseSplit.js`（`:3` 声明镜像、`:16` `isCogsRow`、`:41` `splitExpenses`，均标注对位行号）。**库存不镜像 Electron**：`electron/handlers/inventory.js` 经实测审计确认产出的是「建账以来累计采购净额 ÷ 累计采购数量 × 当前净在库量」，销售不冲减均价（买 10@100 → 卖光 → 再买 10@200，真实剩余成本 2000，该算法给 1500），**不是加权平均法**，故不作为镜像对象。原生按 N0 口径确认书新写移动加权平均引擎，N-PR-1…N-PR-6（#452–#458）已全部合并：schema v24 三表（见 §4）、引擎、六语文案、库存页、期初盘点向导、侧栏入口。**该引擎的出库成本流水不接入任何报表 COGS**——是否接入正式报表属另行裁定的独立事项，在裁定前 `Reports/**` 与库存引擎之间无任何调用出口 |
 | 折旧预览 / 里程 / 家庭办公室 | ⏸️ | 特定制度，暂缓 |
 
@@ -40,7 +40,7 @@
 | 产品 / 服务项（`products`） | ✅（阶段 2b） | `ProductsView` + `ProductPageComposition` + `Inventory/ProductCatalog.swift`（逐行镜像 `electron/handlers/products.js`）。侧栏「商品 / 服务项目」可达。**仅主数据**：`default_unit_cost` 只登记，不参与任何计算——它在 Electron 里同时被用作采购行、销售行与单据行的默认单价，语义不唯一，因此**原生库存引擎不迁移、不读取该列**（N-11）；库存计价走 v24 起的原生新引擎，见 §2 与 §4 |
 | 库存（原生独有，Electron 无对应页） | ✅（N 章 #452–#458） | `InventoryView` + `InventoryPageComposition` + `InventoryOpeningView` + `Core/Inventory/`（`InventoryLedger` / `InventoryPosting` / `InventoryOpeningPlan`）。侧栏「库存」可达。**按 N0 口径确认书新写的移动加权平均引擎，不镜像 `electron/handlers/inventory.js`**（见 §2）。首版半径 = 手工流水录入 + 期初盘点向导；禁负库存、拒迟到交易、拒混币、整数分存储。**出库成本流水不接入任何报表 COGS**——是否接入属另行裁定的独立事项 |
 | 客户 / 供应商 | 🟡 | 目前 `counterparty` 为自由文本 |
-| 现金/银行账户、负债、固定资产、权益、税费台账（策略中立） | ⏸️ | 暂缓 |
+| 现金/银行账户、负债、固定资产、权益、税费台账（策略中立） | ⏸️ | 暂缓。**这五个录入页是资产负债概览镜像章的前提**：那条链的输入表在原生零读零写，没有录入口就没有数据，镜像出来的报表恒为空态（见 §2 该行） |
 
 ## 4. 数据安全 / 迁移（多为 Release 阻塞）
 
@@ -85,9 +85,11 @@
 6. ✅ 用户可见的备份 / 恢复 UI——「设置 → 数据」的导出备份与从备份恢复已上线（`SettingsView` 的「设置 → 数据」按钮），恢复前先快照当前账本，legacy 转换进行中一律拒绝（`AppModel` 的恢复入口守卫）。
 7. ✅ 完整 6 语言——六语各 650 键、键集完全一致，guard 强制恰好六个 `.lproj` 且各语键数相等（`LocalizationWordingGuardTests` 的 `testDiscoveredLocalesAreExactlyTheSixShippedLanguages` 与键数相等断言）。`.xcstrings` parity 仍推迟（`.strings` 对 MAS 可用，非阻塞）。键集合相等另由 `MigrationCopyParityTests.testFullLocaleKeyUniverseRatchet` 严格比对。
 8. 🛑 MAS 签名 / 打包 / App Store Connect（Phase 4）。
-9. ✅ 损益 / VAT / 所得税 / 现金流 / COGS 等敏感报表——已逐字**镜像** `electron/reports/*` 上线，入口已激活（`RootView` detail switch 的 `.reports` 分支）。**残留 🟡**：`electron/handlers/balanceOverview.js`（资产负债概览，246 行）尚未镜像。`electron/handlers/inventory.js`（库存成本，89 行）**不是残留**——按 §2 的实测审计它不是加权平均法，已裁定不作为镜像对象，原生另写新引擎（N 章已收官）。
+9. ✅ 损益 / VAT / 所得税 / 现金流 / COGS 等敏感报表——已逐字**镜像** `electron/reports/*` 上线，入口已激活（`RootView` detail switch 的 `.reports` 分支）。**残留 ⏸️**：`electron/handlers/balanceOverview.js`（资产负债概览，246 行）**测绘已完成（2026-08-15），镜像章按用户裁定挂起**——阻塞在上游数据面而非镜像技术（连上游六个 handler 共 1027 行，其输入表有七张在原生零读零写；详见 §2 该行），**重开前提是先做 §3 的五个录入页**。`electron/handlers/inventory.js`（库存成本，89 行）**不是残留**——按 §2 的实测审计它不是加权平均法，已裁定不作为镜像对象，原生另写新引擎（N 章已收官）。
 
 > 本表随每个阶段更新。**截至 2026-08-07**：生产启动链（C12a / C12b）+ 两条 active-store hardened open（C12x-A1 existing / A2 createFresh）+ DMG 源选择入口（N7.2）+ 附件文件迁移（三条链，G1 已闭合）均已落地；**报表引擎已全线镜像并激活入口**（逐字镜像 `electron/reports/*` 共 **930 行**敏感逻辑，非早前记载的 808 行）；**legacy `sales`/`purchases` 转换器（2a-1…2a-4）已上线**；**用户可见备份 / 恢复 UI 已上线**；六语文案已达成 650 键 parity；**原生库存引擎与库存页已上线（N 章 #452–#458 收官，侧栏入口已激活）**。**剩余发布阻塞项收敛为两条：#4 真实 Release 沙箱下的数据路径 / 升级端到端验证，#8 MAS 签名 / 打包 / App Store Connect。** 报表与转换器输出一律为管理分析口径的估算，不是法定财务报表，也不构成申报依据。
+>
+> **2026-08-16 定点订正**（只订正下列各项，本段其余论断未重新核验，故 08-07 的日期保留）：`electron/handlers/balanceOverview.js` 的状态由「尚未镜像」改为「**测绘已完成（2026-08-15），镜像章按用户裁定挂起**」，§2 的状态标记由 🟡 改为 ⏸️，§3 的五个录入页行补上「是该章前提」的交叉引用。**这不是把一件待办改成另一件待办**：挂起的依据是测绘实测的上游数据面（输入表七张零读零写），不是排期。上句「剩余发布阻塞项……」不受影响——该章从来不在发布阻塞清单里。
 >
 > **2026-08-15 定点订正**（只订正下列各项，本段其余论断未重新核验，故 08-07 的日期保留）：**第 4 条阻塞项已由 2c-8 关闭**，故上句「收敛为两条」应读作**只剩 #8 MAS 签名 / 打包 / App Store Connect**；§4 的「Release 数据路径验证」「附件文件迁移」「迁移前快照与两条恢复语义」三行按实测结果改写。本轮只做验证与入档，**不改任何非文档文件**；矩阵里发现的三条未验事项（真实分发签名下的同一条链、归档 / 导出 / 上传、Release 产物仍是双 slice 与 D4 arm64-only 的落差）如实登记在 §4 该行，不在本轮修。
 >
