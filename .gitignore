@@ -15,6 +15,13 @@ dist-ssr
 # electron-builder DMG output (build artifact, not source)
 release
 
+# SwiftPM scratch path for the native package's warning gate + test run. Lives at the
+# REPO ROOT because CI passes `--scratch-path .swift-gate-build` from here, which is
+# outside native/SoloLedger/.gitignore's reach (that one covers .build/ inside the
+# package). Nothing tracks it and nothing reads it from git — check-swift-warnings.mjs
+# rmSync's it before every build and hands the same path to `swift test` afterwards.
+.swift-gate-build/
+
 # Playwright E2E artifacts (screenshots + report)
 test-results
 playwright-report
