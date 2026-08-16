@@ -17,12 +17,36 @@ import XCTest
 /// "the oracle for those is the source itself, and nothing in the repository pins it". **This
 /// file is that missing pin**, and its claim is correspondingly narrower:
 ///
-/// > the shipped source contains no CALL to these capabilities.
+/// > no source file in any build target names one of the listed capability symbols; each
+/// > target's import closure is the pinned one; and the two Foundation initializers that can
+/// > fetch a URL appear only at their two pinned call sites.
 ///
 /// That is a source-level fact, not an enforcement boundary. It cannot stop a future edit from
 /// adding one — it can only make the edit arrive red instead of silent. Do not read it as
 /// "the app cannot do these things"; for the network half, that stronger statement belongs to
 /// the entitlements guard, and only to it.
+///
+/// ## What it deliberately does NOT cover, and why the wording above is that specific
+///
+/// The first draft said "the shipped source contains no CALL to these capabilities" — the same
+/// over-claim 2c-7 had just corrected elsewhere. Review found two real holes in it:
+///
+///  1. **A symbol list is not a capability list.** `Data(contentsOf:)` and `String(contentsOf:)`
+///     fetch an `http(s)` URL as readily as they read a file, need no import beyond
+///     `Foundation`, and name none of the symbols below. They also have two legitimate LOCAL
+///     uses here (CSV import, manifest decode), so a pattern banning them would be red from
+///     birth and one allowing them would be blind. They are pinned as a CLOSED SET of call
+///     sites instead: the existing two stay green, and a THIRD — which is where a network fetch
+///     would arrive — turns red and has to be justified here. That is a **review trigger, not a
+///     proof of absence**, and it is described as such.
+///  2. **Swift is not the only language in the build.** `Sources/CSQLite` is a real
+///     `.systemLibrary` target. A `socket()`/`connect()` helper added to its header would be
+///     callable from Swift through the already-allowed `CSQLite` import, changing neither the
+///     import closure nor any Swift symbol. The C target is scanned too, and its file set is
+///     pinned so that ADDING a file to it is itself a declared change.
+///
+/// Nothing outside those three assertions is claimed — in particular nothing about the system
+/// SQLite the C target links against.
 ///
 /// ## Two scans, because an import list is not enough
 ///
@@ -111,6 +135,40 @@ final class CapabilityImportGuardTests: XCTestCase {
               positive: "try await AppStore.sync()"),
     ]
 
+    // MARK: - The non-Swift build target
+
+    /// `Sources/CSQLite` is a `.systemLibrary` target: it exists to bind the platform's
+    /// libsqlite3, and it is the one place in the build where C can enter. Its file set is
+    /// pinned so that adding a `.c` — the natural home for a helper the Swift scans cannot
+    /// see — is a declared change rather than a quiet one.
+    static let cTargetFiles: Set<String> = ["module.modulemap", "shim.h"]
+
+    /// C-side network primitives. Kept separate from ``forbidden`` because these are far too
+    /// generic for Swift (`bind`, `connect` and `send` all collide with ordinary Swift
+    /// vocabulary) but are unambiguous in a 300-byte header whose only content is an
+    /// `#include`.
+    static let cForbidden: [Forbidden] = [
+        .init(label: "socket(", pattern: #"\bsocket\s*\("#, positive: "int s = socket(AF_INET, SOCK_STREAM, 0);"),
+        .init(label: "connect(", pattern: #"\bconnect\s*\("#, positive: "connect(s, (struct sockaddr *)&addr, sizeof(addr));"),
+        .init(label: "send(", pattern: #"\bsend\s*\("#, positive: "send(s, buf, len, 0);"),
+        .init(label: "recv(", pattern: #"\brecv\s*\("#, positive: "recv(s, buf, len, 0);"),
+        .init(label: "gethostby", pattern: #"\bgethostby\w*\s*\("#, positive: "struct hostent *h = gethostbyname(name);"),
+        .init(label: "getaddrinfo(", pattern: #"\bgetaddrinfo\s*\("#, positive: "getaddrinfo(host, svc, &hints, &res);"),
+        .init(label: "CFStream", pattern: #"\bCFStream"#, positive: "CFStreamCreatePairWithSocketToHost(NULL, h, p, &r, &w);"),
+    ]
+
+    // MARK: - The Foundation URL loaders
+
+    /// `Data(contentsOf:)` / `String(contentsOf:)` — local file reads here, remote fetches
+    /// elsewhere, and the source cannot tell you which without running it. Pinned by call site:
+    /// these two are reviewed and local; a third has to come through this list.
+    static let urlLoadingCallSites: [String: Int] = [
+        "AppModel.swift": 1,        // CSV import — reads the file the user picked in the panel
+        "AttachmentApply.swift": 1, // import manifest decode — reads a file inside the container
+    ]
+
+    static let urlLoadingPattern = #"\b(?:Data|String)\s*\(\s*contentsOf\s*:"#
+
     // MARK: - Reading the shipped source
 
     static func sourcesRoot() -> URL {
@@ -153,6 +211,16 @@ final class CapabilityImportGuardTests: XCTestCase {
 
     static func matches(_ pattern: String, in code: String) -> Bool {
         code.range(of: pattern, options: .regularExpression) != nil
+    }
+
+    /// How many times `pattern` matches, as a REGEX. Deliberately not `ranges(of:)`: that
+    /// overload takes the string as a LITERAL, so a pattern handed to it silently matches
+    /// nothing and the count comes back 0 — which, in a "these are the only call sites"
+    /// assertion, reads as "there are none". Caught here by the pinned set failing against an
+    /// empty observation rather than passing against one.
+    static func matchCount(_ pattern: String, in code: String) -> Int {
+        guard let re = try? NSRegularExpression(pattern: pattern) else { return 0 }
+        return re.numberOfMatches(in: code, range: NSRange(location: 0, length: (code as NSString).length))
     }
 
     /// Fail-closed: a walk that found nothing would satisfy every "no forbidden symbol"
@@ -238,7 +306,92 @@ final class CapabilityImportGuardTests: XCTestCase {
             """)
     }
 
+    // MARK: - (c) the C target
+
+    func testTheCTargetsFileSetIsPinned() throws {
+        let root = Self.sourcesRoot().appendingPathComponent("CSQLite", isDirectory: true)
+        let names = Set(try FileManager.default.contentsOfDirectory(atPath: root.path)
+            .filter { !$0.hasPrefix(".") })
+        XCTAssertEqual(names, Self.cTargetFiles, """
+            Sources/CSQLite's file set changed. It is a system-library shim — a header and a \
+            modulemap — and the reason this is pinned is that a `.c` added here compiles into \
+            the build, is callable from Swift through the already-allowed CSQLite import, and \
+            is invisible to every Swift-side scan in this file.
+            """)
+    }
+
+    func testNoNetworkPrimitivesInTheCTarget() throws {
+        let root = Self.sourcesRoot().appendingPathComponent("CSQLite", isDirectory: true)
+        let names = try FileManager.default.contentsOfDirectory(atPath: root.path)
+            .filter { !$0.hasPrefix(".") }
+        XCTAssertFalse(names.isEmpty, "the C target scan found no files to read")
+        var offenders: [String] = []
+        for name in names {
+            let text = try String(contentsOf: root.appendingPathComponent(name), encoding: .utf8)
+            let code = WindowReopenCommandGuardTests.strippingComments(text)
+            for entry in Self.cForbidden + Self.forbidden where Self.matches(entry.pattern, in: code) {
+                offenders.append("\(entry.label) in \(name)")
+            }
+        }
+        XCTAssertTrue(offenders.isEmpty,
+                      "network primitives in the C target: \(offenders.sorted().joined(separator: ", "))")
+    }
+
+    func testEveryCPatternMatchesItsOwnPositiveSample() {
+        for entry in Self.cForbidden {
+            XCTAssertTrue(Self.matches(entry.pattern, in: entry.positive),
+                          "the C pattern for \(entry.label) does not match its own sample")
+        }
+    }
+
+    // MARK: - (d) the Foundation URL loaders, as a closed set of call sites
+
+    func testTheURLLoadingInitializersAppearOnlyAtTheirPinnedCallSites() throws {
+        let files = try requireSources("SoloLedgerCore", atLeast: 40)
+            + requireSources("SoloLedger", atLeast: 20)
+        var observed: [String: Int] = [:]
+        for file in files {
+            let count = Self.matchCount(Self.urlLoadingPattern, in: file.code)
+            if count > 0 { observed[file.path] = count }
+        }
+        XCTAssertEqual(observed, Self.urlLoadingCallSites, """
+            The set of `Data(contentsOf:)` / `String(contentsOf:)` call sites changed \
+            (observed \(observed.sorted { $0.key < $1.key }), pinned \
+            \(Self.urlLoadingCallSites.sorted { $0.key < $1.key })). These initializers read a \
+            local file and fetch a remote URL with the same spelling, need no import beyond \
+            Foundation, and name none of the symbols this file scans for — so a NEW one is \
+            exactly where a network call would arrive unnoticed. Add it here with a note on \
+            what it reads. This is a review trigger, not a proof that the existing two are local.
+            """)
+    }
+
     // MARK: - Counterexamples
+
+    func testAThirdURLLoadingCallSiteIsDetected() {
+        var mutated = Self.urlLoadingCallSites
+        mutated["SomeNewFile.swift"] = 1
+        XCTAssertNotEqual(mutated, Self.urlLoadingCallSites,
+                          "an added call site must not satisfy the pinned set")
+    }
+
+    /// The bug this file shipped for one run: `ranges(of:)` treats its String argument as a
+    /// LITERAL, so it reported 0 for a pattern that matches twice — and 0 is exactly what a
+    /// "these are the only call sites" assertion wants to hear.
+    func testTheCounterIsARegexCounterAndNotALiteralOne() {
+        let sample = "try Data(contentsOf: a)\ntry String(contentsOf: b, encoding: .utf8)"
+        XCTAssertEqual(Self.matchCount(Self.urlLoadingPattern, in: sample), 2)
+        XCTAssertEqual(sample.ranges(of: Self.urlLoadingPattern).count, 0,
+                       "literal matching would report zero — that is why matchCount exists")
+    }
+
+    func testTheURLLoadingPatternMatchesBothSpellingsAndNotTheirNeighbours() {
+        XCTAssertTrue(Self.matches(Self.urlLoadingPattern, in: "try Data(contentsOf: url)"))
+        XCTAssertTrue(Self.matches(Self.urlLoadingPattern, in: "try String(contentsOf: url, encoding: .utf8)"))
+        // `append(contentsOf:)` / `write(contentsOf:)` share the label and are unrelated APIs;
+        // matching them would put nine false call sites in the pinned set.
+        XCTAssertFalse(Self.matches(Self.urlLoadingPattern, in: "out.append(contentsOf: buf)"))
+        XCTAssertFalse(Self.matches(Self.urlLoadingPattern, in: "try sink.write(contentsOf: chunk)"))
+    }
 
     func testAForbiddenSymbolInCodeIsDetected() {
         let code = WindowReopenCommandGuardTests.strippingComments("""
