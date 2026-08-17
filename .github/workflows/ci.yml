@@ -21,6 +21,19 @@ jobs:
   checks:
     name: Guards + migrations + build
     runs-on: macos-latest
+    # The repository's default workflow token is read-only (measured:
+    # `default_workflow_permissions: read`), and the Core test step needs to be able to
+    # append to issue #400's ledger when it auto-retries the flake tracked there — an
+    # auto-rerun that leaves no trace is exactly what that issue forbids. A job-level
+    # `permissions:` block replaces the defaults wholesale, so `contents: read` has to
+    # be restated for actions/checkout. Everything else stays `none`.
+    #
+    # A pull request from a FORK gets a read-only token whatever this says. That makes
+    # the recording fail and the job go red rather than re-run silently, which is the
+    # direction this mechanism should fail in; this repository has never taken one.
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -65,10 +78,25 @@ jobs:
         env:
           SWIFT_WARNING_SCRATCH_PATH: .swift-gate-build
         run: npm run check:swift-warnings
-      # Reuses the gate's build directory, so the full compile above is paid for
-      # once rather than twice.
-      - name: Native SwiftUI Core tests (swift test)
-        run: swift test --package-path native/SoloLedger --scratch-path .swift-gate-build
+      # Reuses the gate's build directory (the wrapper passes the same
+      # SWIFT_WARNING_SCRATCH_PATH value, and FlakeRetryGateGuardTests pins the two
+      # together), so the full compile above is paid for once rather than twice.
+      #
+      # T1.5 — the `swift test` invocation moved into scripts/swift-test-with-retry.mjs,
+      # which runs it, and retries EXACTLY ONE named test EXACTLY ONCE: the flake tracked
+      # in issue #400, and only when it is the sole failure. The escalation clause on that
+      # issue ("if the recurrence rate starts hurting the merge queue, escalate to
+      # job-level single-test retry + mandatory accounting") is what asked for this; the
+      # other clause on it ("an auto-rerun that leaves no trace is never allowed") is why
+      # the wrapper can only exit 0 after the recurrence has been written to that issue,
+      # to this job's summary and to the log. Recording fails ⇒ the job fails.
+      #
+      # The test stays in the required checks and is not downgraded: any other failure,
+      # two failures, a crash, or a retry that stays red all go straight to red.
+      - name: Native SwiftUI Core tests (swift test, #400 flake retry + accounting)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/swift-test-with-retry.mjs
 
   e2e:
     name: Locale-matrix e2e (Playwright)
