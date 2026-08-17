@@ -47,13 +47,15 @@
 裁定的三条口径，写成实现轮可以直接照着写断言的形态：
 
 1. **行来源**：`transactions` 中 `type = 'income'` 的行。（`transactions.type` 的 `CHECK` 闭集是 `('income','expense')`，原生 `TransactionType` 枚举同为两例。）
-2. **匹配**：`transactions.counterparty` 与单据 `customer_name` **精确匹配**。（Electron 侧的对应语义是 trim 后的字符串相等，见 `DocumentModal.tsx` 的 `generateStatement`；相等判定不做大小写折叠、不做模糊。）
+2. **匹配**：`transactions.counterparty` 与单据 `customer_name` **精确匹配**——不做大小写折叠、不做模糊。（**前后空白怎么处理尚未裁定，见 §8 的 Q2-c**：Electron 侧是 trim 之后再比较，而原生 `Transaction.normalized()` 只截长度、不 trim，两者不等价。）
 3. **日期范围**：限定在单据自己的期间内，闭区间。（Electron 侧同为闭区间的 ISO 日期字符串比较，见 `generateStatement`；期间由 `business_documents.period_start` / `period_end` 两列承载。）
-4. **客户下拉的取值来源**：`transactions.counterparty` 去重。（Electron 侧的对应物是 `DocumentModal.tsx` 的 `stmtCustomers`，对 `sales.customer` 去重后排序；实测它是全仓**唯一**一处客户去重清单。）
+4. **客户下拉的取值来源**：`transactions.counterparty` 去重。（Electron 侧的对应物是 `DocumentModal.tsx` 的 `stmtCustomers`，对 `sales.customer` **trim 后**去重再排序；实测它是全仓**唯一**一处客户去重清单。下拉与匹配必须用同一套空白规则，否则同一个名字会既进不了下拉又匹配不上——这是 Q2-c 要一并裁定的原因。）
+
+**币种未纳入筛选条件，而它必须被裁定**：见 §8 的 Q2-d。
 
 * **证据锚**：`components/DocumentModal.tsx` 的 `generateStatement` / `stmtCustomers` / `salesToRow`；`electron/db/index.js` 迁移 v5 中 `transactions` 的 `type` `CHECK` 与 `counterparty` 列；原生 `Enums.swift` 的 `TransactionType`；原生 `LedgerStore.swift` 的 `INSERT INTO transactions`。
 * **可测断言**（D-1/D-2 应各自落成测试）：给定一组含 `income` 与 `expense`、多个 `counterparty`、跨越期间边界的流水，生成器返回的行集恰等于「`income` ∧ `counterparty` 相等 ∧ 日期在闭区间内」的那一组；边界两天必须包含；`expense` 行必须不出现；`counterparty` 不等的行必须不出现。
-* **未裁定的残余**：**逐行字段怎么映射尚未裁定**，见 §8 的 Q2-a。没有它，D-1 无法开工。
+* **未裁定的残余，四项，全部阻塞 D-1**：Q2-a 逐行字段映射、Q2-b `transactions.tax_rate` 的量纲、Q2-c 客户名的空白规则、Q2-d 跨币种怎么办。全部见 §8。**四项齐了才能开工 D-1 的对账单部分**；D-1 的其余部分（Q4 算式、Q9 存储）不受它们阻塞。
 
 ### Q3 · 单据编号 = 全部照搬
 
@@ -62,13 +64,14 @@
 | 格式 | `<前缀>-<年>-<4 位序号>` |
 | 前缀表 | `quotation`→`QT`、`sales_order`→`SO`、`proforma_invoice`→`PI`、`commercial_invoice`→`CI`、`statement`→`ST` |
 | 年度 | 按年重置（年份在编号里） |
-| 连续性 | **不保证连续**：删除或作废后号码被释放，可被重用；跳号是正常状态 |
+| 连续性 | **不保证连续**，跳号是正常状态。**只有删除会释放号码**：删掉的行不再占用 `(doc_type, doc_number)`，也不再参与序号最大值的计算。**作废不释放**——作废只把行的 `status` 改成 `void`，行还在，唯一索引仍然约束它，`nextNumber` 也不排除它，所以那个号码既不能被手工重用，也仍然把序号顶上去 |
 | 可编辑性 | 自动值只是**建议**，用户可改 |
 | 年份来源 | 本地时区的当前年 |
 | 唯一性 | 仅 `(doc_type, doc_number)` 唯一——同一编号可在五种类型里各存在一次 |
 
 * **证据锚**：`electron/handlers/documents.js` 的 `nextNumber` 与 `NUMBER_PREFIX`；同文件的 `runGuardingNumberConflict`（唯一索引冲突翻成稳定错误码 `DOC_NUMBER_EXISTS`）；`electron/db/index.js` 迁移 v11 的 `idx_docs_type_number` 唯一索引；`components/DocumentModal.tsx` 中用户改号后停止自动跟随的 `numberEditedRef`。
-* **可测断言**：空库取号得 `<前缀>-<年>-0001`；建一张 `QT-<年>-0007` 后再取号得 `QT-<年>-0008`；**自定义编号不污染序号最大值**（Electron 侧已有同名断言，实测在 `scripts/test-handlers.mjs` 的 §2B Batch 8 内）；同一 `(类型, 编号)` 第二次写入被拒绝，不同类型同编号可写入。
+* **可测断言**：空库取号得 `<前缀>-<年>-0001`；建一张 `QT-<年>-0007` 后再取号得 `QT-<年>-0008`；**自定义编号不污染序号最大值**（Electron 侧已有同名断言，实测在 `scripts/test-handlers.mjs` 的 §2B Batch 8 内）；同一 `(类型, 编号)` 第二次写入被拒绝，不同类型同编号可写入；**作废一张单之后，用同一编号新建仍被拒绝，且下一个自动号不回退**；把那张单删除之后，同一编号可以再次写入。
+* **证据（作废不释放）**：`nextNumber` 的取数语句只按 `doc_type` 与 `doc_number LIKE` 过滤，**没有 status 条件**；`idx_docs_type_number` 是普通唯一索引、**不带 `WHERE` 子句**（不是部分索引）；`update` 作废时只写 `status`，不动 `doc_number`。三处实测。
 * **登记**：「本地时区」是一个真实的口径选择，跨年当天在不同时区会得到不同前缀。照搬即接受。
 
 ### Q4 · 税口径 = 全部照搬
@@ -191,7 +194,7 @@ Electron 现状在三处一致地表达了同一条边界，原生照此写：
 | 轮 | 范围 | 验收线 | 预计新增 | 棘轮 / 登记联动 |
 | --- | --- | --- | --- | --- |
 | **D-0**（本轮） | 把九条裁定落成本文件 | 纯新增一个 `.md`；非 `.md` 变更 0；测试数、键数、黄金全不变 | 0 测试 0 键 | 无 |
-| **D-1 存储层** | 按 Q9 甲案读写 v11 既有表；按 Q4 把算式迁入 Core 并逐字复刻 | 建/读/写往返；舍入链与 Electron 逐字节相等（对抗输入含「先舍后乘 ≠ 先乘后舍」的用例）；Q5 边界断言之 1、2 | +25~40 Core | 不涉 pbxproj（Core 包） |
+| **D-1 存储层** | 按 Q9 甲案读写 v11 既有表；按 Q4 把算式迁入 Core 并逐字复刻。**对账单生成器（Q2）不在本轮，除非 §8 的 Q2-a…Q2-d 四项已全部裁定**——未齐则本轮不含它，也不得先写一个「日后再补币种」的版本 | 建/读/写往返；舍入链与 Electron 逐字节相等（对抗输入含「先舍后乘 ≠ 先乘后舍」的用例）；Q5 边界断言之 1、2 | +25~40 Core | 不涉 pbxproj（Core 包） |
 | **D-2 编号与状态机** | Q3 编号；Q5 状态机、编辑白名单、删除规则；A8 设计约束落地 | 状态机闭集反例全覆盖；编号三条反例（跨年 / 删除后重用 / 自定义不污染最大值）；「改行不传 items」路径在原生不可达 | +20~30 Core | 不涉 pbxproj |
 | **D-3 六语文案** | `documents.*` 的原生等价键族 | 六语键数同步 650 → 650+N；`LocalizationWordingGuardTests` **零新增 sanctioned**；禁词实跑 | +50~87 键 × 6（预计） | **三处 650 棘轮跨两个目标**：`InventoryCopyTests`（Core）、`LegacyConversionCopyTests`（App）、`ProductCopyTests`（App）。**若新增 App 目标测试文件，须手工登记 pbxproj，恰 4 行/文件** |
 | **D-4 视图** | 列表页 + 编辑器 + 明细行 | 新建 `DocumentsView` 与其 composition；**新分区是第 7 个**，须同步撞到的闭集守门与两处分区计数注释 | +30~50 App | `SidebarSection`（`AppModel.swift`）新增一例；`InventoryView` 的「不是本页的五个分区」注释与 `AppModel` 的「六个分区之一」注释同轮改。App 目标新文件须登记 pbxproj |
@@ -227,6 +230,24 @@ Q2 裁定了行来源、匹配条件、日期范围与客户下拉来源，**没
 ### Q2-b · `transactions.tax_rate` 的量纲（**阻塞 D-1**）
 
 实测该列是 `REAL`，写入侧只做 `Number(x) || 0`，**全仓没有任何消费者对它做过归一**（报表读的是 `sales.taxRate` 别名后的同名字段，不是这一列）；原生编辑器也只收一个裸数字。所以「13」还是「0.13」在库里没有约定。而 Q4 的算式吃的是**百分数**（`税率 / 100`），单据的 `tax_rate` 又是 `"13%"` 形的文本。两者之间怎么换算需要裁定。
+
+### Q2-c · 客户名的空白规则（**阻塞 D-1**）
+
+Electron 的对账单在比较前先 trim：`stmtCustomers` 对 `sales.customer` **trim 后**去重排序，`generateStatement` 用 `r.customer.trim() === stmtCustomer` 比较。原生这一侧不同——`Transaction.normalized()` 对 `counterparty` 只做 `prefix(200)` 截断，**不 trim**，所以库里可以同时存在 `"Acme"` 与 `" Acme "` 两个值。
+
+Q2 裁定的字面是「精确匹配」。按字面实现，`" Acme "` 与 `"Acme"` 会被当成两个客户：下拉出现两项，选中任一项都只捞到自己那一半流水。按 Electron 语义实现（trim 后比较）则需要下拉与筛选**用同一套规则**，否则两边会不一致。
+
+三选一，需裁定：**(a)** 原样精确匹配，接受空白差异分裂客户；**(b)** 下拉与筛选都 trim 后再比较（等价于 Electron 语义）；**(c)** 在写入侧就 trim `counterparty`——但那会改动流水的既有写路径，属数据安全范畴，不在本章。
+
+### Q2-d · 对账单跨币种怎么办（**阻塞 D-1**）
+
+Q2 裁定的三个筛选条件里**没有币种**，而 `transactions` 是**逐行带币种**的：`currency TEXT NOT NULL DEFAULT 'CNY'`。Electron 从来没遇到这个问题——它的对账单取自 `sales`，实测**该表根本没有 currency 列**。所以这是 Q2 这处发明**新引入**的口径缺口，不是照搬来的。
+
+后果是具体的：同一客户在同一期间里若有不同币种的收入流水，按当前三条件会被**全部拉进同一张单并求和**；而 Q8 已裁定单据没有币种列、显示币种由 `acc_locale` 推导，于是那个跨币种的和会被冠上**单一**币种符号。原生自身也不是没有币种意识——`LedgerStore.summaryByCurrency` 就是按币种分开汇总的。
+
+四选一，需裁定：**(a)** 只取与单据 `acc_locale` 本位币相同的流水，其余静默排除；**(b)** 同 (a) 但把被排除的行数与币种如实告知用户；**(c)** 期间内存在多币种时拒绝生成并说明原因；**(d)** 按币种拆成多张单据。
+
+**在裁定之前 D-1 不得实现对账单生成器**——按当前三条件写出来的就是一个跨币种求和、再冠单一符号的报表，这正是 CLAUDE.md 禁止的「依赖会计政策的计算静默选择了一种政策」。
 
 ### Q7-a · 导出文件名与落盘位置
 
