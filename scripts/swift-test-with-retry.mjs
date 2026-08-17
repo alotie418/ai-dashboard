@@ -311,8 +311,11 @@ export async function record({ env = {}, detail, firstSummary, retrySummary, dat
     },
     body: JSON.stringify({ body }),
   });
+  // Read the body whatever the status. An unread response body keeps its socket
+  // checked out, which would hold the event loop open after the work is done — and
+  // this script now relies on the loop draining naturally rather than being cut off.
+  const text = typeof response.text === 'function' ? await response.text() : '';
   if (response.status !== 201) {
-    const text = typeof response.text === 'function' ? await response.text() : '';
     throw new Error(`posting the ledger comment to issue #${ISSUE_NUMBER} returned HTTP ` +
                     `${response.status}: ${text}`);
   }
@@ -405,5 +408,12 @@ if (isMain) {
     console.error(`::error::swift-test-with-retry failed: ${error.stack ?? error.message}`);
     return 1;
   });
-  process.exit(code);
+  // `process.exitCode`, never `process.exit()`. On POSIX a stdout that is a pipe — which
+  // is exactly what a runner gives a step — is written ASYNCHRONOUSLY, and process.exit()
+  // does not wait for those writes. Measured, with a reader that reads slowly enough for
+  // the pipe to fill: process.exit(0) after 20001 lines delivered 1332 of them and DROPPED
+  // the ::warning:: annotation, exiting 0 — i.e. exactly the "recorded, therefore allowed
+  // to pass" claim being false while the job goes green. Setting the code and letting the
+  // event loop drain flushes everything first.
+  process.exitCode = code;
 }

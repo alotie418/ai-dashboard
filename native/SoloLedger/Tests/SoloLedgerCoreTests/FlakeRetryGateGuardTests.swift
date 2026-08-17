@@ -399,6 +399,26 @@ final class FlakeRetryGateGuardTests: XCTestCase {
 
     // MARK: - (d) the behaviour is pinned somewhere CI actually runs
 
+    /// The annotation is only recorded if it is actually delivered. On POSIX a stdout
+    /// that is a pipe — a runner step's stdout — is written asynchronously, and
+    /// `process.exit()` does not wait for pending writes. Measured with a slow reader:
+    /// `process.exit(0)` after 20001 lines delivered 1332 of them and dropped the
+    /// `::warning::` line entirely, while still exiting 0. That is the accounting
+    /// silently failing on the green path, which is the one failure mode this whole
+    /// round exists to prevent.
+    func testTheWrapperNeverCutsItsOwnOutputShort() throws {
+        let stripped = Self.strippedJavaScript(try Self.repoText(Self.wrapperPath))
+        XCTAssertEqual(Self.occurrences(of: "process.exit(", in: stripped), 0, """
+            the wrapper calls process.exit(). On a pipe that discards output still queued \
+            for stdout — including the ::warning:: annotation written a moment earlier — \
+            so the job can exit 0 having recorded less than it claims. Set \
+            `process.exitCode` and let the event loop drain instead.
+            """)
+        XCTAssertTrue(stripped.contains("process.exitCode = code;"), """
+            the wrapper no longer sets an exit code at all, so a red Core run would exit 0.
+            """)
+    }
+
     func testTheRetrySemanticsAreExercisedByEveryPullRequest() throws {
         let packageJSON = try Self.repoText(Self.packageJSONPath)
         XCTAssertTrue(packageJSON.contains("\"\(Self.npmScriptName)\": \"node \(Self.semanticsPath)\""), """
