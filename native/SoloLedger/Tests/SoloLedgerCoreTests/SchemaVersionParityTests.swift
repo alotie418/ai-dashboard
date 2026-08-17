@@ -85,7 +85,7 @@ final class SchemaVersionParityTests: XCTestCase {
     // MARK: - Segment two · the native-only increment is exactly the declared list
 
     func testTheNativeOnlyIncrementIsExactlyTheDeclaredList() {
-        XCTAssertEqual(SchemaMigrator.nativeOnlyVersions, [24],
+        XCTAssertEqual(SchemaMigrator.nativeOnlyVersions, [24, 25],
                        "every native-only rung is declared here by hand — add one and this line moves with it")
 
         XCTAssertEqual(
@@ -134,7 +134,7 @@ final class SchemaVersionParityTests: XCTestCase {
         // A rung claimed to be native-only that actually sits inside the shared segment.
         XCTAssertEqual(Self.nativeIncrementViolations(declared: [23], shared: 23, head: 23),
                        ["head-is-not-shared-plus-declared-count", "declared-list-is-not-the-contiguous-range"])
-        // The legal shapes: today's, and a hypothetical two-rung future.
+        // The legal shapes: the one-rung era (before v25), and today's two-rung ladder.
         XCTAssertEqual(Self.nativeIncrementViolations(declared: [24], shared: 23, head: 24), [])
         XCTAssertEqual(Self.nativeIncrementViolations(declared: [24, 25], shared: 23, head: 25), [])
         // And the shape before any native-only rung existed.

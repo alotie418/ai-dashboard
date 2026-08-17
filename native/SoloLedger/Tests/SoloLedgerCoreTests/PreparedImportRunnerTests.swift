@@ -109,7 +109,7 @@ final class PreparedImportRunnerTests: LedgerTestCase {
         let prepared = try PreparedImportRunner().run(gated, workingDirectory: try workingRoot(), preparedRoot: try preparedRoot())
 
         let db = try SQLiteDatabase(path: prepared.preparedDatabaseURL.path, readOnly: true)
-        XCTAssertEqual(try db.userVersion(), 24, "the full ladder must reach head")
+        XCTAssertEqual(try db.userVersion(), SchemaMigrator.schemaVersion, "the full ladder must reach head")
         let present = Set(try db.query("SELECT name FROM sqlite_master WHERE type='table'").compactMap { $0.string("name") })
         for t in SchemaMigrator.requiredTables { XCTAssertTrue(present.contains(t), "missing table \(t)") }
         XCTAssertEqual(prepared.transactionsMigrated, 0)

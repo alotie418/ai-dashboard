@@ -88,7 +88,7 @@ final class InventorySchemaTests: LedgerTestCase {
 
         try SchemaMigrator.migrate(db)
 
-        XCTAssertEqual(try db.userVersion(), 24)
+        XCTAssertEqual(try db.userVersion(), SchemaMigrator.schemaVersion)
         let after = try tableNames(db)
         for t in inventoryTables { XCTAssertTrue(after.contains(t), "v24 must create \(t)") }
         XCTAssertEqual(after.subtracting(before), Set(inventoryTables),
@@ -110,12 +110,12 @@ final class InventorySchemaTests: LedgerTestCase {
         let objectsAfterFirst = try schemaObjects(db)
 
         try SchemaMigrator.migrate(db)                       // no-op: already at head
-        XCTAssertEqual(try db.userVersion(), 24)
+        XCTAssertEqual(try db.userVersion(), SchemaMigrator.schemaVersion)
         XCTAssertEqual(try schemaObjects(db), objectsAfterFirst)
 
         try db.setUserVersion(23)                            // force the rung to run again
         try SchemaMigrator.migrate(db)
-        XCTAssertEqual(try db.userVersion(), 24)
+        XCTAssertEqual(try db.userVersion(), SchemaMigrator.schemaVersion)
         XCTAssertEqual(try schemaObjects(db), objectsAfterFirst,
                        "re-running the rung must not duplicate or alter a single object")
         XCTAssertEqual(try db.query("SELECT COUNT(*) AS c FROM settings WHERE key = 'native_inventory_active'")
@@ -156,8 +156,8 @@ final class InventorySchemaTests: LedgerTestCase {
 
         // ── and forward again ──
         try SchemaMigrator.migrate(db)
-        XCTAssertEqual(try db.userVersion(), 24)
-        XCTAssertEqual(try schemaObjects(db), v24Objects, "the round trip reproduces v24 exactly")
+        XCTAssertEqual(try db.userVersion(), SchemaMigrator.schemaVersion)
+        XCTAssertEqual(try schemaObjects(db), v24Objects, "the round trip reproduces head exactly")
     }
 
     /// G4 — `requiredTables` is the list every completeness check filters against, so the three
@@ -187,7 +187,8 @@ final class InventorySchemaTests: LedgerTestCase {
             DROP TABLE inventory_balances;
             DROP TABLE inventory_exceptions;
             """)
-        XCTAssertEqual(try build.userVersion(), 24, "it still CLAIMS head — only the tables are gone")
+        XCTAssertEqual(try build.userVersion(), SchemaMigrator.schemaVersion,
+                       "it still CLAIMS head — only the tables are gone")
         try build.close()
 
         let staged = try trackedTempDir().appendingPathComponent("SoloLedger", isDirectory: true)
@@ -355,7 +356,8 @@ final class InventorySchemaTests: LedgerTestCase {
         }
 
         let store = try LedgerStore.openActiveExistingHardened(databaseURL: active, expect: evidence, snapshot: plan)
-        XCTAssertEqual(try store.schemaVersion(), 24, "the v24 rung ran on the live ledger")
+        XCTAssertEqual(try store.schemaVersion(), SchemaMigrator.schemaVersion,
+                       "the v24 rung ran on the live ledger")
         XCTAssertTrue(try tableNames(store.db).isSuperset(of: Set(inventoryTables)))
         try store.db.close()
 
@@ -382,7 +384,7 @@ final class InventorySchemaTests: LedgerTestCase {
         try fm.copyItem(at: bundle.appendingPathComponent(AppPaths.databaseFileName), to: restored)
         let reopened = try LedgerStore(databaseURL: restored)
         defer { try? reopened.db.close() }
-        XCTAssertEqual(try reopened.schemaVersion(), 24)
+        XCTAssertEqual(try reopened.schemaVersion(), SchemaMigrator.schemaVersion)
         XCTAssertEqual(try reopened.listTransactions().count, 7)
     }
 }
