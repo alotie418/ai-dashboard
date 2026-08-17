@@ -292,7 +292,7 @@ Electron 现状在三处一致地表达了同一条边界，原生照此写：
 | 路由 | 7 | `electron/handlers/router.js` 中 `/api/documents` 前缀的条目 |
 | `documents.*` 键 | 87 × 6 = 522 | 六个 `i18n/locales/*.json` 的 `documents` 对象键数 |
 | 禁词命中 | 0 | 两张词表 × 522 条，图案先经已知目标自证 |
-| Electron 侧断言 | 259 | `scripts/test-handlers.mjs` 的 §2B Batch 8 段内 `ok(` 与 `expectThrow(` 计数 |
+| Electron 侧断言 | 63 | `scripts/test-handlers.mjs` 的 §2B Batch 8 段内 `ok(` 50 + `expectThrow(` 13；另可用该段每条断言都带的 `[doc]` 标记复算，全仓恰 63 次 |
 | 真 Electron e2e 用例 | 5 | `e2e-electron/documents-attachment-fs.spec.ts` |
 | 镜像面 | ≈1813 行 | handler 322 + 前端 1491（`DocumentsPage` 356 + `DocumentModal` 501 + `documentPdf` 160 + `TaxInvoiceModal` 256 + `invoiceStatusDisplay` 42 + `services/api.ts` 单据段 176） |
 | 原生写入的表 | 10 张 | `native/SoloLedger/Sources` 下全部 `INSERT` 语句，含唯一一处插值写（它只服务 `transactions` 与 `legacy_migrations`） |
@@ -322,6 +322,14 @@ Electron 现状在三处一致地表达了同一条边界，原生照此写：
 | **Q2-d-②** 币种标记载体 | （本次新产生） | **仍未裁定，停在 §8**，D-1 的对账单闸门因此**保持关闭** | 本轮把 24 列逐列普查（谓词自证：`doc.customerName` 判「印在产物上」为真、`doc.createdAt` 为假），结论是没有既能承载标记又满足「页眉/徽标/金额符号都从它渲染」的字段：裁定原文点名的 `notes` **用户可改且印在产物上**，标记被删就会让外币单据静默换回本位币符号——正是后果③要防的；唯一技术上可用的 `source_sales_id` 语义说谎且进 CSV。三选一已列在 §8 |
 | **Q7-a** 文件名与落盘 | §8「未裁定」 | 移入 §2 Q7：文件名 `<doc_number>.html`（非法字符转义），落盘走 Powerbox 用户自选、无默认目录 | 用户裁定。**另登记一条实测订正**：裁定理由里说「唯一性由 `(doc_type, doc_number)` 索引背书」——该索引保证的是**这一对**唯一，不是 `doc_number` 单列唯一（既有守门就断言同一个 `DUP-1` 可在 `quotation` 与 `sales_order` 各存在一次），所以同编号不同类型会撞同名文件。落盘由 Powerbox 面板提示重名，不是静默覆盖，故登记为已知形态而非另开裁定 |
 | **Q8** 币种推导 | 「显示币种一律由 `acc_locale` 推导」 | 加**一处显式例外**：带币种标记的非本位币对账单，金额符号/页眉/徽标按标记渲染。例外**待 Q2-d-② 定了载体才生效** | Q2-d 的后果③要求，写在 Q8 节以免两处互相矛盾 |
+
+### 2026-08-17 · 第四次裁定（§7 数字订正）
+
+| 条目 | 从什么 | 改成什么 | 依据 |
+| --- | --- | --- | --- |
+| **§7** Electron 侧断言 | 259 | **63**，并把复算方式写成两种独立构造：段内 `ok(` 50 + `expectThrow(` 13，以及该段每条断言都带的 `[doc]` 标记全仓恰 63 次 | 用户裁定。依据是 D-1（PR #488）的实测：**259 是从 Batch 8 标题一路数到文件末尾**的结果，把其后 11 个无关段落（现金流、providers、EC27 等）全扫了进去，所以它不是「段内」计数。两种构造互证得 63；`scripts/test-handlers.mjs` 自 `139d6018` 起一字未改，故这是**记录错误而非漂移**。本行不改变任何口径，只改一个可复算的数字 |
+
+**这条订正不解锁也不阻塞任何轮次。** D-1 的语义对照本就按真实的 63 条做：其中 26 条在 D-1 范围内（create 校验 5 / create 成功 8 / get-list 7 / 明细与合计 6），其余 37 条属 D-2（`next-number` 6 / `DOC_NUMBER_EXISTS` 3 / `update` 与状态机 11 / 税务发票关联 9 / `remove` 8）。
 
 ### 2026-08-17 · 第三次（末次）裁定（Q2-d-②）
 

@@ -4,11 +4,11 @@ import XCTest
 /// D-1 · Q9 — the document store, against `electron/handlers/documents.js`.
 ///
 /// The comparison list is `scripts/test-handlers.mjs` §2B Batch 8. **That section holds 63
-/// assertions**, not the 259 recorded in `docs/BUSINESS_DOCUMENTS_SPEC.md` §7 — 259 is what
-/// counting `ok(` and `expectThrow(` from the Batch 8 header to the END OF THE FILE gives, which
-/// sweeps in eleven later sections. The section's own count is confirmed two ways: 50 `ok(` plus 13
-/// `expectThrow(` between its header and the next one, and 63 occurrences of the `[doc]` tag every
-/// one of its assertions carries.
+/// assertions**, confirmed two ways: 50 `ok(` plus 13 `expectThrow(` between its header and the
+/// next one, and 63 occurrences of the `[doc]` tag every one of its assertions carries.
+/// `docs/BUSINESS_DOCUMENTS_SPEC.md` §7 recorded 259 until this round; that number came from
+/// counting from the Batch 8 header to the END OF THE FILE, which sweeps in eleven later sections.
+/// The spec's fourth ruling corrects it.
 ///
 /// Of those 63, **26 are in this round's scope** (create validation 5, create success 8, get/list 7,
 /// lines and totals 6) and each has a counterpart below. The other 37 are Q3/Q5 and belong to D-2:
