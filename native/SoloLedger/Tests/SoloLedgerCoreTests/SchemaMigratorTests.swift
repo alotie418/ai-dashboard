@@ -5,8 +5,10 @@ final class SchemaMigratorTests: LedgerTestCase {
 
     func testMigratesToHead() throws {
         let store = try makeStore()
-        XCTAssertEqual(try store.schemaVersion(), 24)
-        XCTAssertEqual(SchemaMigrator.schemaVersion, 24)
+        XCTAssertEqual(try store.schemaVersion(), SchemaMigrator.schemaVersion)
+        // The one literal head in this file: relative assertions above prove "the store reached
+        // the declared head", which stays true across a bump. This line is what a bump moves.
+        XCTAssertEqual(SchemaMigrator.schemaVersion, 25)
     }
 
     func testAllExpectedTablesExist() throws {
@@ -31,11 +33,11 @@ final class SchemaMigratorTests: LedgerTestCase {
         let url = try tempDatabaseURL()
         do {
             let store = try LedgerStore(databaseURL: url)
-            XCTAssertEqual(try store.schemaVersion(), 24)
+            XCTAssertEqual(try store.schemaVersion(), SchemaMigrator.schemaVersion)
         }
         // Reopen the same file: no re-migration, no duplicate seed.
         let store2 = try LedgerStore(databaseURL: url)
-        XCTAssertEqual(try store2.schemaVersion(), 24)
+        XCTAssertEqual(try store2.schemaVersion(), SchemaMigrator.schemaVersion)
         let count = try store2.db.query("SELECT COUNT(*) AS c FROM categories").first?.int("c")
         XCTAssertEqual(count, 78)
     }

@@ -38,7 +38,8 @@ final class DatabaseUpgradeTests: LedgerTestCase {
         // Destination opens with all data intact.
         XCTAssertTrue(FileManager.default.fileExists(atPath: paths.activeDestination.path))
         let store = try LedgerStore(databaseURL: paths.activeDestination)
-        XCTAssertEqual(try store.schemaVersion(), 24, "the destination is migrated to the NATIVE head")
+        XCTAssertEqual(try store.schemaVersion(), SchemaMigrator.schemaVersion,
+                       "the destination is migrated to the NATIVE head")
         XCTAssertEqual(try store.listTransactions().count, 7)
         XCTAssertEqual(try store.summary().net, 2850.01, accuracy: 0.001)
 
@@ -85,7 +86,8 @@ final class DatabaseUpgradeTests: LedgerTestCase {
                 return XCTFail("expected .unknownVersion, got \(error)")
             }
             XCTAssertEqual(found, 99)
-            XCTAssertEqual(supported, 24, "'supported' is the native head, not the shared-ladder version")
+            XCTAssertEqual(supported, SchemaMigrator.schemaVersion,
+                           "'supported' is the native head, not the shared-ladder version")
         }
         XCTAssertFalse(FileManager.default.fileExists(atPath: paths.activeDestination.path))
     }

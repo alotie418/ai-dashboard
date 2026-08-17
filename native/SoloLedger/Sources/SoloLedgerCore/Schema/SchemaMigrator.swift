@@ -28,7 +28,7 @@ public enum SchemaMigrator {
     /// The native head — what a fully-migrated database reaches. Equals
     /// ``sharedLadderVersion`` + ``nativeOnlyVersions``.count, asserted in
     /// `SchemaVersionParityTests`.
-    public static let schemaVersion = 24
+    public static let schemaVersion = 25
 
     /// The last rung the native ladder SHARES with Electron. MUST equal the JS app's
     /// `SCHEMA_VERSION` (= MIGRATIONS.length); `SchemaVersionParityTests` reads that value
@@ -43,7 +43,11 @@ public enum SchemaMigrator {
     ///
     /// * **v24** — the native inventory ledger (`inventory_movements` / `inventory_balances`
     ///   / `inventory_exceptions`). Purely additive; nothing in v1…v23 is touched.
-    public static let nativeOnlyVersions = [24]
+    /// * **v25** — `business_documents.currency`, one nullable `TEXT` column. Purely additive in
+    ///   the stronger sense that v24 was not: it adds no object, only a column, and `NULL` — the
+    ///   value every pre-existing row gets — carries the OLD meaning (derive the display currency
+    ///   from `acc_locale`). See `docs/BUSINESS_DOCUMENTS_SPEC.md` Q2-d-② and the Q8 exception.
+    public static let nativeOnlyVersions = [24, 25]
 
     public enum MigrationError: Error, CustomStringConvertible {
         case newerThanSupported(found: Int, supported: Int)
@@ -107,11 +111,11 @@ public enum SchemaMigrator {
         }
     }
 
-    // MARK: - The ladder (v1 … v24), one closure per version
+    // MARK: - The ladder (v1 … v25), one closure per version
     //
     // v1…v23 are the SHARED segment — a faithful port of `electron/db/index.js`. Nothing
-    // below this line may be edited to accommodate a native-only rung; v24 exists precisely
-    // so that it does not have to be.
+    // below this line may be edited to accommodate a native-only rung; v24 and v25 exist
+    // precisely so that it does not have to be.
 
     private static let migrations: [(SQLiteDatabase) throws -> Void] = [
         // v1: initial schema
@@ -559,6 +563,31 @@ public enum SchemaMigrator {
                 INSERT OR REPLACE INTO settings (key, value, updated_at)
                 VALUES ('native_inventory_active', ?, datetime('now'))
                 """, [.text("\"24\"")])   // JSON-encoded, matching every other settings value
+        },
+
+        // ── v25 — `business_documents.currency` ───────────────────────────────────────────
+        //
+        // One nullable TEXT column, no CHECK, no DEFAULT. The ruling is in
+        // `docs/BUSINESS_DOCUMENTS_SPEC.md` Q2-d-②; the three properties are load-bearing and
+        // each is a decision, not an omission:
+        //
+        //   * **Nullable, and NULL is the OLD behaviour.** Every row that exists before this rung
+        //     gets NULL, and NULL means "derive the display currency from `acc_locale`" — exactly
+        //     what every document did until now. So the rung changes no document's meaning. A
+        //     non-NULL value is the Q8 exception: header, badge and money symbol all read it.
+        //   * **No DEFAULT.** A DEFAULT would make new rows claim a currency nobody chose, and
+        //     the whole point of NULL here is that it is a value ("follow the profile"), not a gap.
+        //   * **No CHECK.** Measured: not one `currency` column in this repository carries a CHECK
+        //     — `transactions.currency` is `TEXT NOT NULL DEFAULT 'CNY'`, `accounts.currency` and
+        //     `liabilities.currency` are bare `TEXT`. This column follows that convention.
+        //
+        // `addColumn` rather than a raw ALTER: SQLite has no `ADD COLUMN IF NOT EXISTS`, and the
+        // rung has to survive being re-run (the rollback round trip in the guard does exactly
+        // that). No evidence row: v24 wrote one because a future Electron build could act on it;
+        // nothing was asked for here, and inventing one would be a decision this round has no
+        // ruling for.
+        { db in
+            try addColumn(db, "business_documents", "currency", "TEXT")
         },
     ]
 }

@@ -12,10 +12,12 @@ final class FixtureReadTests: LedgerTestCase {
         try LedgerStore(databaseURL: electronFixtureCopy())
     }
 
-    /// The fixture is a v23 file; opening it runs the ladder to the NATIVE head, which is 24.
-    /// The committed fixture itself stays at 23 — the copy-on-open above is what keeps it there.
+    /// The fixture is a v23 file; opening it runs the ladder to the NATIVE head. The committed
+    /// fixture itself stays at 23 — the copy-on-open above is what keeps it there. Asserted
+    /// against the declared head rather than a literal: what this test is about is that opening
+    /// MIGRATES, not what today's head number happens to be.
     func testSchemaVersion() throws {
-        XCTAssertEqual(try openFixture().schemaVersion(), 24)
+        XCTAssertEqual(try openFixture().schemaVersion(), SchemaMigrator.schemaVersion)
     }
 
     func testTablesAndIndexes() throws {

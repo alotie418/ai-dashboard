@@ -88,7 +88,7 @@ final class InventorySchemaTests: LedgerTestCase {
 
         try SchemaMigrator.migrate(db)
 
-        XCTAssertEqual(try db.userVersion(), 24)
+        XCTAssertEqual(try db.userVersion(), SchemaMigrator.schemaVersion)
         let after = try tableNames(db)
         for t in inventoryTables { XCTAssertTrue(after.contains(t), "v24 must create \(t)") }
         XCTAssertEqual(after.subtracting(before), Set(inventoryTables),
@@ -110,12 +110,12 @@ final class InventorySchemaTests: LedgerTestCase {
         let objectsAfterFirst = try schemaObjects(db)
 
         try SchemaMigrator.migrate(db)                       // no-op: already at head
-        XCTAssertEqual(try db.userVersion(), 24)
+        XCTAssertEqual(try db.userVersion(), SchemaMigrator.schemaVersion)
         XCTAssertEqual(try schemaObjects(db), objectsAfterFirst)
 
         try db.setUserVersion(23)                            // force the rung to run again
         try SchemaMigrator.migrate(db)
-        XCTAssertEqual(try db.userVersion(), 24)
+        XCTAssertEqual(try db.userVersion(), SchemaMigrator.schemaVersion)
         XCTAssertEqual(try schemaObjects(db), objectsAfterFirst,
                        "re-running the rung must not duplicate or alter a single object")
         XCTAssertEqual(try db.query("SELECT COUNT(*) AS c FROM settings WHERE key = 'native_inventory_active'")
@@ -133,8 +133,25 @@ final class InventorySchemaTests: LedgerTestCase {
         let db = try openRW(url)
         defer { try? db.close() }
         try SchemaMigrator.migrate(db)
+        let headObjects = try schemaObjects(db)
+
+        // The ladder now runs past v24, so migrating lands at head and NOT at v24. Rewind the
+        // rungs above v24 first, or the "v23" state this test constructs below still carries
+        // them and the byte-identical comparison compares two v25 schemas to each other —
+        // green, and proving nothing about v23. (D-1a added v25; its own rollback form is
+        // pinned by `DocumentCurrencySchemaTests` G3, which is what makes this line safe to
+        // rely on here.)
+        try db.execute("""
+            ALTER TABLE business_documents DROP COLUMN currency;
+            PRAGMA user_version = 24;
+            """)
+        XCTAssertEqual(try db.userVersion(), 24, "the v24 baseline this test needs")
 
         let v24Objects = try schemaObjects(db)
+        XCTAssertNotEqual(v24Objects, headObjects, """
+            rewinding the rungs above v24 must actually change the schema — if it does not, this \
+            test is comparing head to itself again and proves nothing about v23.
+            """)
         let transactionsBefore = try db.query("SELECT COUNT(*) AS c FROM transactions").first?.int("c")
 
         // ── the rollback, exactly as documented ──
@@ -154,10 +171,10 @@ final class InventorySchemaTests: LedgerTestCase {
         XCTAssertEqual(try db.query("SELECT COUNT(*) AS c FROM transactions").first?.int("c"),
                        transactionsBefore, "the rollback touches no data")
 
-        // ── and forward again ──
+        // ── and forward again ── (all the way to head, which is above v24 since D-1a)
         try SchemaMigrator.migrate(db)
-        XCTAssertEqual(try db.userVersion(), 24)
-        XCTAssertEqual(try schemaObjects(db), v24Objects, "the round trip reproduces v24 exactly")
+        XCTAssertEqual(try db.userVersion(), SchemaMigrator.schemaVersion)
+        XCTAssertEqual(try schemaObjects(db), headObjects, "the round trip reproduces head exactly")
     }
 
     /// G4 — `requiredTables` is the list every completeness check filters against, so the three
@@ -187,7 +204,8 @@ final class InventorySchemaTests: LedgerTestCase {
             DROP TABLE inventory_balances;
             DROP TABLE inventory_exceptions;
             """)
-        XCTAssertEqual(try build.userVersion(), 24, "it still CLAIMS head — only the tables are gone")
+        XCTAssertEqual(try build.userVersion(), SchemaMigrator.schemaVersion,
+                       "it still CLAIMS head — only the tables are gone")
         try build.close()
 
         let staged = try trackedTempDir().appendingPathComponent("SoloLedger", isDirectory: true)
@@ -355,7 +373,8 @@ final class InventorySchemaTests: LedgerTestCase {
         }
 
         let store = try LedgerStore.openActiveExistingHardened(databaseURL: active, expect: evidence, snapshot: plan)
-        XCTAssertEqual(try store.schemaVersion(), 24, "the v24 rung ran on the live ledger")
+        XCTAssertEqual(try store.schemaVersion(), SchemaMigrator.schemaVersion,
+                       "the v24 rung ran on the live ledger")
         XCTAssertTrue(try tableNames(store.db).isSuperset(of: Set(inventoryTables)))
         try store.db.close()
 
@@ -382,7 +401,7 @@ final class InventorySchemaTests: LedgerTestCase {
         try fm.copyItem(at: bundle.appendingPathComponent(AppPaths.databaseFileName), to: restored)
         let reopened = try LedgerStore(databaseURL: restored)
         defer { try? reopened.db.close() }
-        XCTAssertEqual(try reopened.schemaVersion(), 24)
+        XCTAssertEqual(try reopened.schemaVersion(), SchemaMigrator.schemaVersion)
         XCTAssertEqual(try reopened.listTransactions().count, 7)
     }
 }
