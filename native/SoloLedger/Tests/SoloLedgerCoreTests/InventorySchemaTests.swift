@@ -133,8 +133,25 @@ final class InventorySchemaTests: LedgerTestCase {
         let db = try openRW(url)
         defer { try? db.close() }
         try SchemaMigrator.migrate(db)
+        let headObjects = try schemaObjects(db)
+
+        // The ladder now runs past v24, so migrating lands at head and NOT at v24. Rewind the
+        // rungs above v24 first, or the "v23" state this test constructs below still carries
+        // them and the byte-identical comparison compares two v25 schemas to each other —
+        // green, and proving nothing about v23. (D-1a added v25; its own rollback form is
+        // pinned by `DocumentCurrencySchemaTests` G3, which is what makes this line safe to
+        // rely on here.)
+        try db.execute("""
+            ALTER TABLE business_documents DROP COLUMN currency;
+            PRAGMA user_version = 24;
+            """)
+        XCTAssertEqual(try db.userVersion(), 24, "the v24 baseline this test needs")
 
         let v24Objects = try schemaObjects(db)
+        XCTAssertNotEqual(v24Objects, headObjects, """
+            rewinding the rungs above v24 must actually change the schema — if it does not, this \
+            test is comparing head to itself again and proves nothing about v23.
+            """)
         let transactionsBefore = try db.query("SELECT COUNT(*) AS c FROM transactions").first?.int("c")
 
         // ── the rollback, exactly as documented ──
@@ -154,10 +171,10 @@ final class InventorySchemaTests: LedgerTestCase {
         XCTAssertEqual(try db.query("SELECT COUNT(*) AS c FROM transactions").first?.int("c"),
                        transactionsBefore, "the rollback touches no data")
 
-        // ── and forward again ──
+        // ── and forward again ── (all the way to head, which is above v24 since D-1a)
         try SchemaMigrator.migrate(db)
         XCTAssertEqual(try db.userVersion(), SchemaMigrator.schemaVersion)
-        XCTAssertEqual(try schemaObjects(db), v24Objects, "the round trip reproduces head exactly")
+        XCTAssertEqual(try schemaObjects(db), headObjects, "the round trip reproduces head exactly")
     }
 
     /// G4 — `requiredTables` is the list every completeness check filters against, so the three
