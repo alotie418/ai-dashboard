@@ -219,6 +219,45 @@ public enum DocumentMath {
         return String(String.UnicodeScalarView(scalars))
     }
 
+    /// `String.prototype.slice(0, end)` — **counted in UTF-16 code units**, which is what every
+    /// `safeString(v, n)` clamp on the Electron side does.
+    ///
+    /// `String.prefix(n)` is the wrong instrument and the difference is not academic: it counts
+    /// extended grapheme clusters. A `doc_number` of 31 thumbs-up emoji is 62 code units and 31
+    /// characters, so Electron cuts it to 30 emoji and `prefix(60)` cuts nothing at all — the same
+    /// input then produces two different numbers, and `idx_docs_type_number` disagrees about
+    /// whether a second one collides.
+    ///
+    /// ## What happens when the cut lands inside a surrogate pair
+    ///
+    /// JS strings may hold an unpaired surrogate; Swift `String` may not. That looked like it might
+    /// make this mirror unreachable, so it was MEASURED on both sides rather than reasoned about:
+    ///
+    /// ```text
+    ///   input "A" + 30 × U+1F44D (61 code units), cut at 60
+    ///     Electron  slice → …D83D DC4D D83D  (trailing LONE high surrogate)
+    ///               better-sqlite3 stores     …F0 9F 91 8D EF BF BD   ← U+FFFD, not WTF-8
+    ///     Swift     this function             …F0 9F 91 8D EF BF BD   ← identical
+    /// ```
+    ///
+    /// The engines agree because both replace the unpaired unit with exactly one U+FFFD: V8 does it
+    /// when better-sqlite3 asks for the UTF-8 bytes, and `String(decoding:as:)` does it here. Had
+    /// better-sqlite3 written WTF-8 (`ED A0 BD`) this would have been a mirror Swift cannot reach,
+    /// and this round would have had to stop and ask. It measured `EF BF BD`, so it does not.
+    ///
+    /// Verified case by case against a real `better-sqlite3` bind: 31 emoji at 60, "A" + 30 emoji
+    /// at 60, "A" + 100 emoji at 200, 30 emoji at 60, one `e` + 60 combining acutes at 60, and ten
+    /// ZWJ family emoji at 60 — all six identical in stored bytes and in code-unit count.
+    ///
+    /// **One asymmetry stays, and it is inherent rather than introduced:** a JS string can ARRIVE
+    /// holding an unpaired surrogate, and a Swift `String` cannot, so the two sides' input domains
+    /// differ before any clamp runs. Nothing this API accepts can be in that state.
+    static func jsSlice(_ s: String, to end: Int) -> String {
+        guard end < s.utf16.count else { return s }   // `slice` past the end returns the whole string
+        guard end > 0 else { return "" }
+        return String(decoding: Array(s.utf16.prefix(end)), as: UTF16.self)
+    }
+
     /// `parseFloat(s)` — the longest leading `StrDecimalLiteral`, which is NOT `Double(s)`.
     ///
     /// `Double("12abc")` is `nil`; `parseFloat("12abc")` is `12`. Returns `nil` where `parseFloat`

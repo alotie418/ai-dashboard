@@ -89,6 +89,76 @@ final class BusinessDocumentStoreTests: LedgerTestCase {
                        "trimming BEFORE clamping would have kept part of TAIL")
     }
 
+    /// **The clamp counts UTF-16 code units, end to end, and the bytes in the column match what a
+    /// real `better-sqlite3` writes.**
+    ///
+    /// Each expectation below was measured by running `documents.js`'s own `safeString(v, n)` in
+    /// node and binding the result through `better-sqlite3`, then reading `hex()` back out — the
+    /// same three quantities this test reads from SQLite here:
+    ///
+    /// ```text
+    ///   field        input              cut  sqlite length()  utf8 bytes  last 4 bytes
+    ///   doc_number   "A" + 30 emoji      60        31            120      8D EF BF BD
+    ///   customer     "A" + 100 emoji    200       101            400      8D EF BF BD
+    ///   description  "A" + 250 emoji    500       251           1000      8D EF BF BD
+    ///   unit         15 emoji + "X"      30        15             60      F0 9F 91 8D
+    /// ```
+    ///
+    /// The three ending `EF BF BD` are the cuts that fall INSIDE a surrogate pair; the `unit` row
+    /// is the control — its cut lands on a pair boundary, so nothing is replaced and the trailing
+    /// `X` is simply gone.
+    ///
+    /// Expectations are byte ARRAYS rather than hex strings on purpose: a hex literal of the right
+    /// length reads as an Apple Team ID to `SigningConfigurationGuardTests`, which caught the first
+    /// draft of this test. Bytes are also the thing actually being claimed.
+    func testEveryClampCutsAtTheSameCodeUnitElectronDoes() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+
+        let thumb = "\u{1F44D}"
+        var input = draft(number: "A" + String(repeating: thumb, count: 30),
+                          customerName: "A" + String(repeating: thumb, count: 100),
+                          lines: [BusinessDocumentLineDraft(
+                            description: "A" + String(repeating: thumb, count: 250),
+                            unit: String(repeating: thumb, count: 15) + "X",
+                            amount: 1)])
+        input.accountingLocale = .CN
+        let id = try store.createBusinessDocument(input)
+
+        /// The stored cell as SQLite holds it: its bytes, and the character count `length()` gives.
+        func stored(_ column: String, _ table: String, _ key: String) throws -> (bytes: [UInt8], length: Int) {
+            let row = try XCTUnwrap(try store.db.query(
+                "SELECT \(column) AS v, length(\(column)) AS n FROM \(table) WHERE \(key) = ?",
+                [.text(id)]).first)
+            return (Array(try XCTUnwrap(row.string("v")).utf8), try XCTUnwrap(row.int("n")))
+        }
+
+        let replacement: [UInt8] = [0xEF, 0xBF, 0xBD]   // U+FFFD, one per unpaired surrogate
+        let thumbBytes: [UInt8] = [0xF0, 0x9F, 0x91, 0x8D]
+
+        for (column, table, key, length, byteCount) in [
+            ("doc_number", "business_documents", "id", 31, 120),
+            ("customer_name", "business_documents", "id", 101, 400),
+            ("description", "business_document_items", "doc_id", 251, 1000),
+        ] {
+            let cell = try stored(column, table, key)
+            XCTAssertEqual(cell.length, length, "\(column) character count")
+            XCTAssertEqual(cell.bytes.count, byteCount, "\(column) byte count")
+            XCTAssertEqual(Array(cell.bytes.suffix(3)), replacement,
+                           "\(column) must end in the replacement character the JS side stores")
+            XCTAssertEqual(Array(cell.bytes.suffix(7).prefix(4)), thumbBytes,
+                           "\(column): a whole emoji precedes it, so exactly one unit was lost")
+        }
+
+        // The control: a clean cut, so nothing is replaced and the trailing "X" is simply gone.
+        let unit = try stored("unit", "business_document_items", "doc_id")
+        XCTAssertEqual(unit.length, 15)
+        XCTAssertEqual(unit.bytes.count, 60)
+        XCTAssertEqual(Array(unit.bytes.suffix(4)), thumbBytes)
+        XCTAssertFalse(unit.bytes.contains(0xEF), "nothing was replaced on a clean boundary")
+        XCTAssertFalse(unit.bytes.contains(UInt8(ascii: "X")), "…and the character past the cut is gone")
+    }
+
     // MARK: - Batch 8 · C — create success
 
     /// Batch 8 C, all eight assertions: the id is the store's own, the status defaults to draft,
@@ -331,19 +401,64 @@ final class BusinessDocumentStoreTests: LedgerTestCase {
         XCTAssertNil(item.unitPrice)
     }
 
-    /// v25's column, written verbatim and defaulting to `NULL`. `NULL` is the Q8 reading — derive
-    /// the display currency from `acc_locale` — which every hand-created document keeps.
-    func testTheCurrencyColumnIsWrittenVerbatimAndDefaultsToNull() throws {
+    // MARK: - Q2-d-② · the currency column has exactly one writer
+
+    /// Every hand-entered document, of every type, stores `NULL` — the Q8 reading, "derive the
+    /// display currency from `acc_locale`". This is the outcome the ruling asks for, measured on
+    /// the whole closed set rather than on one type.
+    func testEveryHandEnteredDocumentTypeStoresANullCurrency() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        for (index, type) in BusinessDocumentType.allCases.enumerated() {
+            let id = try store.createBusinessDocument(draft(type: type, number: "N-\(index)"))
+            XCTAssertNil(try store.businessDocument(id: id)?.document.currency,
+                         "\(type.rawValue) acquired a currency it is not allowed to record")
+        }
+        XCTAssertEqual(try store.businessDocuments().documents.count, BusinessDocumentType.allCases.count)
+    }
+
+    /// **The boundary refuses; it does not trust and it does not silently drop.** A draft carrying
+    /// a currency is rejected unless it is a statement whose lines came from the generator — the
+    /// two halves of Q2-d-②'s own sentence. All three ways of getting it wrong are covered, because
+    /// each is a different mistake a later round could make.
+    func testACurrencyIsRefusedForAnythingButAGeneratedStatement() throws {
         let store = try makeStore()
         defer { try? store.db.close() }
 
-        let plain = try store.createBusinessDocument(draft())
-        XCTAssertNil(try store.businessDocument(id: plain)?.document.currency)
+        // (1) an ordinary hand-entered document that was handed a currency
+        var handEntered = draft(number: "QT-USD")
+        handEntered.currency = "USD"
+        XCTAssertThrowsError(try store.createBusinessDocument(handEntered)) {
+            XCTAssertEqual($0 as? BusinessDocumentError, .currencyIsGeneratedStatementsOnly)
+        }
 
-        var withCurrency = draft(number: "QT-USD")
-        withCurrency.currency = "USD"
-        let usd = try store.createBusinessDocument(withCurrency)
-        XCTAssertEqual(try store.businessDocument(id: usd)?.document.currency, "USD")
+        // (2) the right TYPE but the wrong provenance — a statement somebody typed by hand
+        var typedStatement = draft(type: .statement, number: "ST-TYPED")
+        typedStatement.currency = "USD"
+        XCTAssertThrowsError(try store.createBusinessDocument(typedStatement)) {
+            XCTAssertEqual($0 as? BusinessDocumentError, .currencyIsGeneratedStatementsOnly,
+                           "the type alone must not be enough")
+        }
+
+        // (3) the right PROVENANCE but the wrong type — a generated draft retyped afterwards
+        var retyped = draft(type: .quotation, number: "QT-RETYPED", origin: .statementGenerator)
+        retyped.currency = "USD"
+        XCTAssertThrowsError(try store.createBusinessDocument(retyped)) {
+            XCTAssertEqual($0 as? BusinessDocumentError, .currencyIsGeneratedStatementsOnly,
+                           "the provenance alone must not be enough either")
+        }
+
+        XCTAssertEqual(try store.businessDocuments().documents.count, 0, "and none of the three landed")
+    }
+
+    /// A statement whose lines came from the generator and that carries NO currency is still fine —
+    /// the guard is about a value being present, not about statements being special.
+    func testAGeneratedStatementWithoutACurrencyIsAccepted() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft(type: .statement, number: "ST-NIL",
+                                                        origin: .statementGenerator))
+        XCTAssertNil(try store.businessDocument(id: id)?.document.currency)
     }
 
     /// The header and its lines are written in one transaction, so a failure part way through

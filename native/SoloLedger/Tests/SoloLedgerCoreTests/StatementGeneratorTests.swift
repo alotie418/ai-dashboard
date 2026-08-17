@@ -422,6 +422,56 @@ final class StatementGeneratorTests: LedgerTestCase {
         XCTAssertNil(try store.businessDocument(id: id)?.document.currency)
     }
 
+    // MARK: - Q2-d-② · the generator is the only writer, checked over the source
+
+    /// Q2-d-② names ONE writer of the currency column. The store refuses everything else at run
+    /// time (`BusinessDocumentStoreTests`), and this is the other half: inside the shipped package,
+    /// the only thing that declares a draft's lines to have come FROM the generator is the
+    /// generator, so there is nothing else that could satisfy the store's guard.
+    ///
+    /// Written as a closed-set comparison rather than as "no other file does it": a scan that only
+    /// asserts the absence of something proves nothing when the pattern is wrong. The positive half
+    /// — the set must contain exactly this one file — is what makes the negative half evidence.
+    /// Comments are stripped first, for the same reason the capability guard strips them: the
+    /// prose here explains the very thing being scanned for.
+    ///
+    /// **The pattern is PRODUCTION, not mention.** A first attempt scanned for `.statementGenerator`
+    /// and came back with `DocumentStore.swift` as well — correctly, because that file CONSUMES the
+    /// value (`switch origin`, and the currency guard's `==`). Consuming it is the point; producing
+    /// it is what has one legitimate site. So the pattern matches only the two spellings that SET
+    /// it — an argument label and an assignment — and both spellings are pinned below, along with
+    /// the consumer forms that must NOT match.
+    func testTheGeneratorIsTheOnlyProducerOfGeneratorOriginDraftsInTheShippedSource() throws {
+        let files = try CapabilityImportGuardTests.strippedSources(of: "SoloLedgerCore")
+        XCTAssertGreaterThan(files.count, 40, "the walker found the package")
+
+        let producing = #"lineOrigin\s*[:=]\s*\.statementGenerator"#
+        var producers: Set<String> = []
+        for (path, code) in files where code.range(of: producing, options: .regularExpression) != nil {
+            producers.insert(path)
+        }
+        XCTAssertEqual(producers, ["StatementGenerator.swift"],
+                       "somebody else can now produce a draft the currency guard would accept")
+
+        // The pattern's discriminating power, both directions, on real strings from this package.
+        for produces in ["lineOrigin: .statementGenerator", "lineOrigin = .statementGenerator",
+                         "lineOrigin:.statementGenerator"] {
+            XCTAssertNotNil(produces.range(of: producing, options: .regularExpression),
+                            "\(produces) must count as production")
+        }
+        for consumes in ["case .statementGenerator:", "draft.lineOrigin == .statementGenerator",
+                         "case statementGenerator"] {
+            XCTAssertNil(consumes.range(of: producing, options: .regularExpression),
+                         "\(consumes) is a consumer and must not count")
+        }
+
+        // …and the consumer really is present in the file the narrower pattern now excludes, so
+        // the exclusion is a decision rather than a pattern that happens to find nothing.
+        let store = try XCTUnwrap(files.first { $0.path == "DocumentStore.swift" })
+        XCTAssertTrue(store.code.contains(".statementGenerator"), "DocumentStore consumes it")
+        XCTAssertFalse(producers.contains("DocumentStore.swift"), "…but does not produce it")
+    }
+
     // MARK: - The whole round trip
 
     /// One generated statement, written and read back: every clause of Q2 landing at once on the

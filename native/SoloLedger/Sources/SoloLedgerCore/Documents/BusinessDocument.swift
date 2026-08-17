@@ -184,6 +184,17 @@ public struct BusinessDocumentDraft: Equatable, Sendable {
     public var sourceSalesID: String?
     public var periodStart: String?
     public var periodEnd: String?
+
+    /// The v25 column, and the one field on this type that is not free to set.
+    ///
+    /// Q2-d-② permits exactly one writer, so ``LedgerStore/createBusinessDocument(_:)`` **refuses**
+    /// a draft that carries a value here unless it is a `statement` whose lines came from the
+    /// generator — see ``BusinessDocumentError/currencyIsGeneratedStatementsOnly``. In practice the
+    /// only thing that fills it is ``StatementDraft/documentDraft(number:date:accountingLocale:)``.
+    ///
+    /// It stays a plain `String?` rather than becoming a type only the generator can mint, because
+    /// the guarantee has to be one a TEST can violate: a constraint that the compiler makes
+    /// unrepresentable is also one no reverse proof can show is still being enforced.
     public var currency: String?
 
     /// `nil` reads the ledger's `accounting_locale` setting, which is what the handler does for any
@@ -292,11 +303,19 @@ public enum BusinessDocumentError: Error, Equatable, CustomStringConvertible {
     /// accepted there and here — it is stored verbatim.
     case dateRequired
 
+    /// A `currency` was supplied for something Q2-d-② does not permit to record one.
+    ///
+    /// Not one of the handler's refusals — `currency` is a native column and Electron has never
+    /// seen it. It is here because the ruling names exactly one writer, and a constraint with no
+    /// enforcement is a comment. See ``LedgerStore/createBusinessDocument(_:)``.
+    case currencyIsGeneratedStatementsOnly
+
     public var description: String {
         switch self {
         case .numberRequired: return "numberRequired"
         case .customerNameRequired: return "customerNameRequired"
         case .dateRequired: return "dateRequired"
+        case .currencyIsGeneratedStatementsOnly: return "currencyIsGeneratedStatementsOnly"
         }
     }
 }

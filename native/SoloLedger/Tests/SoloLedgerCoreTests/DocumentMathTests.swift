@@ -301,6 +301,82 @@ final class DocumentMathTests: XCTestCase {
         XCTAssertEqual(DocumentMath.jsTrim("Acme  Co"), "Acme  Co", "inner whitespace is untouched")
     }
 
+    // MARK: - `String.prototype.slice(0, n)`
+
+    /// The clamp counts UTF-16 code units. Every expectation was measured on BOTH engines: the JS
+    /// side by running `safeString(v, n)` from `documents.js` and binding the result through a real
+    /// `better-sqlite3`, the Swift side by the same clamp writing into SQLite — then comparing the
+    /// stored bytes. The `prefix` column is what the first revision of this file did, and it is why
+    /// this is a defect rather than a preference.
+    ///
+    /// ```text
+    ///   input                          units  slice(60)  prefix(60)
+    ///   31 × U+1F44D                      62     60          62   ← no clamp at all
+    ///   "A" + 30 × U+1F44D                61     60          61
+    ///   "A" + 100 × U+1F44D (cap 200)    201    200         201
+    ///   "e" + 60 × U+0301                 61     60          61
+    ///   10 × 👨‍👩‍👧 (ZWJ family)             80     60          80
+    /// ```
+    func testTheClampCountsCodeUnitsAndNotCharacters() {
+        let thumbs = String(repeating: "\u{1F44D}", count: 31)
+        XCTAssertEqual(thumbs.utf16.count, 62)
+        XCTAssertEqual(thumbs.count, 31, "…and 31 Characters, which is what prefix would count")
+        XCTAssertEqual(DocumentMath.jsSlice(thumbs, to: 60).utf16.count, 60)
+        XCTAssertEqual(String(thumbs.prefix(60)).utf16.count, 62,
+                       "the old spelling clamped NOTHING here — that is the defect")
+
+        let acutes = "e" + String(repeating: "\u{0301}", count: 60)
+        XCTAssertEqual(acutes.utf16.count, 61)
+        XCTAssertEqual(acutes.count, 1, "one Character: a grapheme cluster 61 code units long")
+        XCTAssertEqual(DocumentMath.jsSlice(acutes, to: 60).utf16.count, 60)
+        XCTAssertEqual(String(acutes.prefix(60)).utf16.count, 61)
+    }
+
+    /// **A cut that lands inside a surrogate pair leaves half of one, and both engines resolve that
+    /// half to exactly one U+FFFD.** JS keeps the lone surrogate in memory and `better-sqlite3`
+    /// replaces it while encoding to UTF-8; Swift cannot hold one at all and replaces it here. The
+    /// two agree on what reaches the column, which is the only place the mirror is claimed.
+    ///
+    /// Measured: `"A" + 30 × U+1F44D` cut at 60 stores `…F0 9F 91 8D EF BF BD` on both sides. Had
+    /// `better-sqlite3` written WTF-8 (`ED A0 BD`) instead, Swift could not have reproduced it and
+    /// this would have been an unreachable mirror rather than a fixable clamp.
+    func testACutInsideASurrogatePairBecomesExactlyOneReplacementCharacter() {
+        let split = "A" + String(repeating: "\u{1F44D}", count: 30)
+        XCTAssertEqual(split.utf16.count, 61, "the 60th unit is the HIGH half of the last pair")
+
+        let cut = DocumentMath.jsSlice(split, to: 60)
+        XCTAssertEqual(cut.utf16.count, 60, "the replacement is one code unit, as the surrogate was")
+        XCTAssertEqual(cut.utf16.last, 0xFFFD)
+        XCTAssertEqual(Array(cut.utf8.suffix(3)), [0xEF, 0xBF, 0xBD],
+                       "…and it encodes to the three bytes better-sqlite3 was measured to write")
+        XCTAssertNotEqual(Array(cut.utf8.suffix(3)), [0xED, 0xA0, 0xBD], "NOT WTF-8")
+
+        // The same shape at the customer-name budget, and inside a ZWJ sequence.
+        let long = "A" + String(repeating: "\u{1F44D}", count: 100)
+        XCTAssertEqual(long.utf16.count, 201)
+        XCTAssertEqual(DocumentMath.jsSlice(long, to: 200).utf16.last, 0xFFFD)
+
+        let family = String(repeating: "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}", count: 10)
+        XCTAssertEqual(family.utf16.count, 80)
+        let familyCut = DocumentMath.jsSlice(family, to: 60)
+        XCTAssertEqual(familyCut.utf16.count, 60)
+        XCTAssertEqual(Array(familyCut.utf16.suffix(3)), [0xDC68, 0x200D, 0xFFFD],
+                       "measured in node: the cut falls after a ZWJ, mid-pair")
+    }
+
+    /// A cut that lands ON a pair boundary loses nothing, and a cap at or beyond the length is the
+    /// identity — `slice` past the end returns the whole string.
+    func testACleanCutAndAnOversizedCapAreBothLossless() {
+        let thirty = String(repeating: "\u{1F44D}", count: 30)
+        XCTAssertEqual(DocumentMath.jsSlice(thirty, to: 60), thirty)
+        XCTAssertFalse(DocumentMath.jsSlice(thirty, to: 60).unicodeScalars.contains("\u{FFFD}"),
+                       "a clean cut introduces no replacement character")
+        XCTAssertEqual(DocumentMath.jsSlice("Acme", to: 60), "Acme")
+        XCTAssertEqual(DocumentMath.jsSlice("Acme", to: 4), "Acme")
+        XCTAssertEqual(DocumentMath.jsSlice("Acme", to: 0), "")
+        XCTAssertEqual(DocumentMath.jsSlice("", to: 60), "")
+    }
+
     // MARK: - `parseFloat`
 
     /// The four places a naive port of `parseFloat` goes wrong, plus the ordinary cases.

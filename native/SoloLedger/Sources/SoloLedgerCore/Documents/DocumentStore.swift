@@ -101,11 +101,29 @@ public extension LedgerStore {
     ///
     /// `status` is written as the literal `draft`, exactly as the handler's `INSERT` does. The four
     /// `tax_invoice_*` columns are omitted so they take their schema defaults, also as there.
+    ///
+    /// ## The `currency` column is refused to everything but a generated statement
+    ///
+    /// Q2-d-② is not a description of what the first version happens to do — it is a constraint:
+    /// "首版写入者只有对账单生成器；其余四种类型、以及手工新建的单据，一律不写，保持 `NULL`". A
+    /// non-`NULL` value there makes Q8's exception fire, and the header, the badge and the money
+    /// symbol all render from it instead of from `acc_locale`; a hand-made quotation that acquired
+    /// one would print the wrong currency onto a document that goes to a customer.
+    ///
+    /// So the boundary REFUSES rather than trusts, and refuses rather than silently drops — quietly
+    /// discarding a caller's value is the shape this chapter rejects everywhere else. The two
+    /// conditions are the two halves of the ruling's sentence: the document must BE a statement, and
+    /// its lines must have come FROM the generator.
     @discardableResult
     func createBusinessDocument(_ draft: BusinessDocumentDraft) throws -> String {
-        let number = DocumentMath.jsTrim(String(draft.number.prefix(60)))
+        if draft.currency != nil {
+            guard draft.type == .statement, draft.lineOrigin == .statementGenerator else {
+                throw BusinessDocumentError.currencyIsGeneratedStatementsOnly
+            }
+        }
+        let number = DocumentMath.jsTrim(DocumentMath.jsSlice(draft.number, to: 60))
         guard !number.isEmpty else { throw BusinessDocumentError.numberRequired }
-        let customerName = DocumentMath.jsTrim(String(draft.customerName.prefix(200)))
+        let customerName = DocumentMath.jsTrim(DocumentMath.jsSlice(draft.customerName, to: 200))
         guard !customerName.isEmpty else { throw BusinessDocumentError.customerNameRequired }
         guard !draft.date.isEmpty else { throw BusinessDocumentError.dateRequired }
 
@@ -229,7 +247,7 @@ extension LedgerStore {
         return kept.enumerated().map { index, draft in
             SanitizedDocumentLine(
                 productID: nonEmpty(draft.productID, 200),
-                description: String(DocumentMath.jsTrim(draft.description).prefix(500)),
+                description: DocumentMath.jsSlice(DocumentMath.jsTrim(draft.description), to: 500),
                 quantity: finiteOrNil(draft.quantity),
                 unit: nonEmpty(draft.unit, 30),
                 unitPrice: finiteOrNil(draft.unitPrice),
@@ -254,13 +272,17 @@ extension LedgerStore {
 
     /// `safeString(v, n) || null` — clamp, then treat the empty string as absent.
     ///
-    /// `String.prefix(n)` counts Characters where JS `slice(0, n)` counts UTF-16 code units, so the
-    /// two differ for text containing astral characters or combining marks. That divergence is
-    /// inherited rather than introduced: `Transaction.normalized()` mirrors the same `slice` the
-    /// same way, and this file follows it so the package has one answer instead of two.
+    /// The clamp counts **UTF-16 code units**, via ``DocumentMath/jsSlice(_:to:)``, because that is
+    /// what `slice(0, n)` counts. An earlier revision of this file used `String.prefix(n)` and
+    /// registered the difference as inherited from `Transaction.normalized()`; that registration was
+    /// wrong twice over — the difference is reachable (a 31-emoji `doc_number` is clamped on one
+    /// side and untouched on the other, which changes what `idx_docs_type_number` calls a
+    /// collision), and Q9's bar is equality with Electron rather than consistency with a different
+    /// mirror. `Transaction.normalized()` is left alone: changing what IT clamps is a transactions
+    /// question, not this chapter's.
     private static func nonEmpty(_ value: String?, _ maxLength: Int) -> String? {
         guard let value else { return nil }
-        let clamped = String(value.prefix(maxLength))
+        let clamped = DocumentMath.jsSlice(value, to: maxLength)
         return clamped.isEmpty ? nil : clamped
     }
 
