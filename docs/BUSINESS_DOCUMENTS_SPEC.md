@@ -28,7 +28,7 @@
 
 **除 Q2 外，本章不接受任何发明。** 遇到 Electron 没有的行为，默认答案是「不做」，不是「顺手加上」。
 
-Q2 的细目（Q2-a 字段映射 / Q2-b 不列税率 / Q2-c 空白规则 / Q2-d 按币种拆单）与 Q7-a（文件名与落盘）已于 **2026-08-17 第二次裁定**定案，逐条记录见 §9。**唯一仍未裁定的是 Q2-d-②（币种标记写在哪个字段），它继续闸住 D-1 的对账单部分。**
+Q2 的细目（Q2-a 字段映射 / Q2-b 不列税率 / Q2-c 空白规则 / Q2-d 按币种拆单，含 Q2-d-② 币种的持久化）与 Q7-a（文件名与落盘）已分三次裁定完毕，逐条记录见 §9。**本文件自此没有未裁定项，是一份完整的可开工规格。** 唯一的排期依赖是：**D-1 的对账单生成器要等 D-1a（schema v25 加 `currency` 列）合并**。
 
 ---
 
@@ -97,14 +97,32 @@ Q2 的细目（Q2-a 字段映射 / Q2-b 不列税率 / Q2-c 空白规则 / Q2-d 
 
 **① 编号一次消耗 N 个。** 拆出 N 张单就要连发 N 个 `ST` 编号，`ST` 序号一次前进 N 位。（`nextNumber` 每次只算「当前最大 +1」，没有批量预留，所以 N 张单是 N 次取号；跳号规则见 Q3。）
 
-**② 持久化缺口——尚未闭合，见 §8 的 Q2-d-②。** `business_documents` 的 24 列里**没有币种列**，`business_document_items` 的 13 列里也没有（Q8 裁定不加列、Q9 裁定不建新表）。于是拆出来的非本位币单据**存盘之后，没有任何结构化字段记得自己是哪个币种**。裁定要求把币种标记写进表头某个既有文本字段，并由该标记渲染产物页眉、UI 徽标与金额符号——**该字段是哪一个，本轮实测后未能定出可用者，故停下来要新裁定**。
+**② 拆出来的单据必须记得自己的币种。** 处置见紧接着的 Q2-d-② 小节。
 
-**③ 这是 Q2 发明的扩大，与 Q8 / Q9 存在张力，如实写在这里。** Q8 说单据没有币种列、显示币种由 `acc_locale` 推导；Q9 说不建新表不加列。而本条要求单据能表达「我不是本位币」。**结论不是推翻 Q8/Q9，而是登记这处张力**：将来若要给单据加一个真正的币种列，**必须走一个独立的 schema 轮**，不能在实现轮里顺手加。在那之前，币种只能以标记形式寄生在既有字段上（②），其可靠性上限就是那个字段的可靠性上限。
+**③ 这是 Q2 发明的扩大，张力已经用一个独立轮解决，而不是被压住。** Q8 原本说单据没有币种列、显示币种一律由 `acc_locale` 推导；Q9 原本说不建新表不加列。本条要求单据能表达「我不是本位币」，两边确实冲突——**处置是把加列拆成 D-1a 这个独立的 schema 轮**（见 §6），而不是在实现轮里顺手加、也不是让币种寄生在别的字段上。Q8 与 Q9 的正文已按此各自加了一条例外，措辞见那两节。
+
+#### Q2-d-② · 币种的持久化 = 加一个 `currency` 列（走 D-1a 小轮）
+
+原来的 24 列里没有币种列，13 列的明细表里也没有，所以拆出来的非本位币单据存盘后**没有任何结构化字段记得自己是哪个币种**。**裁定：不再往既有文本字段里塞标记，而是新设 D-1a 小轮给 `business_documents` 加一个可空的 `currency TEXT` 列。**
+
+| 项 | 裁定 |
+| --- | --- |
+| 落点 | 原生 schema **v25** 级，`ALTER TABLE business_documents ADD COLUMN currency TEXT` |
+| 可空 | 是 |
+| `NULL` 的含义 | **沿 Q8 按 `acc_locale` 推导**——全部既有单据与全部非对账单类型的行为**一个字都不变** |
+| 非 `NULL` 的含义 | 页眉 / UI 徽标 / 金额符号**三处一律按该列渲染**（这是 Q8 那条例外句的生效载体） |
+| 首版写入者 | **只有对账单生成器**：Q2-d 拆单时逐张写入该单自己的币种。其余四种类型、以及手工新建的单据，一律不写，保持 `NULL` |
+| 格式约束 | **不设 `CHECK`**，照搬 `transactions.currency` 的宽松形态 |
+
+* **「宽松形态」是有实测边界的说法**：本仓的 `currency` 列**没有一个带 `CHECK`**——`transactions.currency` 是 `TEXT NOT NULL DEFAULT 'CNY'`，`accounts` / `liabilities` 上的是裸 `TEXT`。本列在「无 `CHECK`」上照搬全仓通例；在**可空**这一点上同 `accounts.currency` 而**不同于** `transactions.currency`，因为 `NULL` 在这里是一个有意义的取值（= 按 `acc_locale` 推导），不是缺失。
+* **另两个选项为什么落选**（两条理由都是本轮实测出来的，不是推测）：
+  * **`notes`**——它**在 `EDITABLE` 白名单里（用户可改）且印在产物上**（`notesBlock`）。用户改一次备注就能把标记删掉，标记一没，金额符号按 Q8 回落到 `acc_locale`：一张全是外币的对账单会被**静默换上本位币符号**印给客户。
+  * **`source_sales_id`**——技术上够用（不在 `EDITABLE`、不印产物、对账单侧本就恒 `NULL`），但**列名说谎**：一个叫「来源销售记录 id」的列里装着 `USD`，还会原样进 CSV 导出交到会计师手里。
 
 * **证据锚**：`components/DocumentModal.tsx` 的 `generateStatement` / `stmtCustomers` / `salesToRow`；`electron/db/index.js` 迁移 v5 中 `transactions` 的 `type` `CHECK` 与 `counterparty` 列；原生 `Enums.swift` 的 `TransactionType`；原生 `LedgerStore.swift` 的 `INSERT INTO transactions`。
 * **可测断言**（D-1/D-2 应各自落成测试）：给定一组含 `income` 与 `expense`、多个 `counterparty`、跨越期间边界的流水，生成器返回的行集恰等于「`income` ∧ `counterparty` 相等 ∧ 日期在闭区间内」的那一组；边界两天必须包含；`expense` 行必须不出现；`counterparty` 不等的行必须不出现。
 * **可测断言（Q2-a/b/c 部分）**：`amount_net = 0` 的流水，其明细行金额是 **0** 而不是 `amount`；`amount_net IS NULL` 的流水，其明细行金额是 `amount`；`tax_amount` 为空的行显示破折号而不是 `0`；生成出的明细行的 `tax_rate` **一律为空**。
-* **未裁定的残余，只剩一项，仍然阻塞 D-1 的对账单部分**：**Q2-d-②（币种标记写在哪个字段）**，见 §8。Q2-a / Q2-b / Q2-c / Q2-d 的主体已裁定并写在上面。**D-1 的其余部分（Q4 算式、Q9 存储）从来不受它阻塞。**
+* **未裁定的残余：无。** Q2-a / Q2-b / Q2-c / Q2-d（含 ②）全部已裁定。**D-1 的对账单部分的开工条件 = D-1a 合并**（见 §6），因为生成器要写的那一列要先存在。
 
 ### Q3 · 单据编号 = 全部照搬
 
@@ -181,11 +199,15 @@ Q2 的细目（Q2-a 字段映射 / Q2-b 不列税率 / Q2-c 空白规则 / Q2-d 
 
 * **证据锚**：`electron/db/index.js` 迁移 v11（`business_documents` 无 currency 列，有 `acc_locale`）；`components/accountingHelpers.ts` 的 `formatMoney`；`electron/handlers/documents.js` 的 `resolveAccLocale`（创建时解析、`update` 忽略）。
 * **可测断言**：同一张单据在设置切换会计制度后，显示币种不变——因为读的是行上冻结的 `acc_locale`，不是当前设置。
-* **一处显式例外（Q2-d 造成）**：按币种拆出来的**非本位币对账单**，其金额符号**按币种标记渲染，不按 `acc_locale` 推导**；产物页眉与 UI 徽标同样从该标记渲染。本例外只适用于带币种标记的对账单，其余单据与其余四种类型一律仍按本条正文的 `acc_locale` 推导。**该例外要到 Q2-d-② 定了标记载体才能生效**——在那之前没有标记可读，例外也就无从触发。
+* **一处显式例外（Q2-d 造成，载体已定）**：**`business_documents.currency` 非 `NULL` 时，页眉、UI 徽标与金额符号三处一律按该列渲染，不按 `acc_locale` 推导。** `currency` 为 `NULL` 时本条正文原样成立。该列由 D-1a 加入（Q2-d-②），首版只有对账单生成器写它，所以其余四种类型与全部既有单据都落在 `NULL` 分支上、行为不变。
 
 ### Q9 · 存储 = 甲案（写 v11 既有表），计算迁入 Core 但逐字复刻
 
-* **不建新表、不加列。** 原生写 `SchemaMigrator` v11 级已经建好的 `business_documents` 与 `business_document_items`；金额列保持 `REAL`，`tax_rate` 保持 `TEXT`。
+* **不建新表、不加列，唯一例外 = D-1a 的 `currency` 列。** 原生写 `SchemaMigrator` v11 级已经建好的 `business_documents` 与 `business_document_items`；金额列保持 `REAL`，`tax_rate` 保持 `TEXT`；除了 Q2-d-② 裁定的那一个可空 `currency TEXT`（v25，见 §6 的 D-1a），不再加任何列，也不建任何新表。
+* **这条例外的依据与影响面**（三条都是实测，不是推断）：
+  1. **Electron 侧的读写不受影响。** `electron/handlers/documents.js` 对 `business_documents` 的读全部走显式列清单 `HEADER_COLUMNS`，写走显式列名的 `INSERT`，`UPDATE` 逐字段拼 `SET`——**该文件里 `SELECT * FROM business_documents` 出现 0 次**（而 `SELECT * FROM` 在 `electron/` 全树有 20 处，所以这个 0 是有判别力的）。多一列它看不见，也不会写坏。
+  2. **有一处输出形状会变，如实登记：CSV 导出。** `electron/handlers/_csvExport.js` 的 `tableToCsv` 用 `PRAGMA table_info` 取列、`SELECT *` 取行（它的注释自述「列序与 schema 一致」），所以 Electron 打开一个 v25 账本再导出 `documents` 表时，CSV **会多出一列 `currency`**。这不是破坏，是它设计上就跟随 schema；但「导出列不变」这句话不成立，故写在这里。
+  3. **单向性仍然是约定不是强制，v25 不改变这一点。** `SchemaMigrator` 的文件头自述：一个 v24 账本不会被 Electron 拒绝，它的 `runMigrations` 循环跑零次、照常读写 v23 的表；单向性「是一条约定，不是一种强制」，声明在 `docs/SWIFTUI_FEATURE_GAP.md` §4。v25 落在同一条 `nativeOnlyVersions` 序列上，性质一样。
 * **计算位置从界面迁到 Core。** Electron 的行金额与行税额由前端算、后端只求和；原生把算式放进 Core，**但算式与舍入链逐字复刻 Electron 前端**。
 * **验收 = 同输入下结果与 Electron 逐字节相等。**
 
@@ -251,7 +273,8 @@ Electron 现状在三处一致地表达了同一条边界，原生照此写：
 | 轮 | 范围 | 验收线 | 预计新增 | 棘轮 / 登记联动 |
 | --- | --- | --- | --- | --- |
 | **D-0**（本轮） | 把九条裁定落成本文件 | 纯新增一个 `.md`；非 `.md` 变更 0；测试数、键数、黄金全不变 | 0 测试 0 键 | 无 |
-| **D-1 存储层** | 按 Q9 甲案读写 v11 既有表；按 Q4 把算式迁入 Core 并逐字复刻。**对账单生成器（Q2）仍不在本轮**：Q2-a/b/c/d 的主体已裁定，但 **§8 的 Q2-d-② 未决**，闸门因此仍然关着——不得先写一个「日后再补币种」的版本 | 建/读/写往返；舍入链与 Electron 逐字节相等（对抗输入含「先舍后乘 ≠ 先乘后舍」的用例）；Q5 边界断言之 1、2 | +25~40 Core | 不涉 pbxproj（Core 包） |
+| **D-1a schema v25**（排在 D-1 前） | Q2-d-② 的加列轮：`ALTER TABLE business_documents ADD COLUMN currency TEXT`（可空、无 `CHECK`）+ schema 守门 + 确认 `PreMigrationSnapshot` 既有机制覆盖这根新横档。**只加列，不写它**——写入者是 D-1 的对账单生成器 | 沿 N-PR-1（v24）先例：①`sharedLadderVersion` 仍是 **23** 不动，`nativeOnlyVersions` 由 `[24]` 变 `[24, 25]`、`schemaVersion` 由 24 变 **25**，`SchemaVersionParityTests` 的五条断言全部跟着更新（它同时钉「等于字面清单」与「等于连续区间」两件事）；②守门按 `InventorySchemaTests` 的分段写法落（该文件 11 条分 **G/H/L 三段**：G 段管横档行为——到达/幂等/回滚往返/head 必需/prepared-import 闸；H 段管列语义；L 段管就地升级先快照再迁移且快照可还原）；③本轮的 H 段只需钉「列存在、可空、无 `CHECK`」，L 段直接复用 v24 已建立的快照机制并**实测确认它覆盖 v25**，不新建机制 | +10~20 Core | 不涉 pbxproj（Core 包）。**Electron 侧 CSV 导出会多一列，见 Q9 影响面第 2 条** |
+| **D-1 存储层** | 按 Q9 甲案读写 v11 既有表；按 Q4 把算式迁入 Core 并逐字复刻。**对账单生成器（Q2）的开工条件 = D-1a 已合并**——生成器要写的 `currency` 列必须先存在；在那之前不得先写一个「日后再补币种」的版本 | 建/读/写往返；舍入链与 Electron 逐字节相等（对抗输入含「先舍后乘 ≠ 先乘后舍」的用例）；Q5 边界断言之 1、2 | +25~40 Core | 不涉 pbxproj（Core 包） |
 | **D-2 编号与状态机** | Q3 编号；Q5 状态机、编辑白名单、删除规则；A8 设计约束落地 | 状态机闭集反例全覆盖；编号三条反例（跨年 / 删除后重用 / 自定义不污染最大值）；「改行不传 items」路径在原生不可达 | +20~30 Core | 不涉 pbxproj |
 | **D-3 六语文案** | `documents.*` 的原生等价键族 | 六语键数同步 650 → 650+N；`LocalizationWordingGuardTests` **零新增 sanctioned**；禁词实跑 | +50~87 键 × 6（预计） | **三处 650 棘轮跨两个目标**：`InventoryCopyTests`（Core）、`LegacyConversionCopyTests`（App）、`ProductCopyTests`（App）。**若新增 App 目标测试文件，须手工登记 pbxproj，恰 4 行/文件** |
 | **D-4 视图** | 列表页 + 编辑器 + 明细行 | 新建 `DocumentsView` 与其 composition；**新分区是第 7 个**，须同步撞到的闭集守门与两处分区计数注释 | +30~50 App | `SidebarSection`（`AppModel.swift`）新增一例；`InventoryView` 的「不是本页的五个分区」注释与 `AppModel` 的「六个分区之一」注释同轮改。App 目标新文件须登记 pbxproj |
@@ -276,28 +299,13 @@ Electron 现状在三处一致地表达了同一条边界，原生照此写：
 
 ---
 
-## 8. 未裁定，实现轮遇到必须停下来
+## 8. 未裁定项
 
-**只剩一项。** Q2-a / Q2-b / Q2-c / Q2-d 的主体、以及 Q7-a，均已在 2026-08-17 的第二次裁定中定案并写进正文（见 §9）。
+**无。** 测绘九问、Q2 的四条细目（Q2-a / Q2-b / Q2-c / Q2-d 含 ②）、以及 Q7-a，全部已裁定并写在 §2；逐次记录见 §9。**本文件自此是一份完整的可开工规格。**
 
-### Q2-d-② · 币种标记写在哪个既有文本字段（**阻塞 D-1 的对账单部分**）
+开工次序上仍有一处硬依赖，它不是未裁定项而是排期：**D-1 的对账单生成器要等 D-1a 合并**，因为它要写的 `currency` 列由 D-1a 加入。D-1 的其余部分（Q4 算式、Q9 存储）不受这条依赖约束。
 
-Q2-d 要求把币种标记写进表头某个**既有**文本字段（Q8 不加列、Q9 不建新表），并由该标记渲染产物页眉、UI 徽标与**金额符号**。本轮把 `business_documents` 的 24 列逐列普查了一遍，结论是**没有一个既能承载标记又能满足这三项渲染要求的字段**，故停下来。
-
-普查结果（谓词自证：`doc.customerName` 判为「印在产物上」为真、`doc.createdAt` 为假）：
-
-| 候选 | 类型 | 用户可改 | 印在产物上 | 判定 |
-| --- | --- | --- | --- | --- |
-| `notes` | TEXT | **是** | **是** | **不可用**。用户改备注就能把标记删掉，标记一没，金额符号按 Q8 回落到 `acc_locale` 推导——一张全是外币的对账单会被**静默地**换上本位币符号印给客户。这正是裁定第 ③ 条要防的东西 |
-| `source_sales_id` | TEXT | 否 | 否 | **技术上可用、语义上说谎**。它不在 `EDITABLE` 白名单里所以用户改不掉，也不进产物；对账单在 Electron 侧本就恒为 `NULL`（`docType === 'statement' ? null : …`）所以是空的。但一个叫「来源销售记录 id」的列里装着 `USD`，会原样进 CSV 导出交到会计师手里 |
-| `customer_tax_id` / `customer_address` / `customer_contact` / `valid_until` | TEXT | 是 | 是 | 不可用，同 `notes` 且各有自己的用途 |
-| `period_start` / `period_end` | TEXT | 否 | 是 | 不可用，对账单的定义性属性，已被占用 |
-| `tax_invoice_number` / `_date` / `_attachment_path` | TEXT | 否 | 否 | 不可用。它们是「外部已开具发票」的关联字段，语义冲突比 `source_sales_id` 更重，且 `updateTaxInvoice` 会写它们 |
-| `id` / `status` / `doc_type` / `doc_number` / `doc_date` / `acc_locale` / `created_at` / `updated_at` | — | — | — | 不可用，各自有强语义或受 `CHECK` 约束 |
-
-**需要裁定的是三选一**：**(a)** 接受 `source_sales_id` 的语义重载，并在确认书与 CSV 说明里写明这列对对账单另有含义；**(b)** 接受 `notes` 及其「用户可删除标记」的后果，并把「标记缺失时如何显示金额」一并裁定（回落到 `acc_locale` 是错的，拒绝显示还是显示无符号数字？）；**(c)** 判定「不加列就做不成」，把币种列升级为一个独立的 schema 轮，Q2-d 等它落地——这等于承认 §2 Q2-d 第 ③ 条登记的张力必须现在解决而不是将来。
-
-**在裁定之前，D-1 不得实现对账单生成器**——按 Q2-d 拆出来的非本位币单据一旦存盘就丢失币种，而它是要打印给客户的。
+后续轮若遇到本文件没写的口径，正确动作仍是**停下来要裁定**，不是自行择定（见 §9 开头）。
 
 ## 9. 修订
 
@@ -314,3 +322,13 @@ Q2-d 要求把币种标记写进表头某个**既有**文本字段（Q8 不加�
 | **Q2-d-②** 币种标记载体 | （本次新产生） | **仍未裁定，停在 §8**，D-1 的对账单闸门因此**保持关闭** | 本轮把 24 列逐列普查（谓词自证：`doc.customerName` 判「印在产物上」为真、`doc.createdAt` 为假），结论是没有既能承载标记又满足「页眉/徽标/金额符号都从它渲染」的字段：裁定原文点名的 `notes` **用户可改且印在产物上**，标记被删就会让外币单据静默换回本位币符号——正是后果③要防的；唯一技术上可用的 `source_sales_id` 语义说谎且进 CSV。三选一已列在 §8 |
 | **Q7-a** 文件名与落盘 | §8「未裁定」 | 移入 §2 Q7：文件名 `<doc_number>.html`（非法字符转义），落盘走 Powerbox 用户自选、无默认目录 | 用户裁定。**另登记一条实测订正**：裁定理由里说「唯一性由 `(doc_type, doc_number)` 索引背书」——该索引保证的是**这一对**唯一，不是 `doc_number` 单列唯一（既有守门就断言同一个 `DUP-1` 可在 `quotation` 与 `sales_order` 各存在一次），所以同编号不同类型会撞同名文件。落盘由 Powerbox 面板提示重名，不是静默覆盖，故登记为已知形态而非另开裁定 |
 | **Q8** 币种推导 | 「显示币种一律由 `acc_locale` 推导」 | 加**一处显式例外**：带币种标记的非本位币对账单，金额符号/页眉/徽标按标记渲染。例外**待 Q2-d-② 定了载体才生效** | Q2-d 的后果③要求，写在 Q8 节以免两处互相矛盾 |
+
+### 2026-08-17 · 第三次（末次）裁定（Q2-d-②）
+
+| 条目 | 从什么 | 改成什么 | 依据 |
+| --- | --- | --- | --- |
+| **Q2-d-②** 币种载体 | §8「未裁定，三选一（`source_sales_id` 重载 / `notes` 加缺失兜底 / 升级为 schema 轮）」，闸住 D-1 的对账单部分 | 取 **(c)**：新设 **D-1a** 小轮，原生 schema **v25** 给 `business_documents` 加**可空 `currency TEXT`**、**不设 `CHECK`**。`NULL` = 沿 Q8 按 `acc_locale` 推导（既有单据与非对账单类型行为一个字不变）；非 `NULL` = 页眉/徽标/金额符号三处按该列渲染。**首版写入者只有对账单生成器** | 用户裁定。落选两项的理由**是本轮实测**不是推测：`notes` 在 `EDITABLE` 白名单里且印在产物上（`notesBlock`），标记可被用户删掉、删掉后金额符号会静默回落本位币；`source_sales_id` 技术上够用但列名说谎，且原样进 CSV |
+| **§8** | 「未裁定项：Q2-d-②」 | **清空**——无未裁定项，本文件成为完整可开工规格；只保留一条排期依赖（D-1 的对账单部分等 D-1a 合并） | 上一行的直接后果 |
+| **Q8** 例外句 | 「例外**待 Q2-d-② 定了载体**才生效」 | 解除等待，直接指向 `business_documents.currency`：非 `NULL` 时三处按该列渲染，`NULL` 时正文原样成立 | 载体已定 |
+| **Q9** 存储 | 「**不建新表、不加列**」 | 「不建新表、不加列，**唯一例外 = D-1a 的 `currency` 列**」，并补三条实测影响面 | 用户裁定。三条影响面：①Electron 的 `documents.js` 读走 `HEADER_COLUMNS`、写走显式列名，该文件里 `SELECT * FROM business_documents` **出现 0 次**（而 `SELECT * FROM` 在 `electron/` 全树有 20 处，故这个 0 有判别力）⇒ 读写不受影响；②**有一处输出形状会变**：`_csvExport.js` 的 `tableToCsv` 用 `PRAGMA table_info` + `SELECT *`，Electron 打开 v25 账本导出 `documents` 会**多一列 `currency`**，如实登记；③单向性仍是**约定不是强制**（`SchemaMigrator` 文件头自述 v24 账本不被 Electron 拒绝、其迁移循环跑零次），v25 落在同一条 `nativeOnlyVersions` 序列上，性质不变 |
+| **§6 拆轮表** | D-1 是第一个实现轮 | **插入 D-1a 行、排在 D-1 前**；D-1 的对账单闸门解除条件改为「D-1a 已合并」 | 用户裁定。D-1a 的验收线按 N-PR-1（v24）先例落，三条都经本轮实测确认：①`sharedLadderVersion` 仍 **23** 不动、`nativeOnlyVersions` 由 `[24]` 变 `[24, 25]`、`schemaVersion` 由 24 变 **25**，`SchemaVersionParityTests` 的五条断言跟着更新（它同时钉「等于字面清单」与「等于连续区间」两件事）；②守门分段照 `InventorySchemaTests` 的 **G/H/L 三段共 11 条** 写法；③`PreMigrationSnapshot` 是 v24 就为「就地升级活账本」建的既有机制，本轮**只需实测确认它覆盖 v25**，不新建机制 |
