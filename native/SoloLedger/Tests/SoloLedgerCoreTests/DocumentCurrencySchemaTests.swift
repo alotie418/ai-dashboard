@@ -4,9 +4,11 @@ import XCTest
 /// D-1a: schema v25 — `business_documents.currency`, the second native-only rung.
 ///
 /// The ruling is `docs/BUSINESS_DOCUMENTS_SPEC.md` Q2-d-② (and the Q8 exception it activates):
-/// one **nullable** `TEXT` column, **no `CHECK`**, **no `DEFAULT`**, written by nobody yet — the
-/// statement generator in D-1 is its first and only writer. Every expectation below traces to
-/// that ruling or to MEASURED SQLite behaviour, and the measured ones say so at the assertion.
+/// one **nullable** `TEXT` column, **no `CHECK`**, **no `DEFAULT`**. D-1 has since landed the one
+/// writer the ruling allows — `LedgerStore.statementDrafts`, whose per-currency documents each
+/// record their own currency (`StatementGeneratorTests`); every other document type still leaves it
+/// `NULL`, which is what the tests below keep measuring. Every expectation here traces to that
+/// ruling or to MEASURED SQLite behaviour, and the measured ones say so at the assertion.
 ///
 /// Organised the way ``InventorySchemaTests`` is, because it protects the same three properties:
 ///
