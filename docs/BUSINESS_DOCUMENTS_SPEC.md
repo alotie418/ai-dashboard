@@ -157,7 +157,7 @@ Q2 的细目（Q2-a 字段映射 / Q2-b 不列税率 / Q2-c 空白规则 / Q2-d 
 ### Q5 · 状态机与联动 = 照搬，零联动
 
 **状态机**：`draft → issued | void`；`issued → void`；`void` 是终态。
-**编辑**：仅 `draft` 可改字段与明细。
+**编辑**：仅 `draft` 可改字段与明细。**对账单（`statement`）是例外：只可改表头字段，明细只读**——见下面「对账单的编辑语义」。
 **删除**：`issued` 不可直接删除（必须先作废）；`draft` 与 `void` 可删除。
 **联动**：**签发不落流水、不扣库存、不进任何报表。**
 
@@ -166,6 +166,26 @@ Q2 的细目（Q2-a 字段映射 / Q2-b 不列税率 / Q2-c 空白规则 / Q2-d 
   1. 原生报表引擎对 `business_documents` 与 `business_document_items` **零读**。实测依据：`electron/reports/` 下 `FROM <表>` 的闭集是 `transactions` / `sqlite_master` / `settings` / `sales` / `purchases` / `categories` 六张，单据两表一次不出现（该图案在同一次扫描中命中了六张真表，故不是空图案）。
   2. 原生库存引擎对单据两表零读、零写。
   3. 单据的任何状态流转都不产生 `transactions` 行、不产生库存流水行。
+
+#### Q5-a · 对账单的编辑语义 = 表头可改，明细只读（第七次裁定）
+
+对账单在编辑器里**可以打开、可以改表头字段**（编号 / 日期 / 客户 / 税号 / 地址 / 联系方式 / 有效期 / 备注），
+但**明细只呈现、永不回传**：写入 API 收到的编辑请求对 `statement` 一律不携带 `lines`。
+**要改明细，只能删掉这张单据重新生成。**
+
+* **为什么收窄而不是照搬**：Electron 的 draft 对账单明细完全可改，重存时走同一套无模式的 `sanitizeItems`。
+  原生照搬会同时吃下两个后果，两个都落在交给客户的产物上：
+  1. **丢行丢钱**——`sanitizeItems` 把描述为空的行整行丢弃，而 Q2-a 明文允许生成的对账单行描述为空
+     （D-1 第一条裁定），于是一笔真实的 income 流水连同它的金额从单据上消失，表头三合计在同一事务里跟着变小；
+  2. **`NULL` 税额被压成 0**——`sanitizeItems` 的 `round2` 回退是 `0`，压完之后 Q2-a 的
+     「空值显示破折号」永远不可达。
+* **两个后果的判据不对称，登记在案**：后果 1 在 Electron 里**可达**（用户手动清空某行描述即触发，见 §3 A12），
+  后果 2 在 Electron 里**连规则都不存在**（`business_document_items.tax_amount` 可空，但 `sanitizeItems` 的
+  `num()` 回退让 create/update 两条路都写不出 `NULL`）。所以后果 2 **不得引「Electron 就是这么做的」当依据**。
+* **依据**：`statement` 属 Q2 的发明面，发明面的编辑语义可以收窄；其余四种类型的编辑一个字不变。
+* **可测断言**：对 `statement` 构造的编辑请求，其 `lines` 恒为「不改」；对其余四种类型，`lines` 照常携带。
+  **创建**一张对账单只有生成器一条路（编辑器在该形态下不提供保存动作），这是「删掉重新生成」这句话的另一半。
+
 * **正式税务发票关联**：`tax_invoice_issued` / `_number` / `_date` / `_attachment_path` 四列**只记录外部已开具的发票信息**，号码只能手工录入，**永不自动生成**；`void` 单据上该关联为只读。证据锚：`electron/handlers/documents.js` 的 `updateTaxInvoice`（稳定错误码 `DOC_VOID_TAX_INVOICE_READONLY`、`ATTACHMENT_IN_USE`、`INVALID_ATTACHMENT_PATH`）。
 
 ### Q6 · 客户字段 = 自由文本照搬
@@ -220,7 +240,7 @@ Q2 的细目（Q2-a 字段映射 / Q2-b 不列税率 / Q2-c 空白规则 / Q2-d 
 
 ## 3. 镜像保真登记
 
-以下**六条**是 Electron 的**已知形态**，本章照搬，但在此登记，以免将来被当成原生引入的缺陷。
+以下**七条**是 Electron 的**已知形态**，本章照搬，但在此登记，以免将来被当成原生引入的缺陷。
 
 | 编号 | 形态 | 证据锚 | 处置 |
 | --- | --- | --- | --- |
@@ -230,6 +250,7 @@ Q2 的细目（Q2-a 字段映射 / Q2-b 不列税率 / Q2-c 空白规则 / Q2-d 
 | A9 | **`update` 的状态读在事务之外**：先无事务地读出 `status`，在 JS 里判完草稿规则与状态机，随后才开事务写。读与写之间存在窗口 | `electron/handlers/documents.js` 的 `update`：`const existing = db.prepare('SELECT id, status …').get(id)` 在函数顶部，`db.transaction(…)` 只包住 `UPDATE`／明细重写 | 照搬。见下面的**并发窗口三条**与升级条款 |
 | A10 | **`remove` 全程无事务**：读 `status` 与附件路径 → 判 `issued` → `DELETE` → best-effort 删附件，四步各自独立 | 同文件 `remove`：整个函数内**没有** `db.transaction` | 照搬。见下面的**并发窗口三条**与升级条款 |
 | A11 | **`updateTaxInvoice` 全程无事务**：读 `status` 与既有路径 → 判 `void` → 查附件是否被别的单据占用 → `UPDATE` → best-effort 删旧副本，五步各自独立 | 同文件 `updateTaxInvoice`：整个函数内**没有** `db.transaction`；占用查询是独立的 `SELECT 1 … AND id != ?` | 照搬。见下面的**并发窗口三条**与升级条款 |
+| A12 | **手工清空一行的描述会静默丢掉这一行连同它的金额**：编辑器提交前先 `.filter(r => r.description.trim())`，服务端 `sanitizeItems` 再滤一次，表头三合计按剩余行重算。全程无提示、无确认、无「已丢弃 N 行」 | `components/DocumentModal.tsx` 的 `handleSubmit`；`electron/handlers/documents.js` 的 `sanitizeItems` | 照搬。**这是既有形态，与 Q5-a 无关**：Q5-a 挡住的是「生成的对账单行天然带空描述」那一子情形，本条是用户自己清空的那一条，两侧都可达。要让原生不复刻它，是另一个独立裁定 |
 
 **设计约束（对 D-1 / D-2 有约束力）**：原生 API **不得开放 A8 的「改了明细却不传 items」路径**。Electron 的前端不会这么调，但它的 handler 允许；原生的写入口必须做到「明细与合计要么一起变、要么都不变」，使 A8 描述的陈旧合计在原生侧**不可达**。这是照搬存储形态、不照搬可达性。
 
@@ -249,6 +270,24 @@ A9–A11 是同一个形态的三处实例：**check-then-act**——先读状�
 > * **附件删除**：任何真的会删掉 `attachments/docs/` 下文件的代码路径，无论它消费的是本章回传的孤儿路径，还是自己算出来的。
 >
 > 「先修后接」的意思是：修复（条件写 + 受影响行数校验，见 §5 的候选轮）必须先落地并通过反向证明，那条新路径才允许接上去。触发时**不需要重新裁定要不要修**，只需要裁定怎么修。
+
+### D-4 的一处有意不镜像：附件副本只进不出（第七次裁定）
+
+Electron 的关联面板有**三条真正会删文件的路径**：`app:discardDocAttachment`（重选 / 移除未保存副本 / 取消时清理，
+经 `attachments.js` 的 `safeDeleteAttachment` → `fs.rmSync`）、`updateTaxInvoice` 替换关联后删旧副本、
+`remove` 删单据后删附件。
+
+**裁定：D-4 只做「选文件 / 打开 / 保存关联」，一条删除路径都不接。** 重选、移除、取消一律只改状态，
+不动磁盘；`updateTaxInvoice` 与 `deleteBusinessDocument` 回传的孤儿路径在 App 侧被显式丢弃。
+
+* **代价，如实登记**：`attachments/docs/` 下会留下无人引用的副本。这是一处**静默磁盘泄漏**，不是遗漏。
+* **为什么不能顺手做掉**：上面的「升级条款」把「任何真的会删掉 `attachments/docs/` 下文件的代码路径」
+  写成了 A9–A11 的自动触发器。接上删除 = 触发条款 = 三处 check-then-act **必须先修后接**。
+  而 `discardDocAttachment` 自己就是 A11 的形状（先 `SELECT 1 … LIMIT 1` 查引用，再删），
+  逐字镜像等于把条款要防的那条竞态原样搬进来。
+* **排期（同一次裁定）**：**存储原子化轮插在 D-5 之后、D-6 之前**（范围见 §5）；
+  **D-6 激活时接上删除接缝**。在原子化轮落地之前，任何轮次都不得接删除。
+* **接缝是单点的**：App 侧消费那两个回传值的地方各恰一处，都在页面模型里，都只是把值丢掉。
 
 ---
 
@@ -285,14 +324,19 @@ Electron 现状在三处一致地表达了同一条边界，原生照此写：
 | **存储原子化**（下详） | 与 Electron 同形的已知形态，登记在 §3 A9–A11；修它必然越过 Q9 或 §1，属独立候选轮 |
 | 除 Q2 外的一切发明 | §1 已声明 |
 
-**候选轮：存储原子化（排期由用户定，不属 D-x 序列）**
+**候选轮：存储原子化（排期已定：D-5 之后、D-6 之前——第七次裁定）**
 
 范围两件事，绑在一起是因为它们是同一类问题（判据写在宿主语言里而不是写在写语句里）：
 
 1. **三处 check-then-act 收口**（§3 A9 / A10 / A11）：`update` / `deleteBusinessDocument` / `updateTaxInvoice` 改成把被判断的事实写进谓词的**条件写**（`… WHERE id = ? AND status = ?`）并**校验受影响行数**，行数为 0 时给出与今天同一个稳定错误码。**不改 schema**——这是与「加唯一约束」那条路的分野。附件归属那一处同理：把「没被别人占用」并进写语句的谓词。
 2. **`ProductCatalog.mapWriteFailure` 的 `(code 19)` 谓词修正**：D-2 实测坐实它在出货连接上一条也匹配不到——`activeExistingNoFollow` 带 `SQLITE_OPEN_EXRESCODE`，同一条唯一索引冲突报的是 `(code 2067)`（PK/NOT NULL/FK/CHECK 分别 1555/1299/787/275，**主码全是 19**）。改法与 D-2 的 `mappingConstraintToNumberExists` 同形：判主结果码。属库存页，D-2 不越界修，只留证据。
 
-两件都要走反向证明；第 1 件还要各配一个「只有它能杀掉」的用例（条件写被改回无条件写、受影响行数校验被删）。
+3. **附件的安全删除**：把 D-4 登记的那条泄漏收掉——重选 / 移除 / 替换 / 删单据时真的删掉不再被引用的副本，
+   并把「没被别人占用」并进写语句的谓词（与第 1 件同形）。这一件是本轮**排期被提前**的直接原因：
+   D-6 要接删除接缝，而接删除会触发 §3 的升级条款。
+
+三件都要走反向证明；第 1 件与第 3 件还要各配一个「只有它能杀掉」的用例（条件写被改回无条件写、
+受影响行数校验被删、占用查询与删除之间的窗口）。
 
 ---
 
@@ -307,9 +351,10 @@ Electron 现状在三处一致地表达了同一条边界，原生照此写：
 | **D-1 存储层** | 按 Q9 甲案读写 v11 既有表；按 Q4 把算式迁入 Core 并逐字复刻。**对账单生成器（Q2）的开工条件 = D-1a 已合并**——生成器要写的 `currency` 列必须先存在；在那之前不得先写一个「日后再补币种」的版本 | 建/读/写往返；舍入链与 Electron 逐字节相等（对抗输入含「先舍后乘 ≠ 先乘后舍」的用例）；Q5 边界断言之 1、2 | +25~40 Core | 不涉 pbxproj（Core 包） |
 | **D-2 编号与状态机** | Q3 编号；Q5 状态机、编辑白名单、删除规则；A8 设计约束落地 | 状态机闭集反例全覆盖；编号三条反例（跨年 / 删除后重用 / 自定义不污染最大值）；「改行不传 items」路径在原生不可达 | +20~30 Core | 不涉 pbxproj |
 | **D-3 六语文案** | `documents.*` 的原生等价键族，含 D-4 关联面板所需的键 | 六语键数同步 650 → 650+N；`LocalizationWordingGuardTests` **零新增 sanctioned**；禁词实跑 | +50~87 键 × 6（预计） | **棘轮实为四处、跨两个目标**：`InventoryCopyTests` 的 650（Core）**与它同一个测试里的 `nav.* == 7`**、`LegacyConversionCopyTests` 的 650（App）、`ProductCopyTests` 的 650（App）。第四处只在本轮加 `nav.documents` 时才红，与 N-PR-3 加 `nav.inventory` 同形；本行原写「三处」，由第六次裁定订正。**若新增 App 目标测试文件，须手工登记 pbxproj，恰 4 行/文件** |
-| **D-4 视图** | 列表页 + 编辑器 + 明细行 + **正式发票关联面板**（对应 Electron 的 `TaxInvoiceModal.tsx`，含附件控件） | 新建 `DocumentsView` 与其 composition；**新分区是第 7 个**，须同步撞到的闭集守门与两处分区计数注释 | +30~50 App | `SidebarSection`（`AppModel.swift`）新增一例；`InventoryView` 的「不是本页的五个分区」注释与 `AppModel` 的「六个分区之一」注释同轮改。App 目标新文件须登记 pbxproj |
+| **D-4 视图** | 列表页 + 编辑器 + 明细行 + **正式发票关联面板**（对应 Electron 的 `TaxInvoiceModal.tsx`，含附件控件，**但不含任何删除路径**——见 §3 该节）；对账单的编辑语义按 Q5-a 收窄 | 新建 `DocumentsView` 与其 composition；`documents.*` 的休眠守门从「零命中」翻成「恰由 composition 命名」的闭集；`documents.export.*` / `documents.print.*` 九键**继续断言零命中**（属 D-5） | +30~50 App | **本轮不动侧栏**（第七次裁定把它移入 D-6）。App 目标新文件须登记 pbxproj，恰 4 行/文件 |
 | **D-5 输出** | Q7 的自包含 HTML 导出 + Powerbox 存盘 | 产物里必然含免责声明（守门断言）；模板对用户文本全量转义（含注入形对抗用例） | +10~25 | 不动 entitlements 闭集（那是后续轮候选） |
-| **D-6 激活** | 侧栏可达 + 收尾 | 侧栏入口可达；`LegacyLedgerProbe` 的 `otherRecordTables` 移除 `business_documents` 与 `business_document_items` 两项；`legacy.other.message` 六语改写（现文说「本 App 目前只显示流水」，激活后变假）；`docs/SWIFTUI_FEATURE_GAP.md` §3 该行改状态 | +10~20 | `products` 已有同形先例，其理由写在 `AppModel.swift` 对 `otherRecordTables` 的注释里 |
+| **存储原子化**（非 D-x 序列，排在此处） | §5 的候选轮三件：三处条件写 + 受影响行数校验、`ProductCatalog` 的 `(code 19)` 谓词、**附件的安全删除** | 三件各配「只有它能杀掉」的用例；不改 schema | 未估 | **必须早于 D-6**：D-6 要接的删除接缝会触发 §3 的升级条款 |
+| **D-6 激活** | 侧栏可达 + 接上附件删除接缝 + 收尾 | 侧栏入口可达；**`SidebarSection`（`AppModel.swift`）新增一例、`RootView` 加分支、`InventoryView` 的「不是本页的五个分区」注释与 `AppModel` 的「六个分区之一」注释同轮改**（第七次裁定自 D-4 移入；实测届时另有 8 处 `SidebarSection.allCases` 有序断言与 `DocumentCopyTests` 的 `SidebarSectionProbe` 两条要同批翻转，开工前须重跑扫描）；`LegacyLedgerProbe` 的 `otherRecordTables` 移除 `business_documents` 与 `business_document_items` 两项；`legacy.other.message` 六语改写（现文说「本 App 目前只显示流水」，激活后变假）；`docs/SWIFTUI_FEATURE_GAP.md` §3 该行改状态 | +10~20 | `products` 已有同形先例，其理由写在 `AppModel.swift` 对 `otherRecordTables` 的注释里 |
 
 ---
 
@@ -399,3 +444,19 @@ D-3 的键族测绘（只读）发现两处拆轮表说漏了的事实，均已�
 | **§6 · D-3** | 「三处 650 棘轮跨两个目标」 | 「**四处**」——同一个 `testIC2` 里还有一条 `nav.* == 7` 的前缀谓词，加 `nav.documents` 时同样会红 | D-3 全仓重扫实测：只改 `.strings` 后 Core 恰 12 条失败（650 × 6 + `nav.*` × 6）、App 恰 12 条（两处 650 × 6），四个断言点之外一条不多。与 N-PR-3 加 `nav.inventory` 同形 |
 
 **本次修订不改任何口径，也不改代码**：它补的是拆轮表漏记的归属与一个漏数的守门点。
+
+### 2026-08-18 · 第七次裁定（D-4 开工三问：对账单编辑 / 侧栏归属 / 附件删除）
+
+D-4 开工前置的测绘（只读）提出三个超出确认书的判断点，执行会话停下来要裁定，用户逐条裁定如下。
+本次修订**不改任何已裁定口径的方向**，它把一处收窄写进 Q5、把一处归属订正回 D-6、把一处排期写死。
+
+| 条目 | 从什么 | 改成什么 | 依据 |
+| --- | --- | --- | --- |
+| **Q5 编辑** | 「仅 `draft` 可改字段与明细」，对账单无例外 | 新增 **Q5-a**：对账单**表头可改、明细只读**，编辑请求对 `statement` 恒不携带 `lines`；改明细的路径 = 删掉重新生成；**创建**对账单只有生成器一条路 | 用户裁定（选项 B）。`statement` 属 Q2 发明面，发明面的编辑语义可收窄；两个后果（丢行丢钱 / `NULL` 税额压 0）同时挡住，Core 零改动，A8 的「行与总额同进同退」不变。**第二个后果是本轮新测出来的**，原登记只写了第一个 |
+| **§3** 镜像保真登记 | 六条（A5/A6/A8/A9/A10/A11） | **七条**：新增 **A12**（用户手工清空一行描述 → 静默丢行丢钱，两侧都可达） | 用户知会「照搬并登记，不改」。它与 Q5-a 不是同一件事：Q5-a 挡的是生成行天然带空描述那一子情形 |
+| **§3** 附件 | （本次新产生） | 新增「D-4 的一处有意不镜像：附件副本只进不出」一节：D-4 只做选文件 / 打开 / 保存关联，**零删除路径**；孤儿副本磁盘泄漏如实登记；写死**「原子化轮落地前不得接删除」** | 用户裁定 (b)。Electron 的三条删除路径任一都会触发本节上方的升级条款，而 `discardDocAttachment` 本身就是 A11 的形状 |
+| **§5 / §6** 存储原子化轮 | 「排期由用户定」，范围两件 | 排期**写死在 D-5 之后、D-6 之前**；范围**三件**（新增「附件的安全删除」） | 用户裁定。D-6 要接删除接缝，接删除即触发升级条款，所以原子化必须早于 D-6 |
+| **§6 · D-4** | 「新分区是第 7 个……`SidebarSection` 新增一例；两处分区计数注释同轮改」 | 移出 D-4：本轮**不动侧栏**。D-4 行改写为休眠守门的翻转与九个 D-5 键的零命中 | 用户裁定（维持 D-6）。三条依据：①D-3 已合并的代码注释两处明写 `nav.documents` 与侧栏分区属 D-6（`DocumentCopyTests.swift` 文件头与 DC9 内）；②N-PR-4/N-PR-6 先例——库存页的 `SidebarSection` case 是在**激活轮**加的，`InventoryPageComposition.swift` 的注释即此；③`RootView` 的 detail switch 穷尽无 `default`，加 case 即必须加分支、页面当场可达，那样 D-6 的「侧栏入口可达」就没有内容 |
+| **§6 · D-6** | 「侧栏可达 + 收尾」 | 收编自 D-4 的侧栏三件（enum case / `RootView` 分支 / 两处计数注释）+ **接上附件删除接缝**；并登记「届时另有 8 处 `SidebarSection.allCases` 有序断言与 `SidebarSectionProbe` 两条要同批翻转，开工前须重跑扫描」 | 同上。处数是 D-4 开工前置实测的，按 N-PR-6 判例「记忆里的处数只当线索」，D-6 仍须重跑 |
+
+**本次修订不改代码之外的任何口径**：Q1–Q4、Q6–Q9 与 Q2 的四条细目一个字未动。
