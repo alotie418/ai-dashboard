@@ -19,6 +19,7 @@
 "nav.reports" = "报表";
 "nav.products" = "商品 / 服务项目";
 "nav.inventory" = "库存";
+"nav.documents" = "业务单据";
 
 "overview.income" = "收入合计";
 "overview.expense" = "支出合计";
@@ -812,3 +813,145 @@
 "overview.metrics.noBaseNote" = "基期没有数据或为零时，这里留空而不显示 0.0%——没有可比的基数，任何百分比都会是误导。";
 "overview.metrics.empty.title" = "还不能比较";
 "overview.metrics.empty.message" = "这两项都按营业收入计算：环比要求上一个月有营业收入，同比要求去年同月有营业收入。只记支出的账本两者都算不出。";
+
+/* ── D-3 · 单据章六语文案（documents.* 103 键 + nav.documents）────────────────
+   全部休眠：本轮无生产代码引用。D-4 画列表页/编辑器/明细行/关联面板，
+   D-5 画导出产物，D-6 接侧栏（与 nav.inventory 同形）。
+   逐键归属（键 → Electron 来源键 → 镜像/改写/新写）由 DocumentCopyTests 的
+   mirroredFromElectron / rewrittenWithReason / nativeOnly 三张表钉住并逐条实测：
+   镜像 75（六语对 Electron 逐字节相等）、改写 8（每条一个理由）、新写 21。 */
+
+/* D-3 · 页面框架（4 键） */
+"documents.page.title" = "业务单据";
+"documents.page.subtitle" = "创建和管理报价单、销售单等内部业务单据（非税务发票）";
+"documents.page.empty" = "暂无业务单据";
+"documents.page.add" = "新建单据";
+
+/* D-3 · 类型筛选（1 键） */
+"documents.filter.all" = "全部";
+
+/* D-3 · 五种类型（闭集：BusinessDocumentType）（5 键） */
+"documents.type.quotation" = "报价单";
+"documents.type.salesOrder" = "销售单";
+"documents.type.proformaInvoice" = "形式发票";
+"documents.type.commercialInvoice" = "商业发票";
+"documents.type.statement" = "对账单";
+
+/* D-3 · 三种状态（闭集：BusinessDocumentStatus）（3 键） */
+"documents.status.draft" = "草稿";
+"documents.status.issued" = "已签发";
+"documents.status.void" = "已作废";
+
+/* D-3 · 列表列（7 键） */
+"documents.col.number" = "单据编号";
+"documents.col.type" = "类型";
+"documents.col.date" = "日期";
+"documents.col.customer" = "客户";
+"documents.col.total" = "合计金额";
+"documents.col.status" = "状态";
+"documents.col.taxInvoice" = "正式发票";
+
+/* D-3 · 两个生命周期动作；编辑/删除沿用 common.*（2 键） */
+"documents.action.issue" = "签发";
+"documents.action.void" = "作废";
+
+/* D-3 · 两处确认。Q3：作废不释放编号，删除才释放（4 键） */
+"documents.confirm.void.title" = "作废这张单据？";
+"documents.confirm.void.message" = "作废后不能再编辑。编号仍归这张单据所有，同类型的其它单据不能再用它。";
+"documents.confirm.delete.title" = "删除这张单据？";
+"documents.confirm.delete.message" = "明细会一起删除，且无法撤销。删除后这个编号可以被再次使用。";
+
+/* D-3 · 编辑器表头字段（13 键） */
+"documents.form.title" = "新建业务单据";
+"documents.form.editTitle" = "编辑业务单据";
+"documents.form.type" = "单据类型";
+"documents.form.number" = "单据编号（内部）";
+"documents.form.numberHint" = "内部编号，可修改";
+"documents.form.date" = "单据日期";
+"documents.form.validUntil" = "有效期至";
+"documents.form.customer" = "客户名称";
+"documents.form.customerPlaceholder" = "请输入客户名称";
+"documents.form.customerTaxID" = "客户税号";
+"documents.form.customerAddress" = "客户地址";
+"documents.form.customerContact" = "联系方式";
+"documents.form.notes" = "备注";
+
+/* D-3 · 明细表。Q2-a：破折号不是 0（12 键） */
+"documents.item.title" = "明细";
+"documents.item.description" = "品名/说明";
+"documents.item.quantity" = "数量";
+"documents.item.unit" = "单位";
+"documents.item.noUnit" = "无单位";
+"documents.item.unitPrice" = "单价";
+"documents.item.taxRate" = "税率";
+"documents.item.taxAmount" = "税额";
+"documents.item.amount" = "金额";
+"documents.item.add" = "添加明细行";
+"documents.item.remove" = "删除";
+"documents.item.dashNote" = "破折号表示该行没有记录这个数，与记录下来的 0 不是一回事。";
+
+/* D-3 · 表头三个合计（3 键） */
+"documents.total.subtotal" = "不含税合计";
+"documents.total.taxAmount" = "税额合计";
+"documents.total.total" = "含税合计";
+
+/* D-3 · BusinessDocumentError 十二例 + 编辑器三条（15 键） */
+"documents.error.numberRequired" = "请填写单据编号。";
+"documents.error.customerNameRequired" = "请填写客户名称。";
+"documents.error.dateRequired" = "请填写单据日期。";
+"documents.error.currencyIsGeneratedStatementsOnly" = "只有生成出来的对账单才带币种。手工新建的单据按创建时的会计制度显示金额。";
+"documents.error.notFound" = "这张单据已经不在了，可能已被删除。";
+"documents.error.numberExists" = "单据编号已存在，请修改";
+"documents.error.invalidStatusTransition" = "「{from}」不能改成「{to}」。草稿可以签发或作废，已签发只能作废，已作废不能再改。";
+"documents.error.onlyDraftCanBeEdited" = "只有草稿可以修改。要改内容，请先新建一张单据。";
+"documents.error.issuedMustBeVoidedFirst" = "已签发的单据不能直接删除，请先作废。";
+"documents.error.voidTaxInvoiceReadOnly" = "已作废单据的发票关联信息为只读";
+"documents.error.invalidAttachmentPath" = "这个附件路径不合法，请重新选择文件。";
+"documents.error.attachmentInUse" = "这个附件已经关联到另一张单据了。请为这张单据另选一个文件。";
+"documents.error.itemsRequired" = "请至少填写一条明细";
+"documents.error.saveFailed" = "保存失败，请重试";
+"documents.error.loadFailed" = "加载失败，请重试";
+
+/* D-3 · Q2 —— 对账单面板与裁定要求的两句（8 键） */
+"documents.statement.customer" = "选择客户";
+"documents.statement.periodStart" = "期间起始";
+"documents.statement.periodEnd" = "期间截止";
+"documents.statement.generate" = "生成对账明细";
+"documents.statement.noRecords" = "这段期间内没有这个客户的收入流水。";
+"documents.statement.needInput" = "请先选择客户和期间";
+"documents.statement.basisNote" = "对账单是按期间汇总的往来汇总单，不是逐笔明细发票。它把这段时间内这个客户的收入流水汇总成一张往来单据，不描述商品明细，也不是任何一种正式税务文书。";
+"documents.statement.currencySplitNote" = "一张对账单只含一种币种。这段期间内有几种币种，就生成几张单据，编号也就连着用掉几个。";
+
+/* D-3 · Q7 —— 产物是自包含 HTML，文案照说（4 键） */
+"documents.export.action" = "导出 HTML";
+"documents.export.done" = "已导出到：{path}";
+"documents.export.failed" = "导出失败，请重试。";
+"documents.export.formatNote" = "导出的是一个自包含的 HTML 文件，不是 PDF。它可以用浏览器打开，也可以从浏览器再打印成 PDF。";
+
+/* D-3 · 产物自带的标签（5 键） */
+"documents.print.generatedAt" = "生成时间";
+"documents.print.period" = "期间";
+"documents.print.disclaimer" = "本单据为内部业务单据，并非正式税务发票。";
+"documents.print.voidBadge" = "已作废";
+"documents.print.currency" = "币种";
+
+/* D-3 · Q5 —— 只记录别人开具的发票，永不开具（10 键） */
+"documents.taxInvoice.action" = "发票关联";
+"documents.taxInvoice.title" = "正式发票关联";
+"documents.taxInvoice.issuedLabel" = "已开具正式发票（由外部开票平台开具）";
+"documents.taxInvoice.numberLabel" = "发票号码";
+"documents.taxInvoice.numberHint" = "仅手工录入外部开具的发票号码，永不自动生成";
+"documents.taxInvoice.dateLabel" = "开票日期";
+"documents.taxInvoice.attachmentLabel" = "发票附件";
+"documents.taxInvoice.compliance" = "本功能仅记录外部开具的正式发票信息，不提供任何开票功能";
+"documents.taxInvoice.recorded" = "已开";
+"documents.taxInvoice.notRecorded" = "未开";
+
+/* D-3 · 关联面板的文件控件（7 键） */
+"documents.attachment.pick" = "选择文件（PDF / JPG / PNG）";
+"documents.attachment.open" = "打开";
+"documents.attachment.remove" = "移除";
+"documents.attachment.missing" = "附件文件不存在，可能已被移动或删除";
+"documents.attachment.tooLarge" = "文件过大，请选择小一些的文件。";
+"documents.attachment.failed" = "附件操作失败";
+"documents.attachment.invalidType" = "仅支持 PDF / JPG / PNG 格式";

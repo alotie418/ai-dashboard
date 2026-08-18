@@ -306,8 +306,8 @@ Electron 现状在三处一致地表达了同一条边界，原生照此写：
 | **D-1a schema v25**（排在 D-1 前） | Q2-d-② 的加列轮：`ALTER TABLE business_documents ADD COLUMN currency TEXT`（可空、无 `CHECK`）+ schema 守门 + 确认 `PreMigrationSnapshot` 既有机制覆盖这根新横档。**只加列，不写它**——写入者是 D-1 的对账单生成器 | 沿 N-PR-1（v24）先例：①`sharedLadderVersion` 仍是 **23** 不动，`nativeOnlyVersions` 由 `[24]` 变 `[24, 25]`、`schemaVersion` 由 24 变 **25**，`SchemaVersionParityTests` 的五条断言全部跟着更新（它同时钉「等于字面清单」与「等于连续区间」两件事）；②守门按 `InventorySchemaTests` 的分段写法落（该文件 11 条分 **G/H/L 三段**：G 段管横档行为——到达/幂等/回滚往返/head 必需/prepared-import 闸；H 段管列语义；L 段管就地升级先快照再迁移且快照可还原）；③本轮的 H 段只需钉「列存在、可空、无 `CHECK`」，L 段直接复用 v24 已建立的快照机制并**实测确认它覆盖 v25**，不新建机制 | +10~20 Core | 不涉 pbxproj（Core 包）。**Electron 侧 CSV 导出会多一列，见 Q9 影响面第 2 条** |
 | **D-1 存储层** | 按 Q9 甲案读写 v11 既有表；按 Q4 把算式迁入 Core 并逐字复刻。**对账单生成器（Q2）的开工条件 = D-1a 已合并**——生成器要写的 `currency` 列必须先存在；在那之前不得先写一个「日后再补币种」的版本 | 建/读/写往返；舍入链与 Electron 逐字节相等（对抗输入含「先舍后乘 ≠ 先乘后舍」的用例）；Q5 边界断言之 1、2 | +25~40 Core | 不涉 pbxproj（Core 包） |
 | **D-2 编号与状态机** | Q3 编号；Q5 状态机、编辑白名单、删除规则；A8 设计约束落地 | 状态机闭集反例全覆盖；编号三条反例（跨年 / 删除后重用 / 自定义不污染最大值）；「改行不传 items」路径在原生不可达 | +20~30 Core | 不涉 pbxproj |
-| **D-3 六语文案** | `documents.*` 的原生等价键族 | 六语键数同步 650 → 650+N；`LocalizationWordingGuardTests` **零新增 sanctioned**；禁词实跑 | +50~87 键 × 6（预计） | **三处 650 棘轮跨两个目标**：`InventoryCopyTests`（Core）、`LegacyConversionCopyTests`（App）、`ProductCopyTests`（App）。**若新增 App 目标测试文件，须手工登记 pbxproj，恰 4 行/文件** |
-| **D-4 视图** | 列表页 + 编辑器 + 明细行 | 新建 `DocumentsView` 与其 composition；**新分区是第 7 个**，须同步撞到的闭集守门与两处分区计数注释 | +30~50 App | `SidebarSection`（`AppModel.swift`）新增一例；`InventoryView` 的「不是本页的五个分区」注释与 `AppModel` 的「六个分区之一」注释同轮改。App 目标新文件须登记 pbxproj |
+| **D-3 六语文案** | `documents.*` 的原生等价键族，含 D-4 关联面板所需的键 | 六语键数同步 650 → 650+N；`LocalizationWordingGuardTests` **零新增 sanctioned**；禁词实跑 | +50~87 键 × 6（预计） | **棘轮实为四处、跨两个目标**：`InventoryCopyTests` 的 650（Core）**与它同一个测试里的 `nav.* == 7`**、`LegacyConversionCopyTests` 的 650（App）、`ProductCopyTests` 的 650（App）。第四处只在本轮加 `nav.documents` 时才红，与 N-PR-3 加 `nav.inventory` 同形；本行原写「三处」，由第六次裁定订正。**若新增 App 目标测试文件，须手工登记 pbxproj，恰 4 行/文件** |
+| **D-4 视图** | 列表页 + 编辑器 + 明细行 + **正式发票关联面板**（对应 Electron 的 `TaxInvoiceModal.tsx`，含附件控件） | 新建 `DocumentsView` 与其 composition；**新分区是第 7 个**，须同步撞到的闭集守门与两处分区计数注释 | +30~50 App | `SidebarSection`（`AppModel.swift`）新增一例；`InventoryView` 的「不是本页的五个分区」注释与 `AppModel` 的「六个分区之一」注释同轮改。App 目标新文件须登记 pbxproj |
 | **D-5 输出** | Q7 的自包含 HTML 导出 + Powerbox 存盘 | 产物里必然含免责声明（守门断言）；模板对用户文本全量转义（含注入形对抗用例） | +10~25 | 不动 entitlements 闭集（那是后续轮候选） |
 | **D-6 激活** | 侧栏可达 + 收尾 | 侧栏入口可达；`LegacyLedgerProbe` 的 `otherRecordTables` 移除 `business_documents` 与 `business_document_items` 两项；`legacy.other.message` 六语改写（现文说「本 App 目前只显示流水」，激活后变假）；`docs/SWIFTUI_FEATURE_GAP.md` §3 该行改状态 | +10~20 | `products` 已有同形先例，其理由写在 `AppModel.swift` 对 `otherRecordTables` 的注释里 |
 
@@ -385,3 +385,17 @@ D-2（PR #489）开出后，晚到的评审 bot 提了两条 check-then-act 跨�
 | **§9** 第三次裁定标题 | 「第三次（**末次**）裁定」 | 「第三次裁定」 | 「末次」在第四次裁定落笔时就已失效，本次连同订正；本行不改任何口径 |
 
 **本次修订不解锁也不阻塞任何轮次**，也不改变 D-2 的代码：PR #489 的实现保持与 Electron 同形。
+
+### 2026-08-18 · 第六次裁定（拆轮表补 D-4 关联面板；棘轮订正为四处）
+
+D-3 的键族测绘（只读）发现两处拆轮表说漏了的事实，均已实测：**Electron 的 `TaxInvoiceModal.tsx`
+在原生侧没有任何轮次认领**——§6 的 D-4 只写「列表页 + 编辑器 + 明细行」，而那是 Electron 里与
+`DocumentModal.tsx` 并列的另一个组件，它的 16 个键（关联面标签 + 附件控件）因此谁都不画；以及
+**六语键数棘轮实为四处而不是三处**。
+
+| 条目 | 从什么 | 改成什么 | 依据 |
+| --- | --- | --- | --- |
+| **§6 · D-4** | 「列表页 + 编辑器 + 明细行」 | 「列表页 + 编辑器 + 明细行 **+ 正式发票关联面板**（对应 `TaxInvoiceModal.tsx`，含附件控件）」 | 用户裁定。拆轮表漏认领了 Electron 的第二个组件；D-4 收编而不是另开一轮。**直接后果**：那 16 个键回到 D-3 本轮写入、消费轮次标 D-4，不再延后 |
+| **§6 · D-3** | 「三处 650 棘轮跨两个目标」 | 「**四处**」——同一个 `testIC2` 里还有一条 `nav.* == 7` 的前缀谓词，加 `nav.documents` 时同样会红 | D-3 全仓重扫实测：只改 `.strings` 后 Core 恰 12 条失败（650 × 6 + `nav.*` × 6）、App 恰 12 条（两处 650 × 6），四个断言点之外一条不多。与 N-PR-3 加 `nav.inventory` 同形 |
+
+**本次修订不改任何口径，也不改代码**：它补的是拆轮表漏记的归属与一个漏数的守门点。
