@@ -811,33 +811,35 @@
 "overview.metrics.empty.title" = "아직 비교할 수 없습니다";
 "overview.metrics.empty.message" = "두 항목은 모두 매출로 계산합니다. 전월 대비에는 직전 달의 매출이, 전년 동월 대비에는 작년 같은 달의 매출이 필요합니다. 지출만 기록한 장부에서는 둘 다 산출되지 않습니다.";
 
-/* ── D-3 · 单据章六语文案（documents.*，104 键）───────────────────────────────
+/* ── D-3 · 单据章六语文案（documents.* 103 键 + nav.documents）────────────────
    全部休眠：本轮无生产代码引用。D-4 画列表页/编辑器/明细行/关联面板，
-   D-5 画导出产物，D-6 接侧栏（nav.documents，与 nav.inventory 同形）。
-   镜像 83 键、改写 5 键、新写 17 键；逐键归属见 DocumentCopyTests 的表。 */
+   D-5 画导出产物，D-6 接侧栏（与 nav.inventory 同形）。
+   逐键归属（键 → Electron 来源键 → 镜像/改写/新写）由 DocumentCopyTests 的
+   mirroredFromElectron / rewrittenWithReason / nativeOnly 三张表钉住并逐条实测：
+   镜像 75（六语对 Electron 逐字节相等）、改写 8（每条一个理由）、新写 21。 */
 
-/* D-3 · documents page frame (4 键) */
+/* D-3 · 页面框架（4 键） */
 "documents.page.title" = "업무 문서";
 "documents.page.subtitle" = "견적서, 판매 주문서 등 내부 업무 문서를 생성하고 관리합니다 (정식 세무 문서가 아닙니다)";
 "documents.page.empty" = "업무 문서가 없습니다";
 "documents.page.add" = "새 문서";
 
-/* D-3 · the type filter (1 键) */
+/* D-3 · 类型筛选（1 键） */
 "documents.filter.all" = "전체";
 
-/* D-3 · the five document types (closed set: BusinessDocumentType) (5 键) */
+/* D-3 · 五种类型（闭集：BusinessDocumentType）（5 键） */
 "documents.type.quotation" = "견적서";
 "documents.type.salesOrder" = "판매 주문서";
 "documents.type.proformaInvoice" = "견적 송장";
 "documents.type.commercialInvoice" = "상업 송장";
 "documents.type.statement" = "거래 명세서";
 
-/* D-3 · the three statuses (closed set: BusinessDocumentStatus) (3 键) */
+/* D-3 · 三种状态（闭集：BusinessDocumentStatus）（3 键） */
 "documents.status.draft" = "초안";
 "documents.status.issued" = "발행됨";
 "documents.status.void" = "무효";
 
-/* D-3 · list columns (7 键) */
+/* D-3 · 列表列（7 键） */
 "documents.col.number" = "문서 번호";
 "documents.col.type" = "유형";
 "documents.col.date" = "날짜";
@@ -846,17 +848,17 @@
 "documents.col.status" = "상태";
 "documents.col.taxInvoice" = "정식 세무 증빙";
 
-/* D-3 · the two lifecycle actions; edit/delete reuse common.* (2 键) */
+/* D-3 · 两个生命周期动作；编辑/删除沿用 common.*（2 键） */
 "documents.action.issue" = "발행";
 "documents.action.void" = "무효 처리";
 
-/* D-3 · the two confirmations. Q3: voiding keeps the number, deleting releases it (4 键) */
+/* D-3 · 两处确认。Q3：作废不释放编号，删除才释放（4 键） */
 "documents.confirm.void.title" = "이 문서를 무효 처리하시겠습니까?";
-"documents.confirm.void.message" = "무효 처리하면 편집할 수 없습니다. 번호는 이 문서에 남으며 다른 문서가 사용할 수 없습니다.";
+"documents.confirm.void.message" = "무효 처리하면 편집할 수 없습니다. 번호는 이 문서에 남으며 같은 유형의 다른 문서는 사용할 수 없습니다.";
 "documents.confirm.delete.title" = "이 문서를 삭제하시겠습니까?";
 "documents.confirm.delete.message" = "품목도 함께 삭제되며 되돌릴 수 없습니다. 삭제 후에는 그 번호를 다시 사용할 수 있습니다.";
 
-/* D-3 · the editor's header fields (13 键) */
+/* D-3 · 编辑器表头字段（13 键） */
 "documents.form.title" = "새 업무 문서";
 "documents.form.editTitle" = "업무 문서 편집";
 "documents.form.type" = "문서 유형";
@@ -871,7 +873,7 @@
 "documents.form.customerContact" = "연락처";
 "documents.form.notes" = "비고";
 
-/* D-3 · the line table. Q2-a: a dash is not a zero (12 键) */
+/* D-3 · 明细表。Q2-a：破折号不是 0（12 键） */
 "documents.item.title" = "품목";
 "documents.item.description" = "품목/설명";
 "documents.item.quantity" = "수량";
@@ -883,71 +885,70 @@
 "documents.item.amount" = "금액";
 "documents.item.add" = "품목 추가";
 "documents.item.remove" = "삭제";
-"documents.item.dashNote" = "대시는 해당 항목에 그 값이 기록되지 않았다는 뜻이며, 기록된 0 과는 다릅니다.";
+"documents.item.dashNote" = "대시는 해당 항목에 그 값이 기록되지 않았다는 뜻이며, 기록된 0과는 다릅니다.";
 
-/* D-3 · the three header totals (3 键) */
+/* D-3 · 表头三个合计（3 键） */
 "documents.total.subtotal" = "세전 합계";
 "documents.total.taxAmount" = "세액 합계";
 "documents.total.total" = "세금 포함 합계";
 
-/* D-3 · BusinessDocumentError's twelve cases + three the editor raises (15 键) */
+/* D-3 · BusinessDocumentError 十二例 + 编辑器三条（15 键） */
 "documents.error.numberRequired" = "문서 번호를 입력하세요.";
 "documents.error.customerNameRequired" = "고객명을 입력하세요.";
 "documents.error.dateRequired" = "문서 날짜를 입력하세요.";
-"documents.error.currencyIsGeneratedStatementsOnly" = "통화를 갖는 것은 생성된 거래 명세서뿐입니다. 직접 만든 문서는 작성 당시의 회계 제도로 금액을 표시합니다.";
+"documents.error.currencyIsGeneratedStatementsOnly" = "통화를 갖는 것은 생성된 거래 명세서뿐입니다. 직접 만든 문서는 작성 당시의 회계 방식으로 금액을 표시합니다.";
 "documents.error.notFound" = "이 문서를 찾을 수 없습니다. 삭제되었을 수 있습니다.";
-"documents.error.numberExists" = "같은 유형의 다른 문서가 이미 이 번호를 사용하고 있습니다. 다른 번호를 사용하세요.";
+"documents.error.numberExists" = "이미 존재하는 문서 번호입니다";
 "documents.error.invalidStatusTransition" = "{from} 상태에서 {to} 상태로 바꿀 수 없습니다. 초안은 발행하거나 무효 처리할 수 있고, 발행됨은 무효 처리만 가능하며, 무효는 그대로 유지됩니다.";
 "documents.error.onlyDraftCanBeEdited" = "초안만 편집할 수 있습니다. 내용을 바꾸려면 새 문서를 만드세요.";
 "documents.error.issuedMustBeVoidedFirst" = "발행된 문서는 바로 삭제할 수 없습니다. 먼저 무효 처리하세요.";
-"documents.error.voidTaxInvoiceReadOnly" = "무효 처리된 문서의 증빙 연결 정보는 읽기 전용입니다.";
+"documents.error.voidTaxInvoiceReadOnly" = "무효 처리된 문서의 증빙 연결 정보는 읽기 전용입니다";
 "documents.error.invalidAttachmentPath" = "첨부 파일 경로가 올바르지 않습니다. 파일을 다시 선택하세요.";
 "documents.error.attachmentInUse" = "이 첨부 파일은 다른 문서에 이미 연결되어 있습니다. 이 문서에는 다른 파일을 선택하세요.";
-"documents.error.itemsRequired" = "품목을 최소 1개 입력하세요.";
-"documents.error.saveFailed" = "저장에 실패했습니다. 다시 시도해 주세요.";
-"documents.error.loadFailed" = "불러오기에 실패했습니다. 다시 시도해 주세요.";
+"documents.error.itemsRequired" = "품목을 최소 1개 입력해 주세요";
+"documents.error.saveFailed" = "저장에 실패했습니다. 다시 시도해 주세요";
+"documents.error.loadFailed" = "불러오기에 실패했습니다. 다시 시도해 주세요";
 
-/* D-3 · Q2 — the statement panel and the two sentences the ruling requires (8 键) */
+/* D-3 · Q2 —— 对账单面板与裁定要求的两句（8 键） */
 "documents.statement.customer" = "고객 선택";
 "documents.statement.periodStart" = "기간 시작";
 "documents.statement.periodEnd" = "기간 종료";
 "documents.statement.generate" = "명세 생성";
 "documents.statement.noRecords" = "해당 기간에 이 고객의 수입 거래가 없습니다.";
-"documents.statement.needInput" = "먼저 고객과 기간을 선택하세요.";
+"documents.statement.needInput" = "먼저 고객과 기간을 선택하세요";
 "documents.statement.basisNote" = "거래 명세서는 기간별로 한 고객의 거래를 합산한 문서이며, 건별 청구서가 아닙니다. 해당 기간의 수입 거래를 합산할 뿐 상품 명세를 기재하지 않으며, 어떤 정식 세무 문서도 아닙니다.";
 "documents.statement.currencySplitNote" = "명세서 한 장은 통화 하나만 담습니다. 해당 기간에 여러 통화가 있으면 통화마다 한 장씩 생성되고, 그만큼 번호가 연달아 사용됩니다.";
 
-/* D-3 · Q7 — the artifact is self-contained HTML, and the copy says so (4 键) */
+/* D-3 · Q7 —— 产物是自包含 HTML，文案照说（4 键） */
 "documents.export.action" = "HTML 내보내기";
 "documents.export.done" = "내보낸 위치: {path}";
 "documents.export.failed" = "내보내기에 실패했습니다. 다시 시도해 주세요.";
-"documents.export.formatNote" = "내보내는 파일은 자체 포함 HTML 문서이며 PDF 가 아닙니다. 브라우저에서 열 수 있고, PDF 가 필요하면 브라우저에서 인쇄하세요.";
+"documents.export.formatNote" = "내보내는 파일은 자체 포함 HTML 문서이며 PDF가 아닙니다. 브라우저에서 열 수 있고, PDF가 필요하면 브라우저에서 인쇄하세요.";
 
-/* D-3 · labels the exported artifact carries itself (5 键) */
+/* D-3 · 产物自带的标签（5 键） */
 "documents.print.generatedAt" = "생성 시간";
 "documents.print.period" = "기간";
 "documents.print.disclaimer" = "본 문서는 내부 업무 문서이며 정식 세무 문서가 아닙니다.";
 "documents.print.voidBadge" = "무효";
 "documents.print.currency" = "통화";
 
-/* D-3 · Q5 — the association records an invoice issued elsewhere, never issues one (10 键) */
+/* D-3 · Q5 —— 只记录别人开具的发票，永不开具（10 键） */
 "documents.taxInvoice.action" = "증빙 연결";
 "documents.taxInvoice.title" = "정식 세무 증빙 연결";
-"documents.taxInvoice.issuedLabel" = "정식 세무 증빙이 외부에서 발행됨";
+"documents.taxInvoice.issuedLabel" = "정식 세무 증빙 발행됨 (외부 발행 플랫폼에서 발행)";
 "documents.taxInvoice.numberLabel" = "증빙 번호";
-"documents.taxInvoice.numberHint" = "외부에서 발행된 번호는 직접 입력하며, 이 앱이 자동으로 생성하지 않습니다.";
+"documents.taxInvoice.numberHint" = "외부에서 발행된 번호를 직접 입력합니다. 자동 생성되지 않습니다";
 "documents.taxInvoice.dateLabel" = "발행일";
 "documents.taxInvoice.attachmentLabel" = "증빙 첨부 파일";
-"documents.taxInvoice.compliance" = "이 기능은 외부에서 발행된 정식 세무 증빙 정보를 기록만 하며, 발행 기능은 제공하지 않습니다.";
+"documents.taxInvoice.compliance" = "이 기능은 외부에서 발행된 정식 세무 증빙 정보를 기록만 하며, 발행 기능은 제공하지 않습니다";
 "documents.taxInvoice.recorded" = "기록됨";
 "documents.taxInvoice.notRecorded" = "미기록";
 
-/* D-3 · the association panel's file controls (8 键) */
+/* D-3 · 关联面板的文件控件（7 键） */
 "documents.attachment.pick" = "파일 선택 (PDF / JPG / PNG)";
 "documents.attachment.open" = "열기";
 "documents.attachment.remove" = "제거";
-"documents.attachment.missing" = "첨부 파일을 찾을 수 없습니다. 이동되었거나 삭제되었을 수 있습니다.";
+"documents.attachment.missing" = "첨부 파일을 찾을 수 없습니다. 이동되었거나 삭제되었을 수 있습니다";
 "documents.attachment.tooLarge" = "파일이 너무 큽니다. 더 작은 파일을 선택하세요.";
-"documents.attachment.failed" = "첨부 파일 작업에 실패했습니다. 다시 시도해 주세요.";
-"documents.attachment.invalidType" = "PDF / JPG / PNG 파일만 지원합니다.";
-"documents.attachment.notBackedUp" = "첨부 파일은 데이터베이스 백업에 포함되지 않습니다. 첨부 폴더는 따로 백업하세요.";
+"documents.attachment.failed" = "첨부 파일 작업에 실패했습니다";
+"documents.attachment.invalidType" = "PDF / JPG / PNG 파일만 지원됩니다";

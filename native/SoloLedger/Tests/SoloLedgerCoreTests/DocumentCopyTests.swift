@@ -1,7 +1,7 @@
 import XCTest
 @testable import SoloLedgerCore
 
-/// D-3 · the `documents.*` six-language copy — 104 keys, plus `nav.documents`.
+/// D-3 · the `documents.*` six-language copy — 103 keys, plus `nav.documents`.
 ///
 /// **Every key here is dormant.** No production source names one; D-4 draws the list page, the
 /// editor, the line table and the tax-invoice association panel, D-5 draws the exported artifact,
@@ -10,22 +10,28 @@ import XCTest
 ///
 /// ## Where the words came from
 ///
-/// 83 keys are Electron's `documents.*` sentences unchanged; five are rewritten because Electron's
-/// wording is untrue of this app; 17 are new because the spec requires a sentence Electron never
-/// had. The rewrites are worth naming, since "mirror" is this chapter's default and each departure
-/// is a decision:
+/// **75 mirrored, 8 rewritten, 21 native-only.** Those three numbers are not a description: DC13
+/// holds the three lists to a partition of the namespace, and DC14 compares every mirrored key
+/// against `i18n/locales/*.json` — Electron's own copy, in this same repository — in all six
+/// languages. An earlier draft of this comment claimed a different split and was measurably wrong
+/// in every language, with nothing in the suite able to see it.
 ///
-///  * `statement.noRecords` — Electron says "no SALES records"; Q2 redirected the row source to
-///    the transaction ledger, because this app writes no `sales` table at all.
-///  * `export.action` / `export.done` / `export.failed` — Q7 narrows the artifact from PDF to a
-///    self-contained HTML file. Keeping the PDF wording would promise a file the app never writes.
-///  * `confirm.void.message` — Electron says only that a voided document cannot be edited. Q3 makes
-///    the number rule a promise ("作废不释放编号"), so the sentence says that too.
+/// A rewrite has to earn itself; `rewrittenWithReason` carries the reason next to the key, and
+/// DC14's second half proves each one really does differ from its source. They fall into three
+/// groups: a STRUCTURAL split (Electron's confirmations are one `window.confirm` string; a native
+/// dialog has a title and a body), a SPEC narrowing (Q2 moved the statement's row source off
+/// `sales`; Q7 turned the PDF into a self-contained HTML file; Q3 made "voiding keeps the number" a
+/// promise the sentence has to carry), and one ORACLE gap (Electron's oversize-attachment message
+/// names a 20 MB limit; nothing in this round measures such a limit, so the sentence does not
+/// quote one).
 ///
-/// Four of Electron's 87 have no counterpart at all, and the reason is the same in each case — the
+/// Five of Electron's 87 keys have no counterpart, and the reason is the same in each case — the
 /// sentence would be false here. `desktopOnly` and `pdfDesktopOnly` gate on "is this the desktop
 /// app", which is unconditionally true of this one; `generateFromSale` and `generatedOk` belong to
-/// a button on Electron's sales page, and the native ledger has no `sales` table for it to stand on.
+/// a button on Electron's sales page, and the native ledger has no `sales` table for it to stand
+/// on; and `attachmentNotBackedUp` warns that attachments are excluded from backups, while
+/// `BackupExport.writeBundle` copies the whole `attachments/docs` directory into every bundle it
+/// writes. A sixth, `saveButton`, is not missing but reused — `common.save` already says it.
 ///
 /// ## The rule that shapes the sentences
 ///
@@ -125,7 +131,179 @@ final class DocumentCopyTests: XCTestCase {
         "documents.attachment.pick", "documents.attachment.open",
         "documents.attachment.remove", "documents.attachment.missing",
         "documents.attachment.tooLarge", "documents.attachment.failed",
-        "documents.attachment.invalidType", "documents.attachment.notBackedUp",
+        "documents.attachment.invalidType",
+    ]
+
+    /// mirroredFromElectron
+    private static let mirroredFromElectron = [
+        "documents.page.title", "documents.page.subtitle",
+        "documents.page.empty", "documents.page.add",
+        "documents.filter.all", "documents.type.quotation",
+        "documents.type.salesOrder", "documents.type.proformaInvoice",
+        "documents.type.commercialInvoice", "documents.type.statement",
+        "documents.status.draft", "documents.status.issued",
+        "documents.status.void", "documents.col.number",
+        "documents.col.type", "documents.col.date",
+        "documents.col.customer", "documents.col.total",
+        "documents.col.status", "documents.col.taxInvoice",
+        "documents.action.issue", "documents.action.void",
+        "documents.form.title", "documents.form.editTitle",
+        "documents.form.type", "documents.form.number",
+        "documents.form.numberHint", "documents.form.date",
+        "documents.form.validUntil", "documents.form.customer",
+        "documents.form.customerPlaceholder", "documents.form.customerTaxID",
+        "documents.form.customerAddress", "documents.form.customerContact",
+        "documents.form.notes", "documents.item.title",
+        "documents.item.description", "documents.item.quantity",
+        "documents.item.unit", "documents.item.noUnit",
+        "documents.item.unitPrice", "documents.item.amount",
+        "documents.item.add", "documents.item.remove",
+        "documents.total.subtotal", "documents.error.numberExists",
+        "documents.error.voidTaxInvoiceReadOnly", "documents.error.itemsRequired",
+        "documents.error.saveFailed", "documents.error.loadFailed",
+        "documents.statement.customer", "documents.statement.periodStart",
+        "documents.statement.periodEnd", "documents.statement.generate",
+        "documents.statement.needInput", "documents.print.generatedAt",
+        "documents.print.period", "documents.print.disclaimer",
+        "documents.print.voidBadge", "documents.taxInvoice.action",
+        "documents.taxInvoice.title", "documents.taxInvoice.issuedLabel",
+        "documents.taxInvoice.numberLabel", "documents.taxInvoice.numberHint",
+        "documents.taxInvoice.dateLabel", "documents.taxInvoice.attachmentLabel",
+        "documents.taxInvoice.compliance", "documents.taxInvoice.recorded",
+        "documents.taxInvoice.notRecorded", "documents.attachment.pick",
+        "documents.attachment.open", "documents.attachment.remove",
+        "documents.attachment.missing", "documents.attachment.failed",
+        "documents.attachment.invalidType",
+    ]
+
+    /// nativeOnly
+    private static let nativeOnly = [
+        "documents.confirm.delete.message", "documents.item.taxRate",
+        "documents.item.taxAmount", "documents.item.dashNote",
+        "documents.total.taxAmount", "documents.total.total",
+        "documents.error.numberRequired", "documents.error.customerNameRequired",
+        "documents.error.dateRequired", "documents.error.currencyIsGeneratedStatementsOnly",
+        "documents.error.notFound", "documents.error.invalidStatusTransition",
+        "documents.error.onlyDraftCanBeEdited", "documents.error.issuedMustBeVoidedFirst",
+        "documents.error.invalidAttachmentPath", "documents.error.attachmentInUse",
+        "documents.statement.basisNote", "documents.statement.currencySplitNote",
+        "documents.export.formatNote", "documents.print.currency",
+        "nav.documents",
+    ]
+
+    /// The rewrites whose sentence SAYS something different, as opposed to the two that only
+    /// change the shape Electron's own words arrive in. DC14 holds these six to differing from
+    /// Electron in all six languages.
+    private static let contentRewrites: Set<String> = [
+        "documents.confirm.void.message", "documents.statement.noRecords",
+        "documents.export.action", "documents.export.done", "documents.export.failed",
+        "documents.attachment.tooLarge",
+    ]
+
+    private static let rewrittenWithReason: [String: String] = [
+        "documents.confirm.void.title":
+            "documents.voidConfirm",
+        "documents.confirm.void.message":
+            "documents.voidConfirm",
+        "documents.confirm.delete.title":
+            "documents.deleteConfirm",
+        "documents.statement.noRecords":
+            "documents.stmtNoRecords",
+        "documents.export.action":
+            "documents.exportPdf",
+        "documents.export.done":
+            "documents.pdfExported",
+        "documents.export.failed":
+            "documents.pdfFailed",
+        "documents.attachment.tooLarge":
+            "documents.attachmentTooLarge",
+    ]
+
+    /// 每个镜像键在 Electron `documents` 对象里的来源键。
+    private static let electronSourceKey: [String: String] = [
+        "documents.page.title": "title",
+        "documents.page.subtitle": "subtitle",
+        "documents.page.empty": "empty",
+        "documents.page.add": "addButton",
+        "documents.filter.all": "filterAll",
+        "documents.type.quotation": "typeQuotation",
+        "documents.type.salesOrder": "typeSalesOrder",
+        "documents.type.proformaInvoice": "typeProforma",
+        "documents.type.commercialInvoice": "typeCommercial",
+        "documents.type.statement": "typeStatement",
+        "documents.status.draft": "statusDraft",
+        "documents.status.issued": "statusIssued",
+        "documents.status.void": "statusVoid",
+        "documents.col.number": "colNumber",
+        "documents.col.type": "colType",
+        "documents.col.date": "colDate",
+        "documents.col.customer": "colCustomer",
+        "documents.col.total": "colTotal",
+        "documents.col.status": "colStatus",
+        "documents.col.taxInvoice": "colTaxInvoice",
+        "documents.action.issue": "markIssued",
+        "documents.action.void": "voidAction",
+        "documents.confirm.void.title": "voidConfirm",
+        "documents.confirm.void.message": "voidConfirm",
+        "documents.confirm.delete.title": "deleteConfirm",
+        "documents.form.title": "formTitle",
+        "documents.form.editTitle": "formEditTitle",
+        "documents.form.type": "formType",
+        "documents.form.number": "formNumber",
+        "documents.form.numberHint": "formNumberHint",
+        "documents.form.date": "formDate",
+        "documents.form.validUntil": "formValidUntil",
+        "documents.form.customer": "formCustomer",
+        "documents.form.customerPlaceholder": "formCustomerPlaceholder",
+        "documents.form.customerTaxID": "formCustomerTaxId",
+        "documents.form.customerAddress": "formCustomerAddress",
+        "documents.form.customerContact": "formCustomerContact",
+        "documents.form.notes": "formNotes",
+        "documents.item.title": "itemsTitle",
+        "documents.item.description": "itemDescription",
+        "documents.item.quantity": "itemQty",
+        "documents.item.unit": "itemUnit",
+        "documents.item.noUnit": "noUnit",
+        "documents.item.unitPrice": "itemUnitPrice",
+        "documents.item.amount": "itemAmount",
+        "documents.item.add": "addItem",
+        "documents.item.remove": "removeItem",
+        "documents.total.subtotal": "subtotal",
+        "documents.error.numberExists": "numberConflict",
+        "documents.error.voidTaxInvoiceReadOnly": "taxInvoiceVoidReadOnly",
+        "documents.error.itemsRequired": "itemsRequired",
+        "documents.error.saveFailed": "saveFailed",
+        "documents.error.loadFailed": "loadFailed",
+        "documents.statement.customer": "stmtCustomer",
+        "documents.statement.periodStart": "stmtPeriodStart",
+        "documents.statement.periodEnd": "stmtPeriodEnd",
+        "documents.statement.generate": "stmtGenerate",
+        "documents.statement.noRecords": "stmtNoRecords",
+        "documents.statement.needInput": "stmtNeedInput",
+        "documents.export.action": "exportPdf",
+        "documents.export.done": "pdfExported",
+        "documents.export.failed": "pdfFailed",
+        "documents.print.generatedAt": "pdfGeneratedAt",
+        "documents.print.period": "pdfPeriod",
+        "documents.print.disclaimer": "pdfDisclaimer",
+        "documents.print.voidBadge": "statusVoid",
+        "documents.taxInvoice.action": "taxInvoiceAction",
+        "documents.taxInvoice.title": "taxInvoiceTitle",
+        "documents.taxInvoice.issuedLabel": "taxInvoiceIssuedLabel",
+        "documents.taxInvoice.numberLabel": "taxInvoiceNumberLabel",
+        "documents.taxInvoice.numberHint": "taxInvoiceNumberHint",
+        "documents.taxInvoice.dateLabel": "taxInvoiceDateLabel",
+        "documents.taxInvoice.attachmentLabel": "taxInvoiceAttachmentLabel",
+        "documents.taxInvoice.compliance": "taxInvoiceCompliance",
+        "documents.taxInvoice.recorded": "taxInvoiceYes",
+        "documents.taxInvoice.notRecorded": "taxInvoiceNo",
+        "documents.attachment.pick": "attachmentPick",
+        "documents.attachment.open": "attachmentOpen",
+        "documents.attachment.remove": "attachmentRemove",
+        "documents.attachment.missing": "attachmentMissing",
+        "documents.attachment.tooLarge": "attachmentTooLarge",
+        "documents.attachment.failed": "attachmentFailed",
+        "documents.attachment.invalidType": "attachmentInvalidType",
     ]
 
     private static let adjudicatedKeys =
@@ -152,9 +330,9 @@ final class DocumentCopyTests: XCTestCase {
 
     // MARK: - DC1 · the key universe
 
-    func testDC1TheDocumentsNamespaceIsExactlyOneHundredAndFourKeys() throws {
-        XCTAssertEqual(Self.adjudicatedKeys.count, 104, "the adjudicated table itself must be 104")
-        XCTAssertEqual(Set(Self.adjudicatedKeys).count, 104, "the adjudicated table has a duplicate")
+    func testDC1TheDocumentsNamespaceIsExactlyOneHundredAndThreeKeys() throws {
+        XCTAssertEqual(Self.adjudicatedKeys.count, 103, "the adjudicated table itself must be 103")
+        XCTAssertEqual(Set(Self.adjudicatedKeys).count, 103, "the adjudicated table has a duplicate")
         // The sixteen groups, each pinned, so a key that moves between two of them is a change of
         // meaning and not a rename. The sum is checked above; these are what it is a sum OF.
         XCTAssertEqual(Self.pageKeys.count, 4)
@@ -172,7 +350,7 @@ final class DocumentCopyTests: XCTestCase {
         XCTAssertEqual(Self.exportKeys.count, 4)
         XCTAssertEqual(Self.printKeys.count, 5)
         XCTAssertEqual(Self.taxInvoiceKeys.count, 10)
-        XCTAssertEqual(Self.attachmentKeys.count, 8)
+        XCTAssertEqual(Self.attachmentKeys.count, 7)
 
         for language in languages {
             let landed = try sourceTable(language).keys.filter { $0.hasPrefix("documents.") }.sorted()
@@ -190,7 +368,7 @@ final class DocumentCopyTests: XCTestCase {
         var keySets: [Set<String>] = []
         for language in languages {
             let table = try sourceTable(language)
-            XCTAssertEqual(table.count, 755, "\(language) has \(table.count) keys")
+            XCTAssertEqual(table.count, 754, "\(language) has \(table.count) keys")
             // The neighbours, pinned in the same breath: landing a documents key in one of them is
             // the likeliest way to be right about the total and wrong about where it went.
             XCTAssertEqual(table.keys.filter { $0.hasPrefix("nav.") }.count, 8, "\(language) nav.*")
@@ -331,7 +509,7 @@ final class DocumentCopyTests: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(scanned, 630, "105 keys x 6 languages")
+        XCTAssertEqual(scanned, 624, "104 keys x 6 languages")
     }
 
     // MARK: - DC9 · the whole namespace is dormant
@@ -431,17 +609,22 @@ final class DocumentCopyTests: XCTestCase {
     /// something — that is what makes it a boundary rather than a description — so each is checked
     /// against a per-language denial marker.
     func testDC12TheThreeBoundarySentencesArePresentAndEachDeniesSomething() throws {
+        // Matched as REGULAR EXPRESSIONS, word-anchored where the language has word boundaries.
+        // A bare substring is not a denial detector: `"ne "` sits inside `"une "` and `"not"` inside
+        // `"notice"`, so a boundary sentence stripped of its denial would still pass. Measured, and
+        // the reason this is a regex list rather than the substring list it started as.
         let denial: [String: [String]] = [
             "zh-Hans": ["并非", "不", "永不"], "zh-Hant": ["並非", "不", "永不"],
-            "en": ["not", "never", "does not"], "ja": ["ありません", "ません"],
-            "ko": ["아닙니다", "않습니다"], "fr": ["ne ", "pas", "aucune", "jamais"],
+            "en": [#"\bnot\b"#, #"\bnever\b"#], "ja": ["ありません", "ません"],
+            "ko": ["아닙니다", "않습니다"],
+            "fr": [#"\bne\b"#, #"\bn’"#, #"\bpas\b"#, #"\baucune?\b"#, #"\bjamais\b"#],
         ]
         XCTAssertEqual(Self.boundarySentenceKeys.count, 3)
         for language in languages {
             let table = try sourceTable(language)
             for key in Self.boundarySentenceKeys {
                 let value = try XCTUnwrap(table[key])
-                XCTAssertTrue(denial[language]!.contains { value.contains($0) }, """
+                XCTAssertTrue(denial[language]!.contains { Self.matches($0, value) }, """
                     \(language)/\(key) states something without denying anything: \(value)
                     """)
             }
@@ -449,8 +632,14 @@ final class DocumentCopyTests: XCTestCase {
         // The markers are discriminating: an ordinary label carries none of them.
         for language in languages {
             let label = try XCTUnwrap(try sourceTable(language)["documents.col.date"])
-            XCTAssertFalse(denial[language]!.contains { label.contains($0) },
+            XCTAssertFalse(denial[language]!.contains { Self.matches($0, label) },
                            "\(language): the denial markers fire on a plain column header")
+        }
+        // The markers are word-anchored, not substrings — the case that broke the first draft.
+        for (sample, language) in [("une facture commerciale interne", "fr"),
+                                   ("a notice about documents", "en")] {
+            XCTAssertFalse(denial[language]!.contains { Self.matches($0, sample) },
+                           "\(language): a substring marker fires on \(sample)")
         }
     }
 
@@ -463,7 +652,7 @@ final class DocumentCopyTests: XCTestCase {
 
     /// Read one locale's `.strings` from SOURCE. The App bundle resolves through the fallback
     /// chain, which would hide a missing key behind zh-Hans instead of failing.
-    private func sourceTable(_ language: String) throws -> [String: String] {
+    func sourceTable(_ language: String) throws -> [String: String] {
         let url = Self.packageRoot()
             .appendingPathComponent("Sources/SoloLedger/Resources/\(language).lproj/Localizable.strings")
         let text = try String(contentsOf: url, encoding: .utf8)
@@ -597,4 +786,125 @@ private enum SidebarSectionProbe {
             .filter { $0.hasPrefix("case ") }
             .map { String($0.dropFirst(5)).trimmingCharacters(in: .whitespaces) }
     }()
+}
+
+extension DocumentCopyTests {
+
+    // MARK: - DC13 · the classification partitions the namespace
+
+    /// Every key is exactly one of three things, and the three lists cover the namespace with no
+    /// overlap and no gap. The header comment quotes these three numbers; this is what makes them
+    /// true rather than asserted.
+    func testDC13TheThreeSourceListsPartitionTheNamespace() throws {
+        let mirrored = Set(Self.mirroredFromElectron)
+        let rewritten = Set(Self.rewrittenWithReason.keys)
+        let native = Set(Self.nativeOnly)
+        let all = Set(Self.adjudicatedKeys + ["nav.documents"])
+
+        XCTAssertEqual(mirrored.count, 75, "keys that are Electron's sentence, unchanged")
+        XCTAssertEqual(rewritten.count, 8, "keys that depart from it, each with a reason")
+        XCTAssertEqual(native.count, 21, "keys Electron has no counterpart for")
+        XCTAssertEqual(mirrored.count + rewritten.count + native.count, 104)
+        XCTAssertEqual(all.count, 104)
+        XCTAssertEqual(mirrored.union(rewritten).union(native), all, """
+            the three lists do not cover the namespace.
+            uncovered: \(all.subtracting(mirrored).subtracting(rewritten).subtracting(native).sorted())
+            unknown:   \(mirrored.union(rewritten).union(native).subtracting(all).sorted())
+            """)
+        XCTAssertTrue(mirrored.isDisjoint(with: rewritten))
+        XCTAssertTrue(mirrored.isDisjoint(with: native))
+        XCTAssertTrue(rewritten.isDisjoint(with: native))
+
+        // A reason is a sentence, not a shrug.
+        for (key, reason) in Self.rewrittenWithReason {
+            XCTAssertGreaterThan(reason.count, 12, "\(key)'s reason says nothing: \(reason)")
+        }
+        // Every mirrored and rewritten key names the Electron key it came from; a native-only key
+        // must not, because there is nothing for it to name.
+        for key in mirrored.union(rewritten) {
+            XCTAssertNotNil(Self.electronSourceKey[key], "\(key) does not name its Electron source")
+        }
+        for key in native {
+            XCTAssertNil(Self.electronSourceKey[key], "\(key) claims an Electron source it cannot have")
+        }
+    }
+
+    // MARK: - DC14 · "mirrored" is measured against Electron, not asserted
+
+    /// **The 75 mirrored keys are byte-identical to Electron's sentence in all six languages.**
+    ///
+    /// Read straight out of `i18n/locales/*.json` — the Electron app in this same repository — so
+    /// the claim is a comparison and not a memory of one. An earlier draft of this file simply
+    /// stated a split ("83 mirrored, 5 rewritten"); it was measurably wrong in every language, and
+    /// nothing in the suite could see that. This test is the repair.
+    func testDC14EveryMirroredKeyIsElectronsSentenceUnchanged() throws {
+        let electron = try Self.electronDocumentsCopy()
+        XCTAssertEqual(electron.count, 6, "six locale files")
+        for (_, table) in electron {
+            XCTAssertEqual(table.count, 87, "Electron's documents namespace is 87 keys")
+        }
+
+        var compared = 0
+        for key in Self.mirroredFromElectron {
+            let source = try XCTUnwrap(Self.electronSourceKey[key])
+            for (native, foreign) in Self.localePairs {
+                let mine = try XCTUnwrap(try sourceTable(native)[key], "\(native)/\(key)")
+                let theirs = try XCTUnwrap(electron[foreign]?[source], "\(foreign)/documents.\(source)")
+                XCTAssertEqual(mine, theirs, "\(native)/\(key) is not Electron's documents.\(source)")
+                compared += 1
+            }
+        }
+        XCTAssertEqual(compared, 75 * 6, "75 mirrored keys x 6 languages")
+
+        // The other direction, so this is a partition and not a filter. The bar differs by KIND of
+        // rewrite, and the difference is not pedantry:
+        //
+        //  * a CONTENT rewrite says something Electron's sentence does not, and that has to be true
+        //    in every language — one locale quietly reverting to Electron's wording is exactly the
+        //    regression this classification exists to catch (an `Export PDF` label on a round whose
+        //    whole point is that the artifact is HTML);
+        //  * a STRUCTURAL rewrite reuses Electron's words in a different shape — its confirmations
+        //    are one `window.confirm` string and a native dialog has a title and a body — so a
+        //    language whose title happens to BE Electron's whole sentence is correct, not a lapse.
+        for (key, _) in Self.rewrittenWithReason {
+            let source = try XCTUnwrap(Self.electronSourceKey[key])
+            let differing = Self.localePairs.filter { native, foreign in
+                (try? sourceTable(native)[key]) ?? nil != electron[foreign]?[source]
+            }
+            if Self.contentRewrites.contains(key) {
+                XCTAssertEqual(differing.count, 6, """
+                    \(key) is a content rewrite, but \(6 - differing.count) language(s) still carry \
+                    Electron's sentence: \(Self.localePairs.map(\.0).filter { l in !differing.contains { $0.0 == l } })
+                    """)
+            } else {
+                XCTAssertGreaterThan(differing.count, 0,
+                                     "\(key) is listed as rewritten but matches Electron in every language")
+            }
+        }
+        XCTAssertEqual(Self.contentRewrites.count, 6)
+        XCTAssertTrue(Self.contentRewrites.isSubset(of: Set(Self.rewrittenWithReason.keys)))
+    }
+
+    /// `native locale → Electron locale`. The two apps spell three of the six differently.
+    static let localePairs: [(String, String)] = [
+        ("zh-Hans", "zh-CN"), ("zh-Hant", "zh-TW"), ("en", "en"),
+        ("ja", "ja"), ("ko", "ko"), ("fr", "fr"),
+    ]
+
+    /// Electron's `documents` object, per locale, read from `i18n/locales/*.json`.
+    static func electronDocumentsCopy() throws -> [String: [String: String]] {
+        let root = packageRoot().deletingLastPathComponent().deletingLastPathComponent()
+        var out: [String: [String: String]] = [:]
+        for (_, foreign) in localePairs {
+            let url = root.appendingPathComponent("i18n/locales/\(foreign).json")
+            let data = try Data(contentsOf: url)
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            guard let documents = json?["documents"] as? [String: String] else {
+                throw NSError(domain: "DocumentCopyTests", code: 3, userInfo: [
+                    NSLocalizedDescriptionKey: "no documents object in \(foreign).json"])
+            }
+            out[foreign] = documents
+        }
+        return out
+    }
 }

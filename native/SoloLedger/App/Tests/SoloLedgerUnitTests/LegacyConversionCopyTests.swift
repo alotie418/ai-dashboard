@@ -350,7 +350,7 @@ final class LegacyConversionCopyTests: XCTestCase {
                            "\(language): the report namespace must not have moved")
             XCTAssertEqual(table.keys.filter { $0.hasPrefix("settings.") }.count, 36,
                            "\(language): the settings namespace must not have moved")
-            XCTAssertEqual(table.count, 755, "\(language): 496 + 41 + 1 + 2 + 94 + 11 + 5 + 105 (D-3: documents.* 104 + nav.documents 1)")
+            XCTAssertEqual(table.count, 754, "\(language): 496 + 41 + 1 + 2 + 94 + 11 + 5 + 104 (D-3: documents.* 103 + nav.documents 1)")
         }
         XCTAssertEqual(Set(Self.conversionCopyKeys).count, 97,
                        "the declared key list has a duplicate")
