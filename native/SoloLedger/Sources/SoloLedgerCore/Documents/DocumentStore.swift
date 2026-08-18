@@ -251,7 +251,10 @@ public extension LedgerStore {
 
         var lines: [SanitizedDocumentLine]?
         if let drafts = edit.lines {
-            let sanitized = Self.sanitizedLines(drafts, origin: edit.lineOrigin)
+            // Always the hand-entered rules: `sanitizeItems` has no mode, so neither does this.
+            // See ``BusinessDocumentEdit/lines`` for what that costs a generated statement, and why
+            // widening it is a ruling rather than a refactor.
+            let sanitized = Self.sanitizedLines(drafts, origin: .handEntered)
             let totals = DocumentMath.totals(
                 ofLines: sanitized.map { (amount: $0.amount, taxAmount: $0.taxAmount) })
             set("subtotal", .real(totals.subtotal))
@@ -304,7 +307,9 @@ public extension LedgerStore {
         guard status != .issued else { throw BusinessDocumentError.issuedMustBeVoidedFirst }
 
         try db.run("DELETE FROM business_documents WHERE id = ?", [.text(id)])
-        return row.string("tax_invoice_attachment_path")
+        // Truthiness, as `if (row.tax_invoice_attachment_path)` is on the other side: an empty
+        // stored path is no path.
+        return row.string("tax_invoice_attachment_path").flatMap { $0.isEmpty ? nil : $0 }
     }
 
     // MARK: - The formal-tax-invoice association
@@ -331,7 +336,12 @@ public extension LedgerStore {
         else { throw BusinessDocumentError.notFound }
         guard status != .void else { throw BusinessDocumentError.voidTaxInvoiceReadOnly }
 
-        let existingPath = row.string("tax_invoice_attachment_path")
+        // An empty stored path is NO path. The handler decides whether a copy has been orphaned
+        // with `if (existing.tax_invoice_attachment_path …)` — a truthiness test, and `''` is
+        // falsy there. Measured on the handler with `''` written straight into the column: it
+        // neither reports nor deletes anything. Nothing either API writes produces that cell; a
+        // foreign writer can.
+        let existingPath = row.string("tax_invoice_attachment_path").flatMap { $0.isEmpty ? nil : $0 }
         var assignments: [String] = []
         var values: [SQLiteValue] = []
         func set(_ column: String, _ value: SQLiteValue) {
@@ -357,9 +367,17 @@ public extension LedgerStore {
                 guard AttachmentRelPath.bareName(of: path) != nil else {
                     throw BusinessDocumentError.invalidAttachmentPath
                 }
-                // Ownership guard. Compared by UTF-16 code units, as JS `!==` does — Swift's own
-                // `==` folds canonically equivalent spellings together, and "is this the same
-                // stored string" must not.
+                // Ownership guard. The pre-check is the handler's and is kept for that reason
+                // rather than for a reason of its own: the query below already excludes this
+                // document (`id != ?`), so skipping it when the path has not changed cannot change
+                // the answer — it only saves the query.
+                //
+                // What DOES matter is how the two strings are compared. JS `!==` is code-unit
+                // identity; Swift `==` is canonical equivalence, and the two disagree on inputs
+                // this whitelist admits: `attachments/docs/K.pdf` with U+212A KELVIN SIGN is
+                // canonically equal to the ASCII `K` spelling in Swift and different in JS
+                // (measured both ways). A stored path can hold that spelling even though a new one
+                // cannot get past the whitelist above.
                 if !(existingPath.map { StatementText.areEqual($0, path) } ?? false) {
                     let claimed = try db.query("""
                         SELECT 1 FROM business_documents

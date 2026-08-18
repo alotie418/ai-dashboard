@@ -382,12 +382,15 @@ public enum BusinessDocumentError: Error, Equatable, CustomStringConvertible {
 ///
 /// **Whitespace does not clear.** `safeString` never trims, so `"   "` is truthy and is stored as
 /// itself; measured on the handler for `valid_until`, `customer_tax_id` and `tax_invoice_date`
-/// alike. The three REQUIRED fields are the exception, and only because they are trimmed
-/// separately before being tested — see ``BusinessDocumentError/numberRequired`` and its two
-/// neighbours.
+/// alike.
 ///
-/// The three required fields work the same way except that emptying them is refused instead:
-/// ``BusinessDocumentError/numberRequired``, ``customerNameRequired`` and ``dateRequired``.
+/// The three REQUIRED fields refuse to be emptied instead of clearing — but not by one rule, and
+/// the difference is the handler's:
+///
+///  * ``number`` and ``customerName`` are clamped and THEN trimmed, so `"   "` is empty to them and
+///    is refused (``BusinessDocumentError/numberRequired``, ``customerNameRequired``);
+///  * ``date`` is neither clamped nor trimmed — its test is `!b.doc_date`, plain falsiness — so
+///    `""` is refused (``dateRequired``) while `" "` is ACCEPTED and stored verbatim.
 ///
 /// ## What is deliberately not here
 ///
@@ -420,14 +423,18 @@ public struct BusinessDocumentEdit: Equatable, Sendable {
     /// reproduced is the reachability of a stale total: there is no way through this API to move
     /// the lines without the totals following, and `DocumentWriteSurfaceGuardTests` pins that the
     /// two writers of `business_document_items` are the only ones there are.
+    ///
+    /// **These lines are always sanitised as hand-entered**, because that is the only rule the
+    /// handler's `update` has — `sanitizeItems` takes no mode. There is deliberately no
+    /// ``BusinessDocumentLineOrigin`` here: the chapter accepts no invention outside Q2, and
+    /// "Electron has no counterpart" makes the answer "do not do it" rather than "add a parameter"
+    /// (spec §1). **Registered for D-4, which owns the editor:** re-saving a GENERATED statement
+    /// through this path applies the blank-description drop rule, and a generated statement's lines
+    /// may legitimately have no description (D-1's first ruling), so such a line — and the income it
+    /// carries — would disappear from a document that goes to a customer. Nothing in this package
+    /// can reach that today; the round that first can must stop and ask for a ruling rather than
+    /// widen this type on its own.
     public var lines: [BusinessDocumentLineDraft]?
-
-    /// Which sanitising rules the replacement lines get, exactly as on
-    /// ``BusinessDocumentDraft/lineOrigin``. Defaults to ``BusinessDocumentLineOrigin/handEntered``,
-    /// which is what the handler always applies; the other case exists so a later round can re-save
-    /// a generated statement without the blank-description rule deleting a real income
-    /// transaction's money from it.
-    public var lineOrigin: BusinessDocumentLineOrigin
 
     public init(type: BusinessDocumentType? = nil,
                 number: String? = nil,
@@ -439,8 +446,7 @@ public struct BusinessDocumentEdit: Equatable, Sendable {
                 customerContact: String? = nil,
                 notes: String? = nil,
                 status: BusinessDocumentStatus? = nil,
-                lines: [BusinessDocumentLineDraft]? = nil,
-                lineOrigin: BusinessDocumentLineOrigin = .handEntered) {
+                lines: [BusinessDocumentLineDraft]? = nil) {
         self.type = type
         self.number = number
         self.date = date
@@ -452,7 +458,6 @@ public struct BusinessDocumentEdit: Equatable, Sendable {
         self.notes = notes
         self.status = status
         self.lines = lines
-        self.lineOrigin = lineOrigin
     }
 
     /// The nine fields `EDITABLE` names, plus the lines. Everything the handler counts when it asks

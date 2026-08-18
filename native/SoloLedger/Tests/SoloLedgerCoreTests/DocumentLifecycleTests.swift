@@ -143,14 +143,33 @@ final class DocumentLifecycleTests: LedgerTestCase {
         let id = try store.createBusinessDocument(draft(lines: [line("orig", amount: 10)]))
         try store.updateBusinessDocument(id: id, BusinessDocumentEdit(status: .issued))
 
-        for edit in [BusinessDocumentEdit(notes: "nope"),
-                     BusinessDocumentEdit(customerName: "Nope"),
-                     BusinessDocumentEdit(lines: []),
-                     BusinessDocumentEdit(notes: "nope", status: .void)] {
-            XCTAssertThrowsError(try store.updateBusinessDocument(id: id, edit)) {
-                XCTAssertEqual($0 as? BusinessDocumentError, .onlyDraftCanBeEdited)
+        // **All ten things that count as an edit, one at a time.** The rule is a ten-way `||`, and
+        // a test that only ever sends three of them leaves the other seven free to be deleted: the
+        // handler refuses every one of these on an issued document (measured, field by field), and
+        // so must this.
+        let everyEdit: [(String, BusinessDocumentEdit)] = [
+            ("doc_type", BusinessDocumentEdit(type: .commercialInvoice)),
+            ("doc_number", BusinessDocumentEdit(number: "NOPE-1")),
+            ("doc_date", BusinessDocumentEdit(date: "2099-12-31")),
+            ("valid_until", BusinessDocumentEdit(validUntil: "2099-12-31")),
+            ("customer_name", BusinessDocumentEdit(customerName: "Nope")),
+            ("customer_tax_id", BusinessDocumentEdit(customerTaxID: "T-9")),
+            ("customer_address", BusinessDocumentEdit(customerAddress: "Elsewhere")),
+            ("customer_contact", BusinessDocumentEdit(customerContact: "them")),
+            ("notes", BusinessDocumentEdit(notes: "nope")),
+            ("items", BusinessDocumentEdit(lines: [])),
+            ("a legal status change bundled with an edit",
+             BusinessDocumentEdit(notes: "nope", status: .void)),
+        ]
+        let before = try XCTUnwrap(try store.businessDocument(id: id))
+        for (field, edit) in everyEdit {
+            XCTAssertThrowsError(try store.updateBusinessDocument(id: id, edit), field) {
+                XCTAssertEqual($0 as? BusinessDocumentError, .onlyDraftCanBeEdited, field)
             }
         }
+        XCTAssertEqual(try store.businessDocument(id: id)?.document, before.document,
+                       "not one of the eleven requests wrote anything")
+        XCTAssertEqual(try store.businessDocumentItems(documentID: id), before.items)
         XCTAssertEqual(try store.businessDocument(id: id)?.document.status, .issued,
                        "the bundled request wrote neither half")
 
@@ -268,6 +287,14 @@ final class DocumentLifecycleTests: LedgerTestCase {
     /// This is the assertion a mutation adding `acc_locale = ?` to the statement has to get past,
     /// and it is deliberately not "the type has no such field" — a constraint the compiler enforces
     /// is one no reverse proof can show is still being enforced.
+    ///
+    /// **One consequence is registered rather than prevented.** The edit below turns a generated
+    /// statement into a quotation while leaving `currency` set, so a document of a type Q2-d-②
+    /// forbids from RECORDING a currency ends up holding one — and Q8's exception then renders the
+    /// header, the badge and the money symbol from it. The ruling names the WRITERS of that column
+    /// and `update` is not one of them; the handler behaves identically on a v25 ledger (its
+    /// `update` cannot see the column at all), so refusing here would be an invention rather than a
+    /// mirror. Registered for the round that first shows a currency to a user.
     func testAnEditLeavesEveryColumnOutsideTheWhitelistByteIdentical() throws {
         let store = try makeStore()
         defer { try? store.db.close() }
@@ -335,7 +362,12 @@ final class DocumentLifecycleTests: LedgerTestCase {
         defer { try? store.db.close() }
 
         func assertConsistent(_ message: String) throws {
-            for document in try store.businessDocuments().documents {
+            let documents = try store.businessDocuments().documents
+            // Fail closed. Every assertion below lives inside this loop, and an empty ledger would
+            // satisfy all of them by having nothing to check — the same trap `requireShippedSources`
+            // guards against in the sibling file.
+            XCTAssertGreaterThan(documents.count, 0, "nothing to check: \(message)")
+            for document in documents {
                 let lines = try store.businessDocumentItems(documentID: document.id)
                 let expected = DocumentMath.totals(
                     ofLines: lines.map { (amount: $0.amount, taxAmount: $0.taxAmount) })
@@ -372,10 +404,17 @@ final class DocumentLifecycleTests: LedgerTestCase {
                           "a line written around the API is exactly the stale total A8 warns about")
     }
 
-    /// Replacement lines take the same two sanitising rules `create` applies, chosen by the same
-    /// parameter — including the generated-statement case, where a blank description keeps its line
-    /// and a missing tax stays `NULL`.
-    func testReplacementLinesFollowTheirOriginsRules() throws {
+    /// Replacement lines always take `sanitizeItems`' hand-entered rules — a blank description
+    /// drops its line, and a missing tax becomes `0`. There is no second mode, because the handler
+    /// has none.
+    ///
+    /// **The consequence is registered rather than designed around** (see
+    /// ``BusinessDocumentEdit/lines``): a GENERATED statement's line may legitimately have no
+    /// description, so re-saving such a statement through this path would drop it and take its
+    /// money out of the header with it. Nothing in this package can reach that — the second half
+    /// below measures what would be lost, so the round that first CAN reach it has the number in
+    /// front of it when it goes to ask for a ruling.
+    func testReplacementLinesAlwaysTakeTheHandEnteredRules() throws {
         let store = try makeStore()
         defer { try? store.db.close() }
         let id = try store.createBusinessDocument(draft())
@@ -385,12 +424,24 @@ final class DocumentLifecycleTests: LedgerTestCase {
         XCTAssertEqual(try store.businessDocumentItems(documentID: id).map(\.description), ["kept"])
         XCTAssertEqual(try store.businessDocument(id: id)?.document.subtotal, 10)
 
+        // A generated statement's shape, handed to the edit path: the blank-description line goes,
+        // and the `NULL` tax on the surviving line is flattened to 0.
         try store.updateBusinessDocument(id: id, BusinessDocumentEdit(
-            lines: [line("kept", amount: 10), line("", amount: 99)], lineOrigin: .statementGenerator))
+            lines: [line("kept", amount: 10), line("", amount: 99)]))
         let items = try store.businessDocumentItems(documentID: id)
-        XCTAssertEqual(items.map(\.description), ["kept", ""], "the generator's line survives")
-        XCTAssertNil(items.last?.taxAmount, "…and its missing tax is still NULL, not a zero")
-        XCTAssertEqual(try store.businessDocument(id: id)?.document.subtotal, 109)
+        XCTAssertEqual(items.map(\.description), ["kept"],
+                       "an undescribed line does not survive this path — D-4 must raise it")
+        XCTAssertEqual(items.first?.taxAmount, 0, "…and a missing tax lands as a zero, not as NULL")
+        XCTAssertEqual(try store.businessDocument(id: id)?.document.subtotal, 10,
+                       "the 99 that vanished is missing from the header too")
+
+        // …while `create` still has both rules, which is where Q2's ruling lives and stays.
+        let generated = try store.createBusinessDocument(BusinessDocumentDraft(
+            type: .statement, number: "GEN-1", date: "2026-01-01", customerName: "C",
+            lines: [line("", amount: 99)], lineOrigin: .statementGenerator))
+        let generatedItems = try store.businessDocumentItems(documentID: generated)
+        XCTAssertEqual(generatedItems.map(\.description), [""], "create keeps it")
+        XCTAssertNil(generatedItems.first?.taxAmount)
     }
 
     // MARK: - Batch 8 I · deletion
@@ -618,5 +669,246 @@ final class DocumentLifecycleTests: LedgerTestCase {
                            "isValidAttachmentRelPath(\(value.debugDescription)) is \(accepted) in node")
         }
         XCTAssertEqual(expectations.filter(\.1).count, 3, "three of the eighteen are accepted")
+    }
+
+    /// The ownership comparison is by UTF-16 code units, and that is a distinction with a
+    /// difference: `attachments/docs/K.pdf` spelled with U+212A KELVIN SIGN is **canonically
+    /// equivalent** to the ASCII spelling, so Swift `==` calls the two the same string and JS
+    /// `!==` calls them different. Measured on both sides.
+    ///
+    /// A path in that spelling cannot get PAST the whitelist, but one can already be stored — which
+    /// is exactly the side the comparison reads. With `==` in place of
+    /// ``StatementText/areEqual(_:_:)`` the second document below would be told the file is its own
+    /// and allowed to claim it.
+    func testTheOwnershipComparisonIsByCodeUnitsRatherThanCanonicalEquivalence() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let kelvin = "attachments/docs/\u{212A}.pdf"
+        let ascii = "attachments/docs/K.pdf"
+        XCTAssertTrue(kelvin == ascii, "Swift folds them; this test exists because of that")
+        XCTAssertFalse(StatementText.areEqual(kelvin, ascii), "…and JS does not")
+
+        let owner = try store.createBusinessDocument(draft("TI-K1"))
+        try store.db.run("UPDATE business_documents SET tax_invoice_attachment_path = ? WHERE id = ?",
+                         [.text(kelvin), .text(owner)])
+
+        // **The consequence that bites.** Another document already holds the ASCII path. Pointing
+        // the KELVIN one at it is a CHANGE, so the ownership query has to run and refuse — but a
+        // folding comparison calls the two spellings the same string, decides nothing changed, and
+        // skips the query, letting two documents share one file.
+        let holder = try store.createBusinessDocument(draft("TI-K2"))
+        try store.updateTaxInvoice(documentID: holder, TaxInvoiceEdit(attachmentPath: ascii))
+        XCTAssertThrowsError(try store.updateTaxInvoice(documentID: owner,
+                                                        TaxInvoiceEdit(attachmentPath: ascii))) {
+            XCTAssertEqual($0 as? BusinessDocumentError, .attachmentInUse)
+        }
+        XCTAssertEqual(try store.businessDocument(id: owner)?.document.taxInvoiceAttachmentPath,
+                       kelvin, "and the refusal wrote nothing")
+
+        // …and once the other document lets go, the same request is accepted and reports the
+        // KELVIN spelling as the orphan.
+        try store.updateTaxInvoice(documentID: holder, TaxInvoiceEdit(attachmentPath: ""))
+        XCTAssertEqual(try store.updateTaxInvoice(documentID: owner,
+                                                  TaxInvoiceEdit(attachmentPath: ascii)),
+                       kelvin, "the KELVIN spelling is orphaned, which a folding comparison would deny")
+        XCTAssertEqual(try store.businessDocument(id: owner)?.document.taxInvoiceAttachmentPath, ascii)
+    }
+
+    /// An empty stored path is **no path**: the handler's tests on that column are truthiness
+    /// (`if (row.tax_invoice_attachment_path)`, `existing && existing !== p`), and `''` is falsy
+    /// there. Measured on the handler with `''` written straight into the column.
+    func testAnEmptyStoredAttachmentPathCountsAsNoPath() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+
+        let id = try store.createBusinessDocument(draft("TI-E1"))
+        try store.db.run("UPDATE business_documents SET tax_invoice_attachment_path = '' WHERE id = ?",
+                         [.text(id)])
+        XCTAssertNil(try store.updateTaxInvoice(documentID: id,
+                                                TaxInvoiceEdit(attachmentPath: "attachments/docs/new.pdf")),
+                     "an empty previous value orphans nothing")
+
+        let deleted = try store.createBusinessDocument(draft("TI-E2"))
+        try store.db.run("UPDATE business_documents SET tax_invoice_attachment_path = '' WHERE id = ?",
+                         [.text(deleted)])
+        XCTAssertNil(try store.deleteBusinessDocument(id: deleted),
+                     "…and deleting such a document leaves nothing behind either")
+
+        // The control: a real path in the same two places IS reported, so the two nils above are
+        // the truthiness rule and not a broken read.
+        let real = try store.createBusinessDocument(draft("TI-E3"))
+        try store.updateTaxInvoice(documentID: real,
+                                   TaxInvoiceEdit(attachmentPath: "attachments/docs/one.pdf"))
+        XCTAssertEqual(try store.updateTaxInvoice(documentID: real,
+                                                  TaxInvoiceEdit(attachmentPath: "attachments/docs/two.pdf")),
+                       "attachments/docs/one.pdf")
+        XCTAssertEqual(try store.deleteBusinessDocument(id: real), "attachments/docs/two.pdf")
+    }
+
+    // MARK: - The clamps on the two write paths D-2 adds
+
+    /// Every field the edit path writes is cut at the handler's own width, and the two trimmed ones
+    /// are cut BEFORE they are trimmed.
+    ///
+    /// `update` re-spells these clamps rather than sharing `create`'s, so they need measuring on
+    /// their own — every width below came from driving the real handler. `doc_number`'s in
+    /// particular decides what `idx_docs_type_number` calls a collision.
+    func testTheEditPathClampsEveryFieldAtTheHandlersWidth() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft("CL-1"))
+
+        func stored(_ column: String) throws -> String? {
+            try store.db.query("SELECT \(column) AS v FROM business_documents WHERE id = ?",
+                               [.text(id)]).first?.string("v")
+        }
+        func edit(_ field: String, _ value: String) throws {
+            switch field {
+            case "doc_number": try store.updateBusinessDocument(id: id, BusinessDocumentEdit(number: value))
+            case "doc_date": try store.updateBusinessDocument(id: id, BusinessDocumentEdit(date: value))
+            case "valid_until": try store.updateBusinessDocument(id: id, BusinessDocumentEdit(validUntil: value))
+            case "customer_name": try store.updateBusinessDocument(id: id, BusinessDocumentEdit(customerName: value))
+            case "customer_tax_id": try store.updateBusinessDocument(id: id, BusinessDocumentEdit(customerTaxID: value))
+            case "customer_address": try store.updateBusinessDocument(id: id, BusinessDocumentEdit(customerAddress: value))
+            case "customer_contact": try store.updateBusinessDocument(id: id, BusinessDocumentEdit(customerContact: value))
+            case "notes": try store.updateBusinessDocument(id: id, BusinessDocumentEdit(notes: value))
+            default: XCTFail("unknown field \(field)")
+            }
+        }
+
+        for (field, width) in [("doc_number", 60), ("customer_name", 200), ("valid_until", 30),
+                               ("customer_tax_id", 100), ("customer_address", 300),
+                               ("customer_contact", 200), ("notes", 2000)] {
+            try edit(field, String(repeating: "X", count: width) + "TAIL")
+            let value = try XCTUnwrap(try stored(field), field)
+            XCTAssertEqual(value.count, width, field)
+            XCTAssertFalse(value.hasSuffix("TAIL"), "\(field) kept text past its width")
+        }
+
+        // The two trimmed fields: cut at the width — inside the run of spaces — and trimmed after,
+        // so the tail is gone AND the spaces are gone. Trimming first would have kept part of TAIL.
+        try edit("doc_number", "ABC" + String(repeating: " ", count: 57) + "TAIL")
+        XCTAssertEqual(try stored("doc_number"), "ABC")
+        try edit("customer_name", "ABC" + String(repeating: " ", count: 197) + "TAIL")
+        XCTAssertEqual(try stored("customer_name"), "ABC")
+
+        // …and the width counts UTF-16 code units, which is what decides whether two numbers
+        // collide: "A" + 30 emoji is 61 units, so one unit is cut and SQLite counts 31 characters.
+        try edit("doc_number", "A" + String(repeating: "\u{1F44D}", count: 30))
+        XCTAssertEqual(try store.db.query("SELECT length(doc_number) AS n FROM business_documents WHERE id = ?",
+                                          [.text(id)]).first?.int("n"), 31)
+
+        // `doc_date` is the one field with no clamp at all — the handler stores `String(b.doc_date)`.
+        let longDate = String(repeating: "D", count: 120)
+        try edit("doc_date", longDate)
+        XCTAssertEqual(try stored("doc_date"), longDate, "doc_date is neither clamped nor trimmed")
+    }
+
+    /// The association's own two clamps: 100 code units for the number, 30 for the date. Measured
+    /// on the handler; nothing else in the suite pins them.
+    func testTheAssociationClampsItsTwoTextFieldsAtTheHandlersWidths() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft("CL-2"))
+
+        try store.updateTaxInvoice(documentID: id, TaxInvoiceEdit(
+            number: String(repeating: "Y", count: 100) + "TAIL",
+            date: String(repeating: "Z", count: 30) + "TAIL"))
+        let document = try XCTUnwrap(try store.businessDocument(id: id)?.document)
+        XCTAssertEqual(document.taxInvoiceNumber?.count, 100)
+        XCTAssertEqual(document.taxInvoiceDate?.count, 30)
+        XCTAssertEqual(document.taxInvoiceNumber?.hasSuffix("TAIL"), false)
+        XCTAssertEqual(document.taxInvoiceDate?.hasSuffix("TAIL"), false)
+
+        // The number is clamped and THEN trimmed, same as `doc_number`.
+        try store.updateTaxInvoice(documentID: id, TaxInvoiceEdit(
+            number: "ABC" + String(repeating: " ", count: 97) + "TAIL"))
+        XCTAssertEqual(try store.businessDocument(id: id)?.document.taxInvoiceNumber, "ABC")
+
+        // The path is the one field with NO clamp: the handler hands `String(v)` straight to the
+        // whitelist, which is what ends up narrowing it.
+        let longName = String(repeating: "n", count: 400)
+        try store.updateTaxInvoice(documentID: id,
+                                   TaxInvoiceEdit(attachmentPath: "attachments/docs/\(longName).pdf"))
+        XCTAssertEqual(try store.businessDocument(id: id)?.document.taxInvoiceAttachmentPath?.count,
+                       "attachments/docs/".count + longName.count + 4)
+    }
+
+    // MARK: - A8 · the edit's two writes are one transaction
+
+    /// The header UPDATE and the line rewrite are in ONE transaction, so a failure part way through
+    /// leaves neither. Same fault-injection shape `BusinessDocumentStoreTests` uses on `create`:
+    /// the ledger's own trigger machinery, so the production write path runs exactly as it ships.
+    ///
+    /// Without this, dropping `db.transaction` from the edit path is caught by nothing: the source
+    /// guard counts statements and the totals invariant is checked only after successful writes.
+    func testAFailureRewritingTheLinesRollsBackTheHeaderEditToo() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft("TX-1", lines: [line("orig", amount: 10, tax: 1)]))
+        // Park the timestamp BEFORE the snapshot, so `before` records the parked value and the
+        // comparison below covers `updated_at` along with everything else.
+        try parkUpdatedAt(store, id)
+        let before = try XCTUnwrap(try store.businessDocument(id: id))
+
+        try store.db.execute("""
+            CREATE TRIGGER refuse_items BEFORE INSERT ON business_document_items
+            BEGIN SELECT RAISE(ABORT, 'injected'); END;
+            """)
+        XCTAssertThrowsError(try store.updateBusinessDocument(id: id, BusinessDocumentEdit(
+            notes: "should not survive", lines: [line("new", amount: 500, tax: 50)])))
+
+        let after = try XCTUnwrap(try store.businessDocument(id: id))
+        XCTAssertEqual(after.document, before.document, "the header edit rolled back with the lines")
+        XCTAssertEqual(after.items, before.items, "…and the old lines are still there")
+        XCTAssertEqual(try updatedAt(store, id), epoch, "nothing was written at all")
+
+        try store.db.execute("DROP TRIGGER refuse_items")
+        XCTAssertNoThrow(try store.updateBusinessDocument(id: id, BusinessDocumentEdit(
+            notes: "fine now", lines: [line("new", amount: 500, tax: 50)])),
+            "…and the same edit lands once the injected fault is gone")
+        XCTAssertEqual(try store.businessDocument(id: id)?.document.subtotal, 500)
+    }
+
+    // MARK: - Q5 · the boundary a status transition must not cross
+
+    /// Spec §2 Q5's third boundary assertion, which belongs to the round that introduces the
+    /// transitions: **no state change on a document produces a `transactions` row or an inventory
+    /// movement.** Q9 says this is held by the assertion and not by convention, so here it is.
+    ///
+    /// Every mutating path D-2 adds is exercised: issue, void, edit, line replacement, the
+    /// tax-invoice association, and delete.
+    func testNoDocumentStateChangePostsToTheLedgerOrTheInventory() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let watched = ["transactions", "inventory_movements", "inventory_balances",
+                       "inventory_exceptions"]
+
+        func counts() throws -> [String: Int] {
+            var out: [String: Int] = [:]
+            for table in watched {
+                out[table] = try store.db.query("SELECT COUNT(*) AS c FROM \(table)").first?.int("c") ?? -1
+            }
+            return out
+        }
+        // The control: every table exists and reads as a number, so a zero below is a measurement
+        // rather than a failed query.
+        XCTAssertEqual(try counts(), watched.reduce(into: [:]) { $0[$1] = 0 })
+
+        let id = try store.createBusinessDocument(
+            draft("Q5-1", type: .commercialInvoice, lines: [line("a", amount: 10, tax: 1)]))
+        try store.updateBusinessDocument(id: id, BusinessDocumentEdit(
+            notes: "edited", lines: [line("b", amount: 20, tax: 2)]))
+        try store.updateBusinessDocument(id: id, BusinessDocumentEdit(status: .issued))
+        try store.updateTaxInvoice(documentID: id,
+                                   TaxInvoiceEdit(issued: true, number: "FP-1", date: "2026-01-05"))
+        try store.updateBusinessDocument(id: id, BusinessDocumentEdit(status: .void))
+        XCTAssertEqual(try counts(), watched.reduce(into: [:]) { $0[$1] = 0 },
+                       "signing, associating and voiding post nothing")
+
+        try store.deleteBusinessDocument(id: id)
+        XCTAssertEqual(try counts(), watched.reduce(into: [:]) { $0[$1] = 0 },
+                       "…and neither does deleting")
+        XCTAssertEqual(try store.businessDocuments().documents.count, 0)
     }
 }

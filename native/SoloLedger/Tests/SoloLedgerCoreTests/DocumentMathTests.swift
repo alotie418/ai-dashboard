@@ -489,9 +489,28 @@ final class DocumentMathTests: XCTestCase {
             let decomposed = DocumentMath.shortestDecimal(of: value)
             XCTAssertEqual(decomposed.digits, digits, "\(value)")
             XCTAssertEqual(decomposed.pointPosition, point, "\(value)")
-            XCTAssertFalse(decomposed.digits.hasPrefix("0"), "\(value)")
-            XCTAssertFalse(decomposed.digits.hasSuffix("0"), "\(value)")
         }
+
+        // The shape rule, over values NOT pinned above — otherwise the equalities would already
+        // have decided it and these assertions could never be the one that fails. Both zero
+        // positions are reachable in Swift's own spelling (`1000000.0` has trailing zeros before
+        // the point, `0.001` has leading ones after it), so this is a real normalisation step.
+        var generator = SplitMix64(seed: 0x5EED_D2)
+        var values: [Double] = [1e6, 0.001, 1e-5, 20.0, 300.5, 1e17, 4e-9]
+        for _ in 0..<2000 { values.append(abs(generator.nextDouble(magnitude: 1e6))) }
+        var sawMultiDigit = false
+        for value in values where value > 0 && value.isFinite {
+            let decomposed = DocumentMath.shortestDecimal(of: value)
+            XCTAssertFalse(decomposed.digits.isEmpty, "\(value)")
+            XCTAssertFalse(decomposed.digits.hasPrefix("0"), "\(value) kept a leading zero")
+            XCTAssertFalse(decomposed.digits.hasSuffix("0"), "\(value) kept a trailing zero")
+            // The identity the pair has to satisfy, checked by rebuilding the number from it.
+            let k = decomposed.digits.count
+            XCTAssertEqual(Double(decomposed.digits)! * pow(10, Double(decomposed.pointPosition - k)),
+                           value, accuracy: abs(value) * 1e-12, "\(value)")
+            if k > 1 { sawMultiDigit = true }
+        }
+        XCTAssertTrue(sawMultiDigit, "a corpus of single-digit values would not exercise the rule")
     }
 
     /// `padStart` pads and never truncates, and it counts UTF-16 code units.

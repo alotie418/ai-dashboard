@@ -32,11 +32,15 @@ final class DocumentNumberingTests: LedgerTestCase {
         }
     }
 
+    /// Seed `numbers` under `seededAs` (the type under test by default) and ask for `type`'s next
+    /// suggestion. The two are separate parameters so a caller can seed a DIFFERENT type's rows —
+    /// which is the only way to exercise the `doc_type = ?` half of the query.
     private func suggestion(after numbers: [String],
-                            type: BusinessDocumentType = .quotation) throws -> String {
+                            type: BusinessDocumentType = .quotation,
+                            seededAs: BusinessDocumentType? = nil) throws -> String {
         let store = try makeStore()
         defer { try? store.db.close() }
-        try seed(store, numbers)
+        try seed(store, numbers, type: seededAs ?? type)
         return try store.nextBusinessDocumentNumber(for: type, year: year)
     }
 
@@ -90,9 +94,15 @@ final class DocumentNumberingTests: LedgerTestCase {
         XCTAssertEqual(try suggestion(after: ["QT-2026-12345"]), "QT-2026-12346")
     }
 
-    /// Batch 8 A's fourth assertion, widened. Every one of these is fetched by the `LIKE` and then
-    /// refused by the suffix reader, so the suggestion stays at `0001` — and each is refused for a
-    /// DIFFERENT reason, which is why they are listed one by one instead of as "some bad input".
+    /// Batch 8 A's fourth assertion, widened: none of these moves the suggestion off `0001`, and
+    /// each is refused for a DIFFERENT reason.
+    ///
+    /// **Two filters are in play and the table says which is which.** `doc_number LIKE 'QT-2026-%'`
+    /// drops some rows before anything reads them; the rest are fetched and then refused by
+    /// ``DocumentNumbering/numericSuffix(of:)``. Both matter and both are Q3's ("只按 doc_type 与
+    /// doc_number LIKE 过滤", then the regex), but only the second is a property of this round's
+    /// code — so the shapes that never reach it are pinned against `numericSuffix` directly in
+    /// ``testTheSuffixReaderRefusesEveryShapeTheRegexRefuses`` as well.
     func testNothingOutsideTheExactShapeFeedsTheMaximum() throws {
         for (number, why) in [
             ("CUSTOM-9999", "the handler test's own case: a user's own numbering scheme"),
@@ -116,6 +126,45 @@ final class DocumentNumberingTests: LedgerTestCase {
         // The control: the SAME seeding path with a well-formed number does move the suggestion, so
         // the fifteen results above are refusals rather than a broken query.
         XCTAssertEqual(try suggestion(after: ["QT-2026-0500"]), "QT-2026-0501")
+
+        // The OTHER half of Q3's filter: `doc_type = ?`. A sales order numbered in the quotation
+        // series is fetched by neither predicate — and this is the only case that distinguishes the
+        // two, because everything above would also be excluded by the `LIKE` alone.
+        XCTAssertEqual(try suggestion(after: ["QT-2026-0500"], type: .quotation, seededAs: .salesOrder),
+                       "QT-2026-0001", "another type's row must not feed this type's series")
+        XCTAssertEqual(try suggestion(after: ["QT-2026-0500"], type: .salesOrder, seededAs: .salesOrder),
+                       "SO-2026-0001",
+                       "…and it does not feed its OWN series either, because the prefix is wrong")
+    }
+
+    /// The suffix reader on its own, for the shapes the `LIKE` would have dropped first.
+    ///
+    /// Five rows in the table above never reach ``DocumentNumbering/numericSuffix(of:)`` — the
+    /// query filters them — so their assertions there measure the query, not the reader. The two
+    /// whose stated purpose is to pin the reader's `[A-Z]{2}` and `\d{4}` shape rules are pinned
+    /// here instead, against the function itself.
+    func testTheSuffixReaderRefusesEveryShapeTheRegexRefuses() {
+        for (number, why) in [
+            ("QTX-2026-0007", "a three-letter prefix"),
+            ("Q-2026-0007", "a one-letter prefix"),
+            ("QT-20261-0007", "a five-digit year"),
+            ("QT-202-0007", "a three-digit year"),
+            ("qt-2026-0007", "lower case"),
+            ("CUSTOM-9999", "no year group at all"),
+            (" QT-2026-0007", "leading whitespace"),
+            ("QT-2026-0007 ", "trailing whitespace"),
+            ("QT-2026-0007-1", "a second group"),
+            ("QT-2026-", "no digits"),
+            ("QT-2026-٧", "Arabic-Indic digits"),
+            ("QT-2026-＋7", "a full-width sign"),
+            ("", "the empty string"),
+        ] {
+            XCTAssertNil(DocumentNumbering.numericSuffix(of: number), why)
+        }
+        XCTAssertEqual(DocumentNumbering.numericSuffix(of: "QT-2026-0007"), 7, "the control")
+        XCTAssertEqual(DocumentNumbering.numericSuffix(of: "ZZ-0000-0"), 0,
+                       "the reader checks the SHAPE, not which prefix or year it is — the query is "
+                       + "what restricts those, and it is a different filter")
     }
 
     /// **A trailing newline is the case a regex would have got wrong.**
@@ -153,6 +202,12 @@ final class DocumentNumberingTests: LedgerTestCase {
         XCTAssertEqual(try suggestion(after: ["QT-2026-1" + String(repeating: "0", count: 19)]),
                        "QT-2026-10000000000000000000",
                        "adding one to 1e19 changes nothing, and the answer says the same thing")
+        // And the far end: `parseInt` overflows to `Infinity`, which `String(n)` spells out. Both
+        // sides measured; 308 nines is the last finite one.
+        XCTAssertEqual(try suggestion(after: ["QT-2026-" + String(repeating: "9", count: 308)]),
+                       "QT-2026-1e+308")
+        XCTAssertEqual(try suggestion(after: ["QT-2026-" + String(repeating: "9", count: 309)]),
+                       "QT-2026-Infinity")
     }
 
     // MARK: - The year

@@ -37,17 +37,24 @@ public enum DocumentNumbering {
         }
     }
 
-    /// `new Date().getFullYear()` — the year **in the machine's own time zone**, on the proleptic
-    /// Gregorian calendar.
+    /// `new Date().getFullYear()` — the year **in the machine's own time zone**, on an explicitly
+    /// named Gregorian calendar.
     ///
     /// Both halves are load-bearing and neither is the Swift default:
     ///
     ///  * `Calendar.current` follows the user's region settings, and a region set to the Japanese
     ///    calendar answers `8` (Reiwa 8) where `getFullYear()` answers `2026`. The calendar is
-    ///    therefore named, not inherited.
+    ///    therefore named, not inherited. `DocumentWriteSurfaceGuardTests` pins that naming as
+    ///    source, because no in-process test can tell `.gregorian` from `Calendar.current` on a
+    ///    machine whose region already uses the Gregorian calendar.
     ///  * The time zone is NOT named: it is the local one, exactly as `getFullYear()` uses it. Q3
     ///    registers the consequence rather than designing it away — on New Year's Eve, two machines
     ///    in different zones suggest numbers from different years.
+    ///
+    /// One registered inexactness: Foundation's `.gregorian` is ICU's hybrid calendar, which
+    /// switches to Julian before 1582-10-15, while `getFullYear()` is proleptic. The two therefore
+    /// disagree for instants no clock this is called with can produce, and agree for every instant
+    /// one can.
     static func year(at instant: Date, in timeZone: TimeZone) -> Int {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
@@ -137,7 +144,11 @@ public extension LedgerStore {
     /// The year seam. `nextBusinessDocumentNumber(for:)` is the shipping entry point and reads the
     /// clock; this one exists so a test can ask what the suggestion is in a year that is not this
     /// one without moving the machine's clock.
-    func nextBusinessDocumentNumber(for type: BusinessDocumentType, year: Int) throws -> String {
+    ///
+    /// **`internal` on purpose**, even though it sits in a `public extension`: `GET
+    /// /api/documents/next-number` takes only a type, so a public year parameter would be a piece
+    /// of API Electron has no counterpart for. `@testable import` reaches it; the App cannot.
+    internal func nextBusinessDocumentNumber(for type: BusinessDocumentType, year: Int) throws -> String {
         let prefix = DocumentNumbering.prefix(for: type)
         // The maximum is taken in Swift over the fetched rows, not with SQL `MAX()`, because the
         // column is TEXT: `MAX` would compare lexicographically and a user's own `CUSTOM-9999`
