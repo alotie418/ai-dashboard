@@ -16,6 +16,12 @@ import XCTest
 /// `ReportMath.round` here, and THAT function is replayed against a committed V8 corpus in
 /// `ReportMathTests`, so the engine-measured oracle reaches this file through an equality a test
 /// enforces rather than through a second 2.7 MB fixture that would need its own CI wiring.
+///
+/// D-2 added ``DocumentMath/jsNumberToString(_:)`` and measured it the same way: **67,624 doubles,
+/// zero mismatches** against node's `String(n)` — every `parseInt` of a 1-to-64-digit run and that
+/// value plus one, every integer to 5,000, every power of ten from `1e-330` to `1e330` and its two
+/// neighbours, the values around 2^53 / 2^63 / 1e21, 60,000 seeded pseudo-random doubles, and the
+/// named edges. The pinned cases below are the subset where each layout rule decides the answer.
 final class DocumentMathTests: XCTestCase {
 
     // MARK: - `Math.round`
@@ -415,6 +421,109 @@ final class DocumentMathTests: XCTestCase {
         XCTAssertEqual(DocumentMath.jsParseFloat("\u{FEFF}42"), 42)
         XCTAssertEqual(DocumentMath.jsParseFloat("\u{3000}42"), 42)
         XCTAssertNil(DocumentMath.jsParseFloat("\u{0085}42"), "NEL is not ECMAScript whitespace")
+    }
+
+    // MARK: - D-2 · `String(n)`
+
+    /// `Number::toString`'s six layout cases, each with a value that lands in it and nowhere else.
+    ///
+    /// Every string below is node's answer, and none of them is Swift's: Swift writes `10000.0`,
+    /// `1e+19` and `-0.0` for the first, fourth and last of them. That is the whole reason this
+    /// function exists — `nextNumber` ends in `String(max + 1)`, so the layout IS the output.
+    func testNumberToStringReproducesEachOfTheSixLayoutCases() {
+        // k ≤ n ≤ 21 — the digits, zero-padded out to the point.
+        XCTAssertEqual(DocumentMath.jsNumberToString(8), "8")
+        XCTAssertEqual(DocumentMath.jsNumberToString(9999), "9999")
+        XCTAssertEqual(DocumentMath.jsNumberToString(10000), "10000")
+        XCTAssertEqual(DocumentMath.jsNumberToString(1e15), "1000000000000000")
+        XCTAssertEqual(DocumentMath.jsNumberToString(pow(2, 53)), "9007199254740992")
+        XCTAssertEqual(DocumentMath.jsNumberToString(pow(2, 63)), "9223372036854776000",
+                       "past 2^53 the shortest round-trip has fewer digits than the value")
+        XCTAssertEqual(DocumentMath.jsNumberToString(1e19), "10000000000000000000")
+        XCTAssertEqual(DocumentMath.jsNumberToString(1e20), "100000000000000000000")
+        // Written in exponential form because the literal `123456789012345678901` is not exactly
+        // representable and the compiler says so; this is the same Double, spelled without a warning.
+        XCTAssertEqual(DocumentMath.jsNumberToString(1.2345678901234568e20), "123456789012345680000")
+
+        // 0 < n ≤ 21 with n < k — a decimal point inside the digits.
+        XCTAssertEqual(DocumentMath.jsNumberToString(1.5), "1.5")
+        XCTAssertEqual(DocumentMath.jsNumberToString(100.25), "100.25")
+        XCTAssertEqual(DocumentMath.jsNumberToString(1.2345678901234568e18), "1234567890123456800")
+
+        // −6 < n ≤ 0 — a leading `0.` and then the digits.
+        XCTAssertEqual(DocumentMath.jsNumberToString(0.1), "0.1")
+        XCTAssertEqual(DocumentMath.jsNumberToString(0.5), "0.5")
+        XCTAssertEqual(DocumentMath.jsNumberToString(1e-6), "0.000001")
+        XCTAssertEqual(DocumentMath.jsNumberToString(1.0 / 3.0), "0.3333333333333333")
+
+        // n > 21 or n ≤ −6 — exponential, one digit before the point when there is only one.
+        XCTAssertEqual(DocumentMath.jsNumberToString(1e21), "1e+21", "the boundary: 1e20 is not this")
+        XCTAssertEqual(DocumentMath.jsNumberToString(1e22), "1e+22")
+        XCTAssertEqual(DocumentMath.jsNumberToString(1e52), "1e+52")
+        XCTAssertEqual(DocumentMath.jsNumberToString(1e300), "1e+300")
+        XCTAssertEqual(DocumentMath.jsNumberToString(1e-7), "1e-7", "and 1e-6 is not")
+        XCTAssertEqual(DocumentMath.jsNumberToString(5e-324), "5e-324")
+        XCTAssertEqual(DocumentMath.jsNumberToString(.greatestFiniteMagnitude),
+                       "1.7976931348623157e+308")
+        XCTAssertEqual(DocumentMath.jsNumberToString(.ulpOfOne), "2.220446049250313e-16")
+    }
+
+    /// The three values with no digits at all, and the one place in this file where `-0` is
+    /// deliberately NOT preserved: `String(-0)` is `"0"`.
+    func testNumberToStringFlattensNegativeZeroAndNamesTheNonNumbers() {
+        XCTAssertEqual(DocumentMath.jsNumberToString(0), "0")
+        XCTAssertEqual(DocumentMath.jsNumberToString(-0.0), "0",
+                       "every other function here keeps the sign; this one drops it, as JS does")
+        XCTAssertEqual(DocumentMath.jsNumberToString(-1), "-1")
+        XCTAssertEqual(DocumentMath.jsNumberToString(-0.1), "-0.1")
+        XCTAssertEqual(DocumentMath.jsNumberToString(.infinity), "Infinity")
+        XCTAssertEqual(DocumentMath.jsNumberToString(-.infinity), "-Infinity")
+        XCTAssertEqual(DocumentMath.jsNumberToString(.nan), "NaN")
+    }
+
+    /// The digit extraction underneath, stated as the identity it has to satisfy.
+    func testTheShortestDecimalIsDigitsWithoutLeadingOrTrailingZeros() {
+        for (value, digits, point) in [(10000.0, "1", 5), (0.1, "1", 0), (1.5, "15", 1),
+                                       (1e21, "1", 22), (5e-324, "5", -323),
+                                       (9223372036854775808.0, "9223372036854776", 19)] {
+            let decomposed = DocumentMath.shortestDecimal(of: value)
+            XCTAssertEqual(decomposed.digits, digits, "\(value)")
+            XCTAssertEqual(decomposed.pointPosition, point, "\(value)")
+        }
+
+        // The shape rule, over values NOT pinned above — otherwise the equalities would already
+        // have decided it and these assertions could never be the one that fails. Both zero
+        // positions are reachable in Swift's own spelling (`1000000.0` has trailing zeros before
+        // the point, `0.001` has leading ones after it), so this is a real normalisation step.
+        var generator = SplitMix64(seed: 0x5EED_D2)
+        var values: [Double] = [1e6, 0.001, 1e-5, 20.0, 300.5, 1e17, 4e-9]
+        for _ in 0..<2000 { values.append(abs(generator.nextDouble(magnitude: 1e6))) }
+        var sawMultiDigit = false
+        for value in values where value > 0 && value.isFinite {
+            let decomposed = DocumentMath.shortestDecimal(of: value)
+            XCTAssertFalse(decomposed.digits.isEmpty, "\(value)")
+            XCTAssertFalse(decomposed.digits.hasPrefix("0"), "\(value) kept a leading zero")
+            XCTAssertFalse(decomposed.digits.hasSuffix("0"), "\(value) kept a trailing zero")
+            // The identity the pair has to satisfy, checked by rebuilding the number from it.
+            let k = decomposed.digits.count
+            XCTAssertEqual(Double(decomposed.digits)! * pow(10, Double(decomposed.pointPosition - k)),
+                           value, accuracy: abs(value) * 1e-12, "\(value)")
+            if k > 1 { sawMultiDigit = true }
+        }
+        XCTAssertTrue(sawMultiDigit, "a corpus of single-digit values would not exercise the rule")
+    }
+
+    /// `padStart` pads and never truncates, and it counts UTF-16 code units.
+    func testPadStartPadsButNeverTruncates() {
+        XCTAssertEqual(DocumentMath.jsPadStart("8", to: 4), "0008")
+        XCTAssertEqual(DocumentMath.jsPadStart("1", to: 4), "0001")
+        XCTAssertEqual(DocumentMath.jsPadStart("9999", to: 4), "9999")
+        XCTAssertEqual(DocumentMath.jsPadStart("10000", to: 4), "10000", "already longer: untouched")
+        XCTAssertEqual(DocumentMath.jsPadStart("1e+21", to: 4), "1e+21")
+        XCTAssertEqual(DocumentMath.jsPadStart("Infinity", to: 4), "Infinity")
+        XCTAssertEqual(DocumentMath.jsPadStart("", to: 4), "0000")
+        XCTAssertEqual(DocumentMath.jsPadStart("\u{1F44D}", to: 4), "00\u{1F44D}",
+                       "one emoji is TWO code units, so two zeros are added, not three")
     }
 }
 

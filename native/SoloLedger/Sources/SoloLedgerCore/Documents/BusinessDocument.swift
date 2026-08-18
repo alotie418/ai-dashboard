@@ -20,8 +20,10 @@ public enum BusinessDocumentType: String, CaseIterable, Sendable {
 
 /// `draft → issued | void`, `issued → void`, `void` terminal — `documents.js DOC_STATUSES`.
 ///
-/// **The transitions themselves are not this round's subject** (Q5 / D-2). What D-1 uses is the
-/// initial value: `create` writes `'draft'`, exactly as the handler's `INSERT` does with a literal.
+/// `create` writes the literal `'draft'`, exactly as the handler's `INSERT` does. The machine
+/// itself is `LedgerStore.statusTransitions`, applied by
+/// ``LedgerStore/updateBusinessDocument(id:_:)``; `void` maps to an EMPTY list of successors rather
+/// than to a missing entry, because being terminal is a decision and not an omission.
 public enum BusinessDocumentStatus: String, CaseIterable, Sendable {
     case draft
     case issued
@@ -80,9 +82,10 @@ public struct BusinessDocument: Identifiable, Hashable, Sendable {
     /// currency. The statement generator is its only writer in this version.
     public let currency: String?
 
-    // The formal-tax-invoice association (Q5). READ here, never written by this round's API —
-    // `create` omits all four columns exactly as the handler's `INSERT` does, so they take their
-    // schema defaults. `PUT /:id/tax-invoice` is D-2's.
+    // The formal-tax-invoice association (Q5) — a record of an invoice somebody ELSE issued, never
+    // one this app produced. `create` omits all four columns exactly as the handler's `INSERT` does,
+    // so a new document takes their schema defaults; ``LedgerStore/updateTaxInvoice(documentID:_:)``
+    // is the only writer, and the number it writes is always the one it was handed.
     public let taxInvoiceIssued: Bool
     public let taxInvoiceNumber: String?
     public let taxInvoiceDate: String?
@@ -282,18 +285,18 @@ public struct BusinessDocumentLineDraft: Equatable, Sendable {
     }
 }
 
-/// The three refusals `documents.js create` raises before it touches the database, and nothing else.
+/// What the four document writers refuse.
 ///
 /// It does NOT include "a document needs at least one line": the handler accepts an empty `items`
 /// array and writes a header with zero lines and zero totals. The requirement lives in the editor
 /// (`DocumentModal.tsx handleSubmit`), which is a different layer and a later round.
 ///
-/// It also does not include the duplicate-number refusal. `(doc_type, doc_number)` is a unique
-/// index, so a collision surfaces as the raw `SQLiteError` the write threw; translating it into a
-/// stable code is Q3's, i.e. D-2's. **A note for that round:** `ProductCatalog.mapWriteFailure`
-/// discriminates by matching `"(code 19)"` in the message, and the shipping active connection is
-/// opened with `SQLITE_OPEN_EXRESCODE`, so the number in that message is the EXTENDED code on the
-/// path that matters. Do not copy that predicate without measuring it on a hardened connection.
+/// **Three of Electron's message strings collapse into one case each, on purpose.** `create` says
+/// `'doc_number required'` where `update` says `'doc_number cannot be empty'`, and likewise for the
+/// customer name and the date. Those are English sentences, not stable codes; what a caller needs to
+/// branch on is which field was refused, and the user-facing wording is D-3's. The five codes the
+/// spec DOES name — `DOC_NUMBER_EXISTS`, `DOC_ISSUED_VOID_FIRST`, `DOC_VOID_TAX_INVOICE_READONLY`,
+/// `INVALID_ATTACHMENT_PATH`, `ATTACHMENT_IN_USE` — each keep a case of their own.
 public enum BusinessDocumentError: Error, Equatable, CustomStringConvertible {
     /// `doc_number` was empty, or became empty once trimmed.
     case numberRequired
@@ -310,14 +313,205 @@ public enum BusinessDocumentError: Error, Equatable, CustomStringConvertible {
     /// enforcement is a comment. See ``LedgerStore/createBusinessDocument(_:)``.
     case currencyIsGeneratedStatementsOnly
 
+    /// `'Document not found'` — no row with that id. The READ API answers `nil` instead; a write
+    /// has nothing to hand back, so it throws.
+    case notFound
+
+    /// `DOC_NUMBER_EXISTS`. `(doc_type, doc_number)` is a unique index, so this arrives from
+    /// `create`, from an edit that changes either half, and from re-using a **voided** document's
+    /// number — voiding does not release it (Q3).
+    case numberExists
+
+    /// The status machine refused: `draft → issued | void`, `issued → void`, `void` terminal.
+    /// Carries both ends because the handler's message does
+    /// (`Invalid status transition: issued -> draft`).
+    case invalidStatusTransition(from: BusinessDocumentStatus, to: BusinessDocumentStatus)
+
+    /// `'Only draft documents can be edited'`. Note what counts as an edit: any of the nine
+    /// whitelisted fields, or the lines. A status change **alone** is not an edit, which is how an
+    /// issued document can still be voided — and a legal status change bundled WITH an edit is
+    /// refused for the edit's sake.
+    case onlyDraftCanBeEdited
+
+    /// `DOC_ISSUED_VOID_FIRST` — an issued document cannot be deleted. Void it first; a void
+    /// document deletes, and deleting is what gives its number back.
+    case issuedMustBeVoidedFirst
+
+    /// `DOC_VOID_TAX_INVOICE_READONLY` — the association is frozen once the document is void. This
+    /// fires before the request body is looked at, so it fires for an empty body too.
+    case voidTaxInvoiceReadOnly
+
+    /// `INVALID_ATTACHMENT_PATH` — not a well-formed `attachments/docs/<name>` reference.
+    case invalidAttachmentPath
+
+    /// `ATTACHMENT_IN_USE` — another document already points at that file. Sharing one copy would
+    /// let either document's next edit delete the file out from under the other.
+    case attachmentInUse
+
     public var description: String {
         switch self {
         case .numberRequired: return "numberRequired"
         case .customerNameRequired: return "customerNameRequired"
         case .dateRequired: return "dateRequired"
         case .currencyIsGeneratedStatementsOnly: return "currencyIsGeneratedStatementsOnly"
+        case .notFound: return "notFound"
+        case .numberExists: return "numberExists"
+        case let .invalidStatusTransition(from, to):
+            return "invalidStatusTransition(\(from.rawValue) -> \(to.rawValue))"
+        case .onlyDraftCanBeEdited: return "onlyDraftCanBeEdited"
+        case .issuedMustBeVoidedFirst: return "issuedMustBeVoidedFirst"
+        case .voidTaxInvoiceReadOnly: return "voidTaxInvoiceReadOnly"
+        case .invalidAttachmentPath: return "invalidAttachmentPath"
+        case .attachmentInUse: return "attachmentInUse"
         }
     }
+}
+
+// MARK: - Edit models
+
+/// A partial edit of one document — the body `PUT /api/documents/:id` accepts, minus everything the
+/// handler ignores.
+///
+/// ## `nil` means "leave it alone"; `""` means "clear it"
+///
+/// This is not a convention invented here, it is the handler's own expressiveness written down. Its
+/// test is `b[field] !== undefined`, so an absent key is untouched; and every nullable column is
+/// written as `safeString(v, n) || null`, so an empty value — and only a truly EMPTY one — lands on
+/// SQL `NULL`. One `String?` therefore carries exactly the same outcomes the JSON body carries,
+/// with `nil` playing `undefined`.
+///
+/// **Whitespace does not clear.** `safeString` never trims, so `"   "` is truthy and is stored as
+/// itself; measured on the handler for `valid_until`, `customer_tax_id` and `tax_invoice_date`
+/// alike.
+///
+/// The three REQUIRED fields refuse to be emptied instead of clearing — but not by one rule, and
+/// the difference is the handler's:
+///
+///  * ``number`` and ``customerName`` are clamped and THEN trimmed, so `"   "` is empty to them and
+///    is refused (``BusinessDocumentError/numberRequired``, ``customerNameRequired``);
+///  * ``date`` is neither clamped nor trimmed — its test is `!b.doc_date`, plain falsiness — so
+///    `""` is refused (``dateRequired``) while `" "` is ACCEPTED and stored verbatim.
+///
+/// ## What is deliberately not here
+///
+/// `acc_locale` (frozen at create), `currency` (Q2-d-② gives it one writer, and that writer is
+/// `create`), `subtotal` / `tax_amount` / `total` (computed, never supplied), `period_start` /
+/// `period_end`, `source_sales_id`, the four `tax_invoice_*` columns (their own entry point) and
+/// `id` / `created_at` / `updated_at`. Sending any of them to the handler is silently ignored;
+/// here they simply cannot be expressed, and `DocumentLifecycleTests` measures that an edit leaves
+/// **every** column outside the whitelist byte-identical rather than trusting the type to say so.
+public struct BusinessDocumentEdit: Equatable, Sendable {
+    public var type: BusinessDocumentType?
+    public var number: String?
+    public var date: String?
+    public var validUntil: String?
+    public var customerName: String?
+    public var customerTaxID: String?
+    public var customerAddress: String?
+    public var customerContact: String?
+    public var notes: String?
+
+    /// The status to move to. Supplying the status the document already has is **not** a
+    /// transition: the handler compares before it validates, so it is neither checked nor written.
+    public var status: BusinessDocumentStatus?
+
+    /// The replacement lines. `nil` leaves them alone; `[]` removes them all.
+    ///
+    /// **Supplying these always rewrites the three header totals in the same transaction** — the
+    /// A8 design constraint. Registered form A8 says Electron recomputes the totals only when the
+    /// request carried `items`; that is the storage semantics and it is reproduced. What is NOT
+    /// reproduced is the reachability of a stale total: there is no way through this API to move
+    /// the lines without the totals following, and `DocumentWriteSurfaceGuardTests` pins that the
+    /// two writers of `business_document_items` are the only ones there are.
+    ///
+    /// **These lines are always sanitised as hand-entered**, because that is the only rule the
+    /// handler's `update` has — `sanitizeItems` takes no mode. There is deliberately no
+    /// ``BusinessDocumentLineOrigin`` here: the chapter accepts no invention outside Q2, and
+    /// "Electron has no counterpart" makes the answer "do not do it" rather than "add a parameter"
+    /// (spec §1). **Registered for D-4, which owns the editor:** re-saving a GENERATED statement
+    /// through this path applies the blank-description drop rule, and a generated statement's lines
+    /// may legitimately have no description (D-1's first ruling), so such a line — and the income it
+    /// carries — would disappear from a document that goes to a customer. Nothing in this package
+    /// can reach that today; the round that first can must stop and ask for a ruling rather than
+    /// widen this type on its own.
+    public var lines: [BusinessDocumentLineDraft]?
+
+    public init(type: BusinessDocumentType? = nil,
+                number: String? = nil,
+                date: String? = nil,
+                validUntil: String? = nil,
+                customerName: String? = nil,
+                customerTaxID: String? = nil,
+                customerAddress: String? = nil,
+                customerContact: String? = nil,
+                notes: String? = nil,
+                status: BusinessDocumentStatus? = nil,
+                lines: [BusinessDocumentLineDraft]? = nil) {
+        self.type = type
+        self.number = number
+        self.date = date
+        self.validUntil = validUntil
+        self.customerName = customerName
+        self.customerTaxID = customerTaxID
+        self.customerAddress = customerAddress
+        self.customerContact = customerContact
+        self.notes = notes
+        self.status = status
+        self.lines = lines
+    }
+
+    /// The nine fields `EDITABLE` names, plus the lines. Everything the handler counts when it asks
+    /// "is this an edit?", and nothing else — the status is not on the list.
+    var changesFieldsOrLines: Bool {
+        type != nil || number != nil || date != nil || validUntil != nil || customerName != nil
+            || customerTaxID != nil || customerAddress != nil || customerContact != nil
+            || notes != nil || lines != nil
+    }
+}
+
+/// The formal-tax-invoice association — the body `PUT /api/documents/:id/tax-invoice` accepts.
+///
+/// **This records an invoice somebody else issued. It never issues one and it never invents a
+/// number** (`docs/BUSINESS_DOCUMENTS_SPEC.md` §4 · 2 and · 3; `documents.js:1-3`). ``number`` is
+/// stored exactly as it arrives, trimmed; nothing in this package can put a value there that the
+/// caller did not supply, and `DocumentWriteSurfaceGuardTests` checks that as source, not prose.
+///
+/// Same `nil`-is-absent / `""`-clears convention as ``BusinessDocumentEdit``.
+///
+/// The entry point is deliberately separate from ``BusinessDocumentEdit`` because the two obey
+/// different rules: an association can be recorded on an **issued** document, which the draft-only
+/// edit rule would forbid. `documents.js:6-7` says so in as many words.
+public struct TaxInvoiceEdit: Equatable, Sendable {
+    /// Whether a formal invoice was issued elsewhere. Stored as `1` / `0`, which is how the column
+    /// and its JS reader both treat it.
+    public var issued: Bool?
+    /// The external invoice number, **typed in by a human**. Clamped to 100 code units, then
+    /// trimmed; empty after that is `NULL`.
+    public var number: String?
+    /// The date of the external invoice. Clamped to 30 code units and stored verbatim — **not**
+    /// trimmed, so `" "` is stored as `" "`. That asymmetry with ``number`` is the handler's
+    /// (`safeString(v, 30) || null` versus `n && n.trim() ? n.trim() : null`), not this port's.
+    public var date: String?
+    /// A relative `attachments/docs/<name>` reference to the app's own copy of the invoice.
+    ///
+    /// The **only** field here with no length clamp: the handler passes it through `String(v)` and
+    /// straight into the whitelist. A value that is not a well-formed reference is refused
+    /// (``BusinessDocumentError/invalidAttachmentPath``), and one already claimed by another
+    /// document is refused too (``BusinessDocumentError/attachmentInUse``) — sharing a single copy
+    /// would let either document's next edit delete the file the other still points at.
+    public var attachmentPath: String?
+
+    public init(issued: Bool? = nil,
+                number: String? = nil,
+                date: String? = nil,
+                attachmentPath: String? = nil) {
+        self.issued = issued
+        self.number = number
+        self.date = date
+        self.attachmentPath = attachmentPath
+    }
+
+    var isEmpty: Bool { issued == nil && number == nil && date == nil && attachmentPath == nil }
 }
 
 // MARK: - Decoding

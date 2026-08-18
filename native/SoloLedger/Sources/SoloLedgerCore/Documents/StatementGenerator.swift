@@ -18,9 +18,9 @@ import Foundation
 /// ## What it produces, and what it deliberately does not
 ///
 /// It returns ``StatementDraft`` values — one per currency, Q2-d — and stops there. **It assigns no
-/// document number and writes nothing.** Numbering is Q3 and belongs to D-2, and Q2-d's consequence
-/// ① (N currencies consume N `ST` numbers in one go) is a fact about that round, expressed here as
-/// N separate drafts each still needing a number of its own.
+/// document number and writes nothing.** Q2-d's consequence ① (N currencies consume N `ST` numbers
+/// in one go) is carried out by ``LedgerStore/createStatements(_:date:accountingLocale:)``, which
+/// takes these drafts IN THE ORDER THEY ARRIVE and numbers them one at a time.
 public struct StatementDraft: Equatable, Sendable {
     /// The customer, already normalised — this is the value the picker offered, not the raw text of
     /// any one transaction.
@@ -45,10 +45,11 @@ public struct StatementDraft: Equatable, Sendable {
 
     /// Turn this into something ``LedgerStore/createBusinessDocument(_:)`` accepts.
     ///
-    /// `number` and `date` are the caller's on purpose. The number is Q3's and this round has no
-    /// numbering; the document date is a form field Electron leaves at whatever the editor was
-    /// showing (its `generateStatement` does not set it), so choosing one here would be inventing a
-    /// rule — "today", "the period end" — that no ruling states.
+    /// `number` and `date` are the caller's on purpose. The number comes from Q3's suggestion, taken
+    /// one document at a time (see ``LedgerStore/createStatements(_:date:accountingLocale:)``); the
+    /// document date is a form field Electron leaves at whatever the editor was showing (its
+    /// `generateStatement` does not set it), so choosing one here would be inventing a rule —
+    /// "today", "the period end" — that no ruling states.
     public func documentDraft(number: String,
                               date: String,
                               accountingLocale: AccountingLocale? = nil) -> BusinessDocumentDraft {
@@ -192,6 +193,36 @@ public extension LedgerStore {
                                currency: bucket.currency,
                                lines: bucket.lines)
             }
+    }
+
+    /// Q2-d ① — write one statement per draft, **taking a fresh `ST` number for each**.
+    ///
+    /// Numbers are taken one at a time, and each document is committed before the next number is
+    /// asked for. That is not an implementation choice, it is what Q3 leaves available: `nextNumber`
+    /// answers "the largest suffix in the table, plus one" and reserves nothing, so asking for N
+    /// numbers up front would return the same number N times. Taking them in a row is what makes
+    /// the `ST` series advance N places.
+    ///
+    /// **The order is the caller's, not this function's.** ``statementDrafts(customerName:periodStart:periodEnd:)``
+    /// returns its buckets in currency-code order compared by UTF-16 code units, and this consumes
+    /// that sequence as given — re-sorting here would put the rule in two places, and the two could
+    /// then disagree about which currency gets `0001`.
+    ///
+    /// Each statement is its own transaction, so a failure part way through leaves the documents
+    /// already written in place, holding the numbers they took. Registered rather than smoothed
+    /// over: it is the same thing that happens when a user creates them one at a time, which is the
+    /// only thing Electron can do.
+    @discardableResult
+    func createStatements(_ drafts: [StatementDraft],
+                          date: String,
+                          accountingLocale: AccountingLocale? = nil) throws -> [String] {
+        var ids: [String] = []
+        for draft in drafts {
+            let number = try nextBusinessDocumentNumber(for: .statement)
+            ids.append(try createBusinessDocument(
+                draft.documentDraft(number: number, date: date, accountingLocale: accountingLocale)))
+        }
+        return ids
     }
 
     /// SQL `NULL` becomes `nil`; anything with a numeric reading becomes that number.

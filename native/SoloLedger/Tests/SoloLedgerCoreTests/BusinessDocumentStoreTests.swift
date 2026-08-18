@@ -10,10 +10,11 @@ import XCTest
 /// counting from the Batch 8 header to the END OF THE FILE, which sweeps in eleven later sections.
 /// The spec's fourth ruling corrects it.
 ///
-/// Of those 63, **26 are in this round's scope** (create validation 5, create success 8, get/list 7,
-/// lines and totals 6) and each has a counterpart below. The other 37 are Q3/Q5 and belong to D-2:
-/// `next-number` 6, `DOC_NUMBER_EXISTS` 3, `update` and the status machine 11, the tax-invoice
-/// association 9, `remove` 8. None of them is tested here, and nothing here depends on them.
+/// Of those 63, **26 are D-1's** (create validation 5, create success 8, get/list 7, lines and
+/// totals 6) and each has a counterpart below. The other 37 are Q3/Q5 and were covered by D-2:
+/// `next-number` 6 and `DOC_NUMBER_EXISTS` 3 in `DocumentNumberingTests`, `update` and the status
+/// machine 11, the tax-invoice association 9 and `remove` 8 in `DocumentLifecycleTests`. None of
+/// them is tested here, and nothing here depends on them.
 final class BusinessDocumentStoreTests: LedgerTestCase {
 
     private func draft(type: BusinessDocumentType = .quotation,

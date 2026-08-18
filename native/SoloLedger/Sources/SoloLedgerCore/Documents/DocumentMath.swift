@@ -258,6 +258,83 @@ public enum DocumentMath {
         return String(decoding: Array(s.utf16.prefix(end)), as: UTF16.self)
     }
 
+    // MARK: - JS number formatting
+
+    /// JS `String(n)` — ECMA-262 `Number::toString(x, 10)`.
+    ///
+    /// D-2 needs this because `nextNumber` ends in `` String(max + 1).padStart(4, '0') ``, and
+    /// `max` is a Number: a stored `QT-2026-<22 digits>` really does produce the suggestion
+    /// `QT-2026-1e+22`, measured through the real handler. Swift's own `"\(x)"` is NOT that
+    /// function — it writes `1e+22` as `1e+22` but `10000.0` as `10000.0` and `1e+19` as `1e+19`
+    /// where JS writes `10000` and `10000000000000000000`.
+    ///
+    /// The two engines agree on the DIGITS and disagree only on how they are laid out. Both print
+    /// the shortest decimal that round-trips (JS by specification, Swift by construction), so this
+    /// takes Swift's digits and applies ECMA-262's own six-case layout to them. `DocumentMathTests`
+    /// replays it against node over a corpus rather than trusting that sentence.
+    ///
+    /// `-0` is `"0"` here, not `"-0"`: `String(-0)` is `"0"` in JS, and this is the one place in
+    /// this file where the negative zero the rest of it works to PRESERVE is deliberately dropped —
+    /// because that is what the function being mirrored does.
+    public static func jsNumberToString(_ x: Double) -> String {
+        if x.isNaN { return "NaN" }
+        if x == 0 { return "0" }                     // both zeros; `String(-0)` is "0"
+        if x < 0 { return "-" + jsNumberToString(-x) }
+        if x.isInfinite { return "Infinity" }
+
+        let (digits, n) = shortestDecimal(of: x)
+        let k = digits.count
+        // ECMA-262 Number::toString steps 6–10, in order. `n` is the position of the decimal
+        // point relative to the start of `digits`, so the value is digits × 10^(n − k).
+        if k <= n, n <= 21 { return digits + String(repeating: "0", count: n - k) }
+        if n > 0, n <= 21 {
+            let split = digits.index(digits.startIndex, offsetBy: n)
+            return digits[..<split] + "." + digits[split...]
+        }
+        if n > -6, n <= 0 { return "0." + String(repeating: "0", count: -n) + digits }
+        let exponent = n - 1
+        let head = digits.prefix(1), tail = digits.dropFirst()
+        let mantissa = tail.isEmpty ? String(head) : head + "." + tail
+        return mantissa + "e" + (exponent >= 0 ? "+" : "-") + String(abs(exponent))
+    }
+
+    /// The shortest round-tripping decimal for a finite `x > 0`, as `(digits, n)` with
+    /// `x == digits × 10^(n − digits.count)` and no leading or trailing zero in `digits`.
+    ///
+    /// Read out of Swift's `description` rather than computed: that string is already the shortest
+    /// form, in one of two shapes (`123.45`, `1.2345e+20`), and re-deriving the digits would mean
+    /// re-implementing the hard half of a number printer to get the same answer.
+    static func shortestDecimal(of x: Double) -> (digits: String, pointPosition: Int) {
+        var mantissa = Substring("\(x)")
+        var exponent = 0
+        if let e = mantissa.firstIndex(where: { $0 == "e" || $0 == "E" }) {
+            // Swift writes a zero-padded, explicitly signed exponent (`e-07`); `Int` reads both.
+            exponent = Int(mantissa[mantissa.index(after: e)...]) ?? 0
+            mantissa = mantissa[..<e]
+        }
+        var integerPart = mantissa
+        var fractionPart = Substring("")
+        if let dot = mantissa.firstIndex(of: ".") {
+            integerPart = mantissa[..<dot]
+            fractionPart = mantissa[mantissa.index(after: dot)...]
+        }
+        var digits = Array(integerPart) + Array(fractionPart)
+        var pointPosition = integerPart.count + exponent
+        // A leading zero moves the point; a trailing one does not.
+        while digits.first == "0" { digits.removeFirst(); pointPosition -= 1 }
+        while digits.last == "0" { digits.removeLast() }
+        return (String(digits), pointPosition)
+    }
+
+    /// `String.prototype.padStart(targetLength, "0")` — pad on the LEFT to a length counted in
+    /// **UTF-16 code units**, and return the string untouched when it is already that long or
+    /// longer. `String(10000).padStart(4, '0')` is `"10000"`, not a truncation.
+    static func jsPadStart(_ s: String, to targetLength: Int, with pad: Character = "0") -> String {
+        let missing = targetLength - s.utf16.count
+        guard missing > 0 else { return s }
+        return String(repeating: String(pad), count: missing) + s
+    }
+
     /// `parseFloat(s)` — the longest leading `StrDecimalLiteral`, which is NOT `Double(s)`.
     ///
     /// `Double("12abc")` is `nil`; `parseFloat("12abc")` is `12`. Returns `nil` where `parseFloat`
