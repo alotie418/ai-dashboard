@@ -260,6 +260,108 @@ final class DocumentMathTests: XCTestCase {
         XCTAssertNil(DocumentMath.taxRatePercent(from: "%%13"), "the surviving % precedes the digits")
     }
 
+
+    // MARK: - D-4 · the tax rate going the other way
+
+    /// `` `${n}%` `` measured, not reasoned about.
+    ///
+    /// D-1 left this direction undone and D-2's crosscheck named why the obvious argument is not
+    /// enough: "a template literal applies the same abstract operation as `String(n)`" is a reading
+    /// of the specification, and this repository's rule is that the ENGINE is the oracle. So the
+    /// composite was run in node v24 over the same shape of corpus D-2 used —
+    /// **6,010 doubles through `` `${n}%` ``, plus 1,542 input strings through the editor's whole
+    /// save expression and through `parseFloat(t) || 0` and `t.trim() === ''`; 10,636 comparisons,
+    /// zero divergences.** The cases below are the subset where a decision changes the answer.
+    ///
+    /// Each one also kills the naive Swift spelling `"\(x)%"`, which is a different function: it
+    /// writes `13.0` for `13` and `1e+20` for a number JS spells out in full.
+    func testTaxRateTextIsTheJavaScriptStringOfTheNumber() {
+        XCTAssertEqual(DocumentMath.taxRateText(percent: 13), "13%", #""\(13.0)" is "13.0""#)
+        XCTAssertEqual(DocumentMath.taxRateText(percent: 0.13), "0.13%")
+        XCTAssertEqual(DocumentMath.taxRateText(percent: -13.75), "-13.75%")
+        XCTAssertEqual(DocumentMath.taxRateText(percent: 1e20), "100000000000000000000%",
+                       #"Swift writes 1e+20 here; JS spells it out until 1e21"#)
+        XCTAssertEqual(DocumentMath.taxRateText(percent: 1e21), "1e+21%", "and switches at 1e21")
+        XCTAssertEqual(DocumentMath.taxRateText(percent: 1e-6), "0.000001%")
+        XCTAssertEqual(DocumentMath.taxRateText(percent: 1e-7), "1e-7%", "and at 1e-7 going down")
+        XCTAssertEqual(DocumentMath.taxRateText(percent: 0), "0%")
+        XCTAssertEqual(DocumentMath.taxRateText(percent: -0.0), "0%", #"String(-0) is "0""#)
+        XCTAssertEqual(DocumentMath.taxRateText(percent: .infinity), "Infinity%")
+        XCTAssertEqual(DocumentMath.taxRateText(percent: -.infinity), "-Infinity%")
+        XCTAssertEqual(DocumentMath.taxRateText(percent: .nan), "NaN%")
+    }
+
+    /// The editor's whole save expression, in the order it is written:
+    /// `r.taxRatePct === '' ? null : \`${parseFloat(r.taxRatePct) || 0}%\``.
+    ///
+    /// The two steps do not commute and the pair below is what proves it: `""` clears the column
+    /// while `" "` — which is not `''` and from which `parseFloat` reads nothing — stores an
+    /// explicit zero rate. Swapping the steps, or making the empty test a trimmed one, merges them.
+    func testStoredTaxRateKeepsTheEmptyTestAheadOfTheParse() {
+        XCTAssertNil(DocumentMath.storedTaxRate(fromInput: ""), "only a truly empty field clears it")
+        XCTAssertEqual(DocumentMath.storedTaxRate(fromInput: " "), "0%",
+                       "whitespace is not empty here, and parseFloat reads nothing from it")
+        XCTAssertEqual(DocumentMath.storedTaxRate(fromInput: "abc"), "0%",
+                       "unreadable text stores an explicit zero rather than clearing the rate")
+        XCTAssertEqual(DocumentMath.storedTaxRate(fromInput: "13"), "13%")
+        XCTAssertEqual(DocumentMath.storedTaxRate(fromInput: "13.5"), "13.5%")
+        XCTAssertEqual(DocumentMath.storedTaxRate(fromInput: "  13  "), "13%")
+        XCTAssertEqual(DocumentMath.storedTaxRate(fromInput: "13abc"), "13%", "longest leading literal")
+        XCTAssertEqual(DocumentMath.storedTaxRate(fromInput: "13%"), "13%")
+        XCTAssertEqual(DocumentMath.storedTaxRate(fromInput: "1,234"), "1%", "the comma ends it")
+        XCTAssertEqual(DocumentMath.storedTaxRate(fromInput: "1e21"), "1e+21%")
+        XCTAssertEqual(DocumentMath.storedTaxRate(fromInput: "0.0000001"), "1e-7%")
+        XCTAssertEqual(DocumentMath.storedTaxRate(fromInput: "Infinity"), "Infinity%")
+    }
+
+    /// Every stored rate this function writes reads back as the number that produced it.
+    ///
+    /// A round trip rather than a second table: `taxRatePercent(from:)` is the direction D-1
+    /// landed, and the pair has to be inverse on the values a field can hold or a re-save moves a
+    /// rate. `NaN` is excluded because it is not a value the parse is allowed to return — the
+    /// `Number.isFinite` arm is what stops `"NaN%"` becoming a rate — and the two infinities are
+    /// excluded for the same reason.
+    func testTheTwoTaxRateDirectionsAreInverseOnFiniteRates() {
+        for percent in [0.0, 1, 13, 13.5, 0.13, 99.99, 100, -7.5, 1e20, 1e-7, 1.0 / 3] {
+            let stored = DocumentMath.taxRateText(percent: percent)
+            XCTAssertEqual(DocumentMath.taxRatePercent(from: stored), percent,
+                           "\(stored) does not read back as \(percent)")
+        }
+    }
+
+    /// `parseFloat(t) || 0` — and the fold is observable in exactly one place.
+    ///
+    /// `"-0"` parses to `-0`, which is falsy, so the other app stores `+0`. That difference is
+    /// invisible through ``DocumentMath/storedTaxRate(fromInput:)`` (JS writes both zeros as `"0"`),
+    /// so it is pinned HERE, on the sign, where a `?? 0` spelling of the same function fails.
+    func testEditorNumberOrZeroFoldsTheFalsyReadings() {
+        XCTAssertEqual(DocumentMath.editorNumberOrZero(from: "-0").sign, .plus,
+                       "-0 is falsy in JS, so `|| 0` replaces it with +0")
+        XCTAssertEqual(DocumentMath.editorNumberOrZero(from: ""), 0)
+        XCTAssertEqual(DocumentMath.editorNumberOrZero(from: "abc"), 0)
+        XCTAssertEqual(DocumentMath.editorNumberOrZero(from: "12abc"), 12)
+        XCTAssertEqual(DocumentMath.editorNumberOrZero(from: "0.1"), 0.1)
+        XCTAssertEqual(DocumentMath.editorNumberOrZero(from: "1e3"), 1000)
+        XCTAssertEqual(DocumentMath.editorNumberOrZero(from: "5."), 5)
+        XCTAssertEqual(DocumentMath.editorNumberOrZero(from: ".5"), 0.5)
+        XCTAssertEqual(DocumentMath.editorNumberOrZero(from: "0x10"), 0, "hex is not special")
+    }
+
+    /// `String(v || '').trim() === ''` — the test that decides whether a line exists.
+    ///
+    /// The two code points below are the whole reason this is not a Foundation call. `U+0085` NEL
+    /// is in `whitespacesAndNewlines` and is NOT ECMAScript whitespace; `U+FEFF` is the other way
+    /// round. A description made of one of them would exist on one side and not the other, and the
+    /// line's money would go with it.
+    func testTrimmedIsEmptyUsesTheEcmascriptWhitespaceSet() {
+        XCTAssertTrue(DocumentMath.trimmedIsEmpty(""))
+        XCTAssertTrue(DocumentMath.trimmedIsEmpty("   "))
+        XCTAssertTrue(DocumentMath.trimmedIsEmpty("\u{FEFF}"), "ECMAScript trims the BOM")
+        XCTAssertFalse(DocumentMath.trimmedIsEmpty("\u{0085}"), "…and does NOT trim NEL")
+        XCTAssertFalse(DocumentMath.trimmedIsEmpty("a"))
+        XCTAssertFalse(DocumentMath.trimmedIsEmpty(" a "))
+    }
+
     // MARK: - `String.prototype.trim`
 
     /// All 25 code points ECMAScript trims, one at a time, on both sides.

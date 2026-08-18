@@ -150,6 +150,77 @@ public enum DocumentMath {
         return n
     }
 
+    // MARK: - Q4 · the editor's side of the tax rate
+
+    /// `parseFloat(text)` for an editor field, exposed for the view layer.
+    ///
+    /// The three number fields on a line — quantity, unit price, tax rate — are TEXT in both
+    /// apps, and both read them with `parseFloat`, not with a strict number parse. `Double("12abc")`
+    /// is `nil` where `parseFloat("12abc")` is `12`, so a strict parse here would make the two
+    /// editors disagree about what a half-typed field is worth while it is being typed.
+    ///
+    /// `nil` is `NaN`, i.e. "no reading". Feed it straight to ``lineAmount(quantity:unitPrice:)``
+    /// or ``lineTax(amount:ratePercent:)``, both of which fold it exactly as `|| 0` does.
+    public static func editorNumber(from text: String) -> Double? { jsParseFloat(text) }
+
+    /// `parseFloat(text) || 0` for an editor field that is being WRITTEN rather than displayed.
+    ///
+    /// The extra fold matters in exactly one place and it is not academic: `parseFloat("-0")` is
+    /// `-0`, which is falsy, so the other app stores `0` where a plain `?? 0` would store `-0`.
+    /// A `-0` in a money column reads back through `COALESCE` and through every sum as zero, but it
+    /// is not the same bytes, and Q9's acceptance line is byte equality with the other app.
+    public static func editorNumberOrZero(from text: String) -> Double {
+        truthyOrZero(jsParseFloat(text))
+    }
+
+    /// `String(v || '').trim()` is empty — the test both editors apply to a line's description
+    /// before deciding whether the line exists at all.
+    ///
+    /// Uses ``jsTrim(_:)`` rather than Foundation's whitespace set, for the reason that function
+    /// records: the two sets differ by U+0085 and U+FEFF, so a description made only of one of
+    /// those would be dropped on one side and kept on the other.
+    public static func trimmedIsEmpty(_ text: String) -> Bool { jsTrim(text).isEmpty }
+
+    /// A number back into the stored `"13%"` form — the inverse of ``taxRatePercent(from:)``.
+    ///
+    /// The port is JS `String(n)` and nothing else: `` `${n}%` `` applies `ToString(argument)`,
+    /// which for a Number is `Number::toString(n, 10)` — the same abstract operation `String(n)`
+    /// applies. There is no `toFixed` anywhere on this path (measured: zero occurrences in
+    /// `components/DocumentModal.tsx` and `components/documentPdf.ts`, while the same pattern hits
+    /// seven other files under `components/`), so no fixed-width formatting may be introduced here.
+    ///
+    /// Registered by D-1 as the one piece of Q4 it left undone, because Swift's `"\(x)"` is a
+    /// DIFFERENT function from `String(x)` in JS and the divergence only shows in the exponent
+    /// forms. ``jsNumberToString(_:)`` is the port D-2 landed for `nextNumber`; this reuses it
+    /// rather than writing a second one, so the two cannot drift apart.
+    public static func taxRateText(percent: Double) -> String {
+        jsNumberToString(percent) + "%"
+    }
+
+    /// What the editor stores for one line's tax rate — `DocumentModal.tsx:237`:
+    ///
+    /// ```js
+    /// taxRate: r.taxRatePct === '' ? null : `${parseFloat(r.taxRatePct) || 0}%`,
+    /// ```
+    ///
+    /// **The two steps are ordered and they do not commute**, which is why they live here together
+    /// rather than at the call site:
+    ///
+    ///  * the empty test comes FIRST and is an exact `=== ''`, not a trim — so `" "` is not empty
+    ///    and goes on to `parseFloat`, which reads nothing from it and stores `"0%"`;
+    ///  * `|| 0` then folds every unreadable field to zero, so text that is not a number stores an
+    ///    explicit `"0%"` rather than clearing the rate. `"abc"` and `""` therefore have DIFFERENT
+    ///    outcomes, and swapping the steps would merge them.
+    ///
+    /// A consequence worth naming: `parseFloat("-0")` is `-0`, which is falsy, so `|| 0` turns it
+    /// into `+0` and ``jsNumberToString(_:)``'s own `-0 → "0"` arm is unreachable *from here*. That
+    /// arm is still right for its other callers and must not be deleted because this path cannot
+    /// exercise it.
+    public static func storedTaxRate(fromInput text: String) -> String? {
+        guard !text.isEmpty else { return nil }
+        return taxRateText(percent: truthyOrZero(jsParseFloat(text)))
+    }
+
     // MARK: - Q4 · the header totals
 
     /// `documents.js:62-66 sumTotals` — the header's three money columns.

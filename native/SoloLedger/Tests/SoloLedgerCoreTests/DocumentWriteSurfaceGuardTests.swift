@@ -118,8 +118,12 @@ final class DocumentWriteSurfaceGuardTests: XCTestCase {
     static let numbering: [Probe] = [
         Probe(label: "nextBusinessDocumentNumber",
               pattern: #"nextBusinessDocumentNumber\("#,
-              // two declarations plus the overload's own call, and one caller: Q2-d ①.
-              expected: ["DocumentNumbering.swift": 3, "StatementGenerator.swift": 1],
+              // Two declarations plus the overload's own call; one caller for Q2-d ①; and, since
+              // D-4, the editor asking for the suggestion Q3 offers when a new document is opened.
+              // That third site is in the page's model, NOT in DocumentStore.swift — the assertion
+              // below keeps saying so.
+              expected: ["DocumentNumbering.swift": 3, "StatementGenerator.swift": 1,
+                         "AppModel.swift": 1],
               matches: ["try store.nextBusinessDocumentNumber(for: .statement)"],
               doesNotMatch: ["let n = suggestedNumber(for: .statement)"]),
         Probe(label: "DocumentNumbering namespace",
@@ -303,6 +307,88 @@ final class DocumentWriteSurfaceGuardTests: XCTestCase {
                 """)
             XCTAssertFalse(found.isEmpty, "…and the pattern does find the real declarations")
         }
+    }
+
+    // MARK: - (2b) who may NAME the chapter's symbols
+
+    /// The Core document types and store methods are named by the page's model, by its composition,
+    /// and by nothing else in the shipped app.
+    ///
+    /// The same closed set `ProductCatalogTests` and `InventoryLedgerTests` keep over their own
+    /// chapters, and it earns its place for the same reason: a third file naming one of these means
+    /// a second route to the ledger's documents has appeared, which is exactly the thing the write
+    /// surface above cannot see (it only watches SQL). Two entries are pinned EMPTY — the view draws
+    /// what the composition hands it and reaches for no Core type of its own.
+    ///
+    /// Comment-stripped, so a doc comment that mentions a type is not a use. That matters here:
+    /// `documents.js` and these type names appear in prose all over the chapter.
+    func testTheChapterSymbolsAreNamedOnlyByThePagesModelAndItsComposition() throws {
+        let files = try requireShippedSources()
+        let core = "SoloLedgerCore"
+        let model = "AppModel.swift"
+        let composition = "DocumentPageComposition.swift"
+        let view = "DocumentsView.swift"
+
+        // The App target's share of each symbol. Core's own files are filtered out: this asks who
+        // CONSUMES the chapter, not who implements it.
+        let coreFiles = Set(try CapabilityImportGuardTests.strippedSources(of: core).map(\.path))
+        func appNamers(_ symbol: String) -> [String] {
+            distribution(of: "\\b\(symbol)\\b", in: files).keys
+                .filter { !coreFiles.contains($0) }.sorted()
+        }
+
+        let expected: [String: [String]] = [
+            // Read models and write models: the composition holds them, the model moves them.
+            "BusinessDocument": [model, composition],
+            "BusinessDocumentType": [model, composition],
+            "BusinessDocumentStatus": [composition],
+            "BusinessDocumentPage": [model, composition],
+            "BusinessDocumentItem": [composition],
+            "BusinessDocumentDraft": [composition],
+            "BusinessDocumentEdit": [model, composition],
+            "BusinessDocumentLineDraft": [composition],
+            "BusinessDocumentError": [model, composition],
+            "TaxInvoiceEdit": [composition],
+            "StatementDraft": [model],
+            "DocumentMath": [composition],
+            // Store methods. All of them belong to the model: the composition builds the VALUES
+            // they take and never calls one, which is what keeps it a pure function of its input.
+            "businessDocuments": [model],
+            "businessDocument": [model],
+            "createBusinessDocument": [model],
+            "updateBusinessDocument": [model],
+            "deleteBusinessDocument": [model],
+            "updateTaxInvoice": [model],
+            "statementCustomerNames": [model],
+            "statementDrafts": [model],
+            "createStatements": [model],
+            // Pinned EMPTY: the chapter has no reason to reach these from the app at all.
+            "BusinessDocumentDetail": [],
+            "BusinessDocumentLineOrigin": [],
+            "StatementText": [],
+            "DocumentNumbering": [],
+            "DocumentTotals": [],
+        ]
+        XCTAssertEqual(expected.count, 26, "the symbol list itself must not shrink unnoticed")
+
+        for (symbol, files) in expected {
+            XCTAssertEqual(appNamers(symbol), files.sorted(), """
+                \(symbol) is named by \(appNamers(symbol)) in the app target. The documents chapter \
+                is reached from its model and its composition; a third file is a second route to \
+                the same tables.
+                """)
+        }
+
+        // Not vacuous, in both directions: the scan finds the model naming something, and the view
+        // — which the set above says names NONE of these — is in the corpus and does name the
+        // composition it renders.
+        XCTAssertFalse(appNamers("BusinessDocument").isEmpty, "the scan finds nothing at all")
+        XCTAssertEqual(distribution(of: #"\bDocumentPageComposition\b"#, in: files).keys.sorted(),
+                       [model, composition, view, "FilePanels.swift"].sorted(), """
+            the composition is named by the model, by the view it feeds, by the file-panel \
+            extension that hands it an attachment outcome, and by itself. A fifth is a fifth place \
+            deciding what this page can say.
+            """)
     }
 
     // MARK: - (3) the numbering calendar is named

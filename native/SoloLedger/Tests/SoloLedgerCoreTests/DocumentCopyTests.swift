@@ -512,38 +512,83 @@ final class DocumentCopyTests: XCTestCase {
         XCTAssertEqual(scanned, 624, "104 keys x 6 languages")
     }
 
-    // MARK: - DC9 · the whole namespace is dormant
+    // MARK: - DC9 · who may name a documents.* key
 
-    /// **No production source names a `documents.*` key.** This round wrote copy and nothing else;
-    /// the first reference belongs to D-4. Stated as a scan rather than as a promise, because a
-    /// half-wired key is exactly the thing a copy round cannot see in its own diff.
+    /// **Every key this round draws is named by the page's composition, and by no other file.**
     ///
-    /// `nav.documents` is held to the same rule and for the same reason `nav.inventory` was
-    /// between N-PR-3 and N-PR-6: the sidebar entry arrives with the page, not before it.
-    func testDC9NoProductionSourceReferencesAnyDocumentsKey() throws {
+    /// D-3 wrote this as a dormancy scan — no production source may name one at all — because a
+    /// copy round cannot see a half-wired key in its own diff. D-4 draws the page, so the claim
+    /// flips from "nowhere" to "exactly one place", which is the same shape `IC11` took when the
+    /// inventory page landed. Both halves matter: a key named nowhere is copy the page cannot
+    /// reach, and a key named twice means the page has grown a second source of strings that the
+    /// composition does not know about — which is what makes the placement proof in
+    /// `DocumentMountingTests` mean anything.
+    ///
+    /// **The nine keys of `documents.export.*` and `documents.print.*` stay at zero.** They belong
+    /// to the exported artefact, which is D-5's; drawing the button here and leaving the file for
+    /// later would ship a control with nothing behind it. Asserting their absence is what stops
+    /// this round from quietly taking that work.
+    ///
+    /// **The prefix scan survives the flip.** Whole-key matching cannot see a key that is built by
+    /// interpolation, and this package already builds one namespace that way — so the substring
+    /// `"documents.` is ALSO required to appear in that one file and nowhere else. Dropping this
+    /// half would let `t("documents.\(group).title")` in any other file go unnoticed.
+    ///
+    /// `nav.documents` stays at zero, and not because of a general ban: `ResourceCheck.swift` spells
+    /// `"nav.overview"` out today. It stays at zero because `SidebarSection.titleKey` DERIVES the
+    /// key from the case's raw value, so the string only appears when someone writes a literal the
+    /// enum already produces. The sidebar entry itself is D-6's — this round adds no section, which
+    /// is what the case-name probe below still measures.
+    func testDC9EveryDrawnKeyIsNamedByTheCompositionAndByNothingElse() throws {
         let sources = try Self.productionSources()
         XCTAssertGreaterThan(sources.count, 100, "the walk found \(sources.count) files — it is broken")
+        XCTAssertTrue(sources.contains { $0.path.hasSuffix("App/InventoryPageComposition.swift") },
+                      "a neighbouring composition is in scope, so the walk covers the app target")
 
-        // The scan is on the PREFIX with its opening quote, not on whole keys. A key drawn as
-        // `t("documents.\(group).title")` is invisible to a whole-key scan, and this package
-        // already builds one namespace that way — `SidebarSection.titleKey` is `"nav.\(rawValue)"`,
-        // which is why `nav.inventory` appears nowhere as a literal. One substring covers both.
+        var named: [String: [String]] = [:]
         for (path, text) in sources {
-            XCTAssertFalse(text.contains("\"documents."), """
-                \(path) already names a documents.* key. D-3 is a copy round: the namespace is \
-                dormant until D-4/D-5/D-6 wire it. If this is that round, move this assertion.
+            for key in Self.adjudicatedKeys + ["nav.documents"] where text.contains("\"\(key)\"") {
+                named[key, default: []].append(path)
+            }
+        }
+
+        let composition = ["SoloLedger/App/DocumentPageComposition.swift"]
+        let deferred = Set(Self.exportKeys + Self.printKeys)
+        XCTAssertEqual(deferred.count, 9, "the artefact's keys are four exports and five printed lines")
+
+        for key in Self.adjudicatedKeys where !deferred.contains(key) {
+            XCTAssertEqual((named[key] ?? []).sorted(), composition, """
+                \(key) is named by \((named[key] ?? []).sorted()) — every string the documents page \
+                draws belongs to its composition and to no other file.
+                """)
+        }
+        for key in Self.adjudicatedKeys where deferred.contains(key) {
+            XCTAssertNil(named[key], """
+                \(key) is already named in production. The exported artefact is D-5's; a button \
+                drawn before the file it writes is a control with nothing behind it.
                 """)
         }
 
-        // `nav.documents` cannot be scanned for at all, for the reason above — it would be drawn by
-        // the enum, not by a literal. So the dormancy check is the MECHANISM: the sidebar has no
-        // documents section yet. D-6 adds it, and §6 of the spec calls it the seventh.
+        // The prefix half, which is the only one an interpolated key cannot slip past.
+        XCTAssertEqual(sources.filter { $0.text.contains("\"documents.") }.map(\.path).sorted(),
+                       composition, """
+            a file outside the composition holds the string "documents. — a key built by \
+            interpolation is invisible to the whole-key scan above, so this is the half that sees it.
+            """)
+
+        // `nav.documents` cannot be scanned for as a literal, for the reason in the doc comment. So
+        // the dormancy check is the MECHANISM: the sidebar has no documents section yet. D-6 adds
+        // it, and §6 of the spec calls it the seventh.
         XCTAssertEqual(SidebarSectionProbe.caseNames, ["overview", "transactions", "categories",
                                                        "products", "inventory", "reports"],
                        "the sidebar gained a section; nav.documents may no longer be dormant")
+        XCTAssertNil(named["nav.documents"], """
+            nav.documents is written out somewhere in production. SidebarSection derives that key \
+            from its raw value rather than naming it.
+            """)
 
-        // Neither assertion is vacuous: the same walk sees a literal key that IS drawn today, and
-        // the same reader sees the six sections that exist.
+        // Neither half is vacuous: the same walk sees a literal key that IS drawn today, and the
+        // same reader sees the six sections that exist.
         XCTAssertTrue(sources.contains { $0.text.contains("\"inventory.page.title\"") },
                       "the walk cannot see a key known to be drawn — it is not scanning code")
         XCTAssertEqual(SidebarSectionProbe.caseNames.count, 6)
