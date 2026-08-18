@@ -602,13 +602,12 @@ private struct DocumentLineDisplay: View {
         }
     }
 
+    /// Q2-b's four columns, and only four. The date is its OWN column here — the other app glues it
+    /// to the front of the description, and this chapter deliberately does not.
     private var header: some View {
         HStack(spacing: 10) {
             cell(model.t(block.headers.descriptionKey), isWide: true, alignment: .leading)
-            cell(model.t(block.headers.quantityKey), isWide: false, alignment: .trailing)
-            cell(model.t(block.headers.unitKey), isWide: false, alignment: .leading)
-            cell(model.t(block.headers.unitPriceKey), isWide: false, alignment: .trailing)
-            cell(model.t(block.headers.taxRateKey), isWide: false, alignment: .trailing)
+            cell(model.t(block.headers.dateKey), isWide: false, alignment: .leading)
             cell(model.t(block.headers.taxAmountKey), isWide: false, alignment: .trailing)
             cell(model.t(block.headers.amountKey), isWide: false, alignment: .trailing)
         }
@@ -618,35 +617,13 @@ private struct DocumentLineDisplay: View {
 
     private func row(_ line: DocumentPageComposition.DisplayLineBlock) -> some View {
         HStack(spacing: 10) {
-            cell(description(line), isWide: true, alignment: .leading)
-            cell(number(line.quantity), isWide: false, alignment: .trailing)
-            cell(unit(line), isWide: false, alignment: .leading)
-            cell(money(line.unitPrice), isWide: false, alignment: .trailing)
-            cell(line.taxRate ?? "—", isWide: false, alignment: .trailing)
+            cell(line.description, isWide: true, alignment: .leading)
+            cell(line.date ?? "—", isWide: false, alignment: .leading)
             cell(money(line.taxAmount), isWide: false, alignment: .trailing)
             cell(money(line.amount), isWide: false, alignment: .trailing)
         }
         .font(.callout)
         .padding(.vertical, 4)
-    }
-
-    /// A generated statement line may legitimately have no description, and the date it carries is
-    /// in its own column rather than glued to the front of the text. Showing the date here keeps the
-    /// line identifiable without putting it back into the description.
-    private func description(_ line: DocumentPageComposition.DisplayLineBlock) -> String {
-        let text = line.description
-        guard let date = line.refDate, !date.isEmpty else { return text.isEmpty ? "—" : text }
-        return text.isEmpty ? date : "\(date)  \(text)"
-    }
-
-    private func unit(_ line: DocumentPageComposition.DisplayLineBlock) -> String {
-        if let key = line.unitLabelKey { return model.t(key) }
-        if let text = line.unitVerbatim { return text }
-        return "—"
-    }
-
-    private func number(_ value: Double?) -> String {
-        DocumentPageComposition.quantityText(value) ?? "—"
     }
 
     private func money(_ value: Double?) -> String {
@@ -661,7 +638,7 @@ private struct DocumentLineDisplay: View {
     /// reasoned about.
     private func cell(_ text: String, isWide: Bool, alignment: Alignment) -> some View {
         Text(text)
-            .frame(maxWidth: isWide ? .infinity : 72, alignment: alignment)
+            .frame(maxWidth: isWide ? .infinity : 96, alignment: alignment)
             .fixedSize(horizontal: false, vertical: true)
             .lineLimit(2)
     }

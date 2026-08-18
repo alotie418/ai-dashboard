@@ -797,6 +797,159 @@ final class DocumentMountingTests: XCTestCase {
         }
     }
 
+
+    // MARK: - DM21 · the statement line table is Q2-b's four columns
+
+    /// A statement's lines are NOT the six-column table with cells left blank.
+    ///
+    /// Q2-b: "对账单行只列四样：描述 / 日期 / 金额 / 税额。不列税率" and "日期在这里是独立的一列，
+    /// 而 Electron 是把日期揉进描述串里的 —— 这是有意分叉". The first spelling of this view reused the
+    /// editable table's headings and glued `ref_date` back into the description, which is precisely
+    /// the practice the ruling departs from; it also drew a rate column the ruling forbids. Caught in
+    /// review, so this is what keeps it caught.
+    func testDM21TheStatementLineTableIsTheFourAdjudicatedColumns() {
+        let draft = DocumentEditorDraft(
+            document: doc(type: .statement, number: "ST-2026-0001", currency: "CNY"),
+            items: [item(id: 1, description: "", quantity: nil, unit: nil, unitPrice: nil,
+                         taxRate: nil, taxAmount: nil, amount: 500, refDate: "2026-01-09")])
+        let page = DocumentPageComposition.compose(DocumentPageComposition.Input(editor: draft))
+        guard case .readOnlyLines(let block) = page.editor?.body else {
+            return XCTFail("a stored statement must show its lines read-only")
+        }
+
+        XCTAssertEqual(block.headers.allKeys,
+                       ["documents.item.title", "documents.item.description", "documents.col.date",
+                        "documents.item.taxAmount", "documents.item.amount"],
+                       "four columns plus the section title — no quantity, unit, unit price or RATE")
+        for forbidden in ["documents.item.quantity", "documents.item.unit",
+                          "documents.item.unitPrice", "documents.item.taxRate",
+                          "documents.item.noUnit"] {
+            XCTAssertFalse(block.allKeys.contains(forbidden), """
+                \(forbidden) reached a statement's line table. A period summary describes no goods, \
+                and Q2-b forbids the rate outright: `transactions.tax_rate` has no agreed dimension \
+                anywhere in this schema.
+                """)
+        }
+
+        // The date is a FIELD of its own, and the description is not carrying it.
+        let line = try? XCTUnwrap(block.lines.first)
+        XCTAssertEqual(line?.date, "2026-01-09")
+        XCTAssertEqual(line?.description, "", """
+            the date was glued into the description. Q2-b took it out and gave it a column; putting \
+            it back is the other app's practice, which this chapter deliberately departs from.
+            """)
+        XCTAssertNil(line?.taxAmount, "a NULL tax stays NULL so the dash can mean what it says")
+        XCTAssertEqual(line?.amount, 500)
+
+        // …and the six-column table is still the shape the other four types get, so none of the
+        // keys above is left with nowhere to be drawn.
+        var manual = newEditor()
+        manual.lines[0].description = "Widget"
+        guard case .lines(let editable) = DocumentPageComposition
+            .compose(DocumentPageComposition.Input(editor: manual)).editor?.body else {
+            return XCTFail("the other four types keep the editable table")
+        }
+        for key in ["documents.item.quantity", "documents.item.unit",
+                    "documents.item.unitPrice", "documents.item.taxRate"] {
+            XCTAssertTrue(editable.allKeys.contains(key), "\(key) is drawn nowhere at all")
+        }
+    }
+
+    // MARK: - DM22 · a period the generator cannot use is refused, not answered with "none"
+
+    /// The store compares the two period strings against `transactions.date` as TEXT. A
+    /// locale-shaped date sorts nowhere near the column's ISO values, so the generator would report
+    /// "there are no income transactions in that period" for a period that has them — a false
+    /// statement rather than an empty result. The other app cannot produce one: its control is
+    /// `input type="date"`.
+    func testDM22TheISOShapeTestAcceptsWhatTheStoreCanCompare() {
+        for good in ["2026-01-01", "0001-12-31", "2026-02-31"] {
+            XCTAssertTrue(DocumentPageComposition.isISODate(good), "\(good) is ISO-shaped")
+        }
+        for bad in ["8/1/2026", "2026-1-1", "26-01-01", "2026-01-01 ", "", "2026-01",
+                    "2026-01-01-01", "٢٠٢٦-٠١-٠١", "2026/01/01", "Jan 1 2026"] {
+            XCTAssertFalse(DocumentPageComposition.isISODate(bad), """
+                \(bad.debugDescription) passed the shape test. It cannot be compared against the \
+                date column, so accepting it turns a real period into "no records".
+                """)
+        }
+    }
+
+    /// The same thing through the model, on a real ledger that HAS the transactions: a
+    /// locale-shaped period is refused as "fill the period in", and the ISO one then produces the
+    /// documents.
+    func testDM22bALocaleShapedPeriodIsRefusedRatherThanReportedEmpty() async throws {
+        let model = try await bootedModel()
+        let store = try XCTUnwrap(model.store)
+        try store.create(Transaction(id: "t-1", type: .income, date: "2026-01-15", amount: 1130,
+                                     amountNet: 1000, taxAmount: 130, currency: "CNY",
+                                     counterparty: "Acme", description: "January"))
+
+        model.newDocument()
+        model.setDocumentEditorType(.statement)
+        model.setStatementCustomer("Acme")
+        model.setStatementPeriodStart("1/1/2026")
+        model.setStatementPeriodEnd("31/1/2026")
+        model.generateStatements()
+
+        XCTAssertEqual(model.documentEditor?.statementOutcome, .needInput, """
+            a period the store cannot compare must be refused. Reporting "no income transactions in \
+            that period" here would be false — there is one.
+            """)
+        XCTAssertNotEqual(model.documentEditor?.statementOutcome, .noRecords)
+        XCTAssertTrue(model.documents.documents.isEmpty, "and nothing was written")
+
+        model.setStatementPeriodStart("2026-01-01")
+        model.setStatementPeriodEnd("2026-01-31")
+        model.generateStatements()
+
+        XCTAssertNil(model.documentEditor, "the sheet closes once the generator has written")
+        XCTAssertEqual(model.documents.documents.count, 1)
+        XCTAssertEqual(model.documents.documents.first?.type, .statement)
+        XCTAssertEqual(model.documents.documents.first?.currency, "CNY")
+        XCTAssertEqual(model.documents.documents.first?.number, "ST-2026-0001")
+    }
+
+    // MARK: - A booted model over a real temporary ledger
+
+    private var temporaryDirectory: URL?
+
+    override func tearDownWithError() throws {
+        if let temporaryDirectory { try? FileManager.default.removeItem(at: temporaryDirectory) }
+    }
+
+    /// A model over a REAL temporary ledger, adopted through the same Phase-B seam the production
+    /// chain uses, so the path under test is the shipping one.
+    private func bootedModel() async throws -> AppModel {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SLDocuments-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        temporaryDirectory = directory
+        let store = try LedgerStore(databaseURL: directory.appendingPathComponent("documents.db"),
+                                    open: .createIfMissing)
+        try store.settings.setString("CN", for: SettingsStore.Key.accountingLocale)
+        let model = AppModel(runner: DocumentsFakeRunner(store: store))
+        model.boot()
+        await model.currentBootTask?.value
+        XCTAssertNotNil(model.store, "the fixture model must have adopted a store")
+        return model
+    }
+
+    /// Drives one adoption through the real Phase-A/Phase-B seam.
+    private final class DocumentsFakeRunner: BootChainRunner {
+        private let store: LedgerStore
+        init(store: LedgerStore) { self.store = store }
+
+        @MainActor func resolveOutcome(_ intent: BootIntent) async -> BootOutcome {
+            .openStore(authorization: .openExistingPlain, residual: nil)
+        }
+
+        @MainActor func attempt(_ authorization: StoreOpenAuthorization,
+                                residual: MigrationResidual?) -> MigrationBootDriver.Attempt {
+            .opened(store, residual)
+        }
+    }
+
     // ==============================================================================================
     // MARK: - Helpers
     // ==============================================================================================

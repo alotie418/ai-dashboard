@@ -123,7 +123,9 @@ enum DocumentPageComposition {
         // MARK: listHeader (7)
         "documents.col.number": [.listHeader],
         "documents.col.type": [.listHeader],
-        "documents.col.date": [.listHeader],
+        // Two regions: the list's date column, and the statement line table's own date column —
+        // Q2-b gives the date a column of its own there rather than gluing it into the description.
+        "documents.col.date": [.listHeader, .itemTable],
         "documents.col.customer": [.listHeader],
         "documents.col.total": [.listHeader],
         "documents.col.status": [.listHeader],
@@ -397,6 +399,26 @@ enum DocumentPageComposition {
             case .invalidPath: return "documents.error.invalidAttachmentPath"
             }
         }
+    }
+
+    /// A period bound the generator can actually use.
+    ///
+    /// ``LedgerStore/statementDrafts(customerName:periodStart:periodEnd:)`` compares these strings
+    /// against `transactions.date` with `>=` / `<=`, which SQLite evaluates as TEXT ordering. A
+    /// locale-shaped date such as `8/1/2026` therefore sorts nowhere near the ISO dates in the
+    /// column, and the generator reports "no income transactions in that period" for a period that
+    /// has plenty — a false statement, not an empty result. The other app cannot produce one
+    /// because its control is `input type="date"`; this is the same guarantee, enforced rather than
+    /// typed.
+    ///
+    /// Shape only: `YYYY-MM-DD` in ASCII digits. It does not ask whether the date EXISTS —
+    /// `2026-02-31` sorts correctly and simply matches nothing, which is an honest empty result.
+    static func isISODate(_ text: String) -> Bool {
+        let parts = text.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0].count == 4, parts[1].count == 2, parts[2].count == 2 else {
+            return false
+        }
+        return parts.allSatisfy { $0.allSatisfy { $0.isASCII && $0.isNumber } }
     }
 
     /// The picker panel's title — the same sentence as the button that opens it.
@@ -795,27 +817,49 @@ enum DocumentPageComposition {
         }
     }
 
-    /// One stored line, shown and never sent.
+    /// One stored line of a statement, shown and never sent.
+    ///
+    /// **Four fields, because Q2-b says four columns.** A period summary describes no goods, so
+    /// quantity, unit and unit price are not merely empty here — they are not part of this shape at
+    /// all; and the tax RATE is deliberately absent because `transactions.tax_rate` has no agreed
+    /// dimension anywhere in this schema and an unlabelled number does not go on a document that
+    /// leaves the machine.
+    ///
+    /// ``date`` is its own field for the same reason it is its own column: Q2-b took the date OUT of
+    /// the description text, which is what the other app does, and gave it a place of its own.
     struct DisplayLineBlock: Equatable, Identifiable {
         let id: Int
+        /// May be empty — Q2-a lets a generated line have no description, and the date column is
+        /// what makes such a line identifiable.
         let description: String
-        /// `nil` in any of these draws the dash the note explains.
-        let quantity: Double?
-        let unitLabelKey: String?
-        let unitVerbatim: String?
-        let unitPrice: Double?
-        let taxRate: String?
+        /// `nil` draws the dash the note explains.
+        let date: String?
         let taxAmount: Double?
         let amount: Double?
-        let refDate: String?
 
-        var allKeys: [String] { [unitLabelKey].compactMap { $0 } }
+        var allKeys: [String] { [] }
+    }
+
+    /// Q2-b's four headings. A DIFFERENT set from the six-column table above, which is the point:
+    /// the two shapes are not the same table with cells left blank.
+    ///
+    /// The date column borrows the list page's own heading rather than adding a key for the same
+    /// word. `documents.item.quantity` / `.unit` / `.unitPrice` / `.taxRate` are absent here and are
+    /// still drawn by the editable table, so every key keeps a render.
+    struct StatementLineHeaderKeys: Equatable {
+        let titleKey = "documents.item.title"
+        let descriptionKey = "documents.item.description"
+        let dateKey = "documents.col.date"
+        let taxAmountKey = "documents.item.taxAmount"
+        let amountKey = "documents.item.amount"
+
+        var allKeys: [String] { [titleKey, descriptionKey, dateKey, taxAmountKey, amountKey] }
     }
 
     /// Ruling ①'s shape: a statement's lines are drawn, and there is no control that could put them
     /// into a ``BusinessDocumentEdit``.
     struct LineDisplayBlock: Equatable {
-        let headers = LineHeaderKeys()
+        let headers = StatementLineHeaderKeys()
         let dashNoteKey = "documents.item.dashNote"
         let lines: [DisplayLineBlock]
         let totals: TotalsBlock
@@ -1133,9 +1177,7 @@ enum DocumentPageComposition {
                                accountingLocale: draft.accountingLocale)
         if isStatement {
             return .readOnlyLines(LineDisplayBlock(
-                lines: draft.storedLines.enumerated().map { index, item in
-                    displayLine(item, position: index)
-                },
+                lines: draft.storedLines.map(displayLine),
                 totals: TotalsBlock(subtotalLabelKey: "documents.total.subtotal",
                                     taxLabelKey: "documents.total.taxAmount",
                                     totalLabelKey: "documents.total.total",
@@ -1205,22 +1247,16 @@ enum DocumentPageComposition {
         return out
     }
 
-    private static func displayLine(_ item: BusinessDocumentItem, position: Int) -> DisplayLineBlock {
-        var labelKey: String?
-        var verbatim: String?
-        if let unit = item.unit, !unit.isEmpty {
-            if unitRawValues.contains(unit) { labelKey = "product.unit.\(unit)" } else { verbatim = unit }
-        }
-        return DisplayLineBlock(id: item.id,
-                                description: item.description ?? "",
-                                quantity: item.quantity,
-                                unitLabelKey: labelKey,
-                                unitVerbatim: verbatim,
-                                unitPrice: item.unitPrice,
-                                taxRate: item.taxRate,
-                                taxAmount: item.taxAmount,
-                                amount: item.amount,
-                                refDate: item.refDate)
+    /// The four values Q2-b names, and nothing else off the row.
+    ///
+    /// `ref_date` is the only date carrier the line table has — Q2-a settled for it rather than
+    /// choosing it — so it is what fills the date column.
+    private static func displayLine(_ item: BusinessDocumentItem) -> DisplayLineBlock {
+        DisplayLineBlock(id: item.id,
+                         description: item.description ?? "",
+                         date: item.refDate.flatMap { $0.isEmpty ? nil : $0 },
+                         taxAmount: item.taxAmount,
+                         amount: item.amount)
     }
 
     // MARK: - The association sheet

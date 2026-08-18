@@ -2045,9 +2045,13 @@ final class AppModel: ObservableObject {
     /// above the button is what told them it could be more than one.
     func generateStatements() {
         guard let store, var draft = documentEditor, draft.isGenerating else { return }
+        // A period that is not ISO is not a period this generator can use: the store compares these
+        // strings against `transactions.date` as TEXT, so `8/1/2026` would sort away from every row
+        // and report "no transactions" on a period that has them. Refusing it as "not filled in"
+        // keeps the sentence the panel shows TRUE, which reporting an empty result would not.
         guard !draft.statementCustomer.isEmpty,
-              !draft.statementPeriodStart.isEmpty,
-              !draft.statementPeriodEnd.isEmpty else {
+              DocumentPageComposition.isISODate(draft.statementPeriodStart),
+              DocumentPageComposition.isISODate(draft.statementPeriodEnd) else {
             draft.statementOutcome = .needInput
             documentEditor = draft
             return
