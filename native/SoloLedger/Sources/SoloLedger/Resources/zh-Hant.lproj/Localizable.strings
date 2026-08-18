@@ -107,6 +107,7 @@
 "nav.reports" = "報表";
 "nav.products" = "商品 / 服務項目";
 "nav.inventory" = "庫存";
+"nav.documents" = "業務單據";
 
 "type.income" = "收入";
 "type.expense" = "支出";
@@ -809,3 +810,144 @@
 "overview.metrics.noBaseNote" = "基期沒有資料或為零時，這裡留空而不顯示 0.0%——沒有可比的基數，任何百分比都會是誤導。";
 "overview.metrics.empty.title" = "還不能比較";
 "overview.metrics.empty.message" = "這兩項都按營業收入計算：「較上月」需要上一個月有營業收入，「較去年同期」需要去年同月有營業收入。只記支出的帳本兩者都算不出。";
+
+/* ── D-3 · 单据章六语文案（documents.*，104 键）───────────────────────────────
+   全部休眠：本轮无生产代码引用。D-4 画列表页/编辑器/明细行/关联面板，
+   D-5 画导出产物，D-6 接侧栏（nav.documents，与 nav.inventory 同形）。
+   镜像 83 键、改写 5 键、新写 17 键；逐键归属见 DocumentCopyTests 的表。 */
+
+/* D-3 · documents page frame (4 键) */
+"documents.page.title" = "業務單據";
+"documents.page.subtitle" = "建立和管理報價單、銷售單等內部業務單據（非稅務發票）";
+"documents.page.empty" = "暫無業務單據";
+"documents.page.add" = "新增單據";
+
+/* D-3 · the type filter (1 键) */
+"documents.filter.all" = "全部";
+
+/* D-3 · the five document types (closed set: BusinessDocumentType) (5 键) */
+"documents.type.quotation" = "報價單";
+"documents.type.salesOrder" = "銷售單";
+"documents.type.proformaInvoice" = "形式發票";
+"documents.type.commercialInvoice" = "商業發票";
+"documents.type.statement" = "對帳單";
+
+/* D-3 · the three statuses (closed set: BusinessDocumentStatus) (3 键) */
+"documents.status.draft" = "草稿";
+"documents.status.issued" = "已簽發";
+"documents.status.void" = "已作廢";
+
+/* D-3 · list columns (7 键) */
+"documents.col.number" = "單據編號";
+"documents.col.type" = "類型";
+"documents.col.date" = "日期";
+"documents.col.customer" = "客戶";
+"documents.col.total" = "合計金額";
+"documents.col.status" = "狀態";
+"documents.col.taxInvoice" = "正式發票";
+
+/* D-3 · the two lifecycle actions; edit/delete reuse common.* (2 键) */
+"documents.action.issue" = "簽發";
+"documents.action.void" = "作廢";
+
+/* D-3 · the two confirmations. Q3: voiding keeps the number, deleting releases it (4 键) */
+"documents.confirm.void.title" = "作廢這張單據？";
+"documents.confirm.void.message" = "作廢後不能再編輯。編號仍歸這張單據所有，不會被別的單據用掉。";
+"documents.confirm.delete.title" = "刪除這張單據？";
+"documents.confirm.delete.message" = "明細會一起刪除，且無法復原。刪除後這個編號可以再次使用。";
+
+/* D-3 · the editor's header fields (13 键) */
+"documents.form.title" = "新增業務單據";
+"documents.form.editTitle" = "編輯業務單據";
+"documents.form.type" = "單據類型";
+"documents.form.number" = "單據編號（內部）";
+"documents.form.numberHint" = "內部編號，可修改";
+"documents.form.date" = "單據日期";
+"documents.form.validUntil" = "有效期限";
+"documents.form.customer" = "客戶名稱";
+"documents.form.customerPlaceholder" = "請輸入客戶名稱";
+"documents.form.customerTaxID" = "客戶稅號";
+"documents.form.customerAddress" = "客戶地址";
+"documents.form.customerContact" = "聯絡方式";
+"documents.form.notes" = "備註";
+
+/* D-3 · the line table. Q2-a: a dash is not a zero (12 键) */
+"documents.item.title" = "明細";
+"documents.item.description" = "品名/說明";
+"documents.item.quantity" = "數量";
+"documents.item.unit" = "單位";
+"documents.item.noUnit" = "無單位";
+"documents.item.unitPrice" = "單價";
+"documents.item.taxRate" = "稅率";
+"documents.item.taxAmount" = "稅額";
+"documents.item.amount" = "金額";
+"documents.item.add" = "新增明細行";
+"documents.item.remove" = "刪除";
+"documents.item.dashNote" = "破折號表示該行沒有記錄這個數，與記錄下來的 0 不是一回事。";
+
+/* D-3 · the three header totals (3 键) */
+"documents.total.subtotal" = "未稅合計";
+"documents.total.taxAmount" = "稅額合計";
+"documents.total.total" = "含稅合計";
+
+/* D-3 · BusinessDocumentError's twelve cases + three the editor raises (15 键) */
+"documents.error.numberRequired" = "請填寫單據編號。";
+"documents.error.customerNameRequired" = "請填寫客戶名稱。";
+"documents.error.dateRequired" = "請填寫單據日期。";
+"documents.error.currencyIsGeneratedStatementsOnly" = "只有產生出來的對帳單才帶幣別。手動新增的單據依建立時的會計制度顯示金額。";
+"documents.error.notFound" = "這張單據已經不在了，可能已被刪除。";
+"documents.error.numberExists" = "這個編號在同類型單據裡已經用過了，請換一個。";
+"documents.error.invalidStatusTransition" = "「{from}」不能改成「{to}」。草稿可以簽發或作廢，已簽發只能作廢，已作廢不能再改。";
+"documents.error.onlyDraftCanBeEdited" = "只有草稿可以修改。要改內容，請先新增一張單據。";
+"documents.error.issuedMustBeVoidedFirst" = "已簽發的單據不能直接刪除，請先作廢。";
+"documents.error.voidTaxInvoiceReadOnly" = "已作廢單據的發票關聯資訊只能檢視，不能修改。";
+"documents.error.invalidAttachmentPath" = "這個附件路徑不合法，請重新選擇檔案。";
+"documents.error.attachmentInUse" = "這個附件已經關聯到另一張單據了。請為這張單據另選一個檔案。";
+"documents.error.itemsRequired" = "請至少填寫一筆明細。";
+"documents.error.saveFailed" = "儲存失敗，請重試。";
+"documents.error.loadFailed" = "載入失敗，請重試。";
+
+/* D-3 · Q2 — the statement panel and the two sentences the ruling requires (8 键) */
+"documents.statement.customer" = "選擇客戶";
+"documents.statement.periodStart" = "期間起始";
+"documents.statement.periodEnd" = "期間截止";
+"documents.statement.generate" = "產生對帳明細";
+"documents.statement.noRecords" = "這段期間內沒有這個客戶的收入流水。";
+"documents.statement.needInput" = "請先選擇客戶和期間。";
+"documents.statement.basisNote" = "對帳單是按期間彙總的往來彙總單，不是逐筆明細發票。它把這段時間內這個客戶的收入流水彙總成一張往來單據，不描述商品明細，也不是任何一種正式稅務文書。";
+"documents.statement.currencySplitNote" = "一張對帳單只含一種幣別。這段期間內有幾種幣別，就產生幾張單據，編號也就連著用掉幾個。";
+
+/* D-3 · Q7 — the artifact is self-contained HTML, and the copy says so (4 键) */
+"documents.export.action" = "匯出 HTML";
+"documents.export.done" = "已匯出到：{path}";
+"documents.export.failed" = "匯出失敗，請重試。";
+"documents.export.formatNote" = "匯出的是一個自包含的 HTML 檔案，不是 PDF。它可以用瀏覽器開啟，也可以從瀏覽器再列印成 PDF。";
+
+/* D-3 · labels the exported artifact carries itself (5 键) */
+"documents.print.generatedAt" = "產生時間";
+"documents.print.period" = "期間";
+"documents.print.disclaimer" = "本單據為內部業務單據，並非正式稅務發票。";
+"documents.print.voidBadge" = "已作廢";
+"documents.print.currency" = "幣別";
+
+/* D-3 · Q5 — the association records an invoice issued elsewhere, never issues one (10 键) */
+"documents.taxInvoice.action" = "發票關聯";
+"documents.taxInvoice.title" = "正式發票關聯";
+"documents.taxInvoice.issuedLabel" = "外部已開立正式發票";
+"documents.taxInvoice.numberLabel" = "發票號碼";
+"documents.taxInvoice.numberHint" = "外部開立的發票號碼只能手動輸入，本 App 永不自動產生。";
+"documents.taxInvoice.dateLabel" = "開立日期";
+"documents.taxInvoice.attachmentLabel" = "發票附件";
+"documents.taxInvoice.compliance" = "本功能只記錄外部已開立的正式發票資訊，不提供任何開立功能。";
+"documents.taxInvoice.recorded" = "已記錄";
+"documents.taxInvoice.notRecorded" = "未記錄";
+
+/* D-3 · the association panel's file controls (8 键) */
+"documents.attachment.pick" = "選擇檔案（PDF / JPG / PNG）";
+"documents.attachment.open" = "開啟";
+"documents.attachment.remove" = "移除";
+"documents.attachment.missing" = "附件檔案不在了，可能已被移動或刪除。";
+"documents.attachment.tooLarge" = "檔案過大，請選擇小一些的檔案。";
+"documents.attachment.failed" = "附件操作失敗，請重試。";
+"documents.attachment.invalidType" = "只支援 PDF / JPG / PNG 格式。";
+"documents.attachment.notBackedUp" = "附件不包含在資料庫備份裡，請另外備份附件資料夾。";

@@ -19,6 +19,7 @@
 "nav.reports" = "Reports";
 "nav.products" = "Products & Services";
 "nav.inventory" = "Inventory";
+"nav.documents" = "Business Documents";
 
 "overview.income" = "Total income";
 "overview.expense" = "Total expense";
@@ -812,3 +813,144 @@
 "overview.metrics.noBaseNote" = "When the base period has no data or is zero, this is left blank rather than shown as 0.0% — with nothing to compare against, any percentage would mislead.";
 "overview.metrics.empty.title" = "Nothing to compare yet";
 "overview.metrics.empty.message" = "Both are computed on revenue: month on month needs the month before it to have some, and year on year needs the same month last year to have some. A ledger with expenses only produces neither.";
+
+/* ── D-3 · 单据章六语文案（documents.*，104 键）───────────────────────────────
+   全部休眠：本轮无生产代码引用。D-4 画列表页/编辑器/明细行/关联面板，
+   D-5 画导出产物，D-6 接侧栏（nav.documents，与 nav.inventory 同形）。
+   镜像 83 键、改写 5 键、新写 17 键；逐键归属见 DocumentCopyTests 的表。 */
+
+/* D-3 · documents page frame (4 键) */
+"documents.page.title" = "Business Documents";
+"documents.page.subtitle" = "Create and manage quotations, sales orders and other internal business documents (not tax invoices)";
+"documents.page.empty" = "No business documents yet";
+"documents.page.add" = "New Document";
+
+/* D-3 · the type filter (1 键) */
+"documents.filter.all" = "All";
+
+/* D-3 · the five document types (closed set: BusinessDocumentType) (5 键) */
+"documents.type.quotation" = "Quotation";
+"documents.type.salesOrder" = "Sales Order";
+"documents.type.proformaInvoice" = "Proforma Invoice";
+"documents.type.commercialInvoice" = "Commercial Invoice";
+"documents.type.statement" = "Statement of Account";
+
+/* D-3 · the three statuses (closed set: BusinessDocumentStatus) (3 键) */
+"documents.status.draft" = "Draft";
+"documents.status.issued" = "Issued";
+"documents.status.void" = "Voided";
+
+/* D-3 · list columns (7 键) */
+"documents.col.number" = "Document No.";
+"documents.col.type" = "Type";
+"documents.col.date" = "Date";
+"documents.col.customer" = "Customer";
+"documents.col.total" = "Total";
+"documents.col.status" = "Status";
+"documents.col.taxInvoice" = "Tax Invoice";
+
+/* D-3 · the two lifecycle actions; edit/delete reuse common.* (2 键) */
+"documents.action.issue" = "Issue";
+"documents.action.void" = "Void";
+
+/* D-3 · the two confirmations. Q3: voiding keeps the number, deleting releases it (4 键) */
+"documents.confirm.void.title" = "Void this document?";
+"documents.confirm.void.message" = "It can no longer be edited. Its number stays with it and cannot be taken by another document.";
+"documents.confirm.delete.title" = "Delete this document?";
+"documents.confirm.delete.message" = "Its line items go with it and this cannot be undone. The number becomes available again.";
+
+/* D-3 · the editor's header fields (13 键) */
+"documents.form.title" = "New Business Document";
+"documents.form.editTitle" = "Edit Business Document";
+"documents.form.type" = "Document Type";
+"documents.form.number" = "Document No. (internal)";
+"documents.form.numberHint" = "Internal number, editable";
+"documents.form.date" = "Document Date";
+"documents.form.validUntil" = "Valid Until";
+"documents.form.customer" = "Customer Name";
+"documents.form.customerPlaceholder" = "Enter customer name";
+"documents.form.customerTaxID" = "Customer Tax ID";
+"documents.form.customerAddress" = "Customer Address";
+"documents.form.customerContact" = "Contact";
+"documents.form.notes" = "Notes";
+
+/* D-3 · the line table. Q2-a: a dash is not a zero (12 键) */
+"documents.item.title" = "Line Items";
+"documents.item.description" = "Description";
+"documents.item.quantity" = "Qty";
+"documents.item.unit" = "Unit";
+"documents.item.noUnit" = "No unit";
+"documents.item.unitPrice" = "Unit Price";
+"documents.item.taxRate" = "Tax Rate";
+"documents.item.taxAmount" = "Tax Amount";
+"documents.item.amount" = "Amount";
+"documents.item.add" = "Add Line";
+"documents.item.remove" = "Remove";
+"documents.item.dashNote" = "A dash means the line records no such figure, which is not the same as a recorded zero.";
+
+/* D-3 · the three header totals (3 键) */
+"documents.total.subtotal" = "Subtotal (excl. tax)";
+"documents.total.taxAmount" = "Tax Total";
+"documents.total.total" = "Total (incl. tax)";
+
+/* D-3 · BusinessDocumentError's twelve cases + three the editor raises (15 键) */
+"documents.error.numberRequired" = "Enter a document number.";
+"documents.error.customerNameRequired" = "Enter a customer name.";
+"documents.error.dateRequired" = "Enter a document date.";
+"documents.error.currencyIsGeneratedStatementsOnly" = "Only a generated statement of account carries a currency. A document you create by hand shows amounts in the accounting regime it was created under.";
+"documents.error.notFound" = "This document is no longer there; it may have been deleted.";
+"documents.error.numberExists" = "Another document of the same type already uses this number. Choose a different one.";
+"documents.error.invalidStatusTransition" = "A document that is {from} cannot become {to}. A draft can be issued or voided, an issued document can only be voided, and a voided one stays that way.";
+"documents.error.onlyDraftCanBeEdited" = "Only a draft can be edited. To change the contents, create a new document.";
+"documents.error.issuedMustBeVoidedFirst" = "An issued document cannot be deleted directly. Void it first.";
+"documents.error.voidTaxInvoiceReadOnly" = "The invoice link on a voided document is read-only.";
+"documents.error.invalidAttachmentPath" = "That attachment path is not valid. Choose the file again.";
+"documents.error.attachmentInUse" = "Another document is already linked to that attachment. Choose a different file for this one.";
+"documents.error.itemsRequired" = "Add at least one line item.";
+"documents.error.saveFailed" = "Save failed. Please try again.";
+"documents.error.loadFailed" = "Failed to load. Please try again.";
+
+/* D-3 · Q2 — the statement panel and the two sentences the ruling requires (8 键) */
+"documents.statement.customer" = "Select Customer";
+"documents.statement.periodStart" = "Period Start";
+"documents.statement.periodEnd" = "Period End";
+"documents.statement.generate" = "Generate Lines";
+"documents.statement.noRecords" = "There are no income transactions for this customer in that period.";
+"documents.statement.needInput" = "Select a customer and a period first.";
+"documents.statement.basisNote" = "A statement of account summarises a period, one customer at a time. It is not an itemised invoice: it totals that customer’s income transactions over the period, describes no goods, and is not a tax document of any kind.";
+"documents.statement.currencySplitNote" = "One statement covers one currency. If the period holds transactions in several currencies, you get one document per currency, and that many numbers are taken in a row.";
+
+/* D-3 · Q7 — the artifact is self-contained HTML, and the copy says so (4 键) */
+"documents.export.action" = "Export HTML";
+"documents.export.done" = "Exported to: {path}";
+"documents.export.failed" = "Export failed. Please try again.";
+"documents.export.formatNote" = "The file written is a self-contained HTML document, not a PDF. Open it in a browser, and print it to PDF from there if you need one.";
+
+/* D-3 · labels the exported artifact carries itself (5 键) */
+"documents.print.generatedAt" = "Generated at";
+"documents.print.period" = "Period";
+"documents.print.disclaimer" = "This is an internal business document, not an official tax invoice.";
+"documents.print.voidBadge" = "VOIDED";
+"documents.print.currency" = "Currency";
+
+/* D-3 · Q5 — the association records an invoice issued elsewhere, never issues one (10 键) */
+"documents.taxInvoice.action" = "Invoice Link";
+"documents.taxInvoice.title" = "Official Tax Invoice Link";
+"documents.taxInvoice.issuedLabel" = "Official tax invoice issued elsewhere";
+"documents.taxInvoice.numberLabel" = "Invoice number";
+"documents.taxInvoice.numberHint" = "The externally issued number is typed in by hand; this app never generates one.";
+"documents.taxInvoice.dateLabel" = "Issue date";
+"documents.taxInvoice.attachmentLabel" = "Invoice attachment";
+"documents.taxInvoice.compliance" = "This records an official tax invoice issued elsewhere. It does not issue one.";
+"documents.taxInvoice.recorded" = "Recorded";
+"documents.taxInvoice.notRecorded" = "Not recorded";
+
+/* D-3 · the association panel's file controls (8 键) */
+"documents.attachment.pick" = "Choose file (PDF / JPG / PNG)";
+"documents.attachment.open" = "Open";
+"documents.attachment.remove" = "Remove";
+"documents.attachment.missing" = "The attachment file is not there; it may have been moved or deleted.";
+"documents.attachment.tooLarge" = "That file is too large. Choose a smaller one.";
+"documents.attachment.failed" = "The attachment operation failed. Please try again.";
+"documents.attachment.invalidType" = "Only PDF, JPG and PNG files are supported.";
+"documents.attachment.notBackedUp" = "Attachments are not part of the database backup. Back up the attachments folder separately.";

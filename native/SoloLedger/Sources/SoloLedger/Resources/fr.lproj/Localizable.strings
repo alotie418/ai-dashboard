@@ -107,6 +107,7 @@
 "nav.reports" = "Rapports";
 "nav.products" = "Produits et services";
 "nav.inventory" = "Stocks";
+"nav.documents" = "Documents commerciaux";
 
 "type.income" = "Recette";
 "type.expense" = "Dépense";
@@ -809,3 +810,144 @@
 "overview.metrics.noBaseNote" = "Lorsque la période de référence est absente ou nulle, la case reste vide au lieu d’afficher 0,0 % : sans base de comparaison, tout pourcentage induirait en erreur.";
 "overview.metrics.empty.title" = "Rien à comparer pour l’instant";
 "overview.metrics.empty.message" = "Les deux sont calculées sur le chiffre d’affaires : la variation mensuelle exige un chiffre d’affaires le mois précédent, et la variation annuelle un chiffre d’affaires le même mois l’an dernier. Un livre ne contenant que des dépenses n’en produit aucune.";
+
+/* ── D-3 · 单据章六语文案（documents.*，104 键）───────────────────────────────
+   全部休眠：本轮无生产代码引用。D-4 画列表页/编辑器/明细行/关联面板，
+   D-5 画导出产物，D-6 接侧栏（nav.documents，与 nav.inventory 同形）。
+   镜像 83 键、改写 5 键、新写 17 键；逐键归属见 DocumentCopyTests 的表。 */
+
+/* D-3 · documents page frame (4 键) */
+"documents.page.title" = "Documents commerciaux";
+"documents.page.subtitle" = "Créez et gérez des devis, bons de commande et autres documents commerciaux internes (hors documents fiscaux)";
+"documents.page.empty" = "Aucun document commercial";
+"documents.page.add" = "Nouveau document";
+
+/* D-3 · the type filter (1 键) */
+"documents.filter.all" = "Tous";
+
+/* D-3 · the five document types (closed set: BusinessDocumentType) (5 键) */
+"documents.type.quotation" = "Devis";
+"documents.type.salesOrder" = "Bon de commande";
+"documents.type.proformaInvoice" = "Facture pro forma";
+"documents.type.commercialInvoice" = "Facture commerciale";
+"documents.type.statement" = "Relevé de compte";
+
+/* D-3 · the three statuses (closed set: BusinessDocumentStatus) (3 键) */
+"documents.status.draft" = "Brouillon";
+"documents.status.issued" = "Émis";
+"documents.status.void" = "Annulé";
+
+/* D-3 · list columns (7 键) */
+"documents.col.number" = "N° de document";
+"documents.col.type" = "Type";
+"documents.col.date" = "Date";
+"documents.col.customer" = "Client";
+"documents.col.total" = "Montant total";
+"documents.col.status" = "Statut";
+"documents.col.taxInvoice" = "Facture fiscale";
+
+/* D-3 · the two lifecycle actions; edit/delete reuse common.* (2 键) */
+"documents.action.issue" = "Émettre";
+"documents.action.void" = "Annuler";
+
+/* D-3 · the two confirmations. Q3: voiding keeps the number, deleting releases it (4 键) */
+"documents.confirm.void.title" = "Annuler ce document ?";
+"documents.confirm.void.message" = "Il ne pourra plus être modifié. Son numéro lui reste attaché et aucun autre document ne pourra le reprendre.";
+"documents.confirm.delete.title" = "Supprimer ce document ?";
+"documents.confirm.delete.message" = "Ses lignes sont supprimées avec lui et l’opération est irréversible. Le numéro redevient disponible.";
+
+/* D-3 · the editor's header fields (13 键) */
+"documents.form.title" = "Nouveau document commercial";
+"documents.form.editTitle" = "Modifier le document";
+"documents.form.type" = "Type de document";
+"documents.form.number" = "N° de document (interne)";
+"documents.form.numberHint" = "Numéro interne, modifiable";
+"documents.form.date" = "Date du document";
+"documents.form.validUntil" = "Valable jusqu’au";
+"documents.form.customer" = "Nom du client";
+"documents.form.customerPlaceholder" = "Saisissez le nom du client";
+"documents.form.customerTaxID" = "N° fiscal du client";
+"documents.form.customerAddress" = "Adresse du client";
+"documents.form.customerContact" = "Contact";
+"documents.form.notes" = "Remarques";
+
+/* D-3 · the line table. Q2-a: a dash is not a zero (12 键) */
+"documents.item.title" = "Lignes";
+"documents.item.description" = "Désignation";
+"documents.item.quantity" = "Qté";
+"documents.item.unit" = "Unité";
+"documents.item.noUnit" = "Sans unité";
+"documents.item.unitPrice" = "Prix unitaire";
+"documents.item.taxRate" = "Taux de taxe";
+"documents.item.taxAmount" = "Montant de taxe";
+"documents.item.amount" = "Montant";
+"documents.item.add" = "Ajouter une ligne";
+"documents.item.remove" = "Supprimer";
+"documents.item.dashNote" = "Un tiret signifie que la ligne ne comporte aucun chiffre à cet endroit, ce qui n’est pas un zéro enregistré.";
+
+/* D-3 · the three header totals (3 键) */
+"documents.total.subtotal" = "Total hors taxes";
+"documents.total.taxAmount" = "Total des taxes";
+"documents.total.total" = "Total TTC";
+
+/* D-3 · BusinessDocumentError's twelve cases + three the editor raises (15 键) */
+"documents.error.numberRequired" = "Saisissez un numéro de document.";
+"documents.error.customerNameRequired" = "Saisissez le nom du client.";
+"documents.error.dateRequired" = "Saisissez la date du document.";
+"documents.error.currencyIsGeneratedStatementsOnly" = "Seul un relevé de compte généré porte une devise. Un document créé à la main affiche les montants dans le régime comptable en vigueur lors de sa création.";
+"documents.error.notFound" = "Ce document n’existe plus ; il a peut-être été supprimé.";
+"documents.error.numberExists" = "Un autre document du même type porte déjà ce numéro. Choisissez-en un autre.";
+"documents.error.invalidStatusTransition" = "Un document {from} ne peut pas devenir {to}. Un brouillon peut être émis ou annulé, un document émis peut seulement être annulé, et un document annulé le reste.";
+"documents.error.onlyDraftCanBeEdited" = "Seul un brouillon peut être modifié. Pour en changer le contenu, créez un nouveau document.";
+"documents.error.issuedMustBeVoidedFirst" = "Un document émis ne peut pas être supprimé directement. Annulez-le d’abord.";
+"documents.error.voidTaxInvoiceReadOnly" = "Les informations de lien facture d’un document annulé sont en lecture seule.";
+"documents.error.invalidAttachmentPath" = "Ce chemin de pièce jointe n’est pas valide. Sélectionnez à nouveau le fichier.";
+"documents.error.attachmentInUse" = "Un autre document est déjà lié à cette pièce jointe. Choisissez un autre fichier pour celui-ci.";
+"documents.error.itemsRequired" = "Saisissez au moins une ligne.";
+"documents.error.saveFailed" = "Échec de l’enregistrement. Veuillez réessayer.";
+"documents.error.loadFailed" = "Échec du chargement. Veuillez réessayer.";
+
+/* D-3 · Q2 — the statement panel and the two sentences the ruling requires (8 键) */
+"documents.statement.customer" = "Sélectionner un client";
+"documents.statement.periodStart" = "Début de période";
+"documents.statement.periodEnd" = "Fin de période";
+"documents.statement.generate" = "Générer les lignes";
+"documents.statement.noRecords" = "Aucune opération de recette pour ce client sur cette période.";
+"documents.statement.needInput" = "Sélectionnez d’abord un client et une période.";
+"documents.statement.basisNote" = "Un relevé de compte récapitule une période pour un seul client. Ce n’est pas une facture détaillée : il totalise les opérations de recette du client sur la période, ne décrit aucune marchandise et ne constitue aucun document fiscal.";
+"documents.statement.currencySplitNote" = "Un relevé ne couvre qu’une devise. Si la période comporte plusieurs devises, un document est créé par devise et autant de numéros sont utilisés à la suite.";
+
+/* D-3 · Q7 — the artifact is self-contained HTML, and the copy says so (4 键) */
+"documents.export.action" = "Exporter en HTML";
+"documents.export.done" = "Exporté vers : {path}";
+"documents.export.failed" = "Échec de l’export. Veuillez réessayer.";
+"documents.export.formatNote" = "Le fichier produit est un document HTML autonome, pas un PDF. Ouvrez-le dans un navigateur et imprimez-le en PDF depuis celui-ci si nécessaire.";
+
+/* D-3 · labels the exported artifact carries itself (5 键) */
+"documents.print.generatedAt" = "Généré le";
+"documents.print.period" = "Période";
+"documents.print.disclaimer" = "Ce document est un document commercial interne et ne constitue pas une facture fiscale officielle.";
+"documents.print.voidBadge" = "ANNULÉ";
+"documents.print.currency" = "Devise";
+
+/* D-3 · Q5 — the association records an invoice issued elsewhere, never issues one (10 键) */
+"documents.taxInvoice.action" = "Lien facture";
+"documents.taxInvoice.title" = "Lien vers la facture fiscale officielle";
+"documents.taxInvoice.issuedLabel" = "Facture fiscale officielle émise en externe";
+"documents.taxInvoice.numberLabel" = "Numéro de facture";
+"documents.taxInvoice.numberHint" = "Le numéro émis en externe se saisit à la main ; cette application n’en génère jamais.";
+"documents.taxInvoice.dateLabel" = "Date d’émission";
+"documents.taxInvoice.attachmentLabel" = "Pièce jointe";
+"documents.taxInvoice.compliance" = "Cette fonction enregistre une facture fiscale officielle émise ailleurs. Elle n’en émet aucune.";
+"documents.taxInvoice.recorded" = "Enregistrée";
+"documents.taxInvoice.notRecorded" = "Non enregistrée";
+
+/* D-3 · the association panel's file controls (8 键) */
+"documents.attachment.pick" = "Choisir un fichier (PDF / JPG / PNG)";
+"documents.attachment.open" = "Ouvrir";
+"documents.attachment.remove" = "Retirer";
+"documents.attachment.missing" = "La pièce jointe est introuvable ; elle a peut-être été déplacée ou supprimée.";
+"documents.attachment.tooLarge" = "Ce fichier est trop volumineux. Choisissez-en un plus petit.";
+"documents.attachment.failed" = "L’opération sur la pièce jointe a échoué. Veuillez réessayer.";
+"documents.attachment.invalidType" = "Seuls les fichiers PDF, JPG et PNG sont pris en charge.";
+"documents.attachment.notBackedUp" = "Les pièces jointes ne font pas partie de la sauvegarde de la base. Sauvegardez le dossier des pièces jointes séparément.";

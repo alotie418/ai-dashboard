@@ -19,6 +19,7 @@
 "nav.reports" = "报表";
 "nav.products" = "商品 / 服务项目";
 "nav.inventory" = "库存";
+"nav.documents" = "业务单据";
 
 "overview.income" = "收入合计";
 "overview.expense" = "支出合计";
@@ -812,3 +813,144 @@
 "overview.metrics.noBaseNote" = "基期没有数据或为零时，这里留空而不显示 0.0%——没有可比的基数，任何百分比都会是误导。";
 "overview.metrics.empty.title" = "还不能比较";
 "overview.metrics.empty.message" = "这两项都按营业收入计算：环比要求上一个月有营业收入，同比要求去年同月有营业收入。只记支出的账本两者都算不出。";
+
+/* ── D-3 · 单据章六语文案（documents.*，104 键）───────────────────────────────
+   全部休眠：本轮无生产代码引用。D-4 画列表页/编辑器/明细行/关联面板，
+   D-5 画导出产物，D-6 接侧栏（nav.documents，与 nav.inventory 同形）。
+   镜像 83 键、改写 5 键、新写 17 键；逐键归属见 DocumentCopyTests 的表。 */
+
+/* D-3 · documents page frame (4 键) */
+"documents.page.title" = "业务单据";
+"documents.page.subtitle" = "创建和管理报价单、销售单等内部业务单据（非税务发票）";
+"documents.page.empty" = "暂无业务单据";
+"documents.page.add" = "新建单据";
+
+/* D-3 · the type filter (1 键) */
+"documents.filter.all" = "全部";
+
+/* D-3 · the five document types (closed set: BusinessDocumentType) (5 键) */
+"documents.type.quotation" = "报价单";
+"documents.type.salesOrder" = "销售单";
+"documents.type.proformaInvoice" = "形式发票";
+"documents.type.commercialInvoice" = "商业发票";
+"documents.type.statement" = "对账单";
+
+/* D-3 · the three statuses (closed set: BusinessDocumentStatus) (3 键) */
+"documents.status.draft" = "草稿";
+"documents.status.issued" = "已签发";
+"documents.status.void" = "已作废";
+
+/* D-3 · list columns (7 键) */
+"documents.col.number" = "单据编号";
+"documents.col.type" = "类型";
+"documents.col.date" = "日期";
+"documents.col.customer" = "客户";
+"documents.col.total" = "合计金额";
+"documents.col.status" = "状态";
+"documents.col.taxInvoice" = "正式发票";
+
+/* D-3 · the two lifecycle actions; edit/delete reuse common.* (2 键) */
+"documents.action.issue" = "签发";
+"documents.action.void" = "作废";
+
+/* D-3 · the two confirmations. Q3: voiding keeps the number, deleting releases it (4 键) */
+"documents.confirm.void.title" = "作废这张单据？";
+"documents.confirm.void.message" = "作废后不能再编辑。编号仍归这张单据所有，不会被别的单据用掉。";
+"documents.confirm.delete.title" = "删除这张单据？";
+"documents.confirm.delete.message" = "明细会一起删除，且无法撤销。删除后这个编号可以被再次使用。";
+
+/* D-3 · the editor's header fields (13 键) */
+"documents.form.title" = "新建业务单据";
+"documents.form.editTitle" = "编辑业务单据";
+"documents.form.type" = "单据类型";
+"documents.form.number" = "单据编号（内部）";
+"documents.form.numberHint" = "内部编号，可修改";
+"documents.form.date" = "单据日期";
+"documents.form.validUntil" = "有效期至";
+"documents.form.customer" = "客户名称";
+"documents.form.customerPlaceholder" = "请输入客户名称";
+"documents.form.customerTaxID" = "客户税号";
+"documents.form.customerAddress" = "客户地址";
+"documents.form.customerContact" = "联系方式";
+"documents.form.notes" = "备注";
+
+/* D-3 · the line table. Q2-a: a dash is not a zero (12 键) */
+"documents.item.title" = "明细";
+"documents.item.description" = "品名/说明";
+"documents.item.quantity" = "数量";
+"documents.item.unit" = "单位";
+"documents.item.noUnit" = "无单位";
+"documents.item.unitPrice" = "单价";
+"documents.item.taxRate" = "税率";
+"documents.item.taxAmount" = "税额";
+"documents.item.amount" = "金额";
+"documents.item.add" = "添加明细行";
+"documents.item.remove" = "删除";
+"documents.item.dashNote" = "破折号表示该行没有记录这个数，与记录下来的 0 不是一回事。";
+
+/* D-3 · the three header totals (3 键) */
+"documents.total.subtotal" = "不含税合计";
+"documents.total.taxAmount" = "税额合计";
+"documents.total.total" = "含税合计";
+
+/* D-3 · BusinessDocumentError's twelve cases + three the editor raises (15 键) */
+"documents.error.numberRequired" = "请填写单据编号。";
+"documents.error.customerNameRequired" = "请填写客户名称。";
+"documents.error.dateRequired" = "请填写单据日期。";
+"documents.error.currencyIsGeneratedStatementsOnly" = "只有生成出来的对账单才带币种。手工新建的单据按建立时的会计制度显示金额。";
+"documents.error.notFound" = "这张单据已经不在了，可能已被删除。";
+"documents.error.numberExists" = "这个编号在同类型单据里已经用过了，请换一个。";
+"documents.error.invalidStatusTransition" = "「{from}」不能改成「{to}」。草稿可以签发或作废，已签发只能作废，已作废不能再改。";
+"documents.error.onlyDraftCanBeEdited" = "只有草稿可以修改。要改内容，请先新建一张单据。";
+"documents.error.issuedMustBeVoidedFirst" = "已签发的单据不能直接删除，请先作废。";
+"documents.error.voidTaxInvoiceReadOnly" = "已作废单据的发票关联信息只能查看，不能修改。";
+"documents.error.invalidAttachmentPath" = "这个附件路径不合法，请重新选择文件。";
+"documents.error.attachmentInUse" = "这个附件已经关联到另一张单据了。请为这张单据另选一个文件。";
+"documents.error.itemsRequired" = "请至少填写一条明细。";
+"documents.error.saveFailed" = "保存失败，请重试。";
+"documents.error.loadFailed" = "加载失败，请重试。";
+
+/* D-3 · Q2 — the statement panel and the two sentences the ruling requires (8 键) */
+"documents.statement.customer" = "选择客户";
+"documents.statement.periodStart" = "期间起始";
+"documents.statement.periodEnd" = "期间截止";
+"documents.statement.generate" = "生成对账明细";
+"documents.statement.noRecords" = "这段期间内没有这个客户的收入流水。";
+"documents.statement.needInput" = "请先选择客户和期间。";
+"documents.statement.basisNote" = "对账单是按期间汇总的往来汇总单，不是逐笔明细发票。它把这段时间内这个客户的收入流水汇总成一张往来单据，不描述商品明细，也不是任何一种正式税务文书。";
+"documents.statement.currencySplitNote" = "一张对账单只含一种币种。这段期间内有几种币种，就生成几张单据，编号也就连着用掉几个。";
+
+/* D-3 · Q7 — the artifact is self-contained HTML, and the copy says so (4 键) */
+"documents.export.action" = "导出 HTML";
+"documents.export.done" = "已导出到：{path}";
+"documents.export.failed" = "导出失败，请重试。";
+"documents.export.formatNote" = "导出的是一个自包含的 HTML 文件，不是 PDF。它可以用浏览器打开，也可以从浏览器再打印成 PDF。";
+
+/* D-3 · labels the exported artifact carries itself (5 键) */
+"documents.print.generatedAt" = "生成时间";
+"documents.print.period" = "期间";
+"documents.print.disclaimer" = "本单据为内部业务单据，并非正式税务发票。";
+"documents.print.voidBadge" = "已作废";
+"documents.print.currency" = "币种";
+
+/* D-3 · Q5 — the association records an invoice issued elsewhere, never issues one (10 键) */
+"documents.taxInvoice.action" = "发票关联";
+"documents.taxInvoice.title" = "正式发票关联";
+"documents.taxInvoice.issuedLabel" = "外部已开具正式发票";
+"documents.taxInvoice.numberLabel" = "发票号码";
+"documents.taxInvoice.numberHint" = "外部开具的发票号码只能手工录入，本 App 永不自动生成。";
+"documents.taxInvoice.dateLabel" = "开具日期";
+"documents.taxInvoice.attachmentLabel" = "发票附件";
+"documents.taxInvoice.compliance" = "本功能只记录外部已开具的正式发票信息，不提供任何开具功能。";
+"documents.taxInvoice.recorded" = "已记录";
+"documents.taxInvoice.notRecorded" = "未记录";
+
+/* D-3 · the association panel's file controls (8 键) */
+"documents.attachment.pick" = "选择文件（PDF / JPG / PNG）";
+"documents.attachment.open" = "打开";
+"documents.attachment.remove" = "移除";
+"documents.attachment.missing" = "附件文件不在了，可能已被移动或删除。";
+"documents.attachment.tooLarge" = "文件过大，请选择小一些的文件。";
+"documents.attachment.failed" = "附件操作失败，请重试。";
+"documents.attachment.invalidType" = "只支持 PDF / JPG / PNG 格式。";
+"documents.attachment.notBackedUp" = "附件不包含在数据库备份里，请另外备份附件文件夹。";

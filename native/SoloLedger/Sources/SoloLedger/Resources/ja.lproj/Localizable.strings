@@ -107,6 +107,7 @@
 "nav.reports" = "レポート";
 "nav.products" = "商品・サービス";
 "nav.inventory" = "在庫";
+"nav.documents" = "業務帳票";
 
 "type.income" = "収入";
 "type.expense" = "支出";
@@ -809,3 +810,144 @@
 "overview.metrics.noBaseNote" = "基準となる期間にデータが無い、または 0 の場合は 0.0% とは表示せず空欄にします。比べる相手が無いのに割合を出せば誤解を招くためです。";
 "overview.metrics.empty.title" = "まだ比較できません";
 "overview.metrics.empty.message" = "この 2 つはどちらも売上で計算します。前月比には前の月の売上が、前年同月比には去年の同じ月の売上が必要です。支出だけを記録した台帳では、どちらも算出できません。";
+
+/* ── D-3 · 单据章六语文案（documents.*，104 键）───────────────────────────────
+   全部休眠：本轮无生产代码引用。D-4 画列表页/编辑器/明细行/关联面板，
+   D-5 画导出产物，D-6 接侧栏（nav.documents，与 nav.inventory 同形）。
+   镜像 83 键、改写 5 键、新写 17 键；逐键归属见 DocumentCopyTests 的表。 */
+
+/* D-3 · documents page frame (4 键) */
+"documents.page.title" = "業務帳票";
+"documents.page.subtitle" = "見積書・販売注文書などの社内業務帳票を作成・管理します（正式な税務書類ではありません）";
+"documents.page.empty" = "業務帳票はまだありません";
+"documents.page.add" = "新規作成";
+
+/* D-3 · the type filter (1 键) */
+"documents.filter.all" = "すべて";
+
+/* D-3 · the five document types (closed set: BusinessDocumentType) (5 键) */
+"documents.type.quotation" = "見積書";
+"documents.type.salesOrder" = "受注書";
+"documents.type.proformaInvoice" = "仮送り状（プロフォーマ）";
+"documents.type.commercialInvoice" = "商業送り状";
+"documents.type.statement" = "取引明細書";
+
+/* D-3 · the three statuses (closed set: BusinessDocumentStatus) (3 键) */
+"documents.status.draft" = "下書き";
+"documents.status.issued" = "発行済み";
+"documents.status.void" = "無効";
+
+/* D-3 · list columns (7 键) */
+"documents.col.number" = "帳票番号";
+"documents.col.type" = "種類";
+"documents.col.date" = "日付";
+"documents.col.customer" = "取引先";
+"documents.col.total" = "合計金額";
+"documents.col.status" = "ステータス";
+"documents.col.taxInvoice" = "正式税務書類";
+
+/* D-3 · the two lifecycle actions; edit/delete reuse common.* (2 键) */
+"documents.action.issue" = "発行";
+"documents.action.void" = "無効にする";
+
+/* D-3 · the two confirmations. Q3: voiding keeps the number, deleting releases it (4 键) */
+"documents.confirm.void.title" = "この帳票を無効にしますか？";
+"documents.confirm.void.message" = "無効にすると編集できなくなります。番号はこの帳票に残り、他の帳票が使うことはできません。";
+"documents.confirm.delete.title" = "この帳票を削除しますか？";
+"documents.confirm.delete.message" = "明細も一緒に削除され、元に戻せません。削除後はその番号を再び使えます。";
+
+/* D-3 · the editor's header fields (13 键) */
+"documents.form.title" = "業務帳票の新規作成";
+"documents.form.editTitle" = "業務帳票の編集";
+"documents.form.type" = "帳票の種類";
+"documents.form.number" = "帳票番号（社内用）";
+"documents.form.numberHint" = "社内用の番号です。変更できます";
+"documents.form.date" = "日付";
+"documents.form.validUntil" = "有効期限";
+"documents.form.customer" = "取引先名";
+"documents.form.customerPlaceholder" = "取引先名を入力してください";
+"documents.form.customerTaxID" = "取引先の納税者番号";
+"documents.form.customerAddress" = "取引先住所";
+"documents.form.customerContact" = "連絡先";
+"documents.form.notes" = "備考";
+
+/* D-3 · the line table. Q2-a: a dash is not a zero (12 键) */
+"documents.item.title" = "明細";
+"documents.item.description" = "品目・内容";
+"documents.item.quantity" = "数量";
+"documents.item.unit" = "単位";
+"documents.item.noUnit" = "単位なし";
+"documents.item.unitPrice" = "単価";
+"documents.item.taxRate" = "税率";
+"documents.item.taxAmount" = "税額";
+"documents.item.amount" = "金額";
+"documents.item.add" = "明細行を追加";
+"documents.item.remove" = "削除";
+"documents.item.dashNote" = "ダッシュはその行にその数値が記録されていないことを示します。記録された 0 とは別です。";
+
+/* D-3 · the three header totals (3 键) */
+"documents.total.subtotal" = "税抜合計";
+"documents.total.taxAmount" = "税額合計";
+"documents.total.total" = "税込合計";
+
+/* D-3 · BusinessDocumentError's twelve cases + three the editor raises (15 键) */
+"documents.error.numberRequired" = "帳票番号を入力してください。";
+"documents.error.customerNameRequired" = "取引先名を入力してください。";
+"documents.error.dateRequired" = "日付を入力してください。";
+"documents.error.currencyIsGeneratedStatementsOnly" = "通貨を持つのは生成された取引明細書だけです。手動で作成した帳票は、作成時の会計制度で金額を表示します。";
+"documents.error.notFound" = "この帳票は見つかりません。削除された可能性があります。";
+"documents.error.numberExists" = "同じ種類の帳票でこの番号は既に使われています。別の番号にしてください。";
+"documents.error.invalidStatusTransition" = "「{from}」から「{to}」には変更できません。下書きは発行または無効化でき、発行済みは無効化のみ、無効はそのままです。";
+"documents.error.onlyDraftCanBeEdited" = "編集できるのは下書きだけです。内容を変えるには新しい帳票を作成してください。";
+"documents.error.issuedMustBeVoidedFirst" = "発行済みの帳票は直接削除できません。先に無効にしてください。";
+"documents.error.voidTaxInvoiceReadOnly" = "無効にした帳票の関連付け情報は閲覧のみで、変更できません。";
+"documents.error.invalidAttachmentPath" = "この添付ファイルのパスは正しくありません。ファイルを選び直してください。";
+"documents.error.attachmentInUse" = "この添付ファイルは別の帳票に関連付けられています。この帳票には別のファイルを選んでください。";
+"documents.error.itemsRequired" = "明細行を少なくとも 1 件入力してください。";
+"documents.error.saveFailed" = "保存に失敗しました。もう一度お試しください。";
+"documents.error.loadFailed" = "読み込みに失敗しました。もう一度お試しください。";
+
+/* D-3 · Q2 — the statement panel and the two sentences the ruling requires (8 键) */
+"documents.statement.customer" = "取引先を選択";
+"documents.statement.periodStart" = "期間開始";
+"documents.statement.periodEnd" = "期間終了";
+"documents.statement.generate" = "明細を生成";
+"documents.statement.noRecords" = "この期間には、この取引先の収入取引がありません。";
+"documents.statement.needInput" = "先に取引先と期間を選択してください。";
+"documents.statement.basisNote" = "取引明細書は期間ごとの取引をまとめた書類で、明細ごとの請求書ではありません。その期間のこの取引先の収入取引をまとめたもので、商品の明細は記載せず、いかなる正式な税務書類でもありません。";
+"documents.statement.currencySplitNote" = "1 通の取引明細書は 1 つの通貨のみを扱います。期間内に複数の通貨があれば通貨ごとに 1 通ずつ作成され、その分だけ番号が続けて使われます。";
+
+/* D-3 · Q7 — the artifact is self-contained HTML, and the copy says so (4 键) */
+"documents.export.action" = "HTML を書き出す";
+"documents.export.done" = "書き出しました：{path}";
+"documents.export.failed" = "書き出しに失敗しました。もう一度お試しください。";
+"documents.export.formatNote" = "書き出されるのは自己完結型の HTML ファイルで、PDF ではありません。ブラウザで開けます。PDF が必要な場合はブラウザから印刷してください。";
+
+/* D-3 · labels the exported artifact carries itself (5 键) */
+"documents.print.generatedAt" = "生成日時";
+"documents.print.period" = "期間";
+"documents.print.disclaimer" = "本帳票は社内業務帳票であり、正式な税務書類ではありません。";
+"documents.print.voidBadge" = "無効";
+"documents.print.currency" = "通貨";
+
+/* D-3 · Q5 — the association records an invoice issued elsewhere, never issues one (10 键) */
+"documents.taxInvoice.action" = "税務書類";
+"documents.taxInvoice.title" = "正式な税務書類の関連付け";
+"documents.taxInvoice.issuedLabel" = "正式な税務書類が外部で発行済み";
+"documents.taxInvoice.numberLabel" = "書類番号";
+"documents.taxInvoice.numberHint" = "外部で発行された書類番号は手入力のみで、本アプリが自動生成することはありません。";
+"documents.taxInvoice.dateLabel" = "発行日";
+"documents.taxInvoice.attachmentLabel" = "添付ファイル";
+"documents.taxInvoice.compliance" = "本機能は外部で発行された正式な税務書類の情報を記録するだけで、発行機能はありません。";
+"documents.taxInvoice.recorded" = "記録済み";
+"documents.taxInvoice.notRecorded" = "未記録";
+
+/* D-3 · the association panel's file controls (8 键) */
+"documents.attachment.pick" = "ファイルを選択（PDF / JPG / PNG）";
+"documents.attachment.open" = "開く";
+"documents.attachment.remove" = "削除";
+"documents.attachment.missing" = "添付ファイルが見つかりません。移動または削除された可能性があります。";
+"documents.attachment.tooLarge" = "ファイルが大きすぎます。より小さいファイルを選んでください。";
+"documents.attachment.failed" = "添付ファイルの操作に失敗しました。もう一度お試しください。";
+"documents.attachment.invalidType" = "対応しているのは PDF / JPG / PNG のみです。";
+"documents.attachment.notBackedUp" = "添付ファイルはデータベースのバックアップに含まれません。添付フォルダは別途バックアップしてください。";
