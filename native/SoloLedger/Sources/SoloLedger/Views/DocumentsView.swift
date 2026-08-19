@@ -385,6 +385,11 @@ private struct DocumentEditorSheet: View {
                 if let saveKey = block.saveActionKey {
                     Button(model.t(saveKey)) { model.saveDocumentEditor() }
                         .buttonStyle(.borderedProminent)
+                        // The other app's form refuses the submit outright when a control's own
+                        // `min` / `max` / `step` or a date's shape is violated. No sentence is
+                        // invented to explain it: the explanation over there comes from the
+                        // browser, not from this app's copy.
+                        .disabled(!block.canSubmit)
                 }
             }
             .padding(16)
@@ -724,6 +729,11 @@ private struct DocumentStatementPanel: View {
                 }
                 Button(model.t(block.generateActionKey)) { model.generateStatements() }
                     .buttonStyle(.borderedProminent)
+                    // This button is the write, so it carries the submit's refusal: a document
+                    // date the other app's control could not have produced blocks it, with no
+                    // invented sentence. The period bounds are refused with a sentence instead —
+                    // "not filled in" is true of them, and it is what the panel already says.
+                    .disabled(!block.canGenerate)
                     .accessibilityIdentifier("documentsPage.editor.generate")
             }
             if let messageKey = block.messageKey {
@@ -816,6 +826,7 @@ private struct TaxInvoiceSheet: View {
                 if let saveKey = block.saveActionKey {
                     Button(model.t(saveKey)) { model.saveTaxInvoice() }
                         .buttonStyle(.borderedProminent)
+                        .disabled(!block.canSubmit)
                 }
             }
             .padding(16)

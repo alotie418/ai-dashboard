@@ -1967,7 +1967,25 @@ final class AppModel: ObservableObject {
                               to text: String) {
         guard var draft = documentEditor,
               let index = draft.lines.firstIndex(where: { $0.id == id }) else { return }
-        draft.lines[index].setValue(field, to: text)
+        // The three numeric fields are `<input type="number">` over there, and a letter typed into
+        // one is dropped by the control rather than stored and refused later. Description and unit
+        // are plain text and take whatever is typed.
+        let cleaned: String
+        switch field {
+        case .quantity, .unitPrice, .taxRatePercent:
+            cleaned = DocumentPageComposition.numberInput(text)
+        case .description, .unit:
+            cleaned = text
+        }
+        // "Dropped by the control" means NOTHING happens: no character is inserted, so no `input`
+        // event fires and `setRow` is never called. That is what keeps a refused keystroke from
+        // UNLOCKING the line — `didSet` would fire on an assignment even of an equal value, and a
+        // line unlocked here stops showing the money it was saved with and recomputes it from
+        // quantity × unit price. The republish still happens, so the field snaps back to the text
+        // the control would be holding.
+        if draft.lines[index].value(field) != cleaned {
+            draft.lines[index].setValue(field, to: cleaned)
+        }
         documentEditor = draft
     }
 
@@ -1999,6 +2017,10 @@ final class AppModel: ObservableObject {
     func saveDocumentEditor() {
         guard let store, let draft = documentEditor else { return }
         guard !draft.isGenerating else { return }
+        // The other app's form simply does not submit when a control's own attributes are violated,
+        // and the view keeps the button unavailable for the same reason. This is the second half of
+        // that: a save arriving any other way is refused here rather than written.
+        guard draft.passesTheControlsOwnRules else { return }
         guard !draft.submittableLines.isEmpty || draft.showsReadOnlyLines else {
             documentError = .itemsRequired
             return
@@ -2045,13 +2067,17 @@ final class AppModel: ObservableObject {
     /// above the button is what told them it could be more than one.
     func generateStatements() {
         guard let store, var draft = documentEditor, draft.isGenerating else { return }
+        // The document date this stamps on every statement it writes comes from a field the user
+        // can type into, and the other app's control cannot produce anything but a real date. The
+        // button is unavailable for the same reason; this is the half that decides the write.
+        guard draft.passesTheControlsOwnRules else { return }
         // A period that is not ISO is not a period this generator can use: the store compares these
         // strings against `transactions.date` as TEXT, so `8/1/2026` would sort away from every row
         // and report "no transactions" on a period that has them. Refusing it as "not filled in"
         // keeps the sentence the panel shows TRUE, which reporting an empty result would not.
         guard !draft.statementCustomer.isEmpty,
-              DocumentPageComposition.isISODate(draft.statementPeriodStart),
-              DocumentPageComposition.isISODate(draft.statementPeriodEnd) else {
+              DocumentPageComposition.isCalendarDate(draft.statementPeriodStart),
+              DocumentPageComposition.isCalendarDate(draft.statementPeriodEnd) else {
             draft.statementOutcome = .needInput
             documentEditor = draft
             return
@@ -2149,6 +2175,11 @@ final class AppModel: ObservableObject {
     /// ruling ③ says this round does not delete it, so it is dropped here at the single seam.
     func saveTaxInvoice() {
         guard let store, let draft = taxInvoiceDraft else { return }
+        // This sheet's save is NOT inside a `<form>` over there — it is an `onClick` — so nothing
+        // validates it on the way out. It does not have to: the issue date is `<input type="date">`
+        // and simply cannot hold a date that does not exist. Here it can be typed, so the same
+        // guarantee is made here, with the button unavailable for the same reason.
+        guard DocumentPageComposition.isOptionalCalendarDate(draft.date) else { return }
         let saved = performDocumentWrite {
             _ = try store.updateTaxInvoice(documentID: draft.document.id, draft.edit)
         }
@@ -2191,16 +2222,23 @@ final class AppModel: ObservableObject {
         return (try? store.nextBusinessDocumentNumber(for: type)) ?? ""
     }
 
-    /// Today, in the ISO form both apps store, in the user's own calendar and time zone.
+    /// The date the editor opens on — `new Date().toISOString().split('T')[0]`, which is **UTC**.
     ///
-    /// Named explicitly rather than inherited: `Calendar.current` and the Gregorian calendar answer
-    /// the same thing on this machine, so only a source guard could tell them apart — and the
-    /// numbering module already carries that guard for the same reason.
-    static func documentToday() -> String {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone.current
-        let parts = calendar.dateComponents([.year, .month, .day], from: Date())
-        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    /// This is NOT the same clock as the document number's year, and the difference is the other
+    /// app's rather than a choice made here: `nextNumber` reads `new Date().getFullYear()`, which is
+    /// LOCAL, while the form's default date is an ISO string, which is UTC. Q3 records the local
+    /// year for the number; the field beside it disagrees with it for up to a day, on both sides,
+    /// and mirroring means reproducing that rather than tidying it up.
+    ///
+    /// Spelled out rather than taken from `Calendar`: the calendar this needs is the proleptic
+    /// Gregorian one `toISOString` uses, and `Calendar(identifier: .gregorian)` is ICU's mixed
+    /// calendar, which is a different function before 1582. `ISO8601DateFormatter` with an explicit
+    /// UTC zone is that calendar.
+    static func documentToday(_ now: Date = Date()) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.formatOptions = [.withFullDate]
+        return formatter.string(from: now)
     }
 
     /// One amount as the editor shows it, or `nil` for the em dash.

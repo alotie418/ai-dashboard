@@ -401,24 +401,193 @@ enum DocumentPageComposition {
         }
     }
 
-    /// A period bound the generator can actually use.
+    // MARK: - What the other app's controls can and cannot produce
+
+    /// A date the other app's control could have produced.
     ///
-    /// ``LedgerStore/statementDrafts(customerName:periodStart:periodEnd:)`` compares these strings
-    /// against `transactions.date` with `>=` / `<=`, which SQLite evaluates as TEXT ordering. A
-    /// locale-shaped date such as `8/1/2026` therefore sorts nowhere near the ISO dates in the
-    /// column, and the generator reports "no income transactions in that period" for a period that
-    /// has plenty — a false statement, not an empty result. The other app cannot produce one
-    /// because its control is `input type="date"`; this is the same guarantee, enforced rather than
-    /// typed.
+    /// Five fields on this page are `<input type="date">` over there — the document date, the valid-
+    /// until date, the statement's two period bounds and the tax-invoice date — and that control has
+    /// two properties this page has to reproduce, because a plain text field has neither:
     ///
-    /// Shape only: `YYYY-MM-DD` in ASCII digits. It does not ask whether the date EXISTS —
-    /// `2026-02-31` sorts correctly and simply matches nothing, which is an honest empty result.
-    static func isISODate(_ text: String) -> Bool {
+    ///  1. **The value is `YYYY-MM-DD` or empty.** Nothing else can come out of it.
+    ///  2. **The date EXISTS.** A picker cannot land on `2026-02-31`, and typing it is refused.
+    ///
+    /// The first property is why the statement generator cannot be handed `8/1/2026`: the store
+    /// compares these strings against `transactions.date` as TEXT, so a locale-shaped date sorts
+    /// away from every row and the generator would answer "no income transactions in that period"
+    /// for a period that has them — a false statement rather than an empty result.
+    ///
+    /// **Proleptic Gregorian, spelled out rather than borrowed.** `Calendar(identifier: .gregorian)`
+    /// is ICU's MIXED calendar: it switches to Julian before 1582, so it calls `1500-02-29` valid.
+    /// HTML's date control does not — its calendar is proleptic Gregorian all the way down. D-2 hit
+    /// the same distinction in the numbering module and wrote it down there; this is the second
+    /// place it decides an answer.
+    static func isCalendarDate(_ text: String) -> Bool {
         let parts = text.split(separator: "-", omittingEmptySubsequences: false)
-        guard parts.count == 3, parts[0].count == 4, parts[1].count == 2, parts[2].count == 2 else {
-            return false
+        guard parts.count == 3, parts[0].count == 4, parts[1].count == 2, parts[2].count == 2,
+              parts.allSatisfy({ $0.allSatisfy { $0.isASCII && $0.isNumber } }),
+              let year = Int(parts[0]), let month = Int(parts[1]), let day = Int(parts[2]),
+              year >= 1, (1...12).contains(month), day >= 1
+        else { return false }
+        return day <= daysInMonth(month, year: year)
+    }
+
+    /// Empty, or a date the control could have produced.
+    ///
+    /// Exactly two of the five fields take this — the valid-until date and the tax-invoice date.
+    /// The document date carries `required` over there, so empty is not one of its values; the
+    /// statement's two bounds are asked with ``isCalendarDate(_:)`` as well, because an unfilled
+    /// bound is what the panel's own "not filled in" sentence is for.
+    static func isOptionalCalendarDate(_ text: String) -> Bool {
+        text.isEmpty || isCalendarDate(text)
+    }
+
+    /// Proleptic Gregorian: every fourth year, except centuries, except every fourth century.
+    private static func daysInMonth(_ month: Int, year: Int) -> Int {
+        switch month {
+        case 1, 3, 5, 7, 8, 10, 12: return 31
+        case 4, 6, 9, 11: return 30
+        default:
+            let leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+            return leap ? 29 : 28
         }
-        return parts.allSatisfy { $0.allSatisfy { $0.isASCII && $0.isNumber } }
+    }
+
+    /// What one `<input type="number">` on this page accepts, as a value.
+    ///
+    /// The other app writes three of these and they do not carry the same attributes: quantity and
+    /// unit price are `min="0" step="0.01"`, the tax rate adds `max="100"`. Those attributes are not
+    /// decoration — the three inputs sit inside a `<form>` whose submit button is `type="submit"`,
+    /// so the browser's constraint validation REFUSES to submit a value outside them. Reproducing
+    /// the numbers without reproducing that refusal would let this page write a −5 quantity or a
+    /// 101% rate that the other app cannot produce.
+    struct NumberConstraint: Equatable {
+        let minimum: Double
+        /// `nil` where the other app writes no `max`.
+        let maximum: Double?
+        /// The `step`, as a count of decimal places. `0.01` is two.
+        let decimals: Int
+
+        static let quantity = NumberConstraint(minimum: 0, maximum: nil, decimals: 2)
+        static let unitPrice = NumberConstraint(minimum: 0, maximum: nil, decimals: 2)
+        static let taxRate = NumberConstraint(minimum: 0, maximum: 100, decimals: 2)
+
+        /// Whether a field holding this text could be submitted.
+        ///
+        /// Empty is allowed: an empty numeric input is what the other app submits as "no value",
+        /// and only `required` would change that — none of these three carries it.
+        ///
+        /// Everything else is two questions, and neither of them is `parseFloat`'s:
+        ///
+        ///  1. **Could the control HOLD this text?** Anything outside the valid-floating-point
+        ///     grammar is `badInput` over there, and a form containing a badInput control does not
+        ///     submit at all. `parseFloat` reads `1-2`, `1.` and `+5` as numbers, so a gate built on
+        ///     it alone would write a number the field never showed.
+        ///  2. **Is the value a whole number of steps?** Answered in DECIMAL, because that is what
+        ///     the browser does — Blink parses the field into its own `Decimal` and asks for an
+        ///     exact remainder. `(value − min) * 100` in `Double` lands 2e-5 from an integer for a
+        ///     price in the billions, which would refuse a value the other app submits without
+        ///     complaint.
+        func accepts(_ text: String) -> Bool {
+            guard !text.isEmpty else { return true }
+            guard let literal = DecimalLiteral(text) else { return false }
+            guard let value = DocumentMath.editorNumber(from: text), value.isFinite else { return false }
+            guard value >= minimum else { return false }
+            if let maximum, value > maximum { return false }
+            // `step` validity is `(value − stepBase) / step` being a whole number. Every constraint
+            // on this page has `min="0"`, which is also the step base, and a step that is a power
+            // of ten — so the question reduces to how many decimals the value actually has.
+            return literal.fractionDigits <= decimals
+        }
+    }
+
+    /// One HTML *valid floating-point number*, decomposed far enough to answer the `step` question
+    /// exactly.
+    ///
+    /// The grammar is the spec's — `-?(D+(.D+)?|.D+)([eE][+-]?D+)?` — and the shapes it excludes
+    /// are the ones that matter here: a trailing point is not in it (`1.` is badInput while `.5` is
+    /// a number), a leading `+` is not either, and nothing may follow the literal.
+    ///
+    /// **Neither number parser already in the tree answers this**, which is why there is a third:
+    /// ``DocumentMath/editorNumber(from:)`` is `parseFloat`, which reads the longest valid PREFIX
+    /// and so accepts every shape above; `ReportMath`'s decimal-literal validator is JS `Number`,
+    /// a different grammar that takes `5.` and `+3`. Both also answer with a `Double`, and a
+    /// `Double` is the one thing that cannot answer the step question.
+    ///
+    /// ``fractionDigits`` counts the decimals of the EXACT VALUE rather than of the text: `2.500`
+    /// has one, `1500e-4` has two, `15e-4` has four. That is what makes the step test above the
+    /// same test the browser runs.
+    struct DecimalLiteral: Equatable {
+        let fractionDigits: Int
+
+        init?(_ text: String) {
+            var rest = Substring(text)
+            if rest.first == "-" { rest = rest.dropFirst() }
+
+            func digits() -> String {
+                var out = ""
+                while let c = rest.first, c.isASCII, c.isNumber {
+                    out.append(c)
+                    rest = rest.dropFirst()
+                }
+                return out
+            }
+
+            let integerPart = digits()
+            var fractionPart = ""
+            if rest.first == "." {
+                rest = rest.dropFirst()
+                fractionPart = digits()
+                guard !fractionPart.isEmpty else { return nil }
+            }
+            guard !integerPart.isEmpty || !fractionPart.isEmpty else { return nil }
+
+            var exponent = 0
+            if let marker = rest.first, marker == "e" || marker == "E" {
+                rest = rest.dropFirst()
+                var negative = false
+                if let sign = rest.first, sign == "+" || sign == "-" {
+                    negative = (sign == "-")
+                    rest = rest.dropFirst()
+                }
+                // An exponent too long to be an `Int` is refused rather than wrapped: such a text
+                // is `Infinity` or `0` as a number, and wrapping could turn either into a value
+                // that passes.
+                guard let magnitude = Int(digits()) else { return nil }
+                exponent = negative ? -magnitude : magnitude
+            }
+            guard rest.isEmpty else { return nil }
+
+            // The value is <digits> × 10^scale. Trailing zeros move the point rather than counting
+            // as decimals, which is why `1500e-4` is two decimals and `2.500` is one.
+            var scale = exponent - fractionPart.count
+            var significand = Array(integerPart + fractionPart)
+            while significand.count > 1, significand.last == "0" {
+                significand.removeLast()
+                scale += 1
+            }
+            fractionDigits = max(0, -scale)
+        }
+    }
+
+    /// The characters `<input type="number">` lets into the field.
+    ///
+    /// A letter typed into one is dropped by the control, so `abc` never becomes a value there. This
+    /// drops the same characters rather than refusing the whole field, which keeps a half-typed
+    /// `1.` usable.
+    ///
+    /// **Two registered differences**, both of them about text that is mid-edit and neither of them
+    /// able to reach the ledger:
+    ///
+    ///  * PASTING `1a2` clears the field in a browser and leaves `12` here. Both are
+    ///    unsubmittable-as-`1a2`, which is the property that matters.
+    ///  * A half-typed `1.` is `badInput` over there, which makes the bound state `''` — so its
+    ///    running total reads that line as 0 while the field still shows `1.`. Here the text stays
+    ///    `1.` and the total reads it as 1, through the same `parseFloat` D-1 pinned. Both refuse
+    ///    the submit (see ``NumberConstraint/accepts(_:)``); the two totals disagree only while the
+    ///    field is unfinished.
+    static func numberInput(_ text: String) -> String {
+        String(text.filter { $0.isASCII && ($0.isNumber || "+-.eE".contains($0)) })
     }
 
     /// The picker panel's title — the same sentence as the button that opens it.
@@ -883,6 +1052,14 @@ enum DocumentPageComposition {
         let customers: [String]
         /// `needInput` before anything was chosen, `noRecords` after a generate that found none.
         let messageKey: String?
+        /// Whether the button may be pressed at all.
+        ///
+        /// This button IS the write for a statement (ruling ①: creating one means generating it),
+        /// so it stands where the other app's `type="submit"` stands, and the same refusal applies:
+        /// a document date the date control could not have produced blocks it. The two period
+        /// bounds do NOT come into this — they are refused with a sentence instead, because "not
+        /// filled in" is true of them and the user needs to be told why nothing happened.
+        let canGenerate: Bool
 
         var noteKeys: [String] { [basisNoteKey, currencySplitNoteKey] }
         var allKeys: [String] {
@@ -918,6 +1095,14 @@ enum DocumentPageComposition {
         let cancelActionKey: String
         /// `nil` while creating a statement: the generator writes, so there is nothing to save.
         let saveActionKey: String?
+        /// Whether the other app's own form would let this be submitted.
+        ///
+        /// Its controls are `<input type="date">` and `<input type="number" min max step>` inside a
+        /// `<form>` with a `type="submit"` button, so the browser refuses the submit outright when a
+        /// value is outside them. There is no host-provided bubble to mirror here — the explanation
+        /// the browser shows comes from the browser, not from this app's copy — so the refusal is
+        /// mirrored as the button being unavailable, and NO new sentence is invented to explain it.
+        let canSubmit: Bool
 
         var actionKeys: [String] { [cancelActionKey] + [saveActionKey].compactMap { $0 } }
         var allKeys: [String] {
@@ -974,6 +1159,11 @@ enum DocumentPageComposition {
         let cancelActionKey = "common.cancel"
         /// `nil` when the document is void: the other app does not render the button either.
         let saveActionKey: String?
+        /// The date field here is `<input type="date">` too, so the same two properties hold. It is
+        /// NOT inside a `<form>` over there — the save is an `onClick` — so the refusal comes from
+        /// the CONTROL rather than from form validation, and the value simply never becomes
+        /// unparseable in the first place.
+        let canSubmit: Bool
 
         var labelKeys: [String] {
             [titleKey, complianceKey, issuedLabelKey, numberLabelKey, numberHintKey,
@@ -1048,11 +1238,13 @@ enum DocumentPageComposition {
                                                  statusHeaderKey: "documents.col.status",
                                                  taxInvoiceHeaderKey: "documents.col.taxInvoice",
                                                  rows: rows),
-            // The other app's list shows its empty line only when the table has no rows at all.
-            // There is no "some rows could not be read" sentence in this namespace, so a page whose
-            // documents are unreadable says nothing extra rather than borrowing another page's
-            // wording — see ``BusinessDocumentPage/unreadableCount``, which stays uncounted here.
-            emptyKeys: rows.isEmpty ? ["documents.page.empty"] : [],
+            // "No business documents yet" is a CLAIM, and it is false on a ledger whose document
+            // rows exist but could not be decoded. There is no "some records could not be read"
+            // sentence in this namespace — the products page has one, this one does not — so the
+            // page says NOTHING there rather than borrowing another page's wording or saying
+            // something untrue. Adding such a sentence would be new copy, which is a ruling.
+            emptyKeys: rows.isEmpty && input.page.unreadableCount == 0
+                ? ["documents.page.empty"] : [],
             editor: input.editor.map(editorBlock(for:)),
             taxInvoice: input.taxInvoice.map(taxInvoiceBlock(for:)),
             voidConfirm: input.pendingVoid.map { _ in
@@ -1136,7 +1328,8 @@ enum DocumentPageComposition {
                                                       placeholderKey: nil, hintKey: nil),
             body: body(for: draft, generating: generating, isStatement: isStatement),
             cancelActionKey: "common.cancel",
-            saveActionKey: generating ? nil : "common.save")
+            saveActionKey: generating ? nil : "common.save",
+            canSubmit: draft.passesTheControlsOwnRules)
     }
 
     /// The header fields, in draw order.
@@ -1171,7 +1364,8 @@ enum DocumentPageComposition {
                              isStatement: Bool) -> EditorBody {
         if generating {
             return .generator(StatementBlock(customers: draft.statementCustomers,
-                                             messageKey: draft.statementOutcome?.messageKey))
+                                             messageKey: draft.statementOutcome?.messageKey,
+                                             canGenerate: draft.passesTheControlsOwnRules))
         }
         let style = moneyStyle(currency: draft.editing?.currency,
                                accountingLocale: draft.accountingLocale)
@@ -1270,7 +1464,8 @@ enum DocumentPageComposition {
                                         canRemove: !readOnly && draft.attachmentPath != nil,
                                         messageKey: draft.attachmentOutcome.messageKey),
             readOnlyNoticeKey: readOnly ? "documents.error.voidTaxInvoiceReadOnly" : nil,
-            saveActionKey: readOnly ? nil : "common.save")
+            saveActionKey: readOnly ? nil : "common.save",
+            canSubmit: isOptionalCalendarDate(draft.date))
     }
 }
 
@@ -1342,6 +1537,21 @@ struct DocumentLineDraft: Equatable, Identifiable {
         refDate = item.refDate
         // Assigned last: the three `didSet`s above would otherwise clear it as the fields are seeded.
         locked = Locked(amount: item.amount ?? 0, taxAmount: item.taxAmount ?? 0)
+    }
+
+    /// Whether the three numeric inputs on this line hold values their own controls would submit.
+    ///
+    /// The attributes are the other app's, field by field: quantity and unit price are
+    /// `min="0" step="0.01"`, the rate adds `max="100"`. **Nothing about Core's tax-rate semantics
+    /// changes** — `DocumentMath.storedTaxRate(fromInput:)` and `taxRatePercent(from:)` keep every
+    /// one of their five pinned decisions, including what they do with `"abc"` and `""`. What
+    /// narrows is REACHABILITY: `"abc"` can no longer arrive from this page's controls, exactly as
+    /// it cannot arrive from a `type="number"` input. Storage form mirrored, reachability not —
+    /// the same arrangement the A8 design constraint uses.
+    var passesTheControlsOwnRules: Bool {
+        DocumentPageComposition.NumberConstraint.quantity.accepts(quantity)
+            && DocumentPageComposition.NumberConstraint.unitPrice.accepts(unitPrice)
+            && DocumentPageComposition.NumberConstraint.taxRate.accepts(taxRatePercent)
     }
 
     /// What this line would be written as. `nil` for a line the other app's editor drops before it
@@ -1474,6 +1684,25 @@ struct DocumentEditorDraft: Equatable {
         statementPeriodStart = ""
         statementPeriodEnd = ""
         statementOutcome = nil
+    }
+
+    /// Whether the other app's `<form>` would let this be written.
+    ///
+    /// Exactly the controls this page DRAWS, which is not the same set in every shape:
+    ///
+    ///  * Generating a statement draws one header field, the document date — and that date is what
+    ///    ``AppModel/generateStatements()`` stamps on every document it writes, so it is asked.
+    ///    `validUntil` is not drawn there, so there is no control of it to violate, and the two
+    ///    period bounds answer with a sentence rather than here (see ``StatementBlock/canGenerate``).
+    ///  * Editing a statement draws both dates; its lines are read-only and never travel through an
+    ///    edit (ruling ①), so no line is asked.
+    ///  * The other four types draw both dates and three numeric fields per line.
+    var passesTheControlsOwnRules: Bool {
+        guard DocumentPageComposition.isCalendarDate(date) else { return false }
+        guard !isGenerating else { return true }
+        guard DocumentPageComposition.isOptionalCalendarDate(validUntil) else { return false }
+        guard !showsReadOnlyLines else { return true }
+        return lines.allSatisfy(\.passesTheControlsOwnRules)
     }
 
     var isCreating: Bool { editing == nil }

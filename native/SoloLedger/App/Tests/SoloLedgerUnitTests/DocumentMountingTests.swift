@@ -774,12 +774,8 @@ final class DocumentMountingTests: XCTestCase {
         XCTAssertTrue(filled.emptyKeys.isEmpty, "the list and the empty line never share a screen")
         XCTAssertEqual(filled.list?.rows.count, 1)
 
-        // There is no "some rows could not be read" sentence in this namespace, so a page whose
-        // documents are unreadable says nothing extra rather than borrowing another page's wording.
-        let unreadable = DocumentPageComposition.compose(
-            DocumentPageComposition.Input(page: BusinessDocumentPage(documents: [],
-                                                                    unreadableCount: 3)))
-        XCTAssertEqual(unreadable.emptyKeys, ["documents.page.empty"])
+        // What happens when rows exist but could not be decoded is DM25's subject: the empty line
+        // is a CLAIM and it would be false there. This test is about the list/empty exclusion only.
     }
 
     // MARK: - DM20 · the filter row
@@ -862,17 +858,21 @@ final class DocumentMountingTests: XCTestCase {
     /// "there are no income transactions in that period" for a period that has them — a false
     /// statement rather than an empty result. The other app cannot produce one: its control is
     /// `input type="date"`.
-    func testDM22TheISOShapeTestAcceptsWhatTheStoreCanCompare() {
-        for good in ["2026-01-01", "0001-12-31", "2026-02-31"] {
-            XCTAssertTrue(DocumentPageComposition.isISODate(good), "\(good) is ISO-shaped")
+    func testDM22TheGeneratorRefusesAPeriodTheStoreCannotCompare() {
+        for good in ["2026-01-01", "0001-12-31", "2024-02-29"] {
+            XCTAssertTrue(DocumentPageComposition.isCalendarDate(good),
+                          "\(good) is a date the store can compare")
         }
         for bad in ["8/1/2026", "2026-1-1", "26-01-01", "2026-01-01 ", "", "2026-01",
                     "2026-01-01-01", "٢٠٢٦-٠١-٠١", "2026/01/01", "Jan 1 2026"] {
-            XCTAssertFalse(DocumentPageComposition.isISODate(bad), """
-                \(bad.debugDescription) passed the shape test. It cannot be compared against the \
-                date column, so accepting it turns a real period into "no records".
+            XCTAssertFalse(DocumentPageComposition.isCalendarDate(bad), """
+                \(bad.debugDescription) passed. It cannot be compared against the date column, so \
+                accepting it turns a real period into "no records".
                 """)
         }
+        // A date that is ISO-SHAPED but does not exist is refused too — the picker cannot land on
+        // it, so no field on this page may submit it. DM23 is where that rule is pinned in full.
+        XCTAssertFalse(DocumentPageComposition.isCalendarDate("2026-02-31"))
     }
 
     /// The same thing through the model, on a real ledger that HAS the transactions: a
@@ -908,6 +908,428 @@ final class DocumentMountingTests: XCTestCase {
         XCTAssertEqual(model.documents.documents.first?.type, .statement)
         XCTAssertEqual(model.documents.documents.first?.currency, "CNY")
         XCTAssertEqual(model.documents.documents.first?.number, "ST-2026-0001")
+    }
+
+
+    // MARK: - DM23 · the five date fields hold only what `type="date"` can produce
+
+    /// Five fields on this page are `<input type="date">` over there, and that control has two
+    /// properties a plain text field has neither of: the value is `YYYY-MM-DD` or empty, and the
+    /// date EXISTS. `2026-02-31` is the case that separates a shape test from a calendar one.
+    func testDM23TheCalendarTestRefusesWhatThePickerCannotLandOn() {
+        for good in ["2026-01-01", "2026-12-31", "2024-02-29", "2000-02-29", "0001-01-01"] {
+            XCTAssertTrue(DocumentPageComposition.isCalendarDate(good), "\(good) is a real date")
+        }
+        for bad in ["2026-02-31", "2026-02-30", "2026-04-31", "2026-13-01", "2026-00-10",
+                    "2026-01-00", "2026-01-32", "1900-02-29", "2100-02-29", "0000-01-01"] {
+            XCTAssertFalse(DocumentPageComposition.isCalendarDate(bad), """
+                \(bad) is not a date the picker can land on, so no field on this page may submit it.
+                """)
+        }
+        for malformed in ["8/1/2026", "2026-1-1", "26-01-01", "2026-01-01 ", "", "2026-01",
+                          "2026-01-01-01", "٢٠٢٦-٠١-٠١", "2026/01/01", "Jan 1 2026"] {
+            XCTAssertFalse(DocumentPageComposition.isCalendarDate(malformed))
+        }
+        // Proleptic, not ICU's mixed calendar: `Calendar(identifier: .gregorian)` switches to Julian
+        // before 1582 and calls this valid. HTML's control does not, and neither does this.
+        XCTAssertFalse(DocumentPageComposition.isCalendarDate("1500-02-29"), """
+            1500 is not a leap year in the proleptic Gregorian calendar the date control uses. \
+            Foundation's `.gregorian` says otherwise, which is why this rule is spelled out.
+            """)
+        // …and the probe can see the difference it claims to see.
+        var mixed = Calendar(identifier: .gregorian)
+        mixed.timeZone = TimeZone(secondsFromGMT: 0)!
+        XCTAssertTrue(mixed.date(from: DateComponents(year: 1500, month: 2, day: 29)) != nil,
+                      "the calendar this rule departs from must actually accept 1500-02-29")
+
+        // Optional fields take empty; the required one does not.
+        XCTAssertTrue(DocumentPageComposition.isOptionalCalendarDate(""))
+        XCTAssertFalse(DocumentPageComposition.isOptionalCalendarDate("2026-02-31"))
+    }
+
+    /// The same rule, where it decides whether a write happens: all five fields.
+    func testDM23bNoneOfTheFiveDateFieldsCanSubmitAnImpossibleDate() {
+        func editor(date: String = "2026-08-18", validUntil: String = "") -> Bool {
+            var draft = newEditor()
+            draft.date = date
+            draft.validUntil = validUntil
+            draft.lines[0].description = "Widget"
+            return DocumentPageComposition
+                .compose(DocumentPageComposition.Input(editor: draft)).editor?.canSubmit ?? false
+        }
+        XCTAssertTrue(editor(), "a real date and an empty valid-until submit")
+        XCTAssertTrue(editor(validUntil: "2026-09-30"))
+        for bad in ["2026-02-31", "8/1/2026", ""] {
+            XCTAssertFalse(editor(date: bad), "the document date accepted \(bad.debugDescription)")
+            XCTAssertFalse(editor(validUntil: bad.isEmpty ? "2026-02-31" : bad),
+                           "the valid-until date accepted \(bad.debugDescription)")
+        }
+
+        // The generator's button is this page's write for a statement, and the ONE header field
+        // drawn beside it is the document date it stamps on everything it produces. Its two period
+        // bounds are deliberately not part of this: they are refused with the panel's own sentence,
+        // which DM22b pins on a real ledger.
+        func generator(date: String, start: String = "2026-01-01",
+                       end: String = "2026-01-31") -> Bool {
+            var draft = newEditor(type: .statement)
+            draft.date = date
+            draft.statementCustomers = ["Acme"]
+            draft.statementCustomer = "Acme"
+            draft.statementPeriodStart = start
+            draft.statementPeriodEnd = end
+            guard case .generator(let panel)? = DocumentPageComposition
+                .compose(DocumentPageComposition.Input(editor: draft)).editor?.body else {
+                XCTFail("creating a statement must show the generator")
+                return false
+            }
+            return panel.canGenerate
+        }
+        XCTAssertTrue(generator(date: "2026-08-18"))
+        for bad in ["2026-02-31", "8/1/2026", ""] {
+            XCTAssertFalse(generator(date: bad), """
+                the generator would stamp \(bad.debugDescription) on every document it writes.
+                """)
+        }
+        XCTAssertTrue(generator(date: "2026-08-18", start: "", end: ""), """
+            an unfilled period must leave the button available, or the panel never gets to say \
+            which field is missing.
+            """)
+
+        // The tax-invoice date, which is the same control but NOT inside a form over there.
+        func taxInvoice(_ date: String) -> Bool {
+            var draft = TaxInvoiceDraft(document: doc())
+            draft.date = date
+            return DocumentPageComposition
+                .compose(DocumentPageComposition.Input(taxInvoice: draft)).taxInvoice?.canSubmit ?? false
+        }
+        XCTAssertTrue(taxInvoice(""), "an empty issue date is what 'not recorded' looks like")
+        XCTAssertTrue(taxInvoice("2026-08-13"))
+        XCTAssertFalse(taxInvoice("2026-02-31"))
+        XCTAssertFalse(taxInvoice("8/13/2026"))
+    }
+
+    /// The generator's date, where it decides whether documents are written.
+    ///
+    /// The button being unavailable is a statement about the interface; this is the same rule on
+    /// the write path, on a real ledger that HAS the transactions — so "nothing was written" cannot
+    /// be explained away by there being nothing to write.
+    func testDM23cTheGeneratorWritesNothingWithADateThePickerCannotProduce() async throws {
+        let model = try await bootedModel()
+        let store = try XCTUnwrap(model.store)
+        try store.create(Transaction(id: "t-1", type: .income, date: "2026-01-15", amount: 1130,
+                                     amountNet: 1000, taxAmount: 130, currency: "CNY",
+                                     counterparty: "Acme", description: "January"))
+
+        model.newDocument()
+        model.setDocumentEditorType(.statement)
+        model.setStatementCustomer("Acme")
+        model.setStatementPeriodStart("2026-01-01")
+        model.setStatementPeriodEnd("2026-01-31")
+        model.setDocumentEditorField(.date, to: "2026-02-31")
+        model.generateStatements()
+        XCTAssertTrue(model.documents.documents.isEmpty, """
+            a statement was written carrying 2026-02-31 as its document date. The other app's date \
+            control cannot land on it, and this generator is where that date reaches the ledger.
+            """)
+        XCTAssertNil(model.documentEditor?.statementOutcome, """
+            …and no sentence was invented for it either: the refusal is the button being \
+            unavailable, exactly as the save button is.
+            """)
+
+        model.setDocumentEditorField(.date, to: "2026-03-01")
+        model.generateStatements()
+        XCTAssertEqual(model.documents.documents.count, 1, "…and a real date writes")
+        XCTAssertEqual(model.documents.documents.first?.date, "2026-03-01")
+    }
+
+    // MARK: - DM24 · the three numeric fields hold only what their attributes allow
+
+    /// `min` / `max` / `step` are not decoration: the three inputs sit inside a `<form>` whose
+    /// submit button is `type="submit"`, so the browser refuses the submit when a value is outside
+    /// them. Reproducing the numbers without the refusal would let this page write a −5 quantity or
+    /// a 101% rate the other app cannot produce.
+    func testDM24TheNumericAttributesAreEnforcedAtTheSubmit() {
+        func line(quantity: String = "1", unitPrice: String = "10",
+                  rate: String = "13") -> Bool {
+            var draft = newEditor()
+            draft.lines[0].description = "Widget"
+            draft.lines[0].quantity = quantity
+            draft.lines[0].unitPrice = unitPrice
+            draft.lines[0].taxRatePercent = rate
+            return DocumentPageComposition
+                .compose(DocumentPageComposition.Input(editor: draft)).editor?.canSubmit ?? false
+        }
+        XCTAssertTrue(line(), "a plain line submits")
+        XCTAssertTrue(line(quantity: "", unitPrice: "", rate: ""),
+                      "empty numeric fields are what 'no value' looks like; none of the three is required")
+        XCTAssertTrue(line(quantity: "0", rate: "0"), "zero is inside min=0")
+        XCTAssertTrue(line(rate: "100"), "100 is inside max=100")
+        XCTAssertTrue(line(quantity: "2.50"), "two decimals is exactly step=0.01")
+
+        XCTAssertFalse(line(quantity: "-5"), "the quantity input carries min=0")
+        XCTAssertFalse(line(unitPrice: "-0.01"), "the unit-price input carries min=0")
+        XCTAssertFalse(line(rate: "-1"), "the rate input carries min=0")
+        XCTAssertFalse(line(rate: "101"), "max=100, which ONLY the rate input carries")
+        XCTAssertTrue(line(quantity: "101"), "…and the quantity input carries no max, so 101 is fine")
+        XCTAssertFalse(line(quantity: "0.001"), "step=0.01")
+        XCTAssertFalse(line(unitPrice: "1e-3"), "…asked of the NUMBER, so 1e-3 goes the same way")
+        XCTAssertFalse(line(rate: "12.345"), "step=0.01 on the rate too")
+        XCTAssertFalse(line(quantity: "abc"), "not a number at all")
+
+        // A shape the control cannot HOLD is `badInput` over there, and a form containing a
+        // badInput control does not submit at all. `parseFloat` reads most of these as a number,
+        // which is exactly why the submit gate cannot be `parseFloat` alone.
+        for shape in ["1-2", "1.", "+5", "1e", "1.2.3", "5-", "0x10", "Infinity", " 1"] {
+            XCTAssertFalse(line(quantity: shape), """
+                \(shape.debugDescription) is not a value `type="number"` can hold, so the other \
+                app's form refuses to submit it. Reading it with parseFloat writes a number the \
+                field never showed.
+                """)
+        }
+        XCTAssertTrue(line(quantity: ".5"), "…while a leading point IS a valid floating-point number")
+
+        // `step` is decided in DECIMAL over there — Blink parses the field with its own `Decimal`
+        // and asks for an exact remainder — not in binary. A price in the billions with cents is a
+        // whole number of 0.01 steps; `value * 100` in `Double` lands 2e-5 away from an integer,
+        // which is enough to refuse a value the other app submits without complaint.
+        XCTAssertTrue(line(unitPrice: "1234567890.12"),
+                      "a billion-and-change with cents is a whole number of 0.01 steps")
+        XCTAssertTrue(line(quantity: "1500e-4"), "0.15 with an exponent is still two decimals")
+        XCTAssertFalse(line(quantity: "15e-4"), "…and 0.0015 is still four")
+        XCTAssertTrue(line(quantity: "2.500"), "trailing zeros do not add decimals")
+
+        // A second line with a bad value blocks the submit as well — the form validates all of them.
+        var twoLines = newEditor()
+        twoLines.lines[0].description = "Widget"
+        twoLines.addLine()
+        twoLines.lines[1].description = "Other"
+        twoLines.lines[1].quantity = "-1"
+        XCTAssertFalse(DocumentPageComposition
+            .compose(DocumentPageComposition.Input(editor: twoLines)).editor?.canSubmit ?? true)
+    }
+
+    /// A letter never becomes a value in a `type="number"` field: the control drops it as it is
+    /// typed. This is the first of the two layers — the second is the submit refusal above.
+    func testDM24bALetterNeverReachesANumericField() {
+        XCTAssertEqual(DocumentPageComposition.numberInput("abc"), "")
+        XCTAssertEqual(DocumentPageComposition.numberInput("12abc"), "12")
+        XCTAssertEqual(DocumentPageComposition.numberInput("1.5"), "1.5")
+        XCTAssertEqual(DocumentPageComposition.numberInput("-0.01"), "-0.01")
+        XCTAssertEqual(DocumentPageComposition.numberInput("1e-3"), "1e-3",
+                       "an exponent is a shape the control accepts; step is what refuses it")
+        XCTAssertEqual(DocumentPageComposition.numberInput("１３"), "",
+                       "full-width digits are not what the control takes either")
+        XCTAssertEqual(DocumentPageComposition.numberInput("1."), "1.",
+                       "a half-typed value has to survive being half-typed")
+
+        // The three numeric fields go through it and the three text ones do not.
+        var draft = newEditor()
+        draft.lines[0].description = "Widget"
+        let id = draft.lines[0].id
+        let model = AppModel()
+        model.documentEditor = draft
+        for field in [DocumentPageComposition.LineField.quantity, .unitPrice, .taxRatePercent] {
+            model.setDocumentLineValue(id: id, field, to: "1a2")
+            XCTAssertEqual(model.documentLineValue(id: id, field), "12",
+                           "\(field.rawValue) is a numeric control and drops the letter")
+        }
+        model.setDocumentLineValue(id: id, .description, to: "1a2")
+        XCTAssertEqual(model.documentLineValue(id: id, .description), "1a2",
+                       "the description is plain text and takes what is typed")
+    }
+
+    /// A keystroke the control REFUSES changes nothing over there.
+    ///
+    /// No character is inserted, so no `input` event fires, so `setRow` is never called — and the
+    /// line's copied money stays locked. Sanitizing the text without also skipping the assignment
+    /// would fire `didSet` and unlock the line on a keystroke that left no visible trace, turning a
+    /// sales record's stored amount back into quantity × unit price.
+    func testDM24cARefusedKeystrokeDoesNotUnlockALine() throws {
+        var draft = newEditor()
+        draft.lines = [DocumentLineDraft(id: 0, item: item(taxAmount: 99, amount: 999))]
+        let model = AppModel()
+        model.documentEditor = draft
+        XCTAssertEqual(model.documentLineValue(id: 0, .quantity), "2")
+        XCTAssertNotNil(model.documentEditor?.lines.first?.locked)
+
+        model.setDocumentLineValue(id: 0, .quantity, to: "2a")
+        XCTAssertEqual(model.documentLineValue(id: 0, .quantity), "2", "the letter is dropped")
+        XCTAssertNotNil(model.documentEditor?.lines.first?.locked, """
+            a letter the control drops unlocked the line, so its stored 999 would be recomputed as \
+            quantity × unit price by a keystroke that changed nothing on screen.
+            """)
+        let stillLocked = try XCTUnwrap(model.documentEditor?.lines.first)
+        XCTAssertEqual(DocumentPageComposition.lineBlock(for: stillLocked).amount, 999,
+                       "…and the amount it shows is still the stored one, not 2 × 50")
+
+        model.setDocumentLineValue(id: 0, .quantity, to: "3")
+        XCTAssertNil(model.documentEditor?.lines.first?.locked,
+                     "…and a keystroke that DOES change the value still unlocks it")
+    }
+
+    /// The button being unavailable is one half; the model refusing is the other.
+    ///
+    /// A disabled control is a statement about the interface, not about the write path — and this
+    /// suite has no way to press a SwiftUI button. So the same predicate is asserted where it
+    /// actually decides whether a row changes: a save that arrives with a value the other app's form
+    /// would not have submitted writes nothing.
+    func testDM27TheModelRefusesASaveTheFormWouldNotSubmit() async throws {
+        let model = try await bootedModel()
+
+        model.newDocument()
+        model.documentEditor?.customerName = "Acme"
+        let lineID = try XCTUnwrap(model.documentEditor?.lines.first?.id)
+        model.setDocumentLineValue(id: lineID, .description, to: "Widget")
+        model.setDocumentLineValue(id: lineID, .quantity, to: "-5")
+        model.saveDocumentEditor()
+        XCTAssertNotNil(model.documentEditor, "the sheet stays open because nothing was written")
+        XCTAssertTrue(model.documents.documents.isEmpty, """
+            a quantity of −5 reached the ledger. The other app's form refuses to submit it \
+            (min="0"), so this page must not write it either.
+            """)
+
+        model.setDocumentLineValue(id: lineID, .quantity, to: "2")
+        model.setDocumentEditorField(.date, to: "2026-02-31")
+        model.saveDocumentEditor()
+        XCTAssertTrue(model.documents.documents.isEmpty, "…and neither is a date that does not exist")
+
+        model.setDocumentEditorField(.date, to: "2026-08-18")
+        model.saveDocumentEditor()
+        XCTAssertNil(model.documentEditor, "with both fixed, the save goes through")
+        XCTAssertEqual(model.documents.documents.count, 1)
+        XCTAssertEqual(model.documents.documents.first?.date, "2026-08-18")
+    }
+
+    /// The tax-invoice sheet's half of the same rule, on the ledger.
+    ///
+    /// Its save is NOT inside a `<form>` over there — it is an `onClick` — so the guarantee comes
+    /// from the CONTROL rather than from form validation: the date field simply cannot hold a date
+    /// that does not exist. Here it can be typed, so the refusal has to be made.
+    func testDM27bTheModelRefusesATaxInvoiceSaveTheControlCouldNotHold() async throws {
+        let model = try await bootedModel()
+        model.newDocument()
+        model.documentEditor?.customerName = "Acme"
+        let lineID = try XCTUnwrap(model.documentEditor?.lines.first?.id)
+        model.setDocumentLineValue(id: lineID, .description, to: "Widget")
+        model.saveDocumentEditor()
+        let document = try XCTUnwrap(model.documents.documents.first)
+
+        model.openTaxInvoice(document)
+        model.setTaxInvoiceIssued(true)
+        model.setTaxInvoiceNumber("FP-001")
+        model.setTaxInvoiceDate("2026-02-31")
+        model.saveTaxInvoice()
+        XCTAssertNotNil(model.taxInvoiceDraft, "the sheet stays open because nothing was written")
+        XCTAssertEqual(model.documents.documents.first?.taxInvoiceDate, nil, """
+            2026-02-31 was written as an issue date. The other app's control cannot land on it, so \
+            this sheet must not send it either.
+            """)
+        XCTAssertFalse(try XCTUnwrap(model.documents.documents.first).taxInvoiceIssued,
+                       "…and nothing else on the same save went through either")
+
+        model.setTaxInvoiceDate("2026-02-28")
+        model.saveTaxInvoice()
+        XCTAssertNil(model.taxInvoiceDraft, "with a real date the save goes through")
+        XCTAssertEqual(model.documents.documents.first?.taxInvoiceDate, "2026-02-28")
+        XCTAssertEqual(model.documents.documents.first?.taxInvoiceNumber, "FP-001")
+
+        // Empty is what "not recorded" looks like, and it must still save.
+        model.openTaxInvoice(try XCTUnwrap(model.documents.documents.first))
+        model.setTaxInvoiceDate("")
+        model.saveTaxInvoice()
+        XCTAssertNil(model.taxInvoiceDraft)
+        XCTAssertNil(model.documents.documents.first?.taxInvoiceDate)
+    }
+
+    // MARK: - DM28 · every button that WRITES carries the refusal
+
+    /// A disabled SwiftUI button cannot be pressed by this suite, so what gets pinned here is the
+    /// WIRING: each of the three buttons on this page that writes is bound to the gate its own
+    /// block carries. Reading the view is the only way to see that, the same way DM9 and DM13 do.
+    func testDM28EveryWriteButtonIsBoundToItsGate() throws {
+        let code = Self.strippingComments(try Self.appSource("Views/DocumentsView.swift"))
+        for (write, gate) in [("model.saveDocumentEditor()", "block.canSubmit"),
+                              ("model.saveTaxInvoice()", "block.canSubmit"),
+                              ("model.generateStatements()", "block.canGenerate")] {
+            XCTAssertEqual(code.components(separatedBy: write).count - 1, 1,
+                           "\(write) is called from more than one place, so 'the next modifiers' "
+                           + "is no longer a well-defined region")
+            let call = try XCTUnwrap(code.range(of: write))
+            XCTAssertTrue(code[call.upperBound...].prefix(200).contains(".disabled(!\(gate))"), """
+                the button that calls \(write) is not bound to \(gate), so it can be pressed while \
+                holding a value the other app's form would refuse to submit.
+                """)
+        }
+        XCTAssertEqual(code.components(separatedBy: ".disabled(!block.canSubmit)").count - 1, 2,
+                       "the editor's save and the tax invoice's save, and nothing else")
+        XCTAssertEqual(code.components(separatedBy: ".disabled(!block.canGenerate)").count - 1, 1,
+                       "the generator's button, which is this page's write for a statement")
+
+        // …and the stripper this leans on can see the difference it claims to see.
+        XCTAssertEqual(Self.strippingComments("""
+            Button("x") { model.saveDocumentEditor() }
+                // .disabled(!block.canSubmit) written in a comment does not count
+                .buttonStyle(.borderedProminent)
+            """), """
+            Button("x") { model.saveDocumentEditor() }
+                .buttonStyle(.borderedProminent)
+            """)
+    }
+
+    // MARK: - DM25 · the empty line is a claim, and it must not be made falsely
+
+    /// "No business documents yet" is false on a ledger whose document rows exist but could not be
+    /// decoded. This namespace has no "some records could not be read" sentence — the products page
+    /// has one, this one does not — so the page says nothing there rather than something untrue.
+    func testDM25TheEmptyLineIsNotShownWhenRowsCouldNotBeRead() {
+        let none = DocumentPageComposition.compose(DocumentPageComposition.Input(
+            page: BusinessDocumentPage(documents: [], unreadableCount: 0)))
+        XCTAssertEqual(none.emptyKeys, ["documents.page.empty"])
+
+        let unreadable = DocumentPageComposition.compose(DocumentPageComposition.Input(
+            page: BusinessDocumentPage(documents: [], unreadableCount: 3)))
+        XCTAssertTrue(unreadable.emptyKeys.isEmpty, """
+            the page claimed it holds no documents while three of its rows could not be decoded. \
+            Saying nothing is the honest answer; saying "some could not be read" would be new copy, \
+            which is a ruling and not this round's to make.
+            """)
+        XCTAssertNil(unreadable.list, "…and there is still nothing to list")
+
+        // A list plus unreadable rows still shows the list and no empty line.
+        let mixed = DocumentPageComposition.compose(DocumentPageComposition.Input(
+            page: BusinessDocumentPage(documents: [doc()], unreadableCount: 2)))
+        XCTAssertTrue(mixed.emptyKeys.isEmpty)
+        XCTAssertEqual(mixed.list?.rows.count, 1)
+    }
+
+    // MARK: - DM26 · the editor's default date is the other app's UTC one
+
+    /// `new Date().toISOString().split('T')[0]`, which is UTC — and NOT the same clock as the
+    /// document number's year, which `nextNumber` takes from `getFullYear()`, i.e. local. The two
+    /// disagree for up to a day on both sides; mirroring means reproducing that rather than tidying
+    /// it up.
+    func testDM26TheDefaultDocumentDateIsUTC() {
+        // One second either side of a UTC midnight. A local-clock implementation puts the boundary
+        // somewhere else, so on any host that is not itself UTC one of these two fails.
+        XCTAssertEqual(AppModel.documentToday(Date(timeIntervalSince1970: 1_767_225_599)),
+                       "2025-12-31")
+        XCTAssertEqual(AppModel.documentToday(Date(timeIntervalSince1970: 1_767_225_600)),
+                       "2026-01-01")
+
+        // On a host that IS UTC the pair above cannot tell the two apart, so say so rather than
+        // let the test look stronger than it is; everywhere else, prove the local answer differs.
+        let instant = Date(timeIntervalSince1970: 1_767_225_600)
+        if TimeZone.current.secondsFromGMT(for: instant) != 0 {
+            var local = Calendar(identifier: .gregorian)
+            local.timeZone = TimeZone.current
+            let parts = local.dateComponents([.year, .month, .day], from: instant)
+            let localText = String(format: "%04d-%02d-%02d",
+                                   parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+            XCTAssertNotEqual(AppModel.documentToday(instant), localText, """
+                the default date matches this host's LOCAL date for an instant where UTC differs, \
+                so it is not the ISO string the other app uses.
+                """)
+        }
     }
 
     // MARK: - A booted model over a real temporary ledger
@@ -972,6 +1394,19 @@ final class DocumentMountingTests: XCTestCase {
     private static func appSource(_ relative: String) throws -> String {
         try String(contentsOf: packageRoot()
             .appendingPathComponent("Sources/SoloLedger/\(relative)"), encoding: .utf8)
+    }
+
+    /// Whole-line comments out, code lines kept in order. A `.disabled(...)` written inside a
+    /// comment would satisfy a plain `contains`, and the comments this page needed sit right beside
+    /// the code they explain.
+    private static func strippingComments(_ text: String) -> String {
+        text.split(separator: "\n", omittingEmptySubsequences: false)
+            .filter {
+                let trimmed = $0.trimmingCharacters(in: .whitespaces)
+                return !trimmed.hasPrefix("//") && !trimmed.hasPrefix("*")
+                    && !trimmed.hasPrefix("/*")
+            }
+            .joined(separator: "\n")
     }
 
     private static func appSources() throws -> [(path: String, text: String)] {
