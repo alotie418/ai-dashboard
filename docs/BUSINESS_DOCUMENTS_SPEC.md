@@ -289,6 +289,21 @@ Electron 的关联面板有**三条真正会删文件的路径**：`app:discardD
   **D-6 激活时接上删除接缝**。在原子化轮落地之前，任何轮次都不得接删除。
 * **接缝是单点的**：App 侧消费那两个回传值的地方各恰一处，都在页面模型里，都只是把值丢掉。
 
+### D-4 的两处编辑期差异（第八次裁定：登记级）
+
+上面那张表是 **A 系列**，它的表头写的是「Electron 的**已知形态**，本章照搬」。下面这两条**不是那种东西**：
+它们是原生这一侧与浏览器控件之间的**有意差异**，方向相反——照搬的是拒绝，差的是字段还没打完时屏幕上的数。
+两者不该共用一个编号命名空间，故另编 **B 系列**。
+
+两条的共同性质：**都到不了账本**。输入侧由 `DocumentPageComposition.numberInput` 净化字符，
+提交侧由 `DocumentPageComposition.NumberConstraint.accepts` 按 HTML 的 valid floating-point number
+文法再判一次，两道都过不去。差异只存在于「字段正在被编辑」这一段时间里。
+
+| 编号 | 形态 | 证据锚 | 处置 |
+| --- | --- | --- | --- |
+| B1 | **粘贴 `1a2`**：浏览器把字段清空，原生留下 `12`。两边都提交不了 `1a2`。逐字（英文原文即证据锚本身）：*PASTING `1a2` clears the field in a browser and leaves `12` here. Both are unsubmittable-as-`1a2`, which is the property that matters.* | `native/SoloLedger/Sources/SoloLedger/App/DocumentPageComposition.swift` 的 `numberInput(_:)` 文档注释，「**Two registered differences**」第一条 | **登记级，不改。** 要抹平它得让原生的字符净化在遇到一个非法字符时清空整个字段，那会连带把「半打的值」一起清掉——见 B2 的同一处注释 |
+| B2 | **半打的 `1.`**：对面是 `badInput`，绑定态因此变成 `''`，**它的合计把那一行读成 0**，而字段仍显示 `1.`；原生文本留 `1.`，合计按 `parseFloat` 读成 1。两边都拒绝提交，两个合计只在字段没打完时不同。逐字（英文原文即证据锚本身）：*A half-typed `1.` is `badInput` over there, which makes the bound state `''` — so its running total reads that line as 0 while the field still shows `1.`. Here the text stays `1.` and the total reads it as 1, through the same `parseFloat` D-1 pinned. Both refuse the submit (see ``NumberConstraint/accepts(_:)``); the two totals disagree only while the field is unfinished.* | 同一处注释第二条；提交侧的判据在同文件 `NumberConstraint.accepts(_:)` | **登记级，不改。** 要抹平它得让原生合计对「不是合法浮点字面量」的文本读 0，那是改 D-1 钉住的编辑期读数口径（`DocumentMath.editorNumber` 是 `parseFloat`，两侧同一个函数），属另一个裁定，不在本章已裁定的范围内 |
+
 ---
 
 ## 4. 产品边界与措辞
@@ -460,3 +475,18 @@ D-4 开工前置的测绘（只读）提出三个超出确认书的判断点，�
 | **§6 · D-6** | 「侧栏可达 + 收尾」 | 收编自 D-4 的侧栏三件（enum case / `RootView` 分支 / 两处计数注释）+ **接上附件删除接缝**；并登记「届时另有 8 处 `SidebarSection.allCases` 有序断言与 `SidebarSectionProbe` 两条要同批翻转，开工前须重跑扫描」 | 同上。处数是 D-4 开工前置实测的，按 N-PR-6 判例「记忆里的处数只当线索」，D-6 仍须重跑 |
 
 **本次修订不改代码之外的任何口径**：Q1–Q4、Q6–Q9 与 Q2 的四条细目一个字未动。
+
+### 2026-08-19 · 第八次裁定（D-4 复核返工的两处编辑期差异 → 登记级）
+
+D-4 的复核返工（PR #491，merge `66ed9fef`）在实现「三个数字域按控件自己的属性判」时，实测出两处
+**编辑期**差异：两边都拒绝把它们写进账本，但字段还没打完时屏幕上的合计不同。用户在合并授权的同一条
+消息里**追认它们为登记级**，并把 §3 的登记行排期到 **D-5 的首个 commit**——即本次修订。
+
+| 条目 | 从什么 | 改成什么 | 依据 |
+| --- | --- | --- | --- |
+| **§3** | 只有 A 系列七条 | 新增一节「D-4 的两处编辑期差异（第八次裁定：登记级）」与 **B1 / B2** 两行 | 用户追认。两条都到不了账本，差异只在字段被编辑的那一段时间里 |
+| **编号** | （本次新产生） | 另编 **B 系列**而不是接着 A12 写 A13/A14 | A 系列表头自己写的是「Electron 的已知形态，本章照搬」，这两条不是那种东西——方向相反。混进同一命名空间会让那句表头对它自己的两行为假 |
+| **措辞** | （本次新产生） | 两行的形态列**逐字带上代码注释里的英文原句** | 用户指令「措辞照抄注释不重写」。那两句是 D-4 返工实测出来的，不是推的；逐字带上，任何时候都能与注释按字节对回去 |
+
+**本次修订不改任何已裁定口径**：Q1–Q9 与 Q2 的四条细目、§5 / §6 拆轮表一个字未动。
+D-5 的输出本体（Q7 自包含 HTML + Powerbox）**不在**本次修订内——它的测绘还没做完，还没有任何东西可裁。
