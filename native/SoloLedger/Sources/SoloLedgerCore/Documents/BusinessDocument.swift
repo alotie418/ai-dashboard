@@ -142,6 +142,14 @@ public struct BusinessDocumentDetail: Equatable, Sendable {
 public struct BusinessDocumentPage: Equatable, Sendable {
     public let documents: [BusinessDocument]
     public let unreadableCount: Int
+
+    /// Public for the same reason ``ProductCatalogPage``'s is: the presentation layer has to be
+    /// able to say "nothing has been read yet" before any query has run, and it lives in a
+    /// different module.
+    public init(documents: [BusinessDocument], unreadableCount: Int) {
+        self.documents = documents
+        self.unreadableCount = unreadableCount
+    }
 }
 
 // MARK: - Write models

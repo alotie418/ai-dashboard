@@ -1810,6 +1810,470 @@ final class AppModel: ObservableObject {
     var databasePath: String {
         (try? AppPaths.databaseURL().path) ?? "—"
     }
+
+    // MARK: - Business documents (D-4 page state; NOT reachable — the sidebar entry is D-6's)
+
+    /// The list as last read, together with the headers that could not be decoded.
+    ///
+    /// Loaded LAZILY — `DocumentsView` asks for it when it appears, and `reloadAll()` deliberately
+    /// does not. A session that never opens that page must not pay for its query on every refresh
+    /// of every other screen; and while the page has no sidebar entry, that laziness is also what
+    /// keeps each intermediate `main` byte-for-byte identical to the one before it.
+    @Published private(set) var documents = BusinessDocumentPage(documents: [], unreadableCount: 0)
+
+    /// Which type the list is showing. The filter is applied by the QUERY, not by this class —
+    /// picking one re-reads, exactly as the other app does.
+    @Published private(set) var documentFilter: DocumentPageComposition.TypeFilter = .all
+
+    /// The last refusal, as a case and never as text.
+    @Published private(set) var documentError: DocumentPageComposition.PageError?
+
+    /// The editor sheet's state, or `nil` when it is closed. Writable so the view can bind fields.
+    @Published var documentEditor: DocumentEditorDraft?
+
+    /// The association sheet's state, or `nil` when it is closed.
+    @Published var taxInvoiceDraft: TaxInvoiceDraft?
+
+    @Published private(set) var pendingDocumentVoid: BusinessDocument?
+    @Published private(set) var pendingDocumentDelete: BusinessDocument?
+
+    /// One undecided write at a time, the same rule the products and inventory pages follow.
+    var documentWriteIsPending: Bool {
+        documentEditor != nil || taxInvoiceDraft != nil
+            || pendingDocumentVoid != nil || pendingDocumentDelete != nil
+    }
+
+    /// What the page draws, assembled from the state above and nothing else.
+    var documentInput: DocumentPageComposition.Input {
+        DocumentPageComposition.Input(page: documents,
+                                      filter: documentFilter,
+                                      editor: documentEditor,
+                                      taxInvoice: taxInvoiceDraft,
+                                      pendingVoid: pendingDocumentVoid,
+                                      pendingDelete: pendingDocumentDelete,
+                                      error: documentError)
+    }
+
+    func reloadDocuments() {
+        guard let store else { return }
+        do { documents = try store.businessDocuments(type: documentFilter.storeArgument) }
+        catch { documentError = .loadFailed }
+    }
+
+    func setDocumentFilter(_ filter: DocumentPageComposition.TypeFilter) {
+        guard !documentWriteIsPending else { return }
+        documentFilter = filter
+        reloadDocuments()
+    }
+
+    func dismissDocumentError() { documentError = nil }
+
+    // MARK: Editor
+
+    /// Open the editor on a new document, with the number the ledger suggests for its type.
+    ///
+    /// The suggestion is only a suggestion: Q3 reserves nothing, so two editors opened at once
+    /// would be offered the same number and the second save would be refused with
+    /// `DOC_NUMBER_EXISTS`. That is the other app's behaviour and it is the ledger's unique index
+    /// doing the work, not this method.
+    func newDocument() {
+        guard !documentWriteIsPending else { return }
+        let type = BusinessDocumentType.quotation
+        var draft = DocumentEditorDraft(type: type,
+                                        number: suggestedDocumentNumber(for: type),
+                                        date: Self.documentToday(),
+                                        accountingLocale: accountingLocale)
+        draft.products = documentProductChoices()
+        draft.statementCustomers = statementCustomers(for: type)
+        documentEditor = draft
+    }
+
+    /// Open the editor on an existing document. Only a draft ever gets here — the list offers no
+    /// edit control on anything else.
+    func editDocument(_ document: BusinessDocument) {
+        guard let store, !documentWriteIsPending else { return }
+        do {
+            guard let detail = try store.businessDocument(id: document.id) else {
+                documentError = .store(.notFound)
+                return
+            }
+            var draft = DocumentEditorDraft(document: detail.document, items: detail.items)
+            draft.products = documentProductChoices()
+            documentEditor = draft
+            documentError = nil
+        } catch {
+            documentError = .loadFailed
+        }
+    }
+
+    func cancelDocumentEditor() { documentEditor = nil }
+
+    var documentEditorType: BusinessDocumentType { documentEditor?.type ?? .quotation }
+
+    var documentEditorCanRemoveLines: Bool { documentEditor?.canRemoveLines ?? false }
+
+    /// Changing the type re-asks for a suggestion, but only while the user has not typed one.
+    ///
+    /// Both halves are the other app's: its effect depends on `docType`, and the flag it checks
+    /// first is set the moment the field is edited. Here the suggestion is fetched synchronously,
+    /// so the in-flight race that needs a second guard over there cannot arise.
+    func setDocumentEditorType(_ type: BusinessDocumentType) {
+        guard var draft = documentEditor, draft.isCreating, draft.type != type else { return }
+        draft.type = type
+        if !draft.numberEdited { draft.number = suggestedDocumentNumber(for: type) }
+        draft.statementCustomers = statementCustomers(for: type)
+        draft.statementOutcome = nil
+        documentEditor = draft
+    }
+
+    func documentEditorField(_ field: DocumentPageComposition.EditorField) -> String {
+        guard let draft = documentEditor else { return "" }
+        switch field {
+        case .number:          return draft.number
+        case .date:            return draft.date
+        case .validUntil:      return draft.validUntil
+        case .customerName:    return draft.customerName
+        case .customerTaxID:   return draft.customerTaxID
+        case .customerContact: return draft.customerContact
+        case .customerAddress: return draft.customerAddress
+        case .notes:           return draft.notes
+        }
+    }
+
+    func setDocumentEditorField(_ field: DocumentPageComposition.EditorField, to text: String) {
+        guard var draft = documentEditor else { return }
+        switch field {
+        case .number:
+            draft.number = text
+            // Typing in the number field stops the suggestion following the type, for good.
+            draft.numberEdited = true
+        case .date:            draft.date = text
+        case .validUntil:      draft.validUntil = text
+        case .customerName:    draft.customerName = text
+        case .customerTaxID:   draft.customerTaxID = text
+        case .customerContact: draft.customerContact = text
+        case .customerAddress: draft.customerAddress = text
+        case .notes:           draft.notes = text
+        }
+        documentEditor = draft
+    }
+
+    func documentLineValue(id: Int, _ field: DocumentPageComposition.LineField) -> String {
+        documentEditor?.lines.first { $0.id == id }?.value(field) ?? ""
+    }
+
+    func setDocumentLineValue(id: Int,
+                              _ field: DocumentPageComposition.LineField,
+                              to text: String) {
+        guard var draft = documentEditor,
+              let index = draft.lines.firstIndex(where: { $0.id == id }) else { return }
+        // The three numeric fields are `<input type="number">` over there, and a letter typed into
+        // one is dropped by the control rather than stored and refused later. Description and unit
+        // are plain text and take whatever is typed.
+        let cleaned: String
+        switch field {
+        case .quantity, .unitPrice, .taxRatePercent:
+            cleaned = DocumentPageComposition.numberInput(text)
+        case .description, .unit:
+            cleaned = text
+        }
+        // "Dropped by the control" means NOTHING happens: no character is inserted, so no `input`
+        // event fires and `setRow` is never called. That is what keeps a refused keystroke from
+        // UNLOCKING the line — `didSet` would fire on an assignment even of an equal value, and a
+        // line unlocked here stops showing the money it was saved with and recomputes it from
+        // quantity × unit price. The republish still happens, so the field snaps back to the text
+        // the control would be holding.
+        if draft.lines[index].value(field) != cleaned {
+            draft.lines[index].setValue(field, to: cleaned)
+        }
+        documentEditor = draft
+    }
+
+    func addDocumentLine() {
+        guard var draft = documentEditor else { return }
+        draft.addLine()
+        documentEditor = draft
+    }
+
+    func removeDocumentLine(id: Int) {
+        guard var draft = documentEditor else { return }
+        draft.removeLine(id: id)
+        documentEditor = draft
+    }
+
+    func pickDocumentProduct(lineID: Int, productID: String) {
+        guard var draft = documentEditor,
+              let index = draft.lines.firstIndex(where: { $0.id == lineID }) else { return }
+        let choice = draft.products.first { $0.id == productID }
+        DocumentPageComposition.applyProduct(choice, to: &draft.lines[index])
+        documentEditor = draft
+    }
+
+    /// Create or update, and close the sheet only if the ledger accepted it.
+    ///
+    /// The editor refuses a document with no usable line before it calls anything, which is where
+    /// `documents.error.itemsRequired` comes from — the store accepts an empty line array and would
+    /// write a header with nothing under it.
+    func saveDocumentEditor() {
+        guard let store, let draft = documentEditor else { return }
+        guard !draft.isGenerating else { return }
+        // The other app's form simply does not submit when a control's own attributes are violated,
+        // and the view keeps the button unavailable for the same reason. This is the second half of
+        // that: a save arriving any other way is refused here rather than written.
+        guard draft.passesTheControlsOwnRules else { return }
+        guard !draft.submittableLines.isEmpty || draft.showsReadOnlyLines else {
+            documentError = .itemsRequired
+            return
+        }
+        let saved: Bool
+        if let editing = draft.editing {
+            saved = performDocumentWrite {
+                try store.updateBusinessDocument(id: editing.id, draft.edit())
+            }
+        } else {
+            saved = performDocumentWrite { _ = try store.createBusinessDocument(draft.createDraft()) }
+        }
+        if saved { documentEditor = nil }
+    }
+
+    // MARK: The statement generator
+
+    func setStatementCustomer(_ name: String) {
+        guard var draft = documentEditor else { return }
+        draft.statementCustomer = name
+        draft.statementOutcome = nil
+        documentEditor = draft
+    }
+
+    func setStatementPeriodStart(_ text: String) {
+        guard var draft = documentEditor else { return }
+        draft.statementPeriodStart = text
+        draft.statementOutcome = nil
+        documentEditor = draft
+    }
+
+    func setStatementPeriodEnd(_ text: String) {
+        guard var draft = documentEditor else { return }
+        draft.statementPeriodEnd = text
+        draft.statementOutcome = nil
+        documentEditor = draft
+    }
+
+    /// Q2-d: write one statement per currency found, taking one number for each.
+    ///
+    /// Nothing is written when the period holds no matching income transaction, and the panel says
+    /// so rather than producing an empty document. When something IS written the sheet closes and
+    /// the list re-reads, which is how the user sees how many documents came out — the standing note
+    /// above the button is what told them it could be more than one.
+    func generateStatements() {
+        guard let store, var draft = documentEditor, draft.isGenerating else { return }
+        // The document date this stamps on every statement it writes comes from a field the user
+        // can type into, and the other app's control cannot produce anything but a real date. The
+        // button is unavailable for the same reason; this is the half that decides the write.
+        guard draft.passesTheControlsOwnRules else { return }
+        // A period that is not ISO is not a period this generator can use: the store compares these
+        // strings against `transactions.date` as TEXT, so `8/1/2026` would sort away from every row
+        // and report "no transactions" on a period that has them. Refusing it as "not filled in"
+        // keeps the sentence the panel shows TRUE, which reporting an empty result would not.
+        guard !draft.statementCustomer.isEmpty,
+              DocumentPageComposition.isCalendarDate(draft.statementPeriodStart),
+              DocumentPageComposition.isCalendarDate(draft.statementPeriodEnd) else {
+            draft.statementOutcome = .needInput
+            documentEditor = draft
+            return
+        }
+        let drafts: [StatementDraft]
+        do {
+            drafts = try store.statementDrafts(customerName: draft.statementCustomer,
+                                               periodStart: draft.statementPeriodStart,
+                                               periodEnd: draft.statementPeriodEnd)
+        } catch {
+            documentError = .loadFailed
+            return
+        }
+        guard !drafts.isEmpty else {
+            draft.statementOutcome = .noRecords
+            documentEditor = draft
+            return
+        }
+        let written = performDocumentWrite {
+            _ = try store.createStatements(drafts, date: draft.date, accountingLocale: nil)
+        }
+        if written { documentEditor = nil }
+    }
+
+    // MARK: Row actions
+
+    /// Dispatch one row control. The identifiers are the composition's own, so a control that is
+    /// not offered cannot be invoked by name from anywhere else either.
+    func performDocumentRowAction(_ id: String, on document: BusinessDocument) {
+        guard let action = DocumentPageComposition.RowAction(rawValue: id),
+              DocumentPageComposition.actions(for: document.status).contains(action) else { return }
+        switch action {
+        case .edit:       editDocument(document)
+        case .issue:      issueDocument(document)
+        case .void:       requestDocumentVoid(document)
+        case .delete:     requestDocumentDelete(document)
+        case .taxInvoice: openTaxInvoice(document)
+        }
+    }
+
+    /// Issuing has no confirmation on either side: it is reversible by voiding, and voiding is what
+    /// asks.
+    func issueDocument(_ document: BusinessDocument) {
+        guard let store, !documentWriteIsPending else { return }
+        performDocumentWrite {
+            try store.updateBusinessDocument(id: document.id, BusinessDocumentEdit(status: .issued))
+        }
+    }
+
+    func requestDocumentVoid(_ document: BusinessDocument) {
+        guard !documentWriteIsPending else { return }
+        pendingDocumentVoid = document
+    }
+
+    func cancelDocumentVoid() { pendingDocumentVoid = nil }
+
+    func confirmDocumentVoid() {
+        guard let store, let document = pendingDocumentVoid else { return }
+        pendingDocumentVoid = nil
+        performDocumentWrite {
+            try store.updateBusinessDocument(id: document.id, BusinessDocumentEdit(status: .void))
+        }
+    }
+
+    func requestDocumentDelete(_ document: BusinessDocument) {
+        guard !documentWriteIsPending else { return }
+        pendingDocumentDelete = document
+    }
+
+    func cancelDocumentDelete() { pendingDocumentDelete = nil }
+
+    /// Delete the row. The store hands back the attachment reference the document held; this round
+    /// deliberately does NOT act on it — ruling ③ — so the copy stays on disk. The value is dropped
+    /// here rather than passed anywhere, which is the seam the atomicity round connects.
+    func confirmDocumentDelete() {
+        guard let store, let document = pendingDocumentDelete else { return }
+        pendingDocumentDelete = nil
+        performDocumentWrite { _ = try store.deleteBusinessDocument(id: document.id) }
+    }
+
+    // MARK: The association sheet
+
+    func openTaxInvoice(_ document: BusinessDocument) {
+        guard !documentWriteIsPending else { return }
+        taxInvoiceDraft = TaxInvoiceDraft(document: document)
+    }
+
+    func cancelTaxInvoice() { taxInvoiceDraft = nil }
+
+    func setTaxInvoiceIssued(_ value: Bool) { taxInvoiceDraft?.issued = value }
+    func setTaxInvoiceNumber(_ text: String) { taxInvoiceDraft?.number = text }
+    func setTaxInvoiceDate(_ text: String) { taxInvoiceDraft?.date = text }
+
+    /// Save the association. The store hands back a reference that has just become unreferenced;
+    /// ruling ③ says this round does not delete it, so it is dropped here at the single seam.
+    func saveTaxInvoice() {
+        guard let store, let draft = taxInvoiceDraft else { return }
+        // This sheet's save is NOT inside a `<form>` over there — it is an `onClick` — so nothing
+        // validates it on the way out. It does not have to: the issue date is `<input type="date">`
+        // and simply cannot hold a date that does not exist. Here it can be typed, so the same
+        // guarantee is made here, with the button unavailable for the same reason.
+        guard DocumentPageComposition.isOptionalCalendarDate(draft.date) else { return }
+        let saved = performDocumentWrite {
+            _ = try store.updateTaxInvoice(documentID: draft.document.id, draft.edit)
+        }
+        if saved { taxInvoiceDraft = nil }
+    }
+
+    /// One catalogue read, turned into the page's own choice type.
+    ///
+    /// Only the active items, which is the filter the other app applies to the same control. Rows
+    /// that could not be decoded are not among them: an undecodable product is not selectable, and
+    /// the page that reports such rows is the products page.
+    private func documentProductChoices() -> [DocumentPageComposition.ProductChoice] {
+        guard let store, let catalog = try? store.productCatalog() else { return [] }
+        return catalog.products
+            .filter(\.isActive)
+            .map { DocumentPageComposition.ProductChoice(id: $0.id,
+                                                         name: $0.name,
+                                                         unit: $0.unit ?? "",
+                                                         defaultUnitCost: $0.defaultUnitCost) }
+    }
+
+    /// The generator's picker domain, read only when the type that has one is selected.
+    ///
+    /// Q2 · 4: `transactions.counterparty`, trimmed, de-duplicated and ordered on code units by the
+    /// Core function — this does not re-sort it, because the ordering rule belongs in one place.
+    /// An empty list is what a ledger with no transactions gives, and the panel then offers nothing
+    /// to pick, which is the truthful state rather than an error.
+    private func statementCustomers(for type: BusinessDocumentType) -> [String] {
+        guard type == .statement, let store else { return [] }
+        return (try? store.statementCustomerNames()) ?? []
+    }
+
+    /// Q3's suggestion for a type, or an empty field when the ledger cannot be asked.
+    ///
+    /// An empty field is refused on save (`documents.error.numberRequired`) rather than filled with
+    /// something invented, which is what the other app's silently-swallowed request leaves behind
+    /// too.
+    private func suggestedDocumentNumber(for type: BusinessDocumentType) -> String {
+        guard let store else { return "" }
+        return (try? store.nextBusinessDocumentNumber(for: type)) ?? ""
+    }
+
+    /// The date the editor opens on — `new Date().toISOString().split('T')[0]`, which is **UTC**.
+    ///
+    /// This is NOT the same clock as the document number's year, and the difference is the other
+    /// app's rather than a choice made here: `nextNumber` reads `new Date().getFullYear()`, which is
+    /// LOCAL, while the form's default date is an ISO string, which is UTC. Q3 records the local
+    /// year for the number; the field beside it disagrees with it for up to a day, on both sides,
+    /// and mirroring means reproducing that rather than tidying it up.
+    ///
+    /// Spelled out rather than taken from `Calendar`: the calendar this needs is the proleptic
+    /// Gregorian one `toISOString` uses, and `Calendar(identifier: .gregorian)` is ICU's mixed
+    /// calendar, which is a different function before 1582. `ISO8601DateFormatter` with an explicit
+    /// UTC zone is that calendar.
+    static func documentToday(_ now: Date = Date()) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.formatOptions = [.withFullDate]
+        return formatter.string(from: now)
+    }
+
+    /// One amount as the editor shows it, or `nil` for the em dash.
+    func documentMoney(_ value: Double?) -> String? {
+        DocumentPageComposition.money(value, style: documentMoneyStyle,
+                                      locale: Locale.autoupdatingCurrent)
+    }
+
+    private var documentMoneyStyle: DocumentPageComposition.MoneyStyle {
+        DocumentPageComposition.moneyStyle(
+            currency: documentEditor?.editing?.currency,
+            accountingLocale: documentEditor?.accountingLocale ?? accountingLocale)
+    }
+
+    /// Run one document write and land its outcome.
+    ///
+    /// On success the list is re-read HERE, so no caller can forget. On failure nothing is reloaded
+    /// and the list stays as it was, because nothing in the ledger changed. Anything that is not one
+    /// of the store's twelve refusals is mapped to a single sentence rather than printed: its text
+    /// carries the statement, the path, or the driver's own words.
+    @discardableResult
+    private func performDocumentWrite(_ work: () throws -> Void) -> Bool {
+        do {
+            try work()
+        } catch let error as BusinessDocumentError {
+            documentError = .store(error)
+            return false
+        } catch {
+            documentError = .saveFailed
+            return false
+        }
+        documentError = nil
+        reloadDocuments()
+        return true
+    }
 }
 
 // MARK: - The restore interlock, as one predicate
