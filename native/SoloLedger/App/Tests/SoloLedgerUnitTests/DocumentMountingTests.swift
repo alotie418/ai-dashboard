@@ -828,7 +828,7 @@ final class DocumentMountingTests: XCTestCase {
 
     /// A statement's lines are NOT the six-column table with cells left blank.
     ///
-    /// Q2-b: "对账单行只列四样：描述 / 日期 / 金额 / 税额。不列税率" and "日期在这里是独立的一列，
+    /// Q2-b: "对账单行只列四样：描述 / 日期 / 税额 / 金额。不列税率" and "日期在这里是独立的一列，
     /// 而 Electron 是把日期揉进描述串里的 —— 这是有意分叉". The first spelling of this view reused the
     /// editable table's headings and glued `ref_date` back into the description, which is precisely
     /// the practice the ruling departs from; it also drew a rate column the ruling forbids. Caught in

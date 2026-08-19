@@ -64,6 +64,9 @@ public enum DocumentHTML {
         public let notesLabel: String
         public let generatedAtLabel: String
         public let disclaimer: String
+        /// What the dash in a statement's tax column means. Drawn under that one table and nowhere
+        /// else — the other four types never produce a dash, so they never carry the sentence.
+        public let dashNote: String
 
         public init(lang: String, typeTitle: String, voidBadge: String, numberLabel: String,
                     dateLabel: String, validUntilLabel: String, periodLabel: String,
@@ -72,7 +75,7 @@ public enum DocumentHTML {
                     descriptionLabel: String, quantityLabel: String, unitPriceLabel: String,
                     taxRateLabel: String, taxAmountLabel: String, amountLabel: String,
                     subtotalLabel: String, totalLabel: String, notesLabel: String,
-                    generatedAtLabel: String, disclaimer: String) {
+                    generatedAtLabel: String, disclaimer: String, dashNote: String) {
             self.lang = lang
             self.typeTitle = typeTitle
             self.voidBadge = voidBadge
@@ -96,6 +99,7 @@ public enum DocumentHTML {
             self.notesLabel = notesLabel
             self.generatedAtLabel = generatedAtLabel
             self.disclaimer = disclaimer
+            self.dashNote = dashNote
         }
     }
 
@@ -172,6 +176,13 @@ public enum DocumentHTML {
         let escaped = String(out)
         return (escaped.isEmpty ? document.id : escaped) + ".html"
     }
+
+    /// What a statement prints where the ledger recorded no tax.
+    ///
+    /// The SAME character the screen falls back to (`DocumentsView`'s `?? "—"`), because the two
+    /// are the same claim about the same row and a file that said it differently would read as a
+    /// different fact. U+2014, spelled out here so the tie is one constant rather than two literals.
+    public static let noValueDash = "\u{2014}"
 
     /// `escapeHtml` — the same five replacements in the same order, `&` first.
     ///
@@ -252,6 +263,13 @@ public enum DocumentHTML {
             .map { isStatement ? statementRow($0, labels: labels, options: options)
                                : itemRow($0, labels: labels, options: options) }
             .joined()
+        // The dash needs its sentence, and only where a dash can appear: under a statement's table,
+        // and only when that table actually drew one. An unconditional footnote would explain a
+        // mark the reader cannot see, which is its own kind of untrue.
+        var dashNote = ""
+        if isStatement, detail.items.contains(where: { $0.taxAmount == nil }) {
+            dashNote = "\n<div class=\"meta\">\(e(labels.dashNote))</div>"
+        }
 
         let voidBadge = labels.voidBadge.isEmpty ? "" : "<span class=\"void\">\(e(labels.voidBadge))</span>"
         var notes = ""
@@ -296,7 +314,7 @@ public enum DocumentHTML {
         <table>
         <thead>\(head)</thead>
         <tbody>\(rows)</tbody>
-        </table>
+        </table>\(dashNote)
         <div class="totals">
         <div class="trow"><span>\(e(labels.subtotalLabel))</span><span>\(e(options.money(DocumentMath.truthyOrZero(document.subtotal))))</span></div>
         <div class="trow"><span>\(e(labels.taxAmountLabel))</span><span>\(e(options.money(DocumentMath.truthyOrZero(document.taxAmount))))</span></div>
@@ -354,9 +372,20 @@ public enum DocumentHTML {
 
     private static func statementRow(_ item: BusinessDocumentItem,
                                      labels: Labels, options: Options) -> String {
-        "<tr><td>\(escape(item.description))</td>"
+        // Q2-a's `NULL` reaches the file as a DASH, not as a confident zero.
+        //
+        // Measured, so the departure is from a known thing: the other app's template runs
+        // `money(it.taxAmount || 0)` and prints `¥0.00` for a source transaction that recorded no
+        // tax at all. This chapter's product boundary forbids that on the one artefact that leaves
+        // the machine, and the screen has shown a dash for the same row since D-4 — a file that
+        // disagreed with the page about the same line would be the worse of the two answers.
+        //
+        // `amount` keeps its fold on purpose: Q2-a makes a null TAX mean "none recorded", while
+        // `BusinessDocumentItem` records that no writer in this package produces a null amount.
+        let tax = item.taxAmount.map { escape(options.money($0)) } ?? noValueDash
+        return "<tr><td>\(escape(item.description))</td>"
             + "<td>\(escape(item.refDate ?? ""))</td>"
-            + "<td class=\"val\">\(escape(options.money(DocumentMath.truthyOrZero(item.taxAmount))))</td>"
+            + "<td class=\"val\">\(tax)</td>"
             + "<td class=\"val\">\(escape(options.money(DocumentMath.truthyOrZero(item.amount))))</td></tr>"
     }
 }

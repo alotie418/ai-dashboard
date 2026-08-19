@@ -149,6 +149,58 @@ final class DocumentExportTests: XCTestCase {
         XCTAssertFalse(invoice.contains("<th>Date</th>"), "the date column is the statement's alone")
     }
 
+    // MARK: - DX4 · a statement's missing tax is a dash, and the dash carries its sentence
+
+    /// Q2-a: a statement line whose source transaction recorded no tax must read as "none
+    /// recorded", not as a confident zero. The screen has drawn a dash for that row since D-4; this
+    /// is the same answer in the file.
+    ///
+    /// **Measured, so the departure is from a known thing:** run through the other app's template,
+    /// this very row comes out `¥0.00` — `money(it.taxAmount || 0)` folds the null away. That is
+    /// the confident zero §4's product boundary forbids on the one artefact that leaves the machine.
+    func testDX4AStatementsMissingTaxIsADashWithItsFootnote() throws {
+        let note = "A dash means the line records no such figure, which is not the same as a recorded zero."
+        let withGap = try Self.render(Self.detail(type: .statement, items: [
+            Self.item(description: "January", taxAmount: nil, amount: 500, refDate: "2026-01-09"),
+            Self.item(description: "February", taxAmount: 30, amount: 500, refDate: "2026-02-09"),
+        ]))
+        XCTAssertTrue(withGap.contains("<td class=\"val\">\(DocumentHTML.noValueDash)</td>"), """
+            a statement line with no recorded tax printed something other than the dash. Folding it \
+            to zero hands the customer a figure the ledger never held.
+            """)
+        XCTAssertFalse(withGap.contains("<td class=\"val\">¥0.00</td>"),
+                       "…and specifically not the ¥0.00 the other app's template produces here")
+        XCTAssertTrue(withGap.contains("<td class=\"val\">¥30.00</td>"), "a recorded tax still prints")
+        XCTAssertTrue(withGap.contains("<div class=\"meta\">\(note)</div>"), """
+            the dash appeared without the sentence that says what it means. On screen the note sits \
+            under the same table; in the file the reader has no other way to find out.
+            """)
+
+        // No dash, no sentence: a footnote explaining a mark the reader cannot see is its own
+        // kind of untrue.
+        let complete = try Self.render(Self.detail(type: .statement, items: [
+            Self.item(description: "January", taxAmount: 30, amount: 500, refDate: "2026-01-09"),
+        ]))
+        XCTAssertFalse(complete.contains(note))
+        XCTAssertFalse(complete.contains(DocumentHTML.noValueDash))
+
+        // The other four types are untouched: their null tax still folds to zero, exactly as the
+        // template does, which is what keeps them inside Q7-b's byte-for-byte domain.
+        let invoice = try Self.render(Self.detail(type: .commercialInvoice, items: [
+            Self.item(description: "Widget", taxAmount: nil, amount: 100),
+        ]))
+        XCTAssertTrue(invoice.contains("<td class=\"val\">¥0.00</td>"))
+        XCTAssertFalse(invoice.contains(note), "the footnote belongs to the one table that can dash")
+
+        // The file's dash and the screen's dash are ONE character, tied mechanically rather than by
+        // two literals that happen to agree today.
+        let view = try String(contentsOf: Self.viewSource(), encoding: .utf8)
+        XCTAssertTrue(view.contains("?? \"\(DocumentHTML.noValueDash)\""), """
+            the screen no longer falls back to the character the file prints. Two spellings of \
+            "no value" on the same row is the drift this tie exists to catch.
+            """)
+    }
+
     // MARK: - R4 / Q8 · the currency row, and only when there is a currency
 
     func testR4TheCurrencyRowAppearsOnlyWhenTheColumnHoldsOne() throws {
@@ -368,11 +420,20 @@ final class DocumentExportTests: XCTestCase {
                    encoding: .utf8)
     }
 
+    private static func viewSource() -> URL {
+        packageRoot().appendingPathComponent("Sources/SoloLedger/Views/DocumentsView.swift")
+    }
+
     /// …/native/SoloLedger/App/Tests/SoloLedgerUnitTests/<this>.swift → …/native/SoloLedger
-    private static func fixtureRoot() -> URL {
+    private static func packageRoot() -> URL {
         var dir = URL(fileURLWithPath: #filePath)
         for _ in 0..<4 { dir.deleteLastPathComponent() }
-        return dir.appendingPathComponent("Tests/Fixtures/documentHtml")
+        return dir
+    }
+
+    /// …/native/SoloLedger/App/Tests/SoloLedgerUnitTests/<this>.swift → …/native/SoloLedger
+    private static func fixtureRoot() -> URL {
+        packageRoot().appendingPathComponent("Tests/Fixtures/documentHtml")
     }
 
     /// The first line that differs, so a failure names the byte instead of printing 4 kB twice.

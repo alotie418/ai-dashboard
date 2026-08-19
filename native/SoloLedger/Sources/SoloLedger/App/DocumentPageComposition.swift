@@ -85,7 +85,7 @@ enum DocumentPageComposition {
         /// the "this is HTML, not a PDF" sentence belongs: the user reads it while choosing where
         /// the file goes, not afterwards.
         case savePanel
-        /// **Inside the exported file.** Not a screen region at all, and that is the point: five of
+        /// **Inside the exported file.** Not a screen region at all, and that is the point: some of
         /// this namespace's sentences are carried by the artefact rather than by the app, and a
         /// placement table that only knew about screens would have nowhere to put them.
         case artefact
@@ -95,10 +95,14 @@ enum DocumentPageComposition {
 
     // MARK: - Placement
 
-    /// Every `documents.*` key this round draws, and the regions it belongs to.
+    /// Every `documents.*` key this page draws, and the regions it belongs to.
     ///
-    /// Total over `documents.*` MINUS ``deferredPrefixes``, and asserted to be — ninety-four of the
-    /// hundred and three keys D-3 landed. There are no exemptions: ``exemptKeys`` is empty and the
+    /// **All one hundred and three of them**, which is the whole namespace D-3 landed:
+    /// ``deferredPrefixes`` is empty since D-5 drew the artefact, so this table no longer has a hole
+    /// in it and `DM1`'s closure is a plain equality. It read "ninety-four of the hundred and three"
+    /// through D-4 and went stale the moment the nine moved in — the count is asserted, so the
+    /// sentence was the only part that could drift. There are no exemptions: ``exemptKeys`` is empty
+    /// and the
     /// emptiness is itself asserted, so a key that has nowhere to go has to change a declaration
     /// here rather than slip into a bag.
     static let placement: [String: Set<Region>] = [
@@ -177,7 +181,7 @@ enum DocumentPageComposition {
         "documents.item.taxRate": [.itemTable],
         "documents.item.taxAmount": [.itemTable],
         "documents.item.amount": [.itemTable],
-        "documents.item.dashNote": [.itemTable],
+        "documents.item.dashNote": [.itemTable, .artefact],
         // MARK: itemUnitPicker (1)
         "documents.item.noUnit": [.itemUnitPicker],
         // MARK: itemAction (2)
@@ -1316,7 +1320,8 @@ enum DocumentPageComposition {
             totalLabel: t("documents.total.total"),
             notesLabel: t("documents.form.notes"),
             generatedAtLabel: t(artefact.generatedAtKey),
-            disclaimer: t(artefact.disclaimerKey))
+            disclaimer: t(artefact.disclaimerKey),
+            dashNote: t("documents.item.dashNote"))
     }
 
     /// The unit as the ARTEFACT shows it, which is not what the editor's picker shows.
