@@ -362,14 +362,19 @@ final class DocumentWriteSurfaceGuardTests: XCTestCase {
             "statementCustomerNames": [model],
             "statementDrafts": [model],
             "createStatements": [model],
+            // The artefact is a header AND its lines, which is what this type is — D-5 reads one
+            // per export. It was pinned EMPTY through D-4, when nothing in the app needed both
+            // halves at once; the composition still does not, because it composes a page from the
+            // list's headers and an editor's draft, never from a detail.
+            "BusinessDocumentDetail": [model],
+            "DocumentHTML": [model, composition],
             // Pinned EMPTY: the chapter has no reason to reach these from the app at all.
-            "BusinessDocumentDetail": [],
             "BusinessDocumentLineOrigin": [],
             "StatementText": [],
             "DocumentNumbering": [],
             "DocumentTotals": [],
         ]
-        XCTAssertEqual(expected.count, 26, "the symbol list itself must not shrink unnoticed")
+        XCTAssertEqual(expected.count, 27, "the symbol list itself must not shrink unnoticed")
 
         for (symbol, files) in expected {
             XCTAssertEqual(appNamers(symbol), files.sorted(), """

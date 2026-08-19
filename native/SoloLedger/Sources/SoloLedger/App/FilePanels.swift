@@ -115,6 +115,42 @@ extension AppModel {
         }
     }
 
+    // MARK: - The documents page's artefact (Q7)
+
+    /// What a save-panel run came to. `cancelled` is not a failure and must not be reported as one:
+    /// the other app is silent on a cancelled save too.
+    enum DocumentSaveResult: Equatable {
+        case written(path: String)
+        case cancelled
+        case failed
+    }
+
+    /// Write one document's HTML through the Powerbox save grant.
+    ///
+    /// Both strings arrive already resolved. This file may not name a `documents.*` key — DC9 holds
+    /// that whole namespace to the page's composition and to no other file — so the caller resolves
+    /// and hands over text.
+    ///
+    /// `panelMessage` is where Q7's narrowing gets said: the other app's button produces a PDF and
+    /// this one produces HTML, and the user reads that while choosing the destination rather than
+    /// discovering it afterwards.
+    func saveDocumentHTMLViaPanel(html: String,
+                                  suggestedName: String,
+                                  panelMessage: String) -> DocumentSaveResult {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.html]
+        panel.nameFieldStringValue = suggestedName
+        panel.message = panelMessage
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return .cancelled }
+        do {
+            try html.write(to: url, atomically: true, encoding: .utf8)
+            return .written(path: url.path)
+        } catch {
+            return .failed
+        }
+    }
+
     // MARK: - Backup export (Settings → Data)
 
     /// Timestamp for backup file/dir names — ASCII, filesystem-safe, POSIX-stable.

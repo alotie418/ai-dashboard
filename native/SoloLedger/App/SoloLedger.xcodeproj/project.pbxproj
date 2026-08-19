@@ -71,6 +71,7 @@
 		F7E335F88BD61FB3210BD6FA /* ReportStructuralCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04B73F5ACCA2246832685898 /* ReportStructuralCopyTests.swift */; };
 		FC8D8B1A558465530BF9CA27 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 696F07DAFA605B5BDFA9D581 /* Assets.xcassets */; };
 		FD4AD5C20359810682D6A039 /* DocumentMountingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99D848C2E7BBE702B70BBEA9 /* DocumentMountingTests.swift */; };
+		FD4AD5C20359810682D6A040 /* DocumentExportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99D848C2E7BBE702B70BBEB0 /* DocumentExportTests.swift */; };
 		FFF7B402438816464EC609EC /* LegacyConversionCopyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74568FEF2DF4A81900AB8190 /* LegacyConversionCopyTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -141,6 +142,7 @@
 		8F110EF8BC57063D90D62A40 /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsView.swift; sourceTree = "<group>"; };
 		94CD9BC9AA30458BF828A058 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/Localizable.strings; sourceTree = "<group>"; };
 		99D848C2E7BBE702B70BBEA9 /* DocumentMountingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentMountingTests.swift; sourceTree = "<group>"; };
+		99D848C2E7BBE702B70BBEB0 /* DocumentExportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentExportTests.swift; sourceTree = "<group>"; };
 		9A2D61F4C80B3E5729D4AF63 /* OverviewMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewMetricsTests.swift; sourceTree = "<group>"; };
 		9C55F715C81A53197D609954 /* ReportFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportFormatters.swift; sourceTree = "<group>"; };
 		9CECAC57D1DFBD07FE47679B /* AppCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCommands.swift; sourceTree = "<group>"; };
@@ -277,6 +279,7 @@
 				6830222C9FA6F31E6BE497E2 /* AppModelBootTests.swift */,
 				8C26549A6E2C20DB2210C445 /* AppUnitTests.swift */,
 				99D848C2E7BBE702B70BBEA9 /* DocumentMountingTests.swift */,
+				99D848C2E7BBE702B70BBEB0 /* DocumentExportTests.swift */,
 				3E562DD88E7D26BED7D6DD42 /* DormantSourceChoiceBootTests.swift */,
 				5592CBD647AF371A1D160A7C /* ElectronFixtureProductionOpenTests.swift */,
 				9E1A6C3D5B074F28A1C0D742 /* InventoryMountingTests.swift */,
@@ -533,6 +536,7 @@
 				47AED20762FB91EC3DC2344F /* AppModelBootTests.swift in Sources */,
 				821321D467EC23E204FF19DF /* AppUnitTests.swift in Sources */,
 				FD4AD5C20359810682D6A039 /* DocumentMountingTests.swift in Sources */,
+				FD4AD5C20359810682D6A040 /* DocumentExportTests.swift in Sources */,
 				EE1B48EDB26A061CD1B3E584 /* DormantSourceChoiceBootTests.swift in Sources */,
 				319B70CB0DBEC47627D1F71C /* ElectronFixtureProductionOpenTests.swift in Sources */,
 				4C8D2F91A3E7B05614DA8CB3 /* InventoryMountingTests.swift in Sources */,

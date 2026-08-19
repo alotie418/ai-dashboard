@@ -81,6 +81,16 @@ enum DocumentPageComposition {
         case taxInvoicePanel
         /// The attachment control inside that sheet.
         case attachment
+        /// The Powerbox save panel that writes the artefact — its own message line, which is where
+        /// the "this is HTML, not a PDF" sentence belongs: the user reads it while choosing where
+        /// the file goes, not afterwards.
+        case savePanel
+        /// **Inside the exported file.** Not a screen region at all, and that is the point: five of
+        /// this namespace's sentences are carried by the artefact rather than by the app, and a
+        /// placement table that only knew about screens would have nowhere to put them.
+        case artefact
+        /// What the page says once an export has finished, or failed.
+        case exportMessage
     }
 
     // MARK: - Placement
@@ -223,21 +233,39 @@ enum DocumentPageComposition {
         "documents.attachment.tooLarge": [.attachment],
         "documents.attachment.failed": [.attachment],
         "documents.attachment.invalidType": [.attachment],
+        // MARK: rowAction + savePanel + exportMessage (4)
+        //
+        // D-5 draws what D-3 wrote and D-4 deliberately left at zero. The button and the file land
+        // together, which is why they could not be split across rounds: a control that writes
+        // nothing is worse than no control.
+        "documents.export.action": [.rowAction],
+        "documents.export.formatNote": [.savePanel],
+        "documents.export.done": [.exportMessage],
+        "documents.export.failed": [.exportMessage],
+        // MARK: artefact (5)
+        //
+        // These five are printed INTO the file. `period` and `currency` appear only when the
+        // document carries them; `voidBadge` only on a void document. They are placed
+        // unconditionally because placement is about where a key MAY land, not about one document.
+        "documents.print.generatedAt": [.artefact],
+        "documents.print.period": [.artefact],
+        "documents.print.disclaimer": [.artefact],
+        "documents.print.voidBadge": [.artefact],
+        "documents.print.currency": [.artefact],
     ]
 
-    /// The two families of this namespace that a LATER round draws.
+    /// The families of this namespace that a LATER round draws — **empty since D-5**.
     ///
-    /// Named by PREFIX rather than one key at a time, and that is not a shortcut: `DocumentCopyTests`
-    /// asserts each of the nine is named in production NOWHERE, and spelling them out here would be
-    /// this file naming them. A prefix cannot collide with a whole key, so the declaration stays
-    /// visible without becoming a use.
+    /// It stays declared rather than being deleted because the two tests that lean on it are the
+    /// ones that would go quiet if it vanished: `DM1` proves `placement ∪ deferred` is the whole
+    /// namespace, and an empty deferred set turns that into the plain equality it should now be.
+    /// Emptiness is asserted, so a future round cannot park a family here without saying so.
     ///
-    /// `documents.export.*` puts the artefact on disk and `documents.print.*` goes inside it, which
-    /// is D-5's subject in the split table and in `DocumentCopyTests`' own header. Drawing the
-    /// export button here and leaving the artefact for D-5 would ship a control with nothing behind
-    /// it, so the button waits with the file. `DocumentMountingTests` measures that the keys these
-    /// prefixes cover are exactly the nine that ``placement`` does not hold.
-    static let deferredPrefixes = ["documents.export.", "documents.print."]
+    /// It was `["documents.export.", "documents.print."]` through D-4. Named by PREFIX, and that
+    /// was not a shortcut: `DocumentCopyTests` asserted each of those nine was named in production
+    /// NOWHERE, so spelling them out here would have been this file naming them. D-5 draws the
+    /// artefact, so the nine are in ``placement`` now and the closed set counts them like any other.
+    static let deferredPrefixes: [String] = []
 
     /// The keys this page borrows from other namespaces, and where they land.
     ///
@@ -758,6 +786,9 @@ enum DocumentPageComposition {
         var pendingVoid: BusinessDocument?
         var pendingDelete: BusinessDocument?
         var error: PageError?
+        /// Where the last export landed, or that it failed. Separate from ``error`` because an
+        /// export that succeeded is not an error and must not be drawn as one.
+        var exportOutcome: ExportOutcome?
 
         init(page: BusinessDocumentPage = BusinessDocumentPage(documents: [], unreadableCount: 0),
              filter: TypeFilter = .all,
@@ -765,7 +796,8 @@ enum DocumentPageComposition {
              taxInvoice: TaxInvoiceDraft? = nil,
              pendingVoid: BusinessDocument? = nil,
              pendingDelete: BusinessDocument? = nil,
-             error: PageError? = nil) {
+             error: PageError? = nil,
+             exportOutcome: ExportOutcome? = nil) {
             self.page = page
             self.filter = filter
             self.editor = editor
@@ -773,6 +805,7 @@ enum DocumentPageComposition {
             self.pendingVoid = pendingVoid
             self.pendingDelete = pendingDelete
             self.error = error
+            self.exportOutcome = exportOutcome
         }
     }
 
@@ -780,7 +813,7 @@ enum DocumentPageComposition {
 
     /// One row's controls, in the other app's own left-to-right order.
     enum RowAction: String, Equatable, Identifiable, CaseIterable {
-        case edit, issue, void, delete, taxInvoice
+        case edit, issue, void, delete, taxInvoice, export
 
         var labelKey: String {
             switch self {
@@ -789,6 +822,7 @@ enum DocumentPageComposition {
             case .void:       return "documents.action.void"
             case .delete:     return "common.delete"
             case .taxInvoice: return "documents.taxInvoice.action"
+            case .export:     return "documents.export.action"
             }
         }
 
@@ -1189,6 +1223,113 @@ enum DocumentPageComposition {
 
     // MARK: - One render · the page
 
+    // MARK: - The exported artefact (Q7)
+
+    /// The five sentences that travel INSIDE the file.
+    ///
+    /// They are a block of their own rather than loose constants because the placement proof reads
+    /// what a composed page can draw; a label that only existed inside a renderer's argument list
+    /// would be invisible to it, and this namespace has spent three rounds making sure nothing is.
+    struct ArtefactLabelKeys: Equatable {
+        let generatedAtKey = "documents.print.generatedAt"
+        let periodKey = "documents.print.period"
+        let disclaimerKey = "documents.print.disclaimer"
+        let voidBadgeKey = "documents.print.voidBadge"
+        let currencyKey = "documents.print.currency"
+
+        var allKeys: [String] {
+            [generatedAtKey, periodKey, disclaimerKey, voidBadgeKey, currencyKey]
+        }
+    }
+
+    /// Where an export ended up, or that it did not.
+    enum ExportOutcome: Equatable {
+        case done(path: String)
+        case failed
+
+        var messageKey: String {
+            switch self {
+            case .done:   return "documents.export.done"
+            case .failed: return "documents.export.failed"
+            }
+        }
+
+        /// The `{path}` the sentence interpolates, and `nil` where it has none.
+        var path: String? {
+            if case .done(let path) = self { return path }
+            return nil
+        }
+    }
+
+    /// The export control's words: the note the save panel carries, the artefact's own labels, and
+    /// whatever the last export left behind.
+    struct ExportBlock: Equatable {
+        /// Q7's 收窄 said in the one place it matters — on the panel that is about to write the
+        /// file. The other app produces a PDF here; this one produces HTML, and the user is told
+        /// so while choosing the destination rather than after.
+        let formatNoteKey = "documents.export.formatNote"
+        let artefact = ArtefactLabelKeys()
+        /// `nil` until an export has finished.
+        let outcome: ExportOutcome?
+
+        var allKeys: [String] {
+            [formatNoteKey] + artefact.allKeys + [outcome?.messageKey].compactMap { $0 }
+        }
+    }
+
+    /// Every label the artefact shows, resolved.
+    ///
+    /// This is the one place `documents.*` keys become text for the file, and it is in the
+    /// composition for the reason DC9 states: the renderer may not name a key. The borrowed halves
+    /// are deliberate and each is the label the SCREEN already uses for the same thing —
+    ///
+    ///  * the tax labels are the fixed ones (**B3 / B4**): the other app asks its accounting-locale
+    ///    config for `formTaxRate` / `headerTaxAmount` / `headerTotalWithTax`, and this app has no
+    ///    such concept table. Taking one from the screen keeps the file and the page saying the
+    ///    same word;
+    ///  * `documents.item.taxAmount` fills BOTH the tax column and the totals row, because over
+    ///    there one label field feeds both places.
+    static func artefactLabels(for document: BusinessDocument,
+                               language: String,
+                               t: (String) -> String) -> DocumentHTML.Labels {
+        let artefact = ArtefactLabelKeys()
+        return DocumentHTML.Labels(
+            lang: DocumentHTML.artefactLanguage(for: language),
+            typeTitle: t(key(for: document.type)),
+            voidBadge: document.status == .void ? t(artefact.voidBadgeKey) : "",
+            numberLabel: t("documents.col.number"),
+            dateLabel: t("documents.col.date"),
+            validUntilLabel: t("documents.form.validUntil"),
+            periodLabel: t(artefact.periodKey),
+            currencyLabel: t(artefact.currencyKey),
+            customerLabel: t("documents.col.customer"),
+            customerTaxIDLabel: t("documents.form.customerTaxID"),
+            customerAddressLabel: t("documents.form.customerAddress"),
+            customerContactLabel: t("documents.form.customerContact"),
+            descriptionLabel: t("documents.item.description"),
+            quantityLabel: t("documents.item.quantity"),
+            unitPriceLabel: t("documents.item.unitPrice"),
+            taxRateLabel: t("documents.item.taxRate"),
+            taxAmountLabel: t("documents.item.taxAmount"),
+            amountLabel: t("documents.item.amount"),
+            subtotalLabel: t("documents.total.subtotal"),
+            totalLabel: t("documents.total.total"),
+            notesLabel: t("documents.form.notes"),
+            generatedAtLabel: t(artefact.generatedAtKey),
+            disclaimer: t(artefact.disclaimerKey))
+    }
+
+    /// The unit as the ARTEFACT shows it, which is not what the editor's picker shows.
+    ///
+    /// `getProductUnitLabel` returns the empty string for a line with no unit, so the other app's
+    /// quantity cell is just the number. The picker's `documents.item.noUnit` ("No unit") is a
+    /// choice in a menu, not a value in a table — printing it into the file would put "2 No unit"
+    /// in a cell that should read "2".
+    static func artefactUnitLabel(_ unit: String?, t: (String) -> String) -> String {
+        guard let unit, !unit.isEmpty else { return "" }
+        return unitRawValues.contains(unit) ? t("product.unit.\(unit)") : unit
+    }
+
     struct Page: Equatable {
         let titleKey: String
         let headerKeys: [String]
@@ -1201,6 +1342,10 @@ enum DocumentPageComposition {
         let taxInvoice: TaxInvoiceBlock?
         let voidConfirm: ConfirmBlock?
         let deleteConfirm: ConfirmBlock?
+        /// What the page can put on disk, and the words that go with it. Always present: the page
+        /// can always export, and the artefact's own labels have to be reachable from here or the
+        /// placement proof would have nowhere to find them.
+        let export: ExportBlock
 
         var errorKeys: [String] { error?.allKeys ?? [] }
 
@@ -1216,6 +1361,7 @@ enum DocumentPageComposition {
             keys.formUnion(taxInvoice?.allKeys ?? [])
             keys.formUnion(voidConfirm?.allKeys ?? [])
             keys.formUnion(deleteConfirm?.allKeys ?? [])
+            keys.formUnion(export.allKeys)
             return keys
         }
     }
@@ -1258,7 +1404,8 @@ enum DocumentPageComposition {
                              messageKey: "documents.confirm.delete.message",
                              confirmActionKey: "common.delete",
                              cancelActionKey: "common.cancel")
-            })
+            },
+            export: ExportBlock(outcome: input.exportOutcome))
     }
 
     private static func filterOption(for filter: TypeFilter) -> FilterOption {
@@ -1305,6 +1452,10 @@ enum DocumentPageComposition {
         if status == .draft || status == .issued { out.append(.void) }
         if status != .issued { out.append(.delete) }
         out.append(.taxInvoice)
+        // Every status, void included: the other app's export button carries no condition at all,
+        // and its template has a badge for exactly that case. A voided document is still a record
+        // somebody may need to hand over.
+        out.append(.export)
         return out
     }
 

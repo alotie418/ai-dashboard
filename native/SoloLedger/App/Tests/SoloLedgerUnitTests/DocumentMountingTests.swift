@@ -102,6 +102,11 @@ final class DocumentMountingTests: XCTestCase {
                          unitPrice: nil, taxRate: nil, taxAmount: 30, amount: 500,
                          refDate: "2026-01-20")])
 
+        var exported = DocumentPageComposition.Input(page: page)
+        exported.exportOutcome = .done(path: "/Users/x/Desktop/QT-2026-0001.html")
+        var exportFailed = DocumentPageComposition.Input(page: page)
+        exportFailed.exportOutcome = .failed
+
         var attached = DocumentPageComposition.Input(page: page)
         attached.taxInvoice = TaxInvoiceDraft(document: doc(attachment: "attachments/docs/a.pdf"))
         var picking = DocumentPageComposition.Input(page: page)
@@ -132,6 +137,7 @@ final class DocumentMountingTests: XCTestCase {
             DocumentPageComposition.Input(page: page, pendingVoid: rows[0]),
             DocumentPageComposition.Input(page: page, pendingDelete: rows[0]),
             attached, picking, tooLarge, invalidType, missing, failed, badPath, voided,
+            exported, exportFailed,
         ]
         for error in Self.everyError {
             inputs.append(DocumentPageComposition.Input(page: page, error: error))
@@ -154,14 +160,19 @@ final class DocumentMountingTests: XCTestCase {
     func testDM1ThePlacementTableCoversTheNamespaceMinusTheDeferredFamilies() throws {
         let table = try sourceTable("en")
         let namespace = Set(table.keys.filter { $0.hasPrefix("documents.") })
-        XCTAssertEqual(namespace.count, 103, "the namespace D-3 landed")
+        XCTAssertEqual(namespace.count, 103, "the namespace D-3 landed, unchanged by D-5")
 
         let placed = Set(DocumentPageComposition.placement.keys)
         let deferred = namespace.filter { key in
             DocumentPageComposition.deferredPrefixes.contains { key.hasPrefix($0) }
         }
-        XCTAssertEqual(deferred.count, 9, "four exports and five printed lines belong to D-5")
-        XCTAssertEqual(placed.count, 94)
+        XCTAssertTrue(deferred.isEmpty, """
+            a family is deferred again. D-5 drew the last two — the artefact and the words inside \
+            it — so this set is empty and the closure below is a plain equality rather than one \
+            with a hole in it.
+            """)
+        XCTAssertTrue(DocumentPageComposition.deferredPrefixes.isEmpty)
+        XCTAssertEqual(placed.count, 103, "the whole namespace is drawn now")
         XCTAssertEqual(placed.union(deferred), namespace, """
             placement ∪ deferred is not the namespace.
             unplaced: \(namespace.subtracting(placed).subtracting(deferred).sorted())
@@ -217,23 +228,35 @@ final class DocumentMountingTests: XCTestCase {
             """)
     }
 
-    // MARK: - DM4 · a deferred key is never composed
+    // MARK: - DM4 · the nine keys D-4 held back are the nine D-5 draws
 
-    func testDM4TheExportedArtefactsKeysAreNeverComposed() {
+    /// D-4 asserted these were composed NOWHERE. The claim flips rather than disappearing: each of
+    /// the nine now has to be reachable from a composed page, and each has to be in `placement`.
+    ///
+    /// The flip is the whole point of the round, so it gets its own equality instead of being left
+    /// to DM1's counting: a count can be satisfied by any nine keys, and these are the nine.
+    func testDM4TheArtefactsNineKeysAreAllDrawnNow() {
         let produced = compositions().reduce(into: Set<String>()) { $0.formUnion($1.allKeys) }
-        for key in produced {
-            for prefix in DocumentPageComposition.deferredPrefixes {
-                XCTAssertFalse(key.hasPrefix(prefix), """
-                    \(key) reached a render. The exported artefact is D-5's; drawing its copy here \
-                    would ship a control with nothing behind it.
-                    """)
-            }
+        let nine = ["documents.export.action", "documents.export.done", "documents.export.failed",
+                    "documents.export.formatNote", "documents.print.generatedAt",
+                    "documents.print.period", "documents.print.disclaimer",
+                    "documents.print.voidBadge", "documents.print.currency"]
+        XCTAssertEqual(Set(nine).count, 9)
+        for key in nine {
+            XCTAssertTrue(produced.contains(key), """
+                \(key) is still composed nowhere. D-4 held these back because the button and the \
+                file had to land together; this round lands both, so a key with no render is now a \
+                control with nothing behind it rather than a deliberate absence.
+                """)
+            XCTAssertNotNil(DocumentPageComposition.placement[key], "\(key) has no region")
         }
-        // …and the check is not vacuous: the prefixes match the keys they are meant to match.
-        XCTAssertTrue(DocumentPageComposition.deferredPrefixes
-            .contains { "documents.export.action".hasPrefix($0) })
-        XCTAssertTrue(DocumentPageComposition.deferredPrefixes
-            .contains { "documents.print.disclaimer".hasPrefix($0) })
+        // …and the four that only appear on one path really do need that path: the two outcome
+        // sentences are absent from a page that has not exported anything.
+        let quiet = DocumentPageComposition.compose(DocumentPageComposition.Input()).allKeys
+        XCTAssertFalse(quiet.contains("documents.export.done"))
+        XCTAssertFalse(quiet.contains("documents.export.failed"))
+        XCTAssertTrue(quiet.contains("documents.print.disclaimer"),
+                      "the artefact's own labels are always reachable — the page can always export")
     }
 
     // MARK: - DM5 · the borrowed keys do not go stale
@@ -644,17 +667,24 @@ final class DocumentMountingTests: XCTestCase {
 
     func testDM15TheRowControlsFollowTheStatusMachine() {
         XCTAssertEqual(DocumentPageComposition.actions(for: .draft),
-                       [.edit, .issue, .void, .delete, .taxInvoice])
-        XCTAssertEqual(DocumentPageComposition.actions(for: .issued), [.void, .taxInvoice],
+                       [.edit, .issue, .void, .delete, .taxInvoice, .export])
+        XCTAssertEqual(DocumentPageComposition.actions(for: .issued), [.void, .taxInvoice, .export],
                        "an issued document cannot be edited, re-issued, or deleted directly")
-        XCTAssertEqual(DocumentPageComposition.actions(for: .void), [.delete, .taxInvoice],
+        XCTAssertEqual(DocumentPageComposition.actions(for: .void), [.delete, .taxInvoice, .export],
                        "a void document can be deleted — that is what gives its number back")
         for status in BusinessDocumentStatus.allCases {
             XCTAssertTrue(DocumentPageComposition.actions(for: status).contains(.taxInvoice), """
                 the association is offered on every row: an invoice is recorded against documents \
                 that have already been issued.
                 """)
+            XCTAssertTrue(DocumentPageComposition.actions(for: status).contains(.export), """
+                export is offered on every row, void included. The other app's button carries no \
+                condition at all and its template has a badge for exactly that case — a voided \
+                document is still a record somebody may have to hand over.
+                """)
         }
+        XCTAssertEqual(DocumentPageComposition.RowAction.allCases.count, 6,
+                       "a seventh control would need a place in the status machine above")
         // The period sub-line, on the one type and the one condition that draws it.
         XCTAssertEqual(DocumentPageComposition.period(of: doc(type: .statement,
                                                              periodStart: "2026-01-01",
