@@ -1,0 +1,61 @@
+{
+  "generatedAt": "2026-08-19T03:04:05Z",
+  "document": {
+    "id": "doc-golden-1",
+    "docType": "commercial_invoice",
+    "docNumber": "CI-2026-0007",
+    "docDate": "2026-08-18",
+    "validUntil": "2026-09-30",
+    "customerName": "Acme & Sons <Holdings>",
+    "customerTaxId": "91310000MA1FL0\"X\"9",
+    "customerAddress": "12 O'Connell Street",
+    "customerContact": "ops@acme.example",
+    "accLocale": "CN",
+    "currency": null,
+    "status": "draft",
+    "subtotal": 1234.5,
+    "taxAmount": 160.49,
+    "total": 1394.99,
+    "notes": "Pay within 30 days.\nBank: <Acme & Co>",
+    "periodStart": null,
+    "periodEnd": null,
+    "items": [
+      {
+        "description": "Widget <A> & \"B\"",
+        "quantity": 2,
+        "unit": "piece",
+        "unitPrice": 50,
+        "taxRate": "13%",
+        "taxAmount": 13,
+        "amount": 100
+      },
+      {
+        "description": "No numbers at all",
+        "quantity": null,
+        "unit": null,
+        "unitPrice": null,
+        "taxRate": null,
+        "taxAmount": null,
+        "amount": null
+      },
+      {
+        "description": "Zero quantity, unknown unit",
+        "quantity": 0,
+        "unit": "carton",
+        "unitPrice": 0,
+        "taxRate": "",
+        "taxAmount": 0,
+        "amount": 0
+      },
+      {
+        "description": "",
+        "quantity": 1234.5,
+        "unit": "",
+        "unitPrice": 1234.5,
+        "taxRate": "0%",
+        "taxAmount": 0,
+        "amount": 1234.5
+      }
+    ]
+  }
+}

@@ -15,7 +15,13 @@ export async function resolve(specifier, context, nextResolve) {
       try {
         const p = fileURLToPath(tryUrl);
         await stat(p);
-        return { url: tryUrl, shortCircuit: true, format: ext.endsWith('tsx') ? 'module' : 'module' };
+        // `.ts` must be declared as TypeScript, not as plain ESM: naming the format at all
+        // short-circuits node's own inference, and 'module' means "this is already JavaScript",
+        // so the type annotations reach the parser and a bare `export type` is a syntax error.
+        // Only files reached THROUGH this hook were affected — an import that already carries
+        // its `.ts` extension never gets here, which is why this went unnoticed.
+        return { url: tryUrl, shortCircuit: true,
+                 format: ext.endsWith('tsx') ? 'module' : 'module-typescript' };
       } catch {}
     }
     throw e;

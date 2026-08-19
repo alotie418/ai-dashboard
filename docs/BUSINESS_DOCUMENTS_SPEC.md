@@ -75,7 +75,7 @@ Q2 的细目（Q2-a 字段映射 / Q2-b 不列税率 / Q2-c 空白规则 / Q2-d 
 
 #### Q2-b · 不显示税率列
 
-对账单行**只列四样：描述 / 日期 / 金额 / 税额**。不列税率，也不写 `business_document_items.tax_rate`。
+对账单行**只列四样：描述 / 日期 / 税额 / 金额**。不列税率，也不写 `business_document_items.tax_rate`。
 
 * **依据**：`transactions.tax_rate` 是 `REAL`，而**它的量纲在库内没有任何约定**——写入侧只做 `Number(x) || 0`，全仓没有任何消费者对它做过归一，原生编辑器也只收一个裸数字，所以「13」还是「0.13」无从判断。**不把一个没有约定的数字印到交给客户的产物上。**
 * **与其它单据类型的差别，登记在案**：其余四种类型沿用六列表（描述 / 数量与单位 / 单价 / 税率 / 税额 / 金额）；对账单是四列的另一套版式。**日期在这里是独立的一列**，而 Electron 是把日期揉进描述串里的（`` `${r.date} ${...}` ``）——这是本条与 Q2-a 一起造成的有意分叉。
@@ -200,6 +200,9 @@ Q2 的细目（Q2-a 字段映射 / Q2-b 不列税率 / Q2-c 空白规则 / Q2-d 
 
 * **首版形态**：导出一份**自包含 HTML 文件**（样式内联、无外部资源、用户文本全量转义），经 Powerbox 存盘。
 * **模板语义镜像 Electron**：抬头（公司名 + 可选税号/地址/负责人）、单据 meta 行（编号 / 日期 / 可选有效期 / 对账期间）、客户块、明细表（描述 / 数量与单位 / 单价 / 税率 / 税额 / 金额六列）、合计三行（小计 / 税额 / 总计）、备注块、页脚。
+* **对账单是唯一的模板变体（第九次裁定）**：它的明细表出**四列**——描述 / 日期 / 税额 / 金额——**不出税率**，且**日期是独立的一列**，取自 `business_document_items.ref_date`。这与 Q2-b 在屏幕侧定的是同一条口径：Electron 把日期揉进描述串（`salesToRow` 的前缀 `` `${r.date} ${...}` ``），原生把它拿掉了，所以在产物里照抄六列会把日期整个丢掉。**其余四种类型仍是六列。** 实测：Electron 对一张原生形状的对账单出的是六列、其中三列全空、日期在描述格里。
+* **抬头在原生只出公司名**：`SettingsStore` 只有 `company_name`，没有 Electron 的 `company_info` 三字段，`.cmeta` 那一行恒空——登记为 **B5**，不为它加设置项。
+* **页眉的币种行（第九次裁定）**：`business_documents.currency` 非 `NULL` 时，产物页眉多出一行「币种: <代码>」（`documents.print.currency`）；为 `NULL` 时**该行不出现**，产物在这一处与 Electron 逐字节相同。这是 Q8 例外在产物面的第四处延伸，见 Q8。
 * **页脚免责声明必须在产物内**，不是只在界面上；后续轮把「产物里必然含免责声明」写成守门断言。
 * **系统打印**（`NSPrintOperation` 路线）登记为**后续轮候选**：它需要动 2c-7 已经钉死的 entitlements 闭集，属另行裁定。
 * **`WKWebView` 路线否决**：与 #483 钉住的「无网络」能力守门冲突。
@@ -210,8 +213,22 @@ Q2 的细目（Q2-a 字段映射 / Q2-b 不列税率 / Q2-c 空白规则 / Q2-d 
 #### Q7-a · 文件名与落盘位置
 
 * **文件名** = `<doc_number>.html`，其中 `doc_number` 里对文件系统非法的字符要先转义。
+* **转义函数（第九次裁定）= 照抄 Electron 的那一个**：`docNumber.replace(/[\\/:*?"<>|\s]+/g, '_')`（连续的非法字符与空白折成一个下划线），结果为空串时**回落到单据 `id`**。与 Electron 的两处差别都由 Q7-a 正文定过、不再重复：**不带 `SoloLedger-` 前缀**，扩展名是 `.html` 而不是 `.pdf`。
 * **落盘位置** = Powerbox 用户自选，**没有默认目录**，也不自建目录。
 * **登记的已知形态（文件名不保证唯一）**：编号的唯一性是 `(doc_type, doc_number)` 上的，**不是 `doc_number` 单列上的**——实测既有守门就断言着同一个 `DUP-1` 可以在 `quotation` 与 `sales_order` 上各存在一次。所以两张不同类型、同编号的单据导出到同一个目录会得到同一个文件名。**这不是静默覆盖**：落盘走 Powerbox 存盘面板，重名由系统面板提示用户；但「文件名唯一」这句话不成立，故在此登记而不是当成保证。
+
+#### Q7-b · 验收线（第九次裁定）
+
+Q9 的验收线是「同输入下结果与 Electron 逐字节相等」。产物面上它有一个**能成立的定义域**，因为下面每一条
+登记的分叉都会让某一类样本永远不可能相等；把边界写下来，比让一条永远为真不了的断言挂在那里诚实。
+
+* **逐字节相等的定义域** = **非对账单** + `currency IS NULL` + **CN 制度** + **注入固定的 `generatedAt`**。
+  这个交集里的产物必须与 `components/documentPdf.ts` 的 `buildDocumentHtml` 输出**逐字节相等**。
+* **黄金**：六语各一份，由 node 经 `scripts/_ts-resolver.mjs` 直接 import 真模板生成，**提交进仓**。
+  放**独立目录、配独立的再生成校验**；**不得进冻结的报表黄金目录**，其变更**不得**使用行首
+  `Allowed-Golden-Changes` 通道。
+* **定义域之外**：R1–R6 每一处分叉**各钉一条只钉它的测试**（D-3 判例 47：规格里凡写着「有意分叉」的地方，
+  都要有一条只钉那处分叉的测试，否则实现可以悄悄把它改回去）。
 
 ### Q8 · 币种 = 照搬隐式本位币
 
@@ -219,6 +236,7 @@ Q2 的细目（Q2-a 字段映射 / Q2-b 不列税率 / Q2-c 空白规则 / Q2-d 
 
 * **证据锚**：`electron/db/index.js` 迁移 v11（`business_documents` 无 currency 列，有 `acc_locale`）；`components/accountingHelpers.ts` 的 `formatMoney`；`electron/handlers/documents.js` 的 `resolveAccLocale`（创建时解析、`update` 忽略）。
 * **可测断言**：同一张单据在设置切换会计制度后，显示币种不变——因为读的是行上冻结的 `acc_locale`，不是当前设置。
+* **第四处延伸（第九次裁定，载体 = 导出产物）**：`currency` 非 `NULL` 时，**导出产物的页眉也出一行「币种: <代码>」**（`documents.print.currency`）。出的是**代码不是符号**，与下面那条例外在金额符号一侧的做法同源——本仓没有 code→symbol 表，`ReportFormat` 早已写明不借 OS 的。`currency` 为 `NULL` 时该行不出现。
 * **一处显式例外（Q2-d 造成，载体已定）**：**`business_documents.currency` 非 `NULL` 时，页眉、UI 徽标与金额符号三处一律按该列渲染，不按 `acc_locale` 推导。** `currency` 为 `NULL` 时本条正文原样成立。该列由 D-1a 加入（Q2-d-②），首版只有对账单生成器写它，所以其余四种类型与全部既有单据都落在 `NULL` 分支上、行为不变。
 
 ### Q9 · 存储 = 甲案（写 v11 既有表），计算迁入 Core 但逐字复刻
@@ -288,6 +306,29 @@ Electron 的关联面板有**三条真正会删文件的路径**：`app:discardD
 * **排期（同一次裁定）**：**存储原子化轮插在 D-5 之后、D-6 之前**（范围见 §5）；
   **D-6 激活时接上删除接缝**。在原子化轮落地之前，任何轮次都不得接删除。
 * **接缝是单点的**：App 侧消费那两个回传值的地方各恰一处，都在页面模型里，都只是把值丢掉。
+
+### B 系列：原生这一侧的有意差异（第八 / 第九次裁定）
+
+上面那张表是 **A 系列**，它的表头写的是「Electron 的**已知形态**，本章照搬」。下面这些**不是那种东西**：
+它们是原生这一侧与 Electron 之间的**有意差异**，方向相反——照搬的是别人的形态，这里记的是「本仓给不出
+同一个东西」或「本仓有意给了另一个形状」。两者不该共用一个编号命名空间，故另编 **B 系列**。
+
+**B1 / B2（第八次裁定，D-4）的共同性质：都到不了账本。** 输入侧由 `DocumentPageComposition.numberInput`
+净化字符，提交侧由 `DocumentPageComposition.NumberConstraint.accepts` 按 HTML 的 valid floating-point
+number 文法再判一次，两道都过不去。差异只存在于「字段正在被编辑」这一段时间里。
+
+**B3–B7（第九次裁定，D-5）都在产物面上**，其中 B4 是 D-3/D-4 就已发生、此前一直没登记的那一处。
+按 Q7-b，它们每一条都要有一条**只钉它自己**的测试；逐字节相等的定义域也是因为它们才需要写下来。
+
+| 编号 | 形态 | 证据锚 | 处置 |
+| --- | --- | --- | --- |
+| B1 | **粘贴 `1a2`**：浏览器把字段清空，原生留下 `12`。两边都提交不了 `1a2`。逐字（英文原文即证据锚本身）：*PASTING `1a2` clears the field in a browser and leaves `12` here. Both are unsubmittable-as-`1a2`, which is the property that matters.* | `native/SoloLedger/Sources/SoloLedger/App/DocumentPageComposition.swift` 的 `numberInput(_:)` 文档注释，「**Two registered differences**」第一条 | **登记级，不改。** 要抹平它得让原生的字符净化在遇到一个非法字符时清空整个字段，那会连带把「半打的值」一起清掉——见 B2 的同一处注释 |
+| B2 | **半打的 `1.`**：对面是 `badInput`，绑定态因此变成 `''`，**它的合计把那一行读成 0**，而字段仍显示 `1.`；原生文本留 `1.`，合计按 `parseFloat` 读成 1。两边都拒绝提交，两个合计只在字段没打完时不同。逐字（英文原文即证据锚本身）：*A half-typed `1.` is `badInput` over there, which makes the bound state `''` — so its running total reads that line as 0 while the field still shows `1.`. Here the text stays `1.` and the total reads it as 1, through the same `parseFloat` D-1 pinned. Both refuse the submit (see ``NumberConstraint/accepts(_:)``); the two totals disagree only while the field is unfinished.* | 同一处注释第二条；提交侧的判据在同文件 `NumberConstraint.accepts(_:)` | **登记级，不改。** 要抹平它得让原生合计对「不是合法浮点字面量」的文本读 0，那是改 D-1 钉住的编辑期读数口径（`DocumentMath.editorNumber` 是 `parseFloat`，两侧同一个函数），属另一个裁定，不在本章已裁定的范围内 |
+| B3 | **产物的税相关标签不随会计制度变**：Electron 的产物按 `getTaxLabel(acc_locale, uiLang, …)` 取 `formTaxRate` / `headerTaxAmount` / `headerTotalWithTax`（非 CN 制度下是「Sales Tax Rate」「消費税率」这类制度自己的说法）；原生产物沿用屏幕已在用的固定键 `documents.item.taxRate` / `documents.item.taxAmount` / `documents.total.*` | `components/accountingLocaleConfig.ts` 的 `formTaxRate` / `headerTaxAmount` / `headerTotalWithTax` 三个概念；原生 `AccountingProfile` 只有 `taxLabel` 与 `surchargeLabel` | **登记，不改。** 把那张概念表搬进原生等于动 accounting profiles，`CLAUDE.md` 把它列为需要显式批准的红线；而只补三个概念同样是 profile 改动。**零制度化标签概念进原生**是第九次裁定的原话 |
+| B4 | **屏幕侧同一处分叉，D-3/D-4 就已发生**：单据编辑器的税率列表头，Electron 是 `taxLabel('formTaxRate')`，原生是六语恒为「税率」的 `documents.item.taxRate`；税额与总计表头同理（Electron 非 CN 走 `headerTaxAmount` / `headerTotalWithTax`） | `components/DocumentModal.tsx` 的 `taxLabel('formTaxRate')` 与 `taxAmountLabel`；原生 `DocumentPageComposition` 的 `taxRateKey` / `taxAmountKey` | **补登记，不改。** 这一条**不是 D-5 造成的**——它在 D-3 写文案、D-4 画表时就已经这样，只是此前规格里零登记（`formTaxRate` / `taxLabel` 在本文件中此前零命中）。产物与屏幕保持同一套标签，是 B3 成立的前提 |
+| B5 | **抬头只出公司名**：Electron 的产物抬头出 `company_info` 的名称 + 税号 / 地址 / 负责人三个可选小字；原生只出 `company_name`，其余传空，`.cmeta` 那一行恒不出现 | `components/documentPdf.ts` 的 `companyMeta`；原生 `SettingsStore.Key` 只有 `companyName`，无 `company_info` | **登记，不改。** 为产物加三个设置项是本章之外的事 |
+| B6 | **生成时间的格式**：Electron 是 `new Date().toLocaleString(uiLang)`（宿主 ICU 的本地化串，随语言与地区变，没有固定格式契约）；原生固定为 **ISO-8601 UTC**，且 `now` 可注入 | `components/DocumentsPage.tsx` 的 `generatedAt: new Date().toLocaleString(uiLang)` | **登记，不改。** 逐字端口一个没有稳定契约的格式，钉不住也测不动；可注入的 `now` 正是 Q7-b 逐字节定义域能成立的前提 |
+| B7 | **产物里的语言码是 Electron 的**：`<html lang>` 与 CJK 字体族的挑选键出 `zh-CN` / `zh-TW`，不是原生自己的 `zh-Hans` / `zh-Hant`；其余四语两侧同码 | `components/documentPdf.ts` 的 `cjkFonts(lang)` 与 `<html lang="${e(L.lang)}">`；原生语言码见 `Localizer.swift` | **有意映射，登记。** 出原生码会同时改掉字体回落与产物字节；映射只此一处、只在产物边界上发生 |
 
 ---
 
@@ -460,3 +501,59 @@ D-4 开工前置的测绘（只读）提出三个超出确认书的判断点，�
 | **§6 · D-6** | 「侧栏可达 + 收尾」 | 收编自 D-4 的侧栏三件（enum case / `RootView` 分支 / 两处计数注释）+ **接上附件删除接缝**；并登记「届时另有 8 处 `SidebarSection.allCases` 有序断言与 `SidebarSectionProbe` 两条要同批翻转，开工前须重跑扫描」 | 同上。处数是 D-4 开工前置实测的，按 N-PR-6 判例「记忆里的处数只当线索」，D-6 仍须重跑 |
 
 **本次修订不改代码之外的任何口径**：Q1–Q4、Q6–Q9 与 Q2 的四条细目一个字未动。
+
+### 2026-08-19 · 第八次裁定（D-4 复核返工的两处编辑期差异 → 登记级）
+
+D-4 的复核返工（PR #491，merge `66ed9fef`）在实现「三个数字域按控件自己的属性判」时，实测出两处
+**编辑期**差异：两边都拒绝把它们写进账本，但字段还没打完时屏幕上的合计不同。用户在合并授权的同一条
+消息里**追认它们为登记级**，并把 §3 的登记行排期到 **D-5 的首个 commit**——即本次修订。
+
+| 条目 | 从什么 | 改成什么 | 依据 |
+| --- | --- | --- | --- |
+| **§3** | 只有 A 系列七条 | 新增一节「D-4 的两处编辑期差异（第八次裁定：登记级）」与 **B1 / B2** 两行 | 用户追认。两条都到不了账本，差异只在字段被编辑的那一段时间里 |
+| **编号** | （本次新产生） | 另编 **B 系列**而不是接着 A12 写 A13/A14 | A 系列表头自己写的是「Electron 的已知形态，本章照搬」，这两条不是那种东西——方向相反。混进同一命名空间会让那句表头对它自己的两行为假 |
+| **措辞** | （本次新产生） | 两行的形态列**逐字带上代码注释里的英文原句** | 用户指令「措辞照抄注释不重写」。那两句是 D-4 返工实测出来的，不是推的；逐字带上，任何时候都能与注释按字节对回去 |
+
+**本次修订不改任何已裁定口径**：Q1–Q9 与 Q2 的四条细目、§5 / §6 拆轮表一个字未动。
+D-5 的输出本体（Q7 自包含 HTML + Powerbox）**不在**本次修订内——它的测绘还没做完，还没有任何东西可裁。
+
+### 2026-08-19 · 第九次裁定（D-5 开工测绘的九点 + B 系列编号追认）
+
+D-5 开工前置的只读测绘（Q7 自包含 HTML + Powerbox）提出九个超出确认书的判断点，执行会话停下来要裁定，
+用户逐条裁定如下。**本次修订不改任何已裁定口径的方向**：它把一处模板变体写进 Q7、把一处例外延伸写进 Q8、
+把验收线的定义域写成 Q7-b，其余五处全部落成 §3 的 B 系列登记行。
+
+| 条目 | 从什么 | 改成什么 | 依据 |
+| --- | --- | --- | --- |
+| **B 系列编号** | 第八次裁定时由执行会话自行择定 | **追认** | 用户追认。A 系列表头自称「Electron 的已知形态，本章照搬」，B 系列的东西方向相反，混进同一命名空间会让那句表头对它自己的行为假 |
+| **Q7 模板** | 「明细表（描述 / 数量与单位 / 单价 / 税率 / 税额 / 金额六列）」，无类型分支 | 新增**对账单变体**：四列（描述 / 日期 / 金额 / 税额），不出税率，**日期独立成列**取 `ref_date`；其余四型仍六列 | 用户裁定。Q2-b 在屏幕侧已经把日期从描述串里拿掉，产物若照抄六列会把日期整个丢掉——实测：Electron 对一张原生形状的对账单出六列、三列全空、日期在描述格里 |
+| **Q7-a 文件名** | 「非法字符要先转义」，未指定转义函数 | **照抄 Electron 正则** `replace(/[\\/:*?"<>|\s]+/g,'_')`，空串回落 `id`，**不带前缀** | 用户裁定。转义规则照抄，前缀与扩展名按 Q7-a 正文既有的收窄 |
+| **Q7-b 验收线** | Q9 只写「同输入下结果与 Electron 逐字节相等」，产物面无定义域 | **非对账单 + `currency IS NULL` + CN 制度 + 注入固定 `generatedAt` → 逐字节相等**；黄金六语各一份、node 经 `_ts-resolver` 生成并提交、独立目录 + 独立再生成校验、**不进冻结的报表黄金目录**、**不得出现行首 `Allowed-Golden-Changes`**；定义域之外每处分叉各钉一条只钉它的测试 | 用户裁定。B3–B7 每一条都会让某一类样本永远不可能逐字节相等，把边界写下来比挂一条永远为真不了的断言诚实 |
+| **Q8 例外** | 三处载体（页眉 / UI 徽标 / 金额符号） | 加**第四处延伸**：产物页眉在 `currency` 非 `NULL` 时出一行「币种: <代码>」，`NULL` 时零行 | 用户裁定。`documents.print.currency` 是 D-3 已写入的键，本轮给它定了落点；出代码不出符号，与 Q8 在金额符号一侧同源（本仓无 code→symbol 表） |
+| **§3 · B3** | （本次新产生） | 产物的税相关标签沿用屏幕固定键，**零制度化标签概念进原生** | 用户裁定。搬概念表 = 动 accounting profiles，`CLAUDE.md` 的红线 |
+| **§3 · B4** | （既有分叉，此前零登记） | 屏幕侧同一处分叉**补登记** | 用户裁定。它在 D-3/D-4 就已发生，是 B3 成立的前提 |
+| **§3 · B5** | （本次新产生） | 抬头只出 `company_name`，其余传空；**不加设置项** | 用户裁定 |
+| **§3 · B6** | （本次新产生） | `generatedAt` 固定 ISO-8601 UTC，`now` 可注入 | 用户裁定。`toLocaleString` 没有稳定格式契约，钉不住；可注入是 Q7-b 定义域的前提 |
+| **§3 · B7** | （本次新产生） | 产物的 `<html lang>` 与 CJK 字体键出 Electron 码（`zh-Hans`→`zh-CN`、`zh-Hant`→`zh-TW`） | 用户裁定。出原生码会同时改掉字体回落与产物字节 |
+
+**本次修订不改代码之外的任何口径**：Q1–Q6、Q9 与 Q2 的四条细目、§5 / §6 拆轮表一个字未动。
+`documents.print.*` 五键**不是打印动作**而是产物自带的标签（.strings 注释原文），测绘据此确认
+「原生的打印对应物是什么」这一超规格判断**在本轮不产生**——系统打印（`NSPrintOperation`）仍按 Q7 正文
+登记为后续轮候选。
+
+### 2026-08-19 · 第十次裁定（四列的画序以已合并的屏幕为准）
+
+D-5 的实现按已合并的屏幕（`DM21`）画「描述 / 日期 / **税额 / 金额**」，而 Q2-b 与第九次裁定写进 Q7 的
+那两句枚举都写着「金额 / 税额」。执行会话在实现时就看出这处不一致，却只写进代码注释、没有主动报告，
+由复核（PR #492 的 bot 意见）抓出。用户裁定：**以屏幕为准，改规格的那两句枚举。**
+
+| 条目 | 从什么 | 改成什么 | 依据 |
+| --- | --- | --- | --- |
+| **Q2-b** | 「只列四样：描述 / 日期 / 金额 / 税额」 | 「只列四样：描述 / 日期 / **税额 / 金额**」 | 用户裁定。**金额殿后与两侧全部表格同序**：六列表的表尾就是 税额 → 金额，Electron 与原生皆然；四列表若反过来，同一个页面上两张表的最后两列会互调 |
+| **Q7 · 对账单变体** | 同上的枚举 | 同上 | 同一条口径的另一处书写，一并订正 |
+| **代码** | （无） | **零改动**：屏幕（`DM21` 的有序等式）与产物（`DocumentHTML.statementHead`）本来就是这个顺序 | 本次裁定订正的是规格的书写，不是实现 |
+
+**§9 的历史行不改。** 第三次裁定（Q2-b 移入 §2）与第九次裁定（Q7 加变体）两处表格里引用的旧枚举
+按其性质保留：它们记录的是当时写下的东西，改掉就不再是修订记录了。判断当前口径请看 §2 正文。
+
+**本次修订不改任何其它口径**：Q1 / Q3–Q9、§3 的 A 与 B 两系列、§5 / §6 拆轮表一个字未动。

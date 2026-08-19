@@ -524,10 +524,12 @@ final class DocumentCopyTests: XCTestCase {
     /// composition does not know about — which is what makes the placement proof in
     /// `DocumentMountingTests` mean anything.
     ///
-    /// **The nine keys of `documents.export.*` and `documents.print.*` stay at zero.** They belong
-    /// to the exported artefact, which is D-5's; drawing the button here and leaving the file for
-    /// later would ship a control with nothing behind it. Asserting their absence is what stops
-    /// this round from quietly taking that work.
+    /// **The nine keys of `documents.export.*` and `documents.print.*` joined the set in D-5.**
+    /// They were held at zero through D-4 — the button and the file it writes had to land in one
+    /// round, or the page would have shipped a control with nothing behind it. D-5 landed both, so
+    /// they are held to the same rule as every other key: named by the composition, and by nothing
+    /// else. The renderer in `SoloLedgerCore` names none of them; it takes its labels as arguments,
+    /// which is what keeps the closed set closed with a second module in the picture.
     ///
     /// **The prefix scan survives the flip.** Whole-key matching cannot see a key that is built by
     /// interpolation, and this package already builds one namespace that way — so the substring
@@ -553,19 +555,23 @@ final class DocumentCopyTests: XCTestCase {
         }
 
         let composition = ["SoloLedger/App/DocumentPageComposition.swift"]
-        let deferred = Set(Self.exportKeys + Self.printKeys)
-        XCTAssertEqual(deferred.count, 9, "the artefact's keys are four exports and five printed lines")
+        let artefact = Set(Self.exportKeys + Self.printKeys)
+        XCTAssertEqual(artefact.count, 9, "the artefact's keys are four exports and five printed lines")
 
-        for key in Self.adjudicatedKeys where !deferred.contains(key) {
+        for key in Self.adjudicatedKeys {
             XCTAssertEqual((named[key] ?? []).sorted(), composition, """
                 \(key) is named by \((named[key] ?? []).sorted()) — every string the documents page \
                 draws belongs to its composition and to no other file.
                 """)
         }
-        for key in Self.adjudicatedKeys where deferred.contains(key) {
-            XCTAssertNil(named[key], """
-                \(key) is already named in production. The exported artefact is D-5's; a button \
-                drawn before the file it writes is a control with nothing behind it.
+        // The nine are inside that loop now rather than beside it, and this says so out loud: D-4
+        // asserted they were named NOWHERE, and a flip that quietly dropped the old assertion would
+        // leave the round's whole subject uncovered.
+        for key in artefact {
+            XCTAssertEqual(named[key] ?? [], composition, """
+                \(key) belongs to the artefact D-5 landed, so it is named by the composition like \
+                every other key. Naming it in the renderer instead would put a second source of \
+                strings behind this page.
                 """)
         }
 

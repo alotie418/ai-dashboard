@@ -1828,6 +1828,11 @@ final class AppModel: ObservableObject {
     /// The last refusal, as a case and never as text.
     @Published private(set) var documentError: DocumentPageComposition.PageError?
 
+    /// Where the last export landed, or that it failed. A cancelled save panel leaves this `nil` —
+    /// the other app is silent on a cancelled save too, and inventing a sentence for it would be
+    /// this page telling the user something their own Escape key already told them.
+    @Published private(set) var documentExportOutcome: DocumentPageComposition.ExportOutcome?
+
     /// The editor sheet's state, or `nil` when it is closed. Writable so the view can bind fields.
     @Published var documentEditor: DocumentEditorDraft?
 
@@ -1851,7 +1856,8 @@ final class AppModel: ObservableObject {
                                       taxInvoice: taxInvoiceDraft,
                                       pendingVoid: pendingDocumentVoid,
                                       pendingDelete: pendingDocumentDelete,
-                                      error: documentError)
+                                      error: documentError,
+                                      exportOutcome: documentExportOutcome)
     }
 
     func reloadDocuments() {
@@ -2115,6 +2121,7 @@ final class AppModel: ObservableObject {
         case .void:       requestDocumentVoid(document)
         case .delete:     requestDocumentDelete(document)
         case .taxInvoice: openTaxInvoice(document)
+        case .export:     exportDocument(document)
         }
     }
 
@@ -2133,6 +2140,80 @@ final class AppModel: ObservableObject {
     }
 
     func cancelDocumentVoid() { pendingDocumentVoid = nil }
+
+    // MARK: The artefact (Q7)
+
+    /// One document as HTML, exactly as the file will hold it.
+    ///
+    /// Split out from ``exportDocument(_:)`` because that one opens a save panel, and a panel is
+    /// not something a test can drive. Everything that decides BYTES lives here; the panel only
+    /// chooses where they land.
+    ///
+    /// `locale` is what formats the numbers. Production passes the host's, exactly as the other
+    /// app's `toLocaleString(undefined, …)` does; the parity test pins `en_US` on both sides so a
+    /// committed golden cannot carry one machine's thousands separator.
+    func documentArtefactHTML(for detail: BusinessDocumentDetail,
+                              locale: Locale = .autoupdatingCurrent,
+                              generatedAt: String = artefactGeneratedAt()) -> String {
+        let style = DocumentPageComposition.moneyStyle(currency: detail.document.currency,
+                                                       accountingLocale: detail.document.accountingLocale)
+        return DocumentHTML.build(
+            detail,
+            companyName: companyName,
+            labels: DocumentPageComposition.artefactLabels(for: detail.document,
+                                                           language: language,
+                                                           t: { self.t($0) }),
+            options: DocumentHTML.Options(
+                money: { DocumentPageComposition.money($0, style: style, locale: locale) ?? "" },
+                unitLabel: { DocumentPageComposition.artefactUnitLabel($0, t: { self.t($0) }) },
+                generatedAt: generatedAt))
+    }
+
+    /// Q7: build the file, then let the user say where it goes.
+    ///
+    /// Reads the document again rather than exporting the row the list is holding: the list carries
+    /// headers only, and the artefact is mostly lines.
+    func exportDocument(_ document: BusinessDocument) {
+        guard let store else { return }
+        documentExportOutcome = nil
+        guard let detail = try? store.businessDocument(id: document.id) else {
+            documentError = .loadFailed
+            return
+        }
+        let block = DocumentPageComposition.ExportBlock(outcome: nil)
+        documentExportOutcome = Self.exportOutcome(
+            for: saveDocumentHTMLViaPanel(html: documentArtefactHTML(for: detail),
+                                          suggestedName: DocumentHTML.fileName(for: detail.document),
+                                          panelMessage: t(block.formatNoteKey)))
+    }
+
+    /// What a save-panel run leaves on the page.
+    ///
+    /// Its own function because the interesting case is the one a test could otherwise never see:
+    /// **a cancelled panel says nothing at all.** The other app is silent there too (`ok=false` with
+    /// no error falls through its `if`), and reporting a failure would tell the user their own
+    /// Escape key broke something.
+    nonisolated static func exportOutcome(for result: DocumentSaveResult)
+        -> DocumentPageComposition.ExportOutcome? {
+        switch result {
+        case .written(let path): return .done(path: path)
+        case .failed:            return .failed
+        case .cancelled:         return nil
+        }
+    }
+
+    /// **B6**: the artefact's timestamp is ISO-8601 UTC, not the host's localized string.
+    ///
+    /// The other app writes `new Date().toLocaleString(uiLang)`, which has no stable format
+    /// contract to port — the same instant reads differently across ICU versions, let alone across
+    /// regions. A fixed shape is also what lets Q7-b's byte-for-byte domain exist: an injectable
+    /// `now` is only useful if what it produces is deterministic.
+    nonisolated static func artefactGeneratedAt(_ now: Date = Date()) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.string(from: now)
+    }
 
     func confirmDocumentVoid() {
         guard let store, let document = pendingDocumentVoid else { return }

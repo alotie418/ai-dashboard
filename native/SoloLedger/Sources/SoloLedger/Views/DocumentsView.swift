@@ -33,6 +33,9 @@ struct DocumentsView: View {
             if let block = page.error {
                 DocumentsErrorBanner(block: block)
             }
+            if let outcome = page.export.outcome {
+                DocumentsExportNotice(outcome: outcome)
+            }
             DocumentsFilterBar(block: page.filter)
             list(page)
         }
@@ -311,6 +314,29 @@ private struct DocumentTaxInvoiceCell: View {
                 Image(systemName: "paperclip").font(.caption2).foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+/// Where an export landed, or that it failed.
+///
+/// Not the error banner: an export that succeeded is not an error, and the page has to be able to
+/// tell the user the path without borrowing the sentence a refusal uses. A cancelled save shows
+/// nothing at all — see ``AppModel/documentExportOutcome``.
+private struct DocumentsExportNotice: View {
+    @EnvironmentObject var model: AppModel
+    let outcome: DocumentPageComposition.ExportOutcome
+
+    var body: some View {
+        Text(text)
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("documentsPage.exportNotice")
+    }
+
+    private var text: String {
+        guard let path = outcome.path else { return model.t(outcome.messageKey) }
+        return model.t(outcome.messageKey, ["path": path])
     }
 }
 
