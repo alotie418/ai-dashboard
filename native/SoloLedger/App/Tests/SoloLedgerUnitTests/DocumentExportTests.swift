@@ -97,6 +97,20 @@ final class DocumentExportTests: XCTestCase {
             a number that escapes to nothing must fall back to the id, exactly as `|| full.id` does \
             over there — otherwise the panel opens on a file called ".html".
             """)
+        // The whitespace class is JS's `\\s`, and it is NOT `Character.isWhitespace`. Measured in
+        // node: U+FEFF matches `\\s` and U+0085 does not; Swift's property says the opposite about
+        // both, so a number carrying either would be named differently on the two sides.
+        XCTAssertEqual(name("A\u{FEFF}B"), "A_B.html", "U+FEFF is whitespace to JS")
+        XCTAssertEqual(name("A\u{0085}B"), "A\u{0085}B.html", """
+            U+0085 is not in JS's whitespace class, so the other app keeps it. Swift's \
+            `Character.isWhitespace` calls it whitespace — that disagreement is the whole reason \
+            this port borrows the set D-1 measured instead of asking Foundation.
+            """)
+        XCTAssertEqual(name("A\u{00A0}B"), "A_B.html", "…and U+00A0 is in both")
+        // A grapheme cluster that merely BEGINS with a space is not whitespace: JS replaces the
+        // space alone and the combining mark survives, so this iterates scalars.
+        XCTAssertEqual(name("A\u{0020}\u{0301}B"), "A_\u{0301}B.html")
+
         XCTAssertFalse(name("QT-1").hasPrefix("SoloLedger-"), """
             Q7-a's name is the number alone. The other app prefixes `SoloLedger-`; that difference \
             is the ruling's, not an oversight.

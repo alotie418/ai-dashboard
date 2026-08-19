@@ -142,15 +142,23 @@ public enum DocumentHTML {
     /// back to the document's id. Two differences from over there are Q7-a's own and predate this:
     /// no `SoloLedger-` prefix, and `.html` rather than `.pdf`.
     ///
+    /// **The whitespace class is JS's, applied over SCALARS**, and neither half of that is
+    /// pedantry. `Character.isWhitespace` is a DIFFERENT set: it holds U+0085, which JS excludes,
+    /// and lacks U+FEFF, which JS includes — both measured, not assumed — so a number carrying
+    /// either would come out named differently on the two sides. Iterating `Character`s would also
+    /// drop a grapheme cluster that merely BEGINS with a space, where JS replaces the space alone.
+    /// ``DocumentMath/stringWhitespace`` is the set D-1 already measured for `String.trim`, reused
+    /// here rather than grown a second time.
+    ///
     /// **Uniqueness is not claimed.** `(doc_type, doc_number)` is what the ledger makes unique, so
     /// two documents of different types can share a number and therefore a file name; the save
     /// panel is what surfaces the collision, and Q7-a registers that rather than promising more.
     public static func fileName(for document: BusinessDocument) -> String {
-        let illegal = Set("\\/:*?\"<>|")
-        var out = ""
+        let illegal: Set<Unicode.Scalar> = ["\\", "/", ":", "*", "?", "\"", "<", ">", "|"]
+        var out = String.UnicodeScalarView()
         var pendingUnderscore = false
-        for character in document.number {
-            if illegal.contains(character) || character.isWhitespace {
+        for scalar in document.number.unicodeScalars {
+            if illegal.contains(scalar) || DocumentMath.stringWhitespace.contains(scalar) {
                 pendingUnderscore = true
                 continue
             }
@@ -158,10 +166,11 @@ public enum DocumentHTML {
                 out.append("_")
                 pendingUnderscore = false
             }
-            out.append(character)
+            out.append(scalar)
         }
         if pendingUnderscore { out.append("_") }
-        return (out.isEmpty ? document.id : out) + ".html"
+        let escaped = String(out)
+        return (escaped.isEmpty ? document.id : escaped) + ".html"
     }
 
     /// `escapeHtml` — the same five replacements in the same order, `&` first.
