@@ -866,6 +866,7 @@
 "documents.form.numberHint" = "社内用の番号です。変更できます";
 "documents.form.date" = "日付";
 "documents.form.validUntil" = "有効期限";
+"documents.form.dateRangeHint" = "0001-01-01 から 9999-12-31 までの実在する日付を入力してください。";
 "documents.form.customer" = "取引先名";
 "documents.form.customerPlaceholder" = "取引先名を入力してください";
 "documents.form.customerTaxID" = "取引先の納税者番号";

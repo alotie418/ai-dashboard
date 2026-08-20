@@ -160,7 +160,9 @@ final class DocumentMountingTests: XCTestCase {
     func testDM1ThePlacementTableCoversTheNamespaceMinusTheDeferredFamilies() throws {
         let table = try sourceTable("en")
         let namespace = Set(table.keys.filter { $0.hasPrefix("documents.") })
-        XCTAssertEqual(namespace.count, 103, "the namespace D-3 landed, unchanged by D-5")
+        XCTAssertEqual(namespace.count, 104, """
+            the namespace D-3 landed at 103; the input-mirror correction added             documents.form.dateRangeHint for B10, and nothing else.
+            """)
 
         let placed = Set(DocumentPageComposition.placement.keys)
         let deferred = namespace.filter { key in
@@ -172,7 +174,7 @@ final class DocumentMountingTests: XCTestCase {
             with a hole in it.
             """)
         XCTAssertTrue(DocumentPageComposition.deferredPrefixes.isEmpty)
-        XCTAssertEqual(placed.count, 103, "the whole namespace is drawn now")
+        XCTAssertEqual(placed.count, 104, "the whole namespace is drawn now")
         XCTAssertEqual(placed.union(deferred), namespace, """
             placement ∪ deferred is not the namespace.
             unplaced: \(namespace.subtracting(placed).subtracting(deferred).sorted())
@@ -550,10 +552,17 @@ final class DocumentMountingTests: XCTestCase {
         line.setValue(.unit, to: "box")
         XCTAssertNotNil(line.locked, "description and unit do not unlock it")
 
+        // Writing the value it ALREADY holds is not a change over there — React's tracker sees the
+        // same string and fires nothing, so `setRow` never runs. This asserted the opposite before
+        // the input-mirror correction, which is how D-4's unlock bug got a test to stand on.
         line.setValue(.quantity, to: "2")
-        XCTAssertNil(line.locked, "…and quantity does")
-        XCTAssertEqual(DocumentPageComposition.lineBlock(for: line).amount, 100,
-                       "an unlocked line recomputes 2 × 50")
+        XCTAssertNotNil(line.locked, "re-writing the same 2 is not a change and must not unlock")
+        XCTAssertEqual(DocumentPageComposition.lineBlock(for: line).amount, 999)
+
+        line.setValue(.quantity, to: "3")
+        XCTAssertNil(line.locked, "…and a DIFFERENT quantity does unlock it")
+        XCTAssertEqual(DocumentPageComposition.lineBlock(for: line).amount, 150,
+                       "an unlocked line recomputes 3 × 50")
 
         for field in [DocumentPageComposition.LineField.unitPrice, .taxRatePercent] {
             var other = DocumentLineDraft(id: 1, item: item())
@@ -946,7 +955,7 @@ final class DocumentMountingTests: XCTestCase {
     /// Five fields on this page are `<input type="date">` over there, and that control has two
     /// properties a plain text field has neither of: the value is `YYYY-MM-DD` or empty, and the
     /// date EXISTS. `2026-02-31` is the case that separates a shape test from a calendar one.
-    func testDM23TheCalendarTestRefusesWhatThePickerCannotLandOn() {
+    func testDM23TheCalendarTestRefusesWhatThePickerCannotLandOn() throws {
         for good in ["2026-01-01", "2026-12-31", "2024-02-29", "2000-02-29", "0001-01-01"] {
             XCTAssertTrue(DocumentPageComposition.isCalendarDate(good), "\(good) is a real date")
         }
@@ -975,6 +984,36 @@ final class DocumentMountingTests: XCTestCase {
         // Optional fields take empty; the required one does not.
         XCTAssertTrue(DocumentPageComposition.isOptionalCalendarDate(""))
         XCTAssertFalse(DocumentPageComposition.isOptionalCalendarDate("2026-02-31"))
+
+        // ── B10 · the four-digit year is a NARROWING, not a mirror ──
+        //
+        // The old sentence here was "the picker cannot land on it", and for these it is false: the
+        // control holds every one of them, hands it back from `element.value`, and a user reaches
+        // five digits by typing `10000` into the year segment. Measured, with the form submitting
+        // through a `required` date input — the rows are `b10-…` in
+        // `e2e/documents-number-input-oracle.spec.ts`, which DM29 maps onto this predicate.
+        for wide in ["10000-01-01", "12345-06-07", "99999-12-31", "275760-09-13"] {
+            XCTAssertFalse(DocumentPageComposition.isCalendarDate(wide), """
+                \(wide) is refused HERE, and the reason is not that the other app cannot produce \
+                it — it can, and it saves it. The reason is the ordering fact below.
+                """)
+        }
+        // The reason, as a fact rather than as a sentence. Periods are filtered by comparing ISO
+        // date TEXT, so a five-digit year does not sort after a four-digit one — it sorts before
+        // every one of them, and a closed interval would silently stop containing what it contains.
+        XCTAssertLessThan("10000-01-01", "2026-01-01", """
+            the ordering B10 rests on stopped being true, so the narrowing has lost its reason.
+            """)
+        XCTAssertGreaterThan("9999-12-31", "10000-01-01", """
+            a text comparison puts 9999-12-31 AFTER 10000-01-01 — later by string, earlier by \
+            calendar. That inversion is what widening the year would let into the period filter.
+            """)
+        // …and the store really does compare these as text.
+        let generator = try Self.coreSource("Documents/StatementGenerator.swift")
+        XCTAssertTrue(generator.contains("date >= ?") && generator.contains("date <= ?"), """
+            the statement generator no longer filters its period with a plain comparison on the \
+            date column, so B10's reason has to be re-derived rather than assumed.
+            """)
     }
 
     /// The same rule, where it decides whether a write happens: all five fields.
@@ -1072,20 +1111,188 @@ final class DocumentMountingTests: XCTestCase {
         XCTAssertEqual(model.documents.documents.first?.date, "2026-03-01")
     }
 
-    // MARK: - DM24 · the three numeric fields hold only what their attributes allow
+    // MARK: - DM24 · the three numeric fields, one layer at a time
 
+    /// The control is three gates, and D-4 modelled it as one. That is what these four tests undo.
+    ///
+    /// The old shape asserted, of nine raw strings, that "`<shape>` is not a value `type="number"`
+    /// can hold, so the other app's form refuses to submit it". Six of the nine were false as
+    /// statements about the browser — `1.`, `+5`, `1.2.3`, `0x10`, `Infinity` and `" 1"` are all
+    /// submitted over there — and four of them were strings the running app can never produce,
+    /// because they were fed straight to the submit predicate without passing the editor first.
+    ///
+    /// So the layers are now separate, each asked of the thing it actually decides:
+    ///
+    ///  * **A** — the editor: which characters end up in the field. `numberInput`.
+    ///  * **B** — the bound value: what `element.value` reads back, which is the other app's state.
+    ///  * **C** — the submit: `badInput`, then `min` / `max` / `step`, over that bound value.
+    ///  * **D** — the write: what a save carries, and the money a locked line keeps.
+    ///
+    /// Every expectation here is measured against a real browser rather than described:
+    /// `e2e/documents-number-input-oracle.spec.ts` drives Chromium over the same named cases and
+    /// DM29 maps this side onto it, so neither can drift without the other going red.
+
+    /// **Layer A** — the editor keeps exactly what the control keeps.
+    func testDM24TheEditorKeepsExactlyWhatTheControlKeeps() {
+        let editor = DocumentPageComposition.numberInput
+
+        // A letter never becomes a value: the control drops it as it is typed, and a paste of the
+        // same three characters lands in exactly the same place. B1 claimed the paste cleared the
+        // field over there; it does not, and both sides are left holding `12`.
+        XCTAssertEqual(editor("1a2"), "12")
+        XCTAssertEqual(editor("12abc"), "12")
+        XCTAssertEqual(editor("abc"), "")
+        XCTAssertEqual(editor("Infinity"), "", "not one of its letters is in the accepted set")
+        XCTAssertEqual(editor("0x10"), "010", "the x goes and the digits close up")
+        XCTAssertEqual(editor(" 1"), "1")
+        XCTAssertEqual(editor("1_0"), "10")
+
+        // At most one point and at most one exponent marker survive, the first of each.
+        XCTAssertEqual(editor("1..2"), "1.2")
+        XCTAssertEqual(editor("1.2.3"), "1.23")
+        XCTAssertEqual(editor("1e2e3"), "1e23")
+        XCTAssertEqual(editor("1ee2"), "1e2")
+        XCTAssertEqual(editor("1.5"), "1.5")
+        XCTAssertEqual(editor("1e-3"), "1e-3")
+
+        // …and the rules CHANGE once the marker has been seen, which D-4 had no notion of.
+        // A point after it is dropped wherever it falls.
+        XCTAssertEqual(editor("1e2.3"), "1e23")
+        XCTAssertEqual(editor("1e.2"), "1e2")
+        XCTAssertEqual(editor("1e2."), "1e2")
+        XCTAssertEqual(editor("1e..2"), "1e2")
+        XCTAssertEqual(editor("1.2e3.4"), "1.2e34", "the point BEFORE the marker still counts")
+        XCTAssertEqual(editor("1.e.2"), "1.e2")
+        XCTAssertEqual(editor("e.2"), "e2", "…even with no mantissa at all")
+        XCTAssertEqual(editor(".e2"), ".e2", "…while a point before it is kept")
+        // A sign survives only while the exponent is still empty: the first one, and no more.
+        XCTAssertEqual(editor("1e++2"), "1e+2")
+        XCTAssertEqual(editor("1e-+2"), "1e-2")
+        XCTAssertEqual(editor("1e+-2"), "1e+2")
+        XCTAssertEqual(editor("1e--2"), "1e-2")
+        // …and once a digit has landed, no sign can follow at all.
+        XCTAssertEqual(editor("1e2-3"), "1e23")
+        XCTAssertEqual(editor("1e2+3"), "1e23")
+        XCTAssertEqual(editor("1e+2+"), "1e+2")
+        XCTAssertEqual(editor("1e2-"), "1e2")
+        XCTAssertEqual(editor("1e-2-3"), "1e-23")
+        XCTAssertEqual(editor("1e-2-3-4"), "1e-234")
+        XCTAssertEqual(editor("1e-2e3"), "1e-23")
+        // A half-typed exponent sign is still a half-typed value and survives being one.
+        XCTAssertEqual(editor("1e-"), "1e-")
+        XCTAssertEqual(editor("1e+"), "1e+")
+
+        // Signs are kept wherever they fall — layer B is what refuses them, not this.
+        XCTAssertEqual(editor("1-2"), "1-2")
+        XCTAssertEqual(editor("--5"), "--5")
+        XCTAssertEqual(editor("+"), "+")
+
+        // A half-typed value survives being half-typed.
+        XCTAssertEqual(editor("1."), "1.")
+        XCTAssertEqual(editor("-0.01"), "-0.01")
+
+        // Fullwidth: the three forms the control folds, and the ones it drops. DM24b's old
+        // assertion said full-width digits "are not what the control takes either" — measured, it
+        // takes them and hands back `13`, so a user typing them saw nothing here and 13 there.
+        XCTAssertEqual(editor("１３"), "13")
+        XCTAssertEqual(editor("１．５"), "1.5", "fullwidth full stop folds")
+        XCTAssertEqual(editor("－５"), "-5", "fullwidth hyphen-minus folds")
+        XCTAssertEqual(editor("＋１．５"), "1.5", "fullwidth plus does NOT fold — it is dropped")
+        XCTAssertEqual(editor("１ｅ２"), "12", "fullwidth e does NOT fold either")
+
+        // …and the fold is that measured set, not the Unicode decimal-digit category. Every one of
+        // these IS a decimal digit to Unicode, and the control drops every one of them.
+        for otherDigits in ["٢٣", "۲۳", "२३", "২৩", "๒๓", "߂", "𝟙"] {
+            XCTAssertEqual(editor(otherDigits), "", """
+                \(otherDigits) is a Unicode decimal digit that the control does NOT take. Folding \
+                the whole category would let this page hold a number the other app cannot.
+                """)
+        }
+        for notADigit in ["Ⅲ", "½", "²", "②"] {
+            XCTAssertEqual(editor(notADigit), "")
+        }
+
+        // The three numeric fields go through it and the three text ones do not.
+        var draft = newEditor()
+        draft.lines[0].description = "Widget"
+        let id = draft.lines[0].id
+        let model = AppModel()
+        model.documentEditor = draft
+        for field in [DocumentPageComposition.LineField.quantity, .unitPrice, .taxRatePercent] {
+            model.setDocumentLineValue(id: id, field, to: "1a2")
+            XCTAssertEqual(model.documentLineValue(id: id, field), "12",
+                           "\(field.rawValue) is a numeric control and drops the letter")
+        }
+        model.setDocumentLineValue(id: id, .description, to: "1a2")
+        XCTAssertEqual(model.documentLineValue(id: id, .description), "1a2",
+                       "the description is plain text and takes what is typed")
+    }
+
+    /// **Layer B** — the bound value is what the other app's state holds.
+    ///
+    /// `nil` is `badInput`. The DOM reports it and an empty field as the same `""` and puts the
+    /// difference in a second property; the optional carries both, because layer C has to allow one
+    /// and refuse the other.
+    func testDM24bTheBoundValueIsWhatTheOtherAppsStateHolds() {
+        let bound = DocumentPageComposition.numberBoundValue
+
+        // The text comes back VERBATIM when the control can read it — no re-serialising.
+        for verbatim in ["12", "0012", "000", "2.500", ".5", "1e2", "1E2", "-1e2", "1e-2", "1.e2",
+                         "5e-324", "9007199254740993", "1234567890.12"] {
+            XCTAssertEqual(bound(verbatim), verbatim, "\(verbatim) came back changed")
+        }
+
+        // Two repairs, and only two: a leading `+` goes, and a TRAILING point goes.
+        XCTAssertEqual(bound("1."), "1", "B2 said this was badInput with an empty state. It is 1.")
+        XCTAssertEqual(bound("5."), "5")
+        XCTAssertEqual(bound("+5"), "5")
+        XCTAssertEqual(bound("+.5"), ".5")
+        XCTAssertEqual(bound("+1."), "1")
+        XCTAssertEqual(bound("-1."), "-1")
+        XCTAssertEqual(bound("1.e2"), "1.e2", "the point is before the exponent, so it is not trailing")
+
+        // …and the asymmetry that is measured rather than derived: a leading `+` is fine on its
+        // own and badInput as soon as an exponent appears.
+        XCTAssertNil(bound("+1e2"))
+        XCTAssertNil(bound("+1E2"))
+        XCTAssertNil(bound("+1.5e2"))
+        XCTAssertEqual(bound("-1e2"), "-1e2", "…while a leading minus with an exponent is fine")
+
+        // badInput.
+        for bad in ["1-2", "1e", "1e-", "+", "-", "--5", "++5", ".", "e5", "1.5e"] {
+            XCTAssertNil(bound(bad), "\(bad) is badInput over there, so it must be nil here")
+        }
+
+        // An empty field is NOT badInput. That difference is the whole reason for the optional.
+        XCTAssertEqual(bound(""), "")
+
+        // Not finite is badInput, which is where a positive exponent too big for a Double goes —
+        // and it is why the step test never sees it.
+        for infinite in ["1e309", "1e99999999999999999999", "100e9223372036854775807",
+                         "1.7976931348623157e309"] {
+            XCTAssertNil(bound(infinite), "\(infinite) is Infinity as a number, so it is badInput")
+        }
+        // Underflow is not: it is an ordinary, finite zero.
+        XCTAssertEqual(bound("1e-99999999999999999999"), "1e-99999999999999999999")
+        XCTAssertEqual(bound("1.00e-9223372036854775807"), "1.00e-9223372036854775807")
+    }
+
+    /// **Layer C** — the submit, asked of the bound value.
+    ///
     /// `min` / `max` / `step` are not decoration: the three inputs sit inside a `<form>` whose
-    /// submit button is `type="submit"`, so the browser refuses the submit when a value is outside
-    /// them. Reproducing the numbers without the refusal would let this page write a −5 quantity or
-    /// a 101% rate the other app cannot produce.
-    func testDM24TheNumericAttributesAreEnforcedAtTheSubmit() {
+    /// submit button is `type="submit"`, so the browser refuses the submit when the value is
+    /// outside them, and refuses it outright when the control is `badInput`.
+    func testDM24cTheSubmitIsDecidedOnTheBoundValue() {
+        /// The argument is EDITOR TEXT — what the field is actually holding — so every case here is
+        /// a state the running app can reach. Feeding raw unsanitised strings is what let the old
+        /// version assert things about `0x10` and `Infinity` that no user could ever produce.
         func line(quantity: String = "1", unitPrice: String = "10",
                   rate: String = "13") -> Bool {
             var draft = newEditor()
             draft.lines[0].description = "Widget"
-            draft.lines[0].quantity = quantity
-            draft.lines[0].unitPrice = unitPrice
-            draft.lines[0].taxRatePercent = rate
+            draft.lines[0].quantity = DocumentPageComposition.numberInput(quantity)
+            draft.lines[0].unitPrice = DocumentPageComposition.numberInput(unitPrice)
+            draft.lines[0].taxRatePercent = DocumentPageComposition.numberInput(rate)
             return DocumentPageComposition
                 .compose(DocumentPageComposition.Input(editor: draft)).editor?.canSubmit ?? false
         }
@@ -1104,29 +1311,52 @@ final class DocumentMountingTests: XCTestCase {
         XCTAssertFalse(line(quantity: "0.001"), "step=0.01")
         XCTAssertFalse(line(unitPrice: "1e-3"), "…asked of the NUMBER, so 1e-3 goes the same way")
         XCTAssertFalse(line(rate: "12.345"), "step=0.01 on the rate too")
-        XCTAssertFalse(line(quantity: "abc"), "not a number at all")
 
-        // A shape the control cannot HOLD is `badInput` over there, and a form containing a
-        // badInput control does not submit at all. `parseFloat` reads most of these as a number,
-        // which is exactly why the submit gate cannot be `parseFloat` alone.
-        for shape in ["1-2", "1.", "+5", "1e", "1.2.3", "5-", "0x10", "Infinity", " 1"] {
-            XCTAssertFalse(line(quantity: shape), """
-                \(shape.debugDescription) is not a value `type="number"` can hold, so the other \
-                app's form refuses to submit it. Reading it with parseFloat writes a number the \
-                field never showed.
+        // ── the shapes the control CANNOT read: badInput, and a form holding one does not submit ──
+        for badInput in ["1-2", "1e", "1e-", "5-", "+", "-", "--5", ".", "+1e2"] {
+            XCTAssertFalse(line(quantity: badInput), """
+                \(badInput.debugDescription) is `badInput` over there — the control holds the text \
+                and `element.value` is empty — so the other app's form refuses to submit at all.
                 """)
         }
-        XCTAssertTrue(line(quantity: ".5"), "…while a leading point IS a valid floating-point number")
+
+        // ── the shapes it CAN read, which the other app submits and so must this ──
+        // Every one of these was asserted the other way round before this round, with a message
+        // about the browser that the browser contradicts.
+        for accepted in ["1.", "5.", "+5", "+.5", "+1.", "1..2", "1.2.3", "1.e2", ".5", "0012",
+                         "1e2.3", "1e.2", "1e++2", "1e-+2", "1e2-3", "1e+2+", "1.2e3.4"] {
+            XCTAssertTrue(line(quantity: accepted), """
+                \(accepted.debugDescription) reads back as \
+                \(DocumentPageComposition.numberBoundValue(DocumentPageComposition.numberInput(accepted)) ?? "<badInput>") \
+                over there and the form submits it. Refusing it here writes a different ledger.
+                """)
+        }
+        // …including the four that are unreachable as typed and reachable as sanitised text.
+        XCTAssertTrue(line(quantity: "0x10"), "the editor holds 010, which is a number")
+        XCTAssertTrue(line(quantity: "Infinity"), "the editor holds nothing, which is 'no value'")
+        XCTAssertTrue(line(quantity: " 1"), "the editor holds 1")
+        XCTAssertTrue(line(quantity: "abc"), "the editor holds nothing")
 
         // `step` is decided in DECIMAL over there — Blink parses the field with its own `Decimal`
-        // and asks for an exact remainder — not in binary. A price in the billions with cents is a
-        // whole number of 0.01 steps; `value * 100` in `Double` lands 2e-5 away from an integer,
-        // which is enough to refuse a value the other app submits without complaint.
+        // — not in binary. A price in the billions with cents is a whole number of 0.01 steps;
+        // `value * 100` in `Double` lands 2e-5 away from an integer, which is enough to refuse a
+        // value the other app submits without complaint.
         XCTAssertTrue(line(unitPrice: "1234567890.12"),
                       "a billion-and-change with cents is a whole number of 0.01 steps")
         XCTAssertTrue(line(quantity: "1500e-4"), "0.15 with an exponent is still two decimals")
         XCTAssertFalse(line(quantity: "15e-4"), "…and 0.0015 is still four")
         XCTAssertTrue(line(quantity: "2.500"), "trailing zeros do not add decimals")
+
+        // ── B9 · where this is deliberately stricter, and does not crash ──
+        for stricter in ["15e-11", "5e-324", "1e-99999999999999999999",
+                         "1.00e-9223372036854775807", "1.1e-9223372036854775807",
+                         "1e-2-3", "1e-2e3"] {
+            XCTAssertFalse(line(quantity: stricter), """
+                \(stricter) is submitted over there — Blink's own Decimal is finite-precision and \
+                its remainder against 0.01 comes out zero — and refused here by the exact test. \
+                That is B9, and its upgrade clause fires the moment such a number is in a ledger.
+                """)
+        }
 
         // A second line with a bad value blocks the submit as well — the form validates all of them.
         var twoLines = newEditor()
@@ -1138,63 +1368,92 @@ final class DocumentMountingTests: XCTestCase {
             .compose(DocumentPageComposition.Input(editor: twoLines)).editor?.canSubmit ?? true)
     }
 
-    /// A letter never becomes a value in a `type="number"` field: the control drops it as it is
-    /// typed. This is the first of the two layers — the second is the submit refusal above.
-    func testDM24bALetterNeverReachesANumericField() {
-        XCTAssertEqual(DocumentPageComposition.numberInput("abc"), "")
-        XCTAssertEqual(DocumentPageComposition.numberInput("12abc"), "12")
-        XCTAssertEqual(DocumentPageComposition.numberInput("1.5"), "1.5")
-        XCTAssertEqual(DocumentPageComposition.numberInput("-0.01"), "-0.01")
-        XCTAssertEqual(DocumentPageComposition.numberInput("1e-3"), "1e-3",
-                       "an exponent is a shape the control accepts; step is what refuses it")
-        XCTAssertEqual(DocumentPageComposition.numberInput("１３"), "",
-                       "full-width digits are not what the control takes either")
-        XCTAssertEqual(DocumentPageComposition.numberInput("1."), "1.",
-                       "a half-typed value has to survive being half-typed")
-
-        // The three numeric fields go through it and the three text ones do not.
-        var draft = newEditor()
-        draft.lines[0].description = "Widget"
-        let id = draft.lines[0].id
-        let model = AppModel()
-        model.documentEditor = draft
-        for field in [DocumentPageComposition.LineField.quantity, .unitPrice, .taxRatePercent] {
-            model.setDocumentLineValue(id: id, field, to: "1a2")
-            XCTAssertEqual(model.documentLineValue(id: id, field), "12",
-                           "\(field.rawValue) is a numeric control and drops the letter")
-        }
-        model.setDocumentLineValue(id: id, .description, to: "1a2")
-        XCTAssertEqual(model.documentLineValue(id: id, .description), "1a2",
-                       "the description is plain text and takes what is typed")
-    }
-
-    /// A keystroke the control REFUSES changes nothing over there.
+    /// **Layer D** — the write, and the money a locked line keeps.
     ///
-    /// No character is inserted, so no `input` event fires, so `setRow` is never called — and the
-    /// line's copied money stays locked. Sanitizing the text without also skipping the assignment
-    /// would fire `didSet` and unlock the line on a keystroke that left no visible trace, turning a
-    /// sales record's stored amount back into quantity × unit price.
-    func testDM24cARefusedKeystrokeDoesNotUnlockALine() throws {
-        var draft = newEditor()
-        draft.lines = [DocumentLineDraft(id: 0, item: item(taxAmount: 99, amount: 999))]
-        let model = AppModel()
-        model.documentEditor = draft
-        XCTAssertEqual(model.documentLineValue(id: 0, .quantity), "2")
-        XCTAssertNotNil(model.documentEditor?.lines.first?.locked)
+    /// A line prefilled from a sales record arrives LOCKED: it carries the amount that record was
+    /// saved with, and a save copies it rather than recomputing quantity × unit price. `setRow`
+    /// clears that lock, and `setRow` runs only when React's `onChange` fired — which happens when
+    /// `element.value` CHANGES, not when a character is inserted.
+    ///
+    /// D-4 compared the TEXT. So typing `.` after `2` cleared the lock here and did nothing at all
+    /// over there, and a decimal point followed by a backspace rewrote a sales record's stored 999
+    /// as 2 × 50. Both sides saveable, two different ledgers, nothing on screen.
+    func testDM24dALockedLineSurvivesAKeystrokeThatMovesNoValue() throws {
+        func lockedModel() -> AppModel {
+            var draft = newEditor()
+            draft.lines = [DocumentLineDraft(id: 0, item: item(taxAmount: 99, amount: 999))]
+            let model = AppModel()
+            model.documentEditor = draft
+            return model
+        }
+        func amount(_ model: AppModel) throws -> Double? {
+            try XCTUnwrap(model.documentEditor?.lines.first).lineDraft(position: 0)?.amount
+        }
 
-        model.setDocumentLineValue(id: 0, .quantity, to: "2a")
-        XCTAssertEqual(model.documentLineValue(id: 0, .quantity), "2", "the letter is dropped")
-        XCTAssertNotNil(model.documentEditor?.lines.first?.locked, """
-            a letter the control drops unlocked the line, so its stored 999 would be recomputed as \
-            quantity × unit price by a keystroke that changed nothing on screen.
-            """)
-        let stillLocked = try XCTUnwrap(model.documentEditor?.lines.first)
-        XCTAssertEqual(DocumentPageComposition.lineBlock(for: stillLocked).amount, 999,
-                       "…and the amount it shows is still the stored one, not 2 × 50")
+        let start = lockedModel()
+        XCTAssertEqual(start.documentLineValue(id: 0, .quantity), "2")
+        XCTAssertNotNil(start.documentEditor?.lines.first?.locked)
+        XCTAssertEqual(try amount(start), 999, "the stored amount, not 2 × 50")
 
-        model.setDocumentLineValue(id: 0, .quantity, to: "3")
-        XCTAssertNil(model.documentEditor?.lines.first?.locked,
-                     "…and a keystroke that DOES change the value still unlocks it")
+        // ── the keystrokes that insert a character and move no value ──
+        for (name, sequence) in [("a trailing point", ["2."]),
+                                 ("a point then a backspace", ["2.", "2"]),
+                                 ("a leading plus", ["+2"]),
+                                 ("a leading plus then a backspace", ["+2", "2"])] {
+            let model = lockedModel()
+            for text in sequence { model.setDocumentLineValue(id: 0, .quantity, to: text) }
+            XCTAssertNotNil(model.documentEditor?.lines.first?.locked, """
+                \(name) unlocked the line. Over there it fires no change event at all, so the \
+                line keeps the money it was saved with.
+                """)
+            XCTAssertEqual(try amount(model), 999, """
+                \(name) rewrote a sales record's stored amount as quantity × unit price.
+                """)
+            XCTAssertEqual(model.documentLineValue(id: 0, .quantity), sequence.last,
+                           "…and the field still shows what was typed")
+        }
+
+        // ── a character the control never inserts: nothing happens at all ──
+        let dropped = lockedModel()
+        dropped.setDocumentLineValue(id: 0, .quantity, to: "2a")
+        XCTAssertEqual(dropped.documentLineValue(id: 0, .quantity), "2", "the letter is dropped")
+        XCTAssertNotNil(dropped.documentEditor?.lines.first?.locked)
+        XCTAssertEqual(try amount(dropped), 999)
+
+        // ── the keystrokes that DO move the value: the lock goes, as it does over there ──
+        // `2e` is B8: the value goes empty over there so its total reads the line as 0, while the
+        // text stays here and `parseFloat("2e")` is 2. Both UNLOCK — which is the subject here —
+        // and neither can be saved, so the two totals differ only while the field is unfinished.
+        for (name, text, expected) in [("a new digit", "23", 23.0 * 50),
+                                       ("clearing the field", "", 0),
+                                       ("a badInput shape", "2e", 2.0 * 50),
+                                       ("a paste of 1a2", "1a2", 12.0 * 50)] {
+            let model = lockedModel()
+            model.setDocumentLineValue(id: 0, .quantity, to: text)
+            XCTAssertNil(model.documentEditor?.lines.first?.locked, """
+                \(name) left the line locked. `element.value` moved over there, so `onChange` \
+                fired, so `setRow` ran and the patch cleared it.
+                """)
+            XCTAssertEqual(try amount(model), expected, "\(name) recomputes from the fields")
+        }
+
+        // ── and a value change followed by a change BACK stays unlocked ──
+        let thereAndBack = lockedModel()
+        thereAndBack.setDocumentLineValue(id: 0, .quantity, to: "23")
+        thereAndBack.setDocumentLineValue(id: 0, .quantity, to: "2")
+        XCTAssertNil(thereAndBack.documentEditor?.lines.first?.locked,
+                     "the lock does not come back; over there the patch already happened")
+        XCTAssertEqual(try amount(thereAndBack), 100, "2 × 50, not the stored 999")
+
+        // Description and unit still do not unlock at all.
+        let text = lockedModel()
+        text.setDocumentLineValue(id: 0, .description, to: "Renamed")
+        text.setDocumentLineValue(id: 0, .unit, to: "box")
+        XCTAssertNotNil(text.documentEditor?.lines.first?.locked)
+        XCTAssertEqual(try amount(text), 999)
+        // …and the tax the locked line carries travels with the amount.
+        let stillLocked = try XCTUnwrap(text.documentEditor?.lines.first)
+        XCTAssertEqual(stillLocked.lineDraft(position: 0)?.taxAmount, 99)
     }
 
     /// The button being unavailable is one half; the model refusing is the other.
@@ -1304,6 +1563,267 @@ final class DocumentMountingTests: XCTestCase {
             Button("x") { model.saveDocumentEditor() }
                 .buttonStyle(.borderedProminent)
             """)
+    }
+
+    // MARK: - DM29 · the browser oracle, and this side mapped onto it
+
+    /// **The oracle is a real browser, not this file.**
+    ///
+    /// Until this round the only oracle for "what does `<input type="number">` do" was a comment in
+    /// `DocumentPageComposition`, and the assertions quoted that comment back. Six of the nine
+    /// shapes the suite said the browser refuses are in fact submitted by it, and nothing here
+    /// could see it because both sides came from the same source.
+    ///
+    /// `e2e/documents-number-input-oracle.spec.ts` now drives Chromium 148 over a named matrix,
+    /// inside the existing Locale-matrix job. This reads that file and maps every case onto this
+    /// side, so the two cannot drift: change the Swift and this goes red, change the expectations
+    /// and the browser job goes red instead.
+    func testDM29TheBrowserOracleAndThisSideAgreeCaseByCase() throws {
+        let cases = try Self.oracleCases(table: "NUMBER_ORACLE")
+        XCTAssertGreaterThan(cases.count, 60, """
+            the oracle table came back with \(cases.count) rows. The parser is broken, or the \
+            matrix was gutted — either way this test is passing on nothing.
+            """)
+        XCTAssertEqual(Set(cases.map { $0["name"] ?? "" }).count, cases.count, "duplicate case name")
+
+        var divergent: [String] = []
+        for row in cases {
+            let name = try XCTUnwrap(row["name"])
+            let typed = try XCTUnwrap(row["typed"])
+            let editor = DocumentPageComposition.numberInput(typed)
+            XCTAssertEqual(editor, try XCTUnwrap(row["editor"]), """
+                \(name): the editor layer disagrees with the browser.
+                """)
+            let bound = DocumentPageComposition.numberBoundValue(editor)
+            let expectedBound = try XCTUnwrap(row["bound"])
+            if expectedBound == "<null>" {
+                XCTAssertNil(bound, "\(name): the browser reports badInput and this does not")
+            } else {
+                XCTAssertEqual(bound, expectedBound, "\(name): the bound value disagrees")
+            }
+            let constraint = row["field"] == "rate"
+                ? DocumentPageComposition.NumberConstraint.taxRate
+                : DocumentPageComposition.NumberConstraint.quantity
+            XCTAssertEqual(constraint.accepts(editor), row["native"] == "true", """
+                \(name): the submit layer disagrees with the row's own `native` column.
+                """)
+            if row["submits"] != row["native"] { divergent.append(name) }
+        }
+
+        // Every place this side deliberately differs from the browser is a B9 row, and every B9 row
+        // is one of them — the two columns disagreeing is exactly what the `b9-` prefix means, and
+        // the check below makes the prefix load-bearing rather than decorative. A new divergence
+        // cannot be introduced without editing this list.
+        for name in divergent {
+            XCTAssertTrue(name.hasPrefix("b9-"), """
+                \(name) is a divergence from the browser that is not named as one. A row whose \
+                `submits` and `native` columns differ has to carry the registration in its name.
+                """)
+        }
+        XCTAssertEqual(divergent.sorted(), ["b9-denormal", "b9-exponent-at-int-max",
+                                           "b9-exponent-int-min-scale", "b9-exponent-marker-after-digit",
+                                           "b9-exponent-past-int", "b9-sign-after-exponent-digit",
+                                           "b9-step-band-edge-accepted"], """
+            the set of cases where this app and the browser disagree changed. Every member has to \
+            be registered — B9 is the only registration that covers a numeric one.
+            """)
+
+        // …and the date table the same way.
+        let dates = try Self.oracleCases(table: "DATE_ORACLE")
+        XCTAssertGreaterThan(dates.count, 15)
+        var narrowed: [String] = []
+        for row in dates {
+            let name = try XCTUnwrap(row["name"])
+            let assigned = try XCTUnwrap(row["assigned"])
+            let readBack = try XCTUnwrap(row["readBack"])
+            XCTAssertEqual(DocumentPageComposition.isCalendarDate(assigned),
+                           row["native"] == "true", "\(name): isCalendarDate disagrees")
+            if readBack == assigned && row["native"] != "true" { narrowed.append(name) }
+        }
+        XCTAssertEqual(narrowed.sorted(), ["b10-control-maximum", "b10-year-10000",
+                                          "b10-year-12345", "b10-year-99999"], """
+            the set of dates the other app produces and this one refuses changed. B10 covers \
+            exactly the years wider than four digits.
+            """)
+    }
+
+    /// One row of the oracle, as a dictionary. The format is one object literal per line, which is
+    /// why that file says not to reflow the table.
+    private static func oracleCases(table: String) throws -> [[String: String]] {
+        let url = repositoryRoot().appendingPathComponent("e2e/documents-number-input-oracle.spec.ts")
+        let text = try String(contentsOf: url, encoding: .utf8)
+        guard let tableStart = text.range(of: "export const \(table)") else {
+            XCTFail("\(table) is not in the oracle file")
+            return []
+        }
+        let body = text[tableStart.upperBound...]
+        guard let tableEnd = body.range(of: "\n];") else {
+            XCTFail("\(table) has no terminator")
+            return []
+        }
+        return body[..<tableEnd.lowerBound]
+            .split(separator: "\n")
+            .filter { $0.contains("{ name: '") }
+            .map { line in
+                var row: [String: String] = [:]
+                for key in ["name", "field", "typed", "editor", "bound", "submits", "native",
+                            "assigned", "readBack"] {
+                    guard let value = Self.oracleField(key, in: String(line)) else { continue }
+                    row[key] = value
+                }
+                return row
+            }
+    }
+
+    private static func oracleField(_ key: String, in line: String) -> String? {
+        guard let marker = line.range(of: "\(key): ") else { return nil }
+        let rest = line[marker.upperBound...]
+        if rest.first == "'" {
+            let body = rest.dropFirst()
+            guard let end = body.firstIndex(of: "'") else { return nil }
+            return String(body[..<end])
+        }
+        for literal in ["null", "true", "false"] where rest.hasPrefix(literal) {
+            return literal == "null" ? "<null>" : literal
+        }
+        return nil
+    }
+
+    // MARK: - DM30 · an exponent of any length answers, and does not take the process with it
+
+    /// D-4's `DecimalLiteral` did its scale arithmetic unchecked, and three sites overflowed. None
+    /// of them produced a wrong answer: every one was a **signal trap**, and the page asks this
+    /// question on every keystroke, so the app died as the last character was typed. All three
+    /// texts pass `numberInput` unchanged, and two of the three are values the other app submits.
+    func testDM30AnyExponentAnswersInsteadOfTrapping() throws {
+        // The three witnesses, one per site. Reaching the assertion at all is the proof.
+        let quantity = DocumentPageComposition.NumberConstraint.quantity
+        XCTAssertFalse(quantity.accepts("1.00e-9223372036854775807"),
+                       "exponent − fractionPart.count, at Int.min")
+        XCTAssertFalse(quantity.accepts("100e9223372036854775807"),
+                       "scale += 1 while dropping trailing zeros, at Int.max")
+        XCTAssertFalse(quantity.accepts("1.1e-9223372036854775807"),
+                       "-scale, where scale is exactly Int.min")
+
+        // …and the same three through the whole input path, which is how a user reaches them.
+        for typed in ["1.00e-9223372036854775807", "100e9223372036854775807",
+                      "1.1e-9223372036854775807", "0.1e-9223372036854775807",
+                      "1.000e-9223372036854775806", "10e9223372036854775807"] {
+            var draft = newEditor()
+            draft.lines[0].description = "Widget"
+            draft.lines[0].quantity = DocumentPageComposition.numberInput(typed)
+            XCTAssertEqual(draft.lines[0].quantity, typed, "\(typed) survives the editor unchanged")
+            XCTAssertFalse(DocumentPageComposition
+                .compose(DocumentPageComposition.Input(editor: draft)).editor?.canSubmit ?? true)
+        }
+
+        // The saturation is exact for the only question this type is asked, and that is checkable
+        // rather than assertable-by-comment: the answer for a saturated scale must equal the answer
+        // for the same literal with an exponent small enough that nothing saturates.
+        for decimals in 0...9 {
+            let saturated = try XCTUnwrap(DocumentPageComposition.DecimalLiteral("1.1e-9223372036854775807"))
+            let ordinary = try XCTUnwrap(DocumentPageComposition.DecimalLiteral("1.1e-400"))
+            XCTAssertEqual(saturated.fractionDigits <= decimals, ordinary.fractionDigits <= decimals,
+                           "saturation changed the answer at decimals = \(decimals)")
+        }
+
+        // The three primitives, at the edges that used to trap.
+        typealias Literal = DocumentPageComposition.DecimalLiteral
+        XCTAssertEqual(Literal.saturatingSubtract(Int.min, 1), Int.min)
+        XCTAssertEqual(Literal.saturatingSubtract(Int.max, -1), Int.max)
+        XCTAssertEqual(Literal.saturatingSubtract(5, 3), 2, "…and it is still subtraction")
+        XCTAssertEqual(Literal.saturatingAdd(Int.max, 1), Int.max)
+        XCTAssertEqual(Literal.saturatingAdd(Int.min, -1), Int.min)
+        XCTAssertEqual(Literal.saturatingAdd(5, 3), 8)
+        XCTAssertEqual(Literal.saturatingNegate(Int.min), Int.max)
+        XCTAssertEqual(Literal.saturatingNegate(5), -5)
+
+        // An exponent too long to be an `Int` is still refused rather than wrapped.
+        XCTAssertNil(Literal("1e9223372036854775808"))
+        XCTAssertNil(Literal("1e-99999999999999999999"))
+
+        // Trailing zeros crossing the boundary, which is the `scale += 1` site.
+        XCTAssertEqual(Literal("100e9223372036854775807")?.fractionDigits, 0)
+        XCTAssertEqual(Literal("1e9223372036854775807")?.fractionDigits, 0)
+        // …and negative saturation, which is `-scale`.
+        XCTAssertEqual(Literal("1.1e-9223372036854775807")?.fractionDigits, Int.max)
+        XCTAssertEqual(Literal("1.00e-9223372036854775807")?.fractionDigits, Int.max - 1)
+
+        // The ordinary answers are untouched.
+        XCTAssertEqual(Literal("2.500")?.fractionDigits, 1)
+        XCTAssertEqual(Literal("1500e-4")?.fractionDigits, 2)
+        XCTAssertEqual(Literal("15e-4")?.fractionDigits, 4)
+        XCTAssertEqual(Literal("1.e2")?.fractionDigits, 0, "a bound value may carry a bare point")
+        XCTAssertNil(Literal("."), "…but a point with digits on neither side is not a literal")
+    }
+
+    // MARK: - DM31 · all five date inputs say what they take
+
+    /// B10 narrows the year to four digits, and a narrowing the user cannot see is a dead button.
+    /// Each of the five date surfaces draws `documents.form.dateRangeHint`, and each is checked
+    /// where it is actually drawn rather than by counting how often the key appears.
+    func testDM31EachOfTheFiveDateInputsDrawsTheRangeHint() throws {
+        let key = "documents.form.dateRangeHint"
+        let view = Self.strippingComments(try Self.appSource("Views/DocumentsView.swift"))
+
+        // ── 1 & 2 · the editor's document date and valid-until ──
+        // `DocumentFieldRow` builds its identifier from `field.rawValue` and draws `block.hintKey`
+        // in the same control, so the block's hint IS the hint under that identifier.
+        XCTAssertTrue(view.contains("\"documentsPage.editor.\\(block.field.rawValue)\""))
+        XCTAssertTrue(view.contains("if let hintKey = block.hintKey {"),
+                      "the header row stopped drawing its hint")
+        for (identifier, field) in [("documentsPage.editor.date", DocumentPageComposition.EditorField.date),
+                                    ("documentsPage.editor.validUntil", .validUntil)] {
+            // Both shapes of the sheet: an ordinary editor, and the statement generator — whose
+            // one header field is the same `date` block, so it carries the hint too.
+            for type in [BusinessDocumentType.quotation, .statement] {
+                let page = DocumentPageComposition
+                    .compose(DocumentPageComposition.Input(editor: newEditor(type: type)))
+                let generating = type == .statement
+                guard let block = page.editor?.fields.first(where: { $0.field == field }) else {
+                    XCTAssertTrue(generating && field == .validUntil, """
+                        \(identifier) is missing from a shape that draws it
+                        """)
+                    continue
+                }
+                XCTAssertEqual(block.hintKey, key, "\(identifier) draws no range hint")
+            }
+        }
+
+        // ── 3 & 4 · the statement generator's two period bounds ──
+        let statement = DocumentPageComposition.StatementBlock(customers: [], messageKey: nil,
+                                                              canGenerate: false)
+        XCTAssertEqual(statement.periodStartHintKey, key)
+        XCTAssertEqual(statement.periodEndHintKey, key)
+        XCTAssertEqual(statement.allKeys.filter { $0 == key }.count, 1,
+                       "one sentence, two fields — `allKeys` is a set of what can be drawn")
+        for call in ["field(block.periodStartLabelKey, hintKey: block.periodStartHintKey)",
+                     "field(block.periodEndLabelKey, hintKey: block.periodEndHintKey)"] {
+            XCTAssertEqual(view.components(separatedBy: call).count - 1, 1,
+                           "\(call) is not drawn exactly once")
+        }
+        XCTAssertEqual(view.components(separatedBy: "field(block.customerLabelKey) {").count - 1, 1,
+                       "the customer picker beside them deliberately carries no hint")
+
+        // ── 5 · the tax-invoice sheet's issue date ──
+        XCTAssertEqual(view.components(separatedBy: "field(block.dateLabelKey, hintKey: block.dateHintKey)").count - 1, 1,
+                       "the tax-invoice date is back to passing a literal nil")
+        XCTAssertEqual(view.components(separatedBy: "hintKey: nil").count - 1, 1,
+                       "only the attachment row passes no hint")
+        XCTAssertTrue(view.contains("if let hintKey {"), "that sheet stopped drawing its hint")
+
+        // The key is placed in all three regions, and in no others.
+        XCTAssertEqual(DocumentPageComposition.placement[key],
+                       [.form, .statementPanel, .taxInvoicePanel])
+
+        // …and it says the range, in every language. A hint that does not name the bounds would
+        // satisfy every assertion above and tell the user nothing.
+        for language in languages {
+            let sentence = try XCTUnwrap(sourceTable(language)[key], "\(language) has no \(key)")
+            XCTAssertTrue(sentence.contains("0001-01-01") && sentence.contains("9999-12-31"), """
+                \(language)'s range hint does not name the range: \(sentence)
+                """)
+        }
     }
 
     // MARK: - DM25 · the empty line is a claim, and it must not be made falsely
@@ -1424,6 +1944,19 @@ final class DocumentMountingTests: XCTestCase {
     private static func appSource(_ relative: String) throws -> String {
         try String(contentsOf: packageRoot()
             .appendingPathComponent("Sources/SoloLedger/\(relative)"), encoding: .utf8)
+    }
+
+    private static func coreSource(_ relative: String) throws -> String {
+        try String(contentsOf: packageRoot()
+            .appendingPathComponent("Sources/SoloLedgerCore/\(relative)"), encoding: .utf8)
+    }
+
+    /// …/native/SoloLedger → the repository root, which is where the browser oracle lives.
+    private static func repositoryRoot() -> URL {
+        var dir = packageRoot()
+        dir.deleteLastPathComponent()
+        dir.deleteLastPathComponent()
+        return dir
     }
 
     /// Whole-line comments out, code lines kept in order. A `.disabled(...)` written inside a

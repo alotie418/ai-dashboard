@@ -1975,7 +1975,9 @@ final class AppModel: ObservableObject {
               let index = draft.lines.firstIndex(where: { $0.id == id }) else { return }
         // The three numeric fields are `<input type="number">` over there, and a letter typed into
         // one is dropped by the control rather than stored and refused later. Description and unit
-        // are plain text and take whatever is typed.
+        // are plain text and take whatever is typed. `numberInput` is layer ONE of that control —
+        // what ends up in the editor; the value it reads back and the submit it allows are two
+        // further layers, and neither of them is decided here.
         let cleaned: String
         switch field {
         case .quantity, .unitPrice, .taxRatePercent:
@@ -1983,12 +1985,16 @@ final class AppModel: ObservableObject {
         case .description, .unit:
             cleaned = text
         }
-        // "Dropped by the control" means NOTHING happens: no character is inserted, so no `input`
-        // event fires and `setRow` is never called. That is what keeps a refused keystroke from
-        // UNLOCKING the line — `didSet` would fire on an assignment even of an equal value, and a
-        // line unlocked here stops showing the money it was saved with and recomputes it from
-        // quantity × unit price. The republish still happens, so the field snaps back to the text
-        // the control would be holding.
+        // "Dropped by the control" means the editor text does not change, so this assignment is
+        // skipped and `didSet` never runs on an equal value. The republish still happens, so the
+        // field snaps back to the text the control would be holding.
+        //
+        // That is only HALF of what keeps a locked line locked, and D-4 shipped only this half. A
+        // character the control DOES insert can still leave the bound value alone — typing `.`
+        // after `2` gives the editor `2.` and the value `2`, and over there `onChange` does not
+        // fire, so `setRow` is not called and the line keeps the money it was saved with. The other
+        // half therefore lives where the lock does, in `DocumentLineDraft.unlock(ifBoundValue…)`:
+        // the text still updates here, and the lock survives it.
         if draft.lines[index].value(field) != cleaned {
             draft.lines[index].setValue(field, to: cleaned)
         }
@@ -2256,10 +2262,13 @@ final class AppModel: ObservableObject {
     /// ruling ③ says this round does not delete it, so it is dropped here at the single seam.
     func saveTaxInvoice() {
         guard let store, let draft = taxInvoiceDraft else { return }
-        // This sheet's save is NOT inside a `<form>` over there — it is an `onClick` — so nothing
-        // validates it on the way out. It does not have to: the issue date is `<input type="date">`
-        // and simply cannot hold a date that does not exist. Here it can be typed, so the same
-        // guarantee is made here, with the button unavailable for the same reason.
+        // This sheet's save is NOT inside a `<form>` over there. `TaxInvoiceModal.tsx` has no
+        // `<form>` element at all and its save is `<button type="button" onClick={handleSave}>`, so
+        // NO constraint validation runs on that side — and the date input does not carry `required`
+        // either. What refuses over there is the control alone, and it refuses exactly one thing: a
+        // date that does not exist. It does not refuse a five-digit year; that one it holds and
+        // saves. Here the field is a plain `TextField`, so this gate makes the first guarantee and
+        // — by B10 — narrows the second, which is why the sheet draws `dateHintKey` beside it.
         guard DocumentPageComposition.isOptionalCalendarDate(draft.date) else { return }
         let saved = performDocumentWrite {
             _ = try store.updateTaxInvoice(documentID: draft.document.id, draft.edit)

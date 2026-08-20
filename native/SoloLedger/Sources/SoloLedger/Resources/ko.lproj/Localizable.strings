@@ -866,6 +866,7 @@
 "documents.form.numberHint" = "내부용 번호이며 수정할 수 있습니다";
 "documents.form.date" = "문서 날짜";
 "documents.form.validUntil" = "유효 기한";
+"documents.form.dateRangeHint" = "0001-01-01부터 9999-12-31 사이의 실제 날짜를 입력하세요.";
 "documents.form.customer" = "고객명";
 "documents.form.customerPlaceholder" = "고객명을 입력하세요";
 "documents.form.customerTaxID" = "고객 사업자 번호";

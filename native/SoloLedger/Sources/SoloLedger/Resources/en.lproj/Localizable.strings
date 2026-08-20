@@ -869,6 +869,7 @@
 "documents.form.numberHint" = "Internal number, editable";
 "documents.form.date" = "Document Date";
 "documents.form.validUntil" = "Valid Until";
+"documents.form.dateRangeHint" = "Enter a real calendar date from 0001-01-01 through 9999-12-31.";
 "documents.form.customer" = "Customer Name";
 "documents.form.customerPlaceholder" = "Enter customer name";
 "documents.form.customerTaxID" = "Customer Tax ID";
