@@ -262,7 +262,7 @@ Q9 的验收线是「同输入下结果与 Electron 逐字节相等」。产物�
 
 | 编号 | 形态 | 证据锚 | 处置 |
 | --- | --- | --- | --- |
-| A5 | **锁定行**：由销售/流水导入的明细行复制其来源的已存金额，**不重算**；用户一旦改动数量、单价或税率，该行解锁并转为重算 | `components/DocumentModal.tsx` 的 `ItemRow.locked` 与 `setRow` 的解锁条件 | 照搬。同一张单内可并存「复制来的数」与「算出来的数」，两者舍入来源不同 |
+| A5 | **锁定行**：由销售/流水导入的明细行复制其来源的已存金额，**不重算**；用户一旦改动数量、单价或税率，该行解锁并转为重算。**「改动」的判据是 `element.value` 变了**，不是「敲了一个键」：`setRow` 只在 React 的 `onChange` 触发时才跑，而 `onChange` 由 react-dom 的 value tracker 判定，同一个字符串不触发 | `components/DocumentModal.tsx` 的 `ItemRow.locked` 与 `setRow` 的解锁条件；判据的实测在 `e2e/documents-number-input-oracle.spec.ts` 的 `a keystroke can change the editor and leave element.value alone` | 照搬。同一张单内可并存「复制来的数」与「算出来的数」，两者舍入来源不同。**「照搬」在实现侧一度失真**：D-4 比的是文本，于是在锁定行上打一个 `.` 再退格，就把销售记录已存的金额改写成数量×单价，两侧都能保存而账本不同。第十一次裁定已修；判据的两层拆分见 B8 上方那段 |
 | A6 | **`\|\|` 回退对 0 会跳过**：导入行的单价与金额都走 `a \|\| b` 形的回退链，来源值恰为 0 时会落到后一个候选 | `components/DocumentModal.tsx` 的 `salesToRow` | 照搬。与 F 章「零值/非有限值被静默改写」同族，登记在案 |
 | A8 | **表头合计只随明细重算**：`update` 仅当请求带了 `items` 时才重算 `subtotal`/`tax_amount`/`total`；只改表头字段时三个合计保持旧值 | `electron/handlers/documents.js` 的 `update` | 照搬**存储语义**，但见下面的设计约束 |
 | A9 | **`update` 的状态读在事务之外**：先无事务地读出 `status`，在 JS 里判完草稿规则与状态机，随后才开事务写。读与写之间存在窗口 | `electron/handlers/documents.js` 的 `update`：`const existing = db.prepare('SELECT id, status …').get(id)` 在函数顶部，`db.transaction(…)` 只包住 `UPDATE`／明细重写 | 照搬。见下面的**并发窗口三条**与升级条款 |
@@ -307,28 +307,38 @@ Electron 的关联面板有**三条真正会删文件的路径**：`app:discardD
   **D-6 激活时接上删除接缝**。在原子化轮落地之前，任何轮次都不得接删除。
 * **接缝是单点的**：App 侧消费那两个回传值的地方各恰一处，都在页面模型里，都只是把值丢掉。
 
-### B 系列：原生这一侧的有意差异（第八 / 第九次裁定）
+### B 系列：原生这一侧的有意差异（第八 / 第九 / 第十一次裁定）
 
 上面那张表是 **A 系列**，它的表头写的是「Electron 的**已知形态**，本章照搬」。下面这些**不是那种东西**：
 它们是原生这一侧与 Electron 之间的**有意差异**，方向相反——照搬的是别人的形态，这里记的是「本仓给不出
 同一个东西」或「本仓有意给了另一个形状」。两者不该共用一个编号命名空间，故另编 **B 系列**。
 
-**B1 / B2（第八次裁定，D-4）的共同性质：都到不了账本。** 输入侧由 `DocumentPageComposition.numberInput`
-净化字符，提交侧由 `DocumentPageComposition.NumberConstraint.accepts` 按 HTML 的 valid floating-point
-number 文法再判一次，两道都过不去。差异只存在于「字段正在被编辑」这一段时间里。
+**B1 与 B2（第八次裁定，D-4）已于第十一次裁定退役。** 它们登记的两处「差异」是用错误的浏览器事实
+写下来的：B1 说的那处差异根本不存在，B2 的四个承重分句全部与实测相反，且方向是反的。两个编号
+**永久退役、不得复用**；退役的证据与订正见 §9 的第十一次裁定，第八次裁定那一条也在原地标注了它已被
+取代——旧记录保留原文，不改写成仿佛从未发生。
 
 **B3–B7（第九次裁定，D-5）都在产物面上**，其中 B4 是 D-3/D-4 就已发生、此前一直没登记的那一处。
 按 Q7-b，它们每一条都要有一条**只钉它自己**的测试；逐字节相等的定义域也是因为它们才需要写下来。
 
+**B8–B10（第十一次裁定，D-4 输入镜像纠偏）都在输入面上**，且它们与 B1/B2 的关键区别是：**每一条都由
+真实浏览器实测支撑，而不是由代码注释支撑**。证据锚统一是
+`e2e/documents-number-input-oracle.spec.ts` —— 它在已有的 `Locale-matrix e2e (Playwright)` 门里驱动
+真实 Chromium 148 跑一张具名矩阵，原生侧由 `DM29` 逐案映射上去；任一侧改动而另一侧不改，都会红。
+**B9 与 B10 各带一条自动升级条款**，写在各自的处置列里。
+
 | 编号 | 形态 | 证据锚 | 处置 |
 | --- | --- | --- | --- |
-| B1 | **粘贴 `1a2`**：浏览器把字段清空，原生留下 `12`。两边都提交不了 `1a2`。逐字（英文原文即证据锚本身）：*PASTING `1a2` clears the field in a browser and leaves `12` here. Both are unsubmittable-as-`1a2`, which is the property that matters.* | `native/SoloLedger/Sources/SoloLedger/App/DocumentPageComposition.swift` 的 `numberInput(_:)` 文档注释，「**Two registered differences**」第一条 | **登记级，不改。** 要抹平它得让原生的字符净化在遇到一个非法字符时清空整个字段，那会连带把「半打的值」一起清掉——见 B2 的同一处注释 |
-| B2 | **半打的 `1.`**：对面是 `badInput`，绑定态因此变成 `''`，**它的合计把那一行读成 0**，而字段仍显示 `1.`；原生文本留 `1.`，合计按 `parseFloat` 读成 1。两边都拒绝提交，两个合计只在字段没打完时不同。逐字（英文原文即证据锚本身）：*A half-typed `1.` is `badInput` over there, which makes the bound state `''` — so its running total reads that line as 0 while the field still shows `1.`. Here the text stays `1.` and the total reads it as 1, through the same `parseFloat` D-1 pinned. Both refuse the submit (see ``NumberConstraint/accepts(_:)``); the two totals disagree only while the field is unfinished.* | 同一处注释第二条；提交侧的判据在同文件 `NumberConstraint.accepts(_:)` | **登记级，不改。** 要抹平它得让原生合计对「不是合法浮点字面量」的文本读 0，那是改 D-1 钉住的编辑期读数口径（`DocumentMath.editorNumber` 是 `parseFloat`，两侧同一个函数），属另一个裁定，不在本章已裁定的范围内 |
+| ~~B1~~ | **已退役（第十一次裁定）。** 原文声称「粘贴 `1a2` 时浏览器把字段清空，原生留下 `12`」。实测：两侧都留下 `12`，都可提交为 12 —— 这条差异不存在。编号不复用 | 原证据锚是 `numberInput` 的文档注释，该注释已删除 | **退役。** 差异不存在，登记本身是错的；订正见 §9 第十一次裁定 |
+| ~~B2~~ | **已退役（第十一次裁定）。** 原文的四个承重分句（对面是 `badInput` / 绑定态变 `''` / 合计读成 0 / 两边都拒绝提交）全部与实测相反，且方向相反：对面 `1.` 的 `value` 是 `1`、可提交，原生反而拒绝。它描述的「合计不同」现象是真的，但见证串挂错了 —— 真正的见证是 `1e` / `1e-`，已另立 **B8** | 原证据锚是同一处注释，已删除 | **退役。** 编号不复用；分叉本体已按第十一次裁定修到与 Electron 一致（`1.` / `5.` / 前置 `+` / 重复小数点 / 指数上下文），不再登记 |
 | B3 | **产物的税相关标签不随会计制度变**：Electron 的产物按 `getTaxLabel(acc_locale, uiLang, …)` 取 `formTaxRate` / `headerTaxAmount` / `headerTotalWithTax`（非 CN 制度下是「Sales Tax Rate」「消費税率」这类制度自己的说法）；原生产物沿用屏幕已在用的固定键 `documents.item.taxRate` / `documents.item.taxAmount` / `documents.total.*` | `components/accountingLocaleConfig.ts` 的 `formTaxRate` / `headerTaxAmount` / `headerTotalWithTax` 三个概念；原生 `AccountingProfile` 只有 `taxLabel` 与 `surchargeLabel` | **登记，不改。** 把那张概念表搬进原生等于动 accounting profiles，`CLAUDE.md` 把它列为需要显式批准的红线；而只补三个概念同样是 profile 改动。**零制度化标签概念进原生**是第九次裁定的原话 |
 | B4 | **屏幕侧同一处分叉，D-3/D-4 就已发生**：单据编辑器的税率列表头，Electron 是 `taxLabel('formTaxRate')`，原生是六语恒为「税率」的 `documents.item.taxRate`；税额与总计表头同理（Electron 非 CN 走 `headerTaxAmount` / `headerTotalWithTax`） | `components/DocumentModal.tsx` 的 `taxLabel('formTaxRate')` 与 `taxAmountLabel`；原生 `DocumentPageComposition` 的 `taxRateKey` / `taxAmountKey` | **补登记，不改。** 这一条**不是 D-5 造成的**——它在 D-3 写文案、D-4 画表时就已经这样，只是此前规格里零登记（`formTaxRate` / `taxLabel` 在本文件中此前零命中）。产物与屏幕保持同一套标签，是 B3 成立的前提 |
 | B5 | **抬头只出公司名**：Electron 的产物抬头出 `company_info` 的名称 + 税号 / 地址 / 负责人三个可选小字；原生只出 `company_name`，其余传空，`.cmeta` 那一行恒不出现 | `components/documentPdf.ts` 的 `companyMeta`；原生 `SettingsStore.Key` 只有 `companyName`，无 `company_info` | **登记，不改。** 为产物加三个设置项是本章之外的事 |
 | B6 | **生成时间的格式**：Electron 是 `new Date().toLocaleString(uiLang)`（宿主 ICU 的本地化串，随语言与地区变，没有固定格式契约）；原生固定为 **ISO-8601 UTC**，且 `now` 可注入 | `components/DocumentsPage.tsx` 的 `generatedAt: new Date().toLocaleString(uiLang)` | **登记，不改。** 逐字端口一个没有稳定契约的格式，钉不住也测不动；可注入的 `now` 正是 Q7-b 逐字节定义域能成立的前提 |
 | B7 | **产物里的语言码是 Electron 的**：`<html lang>` 与 CJK 字体族的挑选键出 `zh-CN` / `zh-TW`，不是原生自己的 `zh-Hans` / `zh-Hant`；其余四语两侧同码 | `components/documentPdf.ts` 的 `cjkFonts(lang)` 与 `<html lang="${e(L.lang)}">`；原生语言码见 `Localizer.swift` | **有意映射，登记。** 出原生码会同时改掉字体回落与产物字节；映射只此一处、只在产物边界上发生 |
+| B8 | **`1e` / `1e-` 的编辑期合计**：对面这两个文本是 `badInput`，`element.value` 读回空串，绑定态因此是 `''`，它的合计把那一行读成 **0**；原生保留编辑文本 `1e` / `1e-`，合计按 D-1 钉住的 `parseFloat` 读成 **1**。**两侧都不能提交**，所以差异只存在于「字段还没打完」这一段时间里，**账本不可达** | `e2e/documents-number-input-oracle.spec.ts` 的 `exponent-no-digits` / `exponent-sign-no-digits` 两案（`bound: null`、`submits: false`）；原生侧 `DM24d` 的 `2e` 一行与 `DocumentMath.editorNumber` | **登记，不改。** 要抹平它得让原生合计对「读不回值的文本」读 0，那是改 D-1 钉住的编辑期读数口径（两侧同一个 `parseFloat`），属另一个裁定 |
+| B9 | **极小非整步值：原生更严**。Blink 自己的 `Decimal` 是有限精度的（约 19 位有效数字），小于约 **1.5e-10** 时它对 `0.01` 求余得 0，于是把本来不是整数步的值判为合法并提交；原生用精确 decimal 判据拒绝。**下溢到零的值同理**。本轮不移植 Blink 的私有 `Decimal`/容差行为 | 同一文件里全部以 `b9-` 为前缀的具名案，见证至少含：`15e-11`（带边界，对照 `15e-10` 两侧同为拒绝）、`5e-324`、`1.00e-9223372036854775807`、`1e-99999999999999999999`、`1e-2-3` → `1e-23`、`1e-2e3` → `1e-23`；正指数溢出的对照是 `100e9223372036854775807` / `1e309`，它们在两侧**同为 `badInput`**，根本到不了 step 层 | **登记，不改，但带自动升级条款。** 谓词式表述：*凡 `numberBoundValue` 读得回、作为 `Double` 有限、且其精确十进制小数位数大于该输入的 `step` 位数的值*，对面可能提交而原生一律拒绝。**一旦真实账本里读到一个 Electron 已保存、而原生因该判据不能重新保存的数字，本项立即升级为必修：必须先修后接，不得进入 D-6 激活。** 无论如何，任何值都只能正常返回 true/false，不得崩溃 |
+| B10 | **日期只收四位年份**：Electron 的 `<input type="date">` 年份可到 `275760-09-13`，`10000-01-01` 能持有、能从 `element.value` 读回、能用键盘在年份段直接打出来，并且**能穿过 `required` 的单据日期把表单提交出去**；原生只接受 `0001-01-01`…`9999-12-31` 之间的真实先验格里高利日期 | 同一文件 `DATE_ORACLE` 里以 `b10-` 为前缀的具名案（`10000-01-01` / `12345-06-07` / `99999-12-31` / `275760-09-13`），以及 `a five-digit year is keyboard-reachable and submits through a required date` 一例；原生侧 `DM23` 与 `DM29` | **有意收窄，登记。** 理由不是「控件产不出」，而是**本仓的期间筛选依赖 ISO 日期文本的词典序**（`StatementGenerator.swift` 的 `date >= ? AND date <= ?`）：`"10000-01-01" < "2026-01-01"`，放宽会让五位年份排到全部四位年份之前，闭区间判断**静默出错**——那是给出一份错的对账单，比拒绝更坏。收窄**不是无声的**：五个日期输入面全部常显 `documents.form.dateRangeHint`。**一旦账本里出现四位年份范围外的日期，本项立即升级为必修：必须先修后接，不得进入 D-6 激活。** |
 
 ---
 
@@ -504,6 +514,10 @@ D-4 开工前置的测绘（只读）提出三个超出确认书的判断点，�
 
 ### 2026-08-19 · 第八次裁定（D-4 复核返工的两处编辑期差异 → 登记级）
 
+> **⚠️ 本条已被 2026-08-20 的第十一次裁定取代。** 下面这一整条记录的事实基础是错的：B1 登记的差异
+> 不存在，B2 的四个承重分句全部与实测相反。原文一字未改地保留在这里 —— 它记录的是当时写下的东西，
+> 以及它错在哪里能被追回；两个编号已永久退役，订正见本节末尾的第十一次裁定。
+
 D-4 的复核返工（PR #491，merge `66ed9fef`）在实现「三个数字域按控件自己的属性判」时，实测出两处
 **编辑期**差异：两边都拒绝把它们写进账本，但字段还没打完时屏幕上的合计不同。用户在合并授权的同一条
 消息里**追认它们为登记级**，并把 §3 的登记行排期到 **D-5 的首个 commit**——即本次修订。
@@ -557,3 +571,32 @@ D-5 的实现按已合并的屏幕（`DM21`）画「描述 / 日期 / **税额 /
 按其性质保留：它们记录的是当时写下的东西，改掉就不再是修订记录了。判断当前口径请看 §2 正文。
 
 **本次修订不改任何其它口径**：Q1 / Q3–Q9、§3 的 A 与 B 两系列、§5 / §6 拆轮表一个字未动。
+
+### 2026-08-20 · 第十一次裁定（D-4 输入镜像纠偏：崩溃、锁、B1/B2 退役、B8–B10）
+
+D-4 把 `<input type="number">` 建模成了**一道**门。它是**三道**：字符进不进编辑器、`element.value`
+读回什么、以及提交层的 `badInput` / `min` / `max` / `step`。这一处建模错误同时造成了本轮修掉的每一件事，
+而它之所以能一路走到合并，是因为**当时唯一的浏览器 oracle 是 Swift 源码里的一段注释，而断言抄的就是
+那段注释** —— 同源自证，测不出自己错。
+
+本轮先补 oracle 再改代码：`e2e/documents-number-input-oracle.spec.ts` 在**已在 main 上、且已是必需检查**
+的 `Locale-matrix e2e (Playwright)` 门里驱动真实 Chromium 148 跑一张具名矩阵（键入与真实剪贴板粘贴两路
+各跑一遍），原生侧由 `DM29` 读同一份文件、逐案映射。未新增工作流、未新增必需检查。
+
+| 条目 | 从什么 | 改成什么 | 依据 |
+| --- | --- | --- | --- |
+| **`DecimalLiteral` 的三处整数溢出** | `exponent - fractionPart.count`、去尾零时的 `scale += 1`、`Int.min` 上的 `-scale`，三处都是**信号陷阱**（`EXC_BREAKPOINT` / `brk #0x1` / 退出码 133），而 `compose` 在每次 SwiftUI body 求值时都会走到，所以是**打字打到最后一个字符就崩** | 三处改可证明的饱和运算（`…ReportingOverflow`），**必须修，禁止用登记代替修复** | 用户裁定。饱和对「`fractionDigits <= decimals`」这一个谓词是精确的：饱和后的标度比真值离零更远，同向，比较结果不变——这是关于**这个谓词**的命题，不是「饱和值等于数学值」，也不是关于浏览器的任何主张（那是 B9）。`DM30` 把这条命题测了出来，而不是只写在注释里 |
+| **锁定行的无痕解锁** | 三个数字字段的 `didSet` 一律清锁，判据是**文本**变了 | 判据改为**绑定值**变了：`numberBoundValue(old) ?? "" != numberBoundValue(new) ?? ""` 才清锁。**必须修，禁止登记** | 用户裁定。实测：锁定行 `quantity="2"`、已存金额 999，打一个 `.` 再退格 —— 对面 `onChange` 零触发、绑定值仍是 `2`、锁仍在、payload 仍是 999；原生原本先存 `"2."` 清锁、退格回 `"2"` 后按 2×50 重算成 100，**两侧都能保存而账本不同**。A5 自称「照搬」，实现侧一度失真，已在 §3 原地订正 |
+| **B1** | 「粘贴 `1a2` 浏览器清空、原生留下 `12`」 | **退役，编号永久不复用**；代码注释里的该句删除 | 用户裁定。实测两侧都留下 `12` 且都可提交 —— 差异不存在。第八次裁定那一条已在原地标注被取代，原文保留 |
+| **B2** | 「`1.` 对面是 `badInput` / 绑定态 `''` / 合计读 0 / 两边都拒绝提交」 | **退役，编号永久不复用**；`1.`、`5.`、前置 `+`、重复小数点等会改变 submit 或锁状态的形态，**一律修到与 Electron 一致，不得登记逃避** | 用户裁定。四个分句全错且方向相反：对面 `value` 是 `1`、可提交，原生反而拒绝 |
+| **B8**（新） | （本次新产生） | `1e` / `1e-` 的编辑期合计差异登记：对面 0、原生按 `parseFloat` 读 1；**仅限编辑期，两侧都不能提交，账本不可达** | 用户裁定。B2 描述的现象是真的，只是见证串挂错了；真正的见证是这两个 |
+| **B9**（新） | （本次新产生） | 极小非整步值与下溢值：原生维持精确 decimal 判据，比 Blink 的有限精度 `Decimal` 更严；**登记 + 自动升级条款**；不移植 Blink 私有行为 | 用户裁定。登记用**谓词**表述而不是只列一个见证串；见证含 `15e-11`（带 `15e-10` 边界对照）、`5e-324`、`1.00e-9223372036854775807`、`1e-99999999999999999999`、`1e-2-3`、`1e-2e3`，正指数溢出的对照两侧同为 `badInput` |
+| **B10**（新） | （本次新产生） | 日期维持四位年份；理由（对面能提交五位年份 + 本仓期间筛选依赖 ISO 文本词典序 + `"10000-01-01" < "2026-01-01"` 会静默破坏闭区间）写进规格；**登记 + 自动升级条款** | 用户裁定。`DM23` 补五位年份反例与词典序承重断言，不再写成「控件产不出」 |
+| **`documents.form.dateRangeHint`**（新键） | 五个日期输入面对收窄零说明 | 六语各 +1（754 → 755），文案由用户逐字下稿；`placement` 落 `[.form, .statementPanel, .taxInvoicePanel]`，五个面全部常显 | 用户裁定（条件停止点：只读扫描确认无准确现成键，`report.year.invalid` 问的是年份不是日期，`legacy.convert.issue.dateNotACalendarDay` 说的是存量值的前十个字符且不含范围）。`StatementBlock.allKeys` 只记一次、`TaxInvoiceBlock.labelKeys` 记一次，闭集用 Set 语义证明 |
+| **全角数字** | `numberInput` 的 `$0.isASCII` 把全角数字丢成空 | 折半角，但**只折实测的那一组**：`０`–`９`、`．`、`－`；全角 `＋` / `ｅ` / `Ｅ` 控件自己丢弃，这里也丢弃 | 用户裁定「修到与 Chromium 一致」。**这与提示词里「仅转换 Unicode decimal digits」的措辞有出入，实测为准**：阿拉伯-印度数字 `٢٣`、天城文、孟加拉、泰文、N'Ko、数学粗体数字都是 Unicode 十进制数字，而控件**全部丢弃**；按类别折会让本页持有对面持不住的值 |
+| **指数上下文**（复核补充） | `numberInput` 只知道「至多一个 `.`、至多一个 `e`」 | 指数出现后：`.` 一律丢弃；指数符号只在指数还没有数字时保留第一枚，之后一律丢弃 | 用户裁定（复核侧四案）。实测：`1e2.3`→`1e23`、`1e.2`→`1e2`、`1e++2`→`1e+2`、`1e-2-3`→`1e-23`；前三案两侧同为可提交，第四案落在 B9 的已登记集合里（**不是 `badInput`**） |
+| **DM24 / DM24b / DM24c** | 九形状循环，逐条主张「浏览器拒绝提交」，且把应用到不了的未净化字符串直接喂给提交谓词 | 按四层重分组：A 编辑器 / B 绑定值 / C 提交 / D 写入与 locked payload；每句失败信息与 Chromium 148 / Electron 42.6 的实测一致，不再泛称「浏览器」 | 用户裁定。九条里六条为假（`1.`、`+5`、`1.2.3`、`0x10`、`Infinity`、`" 1"` 对面都提交），其中四条还是应用永远产不出的文本 |
+| **`TaxInvoiceModal` 注释** | 「保存不在 `<form>` 里，但日期控件持不住不存在的日期」 | 订正为：那张卡**完全没有 `<form>`**，保存是 `type="button" onClick`，日期输入也没有 `required`，所以对面**零约束校验**；控件只挡不存在的日期，**挡不住五位年份**，行为统一服从 B10 | 用户裁定 |
+
+**本次修订不改任何其他已裁定口径**：Q1–Q9 与 Q2 的四条细目、§5 / §6 拆轮表一个字未动。存储原子化轮与
+D-6 都不在本轮内。
