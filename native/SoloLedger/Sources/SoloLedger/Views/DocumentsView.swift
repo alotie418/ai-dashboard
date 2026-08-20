@@ -739,14 +739,14 @@ private struct DocumentStatementPanel: View {
                     .labelsHidden()
                     .accessibilityIdentifier("documentsPage.editor.statementCustomer")
                 }
-                field(block.periodStartLabelKey) {
+                field(block.periodStartLabelKey, hintKey: block.periodStartHintKey) {
                     TextField("", text: Binding(
                         get: { model.documentEditor?.statementPeriodStart ?? "" },
                         set: { model.setStatementPeriodStart($0) }
                     ))
                     .accessibilityIdentifier("documentsPage.editor.statementStart")
                 }
-                field(block.periodEndLabelKey) {
+                field(block.periodEndLabelKey, hintKey: block.periodEndHintKey) {
                     TextField("", text: Binding(
                         get: { model.documentEditor?.statementPeriodEnd ?? "" },
                         set: { model.setStatementPeriodEnd($0) }
@@ -772,11 +772,19 @@ private struct DocumentStatementPanel: View {
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
     }
 
+    /// The hint is drawn exactly as `TaxInvoiceSheet.field` draws its own — same font, same style,
+    /// same wrap — rather than in a third shape invented here.
     private func field<Content: View>(_ labelKey: String,
+                                      hintKey: String? = nil,
                                       @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(model.t(labelKey)).font(.caption).foregroundStyle(.secondary)
             content()
+            if let hintKey {
+                Text(model.t(hintKey))
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -830,7 +838,7 @@ private struct TaxInvoiceSheet: View {
                         .disabled(block.saveActionKey == nil)
                         .accessibilityIdentifier("documentsPage.taxInvoice.number")
                     }
-                    field(block.dateLabelKey, hintKey: nil) {
+                    field(block.dateLabelKey, hintKey: block.dateHintKey) {
                         TextField("", text: Binding(
                             get: { model.taxInvoiceDraft?.date ?? "" },
                             set: { model.setTaxInvoiceDate($0) }

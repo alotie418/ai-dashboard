@@ -866,6 +866,7 @@
 "documents.form.numberHint" = "Numéro interne, modifiable";
 "documents.form.date" = "Date du document";
 "documents.form.validUntil" = "Valable jusqu'au";
+"documents.form.dateRangeHint" = "Saisissez une date réelle comprise entre le 0001-01-01 et le 9999-12-31.";
 "documents.form.customer" = "Nom du client";
 "documents.form.customerPlaceholder" = "Saisissez le nom du client";
 "documents.form.customerTaxID" = "N° fiscal du client";

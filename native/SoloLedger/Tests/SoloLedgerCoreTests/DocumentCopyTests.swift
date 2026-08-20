@@ -1,7 +1,7 @@
 import XCTest
 @testable import SoloLedgerCore
 
-/// D-3 · the `documents.*` six-language copy — 103 keys, plus `nav.documents`.
+/// D-3 · the `documents.*` six-language copy — 104 keys, plus `nav.documents`.
 ///
 /// **Every key here is dormant.** No production source names one; D-4 draws the list page, the
 /// editor, the line table and the tax-invoice association panel, D-5 draws the exported artifact,
@@ -10,7 +10,7 @@ import XCTest
 ///
 /// ## Where the words came from
 ///
-/// **75 mirrored, 8 rewritten, 21 native-only.** Those three numbers are not a description: DC13
+/// **75 mirrored, 8 rewritten, 22 native-only.** Those three numbers are not a description: DC13
 /// holds the three lists to a partition of the namespace, and DC14 compares every mirrored key
 /// against `i18n/locales/*.json` — Electron's own copy, in this same repository — in all six
 /// languages. An earlier draft of this comment claimed a different split and was measurably wrong
@@ -78,7 +78,8 @@ final class DocumentCopyTests: XCTestCase {
         "documents.form.title", "documents.form.editTitle",
         "documents.form.type", "documents.form.number",
         "documents.form.numberHint", "documents.form.date",
-        "documents.form.validUntil", "documents.form.customer",
+        "documents.form.validUntil", "documents.form.dateRangeHint",
+        "documents.form.customer",
         "documents.form.customerPlaceholder", "documents.form.customerTaxID",
         "documents.form.customerAddress", "documents.form.customerContact",
         "documents.form.notes",
@@ -188,6 +189,9 @@ final class DocumentCopyTests: XCTestCase {
         "documents.error.invalidAttachmentPath", "documents.error.attachmentInUse",
         "documents.statement.basisNote", "documents.statement.currencySplitNote",
         "documents.export.formatNote", "documents.print.currency",
+        // B10's sentence. Electron has no counterpart because its control needs none: `type="date"`
+        // says what it takes by being a picker, and its year is not narrowed to four digits.
+        "documents.form.dateRangeHint",
         "nav.documents",
     ]
 
@@ -330,9 +334,9 @@ final class DocumentCopyTests: XCTestCase {
 
     // MARK: - DC1 · the key universe
 
-    func testDC1TheDocumentsNamespaceIsExactlyOneHundredAndThreeKeys() throws {
-        XCTAssertEqual(Self.adjudicatedKeys.count, 103, "the adjudicated table itself must be 103")
-        XCTAssertEqual(Set(Self.adjudicatedKeys).count, 103, "the adjudicated table has a duplicate")
+    func testDC1TheDocumentsNamespaceIsExactlyOneHundredAndFourKeys() throws {
+        XCTAssertEqual(Self.adjudicatedKeys.count, 104, "the adjudicated table itself must be 104")
+        XCTAssertEqual(Set(Self.adjudicatedKeys).count, 104, "the adjudicated table has a duplicate")
         // The sixteen groups, each pinned, so a key that moves between two of them is a change of
         // meaning and not a rename. The sum is checked above; these are what it is a sum OF.
         XCTAssertEqual(Self.pageKeys.count, 4)
@@ -342,7 +346,7 @@ final class DocumentCopyTests: XCTestCase {
         XCTAssertEqual(Self.columnKeys.count, 7)
         XCTAssertEqual(Self.actionKeys.count, 2)
         XCTAssertEqual(Self.confirmKeys.count, 4)
-        XCTAssertEqual(Self.formKeys.count, 13)
+        XCTAssertEqual(Self.formKeys.count, 14, "13, plus B10's range hint")
         XCTAssertEqual(Self.itemKeys.count, 12)
         XCTAssertEqual(Self.totalKeys.count, 3)
         XCTAssertEqual(Self.errorKeys.count, 15)
@@ -368,7 +372,7 @@ final class DocumentCopyTests: XCTestCase {
         var keySets: [Set<String>] = []
         for language in languages {
             let table = try sourceTable(language)
-            XCTAssertEqual(table.count, 754, "\(language) has \(table.count) keys")
+            XCTAssertEqual(table.count, 755, "\(language) has \(table.count) keys")
             // The neighbours, pinned in the same breath: landing a documents key in one of them is
             // the likeliest way to be right about the total and wrong about where it went.
             XCTAssertEqual(table.keys.filter { $0.hasPrefix("nav.") }.count, 8, "\(language) nav.*")
@@ -509,7 +513,7 @@ final class DocumentCopyTests: XCTestCase {
                 }
             }
         }
-        XCTAssertEqual(scanned, 624, "104 keys x 6 languages")
+        XCTAssertEqual(scanned, 630, "105 keys x 6 languages")
     }
 
     // MARK: - DC9 · who may name a documents.* key
@@ -854,9 +858,9 @@ extension DocumentCopyTests {
 
         XCTAssertEqual(mirrored.count, 75, "keys that are Electron's sentence, unchanged")
         XCTAssertEqual(rewritten.count, 8, "keys that depart from it, each with a reason")
-        XCTAssertEqual(native.count, 21, "keys Electron has no counterpart for")
-        XCTAssertEqual(mirrored.count + rewritten.count + native.count, 104)
-        XCTAssertEqual(all.count, 104)
+        XCTAssertEqual(native.count, 22, "keys Electron has no counterpart for")
+        XCTAssertEqual(mirrored.count + rewritten.count + native.count, 105)
+        XCTAssertEqual(all.count, 105)
         XCTAssertEqual(mirrored.union(rewritten).union(native), all, """
             the three lists do not cover the namespace.
             uncovered: \(all.subtracting(mirrored).subtracting(rewritten).subtracting(native).sorted())

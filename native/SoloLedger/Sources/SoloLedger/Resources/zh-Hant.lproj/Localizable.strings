@@ -866,6 +866,7 @@
 "documents.form.numberHint" = "內部編號，可修改";
 "documents.form.date" = "單據日期";
 "documents.form.validUntil" = "有效期限";
+"documents.form.dateRangeHint" = "請輸入 0001-01-01 至 9999-12-31 之間的真實日期。";
 "documents.form.customer" = "客戶名稱";
 "documents.form.customerPlaceholder" = "請輸入客戶名稱";
 "documents.form.customerTaxID" = "客戶稅號";

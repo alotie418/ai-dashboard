@@ -97,7 +97,8 @@ enum DocumentPageComposition {
 
     /// Every `documents.*` key this page draws, and the regions it belongs to.
     ///
-    /// **All one hundred and three of them**, which is the whole namespace D-3 landed:
+    /// **All one hundred and four of them** — the hundred and three D-3 landed, plus the one the
+    /// input-mirror correction added for B10's four-digit narrowing:
     /// ``deferredPrefixes`` is empty since D-5 drew the artefact, so this table no longer has a hole
     /// in it and `DM1`'s closure is a plain equality. It read "ninety-four of the hundred and three"
     /// through D-4 and went stale the moment the nine moved in — the count is asserted, so the
@@ -166,6 +167,9 @@ enum DocumentPageComposition {
         "documents.form.numberHint": [.form],
         "documents.form.date": [.form],
         "documents.form.validUntil": [.form],
+        // The five date inputs are three different panels, so this one sentence is placed in three
+        // regions rather than repeated as three keys. B10 is what it says out loud.
+        "documents.form.dateRangeHint": [.form, .statementPanel, .taxInvoicePanel],
         "documents.form.customer": [.form],
         "documents.form.customerPlaceholder": [.form],
         "documents.form.customerTaxID": [.form],
@@ -453,7 +457,23 @@ enum DocumentPageComposition {
     /// is ICU's MIXED calendar: it switches to Julian before 1582, so it calls `1500-02-29` valid.
     /// HTML's date control does not — its calendar is proleptic Gregorian all the way down. D-2 hit
     /// the same distinction in the numbering module and wrote it down there; this is the second
-    /// place it decides an answer.
+    /// place it decides an answer. Measured: `1500-02-29` is refused over there, while `1582-10-05`
+    /// and `1582-10-15` are both taken, so there is no Julian gap either.
+    ///
+    /// **The four-digit year is a deliberate narrowing, and it is B10.** The other app's control is
+    /// wider than this: its year runs to `275760-09-13`, it holds and returns `10000-01-01`, a user
+    /// reaches five digits by typing `10000` into the year segment, and the form then submits —
+    /// measured, through a `required` date input, with the payload carrying `10000-01-01`. This
+    /// refuses all of that, for a reason that is about THIS repository rather than about the
+    /// control: the statement generator filters its period by comparing ISO date TEXT, and
+    /// `"10000-01-01" < "2026-01-01"` on code units. Widening the year would sort every five-digit
+    /// date BEFORE every four-digit one and silently break the closed-interval test — a wrong
+    /// statement instead of a refused one. The registered clause is that a date outside
+    /// `0001-01-01`…`9999-12-31` found in a real ledger turns this into a must-fix.
+    ///
+    /// The narrowing is not silent: ``FieldBlock/hintKey``, ``StatementBlock/periodStartHintKey``
+    /// and ``TaxInvoiceBlock/dateHintKey`` all carry `documents.form.dateRangeHint`, so each of the
+    /// five inputs says what it takes before anything is refused.
     static func isCalendarDate(_ text: String) -> Bool {
         let parts = text.split(separator: "-", omittingEmptySubsequences: false)
         guard parts.count == 3, parts[0].count == 4, parts[1].count == 2, parts[2].count == 2,
@@ -504,28 +524,34 @@ enum DocumentPageComposition {
         static let unitPrice = NumberConstraint(minimum: 0, maximum: nil, decimals: 2)
         static let taxRate = NumberConstraint(minimum: 0, maximum: 100, decimals: 2)
 
-        /// Whether a field holding this text could be submitted.
+        /// Whether a field holding this EDITOR TEXT could be submitted — **layer three**.
         ///
-        /// Empty is allowed: an empty numeric input is what the other app submits as "no value",
-        /// and only `required` would change that — none of these three carries it.
+        /// The text is turned into the bound value first, because that is the order the browser
+        /// works in and the order that decides three of the answers D-4 got wrong: `1.` reads back
+        /// as `1` and submits, `+5` reads back as `5` and submits, and `1-2` reads back as nothing
+        /// at all and blocks the submit outright.
         ///
-        /// Everything else is two questions, and neither of them is `parseFloat`'s:
+        ///  1. **`badInput`.** A form containing such a control does not submit, and no attribute
+        ///     is consulted. That is `nil` from ``numberBoundValue(_:)``, and it is NOT the same as
+        ///     an empty field — which submits, because none of these three carries `required`.
+        ///  2. **`min` / `max`**, on the number the bound value reads as.
+        ///  3. **`step`**, answered in DECIMAL rather than in binary: `(value − min) * 100` in a
+        ///     `Double` lands 2e-5 from an integer for a price in the billions, which would refuse
+        ///     a value the other app submits without complaint.
         ///
-        ///  1. **Could the control HOLD this text?** Anything outside the valid-floating-point
-        ///     grammar is `badInput` over there, and a form containing a badInput control does not
-        ///     submit at all. `parseFloat` reads `1-2`, `1.` and `+5` as numbers, so a gate built on
-        ///     it alone would write a number the field never showed.
-        ///  2. **Is the value a whole number of steps?** Answered in DECIMAL, because that is what
-        ///     the browser does — Blink parses the field into its own `Decimal` and asks for an
-        ///     exact remainder. `(value − min) * 100` in `Double` lands 2e-5 from an integer for a
-        ///     price in the billions, which would refuse a value the other app submits without
-        ///     complaint.
+        /// **Where this is deliberately stricter than the browser: B9.** Blink's own `Decimal` is
+        /// finite-precision, so below roughly 1.5e-10 its remainder against `0.01` comes out zero
+        /// and it accepts values that are not whole steps at all — `15e-11`, `5e-324`,
+        /// `1e-99999999999999999999` and `1.00e-9223372036854775807` all submit over there. This
+        /// asks the exact question instead and refuses them. The registered clause is that the
+        /// moment such a number is found in a real ledger, the narrowing becomes a must-fix.
         func accepts(_ text: String) -> Bool {
-            guard !text.isEmpty else { return true }
-            guard let literal = DecimalLiteral(text) else { return false }
-            guard let value = DocumentMath.editorNumber(from: text), value.isFinite else { return false }
-            guard value >= minimum else { return false }
-            if let maximum, value > maximum { return false }
+            guard let value = DocumentPageComposition.numberBoundValue(text) else { return false }
+            guard !value.isEmpty else { return true }
+            guard let literal = DecimalLiteral(value) else { return false }
+            guard let number = DocumentMath.editorNumber(from: value), number.isFinite else { return false }
+            guard number >= minimum else { return false }
+            if let maximum, number > maximum { return false }
             // `step` validity is `(value − stepBase) / step` being a whole number. Every constraint
             // on this page has `min="0"`, which is also the step base, and a step that is a power
             // of ten — so the question reduces to how many decimals the value actually has.
@@ -533,12 +559,11 @@ enum DocumentPageComposition {
         }
     }
 
-    /// One HTML *valid floating-point number*, decomposed far enough to answer the `step` question
-    /// exactly.
+    /// One BOUND VALUE, decomposed far enough to answer the `step` question exactly.
     ///
-    /// The grammar is the spec's — `-?(D+(.D+)?|.D+)([eE][+-]?D+)?` — and the shapes it excludes
-    /// are the ones that matter here: a trailing point is not in it (`1.` is badInput while `.5` is
-    /// a number), a leading `+` is not either, and nothing may follow the literal.
+    /// Its input is always ``numberBoundValue(_:)``'s output, never raw editor text, so the
+    /// grammar it has to accept is that one: a trailing point may still be present when an exponent
+    /// follows it (`1.e2`), a leading `+` never is, and nothing may follow the literal.
     ///
     /// **Neither number parser already in the tree answers this**, which is why there is a third:
     /// ``DocumentMath/editorNumber(from:)`` is `parseFloat`, which reads the longest valid PREFIX
@@ -547,10 +572,46 @@ enum DocumentPageComposition {
     /// `Double` is the one thing that cannot answer the step question.
     ///
     /// ``fractionDigits`` counts the decimals of the EXACT VALUE rather than of the text: `2.500`
-    /// has one, `1500e-4` has two, `15e-4` has four. That is what makes the step test above the
-    /// same test the browser runs.
+    /// has one, `1500e-4` has two, `15e-4` has four — and **zero has none, whatever its exponent
+    /// says**. `0e-3` is `0`, not `0.001`; the exponent of a zero significand cannot move a point
+    /// that is not there. That case is normalised before the scale arithmetic runs, and before the
+    /// exponent is required to fit in an `Int`.
+    ///
+    /// ## Why every `Int` operation below is checked
+    ///
+    /// An exponent is an arbitrary run of digits, and D-4 did the scale arithmetic unchecked. Three
+    /// sites overflowed and every one of them was a **signal trap**, not a wrong answer:
+    /// `exponent − fractionPart.count` on `1.00e-9223372036854775807`, `scale += 1` while dropping
+    /// trailing zeros on `100e9223372036854775807`, and `-scale` at `Int.min` on
+    /// `1.1e-9223372036854775807`. `numberInput` passes all three through unchanged and the page
+    /// asks this question on every keystroke, so the app died as the last character was typed.
+    ///
+    /// The fix is **saturation, and it is exact for the only question this type is asked.** The
+    /// single consumer compares `fractionDigits <= decimals` for a `decimals` of 0…9. Saturating a
+    /// scale that has already run past `Int.min` or `Int.max` cannot change that comparison: the
+    /// true value lies even further from zero in the same direction, so it and the saturated value
+    /// give the same answer. That is a statement about THIS predicate, not a claim that the
+    /// saturated number equals the mathematical one — and not a claim about what the browser does
+    /// with such a literal, which is B9's subject.
     struct DecimalLiteral: Equatable {
         let fractionDigits: Int
+
+        /// `a - b`, pinned at the ends of `Int` instead of trapping.
+        static func saturatingSubtract(_ a: Int, _ b: Int) -> Int {
+            let (result, overflow) = a.subtractingReportingOverflow(b)
+            guard overflow else { return result }
+            return b > 0 ? .min : .max
+        }
+
+        /// `a + b`, pinned at the ends of `Int` instead of trapping.
+        static func saturatingAdd(_ a: Int, _ b: Int) -> Int {
+            let (result, overflow) = a.addingReportingOverflow(b)
+            guard overflow else { return result }
+            return b > 0 ? .max : .min
+        }
+
+        /// `-a`, whose one trapping input is `Int.min`.
+        static func saturatingNegate(_ a: Int) -> Int { a == .min ? .max : -a }
 
         init?(_ text: String) {
             var rest = Substring(text)
@@ -569,10 +630,19 @@ enum DocumentPageComposition {
             var fractionPart = ""
             if rest.first == "." {
                 rest = rest.dropFirst()
+                // No `guard` on emptiness: a bound value may still carry a point with nothing after
+                // it when an exponent follows (`1.e2` reads back verbatim over there). The combined
+                // guard below is what refuses a lone `.`.
                 fractionPart = digits()
-                guard !fractionPart.isEmpty else { return nil }
             }
             guard !integerPart.isEmpty || !fractionPart.isEmpty else { return nil }
+
+            // **Is the value exactly zero?** Decided from the DIGITS alone, before the exponent is
+            // even read, because that is what makes the question answerable at all: zero times any
+            // power of ten is zero, so no exponent — however long, however negative — can give it a
+            // decimal place. Deciding it here rather than after the scale arithmetic is the whole
+            // fix; see the comment on ``fractionDigits`` below.
+            let isZero = (integerPart + fractionPart).allSatisfy { $0 == "0" }
 
             var exponent = 0
             if let marker = rest.first, marker == "e" || marker == "E" {
@@ -582,44 +652,192 @@ enum DocumentPageComposition {
                     negative = (sign == "-")
                     rest = rest.dropFirst()
                 }
-                // An exponent too long to be an `Int` is refused rather than wrapped: such a text
-                // is `Infinity` or `0` as a number, and wrapping could turn either into a value
-                // that passes.
-                guard let magnitude = Int(digits()) else { return nil }
-                exponent = negative ? -magnitude : magnitude
+                let exponentDigits = digits()
+                guard !exponentDigits.isEmpty else { return nil }
+                if let magnitude = Int(exponentDigits) {
+                    // `digits()` yields no sign, so `magnitude` is in `0...Int.max` and negating it
+                    // is the one operation here that cannot overflow.
+                    exponent = negative ? -magnitude : magnitude
+                } else {
+                    // An exponent too long to be an `Int`. As a number the text is `Infinity` or
+                    // `0`, and only the second of those can be answered without the exponent —
+                    // which is exactly the zero case. Anything else is refused rather than wrapped,
+                    // because wrapping could turn either into a value that passes.
+                    guard isZero else { return nil }
+                }
             }
             guard rest.isEmpty else { return nil }
 
+            // **Zero has no decimal places.** `0e-3` is not 0.001 — it is 0, and the other app
+            // submits it without complaint. Before this normalisation the scale arithmetic ran on a
+            // significand of `"0"`, the trailing-zero loop could not strip it (it never strips the
+            // last digit), and `0e-3` came out with three decimals and was refused. Every member of
+            // the family went the same way: `0.0e-3`, `-0e-3`, and — through the `Int` guard above
+            // — `0e-99999999999999999999` and `0e99999999999999999999`.
+            //
+            // This is NOT B9. B9 is about values whose EXACT decimal expansion has more places than
+            // the step allows; zero's has none, so the predicate B9 registers does not reach it and
+            // widening B9 to cover it would be registering a bug as a difference.
+            guard !isZero else {
+                fractionDigits = 0
+                return
+            }
+
             // The value is <digits> × 10^scale. Trailing zeros move the point rather than counting
             // as decimals, which is why `1500e-4` is two decimals and `2.500` is one.
-            var scale = exponent - fractionPart.count
+            var scale = Self.saturatingSubtract(exponent, fractionPart.count)
             var significand = Array(integerPart + fractionPart)
             while significand.count > 1, significand.last == "0" {
                 significand.removeLast()
-                scale += 1
+                scale = Self.saturatingAdd(scale, 1)
             }
-            fractionDigits = max(0, -scale)
+            fractionDigits = scale >= 0 ? 0 : Self.saturatingNegate(scale)
         }
     }
 
-    /// The characters `<input type="number">` lets into the field.
+    /// The characters `<input type="number">` lets into the field — **layer one of three**.
     ///
-    /// A letter typed into one is dropped by the control, so `abc` never becomes a value there. This
-    /// drops the same characters rather than refusing the whole field, which keeps a half-typed
-    /// `1.` usable.
+    /// The control is not one gate. D-4 modelled it as one, and that is what made a pasted `1a2`,
+    /// a half-typed `1.` and a doubled decimal point all come out wrong. The three layers are:
     ///
-    /// **Two registered differences**, both of them about text that is mid-edit and neither of them
-    /// able to reach the ledger:
+    ///  1. **The editor** — which characters end up in the field, and what the user sees. Here.
+    ///  2. **The bound value** — what `element.value` reads back. That is what React's `onChange`
+    ///     delivers, so it is what the other app's state, its running total, its save payload and
+    ///     its `setRow` unlock all see. ``numberBoundValue(_:)``.
+    ///  3. **The submit** — `badInput`, then `min` / `max` / `step`, over that bound value.
+    ///     ``NumberConstraint/accepts(_:)``.
     ///
-    ///  * PASTING `1a2` clears the field in a browser and leaves `12` here. Both are
-    ///    unsubmittable-as-`1a2`, which is the property that matters.
-    ///  * A half-typed `1.` is `badInput` over there, which makes the bound state `''` — so its
-    ///    running total reads that line as 0 while the field still shows `1.`. Here the text stays
-    ///    `1.` and the total reads it as 1, through the same `parseFloat` D-1 pinned. Both refuse
-    ///    the submit (see ``NumberConstraint/accepts(_:)``); the two totals disagree only while the
-    ///    field is unfinished.
+    /// Everything below was measured in Electron 42.6.0 (Chromium 148.0.7778.280), typed character
+    /// by character AND pasted through the real clipboard, both giving the same answer. **The
+    /// oracle is `e2e/documents-number-input-oracle.spec.ts`**, which drives a real browser in CI
+    /// over the same named cases the Swift tests use; this comment is a description of it, not a
+    /// substitute for it.
+    ///
+    ///  * **Before the exponent**: ASCII digits are kept, `+` and `-` are kept wherever they fall
+    ///    (`++5` and `1-2` stay as typed and are refused by layer 2, not here), and at most one `.`
+    ///    survives — `1..2` becomes `1.2` and `1.2.3` becomes `1.23`.
+    ///  * **At most one `e`/`E` survives**, the first: `1ee2` and `1e2e3` become `1e2` and `1e23`.
+    ///  * **After the exponent marker the rules change, and that is the part D-4 had no notion of.**
+    ///    A `.` is dropped outright, wherever it falls — `1e.2` and `1e2.3` become `1e2` and `1e23`,
+    ///    and `1.2e3.4` keeps only the point that came BEFORE the marker, giving `1.2e34`. A sign is
+    ///    kept only while the exponent is still empty: the first one survives and the rest go
+    ///    (`1e++2` → `1e+2`, `1e-+2` → `1e-2`), and once a digit has landed no sign can follow at
+    ///    all (`1e2-3` → `1e23`, `1e+2+` → `1e+2`). Measured both ways round, typed and pasted.
+    ///  * **Fullwidth `０`–`９`, `．` and `－` fold to ASCII; fullwidth `＋`, `ｅ` and `Ｅ` do not**
+    ///    — they are dropped like any other character. That set is measured, and it is NOT the
+    ///    Unicode decimal-digit category: Arabic-Indic `٢٣`, extended Arabic-Indic, Devanagari,
+    ///    Bengali, Thai, N'Ko and the mathematical bold digits are all dropped, and so are Roman
+    ///    numerals, vulgar fractions, superscripts and circled digits.
+    ///  * Everything else goes, which is why `abc` empties the field, `0x10` becomes `010` and
+    ///    `Infinity` becomes nothing at all.
     static func numberInput(_ text: String) -> String {
-        String(text.filter { $0.isASCII && ($0.isNumber || "+-.eE".contains($0)) })
+        var out = String.UnicodeScalarView()
+        var sawPoint = false
+        var sawExponent = false
+        var sawExponentSign = false
+        var sawExponentDigit = false
+        for scalar in text.unicodeScalars {
+            let folded = halfWidth(scalar)
+            switch folded {
+            case "0"..."9":
+                if sawExponent { sawExponentDigit = true }
+                out.append(folded)
+            case "+", "-":
+                if sawExponent {
+                    // One sign, and only while the exponent has no digits yet.
+                    guard !sawExponentSign, !sawExponentDigit else { continue }
+                    sawExponentSign = true
+                }
+                out.append(folded)
+            case ".":
+                // Never inside an exponent, and only once outside one.
+                guard !sawExponent, !sawPoint else { continue }
+                sawPoint = true
+                out.append(folded)
+            case "e", "E":
+                guard !sawExponent else { continue }
+                sawExponent = true
+                out.append(folded)
+            default:
+                continue
+            }
+        }
+        return String(out)
+    }
+
+    /// The three fullwidth forms the control folds, and only those.
+    ///
+    /// Fullwidth `＋` (U+FF0B), `ｅ` (U+FF45) and `Ｅ` (U+FF25) are deliberately absent: the control
+    /// drops them, so folding them here would let this page hold a value the other app cannot.
+    private static func halfWidth(_ scalar: Unicode.Scalar) -> Unicode.Scalar {
+        switch scalar {
+        case "\u{FF10}"..."\u{FF19}": return Unicode.Scalar(scalar.value - 0xFF10 + 0x30)!
+        case "\u{FF0E}": return "."
+        case "\u{FF0D}": return "-"
+        default: return scalar
+        }
+    }
+
+    /// What `element.value` reads back for one of these fields — **layer two**.
+    ///
+    /// `nil` is `validity.badInput`: the field holds something, and it is not a number. The DOM
+    /// collapses THAT case and an EMPTY field into the same `""` and exposes the difference through
+    /// a second property; one optional carries both bits, so ``NumberConstraint/accepts(_:)`` can
+    /// refuse the first while allowing the second. Where the browser's own change detection is what
+    /// matters — React fires `onChange` only when the value STRING changes — the collapsed form
+    /// (`?? ""`) is what to compare, and that is what ``DocumentLineDraft``'s unlock rule uses.
+    ///
+    /// The grammar is the control's, measured, and it is **not** the spec's *valid floating-point
+    /// number*: it also takes a trailing point and a leading `+`, and it hands the text back
+    /// VERBATIM rather than re-serialising it, so `0012`, `000`, `2.500` and `1e2` read back as
+    /// written.
+    ///
+    ///  * a mantissa: `[+-]?` then `D+` with an optional `.` and optional digits, or `.` `D+`;
+    ///  * an optional exponent `[eE][+-]?D+`;
+    ///  * **but a leading `+` and an exponent may not appear together** — `+5` reads back `5` while
+    ///    `+1e2` is `badInput`. That asymmetry is measured, not derived from any grammar;
+    ///  * the value is the text minus a leading `+` and minus a TRAILING `.`; a point sitting
+    ///    before the exponent is not trailing and stays (`1.e2` reads back `1.e2`);
+    ///  * and anything that is not FINITE is `badInput`, which is where `1e309` and
+    ///    `100e9223372036854775807` go — the second of those is why a positive exponent big enough
+    ///    to overflow never reaches the step test at all.
+    static func numberBoundValue(_ text: String) -> String? {
+        guard !text.isEmpty else { return "" }
+        var rest = Substring(text)
+        var leadingPlus = false
+        if let sign = rest.first, sign == "+" || sign == "-" {
+            leadingPlus = (sign == "+")
+            rest = rest.dropFirst()
+        }
+        func digitRun() -> Int {
+            var n = 0
+            while let c = rest.first, c.isASCII, c.isNumber { n += 1; rest = rest.dropFirst() }
+            return n
+        }
+        let integerDigits = digitRun()
+        var trailingPoint = false
+        if rest.first == "." {
+            rest = rest.dropFirst()
+            let fractionDigits = digitRun()
+            guard integerDigits > 0 || fractionDigits > 0 else { return nil }
+            trailingPoint = (fractionDigits == 0)
+        } else {
+            guard integerDigits > 0 else { return nil }
+        }
+        if let marker = rest.first, marker == "e" || marker == "E" {
+            guard !leadingPlus else { return nil }
+            rest = rest.dropFirst()
+            if let sign = rest.first, sign == "+" || sign == "-" { rest = rest.dropFirst() }
+            guard digitRun() > 0 else { return nil }
+            // The point is before the exponent, so it is not the last character.
+            trailingPoint = false
+        }
+        guard rest.isEmpty else { return nil }
+        var value = text
+        if leadingPlus { value.removeFirst() }
+        if trailingPoint { value.removeLast() }
+        guard let number = DocumentMath.editorNumber(from: value), number.isFinite else { return nil }
+        return value
     }
 
     /// The picker panel's title — the same sentence as the button that opens it.
@@ -1081,6 +1299,10 @@ enum DocumentPageComposition {
         let customerLabelKey = "documents.statement.customer"
         let periodStartLabelKey = "documents.statement.periodStart"
         let periodEndLabelKey = "documents.statement.periodEnd"
+        /// B10's sentence, under each of the two bounds. One key, two fields — and `allKeys` names
+        /// it once, because that list is a SET of what this panel can draw, not a draw count.
+        let periodStartHintKey = "documents.form.dateRangeHint"
+        let periodEndHintKey = "documents.form.dateRangeHint"
         let generateActionKey = "documents.statement.generate"
         let basisNoteKey = "documents.statement.basisNote"
         let currencySplitNoteKey = "documents.statement.currencySplitNote"
@@ -1101,8 +1323,8 @@ enum DocumentPageComposition {
 
         var noteKeys: [String] { [basisNoteKey, currencySplitNoteKey] }
         var allKeys: [String] {
-            [customerLabelKey, periodStartLabelKey, periodEndLabelKey, generateActionKey]
-                + noteKeys + [messageKey].compactMap { $0 }
+            [customerLabelKey, periodStartLabelKey, periodEndLabelKey, periodStartHintKey,
+             generateActionKey] + noteKeys + [messageKey].compactMap { $0 }
         }
     }
 
@@ -1187,6 +1409,11 @@ enum DocumentPageComposition {
         let numberLabelKey = "documents.taxInvoice.numberLabel"
         let numberHintKey = "documents.taxInvoice.numberHint"
         let dateLabelKey = "documents.taxInvoice.dateLabel"
+        /// B10's sentence again. This sheet needs it MORE than the editor does, not less: its save
+        /// is not inside a `<form>` over there — see ``canSubmit`` — so nothing on that side
+        /// refuses anything, and the only thing standing between the user and a date this app will
+        /// not take is this line.
+        let dateHintKey = "documents.form.dateRangeHint"
         let attachmentLabelKey = "documents.taxInvoice.attachmentLabel"
         /// The document's own number, drawn as the sheet's subtitle. A value, not a key.
         let documentNumber: String
@@ -1197,15 +1424,18 @@ enum DocumentPageComposition {
         let cancelActionKey = "common.cancel"
         /// `nil` when the document is void: the other app does not render the button either.
         let saveActionKey: String?
-        /// The date field here is `<input type="date">` too, so the same two properties hold. It is
-        /// NOT inside a `<form>` over there — the save is an `onClick` — so the refusal comes from
-        /// the CONTROL rather than from form validation, and the value simply never becomes
-        /// unparseable in the first place.
+        /// The date field here is `<input type="date">` too, so the same two properties hold, and
+        /// the sheet is NOT inside a `<form>` over there: `TaxInvoiceModal.tsx` has no `<form>` at
+        /// all and its save is `<button type="button" onClick={handleSave}>`, so **no constraint
+        /// validation runs on that side whatsoever** — the date input does not even carry
+        /// `required`. What refuses over there is the CONTROL alone, and it refuses exactly one
+        /// thing: a date that does not exist. It does NOT refuse a five-digit year, which it holds
+        /// and submits. This gate is therefore strictly narrower than the other app's, by B10.
         let canSubmit: Bool
 
         var labelKeys: [String] {
             [titleKey, complianceKey, issuedLabelKey, numberLabelKey, numberHintKey,
-             dateLabelKey, attachmentLabelKey]
+             dateLabelKey, dateHintKey, attachmentLabelKey]
         }
         var actionKeys: [String] { [cancelActionKey] + [saveActionKey].compactMap { $0 } }
         var allKeys: [String] {
@@ -1495,15 +1725,17 @@ enum DocumentPageComposition {
     /// the remaining columns are not part of what ``StatementDraft`` writes. Showing fields whose
     /// contents would be discarded is the thing this avoids.
     private static func fields(generating: Bool) -> [FieldBlock] {
+        // B10's sentence, on the first of the five date inputs. This block is the one the
+        // generating case returns too, so the statement generator's date carries it as well.
         let date = FieldBlock(field: .date, labelKey: "documents.form.date",
-                              placeholderKey: nil, hintKey: nil)
+                              placeholderKey: nil, hintKey: "documents.form.dateRangeHint")
         guard !generating else { return [date] }
         return [
             FieldBlock(field: .number, labelKey: "documents.form.number",
                        placeholderKey: nil, hintKey: "documents.form.numberHint"),
             date,
             FieldBlock(field: .validUntil, labelKey: "documents.form.validUntil",
-                       placeholderKey: nil, hintKey: nil),
+                       placeholderKey: nil, hintKey: "documents.form.dateRangeHint"),
             FieldBlock(field: .customerName, labelKey: "documents.form.customer",
                        placeholderKey: "documents.form.customerPlaceholder", hintKey: nil),
             FieldBlock(field: .customerTaxID, labelKey: "documents.form.customerTaxID",
@@ -1641,14 +1873,35 @@ struct DocumentLineDraft: Equatable, Identifiable {
     let id: Int
     var productID: String = ""
     var description: String = ""
-    /// Touching any of the three number fields UNLOCKS the line, which is exactly `setRow`'s
-    /// `unlocks` condition: `patch.quantity !== undefined || patch.unitPrice !== undefined ||
-    /// patch.taxRatePct !== undefined`. Description, unit and product do not unlock it.
-    var quantity: String = "" { didSet { locked = nil } }
+    /// Touching one of the three number fields unlocks the line — but only when the other app's
+    /// control would have reported a **new value** for it.
+    ///
+    /// `setRow`'s `unlocks` condition (`patch.quantity !== undefined || patch.unitPrice !==
+    /// undefined || patch.taxRatePct !== undefined`) fires on the patch, and the patch only exists
+    /// when React's `onChange` ran — which happens when `element.value` CHANGES, not when a
+    /// character is inserted. Measured on a locked line holding `2` with a stored amount of 999:
+    /// typing `.` puts `2.` in the editor, leaves the value `2`, fires nothing at all, and the line
+    /// keeps its 999.
+    ///
+    /// D-4 compared the TEXT, so it cleared the lock on that keystroke. A decimal point followed by
+    /// a backspace then rewrote a sales record's stored amount as quantity × unit price — both
+    /// sides saveable, the two ledgers differing, and nothing on screen to show it. Description,
+    /// unit and product still do not unlock at all.
+    var quantity: String = "" { didSet { unlock(ifBoundValueChangedFrom: oldValue, to: quantity) } }
     var unit: String = ""
-    var unitPrice: String = "" { didSet { locked = nil } }
-    var taxRatePercent: String = "" { didSet { locked = nil } }
+    var unitPrice: String = "" { didSet { unlock(ifBoundValueChangedFrom: oldValue, to: unitPrice) } }
+    var taxRatePercent: String = "" { didSet { unlock(ifBoundValueChangedFrom: oldValue, to: taxRatePercent) } }
     private(set) var locked: Locked?
+
+    /// The comparison is on the value the OTHER app's state would be holding, because that is what
+    /// its change detection compares. `badInput` and an empty field are the same `""` to that
+    /// comparison — the DOM getter collapses them — so they collapse here too, with `?? ""`.
+    private mutating func unlock(ifBoundValueChangedFrom old: String, to new: String) {
+        guard locked != nil else { return }
+        let before = DocumentPageComposition.numberBoundValue(old) ?? ""
+        let after = DocumentPageComposition.numberBoundValue(new) ?? ""
+        if before != after { locked = nil }
+    }
     var refSalesID: String?
     var refDate: String?
 
