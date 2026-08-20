@@ -572,7 +572,10 @@ enum DocumentPageComposition {
     /// `Double` is the one thing that cannot answer the step question.
     ///
     /// ``fractionDigits`` counts the decimals of the EXACT VALUE rather than of the text: `2.500`
-    /// has one, `1500e-4` has two, `15e-4` has four.
+    /// has one, `1500e-4` has two, `15e-4` has four — and **zero has none, whatever its exponent
+    /// says**. `0e-3` is `0`, not `0.001`; the exponent of a zero significand cannot move a point
+    /// that is not there. That case is normalised before the scale arithmetic runs, and before the
+    /// exponent is required to fit in an `Int`.
     ///
     /// ## Why every `Int` operation below is checked
     ///
@@ -634,6 +637,13 @@ enum DocumentPageComposition {
             }
             guard !integerPart.isEmpty || !fractionPart.isEmpty else { return nil }
 
+            // **Is the value exactly zero?** Decided from the DIGITS alone, before the exponent is
+            // even read, because that is what makes the question answerable at all: zero times any
+            // power of ten is zero, so no exponent — however long, however negative — can give it a
+            // decimal place. Deciding it here rather than after the scale arithmetic is the whole
+            // fix; see the comment on ``fractionDigits`` below.
+            let isZero = (integerPart + fractionPart).allSatisfy { $0 == "0" }
+
             var exponent = 0
             if let marker = rest.first, marker == "e" || marker == "E" {
                 rest = rest.dropFirst()
@@ -642,14 +652,36 @@ enum DocumentPageComposition {
                     negative = (sign == "-")
                     rest = rest.dropFirst()
                 }
-                // An exponent too long to be an `Int` is refused rather than wrapped: such a text
-                // is `Infinity` or `0` as a number, and wrapping could turn either into a value
-                // that passes. `digits()` yields no sign, so `magnitude` is in `0...Int.max` and
-                // negating it is the one operation here that cannot overflow.
-                guard let magnitude = Int(digits()) else { return nil }
-                exponent = negative ? -magnitude : magnitude
+                let exponentDigits = digits()
+                guard !exponentDigits.isEmpty else { return nil }
+                if let magnitude = Int(exponentDigits) {
+                    // `digits()` yields no sign, so `magnitude` is in `0...Int.max` and negating it
+                    // is the one operation here that cannot overflow.
+                    exponent = negative ? -magnitude : magnitude
+                } else {
+                    // An exponent too long to be an `Int`. As a number the text is `Infinity` or
+                    // `0`, and only the second of those can be answered without the exponent —
+                    // which is exactly the zero case. Anything else is refused rather than wrapped,
+                    // because wrapping could turn either into a value that passes.
+                    guard isZero else { return nil }
+                }
             }
             guard rest.isEmpty else { return nil }
+
+            // **Zero has no decimal places.** `0e-3` is not 0.001 — it is 0, and the other app
+            // submits it without complaint. Before this normalisation the scale arithmetic ran on a
+            // significand of `"0"`, the trailing-zero loop could not strip it (it never strips the
+            // last digit), and `0e-3` came out with three decimals and was refused. Every member of
+            // the family went the same way: `0.0e-3`, `-0e-3`, and — through the `Int` guard above
+            // — `0e-99999999999999999999` and `0e99999999999999999999`.
+            //
+            // This is NOT B9. B9 is about values whose EXACT decimal expansion has more places than
+            // the step allows; zero's has none, so the predicate B9 registers does not reach it and
+            // widening B9 to cover it would be registering a bug as a difference.
+            guard !isZero else {
+                fractionDigits = 0
+                return
+            }
 
             // The value is <digits> × 10^scale. Trailing zeros move the point rather than counting
             // as decimals, which is why `1500e-4` is two decimals and `2.500` is one.

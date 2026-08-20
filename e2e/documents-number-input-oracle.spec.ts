@@ -147,6 +147,22 @@ export const NUMBER_ORACLE: OracleCase[] = [
   { name: 'rate-above-max', field: 'rate', typed: '101', editor: '101', bound: '101', submits: false, native: false },
   { name: 'rate-at-max', field: 'rate', typed: '100', editor: '100', bound: '100', submits: true, native: true },
   { name: 'rate-negative', field: 'rate', typed: '-1', editor: '-1', bound: '-1', submits: false, native: false },
+  // ── zero: exactly zero whatever the exponent says, and NOT a B9 row ──
+  // Zero's exact decimal expansion has no places at all, so B9's predicate — "more decimal
+  // places than the step allows" — does not reach it. These must be accepted on both sides.
+  { name: 'zero-negative-exponent', field: 'qty', typed: '0e-3', editor: '0e-3', bound: '0e-3', submits: true, native: true },
+  { name: 'zero-fraction-negative-exponent', field: 'qty', typed: '0.0e-3', editor: '0.0e-3', bound: '0.0e-3', submits: true, native: true },
+  { name: 'negative-zero-negative-exponent', field: 'qty', typed: '-0e-3', editor: '-0e-3', bound: '-0e-3', submits: true, native: true },
+  { name: 'zero-exponent-past-int', field: 'qty', typed: '0e99999999999999999999', editor: '0e99999999999999999999', bound: '0e99999999999999999999', submits: true, native: true },
+  { name: 'zero-negative-exponent-past-int', field: 'qty', typed: '0e-99999999999999999999', editor: '0e-99999999999999999999', bound: '0e-99999999999999999999', submits: true, native: true },
+  { name: 'zero-positive-exponent', field: 'qty', typed: '0e3', editor: '0e3', bound: '0e3', submits: true, native: true },
+  { name: 'zero-leading-zeros-negative-exponent', field: 'qty', typed: '00e-5', editor: '00e-5', bound: '00e-5', submits: true, native: true },
+  { name: 'zero-many-fraction-digits', field: 'qty', typed: '0.000e-9', editor: '0.000e-9', bound: '0.000e-9', submits: true, native: true },
+  // …and the two neighbours that must NOT move with them: a non-zero significand with an
+  // exponent big enough to overflow is still badInput, and max is still max.
+  { name: 'bare-point-overflow-exponent', field: 'qty', typed: '1.e309', editor: '1.e309', bound: null, submits: false, native: false },
+  { name: 'bare-point-exponent-over-max', field: 'rate', typed: '1.e3', editor: '1.e3', bound: '1.e3', submits: false, native: false },
+  { name: 'bare-point-exponent-under-no-max', field: 'qty', typed: '1.e3', editor: '1.e3', bound: '1.e3', submits: true, native: true },
   // ── B9: the band where Blink's finite-precision Decimal stops seeing the remainder ──
   { name: 'b9-step-band-edge-refused', field: 'qty', typed: '15e-10', editor: '15e-10', bound: '15e-10', submits: false, native: false },
   { name: 'b9-step-band-edge-accepted', field: 'qty', typed: '15e-11', editor: '15e-11', bound: '15e-11', submits: true, native: false },

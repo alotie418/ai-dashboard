@@ -1738,9 +1738,45 @@ final class DocumentMountingTests: XCTestCase {
         XCTAssertEqual(Literal.saturatingNegate(Int.min), Int.max)
         XCTAssertEqual(Literal.saturatingNegate(5), -5)
 
-        // An exponent too long to be an `Int` is still refused rather than wrapped.
+        // An exponent too long to be an `Int` is still refused rather than wrapped — unless the
+        // significand is zero, in which case the exponent cannot change the answer and is not
+        // needed to give it.
         XCTAssertNil(Literal("1e9223372036854775808"))
         XCTAssertNil(Literal("1e-99999999999999999999"))
+        XCTAssertEqual(Literal("0e99999999999999999999")?.fractionDigits, 0)
+        XCTAssertEqual(Literal("0e-99999999999999999999")?.fractionDigits, 0)
+
+        // ── zero has no decimal places, whatever its exponent says ──
+        // `0e-3` is 0, not 0.001. Before the normalisation the scale arithmetic ran on a
+        // significand of "0", the trailing-zero loop could not strip it — it never strips the last
+        // digit — and this came out with three decimals and was refused while the other app
+        // submitted it. This is NOT B9: B9 is about an exact expansion with more places than the
+        // step allows, and zero's has none.
+        for zero in ["0e-3", "0.0e-3", "-0e-3", "0e3", "0.0e3", "-0e3", "00e-5", "0.000e-9",
+                     "0e99999999999999999999", "0e-99999999999999999999", "0", "0.00", "000",
+                     "-0", "0.0"] {
+            XCTAssertEqual(Literal(zero)?.fractionDigits, 0, "\(zero) is exactly zero")
+            XCTAssertTrue(DocumentPageComposition.NumberConstraint.quantity.accepts(zero), """
+                \(zero) is exactly zero and the other app submits it. Refusing it here writes a \
+                different ledger for a value that has no decimal places at all.
+                """)
+        }
+        // …and the non-zero neighbours do NOT move with them.
+        XCTAssertFalse(DocumentPageComposition.NumberConstraint.quantity.accepts("1e-3"),
+                       "0.001 still has three decimals")
+        XCTAssertFalse(DocumentPageComposition.NumberConstraint.quantity.accepts("0.001"))
+        XCTAssertFalse(DocumentPageComposition.NumberConstraint.quantity.accepts("1e-99999999999999999999"),
+                       "a non-zero significand with an exponent past Int is still refused (B9)")
+        XCTAssertFalse(DocumentPageComposition.NumberConstraint.quantity.accepts("15e-11"),
+                       "…and the rest of B9 is untouched")
+        XCTAssertFalse(DocumentPageComposition.NumberConstraint.quantity.accepts("5e-324"))
+        XCTAssertFalse(DocumentPageComposition.NumberConstraint.quantity.accepts("1.00e-9223372036854775807"))
+        // A bare point before an overflowing exponent is badInput, so it never reaches this at all.
+        XCTAssertNil(DocumentPageComposition.numberBoundValue("1.e309"))
+        XCTAssertFalse(DocumentPageComposition.NumberConstraint.quantity.accepts("1.e309"))
+        // …and `max` is still `max`: 1.e3 is 1000, which the rate refuses and the quantity takes.
+        XCTAssertFalse(DocumentPageComposition.NumberConstraint.taxRate.accepts("1.e3"))
+        XCTAssertTrue(DocumentPageComposition.NumberConstraint.quantity.accepts("1.e3"))
 
         // Trailing zeros crossing the boundary, which is the `scale += 1` site.
         XCTAssertEqual(Literal("100e9223372036854775807")?.fractionDigits, 0)
