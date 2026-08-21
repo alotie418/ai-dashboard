@@ -472,4 +472,110 @@ final class AttachmentDeletionTests: LedgerTestCase {
         XCTAssertTrue(spec.contains("| B11 |"), "B11 registers the conditional writes themselves")
         XCTAssertFalse(spec.contains("| E |"), "race E must not be filed as a lettered difference row")
     }
+
+    // MARK: - 9 · the wide match, measured END TO END rather than as a pure function
+
+    /// **Mutation killed: making `namesTheSameFile` case-sensitive.**
+    ///
+    /// The default macOS volume is case-INSENSITIVE — measured right here, not assumed — so
+    /// `A.pdf` and `a.pdf` are ONE file. A case-sensitive reference scan reports the other row's
+    /// reference as "not this file", `openat` hands back the very inode that row points at, and the
+    /// referenced file is destroyed. `AttachmentName` admits `A-Z`, and Electron-migrated names are
+    /// not lower-cased, so the two spellings can genuinely coexist in one ledger.
+    func testAReferenceThatDiffersOnlyInCaseStillKeepsTheFile() throws {
+        let bench = try makeBench()
+        defer { try? bench.store.db.close() }
+        try plant("Receipt.PDF", "keep me", in: bench.attachments)
+
+        // The premise, measured on the volume this test is running on. If the volume turns out to be
+        // case-sensitive the fold is not load-bearing there, and the test says so instead of pretending.
+        let lower = bench.attachments.appendingPathComponent("receipt.pdf")
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: lower.path),
+                          "this volume is case-sensitive; the case fold is not load-bearing here")
+        XCTAssertEqual(try String(contentsOf: lower, encoding: .utf8), "keep me",
+                       "the two spellings name one file on this volume")
+
+        try seedTransactionReference(bench.store, path: reference("Receipt.PDF"))
+
+        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+            reference("receipt.pdf"), in: bench.attachments, using: bench.store.db), .stillReferenced)
+        XCTAssertEqual(contents("Receipt.PDF", in: bench.attachments), "keep me",
+                       "a case-sensitive scan would have deleted the file the transaction points at")
+    }
+
+    /// **Mutation killed: dropping `CAST(… AS TEXT)` from the scan.** `SQLiteValue.stringValue`
+    /// answers `nil` for a BLOB, so a reference a foreign writer stored as a blob reads as no
+    /// reference at all — and the file goes. Same class of foreign value the chapter already reasons
+    /// about for a stored `''`.
+    func testAReferenceStoredAsABlobStillKeepsTheFile() throws {
+        let bench = try makeBench()
+        defer { try? bench.store.db.close() }
+        try plant("blob.pdf", "keep me", in: bench.attachments)
+        try bench.store.db.run("""
+            INSERT INTO transactions (id, type, date, amount, currency, counterparty, attachment_path)
+            VALUES ('tb', 'income', '2026-01-10', 100, 'CNY', 'Acme', ?)
+            """, [.blob(Data(reference("blob.pdf").utf8))])
+
+        // The premise: it really is stored as a blob, and the plain decode really does drop it.
+        XCTAssertEqual(try bench.store.db.query(
+            "SELECT typeof(attachment_path) AS t FROM transactions WHERE id = 'tb'")
+            .first?.string("t"), "blob")
+        XCTAssertNil(try bench.store.db.query(
+            "SELECT attachment_path AS ref FROM transactions WHERE id = 'tb'").first?.string("ref"),
+            "an uncast read of the same cell hands back nothing at all")
+
+        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+            reference("blob.pdf"), in: bench.attachments, using: bench.store.db), .stillReferenced)
+        XCTAssertEqual(contents("blob.pdf", in: bench.attachments), "keep me")
+    }
+
+    /// A reference whose stored spelling the whitelist itself would reject still keeps the file — the
+    /// end-to-end half of ``testTheReferenceComparisonIsWiderThanTheOwnershipOne``, which until now
+    /// only exercised the comparison as a pure function.
+    func testAReferenceTheWhitelistWouldRejectStillKeepsTheFile() throws {
+        let bench = try makeBench()
+        defer { try? bench.store.db.close() }
+        try plant("odd.pdf", "keep me", in: bench.attachments)
+        try seedTransactionReference(bench.store, path: "somewhere/else/odd.pdf")
+
+        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+            reference("odd.pdf"), in: bench.attachments, using: bench.store.db), .stillReferenced)
+        XCTAssertEqual(contents("odd.pdf", in: bench.attachments), "keep me")
+    }
+
+    // MARK: - 10 · `unavailable` is reachable and fail-closed
+
+    /// A directory that cannot be bound reports ``AttachmentDeletion/Outcome/unavailable`` and removes
+    /// nothing — the fail-closed branch, which until now no test entered at all.
+    func testAnUnbindableDirectoryIsFailClosed() throws {
+        let bench = try makeBench()
+        defer { try? bench.store.db.close() }
+        let missing = bench.root.appendingPathComponent("no-such-directory", isDirectory: true)
+        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+            reference("a.pdf"), in: missing, using: bench.store.db), .unavailable)
+
+        // A file where a directory should be is the other way to fail the bind.
+        try plant("not-a-dir", "x", in: bench.root)
+        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+            reference("a.pdf"), in: bench.root.appendingPathComponent("not-a-dir"),
+            using: bench.store.db), .unavailable)
+    }
+
+    /// Called from inside an open transaction it removes nothing and says `unavailable`, because its
+    /// own `BEGIN IMMEDIATE` cannot nest. That is the contract D-6 has to honour, so it is pinned
+    /// rather than left to be discovered.
+    func testCalledInsideATransactionItDeletesNothingAndSaysSo() throws {
+        let bench = try makeBench()
+        defer { try? bench.store.db.close() }
+        try plant("nested.pdf", "payload", in: bench.attachments)
+
+        try bench.store.db.transaction {
+            XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+                reference("nested.pdf"), in: bench.attachments, using: bench.store.db), .unavailable)
+        }
+        XCTAssertEqual(contents("nested.pdf", in: bench.attachments), "payload")
+        // …and the connection is still usable, i.e. the failed nested BEGIN did not wedge it.
+        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+            reference("nested.pdf"), in: bench.attachments, using: bench.store.db), .deleted)
+    }
 }

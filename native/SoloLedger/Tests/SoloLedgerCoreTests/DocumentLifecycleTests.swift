@@ -1054,8 +1054,20 @@ final class DocumentLifecycleTests: LedgerTestCase {
         var thrown: [String] = []
         do { try store.applyDocumentEdit(id: id, BusinessDocumentEdit(notes: "x"), interleave: issue) }
         catch { thrown.append("edit") }
-        do { _ = try store.applyDocumentDelete(id: id, interleave: {}) } catch { thrown.append("delete") }
+
+        // The delete has to reach its CONDITIONAL statement, not be turned away by the pre-check —
+        // so it starts from a draft of its own and the interleave is what issues it. Reusing the
+        // already-issued document above would have made this half say nothing about the row count.
+        let second = try store.createBusinessDocument(draft("SILENT-2"))
+        XCTAssertEqual(try status(store, second), "draft", "the pre-check will let this one through")
+        do {
+            _ = try store.applyDocumentDelete(id: second, interleave: {
+                try other.run("UPDATE business_documents SET status = 'issued' WHERE id = ?",
+                              [.text(second)])
+            })
+        } catch { thrown.append("delete") }
         XCTAssertEqual(thrown, ["edit", "delete"], "a write that matched no row must say so")
+        XCTAssertEqual(try status(store, second), "issued", "…and the row it refused is still there")
     }
 
     /// **Reverse proof 6 — map every zero-row outcome to `notFound`.** Three of the four cases here
@@ -1253,5 +1265,114 @@ final class DocumentLifecycleTests: LedgerTestCase {
             documentID: id, TaxInvoiceEdit(attachmentPath: "attachments/docs/second.pdf"))
         XCTAssertEqual(orphan, "attachments/docs/first.pdf")
         XCTAssertEqual(try attachmentPath(store, id), "attachments/docs/second.pdf")
+    }
+
+    /// The refusal order is the pre-check's order, and swapping the two guards changes what a user is
+    /// told. Constructed so both guards are true at once: the document is VOID (so the draft rule
+    /// fires) and the request also asks for a transition void cannot make.
+    func testTheEditRefusalReportsTheTransitionBeforeTheDraftRule() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft("ORDER-1"))
+        let other = try secondConnection(to: store)
+        defer { try? other.close() }
+
+        XCTAssertThrowsError(try store.applyDocumentEdit(
+            id: id, BusinessDocumentEdit(notes: "x", status: .issued), interleave: {
+                try other.run("UPDATE business_documents SET status = 'void' WHERE id = ?", [.text(id)])
+            })) {
+            XCTAssertEqual($0 as? BusinessDocumentError,
+                           .invalidStatusTransition(from: .void, to: .issued), """
+                both guards hold on the fresh facts — void cannot become issued, AND a void document \
+                cannot be edited. The transition is reported, exactly as the pre-check reports it.
+                """)
+        }
+        // …and the guard that came second is genuinely live: with no transition asked for, the same
+        // fresh facts produce the draft rule instead.
+        XCTAssertEqual(try store.refusalForDocumentEdit(id: id, BusinessDocumentEdit(notes: "x"))
+                        as? BusinessDocumentError, .onlyDraftCanBeEdited)
+    }
+
+    /// The same question for the association: a void document that is ALSO pointed at an attachment
+    /// another document holds must report the void rule, not the attachment one.
+    func testTheTaxInvoiceRefusalReportsVoidBeforeAttachmentInUse() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let mine = try store.createBusinessDocument(draft("ORDER-2"))
+        let rival = try store.createBusinessDocument(draft("ORDER-3"))
+        let path = "attachments/docs/contested.pdf"
+        try store.updateTaxInvoice(documentID: rival, TaxInvoiceEdit(attachmentPath: path))
+        try store.db.run("UPDATE business_documents SET status = 'void' WHERE id = ?", [.text(mine)])
+
+        let refusal = try store.refusalForTaxInvoiceEdit(documentID: mine,
+                                                         TaxInvoiceEdit(attachmentPath: path))
+        XCTAssertEqual(refusal as? BusinessDocumentError, .voidTaxInvoiceReadOnly)
+        // …and the attachment guard is live on a document that is not void.
+        XCTAssertEqual(try store.refusalForTaxInvoiceEdit(documentID: mine,
+                                                          TaxInvoiceEdit(attachmentPath: path))
+                        as? BusinessDocumentError, .voidTaxInvoiceReadOnly)
+        let notVoid = try store.createBusinessDocument(draft("ORDER-4"))
+        XCTAssertEqual(try store.refusalForTaxInvoiceEdit(documentID: notVoid,
+                                                          TaxInvoiceEdit(attachmentPath: path))
+                        as? BusinessDocumentError, .attachmentInUse)
+    }
+
+    /// The association's `notFound` branch, which no behavioural path reached: the row is deleted by
+    /// the second connection inside the window, so the conditional write matches nothing and the
+    /// re-read finds no row at all.
+    func testATaxInvoiceWriteOnARowDeletedInsideTheWindowIsNotFound() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft("GONE-1"))
+        let other = try secondConnection(to: store)
+        defer { try? other.close() }
+
+        XCTAssertThrowsError(try store.applyTaxInvoiceEdit(
+            documentID: id, TaxInvoiceEdit(number: "FP-9"), interleave: {
+                try other.run("DELETE FROM business_documents WHERE id = ?", [.text(id)])
+            })) {
+            XCTAssertEqual($0 as? BusinessDocumentError, .notFound)
+        }
+    }
+
+    /// A writer running an edge the machine does not have — back to `draft` — must not be able to turn
+    /// a refused edit into a silent success. The conditional write matches nothing because the row was
+    /// `issued` at that instant; by the time the refusal is derived the row reads `draft` again, and
+    /// every stable guard passes. Answering `nil` there would report success for a write that never
+    /// happened.
+    func testAnEditIsNeverASilentSuccessWhenTheStatusIsMovedBackwards() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft("BACKWARDS-1"))
+        try parkUpdatedAt(store, id)
+        let other = try secondConnection(to: store)
+        defer { try? other.close() }
+        var moved = false
+
+        XCTAssertThrowsError(try store.applyDocumentEdit(
+            id: id, BusinessDocumentEdit(notes: "sneaked in"), interleave: {
+                // Issued for the duration of the write…
+                try other.run("UPDATE business_documents SET status = 'issued' WHERE id = ?", [.text(id)])
+                moved = true
+            })) { error in
+            // …and while it is STILL issued when the refusal is derived, the stable code is the right
+            // one. This is the ordinary case, and it is here so the harder one below is a contrast.
+            XCTAssertEqual(error as? BusinessDocumentError, .onlyDraftCanBeEdited)
+        }
+        XCTAssertTrue(moved, "the interleave has to have run for this to be about the window")
+
+        // The hard case: the status is moved BACK before the refusal is derived, so every stable guard
+        // passes on the fresh facts even though the write matched nothing. There is no second hook to
+        // stage that between the write and the re-read, so the derivation is asked directly — it is
+        // the function the hole was in.
+        try store.db.run("UPDATE business_documents SET status = 'draft' WHERE id = ?", [.text(id)])
+        let refusal = try store.refusalForDocumentEdit(id: id, BusinessDocumentEdit(notes: "x"))
+        XCTAssertNotNil(refusal, "a zero-row edit whose guards now all pass is not a success")
+        XCTAssertTrue(refusal is DocumentRowMovedUnderTheWrite)
+        XCTAssertEqual(try store.businessDocument(id: id)?.document.notes, "orig notes")
+        XCTAssertEqual(try updatedAt(store, id), epoch)
+
+        // …while the one case that IS a silent success still is one.
+        XCTAssertNil(try store.refusalForDocumentEdit(id: id, BusinessDocumentEdit(status: .draft)))
     }
 }

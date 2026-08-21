@@ -306,8 +306,9 @@ extension LedgerStore {
     ///
     /// Both terms apply when both are asked for, which is how a draft can be edited and issued in one
     /// request. ``statusesAdmitting(_:observed:)`` is that intersection, and it is never empty for a
-    /// request that got this far — proved rather than assumed, because an empty set would have to be
-    /// spelled `AND 0` and would then be a silent refusal of everything.
+    /// request that got this far — proved rather than assumed by the exhaustive walk in
+    /// `DocumentLifecycleTests`, because an empty set would have to be spelled `AND 0` and would then
+    /// be a silent refusal of everything.
     func applyDocumentEdit(id: String, _ edit: BusinessDocumentEdit,
                            interleave: (() throws -> Void)?) throws {
         guard let existing = try db.query("SELECT id, status FROM business_documents WHERE id = ?",
@@ -406,9 +407,9 @@ extension LedgerStore {
             if let refusal = try refusalForDocumentEdit(id: id, edit) { throw refusal }
             return
         }
-        // No refusal applies: the request was a status change to the status the row already holds,
-        // which the pre-check itself answers by writing nothing. `DocumentAtomicityTests` walks the
-        // whole space to show this is the only way here.
+        // A `nil` refusal is the request having asked for the status the row already holds, which the
+        // pre-check itself answers by writing nothing. `DocumentLifecycleTests` walks the whole
+        // request space to show that is the only way to get one.
     }
 
     /// ``deleteBusinessDocument(id:)``, plus the seam.
@@ -464,6 +465,15 @@ extension LedgerStore {
     ///     pre-image cannot be recovered from the statement and has to be pinned by the predicate
     ///     instead. Bound as the RAW cell rather than the decoded string, with `IS` rather than `=`,
     ///     so `NULL` compares and a cell holding a non-TEXT value compares as itself.
+    ///
+    /// **Term 3 has one registered cost.** `SQLiteDatabase.readColumn` decodes TEXT lossily — invalid
+    /// UTF-8 becomes U+FFFD — so a cell a foreign writer filled with bytes that are not UTF-8 cannot be
+    /// bound back byte-for-byte, and this term can never match it. The effect is bounded and it is the
+    /// safe direction: on THAT row, a request that writes the attachment column is refused (nothing is
+    /// written, nothing is reported as orphaned), while a request that only touches the issued flag,
+    /// the number or the date carries no such term and works normally. Refusing is also the honest
+    /// answer — a request that cannot name what it is replacing has no business reporting what it
+    /// displaced.
     ///
     /// Term 3 is the one with no stable error of its own: a zero-row outcome that survives the re-read
     /// means another writer re-pointed this document while the sheet was open. That is not
@@ -570,19 +580,29 @@ extension LedgerStore {
 
     /// The stable error for an edit that matched no row, or `nil` when the request's effect already
     /// holds. Re-reads, then walks the SAME two guards in the SAME order the pre-check uses.
-    func refusalForDocumentEdit(id: String, _ edit: BusinessDocumentEdit) throws -> BusinessDocumentError? {
+    ///
+    /// **`nil` is granted only to the one case that has earned it**: a status-only request whose
+    /// wanted status the row now already holds. That case IS the pre-check's own answer — it compares
+    /// before it validates, finds nothing to write, and returns. Every other way of reaching the end
+    /// of this function means the row moved between the write and this re-read (a writer running an
+    /// edge the machine does not have, e.g. back to `draft`), and answering `nil` there would report
+    /// success for a request that did not happen. That gets the same non-`BusinessDocumentError`
+    /// ``DocumentRowMovedUnderTheWrite`` the association path uses, for the same reason: no stable
+    /// code says it, and the page's generic "save failed, try again" is true.
+    func refusalForDocumentEdit(id: String, _ edit: BusinessDocumentEdit) throws -> Error? {
         guard let row = try db.query("SELECT id, status FROM business_documents WHERE id = ?",
                                      [.text(id)]).first,
               let statusRaw = row.string("status"),
               let status = BusinessDocumentStatus(rawValue: statusRaw)
-        else { return .notFound }
+        else { return BusinessDocumentError.notFound }
 
         if let wanted = edit.status, wanted != status,
            !Self.statusTransitions[status, default: []].contains(wanted) {
-            return .invalidStatusTransition(from: status, to: wanted)
+            return BusinessDocumentError.invalidStatusTransition(from: status, to: wanted)
         }
-        if edit.changesFieldsOrLines, status != .draft { return .onlyDraftCanBeEdited }
-        return nil
+        if edit.changesFieldsOrLines, status != .draft { return BusinessDocumentError.onlyDraftCanBeEdited }
+        if edit.status == status, !edit.changesFieldsOrLines { return nil }
+        return DocumentRowMovedUnderTheWrite(term: "status")
     }
 
     /// The refusal for a tax-invoice write that matched no row. The three terms, re-asked in the
@@ -808,13 +828,15 @@ extension LedgerStore {
     /// `_PRIMARYKEY`. All five share the prefix, so the JS predicate is "the primary code is
     /// `SQLITE_CONSTRAINT`", and this is that predicate rather than a narrower guess at it.
     ///
-    /// ## Why the neighbouring `"(code 19)"` predicate must not be copied
+    /// ## Why the neighbouring `"(code 19)"` predicate could not be copied
     ///
-    /// `ProductCatalog.mapWriteFailure` discriminates by matching the literal `"(code 19)"`. That
-    /// works on a connection opened without `SQLITE_OPEN_EXRESCODE` and **stops working on the one
-    /// the app actually ships**, which sets it: `sqlite3_step` then returns the extended code, and
-    /// the message reads `(code 2067)`. Measured on this machine, SQLite 3.51.0, the same five
-    /// violations on the two connection kinds:
+    /// `ProductCatalog.mapWriteFailure` used to discriminate by matching the literal `"(code 19)"`.
+    /// That works on a connection opened without `SQLITE_OPEN_EXRESCODE` and **stops working on the
+    /// one the app actually ships**, which sets it: `sqlite3_step` then returns the extended code, and
+    /// the message reads `(code 2067)`. D-2 measured it and left the evidence here; the twelfth ruling
+    /// fixed that predicate, and it now asks ``isConstraintViolation(_:)`` — this one — rather than
+    /// carrying a second spelling of the same question. Measured on this machine, SQLite 3.51.0, the
+    /// same five violations on the two connection kinds:
     ///
     /// ```text
     ///                 default open   activeExistingNoFollow (EXRESCODE)
@@ -827,8 +849,9 @@ extension LedgerStore {
     ///
     /// `idx_docs_type_number` is a unique INDEX, so the number that matters here is 2067 — and a
     /// `"(code 19)"` test would call it "not a duplicate number" on the shipping path while passing
-    /// every test written on a default connection. `HardenedDocumentNumberConflictTests` measures
-    /// this mapping on a real `SQLITE_OPEN_EXRESCODE` connection for exactly that reason.
+    /// every test written on a default connection. `DocumentNumberingTests` measures this mapping on a
+    /// real `SQLITE_OPEN_EXRESCODE` connection for exactly that reason, and `ProductCatalogTests` now
+    /// measures the whole matrix on `products` itself, both connection kinds side by side.
     ///
     /// The code is read with `LegacyConversionRunner.resultCodes(in:)` — the complete form of the
     /// `(code N)` / `(rc N)` extraction, reused rather than re-spelled — and the LAST match is the

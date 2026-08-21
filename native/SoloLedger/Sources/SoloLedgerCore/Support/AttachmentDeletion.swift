@@ -47,8 +47,17 @@ import Foundation
 /// `StatementText.areEqual` reproduces JS `===` (code-unit identity) because the mirror's rule is
 /// "exactly equal". Here the two mistakes are not symmetric: calling a referenced file unreferenced
 /// destroys it, calling an unreferenced file referenced merely keeps it. So a stored value counts as
-/// a reference whenever its final path segment is canonically equal to the target name — which
-/// catches the spellings the whitelist would reject and a code-unit test would miss.
+/// a reference whenever its final path segment names the same file — canonical equivalence, and
+/// **case-insensitively**, which catches the spellings the whitelist would reject and a code-unit
+/// test would miss.
+///
+/// **The case fold is not decoration; it is the difference between keeping a file and destroying
+/// one.** The default macOS volume is case-INSENSITIVE (measured: `A.pdf` and `a.pdf` are one inode
+/// on APFS as shipped), and `AttachmentName` admits `A-Z`. A reference stored as
+/// `attachments/docs/A.pdf` and a deletion asked for `attachments/docs/a.pdf` therefore name ONE
+/// file; a case-sensitive scan would report it unreferenced and `openat` would then hand back the
+/// very inode the other row points at. Folding here costs at most an unreferenced copy left on disk
+/// on a case-sensitive volume — the harmless direction.
 ///
 /// ## The window that IS closed, and the one that is NOT
 ///
@@ -70,6 +79,19 @@ import Foundation
 ///
 /// There is no test here that "closes" E, because a green test for something unfixed is worse than
 /// the gap it hides.
+///
+/// ## Two contracts for whoever wires this up
+///
+///  * **Never call it from inside a transaction.** It opens its own `BEGIN IMMEDIATE`; SQLite has no
+///    nested transactions, so a nested call fails, is caught, and reports ``Outcome/unavailable`` —
+///    correct and fail-closed, but it means the copy is silently never removed. The App's deleting
+///    seams run outside any transaction; keep it that way.
+///  * **The directory argument carries authority.** It is bound `O_NOFOLLOW` on its LAST component
+///    only, like every other directory bind in this package, so a symlink at an ANCESTOR is followed
+///    — the caller has, in effect, named whatever that resolves to. Registered rather than tightened:
+///    `openNoFollowAny` would refuse a data root reached through any symlinked ancestor (including
+///    `/var` on this platform), and the guarantee that actually matters here does not come from the
+///    walk — it comes from binding an inode and unlinking only while the name still resolves to it.
 enum AttachmentDeletion {
 
     /// What one best-effort attempt did. Never localized and never surfaced to a user.
@@ -166,10 +188,16 @@ enum AttachmentDeletion {
     /// Read as whole columns rather than as an equality test in SQL, because SQL `=` on TEXT is byte
     /// comparison and the stored spelling need not be byte-identical to the one being deleted. The
     /// rows are filtered to the non-empty ones in SQL so the scan carries only what could match.
+    ///
+    /// **`CAST(… AS TEXT)` is load-bearing.** These columns are declared TEXT, but SQLite stores what
+    /// it was given, and ``SQLiteValue/stringValue`` answers `nil` for a BLOB — so a reference a
+    /// foreign writer stored as a blob would read as no reference at all and the file would go. The
+    /// cast makes every storage class arrive as text; the same class of foreign value the chapter
+    /// already reasons about for `''`.
     static func isReferenced(_ name: String, in db: SQLiteDatabase) throws -> Bool {
         for (table, column) in referenceColumns {
             let rows = try db.query("""
-                SELECT \(column) AS ref FROM \(table)
+                SELECT CAST(\(column) AS TEXT) AS ref FROM \(table)
                  WHERE \(column) IS NOT NULL AND \(column) <> ''
                 """)
             for row in rows where row.string("ref").map({ namesTheSameFile($0, name) }) == true {
@@ -187,11 +215,13 @@ enum AttachmentDeletion {
         ("business_documents", "tax_invoice_attachment_path"),
     ]
 
-    /// Canonical equivalence on the final path segment — see this type's note on why the wider
-    /// comparison is the safe one here.
+    /// Canonical equivalence AND a case fold on the final path segment — see this type's note on why
+    /// the wider comparison is the safe one here, and why the case fold specifically is what keeps a
+    /// referenced file alive on the case-insensitive volume this app actually ships on.
     static func namesTheSameFile(_ storedValue: String, _ name: String) -> Bool {
         let segments = storedValue.split(separator: "/", omittingEmptySubsequences: false)
-        return String(segments.last ?? "") == name
+        let last = String(segments.last ?? "")
+        return last == name || last.lowercased() == name.lowercased()
     }
 
     /// Why a bind failed, in the three shapes the outcome distinguishes.
