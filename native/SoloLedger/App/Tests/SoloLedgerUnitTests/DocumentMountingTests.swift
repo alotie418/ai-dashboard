@@ -821,14 +821,37 @@ final class DocumentMountingTests: XCTestCase {
             XCTAssertEqual(Self.occurrences(of: pattern, inCodeOf: model), 0,
                            "\(pattern) still discards the orphan it is handed")
         }
-        // The discard is never an argument to, or a statement inside, the write closure: every
-        // occurrence sits on its own statement line, outside `performDocumentWrite { … }`.
+        // The discard is never an argument to the write closure…
         for line in model.components(separatedBy: "\n")
         where line.contains("discardOrphanedAttachmentCopy(") && !line.contains("func ") {
             XCTAssertFalse(line.contains("performDocumentWrite"), """
                 a discard shares a line with the write it must follow: \(line.trimmingCharacters(in: .whitespaces))
                 """)
         }
+
+        // …and, the half that actually catches the nesting: the App opens NO transaction at all.
+        //
+        // Added because the line check above was measured and found insufficient. Wrapping the store
+        // call and the discard in `store.db.transaction { … }` puts the discard on its own line
+        // inside the closure, so the loop above stays green while the primitive's own BEGIN can no
+        // longer nest — it fails closed, the copy silently survives, and only a behavioural test
+        // notices. A cleanup that looks wired and does nothing is precisely the shape a source guard
+        // is here to refuse.
+        //
+        // Banning outright is honest rather than over-broad: transaction discipline belongs to the
+        // store, this layer has never opened one, and there is no seam here that would need to.
+        for relative in ["App/AppModel.swift", "App/FilePanels.swift", "Views/DocumentsView.swift"] {
+            let source = try Self.appSource(relative)
+            for opener in ["db.transaction", "immediateTransaction", "BEGIN IMMEDIATE", "BEGIN "] {
+                XCTAssertEqual(Self.occurrences(of: opener, inCodeOf: source), 0, """
+                    \(relative) opens a transaction (\(opener)). A cleanup inside one cannot run — \
+                    the primitive's own BEGIN IMMEDIATE would fail closed and the copy would survive \
+                    silently. Transactions belong to the store.
+                    """)
+            }
+        }
+        // The probe can see one, so those zeroes are a measurement.
+        XCTAssertEqual(Self.occurrences(of: "db.transaction", inCodeOf: "try store.db.transaction { }"), 1)
     }
 
     func testDM16bThePickedCopysNameSatisfiesTheAttachmentWhitelist() {
