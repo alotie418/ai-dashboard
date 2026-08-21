@@ -219,8 +219,13 @@ extension AppModel {
 /// replaced; both of those are paths that really unlink something under `attachments/docs/`, and
 /// the spec's §3 upgrade clause turns the three registered check-then-act windows into must-fix
 /// items the moment one exists. So this round copies IN and never out: a replaced or dropped
-/// attachment leaves its copy behind. That leak is registered in the spec rather than hidden, and
-/// the storage-atomicity round is where the deleting seam gets connected.
+/// attachment leaves its copy behind. That leak is registered in the spec rather than hidden.
+///
+/// The storage-atomicity round has since landed the three conditional writes and the safe-delete
+/// primitive (`AttachmentDeletion`), which is what the upgrade clause demanded be in place FIRST.
+/// **Connecting the seam is still D-6's**, and the twelfth ruling adds a condition to it: the residual
+/// race the primitive registers — a freed name re-claimed by a stale or non-cooperating writer — has
+/// to be ruled on before any of these five sites deletes anything.
 extension AppModel {
 
     /// `MAX_BYTES` from `electron/handlers/index.js`: twenty mebibytes, and the comparison is a
