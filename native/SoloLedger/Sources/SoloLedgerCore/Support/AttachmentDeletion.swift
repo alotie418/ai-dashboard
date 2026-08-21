@@ -70,9 +70,9 @@ import Foundation
 /// **NOT closed — the adjacent-syscall window inside the unlink itself (raised in review of #494,
 /// AWAITING A RULING).** `unlinkIfStillBound` is `fstatat` and then `unlinkat(parent.fd, name, 0)`,
 /// and `unlinkat` removes a NAME. A same-UID process that swaps the entry between those two calls has
-/// its replacement removed instead of the bound inode — so the "a stand-in survives" property holds
-/// against a swap that happens BEFORE the check and not against one landing inside those two adjacent
-/// syscalls. The `matchesChild` call above it does not narrow this: it is a second check-then-act, and
+/// its replacement removed instead of the bound inode — so "a replacement is left alone" holds for a
+/// swap that is already in place when the identity check runs, and NOT for one landing inside those
+/// two adjacent syscalls. The `matchesChild` call above it does not narrow this: it is a second check-then-act, and
 /// it is there to REPORT ``Outcome/movedUnderUs`` rather than to prevent anything.
 ///
 /// **Darwin offers no unlink-by-inode**, so this cannot be closed by writing the call differently; a
@@ -118,7 +118,14 @@ enum AttachmentDeletion {
     /// missing file counts as done. They stay separate cases because a test — and, later, a log —
     /// needs to tell "we removed it" from "there was nothing to remove".
     enum Outcome: Equatable {
-        /// The bound inode's entry was removed.
+        /// `unlinkat` reported success for that NAME, and the name no longer resolves to the bound
+        /// inode afterwards.
+        ///
+        /// **It does not say the bound inode is what was removed.** `unlinkIfStillBound` checks
+        /// identity with `fstatat` and then unlinks by name; an entry swapped inside those two
+        /// adjacent syscalls is what `unlinkat` takes. That window is registered — see this type's
+        /// note — and cannot be closed on Darwin, so this case is exactly as strong as the syscall
+        /// pair is, and no stronger.
         case deleted
         /// No entry at that name. Success.
         case alreadyGone
@@ -128,7 +135,13 @@ enum AttachmentDeletion {
         case rejectedReference
         /// Something is at the name, but it is not a regular file — a symlink, a directory, a device.
         case notARegularFile
-        /// The name stopped resolving to the inode that was bound. A stand-in is never removed.
+        /// **At the identity check**, the name did not resolve to the bound inode, so this call did
+        /// not go on to unlink anything.
+        ///
+        /// It is a statement about that one observation and nothing more. It does NOT say that a
+        /// replacement is safe in general: one that lands AFTER the check — including inside
+        /// `unlinkIfStillBound`'s own `fstatat`→`unlinkat` gap — is not covered by it, and is the
+        /// registered residual.
         case movedUnderUs
         /// The directory could not be bound, the ledger could not be asked, or the `unlink` did not
         /// take. Fail-closed: nothing was removed.
@@ -177,8 +190,10 @@ enum AttachmentDeletion {
                 guard try !isReferenced(name, in: db) else { return .stillReferenced }
                 hooks.afterScanBeforeUnlink?()
 
-                // Checked before the unlink as well as inside it, so the "a stand-in survives"
-                // outcome is REPORTED rather than silently indistinguishable from a success.
+                // Checked here as well as inside `unlinkIfStillBound`, so a replacement that is
+                // already in place is REPORTED rather than being indistinguishable from a success.
+                // It narrows nothing: this is a second check-then-act, and the gap inside the unlink
+                // itself stays open (see this type's note).
                 guard (try? file.matchesChild(named: name, in: parent)) == true else {
                     return .movedUnderUs
                 }

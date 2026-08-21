@@ -2,18 +2,31 @@ import XCTest
 @testable import SoloLedgerCore
 
 /// The storage-atomicity round's third item — ``AttachmentDeletion`` — and the four properties it
-/// only has if they are measured: the reference set is BOTH columns, the target is an inode and not
-/// a name, the parent is a descriptor and not a path, and the gap between "nothing references it"
-/// and `unlink` is held shut by a lock a second connection can be seen bouncing off.
+/// only has if they are measured: the reference set is BOTH columns, the target is BOUND as an inode
+/// and the name is checked against that binding before the unlink, the parent is a descriptor and not
+/// a path, and the gap between "nothing references it" and `unlink` is held shut by a lock a second
+/// connection can be seen bouncing off.
+///
+/// The second of those is deliberately worded as a check and not as "the target is an inode, not a
+/// name": `unlinkat` takes a NAME, and the gap named below is exactly the part that check cannot
+/// cover.
 ///
 /// Every one of those is written so that removing the thing it protects turns THIS file red and
 /// nothing else. The mutation each test kills is named on the test.
 ///
-/// **What is deliberately not here: a test for race E.** After the file is gone the relative name is
-/// free, and a stale or non-cooperating writer can claim it again. This round does not close that and
-/// does not pretend to; ``testTheResidualRaceIsRegisteredAsADSixPrerequisiteRatherThanClosed`` checks
-/// that the spec says so in as many words, which is the opposite of a green test standing in for a
-/// fix.
+/// **Two things are deliberately NOT tested here, because neither is closed.**
+///
+///  * **Race E** — after the file is gone the relative name is free, and a stale or non-cooperating
+///    writer can claim it again.
+///  * **The `fstatat`→`unlinkat` gap inside `unlinkIfStillBound`** — a same-UID swap landing between
+///    those two adjacent syscalls has its replacement unlinked, and Darwin offers no unlink-by-inode
+///    to close it.
+///
+/// Both are registered in the spec as D-6 prerequisites awaiting a ruling.
+/// ``testTheResidualRaceIsRegisteredAsADSixPrerequisiteRatherThanClosed`` checks that the spec says so
+/// in as many words, which is the opposite of a green test standing in for a fix. Every "a
+/// replacement survives" claim below is scoped to a swap that is already in place when the identity
+/// check runs.
 final class AttachmentDeletionTests: LedgerTestCase {
 
     // MARK: - Fixtures
@@ -230,15 +243,21 @@ final class AttachmentDeletionTests: LedgerTestCase {
     // MARK: - 4 · the target is an inode (kills: unlinking by name)
 
     /// **Mutation killed: dropping the device+inode comparison**, i.e. calling `unlinkat` on the name
-    /// instead of `unlinkIfStillBound`. The stand-in put there during the window must survive.
-    func testAStandInSwappedInDuringTheWindowIsNotRemoved() throws {
+    /// instead of `unlinkIfStillBound`. A replacement that is ALREADY IN PLACE when the identity check
+    /// runs must survive.
+    ///
+    /// **The scope is exactly that, and the name says so.** The swap here completes before the check;
+    /// this test says nothing about one landing inside `unlinkIfStillBound`'s own `fstatat`→`unlinkat`
+    /// gap, which is the registered residual and is NOT closed. No test here pretends otherwise.
+    func testAReplacementAlreadyInPlaceAtTheIdentityCheckIsNotRemoved() throws {
         let bench = try makeBench()
         defer { try? bench.store.db.close() }
         try plant("swap.pdf", "original", in: bench.attachments)
 
         var hooks = AttachmentDeletion.Hooks()
         hooks.afterScanBeforeUnlink = { [attachments = bench.attachments] in
-            // Remove the bound file and put a DIFFERENT file at the same name.
+            // Completed BEFORE the identity check: remove the bound file and put a DIFFERENT file at
+            // the same name. This is the swap the check can see.
             try? FileManager.default.removeItem(at: attachments.appendingPathComponent("swap.pdf"))
             try? Data("stand-in".utf8).write(to: attachments.appendingPathComponent("swap.pdf"))
         }

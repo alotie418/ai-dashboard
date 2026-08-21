@@ -223,9 +223,16 @@ extension AppModel {
 ///
 /// The storage-atomicity round has since landed the three conditional writes and the safe-delete
 /// primitive (`AttachmentDeletion`), which is what the upgrade clause demanded be in place FIRST.
-/// **Connecting the seam is still D-6's**, and the twelfth ruling adds a condition to it: the residual
-/// race the primitive registers — a freed name re-claimed by a stale or non-cooperating writer — has
-/// to be ruled on before any of these five sites deletes anything.
+/// **Connecting the seam is still D-6's**, and it now carries TWO independent gates — both registered
+/// in the spec, both awaiting a ruling, and answering one does not answer the other:
+///
+///  1. **Race E** — once the file is unlinked the relative name is free, and a stale or
+///     non-cooperating writer can claim it again.
+///  2. **The `fstatat`→`unlinkat` gap** inside `unlinkIfStillBound` — a same-UID swap landing between
+///     those two adjacent syscalls has its replacement unlinked, and Darwin offers no
+///     unlink-by-inode to close it.
+///
+/// Neither may be left unruled before any of these five sites deletes anything.
 extension AppModel {
 
     /// `MAX_BYTES` from `electron/handlers/index.js`: twenty mebibytes, and the comparison is a

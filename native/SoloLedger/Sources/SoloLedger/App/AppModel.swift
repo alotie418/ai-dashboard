@@ -2240,8 +2240,9 @@ final class AppModel: ObservableObject {
     /// deliberately does NOT act on it — ruling ③ — so the copy stays on disk. The value is dropped
     /// here rather than passed anywhere, and this is one of the two seams **D-6** connects. The
     /// storage-atomicity round landed what that connection requires — the conditional writes and
-    /// `AttachmentDeletion` — but left the wiring alone, and the twelfth ruling gates it further on a
-    /// ruling about the residual race that primitive registers.
+    /// `AttachmentDeletion` — but left the wiring alone, and D-6 is gated on TWO rulings that
+    /// primitive's registered residuals demand, neither of which answers the other: **race E** (a
+    /// freed name re-claimed) and **the `fstatat`→`unlinkat` gap** inside the unlink itself.
     func confirmDocumentDelete() {
         guard let store, let document = pendingDocumentDelete else { return }
         pendingDocumentDelete = nil
