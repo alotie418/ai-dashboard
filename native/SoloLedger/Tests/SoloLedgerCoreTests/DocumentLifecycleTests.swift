@@ -911,4 +911,347 @@ final class DocumentLifecycleTests: LedgerTestCase {
                        "…and neither does deleting")
         XCTAssertEqual(try store.businessDocuments().documents.count, 0)
     }
+
+    // MARK: - The twelfth ruling · A9 / A10 / A11 as conditional writes
+
+    /// A REAL second connection to the same file, with a short busy timeout. Every test below drives
+    /// it from inside the worker's `interleave`, i.e. at the exact instant the check-then-act window
+    /// is open — the instant no amount of luck would let a test hit reliably.
+    private func secondConnection(to store: LedgerStore) throws -> SQLiteDatabase {
+        let other = try SQLiteDatabase(path: store.db.path, mode: .readWriteExisting)
+        try other.execute("PRAGMA busy_timeout = 5000")
+        return other
+    }
+
+    private func status(_ store: LedgerStore, _ id: String) throws -> String? {
+        try store.db.query("SELECT status FROM business_documents WHERE id = ?", [.text(id)])
+            .first?.string("status")
+    }
+
+    private func attachmentPath(_ store: LedgerStore, _ id: String) throws -> String? {
+        try store.db.query("SELECT tax_invoice_attachment_path FROM business_documents WHERE id = ?",
+                           [.text(id)]).first?.string("tax_invoice_attachment_path")
+    }
+
+    /// **Reverse proof 1 — delete `AND status IN (…)` from the edit and this goes green wrongly.**
+    ///
+    /// The document is a draft when the status is read and issued by the time the `UPDATE` runs.
+    /// Without the predicate the edit lands on an issued document; with it, nothing is written and the
+    /// caller gets the same `onlyDraftCanBeEdited` the pre-check would have given.
+    func testAnEditRefusesAfterAConcurrentIssueAndChangesNothing() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft())
+        try parkUpdatedAt(store, id)
+        let other = try secondConnection(to: store)
+        defer { try? other.close() }
+
+        XCTAssertThrowsError(try store.applyDocumentEdit(id: id, BusinessDocumentEdit(notes: "sneaked in"),
+                                                         interleave: {
+            try other.run("UPDATE business_documents SET status = 'issued' WHERE id = ?", [.text(id)])
+        })) {
+            XCTAssertEqual($0 as? BusinessDocumentError, .onlyDraftCanBeEdited)
+        }
+        XCTAssertEqual(try store.businessDocument(id: id)?.document.notes, "orig notes",
+                       "the edit must not have landed on the issued document")
+        XCTAssertEqual(try updatedAt(store, id), epoch, "…and the refused write is not a write")
+    }
+
+    /// The same window, with lines in the request: the header refused, so the LINES must not move
+    /// either. A9's "all or nothing" half, measured rather than promised.
+    func testARefusedEditDoesNotRewriteTheLinesEither() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft(lines: [line("orig", amount: 10, tax: 1)]))
+        let other = try secondConnection(to: store)
+        defer { try? other.close() }
+
+        XCTAssertThrowsError(try store.applyDocumentEdit(
+            id: id, BusinessDocumentEdit(lines: [line("replacement", amount: 99)]), interleave: {
+                try other.run("UPDATE business_documents SET status = 'issued' WHERE id = ?", [.text(id)])
+            }))
+        let detail = try XCTUnwrap(try store.businessDocument(id: id))
+        XCTAssertEqual(detail.items.map(\.description), ["orig"], "the lines were rewritten anyway")
+        XCTAssertEqual(detail.document.subtotal, 10, "…and so were the totals")
+    }
+
+    /// **Reverse proof 2 — delete `AND status != ?` from the delete.** The row is a draft when read
+    /// and issued when the `DELETE` runs; without the predicate the issued document is deleted.
+    func testADeleteRefusesAfterAConcurrentIssueAndLeavesTheRow() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft("DEL-1"))
+        let other = try secondConnection(to: store)
+        defer { try? other.close() }
+
+        XCTAssertThrowsError(try store.applyDocumentDelete(id: id, interleave: {
+            try other.run("UPDATE business_documents SET status = 'issued' WHERE id = ?", [.text(id)])
+        })) {
+            XCTAssertEqual($0 as? BusinessDocumentError, .issuedMustBeVoidedFirst)
+        }
+        XCTAssertEqual(try status(store, id), "issued", "the issued document is still there")
+    }
+
+    /// **Reverse proof 3 — delete `AND status != ?` from the tax-invoice write.** The document is
+    /// issued when read and void when the `UPDATE` runs; the association must stay frozen.
+    func testATaxInvoiceWriteRefusesAfterAConcurrentVoidAndLeavesTheAssociation() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft("TI-1"))
+        try store.updateBusinessDocument(id: id, BusinessDocumentEdit(status: .issued))
+        try store.updateTaxInvoice(documentID: id, TaxInvoiceEdit(number: "FP-ORIGINAL"))
+        let other = try secondConnection(to: store)
+        defer { try? other.close() }
+
+        XCTAssertThrowsError(try store.applyTaxInvoiceEdit(
+            documentID: id, TaxInvoiceEdit(number: "FP-SNEAKED"), interleave: {
+                try other.run("UPDATE business_documents SET status = 'void' WHERE id = ?", [.text(id)])
+            })) {
+            XCTAssertEqual($0 as? BusinessDocumentError, .voidTaxInvoiceReadOnly)
+        }
+        XCTAssertEqual(try store.businessDocument(id: id)?.document.taxInvoiceNumber, "FP-ORIGINAL")
+    }
+
+    /// **Reverse proof 4 — delete the `NOT EXISTS` term.** The path is free when the pre-check asks
+    /// and claimed by another document by the time the `UPDATE` runs. Without the term both documents
+    /// end up pointing at one copy, which is precisely the state `ATTACHMENT_IN_USE` exists to prevent
+    /// — either one's next edit would delete the file out from under the other.
+    func testAnAttachmentClaimedInsideTheWindowIsRefusedAndTheHolderStaysExactlyOne() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let mine = try store.createBusinessDocument(draft("OWN-1"))
+        let rival = try store.createBusinessDocument(draft("OWN-2"))
+        let path = "attachments/docs/shared.pdf"
+        let other = try secondConnection(to: store)
+        defer { try? other.close() }
+
+        XCTAssertThrowsError(try store.applyTaxInvoiceEdit(
+            documentID: mine, TaxInvoiceEdit(attachmentPath: path), interleave: {
+                try other.run("UPDATE business_documents SET tax_invoice_attachment_path = ? WHERE id = ?",
+                              [.text(path), .text(rival)])
+            })) {
+            XCTAssertEqual($0 as? BusinessDocumentError, .attachmentInUse)
+        }
+        let holders = try store.db.query(
+            "SELECT id FROM business_documents WHERE tax_invoice_attachment_path = ?", [.text(path)])
+        XCTAssertEqual(holders.compactMap { $0.string("id") }, [rival],
+                       "exactly one document may hold a copy, and it is the one that claimed it")
+    }
+
+    /// **Reverse proof 5 — delete the affected-row check.** Every worker above would then return
+    /// normally after writing nothing, and a caller that got no error would believe its change landed.
+    /// Stated as its own assertion so the property is named rather than implied by the three above.
+    func testAConditionalWriteThatMatchedNothingIsNeverASilentSuccess() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft("SILENT-1"))
+        let other = try secondConnection(to: store)
+        defer { try? other.close() }
+        let issue: () throws -> Void = {
+            try other.run("UPDATE business_documents SET status = 'issued' WHERE id = ?", [.text(id)])
+        }
+
+        var thrown: [String] = []
+        do { try store.applyDocumentEdit(id: id, BusinessDocumentEdit(notes: "x"), interleave: issue) }
+        catch { thrown.append("edit") }
+        do { _ = try store.applyDocumentDelete(id: id, interleave: {}) } catch { thrown.append("delete") }
+        XCTAssertEqual(thrown, ["edit", "delete"], "a write that matched no row must say so")
+    }
+
+    /// **Reverse proof 6 — map every zero-row outcome to `notFound`.** Three of the four cases here
+    /// have a different stable answer, and only the genuine absence is `notFound`. Collapsing them
+    /// would tell a user their document had been deleted when it had merely been issued.
+    func testOnlyAGenuineAbsenceIsReportedAsNotFound() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let other = try secondConnection(to: store)
+        defer { try? other.close() }
+
+        let edited = try store.createBusinessDocument(draft("NF-1"))
+        XCTAssertThrowsError(try store.applyDocumentEdit(id: edited, BusinessDocumentEdit(notes: "x"),
+                                                         interleave: {
+            try other.run("UPDATE business_documents SET status = 'issued' WHERE id = ?", [.text(edited)])
+        })) { XCTAssertEqual($0 as? BusinessDocumentError, .onlyDraftCanBeEdited) }
+
+        let deleted = try store.createBusinessDocument(draft("NF-2"))
+        XCTAssertThrowsError(try store.applyDocumentDelete(id: deleted, interleave: {
+            try other.run("UPDATE business_documents SET status = 'issued' WHERE id = ?", [.text(deleted)])
+        })) { XCTAssertEqual($0 as? BusinessDocumentError, .issuedMustBeVoidedFirst) }
+
+        // …and the row that really is gone. Removed by the SECOND connection between the read and the
+        // write, so this is the zero-row path and not the pre-check's own `notFound`.
+        let vanishing = try store.createBusinessDocument(draft("NF-3"))
+        XCTAssertThrowsError(try store.applyDocumentEdit(id: vanishing, BusinessDocumentEdit(notes: "x"),
+                                                         interleave: {
+            try other.run("DELETE FROM business_documents WHERE id = ?", [.text(vanishing)])
+        })) { XCTAssertEqual($0 as? BusinessDocumentError, .notFound) }
+
+        let alsoVanishing = try store.createBusinessDocument(draft("NF-4"))
+        XCTAssertThrowsError(try store.applyDocumentDelete(id: alsoVanishing, interleave: {
+            try other.run("DELETE FROM business_documents WHERE id = ?", [.text(alsoVanishing)])
+        })) { XCTAssertEqual($0 as? BusinessDocumentError, .notFound) }
+    }
+
+    /// The predicate pins the RULE, not the value that was read — so a request that is still legal
+    /// against the new status still lands. A draft asked to become void, issued by someone else in the
+    /// window, is `issued → void`: an edge the machine allows and Electron would also have written.
+    /// A `status = <observed>` predicate would refuse it with nothing honest to say.
+    func testAStatusChangeStillLandsWhenTheNewStatusIsAlsoALegalStartingPoint() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft("RULE-1"))
+        let other = try secondConnection(to: store)
+        defer { try? other.close() }
+
+        XCTAssertNoThrow(try store.applyDocumentEdit(id: id, BusinessDocumentEdit(status: .void),
+                                                     interleave: {
+            try other.run("UPDATE business_documents SET status = 'issued' WHERE id = ?", [.text(id)])
+        }))
+        XCTAssertEqual(try status(store, id), "void")
+    }
+
+    /// …and the opposite edge is still refused: `void → issued` is not an edge, so a document voided
+    /// inside the window cannot be issued by a request that read it as a draft.
+    func testAStatusChangeIsRefusedWhenTheNewStatusIsNotALegalStartingPoint() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft("RULE-2"))
+        let other = try secondConnection(to: store)
+        defer { try? other.close() }
+
+        XCTAssertThrowsError(try store.applyDocumentEdit(id: id, BusinessDocumentEdit(status: .issued),
+                                                         interleave: {
+            try other.run("UPDATE business_documents SET status = 'void' WHERE id = ?", [.text(id)])
+        })) {
+            XCTAssertEqual($0 as? BusinessDocumentError,
+                           .invalidStatusTransition(from: .void, to: .issued))
+        }
+        XCTAssertEqual(try status(store, id), "void")
+    }
+
+    /// The one zero-row outcome that is NOT an error: the request asked for the status the row now
+    /// already has. The pre-check answers that case by writing nothing, so the conditional write does
+    /// the same — and `updated_at` proves nothing was written.
+    func testAStatusChangeToTheStatusItNowAlreadyHoldsIsASilentSuccess() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft("SAME-1"))
+        try parkUpdatedAt(store, id)
+        let other = try secondConnection(to: store)
+        defer { try? other.close() }
+
+        XCTAssertNoThrow(try store.applyDocumentEdit(id: id, BusinessDocumentEdit(status: .issued),
+                                                     interleave: {
+            try other.run("UPDATE business_documents SET status = 'issued' WHERE id = ?", [.text(id)])
+        }))
+        XCTAssertEqual(try status(store, id), "issued")
+        XCTAssertEqual(try updatedAt(store, id), epoch, "nothing was written by THIS connection")
+    }
+
+    /// The admitted-status set, over the whole request space rather than over the cases somebody
+    /// thought to write. Two properties: it is never empty for a request the pre-check let through,
+    /// and it never admits a row the pre-check would have refused.
+    func testTheAdmittedStatusSetMatchesThePreCheckOnEveryRequestShape() {
+        let wanted: [BusinessDocumentStatus?] = [nil, .draft, .issued, .void]
+        var covered = 0
+        for observed in BusinessDocumentStatus.allCases {
+            for want in wanted {
+                for touchesFields in [false, true] {
+                    let edit = touchesFields
+                        ? BusinessDocumentEdit(notes: "n", status: want)
+                        : BusinessDocumentEdit(status: want)
+
+                    // Only requests the pre-check admits reach the write.
+                    if let want, want != observed,
+                       !LedgerStore.statusTransitions[observed, default: []].contains(want) { continue }
+                    if touchesFields, observed != .draft { continue }
+                    covered += 1
+
+                    let admitted = LedgerStore.statusesAdmitting(edit, observed: observed)
+                    XCTAssertFalse(admitted.isEmpty,
+                                   "empty admitted set for observed=\(observed) want=\(String(describing: want))")
+                    for candidate in admitted {
+                        // The transition term exists only when a status is actually written, which is
+                        // only when the wanted status differs from the one that was read — asking for
+                        // the status a row already has is not a transition and is not a write.
+                        if let want, want != observed {
+                            XCTAssertTrue(LedgerStore.statusTransitions[candidate, default: []].contains(want),
+                                          "\(candidate) is admitted but cannot reach \(want)")
+                        }
+                        if touchesFields {
+                            XCTAssertEqual(candidate, .draft, "only a draft may be edited")
+                        }
+                    }
+                }
+            }
+        }
+        XCTAssertEqual(covered, 13, """
+            the walk must cover every (observed, wanted, touches-fields) shape the pre-check admits: \
+            eight on a draft, three on an issued document, two on a void one
+            """)
+    }
+
+    /// The orphan a delete hands back is the path the DELETED ROW held, not the one the read saw. A
+    /// stale path handed to a deleter is a new leak: it names a file somebody may still be pointing
+    /// at, while the file that really came free goes unreported.
+    func testTheOrphanHandedBackByADeleteComesFromTheRowThatWasRemoved() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft("ORPH-1"))
+        try store.updateTaxInvoice(documentID: id,
+                                   TaxInvoiceEdit(attachmentPath: "attachments/docs/stale.pdf"))
+        let other = try secondConnection(to: store)
+        defer { try? other.close() }
+
+        let orphan = try store.applyDocumentDelete(id: id, interleave: {
+            try other.run("UPDATE business_documents SET tax_invoice_attachment_path = ? WHERE id = ?",
+                          [.text("attachments/docs/current.pdf"), .text(id)])
+        })
+        XCTAssertEqual(orphan, "attachments/docs/current.pdf", """
+            the reported orphan is the one the read saw, not the one the row actually held when it \
+            was deleted
+            """)
+    }
+
+    /// The same property for the association, where SQLite cannot hand back a pre-image: the write is
+    /// conditioned on the row still holding the copy this request believes it is replacing. When it
+    /// does not, nothing is written and NOTHING is reported as orphaned — the refusal is deliberately
+    /// not one of the chapter's user-facing codes, because none of them says "somebody else moved it".
+    func testATaxInvoiceWriteRefusesRatherThanReportAStaleOrphan() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft("ORPH-2"))
+        try store.updateTaxInvoice(documentID: id,
+                                   TaxInvoiceEdit(attachmentPath: "attachments/docs/old.pdf"))
+        let other = try secondConnection(to: store)
+        defer { try? other.close() }
+
+        XCTAssertThrowsError(try store.applyTaxInvoiceEdit(
+            documentID: id, TaxInvoiceEdit(attachmentPath: "attachments/docs/mine.pdf"), interleave: {
+                try other.run("UPDATE business_documents SET tax_invoice_attachment_path = ? WHERE id = ?",
+                              [.text("attachments/docs/theirs.pdf"), .text(id)])
+            })) { error in
+            XCTAssertNil(error as? BusinessDocumentError, """
+                no stable code says "another writer moved this row"; inventing one would need six \
+                languages of copy for a state the shipping app cannot reach
+                """)
+            XCTAssertTrue(error is DocumentRowMovedUnderTheWrite)
+        }
+        XCTAssertEqual(try attachmentPath(store, id), "attachments/docs/theirs.pdf",
+                       "the other writer's association is intact")
+    }
+
+    /// …and the term is not a blanket refusal: the ordinary replace, with nobody interfering, still
+    /// writes and still reports the copy it displaced.
+    func testTheUndisturbedReplaceStillReportsTheCopyItDisplaced() throws {
+        let store = try makeStore()
+        defer { try? store.db.close() }
+        let id = try store.createBusinessDocument(draft("ORPH-3"))
+        try store.updateTaxInvoice(documentID: id,
+                                   TaxInvoiceEdit(attachmentPath: "attachments/docs/first.pdf"))
+        let orphan = try store.updateTaxInvoice(
+            documentID: id, TaxInvoiceEdit(attachmentPath: "attachments/docs/second.pdf"))
+        XCTAssertEqual(orphan, "attachments/docs/first.pdf")
+        XCTAssertEqual(try attachmentPath(store, id), "attachments/docs/second.pdf")
+    }
 }
