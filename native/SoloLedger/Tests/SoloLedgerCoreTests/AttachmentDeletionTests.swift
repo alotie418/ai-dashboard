@@ -571,41 +571,66 @@ final class AttachmentDeletionTests: LedgerTestCase {
     static func inForceRegions(of spec: String) throws -> InForceRegions {
         let lines = spec.components(separatedBy: "\n")
 
-        /// From a heading line to the next heading of the same level or higher — never past it.
-        func block(startingWith prefix: String) throws -> String {
-            let start = try XCTUnwrap(lines.firstIndex { $0.hasPrefix(prefix) },
-                                      "the spec has no section starting `\(prefix)`")
-            var end = lines.count
+        /// The `##` section `opening`…`closing`, as a half-open index range, with the ordering proved
+        /// rather than assumed.
+        ///
+        /// **Every locator below is bounded by one of these.** A locator that searched the whole file
+        /// would accept a COPY of the anchor living anywhere else — and §9 is a revision log that
+        /// carries copies. Measured: moving §5's "第二处残余" subsection verbatim to the end of §9 left
+        /// the previous, globally-searching version of these locators finding it and passing.
+        func parentSection(_ opening: String, _ closing: String) throws -> Range<Int> {
+            let from = try XCTUnwrap(lines.firstIndex { $0.hasPrefix(opening) },
+                                     "the spec has no `\(opening)` section")
+            let to = try XCTUnwrap(lines.firstIndex { $0.hasPrefix(closing) },
+                                   "the spec has no `\(closing)` section")
+            XCTAssertLessThan(from, to, "`\(opening)` does not come before `\(closing)`")
+            guard from < to else { throw XCTSkip("unordered sections; the slice below is meaningless") }
+            return from..<to
+        }
+
+        /// One `####` subsection, found ONLY inside its parent `##` section and ending at the next
+        /// heading of the same level **or higher** — `####`, `###`, `##`, `#` — and never past the
+        /// parent's own end.
+        func block(startingWith prefix: String, between opening: String, and closing: String) throws -> String {
+            let parent = try parentSection(opening, closing)
+            let start = try XCTUnwrap(lines[parent].firstIndex { $0.hasPrefix(prefix) }, """
+                `\(opening)` has no subsection starting `\(prefix)` before `\(closing)`. A copy of it \
+                elsewhere in the file — §9's revision log included — is not a registration in force.
+                """)
+            var end = parent.upperBound
             var i = start + 1
-            while i < lines.count {
-                if lines[i].hasPrefix("#### ") || lines[i].hasPrefix("## ") { end = i; break }
+            while i < parent.upperBound {
+                if lines[i].hasPrefix("#### ") || lines[i].hasPrefix("### ")
+                    || lines[i].hasPrefix("## ") || lines[i].hasPrefix("# ") { end = i; break }
                 i += 1
             }
             return lines[start..<end].joined(separator: "\n")
         }
 
-        /// One table row, required to sit between two named `##` headings so a row of the same shape
+        /// One table row, found ONLY inside its parent `##` section, so a row of the same shape
         /// elsewhere (or a copy in §9) cannot stand in for it.
         func row(startingWith prefix: String, between opening: String, and closing: String) throws -> String {
-            let from = try XCTUnwrap(lines.firstIndex { $0.hasPrefix(opening) }, "no \(opening)")
-            let to = try XCTUnwrap(lines.firstIndex { $0.hasPrefix(closing) }, "no \(closing)")
-            let index = try XCTUnwrap(lines[from..<to].firstIndex { $0.hasPrefix(prefix) },
-                                      "no row `\(prefix)` between \(opening) and \(closing)")
+            let parent = try parentSection(opening, closing)
+            let index = try XCTUnwrap(lines[parent].firstIndex { $0.hasPrefix(prefix) },
+                                      "no row `\(prefix)` between `\(opening)` and `\(closing)`")
             return lines[index]
         }
 
-        /// §8's gate region: from the gate paragraph to the end of §8.
+        /// §8's gate region: from the gate paragraph to the end of §8 — with the anchor itself sought
+        /// ONLY inside §8. A decoy of the same wording earlier in the file cannot become the start of
+        /// the region, so the slice can never run from §5 or §6 all the way to §9.
         func gateRegion() throws -> String {
-            let from = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("**两处开工闸门") },
-                                     "§8 no longer opens its gate region with a two-gate sentence")
-            let to = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("## 9.") }, "no §9 to stop at")
-            XCTAssertLessThan(from, to, "the gate region starts after §9 begins")
-            return lines[from..<to].joined(separator: "\n")
+            let parent = try parentSection("## 8.", "## 9.")
+            let anchor = try XCTUnwrap(lines[parent].firstIndex { $0.hasPrefix("**两处开工闸门") }, """
+                §8 has no two-gate region between `## 8.` and `## 9.`. An anchor of the same wording \
+                outside §8 does not count.
+                """)
+            return lines[anchor..<parent.upperBound].joined(separator: "\n")
         }
 
         return InForceRegions(
-            raceE: try block(startingWith: "#### 竞态 E"),
-            syscallWindow: try block(startingWith: "#### 第二处残余"),
+            raceE: try block(startingWith: "#### 竞态 E", between: "## 5.", and: "## 6."),
+            syscallWindow: try block(startingWith: "#### 第二处残余", between: "## 5.", and: "## 6."),
             dSixRow: try row(startingWith: "| **D-6 激活** |", between: "## 6.", and: "## 7."),
             sectionEightGate: try gateRegion())
     }
