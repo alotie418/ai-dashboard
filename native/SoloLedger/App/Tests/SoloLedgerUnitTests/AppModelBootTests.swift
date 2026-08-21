@@ -692,6 +692,69 @@ final class AppModelBootTests: XCTestCase {
         try damaged.db.close()
     }
 
+    /// **D-6's twin of T5b, and it exists because D-6 opened the same hole a second time.**
+    ///
+    /// `business_documents` and `business_document_items` left `LegacyLedgerSummary.otherRecordTables`
+    /// when the business-documents page became reachable — correctly, since that page lists those very
+    /// rows. But `holdsHiddenRecords` is one of this predicate's conjuncts, so leaving that list
+    /// *loosened this predicate*: a ledger migrated from Electron carrying a year of somebody's
+    /// quotations and invoices, and nothing else, would have answered "provably new" and had a
+    /// currency written into it.
+    ///
+    /// Every other conjunct passes in this fixture, which is what isolates the new one: no
+    /// transactions, no legacy rows, a working probe, `holdsHiddenRecords` FALSE, an empty catalogue.
+    func testT5dALedgerHoldingBusinessDocumentsIsNotProvablyNewEitherAfterDSix() async throws {
+        let store = try freshStore("t5d.db")
+        _ = try store.createBusinessDocument(
+            BusinessDocumentDraft(type: .quotation, number: "QT-2026-0001",
+                                  date: "2026-08-21", customerName: "Acme"))
+        let model = await booted(store)
+
+        XCTAssertTrue(model.transactions.isEmpty)
+        XCTAssertFalse(model.legacyProbeFailed)
+        XCTAssertFalse(model.legacyLedger.holdsHiddenRecords, """
+            the fixture must isolate the new conjunct: every OTHER one passes here. If this went \
+            TRUE the document tables are back in otherRecordTables and this test proves nothing.
+            """)
+        XCTAssertEqual(model.productCatalogIsProvablyEmpty(store), true)
+        XCTAssertEqual(model.businessDocumentsAreProvablyEmpty(store), false)
+
+        finishOnboarding(model, regime: .CN)
+        XCTAssertEqual(currencyRow(store), .some(.none), """
+            a currency was written into a ledger holding somebody else's business documents. \
+            Visibility is not novelty — the same distinction 2b-A4 drew for products.
+            """)
+        try store.db.close()
+    }
+
+    /// The other direction, so T5d is not merely "the seed never runs": with no documents the very
+    /// same path seeds. An undecodable header counts as a document too — a row this app could not
+    /// read is not an absent one.
+    func testT5eALedgerWithNoDocumentsStillSeedsAndAnUnreadableHeaderStillCounts() async throws {
+        let empty = try freshStore("t5e-empty.db")
+        let emptyModel = await booted(empty)
+        XCTAssertEqual(emptyModel.businessDocumentsAreProvablyEmpty(empty), true)
+        finishOnboarding(emptyModel, regime: .CN)
+        XCTAssertEqual(currencyRow(empty), .some("\"CNY\""), "the seed still runs when it should")
+        try empty.db.close()
+
+        let damaged = try freshStore("t5e-damaged.db")
+        // A header with no text reading for its id: counted, never decoded — the same shape the
+        // products fixture uses, against the other table.
+        try damaged.db.run("""
+            INSERT INTO business_documents (id, doc_type, doc_number, status, doc_date, customer_name)
+            VALUES (?, 'quotation', 'QT-1', 'draft', '2026-08-21', 'Acme')
+            """, [.blob(Data([0x00, 0x01]))])
+        let damagedModel = await booted(damaged)
+        XCTAssertEqual(try damaged.businessDocuments().documents.count, 0)
+        XCTAssertEqual(try damaged.businessDocuments().unreadableCount, 1)
+        XCTAssertEqual(damagedModel.businessDocumentsAreProvablyEmpty(damaged), false)
+        finishOnboarding(damagedModel, regime: .CN)
+        XCTAssertEqual(currencyRow(damaged), .some(.none),
+                       "a header that could not be decoded is not an absent one")
+        try damaged.db.close()
+    }
+
     // T6 ────────────────────────────────────────────────────────────────────────────────
     /// The seed writes the currency and nothing else. Asserted on the CN path, because that is
     /// the one where no cascade runs — on a regime CHANGE the three rates are written on

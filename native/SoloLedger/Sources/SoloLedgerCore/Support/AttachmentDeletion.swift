@@ -4,13 +4,20 @@ import Foundation
 /// ruling, and the primitive `docs/BUSINESS_DOCUMENTS_SPEC.md` §3 requires to exist and to be proven
 /// BEFORE any deleting seam is connected.
 ///
-/// ## Nothing in the app calls this yet, and that is the design
+/// ## D-6 connects all five seams
 ///
 /// D-4's ruling ③ left five places where a copy is orphaned — re-pick, remove, cancel, replace-or-
-/// clear on save, and delete-the-document — and connected NONE of them: the App's two consumers of a
-/// returned orphan still discard the value. D-6 connects them. This round lands the primitive and its
-/// proofs so that connecting is a wiring change against something already measured, not a new
-/// mechanism written under the pressure of a page that needs to ship.
+/// clear on save, and delete-the-document — and connected NONE of them. The storage-atomicity round
+/// landed this primitive and its proofs so that connecting would be a wiring change against something
+/// already measured, rather than a new mechanism written under the pressure of a page that needs to
+/// ship. **D-6 connected all five**, once the thirteenth ruling answered the two prerequisites the
+/// residuals below demand.
+///
+/// The App reaches ``deleteIfUnreferenced(_:in:using:)``, which returns **nothing**. That is the
+/// fourteenth ruling and it is structural, not stylistic: the twelfth ruling forbids a failed cleanup
+/// from being reported as a failed save, and a `Void` entry point makes writing that impossible
+/// rather than merely wrong. ``attemptDeleteIfUnreferenced(_:in:using:hooks:)`` keeps the outcome and
+/// the test hook, and stays internal.
 ///
 /// ## What it will not do
 ///
@@ -67,8 +74,8 @@ import Foundation
 /// connection can commit a new reference in between. `AttachmentDeletionTests` proves it with a real
 /// second connection on the same file.
 ///
-/// **NOT closed — the adjacent-syscall window inside the unlink itself (raised in review of #494,
-/// AWAITING A RULING).** `unlinkIfStillBound` is `fstatat` and then `unlinkat(parent.fd, name, 0)`,
+/// **NOT closed — the adjacent-syscall window inside the unlink itself (raised in review of #494;
+/// the thirteenth ruling ACCEPTS AND REGISTERS it).** `unlinkIfStillBound` is `fstatat` and then `unlinkat(parent.fd, name, 0)`,
 /// and `unlinkat` removes a NAME. A same-UID process that swaps the entry between those two calls has
 /// its replacement removed instead of the bound inode — so "a replacement is left alone" holds for a
 /// swap that is already in place when the identity check runs, and NOT for one landing inside those
@@ -81,19 +88,34 @@ import Foundation
 /// variant of it, so the shape is not the implementation's to change. It is the same class of
 /// same-UID, point-in-time residual `PreparedImportActivator` already registers for its own
 /// fingerprint→rename gaps, and Electron's `safeDeleteAttachment` is strictly weaker (`fs.rmSync` by
-/// path, no identity check at all). **Registered, not fixed, and not defended as harmless** — it is
-/// listed in the spec beside race E as a second thing the user must rule on before D-6 wires deletion.
+/// path, no identity check at all). **Registered, not fixed, and not defended as harmless.**
+///
+/// **The thirteenth ruling accepted it as registered residual** — candidate (a) of the three the spec
+/// listed, the others being a rename-then-unlink scheme and an exclusively-owned directory. It keeps
+/// `unlinkIfStillBound` as it is, ships no variant, and explicitly acknowledges that a same-UID
+/// process swapping the entry between those two syscalls can have its stand-in removed. Four
+/// sentences are forbidden anywhere in this chapter as a result: that a stand-in is never removed,
+/// that the deletion is atomic against the bound inode, that the adjacent-syscall window is closed,
+/// and that the directory is exclusively owned at the system level. The ruling is void — and deletion
+/// wiring must be suspended — if a supported in-App path can concurrently replace a directory entry,
+/// if the attachments directory becomes shared or synced, or if the product must promise resistance
+/// to same-UID writers.
 ///
 /// **NOT closed — E, after the file is gone.** Nothing in this design stops a non-cooperating or
 /// stale writer from claiming the same relative path afterwards: the name is free again the moment
 /// the entry is unlinked, and a writer that computed `attachments/docs/<name>` before the deletion can
-/// still store it. **This round does not pretend otherwise.** It is registered in the spec as the
-/// storage-atomicity residual, and the ruling makes it a MANDATORY prerequisite: before D-6 connects
-/// any deleting seam, the user must rule on either
+/// still store it. **Nothing here pretends otherwise.** It is registered in the spec as the
+/// storage-atomicity residual, and it WAS a mandatory prerequisite for D-6.
 ///
-///  1. coordination among cooperating writers with no schema change — and on what to do about the
-///     external-writer residue that leaves; or
-///  2. a schema-level ownership record, which Q9 forbids without its own ruling.
+/// **The thirteenth ruling answered it: coordination among cooperating writers, with NO schema
+/// change** — the first of the two candidates the spec listed, the second being a schema-level
+/// ownership record Q9 forbids without its own ruling. Supported App writers keep four promises: a
+/// fresh name every pick, no-overwrite on create, never re-storing a path the draft has lost, and one
+/// deletion entry point — this one. **The same ruling ACCEPTS what that leaves**: an external or stale
+/// writer can still re-claim a freed name, and E must not be described as closed. An upgrade clause
+/// voids the ruling the moment supported multi-process writing, cloud sync, a watched folder, an
+/// external editor writing back, or any supported path that caches a stored path across a deletion
+/// arrives.
 ///
 /// There is no test here that "closes" E, because a green test for something unfixed is worse than
 /// the gap it hides.
@@ -102,15 +124,16 @@ import Foundation
 ///
 ///  * **Never call it from inside a transaction.** It opens its own `BEGIN IMMEDIATE`; SQLite has no
 ///    nested transactions, so a nested call fails, is caught, and reports ``Outcome/unavailable`` —
-///    correct and fail-closed, but it means the copy is silently never removed. The App's deleting
-///    seams run outside any transaction; keep it that way.
+///    correct and fail-closed, but it means the copy is silently never removed. **All five of D-6's
+///    seams run outside any transaction** — the two that consume a returned orphan call this only
+///    after the store's own transaction has committed — and `DocumentMountingTests` pins that.
 ///  * **The directory argument carries authority.** It is bound `O_NOFOLLOW` on its LAST component
 ///    only, like every other directory bind in this package, so a symlink at an ANCESTOR is followed
 ///    — the caller has, in effect, named whatever that resolves to. Registered rather than tightened:
 ///    `openNoFollowAny` would refuse a data root reached through any symlinked ancestor (including
 ///    `/var` on this platform), and the guarantee that actually matters here does not come from the
 ///    walk — it comes from binding an inode and unlinking only while the name still resolves to it.
-enum AttachmentDeletion {
+public enum AttachmentDeletion {
 
     /// What one best-effort attempt did. Never localized and never surfaced to a user.
     ///
@@ -156,7 +179,32 @@ enum AttachmentDeletion {
         var afterScanBeforeUnlink: (() -> Void)? = nil
     }
 
-    /// Remove the copy `storedPath` names, if and only if nothing in the ledger still points at it.
+    /// **The App's entry point — D-6's five seams call THIS one.**
+    ///
+    /// It returns nothing, by the fourteenth ruling. Cleanup is best-effort on both sides and the
+    /// database write that orphaned the copy has already committed by the time anyone arrives here,
+    /// so reporting a failed cleanup as a failed save would be a lie. A `Void` signature makes that
+    /// lie unwriteable rather than merely forbidden: there is no value at the seam to branch on, no
+    /// error to surface, no new case, no new key and no new copy. The outcome — for tests, and for a
+    /// future log — stays on ``attemptDeleteIfUnreferenced(_:in:using:hooks:)``, which is internal.
+    ///
+    /// Public only because the App target links `SoloLedgerCore` as a separate module and cannot
+    /// otherwise name an internal symbol. Measured, not assumed: `_ = AttachmentDeletion.self` in
+    /// `FilePanels.swift` fails the App build with `cannot find 'AttachmentDeletion' in scope`.
+    ///
+    /// - Parameters:
+    ///   - storedPath: the value as STORED, e.g. `attachments/docs/doc-1-abc.pdf`.
+    ///   - attachmentsDirectory: the directory the caller has decided is the attachments root. It is
+    ///     opened, never created — the capability is the caller's to hand over.
+    ///   - db: the connection whose ledger owns the two reference columns.
+    public static func deleteIfUnreferenced(_ storedPath: String,
+                                            in attachmentsDirectory: URL,
+                                            using db: SQLiteDatabase) {
+        _ = attemptDeleteIfUnreferenced(storedPath, in: attachmentsDirectory, using: db)
+    }
+
+    /// The same attempt, with the outcome and the test hook kept. Internal: the App must not be able
+    /// to read a result it is forbidden to act on.
     ///
     /// - Parameters:
     ///   - storedPath: the value as STORED, e.g. `attachments/docs/doc-1-abc.pdf`.
@@ -164,10 +212,10 @@ enum AttachmentDeletion {
     ///     opened, never created.
     ///   - db: the connection whose ledger owns the two reference columns.
     @discardableResult
-    static func deleteIfUnreferenced(_ storedPath: String,
-                                     in attachmentsDirectory: URL,
-                                     using db: SQLiteDatabase,
-                                     hooks: Hooks = Hooks()) -> Outcome {
+    static func attemptDeleteIfUnreferenced(_ storedPath: String,
+                                            in attachmentsDirectory: URL,
+                                            using db: SQLiteDatabase,
+                                            hooks: Hooks = Hooks()) -> Outcome {
         guard let name = AttachmentRelPath.bareName(of: storedPath) else { return .rejectedReference }
 
         // The directory is bound BEFORE anything is asked of the ledger, so every later step names a

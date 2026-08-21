@@ -264,6 +264,7 @@ private struct MainSplitView: View {
         case .categories: CategoriesView()
         case .products: ProductsView()
         case .inventory: InventoryView()
+        case .documents: DocumentsView()
         case .reports: ReportsView()
         }
     }

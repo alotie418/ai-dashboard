@@ -139,9 +139,62 @@ final class LegacyLedgerProbeTests: LedgerTestCase {
         XCTAssertFalse(summary.hasUnconverted)
         // And the table is out of the list by name, so a re-added entry fails here too.
         XCTAssertFalse(LegacyLedgerSummary.otherRecordTables.contains("products"))
-        XCTAssertEqual(LegacyLedgerSummary.otherRecordTables.count, 11)
+        XCTAssertEqual(LegacyLedgerSummary.otherRecordTables.count, 9)
         XCTAssertTrue(LegacyLedgerSummary.otherRecordTables.contains("fixed_assets"),
                       "the tables this app still does not show must stay counted")
+    }
+
+    /// D-6, and the same rule 2b-A4 applied to `products`: a record the user can now see on a page
+    /// of its own is not a hidden one. Both document tables leave together — the items table is a
+    /// child of the headers table, and counting the lines of a document the page lists would say
+    /// "records you cannot see" about the rows of a document on screen.
+    ///
+    /// A positive claim rather than an absence: the rows really are there, the probe really does
+    /// see the tables, and it still answers zero.
+    func testABusinessDocumentIsNotAHiddenRecordBecauseTheAppShowsDocuments() throws {
+        let store = try makeStore()
+        let id = try store.createBusinessDocument(
+            BusinessDocumentDraft(type: .quotation, number: "QT-2026-0001",
+                                  date: "2026-08-21", customerName: "Acme",
+                                  lines: [BusinessDocumentLineDraft(description: "Widget", quantity: 2,
+                                                                    unitPrice: 50, taxRate: "13%")],
+                                  lineOrigin: .handEntered))
+        XCTAssertEqual(try store.db.query("SELECT COUNT(*) AS c FROM business_documents").first?.int("c"), 1,
+                       "fixture assumption: the header row is really in the file")
+        XCTAssertGreaterThan(try store.db.query(
+            "SELECT COUNT(*) AS c FROM business_document_items").first?.int("c") ?? 0, 0,
+            "fixture assumption: the item row is really in the file, so removing that table matters too")
+        XCTAssertFalse(id.isEmpty)
+
+        let summary = try store.legacyLedgerSummary()
+        XCTAssertEqual(summary.otherRecords, 0, "a visible record is not a hidden one")
+        XCTAssertFalse(summary.holdsHiddenRecords,
+                       "a ledger holding only business documents is not one whose records are out of reach")
+        XCTAssertFalse(summary.hasUnconverted)
+
+        // Out of the list by name, so a re-added entry fails here too — either one of them.
+        XCTAssertFalse(LegacyLedgerSummary.otherRecordTables.contains("business_documents"))
+        XCTAssertFalse(LegacyLedgerSummary.otherRecordTables.contains("business_document_items"))
+        XCTAssertEqual(LegacyLedgerSummary.otherRecordTables.sorted(),
+                       ["accounts", "equity", "fixed_assets", "liabilities", "mileage_logs",
+                        "price_history", "purchase_items", "sales_items", "tax_payments"],
+                       "the closed set of tables this app still does not show")
+    }
+
+    /// Not vacuous: the probe DOES count a table that is still hidden, on the same ledger shape.
+    /// Without this, "otherRecords == 0" above could equally mean the probe stopped working.
+    func testTheProbeStillCountsATableTheAppDoesNotShow() throws {
+        let store = try makeStore()
+        _ = try store.createBusinessDocument(
+            BusinessDocumentDraft(type: .quotation, number: "QT-2026-0002",
+                                  date: "2026-08-21", customerName: "Acme"))
+        try store.db.run("INSERT INTO liabilities (id, name) VALUES (?, ?)",
+                         [.text("l-1"), .text("Loan")])
+
+        let summary = try store.legacyLedgerSummary()
+        XCTAssertEqual(summary.otherRecords, 1,
+                       "the liability counts and the document does not — one probe, two answers")
+        XCTAssertTrue(summary.holdsHiddenRecords)
     }
 
     func testInfrastructureAndSingletonRowsDoNotCountAsRecords() throws {

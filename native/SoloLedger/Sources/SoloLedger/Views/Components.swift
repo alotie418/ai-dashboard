@@ -31,9 +31,10 @@ struct StatView: View {
 ///
 /// Which of the two notices this is — and therefore whether it offers a conversion — is
 /// decided by ``LegacyConversionComposition/notice(_:)`` rather than by a ternary here.
-/// `legacy.other.*` describes invoices, fixed assets and the rest: the preflight never scans
+/// `legacy.other.*` describes fixed assets, liabilities and the rest: the preflight never scans
 /// those tables and the runner cannot carry them, so an entry point on that branch would be a
-/// button that can only ever report "nothing to convert".
+/// button that can only ever report "nothing to convert". (Business documents were on that list
+/// until D-6 gave them a page of their own.)
 struct LegacyLedgerNotice: View {
     @EnvironmentObject var model: AppModel
 

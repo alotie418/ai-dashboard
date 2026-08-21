@@ -375,7 +375,7 @@ final class ReportStructuralCopyTests: XCTestCase {
     func testTheEntryPointResolvesInEveryLanguage() {
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
                        ["overview", "transactions", "categories", "products", "inventory",
-                        "reports"])
+                        "documents", "reports"])
         for language in languages {
             var labels: [String] = []
             for section in SidebarSection.allCases {

@@ -38,7 +38,7 @@
 "legacy.notice.message" = "Ils sont conservés intacts dans le fichier de comptabilité — rien n'a été perdu. Cette app n'affiche pour l'instant que les écritures, ils ne sont donc pas listés ici. Vous pouvez maintenant voir ce que donnerait la conversion des enregistrements hérités éligibles en écritures ; elle ne démarre qu'après votre confirmation, et rien n'est écrit avant.";
 "legacy.banner" = "Enregistrements de ventes / achats hérités non affichés ici : {count}";
 "legacy.other.title" = "Cette comptabilité contient des enregistrements que cette app n'affiche pas encore";
-"legacy.other.message" = "Le fichier contient des enregistrements tels que factures et immobilisations. Ils sont conservés intacts — rien n'a été perdu. Cette app n'affiche pour l'instant que les écritures.";
+"legacy.other.message" = "Le fichier contient des enregistrements tels que des immobilisations et des passifs. Ils sont conservés intacts — rien n'a été perdu. Cette app n'affiche pas encore ce type d'enregistrements.";
 "txn.noResults.title" = "Aucun résultat";
 "txn.noResults.message" = "Aucune opération ne correspond à la recherche ou aux filtres actuels. Essayez de les effacer.";
 "txn.searchPrompt" = "Rechercher tiers, note, n° de facture";

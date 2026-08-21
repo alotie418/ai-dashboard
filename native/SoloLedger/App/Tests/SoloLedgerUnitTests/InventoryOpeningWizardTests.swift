@@ -278,7 +278,7 @@ final class InventoryOpeningWizardTests: XCTestCase {
         XCTAssertEqual(Self.occurrences(of: "case .inventory", inCodeOf: root), 1)
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
                        ["overview", "transactions", "categories", "products", "inventory",
-                        "reports"])
+                        "documents", "reports"])
 
         XCTAssertEqual(Self.mentions(of: "InventoryOpeningView(",
                                      in: [("X.swift", "  InventoryOpeningView()")]), ["X.swift"])

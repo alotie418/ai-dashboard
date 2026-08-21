@@ -4,10 +4,10 @@ import SoloLedgerCore
 /// The business-documents page — quotations, sales orders, proforma and commercial invoices, and
 /// statements of account.
 ///
-/// **Not reachable.** There is no sidebar section for it, no branch in the detail switch and no
-/// construction site anywhere in this target; it is compiled, tested and unreachable, exactly as the
-/// inventory page was between N-PR-4 and N-PR-6. `DocumentMountingTests` pins all three zeroes, and
-/// the entry point is D-6's.
+/// **Reachable from the sidebar since D-6.** It shipped compiled, tested and unreachable through
+/// D-4 and D-5 — exactly as the inventory page did between N-PR-4 and N-PR-6 — and D-6 gave it its
+/// `SidebarSection` case and the one branch of the detail switch that builds it.
+/// `DocumentMountingTests` pins that the construction site is that branch and only that branch.
 ///
 /// Every key drawn below comes from ``DocumentPageComposition``: each subview takes its slice of
 /// that value and renders exactly what the slice names. There is not one document copy literal in

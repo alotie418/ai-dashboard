@@ -212,27 +212,36 @@ extension AppModel {
 
 // MARK: - Document attachments (D-4)
 
-/// Picking and opening the app's own copy of a formal tax invoice.
+/// Picking, opening and discarding the app's own copy of a formal tax invoice.
 ///
-/// **Nothing here deletes a file** — ruling ③ of 2026-08-18. `documents.js` discards an unsaved copy
-/// on re-pick and on cancel, and its handler removes the previous copy when the association is
-/// replaced; both of those are paths that really unlink something under `attachments/docs/`, and
-/// the spec's §3 upgrade clause turns the three registered check-then-act windows into must-fix
-/// items the moment one exists. So this round copies IN and never out: a replaced or dropped
-/// attachment leaves its copy behind. That leak is registered in the spec rather than hidden.
+/// **D-6 connects three of the five deleting seams here** — re-pick, remove and cancel — and the
+/// other two (replace-or-clear on save, delete-the-document) sit on `AppModel`'s write paths, where
+/// the store hands back the orphan. D-4 shipped with none of them: it copied IN and never out, and
+/// the registered cost was a silent leak under `attachments/docs/`.
 ///
-/// The storage-atomicity round has since landed the three conditional writes and the safe-delete
-/// primitive (`AttachmentDeletion`), which is what the upgrade clause demanded be in place FIRST.
-/// **Connecting the seam is still D-6's**, and it now carries TWO independent gates — both registered
-/// in the spec, both awaiting a ruling, and answering one does not answer the other:
+/// The order this was allowed to happen in is the whole point. The spec's §3 upgrade clause turns the
+/// three registered check-then-act windows into must-fix items the moment ANY path really unlinks a
+/// file there, so the storage-atomicity round had to land the conditional writes and the safe-delete
+/// primitive FIRST. It did. Then the thirteenth ruling answered the two independent gates that
+/// primitive's own residuals demanded — neither of which answered the other:
 ///
 ///  1. **Race E** — once the file is unlinked the relative name is free, and a stale or
-///     non-cooperating writer can claim it again.
+///     non-cooperating writer can claim it again. Ruled: coordination among cooperating writers with
+///     no schema change, and the external-writer residue is ACCEPTED rather than removed.
 ///  2. **The `fstatat`→`unlinkat` gap** inside `unlinkIfStillBound` — a same-UID swap landing between
 ///     those two adjacent syscalls has its replacement unlinked, and Darwin offers no
-///     unlink-by-inode to close it.
+///     unlink-by-inode to close it. Ruled: accepted and registered, with no rename-then-unlink
+///     variant and no claim of exclusive ownership over the directory.
 ///
-/// Neither may be left unruled before any of these five sites deletes anything.
+/// Both rulings carry automatic upgrade clauses; see `docs/BUSINESS_DOCUMENTS_SPEC.md` §5. Race E is
+/// NOT closed and this file must never say it is.
+///
+/// **Race E's first two promises live in this file**, and they are the reason the seams below are
+/// safe to connect at all: ``taxInvoiceAttachmentName(documentID:extension:)`` mints a FRESH name on
+/// every pick and never re-uses a freed one, and `copyItem(at:to:)` refuses an existing destination
+/// rather than overwriting it. The third — never re-storing a path the draft has lost — is what
+/// every seam below observes by clearing the reference before, or in the same step as, asking for
+/// the copy to go.
 extension AppModel {
 
     /// `MAX_BYTES` from `electron/handlers/index.js`: twenty mebibytes, and the comparison is a
@@ -258,8 +267,21 @@ extension AppModel {
     }
 
     /// The part of the pick that does not need a panel, so a test can drive it with a real file.
+    ///
+    /// **Seam 1 of 5 — re-pick.** The copy the draft was holding is asked to go only AFTER the new
+    /// one has been made and the draft points at it. The other order loses the old copy whenever
+    /// `copyItem` throws: the catch below leaves `attachmentPath` untouched, so the draft would go on
+    /// naming a file that no longer exists. There is nowhere to put an intermediate copy either —
+    /// `TaxInvoiceDraft` has ONE path field and `attach(path:fileName:)` overwrites it — so a chain
+    /// of picks has to be cleaned up in place, at each step.
+    ///
+    /// Whether the previous path is really disposable is not decided here. It is handed to the
+    /// primitive, which scans BOTH authoritative reference columns inside a write lock: a path the
+    /// database still holds comes back `stillReferenced` and the file stays. That is what keeps this
+    /// seam from deleting the copy the saved association points at.
     func applyPickedTaxInvoiceAttachment(at url: URL) {
         guard var draft = taxInvoiceDraft else { return }
+        let previous = draft.attachmentPath
         let ext = url.pathExtension.lowercased()
         guard Self.taxInvoiceAttachmentExtensions.contains(ext) else {
             draft.attachmentOutcome = .invalidType
@@ -280,9 +302,13 @@ extension AppModel {
             }
             let name = Self.taxInvoiceAttachmentName(documentID: draft.document.id, extension: ext)
             let directory = try AppPaths.nativeAttachmentsDirectory()
+            // No-overwrite, and race E's second promise: `copyItem` throws rather than replacing an
+            // existing entry, so a freed name that somebody else has re-claimed is never silently
+            // written over.
             try FileManager.default.copyItem(at: url, to: directory.appendingPathComponent(name))
             draft.attach(path: AppPaths.attachmentsRelativeRoot + "/" + name,
                          fileName: url.lastPathComponent)
+            discardOrphanedAttachmentCopy(previous)
         } catch {
             draft.attachmentOutcome = .failed
         }
@@ -317,15 +343,51 @@ extension AppModel {
         taxInvoiceDraft = draft
     }
 
-    /// Drop the reference. **The copy is not removed** — see this extension's own note.
+    /// Drop the reference, and ask for the copy that just lost its owner.
+    ///
+    /// **Seam 2 of 5 — remove.** The draft lets go first, so nothing here can re-store a path the
+    /// draft no longer owns (race E's third promise), and the primitive is then asked about it. If
+    /// the database still holds that path — the association was saved earlier and the user is only
+    /// clearing it on screen — the answer is `stillReferenced` and the file is left exactly where it
+    /// is. The row is not rewritten by this action, so the reference is still live.
     func removeTaxInvoiceAttachment() {
         guard var draft = taxInvoiceDraft else { return }
+        let previous = draft.attachmentPath
         draft.detach()
         taxInvoiceDraft = draft
+        discardOrphanedAttachmentCopy(previous)
+    }
+
+    /// Ask for one copy that nothing should point at any more. **Best-effort and silent.**
+    ///
+    /// The single entry point all five of D-6's seams go through — the fourth promise race E's ruling
+    /// asks for, and the reason there is no second deletion path to keep in step with this one.
+    ///
+    /// Three things it deliberately does not do. It **never decides** whether the copy is disposable:
+    /// the primitive scans both authoritative reference columns under a write lock and refuses a path
+    /// the ledger still names. It **never runs inside a transaction**: the primitive opens its own
+    /// `BEGIN IMMEDIATE`, SQLite cannot nest, and a nested call would fail closed and silently keep
+    /// the file — so every caller here is outside one, the two store-driven seams by waiting for the
+    /// commit. And it **never reports**: the entry point returns nothing, there is no new error case,
+    /// no new key and no new sentence on screen, and a cleanup that could not happen must not turn a
+    /// database write that DID happen into a failure.
+    ///
+    /// The directory is the App's own live attachments location — the same accessor the pick path
+    /// copies into, so a deletion can only ever be aimed at the directory the copies are actually in.
+    /// Core is not allowed to reach for it: `AppPaths.nativeAttachmentsDirectory()` CREATES what it
+    /// names, and a deletion attempt that materialises a folder is not a deletion attempt.
+    func discardOrphanedAttachmentCopy(_ storedPath: String?) {
+        guard let storedPath, !storedPath.isEmpty, let store else { return }
+        guard let directory = try? AppPaths.nativeAttachmentsDirectory() else { return }
+        AttachmentDeletion.deleteIfUnreferenced(storedPath, in: directory, using: store.db)
     }
 
     /// `<sanitised document id>-<base36 stamp><four base36 characters>.<ext>`, the shape
     /// `app:pickDocAttachment` builds.
+    ///
+    /// **Race E's first promise.** The stamp is the current millisecond and the four characters are
+    /// random, so a pick mints a name of its own rather than re-using one a deletion has just freed.
+    /// Nothing in this app looks a freed name back up.
     ///
     /// The sanitising is the handler's: keep only `A-Za-z0-9_-`, drop leading `_` and `-`, cut to
     /// forty, and fall back to `doc` when nothing survives. That is what makes the result satisfy

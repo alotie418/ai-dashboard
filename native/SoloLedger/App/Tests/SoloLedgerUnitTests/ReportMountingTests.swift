@@ -462,7 +462,7 @@ final class ReportMountingTests: XCTestCase {
                       "the one call site must be the `.reports` branch of the detail switch")
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
                        ["overview", "transactions", "categories", "products", "inventory",
-                        "reports"])
+                        "documents", "reports"])
         XCTAssertEqual(SidebarSection(rawValue: "reports"), .reports)
     }
 
