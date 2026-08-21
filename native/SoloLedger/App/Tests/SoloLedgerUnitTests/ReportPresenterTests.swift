@@ -568,7 +568,7 @@ final class ReportPresenterTests: XCTestCase {
     func testTheReportPageHasItsEntryPoint() {
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
                        ["overview", "transactions", "categories", "products", "inventory",
-                        "reports"])
+                        "documents", "reports"])
         XCTAssertEqual(SidebarSection(rawValue: "reports"), .reports)
         XCTAssertEqual(SidebarSection.reports.titleKey, "nav.reports")
         for section in SidebarSection.allCases {

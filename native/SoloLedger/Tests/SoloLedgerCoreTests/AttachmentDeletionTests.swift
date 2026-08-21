@@ -22,13 +22,16 @@ import XCTest
 ///    those two adjacent syscalls has its replacement unlinked, and Darwin offers no unlink-by-inode
 ///    to close it.
 ///
-/// Both are registered in the spec as D-6 prerequisites awaiting a ruling, and
-/// ``testBothUnresolvedResidualsAreRegisteredAsDSixPrerequisitesRatherThanClosed`` checks that BOTH
-/// registrations are still in force — in §5's two subsections, in §6's D-6 row and in §8's gate region
-/// SEPARATELY, never as a `contains` over the whole file, because §9 is a revision log that repeats
-/// every phrase and made exactly that check vacuous. That is the opposite of a green test standing in
-/// for a fix. Every "a replacement survives" claim below is scoped to a swap that is already in place
-/// when the identity check runs.
+/// The thirteenth ruling ANSWERED both — the first with cooperation and no schema change, the second
+/// by accepting it — and answering is not closing. Each ruling names the residue it accepts and
+/// carries an automatic upgrade clause that voids it. So
+/// ``testTheThirteenthRulingIsStillInForceAndNeitherResidualIsClaimedClosed`` checks that each
+/// ruling, its accepted residue and its upgrade clause are still written where a later round would
+/// read them — in §5's two subsections, in §6's D-6 row and in §8's gate region SEPARATELY, never as
+/// a `contains` over the whole file, because §9 is a revision log that repeats every phrase and made
+/// exactly that check vacuous. That is the opposite of a green test standing in for a fix. Every
+/// "a replacement survives" claim below is scoped to a swap that is already in place when the
+/// identity check runs.
 final class AttachmentDeletionTests: LedgerTestCase {
 
     // MARK: - Fixtures
@@ -113,7 +116,7 @@ final class AttachmentDeletionTests: LedgerTestCase {
         defer { try? bench.store.db.close() }
         try plant("a.pdf", "payload", in: bench.attachments)
 
-        let outcome = AttachmentDeletion.deleteIfUnreferenced(
+        let outcome = AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("a.pdf"), in: bench.attachments, using: bench.store.db)
 
         XCTAssertEqual(outcome, .deleted)
@@ -125,7 +128,7 @@ final class AttachmentDeletionTests: LedgerTestCase {
     func testAMissingCopyIsSuccessAndNotAFailure() throws {
         let bench = try makeBench()
         defer { try? bench.store.db.close() }
-        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+        XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("gone.pdf"), in: bench.attachments, using: bench.store.db), .alreadyGone)
     }
 
@@ -140,7 +143,7 @@ final class AttachmentDeletionTests: LedgerTestCase {
         try plant("t.pdf", "receipt", in: bench.attachments)
         try seedTransactionReference(bench.store, path: reference("t.pdf"))
 
-        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+        XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("t.pdf"), in: bench.attachments, using: bench.store.db), .stillReferenced)
         XCTAssertEqual(contents("t.pdf", in: bench.attachments), "receipt",
                        "the file a transaction still points at must be untouched")
@@ -153,7 +156,7 @@ final class AttachmentDeletionTests: LedgerTestCase {
         try plant("d.pdf", "invoice", in: bench.attachments)
         try seedDocumentReference(bench.store, path: reference("d.pdf"))
 
-        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+        XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("d.pdf"), in: bench.attachments, using: bench.store.db), .stillReferenced)
         XCTAssertEqual(contents("d.pdf", in: bench.attachments), "invoice")
     }
@@ -211,7 +214,7 @@ final class AttachmentDeletionTests: LedgerTestCase {
         defer { try? bench.store.db.close() }
         try plant("victim.pdf", "keep me", in: bench.attachments)
 
-        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+        XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
             "attachments/docs/../victim.pdf", in: bench.attachments, using: bench.store.db),
             .rejectedReference)
         XCTAssertEqual(contents("victim.pdf", in: bench.attachments), "keep me")
@@ -233,12 +236,12 @@ final class AttachmentDeletionTests: LedgerTestCase {
             "ATTACHMENTS/DOCS/real.pdf",                // prefix is case-sensitive
         ]
         for raw in refused {
-            XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+            XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
                 raw, in: bench.attachments, using: bench.store.db), .rejectedReference, raw)
         }
         XCTAssertTrue(exists("real.pdf", in: bench.attachments), "nothing was touched")
         // Not vacuous: the whitelisted spelling of the same file IS accepted.
-        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+        XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("real.pdf"), in: bench.attachments, using: bench.store.db), .deleted)
     }
 
@@ -265,7 +268,7 @@ final class AttachmentDeletionTests: LedgerTestCase {
             try? Data("stand-in".utf8).write(to: attachments.appendingPathComponent("swap.pdf"))
         }
 
-        let outcome = AttachmentDeletion.deleteIfUnreferenced(
+        let outcome = AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("swap.pdf"), in: bench.attachments, using: bench.store.db, hooks: hooks)
 
         XCTAssertEqual(outcome, .movedUnderUs)
@@ -284,9 +287,9 @@ final class AttachmentDeletionTests: LedgerTestCase {
         try FileManager.default.createDirectory(
             at: bench.attachments.appendingPathComponent("dir.pdf"), withIntermediateDirectories: false)
 
-        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+        XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("link.pdf"), in: bench.attachments, using: bench.store.db), .notARegularFile)
-        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+        XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("dir.pdf"), in: bench.attachments, using: bench.store.db), .notARegularFile)
 
         XCTAssertEqual(contents("secret.pdf", in: bench.root), "do not touch",
@@ -316,7 +319,7 @@ final class AttachmentDeletionTests: LedgerTestCase {
             try? Data("planted".utf8).write(to: original.appendingPathComponent("target.pdf"))
         }
 
-        let outcome = AttachmentDeletion.deleteIfUnreferenced(
+        let outcome = AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("target.pdf"), in: bench.attachments, using: bench.store.db, hooks: hooks)
 
         XCTAssertEqual(outcome, .deleted)
@@ -356,7 +359,7 @@ final class AttachmentDeletionTests: LedgerTestCase {
             } catch { claimError = error }
         }
 
-        let outcome = AttachmentDeletion.deleteIfUnreferenced(
+        let outcome = AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("race.pdf"), in: bench.attachments, using: bench.store.db, hooks: hooks)
 
         XCTAssertNotNil(claimError, """
@@ -384,7 +387,7 @@ final class AttachmentDeletionTests: LedgerTestCase {
             VALUES ('early', 'income', '2026-01-10', 100, 'CNY', 'Acme', ?)
             """, [.text(reference("ok.pdf"))]))
 
-        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+        XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("ok.pdf"), in: bench.attachments, using: bench.store.db), .stillReferenced)
         XCTAssertTrue(exists("ok.pdf", in: bench.attachments))
     }
@@ -442,90 +445,217 @@ final class AttachmentDeletionTests: LedgerTestCase {
             """), "and no transaction is left dangling on the connection")
     }
 
-    // MARK: - 8 · nothing in the app calls it, and race E is registered rather than closed
+    // MARK: - 8 · the App target's call sites, as a closed set
 
-    /// Ruling: the primitive lands with NO consumer. The App target must not name it, and the two
-    /// places that drop a returned orphan must still drop it.
-    func testTheAppTargetDoesNotCallThePrimitiveAndStillDiscardsBothOrphans() throws {
+    /// **D-6 connected all five seams**, and this is the closed set that says where.
+    ///
+    /// It replaces an absence claim (`namers == []`) with a census, for the reason PM8 / IM8 already
+    /// use one: "nobody names it" stops being informative the moment somebody must, and what has to
+    /// be pinned instead is that the callers are exactly these and no others. A sixth file quietly
+    /// growing a deletion — or one of the five seams growing a second one — is what this fails on.
+    ///
+    /// Read from comment-STRIPPED sources, so the prose in these files that discusses the primitive
+    /// does not count as a call. That stripping is load-bearing here: three of these files carried a
+    /// mention of the name for a whole round while the code named it zero times.
+    func testTheAppTargetCallsThePrimitiveAtExactlyTheFiveSeams() throws {
         let app = try CapabilityImportGuardTests.strippedSources(of: "SoloLedger")
-        XCTAssertGreaterThan(app.count, 10, "an empty walk would satisfy the absence claim")
+        XCTAssertGreaterThan(app.count, 10, "an empty walk would satisfy any claim about it")
 
         let namers = app.filter { CapabilityImportGuardTests.matchCount(#"\bAttachmentDeletion\b"#,
                                                                         in: $0.code) > 0 }
-        XCTAssertEqual(namers.map(\.path), [], """
-            the App target names AttachmentDeletion. Connecting the deleting seam is D-6's, and it is \
-            blocked on the residual-race ruling registered in the spec.
+        XCTAssertEqual(namers.map(\.path).sorted(), ["FilePanels.swift"], """
+            the primitive is named outside the single App-side helper. Every seam goes through \
+            `discardOrphanedAttachmentCopy`, which is the fourth promise race E's ruling asks for: \
+            one deletion entry point, not one per site.
             """)
-        // Not vacuous: the same walk finds the Core symbols the App legitimately names.
-        XCTAssertGreaterThan(app.filter { CapabilityImportGuardTests.matchCount(#"\bLedgerStore\b"#,
-                                                                                in: $0.code) > 0 }.count, 0)
+
+        let panels = try XCTUnwrap(app.first { $0.path == "FilePanels.swift" })
+        XCTAssertEqual(CapabilityImportGuardTests.matchCount(
+            #"AttachmentDeletion\.deleteIfUnreferenced\("#, in: panels.code), 1,
+            "the one helper makes the one call")
+        XCTAssertEqual(CapabilityImportGuardTests.matchCount(
+            #"AttachmentDeletion\.attemptDeleteIfUnreferenced\("#, in: panels.code), 0,
+            "the App must not reach the outcome-returning form — it is forbidden to act on it")
 
         let model = try XCTUnwrap(app.first { $0.path == "AppModel.swift" })
+
+        // The helper is declared once, in the file that owns the pick/open/remove controls.
         XCTAssertEqual(CapabilityImportGuardTests.matchCount(
-            #"_ = try store\.deleteBusinessDocument\("#, in: model.code), 1,
-            "the delete seam still discards the orphan it is handed")
+            #"func discardOrphanedAttachmentCopy\("#, in: panels.code), 1)
         XCTAssertEqual(CapabilityImportGuardTests.matchCount(
-            #"_ = try store\.updateTaxInvoice\("#, in: model.code), 1,
-            "…and so does the association seam")
+            #"func discardOrphanedAttachmentCopy\("#, in: model.code), 0)
+
+        // Five call sites, and the split says WHICH five: re-pick and remove live beside the panel,
+        // cancel and the two store-driven seams live on the model. The declaration is excluded by
+        // asking for a call — `func` never precedes one.
+        let callSites = #"(?<!func )discardOrphanedAttachmentCopy\("#
+        XCTAssertEqual(CapabilityImportGuardTests.matchCount(callSites, in: panels.code), 2,
+                       "re-pick and remove are the two seams that live beside the file panel")
+        XCTAssertEqual(CapabilityImportGuardTests.matchCount(callSites, in: model.code), 3,
+                       "cancel, save-replace-or-clear and delete-the-document are the model's three")
+        let elsewhere = app.filter { $0.path != "FilePanels.swift" && $0.path != "AppModel.swift" }
+            .filter { CapabilityImportGuardTests.matchCount(callSites, in: $0.code) > 0 }
+        XCTAssertEqual(elsewhere.map(\.path), [], "a sixth site started deleting attachments")
+
+        // The two store-driven seams no longer DISCARD the orphan — they consume it. Pinned as the
+        // absence of the old shape, because a half-done wiring that keeps one `_ = try` is exactly
+        // the regression a positive-only check would wave through.
+        for pattern in [#"_ = try store\.deleteBusinessDocument\("#, #"_ = try store\.updateTaxInvoice\("#] {
+            XCTAssertEqual(CapabilityImportGuardTests.matchCount(pattern, in: model.code), 0,
+                           "a store-driven seam still throws its orphan away: \(pattern)")
+        }
+        // …and they really do take the value. Both bind it before the write and hand it on after.
+        XCTAssertEqual(CapabilityImportGuardTests.matchCount(
+            #"orphan = try store\.deleteBusinessDocument\("#, in: model.code), 1)
+        XCTAssertEqual(CapabilityImportGuardTests.matchCount(
+            #"orphan = try store\.updateTaxInvoice\("#, in: model.code), 1)
+
+        // Not vacuous: the same walk finds a Core symbol the App has always named.
+        XCTAssertGreaterThan(app.filter { CapabilityImportGuardTests.matchCount(#"\bLedgerStore\b"#,
+                                                                                in: $0.code) > 0 }.count, 0)
+        // …and the stripping really strips: a file that only TALKS about the primitive is not a caller.
+        XCTAssertEqual(CapabilityImportGuardTests.matchCount(
+            #"\bAttachmentDeletion\b"#,
+            in: WindowReopenCommandGuardTests.strippingComments("// AttachmentDeletion is D-6's")), 0)
     }
 
-    /// **Both** unresolved residuals are registered in the spec as D-6 prerequisites — and this is
-    /// checked against the regions that are CURRENTLY IN FORCE, not against the file as a whole.
+    /// **The thirteenth ruling is still in force, and neither residual is claimed closed** — checked
+    /// against the regions that are CURRENTLY IN FORCE, not against the file as a whole.
+    ///
+    /// This replaces a test that guarded the OPPOSITE state (both gates awaiting a ruling). That test
+    /// was an on/off switch by construction: it demanded the literal phrases `**待裁定**`,
+    /// `三个候选方向` and `本轮不替用户选`, so the moment the user ruled and the spec was rewritten it
+    /// went red. It had to be rewritten in the same commit as the spec, and this is what it became.
     ///
     /// **Why the whole-file check was worthless, measured rather than argued.** §9 is a revision LOG:
     /// it restates every phrase these registrations use. Deleting §5's entire "第二处残余" subsection
     /// left the previous `spec.contains(…)` version of this test executing 1 test and passing, because
     /// §9's record of the same ruling still carried the words. A registration that has been deleted
-    /// from the sections that govern D-6 is not a registration.
+    /// from the sections that govern D-6 is not a registration — and now that §9 also carries a full
+    /// account of the thirteenth ruling, that trap is strictly larger than it was.
     ///
-    /// So the spec is sliced into the four places a D-6 round would actually read — §5's two
+    /// So the spec is sliced into the four places a later round would actually read — §5's two
     /// subsections, §6's D-6 row, §8's gate region — and each is asked separately. §9 is excluded by
     /// construction and that exclusion is itself asserted.
     ///
-    /// No behavioural test here claims either window is closed. This one only checks that the spec
-    /// still says they are open and still says what has to be ruled on.
-    func testBothUnresolvedResidualsAreRegisteredAsDSixPrerequisitesRatherThanClosed() throws {
+    /// **No behavioural test here claims either window is closed.** This one checks that the spec
+    /// still says what was chosen, still says what residue that choice ACCEPTS, and still carries the
+    /// clause that voids the choice.
+    func testTheThirteenthRulingIsStillInForceAndNeitherResidualIsClaimedClosed() throws {
         let spec = try Self.specText()
         let regions = try Self.inForceRegions(of: spec)
 
-        // (a) §5 · race E — the name freed by the unlink, and the two candidate rulings.
-        for phrase in ["#### 竞态 E · 存储原子化的残余",
+        // (a) §5 · race E — the gap itself, the chosen path, the residue it leaves, and the clause.
+        for phrase in ["#### 竞态 E",
                        "重新认领同一路径",
-                       "D-6 接删除前的强制前置裁定",
                        "**无 schema 协调**",
-                       "**schema/所有权记录**"] {
+                       "第十三次裁定选定第 1 条",
+                       "不协作的外部写入者",
+                       "陈旧写入者",
+                       "自动升级条款",
+                       "云同步"] {
             XCTAssertTrue(regions.raceE.contains(phrase),
                           "§5's race-E subsection no longer registers it: \(phrase)")
         }
+        // The other candidate must survive too: a ruling that deletes the option it did not take
+        // stops being a record of a choice.
+        XCTAssertTrue(regions.raceE.contains("**schema/所有权记录**"),
+                      "the path the ruling did NOT take was deleted; the choice is no longer legible")
 
-        // (b) §5 · the adjacent-syscall window — heading, the two syscalls, that it is undecided, that
-        // it is D-6's SECOND question, and that the three candidate directions are still open.
+        // (b) §5 · the adjacent-syscall window — accepted, and accepted in those words.
         for phrase in ["#### 第二处残余",
                        "fstatat",
                        "unlinkat",
-                       "**待裁定**",
-                       "D-6 接删除前必须先答的第二个问题",
-                       "三个候选方向",
-                       "本轮不替用户选"] {
+                       "第十三次裁定选定 (a)",
+                       "接受并登记残余",
+                       "替身可能被删",
+                       "自动升级条款",
+                       "暂停删除接线"] {
             XCTAssertTrue(regions.syscallWindow.contains(phrase),
                           "§5's adjacent-syscall subsection no longer registers it: \(phrase)")
         }
 
-        // (c) and (d) — §6's D-6 row and §8's gate region must EACH name BOTH gates. Either one
-        // naming only race E is how a D-6 round comes to believe there is a single prerequisite.
+        // (c) Neither may be described as closed, atomic, or exclusively owned.
+        //
+        // A plain "must not contain" is the WRONG instrument here and would measure nothing: the
+        // ruling forbids those four sentences BY QUOTING THEM, so every banned string is present in
+        // the very line that bans it. (Same substring-versus-denial trap D-3 hit on a denial marker.)
+        //
+        // So the COUNT is pinned instead, and it cuts both ways: an affirmative claim added anywhere
+        // in the subsection pushes a count up, and deleting the prohibition that records the ruling's
+        // own wording pushes it down. Each number below is the number of times that phrase appears
+        // inside the ruling's own prose, and nowhere else.
+        let bannedInSyscallWindow: [(String, Int)] = [
+            ("替身永远不会被删除", 1),          // the forbidden sentence, quoted once by the ban
+            ("删除针对绑定 inode 原子完成", 1), // ditto
+            ("相邻系统调用窗口已经关闭", 1),    // ditto
+            ("目录已被系统级独占", 1),          // ditto
+            // twice: once where the ruling says the directory is NOT described this way, once in
+            // the quoted ban above.
+            ("系统级独占", 2),
+            ("已经关闭", 1),
+            ("原子完成", 1),
+        ]
+        for (phrase, expected) in bannedInSyscallWindow {
+            XCTAssertEqual(regions.syscallWindow.components(separatedBy: phrase).count - 1, expected, """
+                §5's adjacent-syscall subsection says "\(phrase)" a different number of times than \
+                the ruling's own prose does. More means it is being CLAIMED somewhere; fewer means \
+                the prohibition that records it was deleted.
+                """)
+        }
+        XCTAssertEqual(regions.raceE.components(separatedBy: "竞态 E 已关闭").count - 1, 1, """
+            §5's race-E subsection no longer says exactly once that "race E is closed" is the \
+            sentence the ruling forbids.
+            """)
+        XCTAssertEqual(regions.raceE.components(separatedBy: "已关闭").count - 1, 1,
+                       "a second 已关闭 appeared in the race-E subsection — E is not closed")
+
+        // Not vacuous the other way either: the slices still say the windows are open, in words the
+        // counts above cannot supply.
+        XCTAssertTrue(regions.raceE.contains("关不上"),
+                      "the race-E slice no longer says the window stays open at all")
+        XCTAssertTrue(regions.syscallWindow.contains("不成立"),
+                      "the syscall slice no longer says which property fails")
+
+        // (d) §6's D-6 row and §8's gate region must EACH name BOTH gates AND both answers. Either
+        // one naming only race E is how a later round comes to believe there was one prerequisite;
+        // either one naming a gate without its answer is how it comes to believe the gate is open.
         for (label, region) in [("§6 的 D-6 行", regions.dSixRow),
                                 ("§8 的开工闸门", regions.sectionEightGate)] {
             XCTAssertTrue(region.contains("竞态 E"), "\(label) does not name race E")
             XCTAssertTrue(region.contains("fstatat") && region.contains("unlinkat"),
                           "\(label) does not name the adjacent-syscall window")
+            XCTAssertTrue(region.contains("第十三次裁定"),
+                          "\(label) no longer says the two gates were answered")
+            XCTAssertTrue(region.contains("无 schema 协调"),
+                          "\(label) does not say WHICH way race E was answered")
+            XCTAssertTrue(region.contains("残余"),
+                          "\(label) drops the residue, which is the half that is still true")
+            XCTAssertTrue(region.contains("升级"),
+                          "\(label) drops the upgrade clause that voids the ruling")
         }
 
+        // (e) §8's count of race E's candidate directions. §5 lists TWO numbered options and §8 said
+        // three until D-6 corrected it — a pointer that miscounts the options is a pointer a reader
+        // follows expecting to find one that was never written.
+        XCTAssertTrue(regions.sectionEightGate.contains("**两个**候选方向"),
+                      "§8 no longer says race E had two candidate directions")
+        XCTAssertFalse(regions.sectionEightGate.contains("竞态 E") &&
+                       regions.sectionEightGate.range(of: #"竞态 E[^|]*三个候选方向"#,
+                                                      options: .regularExpression) != nil,
+                       "§8 is back to claiming race E had three candidate directions")
+        // The count is a real property of §5, not a number copied between two prose sentences.
+        XCTAssertEqual(regions.raceE.components(separatedBy: "\n")
+                        .filter { $0.hasPrefix("1. ") || $0.hasPrefix("2. ") || $0.hasPrefix("3. ") }
+                        .count, 2,
+                       "§5's race-E subsection no longer lists exactly two numbered candidates")
+
         // The registration is NOT in the B series — the ruling puts it in the atomicity residual, and
-        // a B row would file it as a settled difference instead of an open prerequisite.
+        // a B row would file it as a settled difference instead of an accepted residual.
         XCTAssertTrue(spec.contains("| B11 |"), "B11 registers the conditional writes themselves")
         XCTAssertFalse(spec.contains("| E |"), "race E must not be filed as a lettered difference row")
 
-        // (e) The slicing itself, proved rather than trusted — otherwise "by region" would be an empty
+        // (f) The slicing itself, proved rather than trusted — otherwise "by region" would be an empty
         // precaution and this test would be back to reading the revision log.
         let revisionLog = try XCTUnwrap(spec.range(of: "\n## 9. 修订").map { String(spec[$0.lowerBound...]) },
                                         "§9 not found; the exclusion below would be vacuous")
@@ -533,9 +663,13 @@ final class AttachmentDeletionTests: LedgerTestCase {
             §9 no longer restates these, so the whole-file check this one replaced would not have been \
             fooled — re-read why the slicing exists before simplifying it away.
             """)
+        XCTAssertTrue(revisionLog.contains("第十三次裁定"), """
+            §9 does not record the thirteenth ruling at all, so the slices above could be passing on \
+            text that no revision log accounts for.
+            """)
         for (label, region) in regions.all {
             XCTAssertFalse(region.contains("## 9. 修订"), "\(label) swallowed the revision log")
-            XCTAssertFalse(region.contains("### 2026-08-20 · 第十二次裁定"),
+            XCTAssertFalse(region.contains("### 2026-08-21 · 第十三次裁定"),
                            "\(label) reaches into §9's record of the ruling")
             XCTAssertGreaterThan(region.count, 60, "\(label) sliced to almost nothing")
         }
@@ -621,9 +755,10 @@ final class AttachmentDeletionTests: LedgerTestCase {
         /// the region, so the slice can never run from §5 or §6 all the way to §9.
         func gateRegion() throws -> String {
             let parent = try parentSection("## 8.", "## 9.")
-            let anchor = try XCTUnwrap(lines[parent].firstIndex { $0.hasPrefix("**两处开工闸门") }, """
+            let anchor = try XCTUnwrap(lines[parent].firstIndex { $0.hasPrefix("**两处已经分别裁定的残余边界") }, """
                 §8 has no two-gate region between `## 8.` and `## 9.`. An anchor of the same wording \
-                outside §8 does not count.
+                outside §8 does not count. The anchor changed in D-6, with the gates themselves: \
+                they stopped being 开工闸门 and became 已裁定的残余边界.
                 """)
             return lines[anchor..<parent.upperBound].joined(separator: "\n")
         }
@@ -659,7 +794,7 @@ final class AttachmentDeletionTests: LedgerTestCase {
 
         try seedTransactionReference(bench.store, path: reference("Receipt.PDF"))
 
-        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+        XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("receipt.pdf"), in: bench.attachments, using: bench.store.db), .stillReferenced)
         XCTAssertEqual(contents("Receipt.PDF", in: bench.attachments), "keep me",
                        "a case-sensitive scan would have deleted the file the transaction points at")
@@ -686,7 +821,7 @@ final class AttachmentDeletionTests: LedgerTestCase {
             "SELECT attachment_path AS ref FROM transactions WHERE id = 'tb'").first?.string("ref"),
             "an uncast read of the same cell hands back nothing at all")
 
-        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+        XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("blob.pdf"), in: bench.attachments, using: bench.store.db), .stillReferenced)
         XCTAssertEqual(contents("blob.pdf", in: bench.attachments), "keep me")
     }
@@ -700,7 +835,7 @@ final class AttachmentDeletionTests: LedgerTestCase {
         try plant("odd.pdf", "keep me", in: bench.attachments)
         try seedTransactionReference(bench.store, path: "somewhere/else/odd.pdf")
 
-        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+        XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("odd.pdf"), in: bench.attachments, using: bench.store.db), .stillReferenced)
         XCTAssertEqual(contents("odd.pdf", in: bench.attachments), "keep me")
     }
@@ -713,12 +848,12 @@ final class AttachmentDeletionTests: LedgerTestCase {
         let bench = try makeBench()
         defer { try? bench.store.db.close() }
         let missing = bench.root.appendingPathComponent("no-such-directory", isDirectory: true)
-        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+        XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("a.pdf"), in: missing, using: bench.store.db), .unavailable)
 
         // A file where a directory should be is the other way to fail the bind.
         try plant("not-a-dir", "x", in: bench.root)
-        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+        XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("a.pdf"), in: bench.root.appendingPathComponent("not-a-dir"),
             using: bench.store.db), .unavailable)
     }
@@ -732,12 +867,12 @@ final class AttachmentDeletionTests: LedgerTestCase {
         try plant("nested.pdf", "payload", in: bench.attachments)
 
         try bench.store.db.transaction {
-            XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+            XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
                 reference("nested.pdf"), in: bench.attachments, using: bench.store.db), .unavailable)
         }
         XCTAssertEqual(contents("nested.pdf", in: bench.attachments), "payload")
         // …and the connection is still usable, i.e. the failed nested BEGIN did not wedge it.
-        XCTAssertEqual(AttachmentDeletion.deleteIfUnreferenced(
+        XCTAssertEqual(AttachmentDeletion.attemptDeleteIfUnreferenced(
             reference("nested.pdf"), in: bench.attachments, using: bench.store.db), .deleted)
     }
 }

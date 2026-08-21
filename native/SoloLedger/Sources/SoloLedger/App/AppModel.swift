@@ -12,6 +12,12 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     /// The stock those products carry, so it reads straight after the master data it counts
     /// and before the reports that summarise everything above.
     case inventory
+    /// The papers the business hands to a customer — quotations, orders, invoices, statements.
+    /// Last of the working sections and still ahead of reports, for the reason the two comments
+    /// above already give: reports are the output of everything above them, and these are input
+    /// to nothing. It reads after inventory because a document is what the goods above it are
+    /// sold ON, not another way of counting them.
+    case documents
     case reports
     var id: String { rawValue }
     var titleKey: String { "nav.\(rawValue)" }
@@ -29,6 +35,11 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         // recognisably the same goods as the row above, and recognisably not a second
         // products row.
         case .inventory: return "shippingbox.and.arrow.backward"
+        // Taken from the page, the way the products row is and unlike the inventory row: the
+        // documents page's own empty state draws this, and a sheet of text IS what this section
+        // holds. It sits one row above `doc.text.magnifyingglass`, and the difference is the point
+        // — reports LOOK THROUGH the ledger, documents come OUT of it.
+        case .documents: return "doc.text"
         case .reports: return "doc.text.magnifyingglass"
         }
     }
@@ -755,6 +766,10 @@ final class AppModel: ObservableObject {
     /// `transactions`, which is exactly the blind spot here: a ledger migrated from the
     /// Electron app can hold real records this app does not read and still look empty.
     /// Also refuses when the probe failed, since emptiness is then unproven.
+    ///
+    /// Deliberately WITHOUT the products and business-documents conjuncts that
+    /// `seedCurrencyIfProvablyNew` carries — see the note there for why the two predicates ask
+    /// different questions, and why this one is allowed the looser answer.
     var canLoadDemoData: Bool { !legacyLedger.holdsHiddenRecords && !legacyProbeFailed }
 
     /// Seed anonymized demo data. Idempotent: `DemoData.seed` is a no-op on a
@@ -1012,10 +1027,21 @@ final class AppModel: ObservableObject {
     ///     carrying a product catalogue is not, however visible it now is. Reading the two
     ///     through one flag would have quietly loosened this one the moment the other changed.
     ///     Unreadable rows count too: a catalogue this app could not decode is not an absent one.
+    ///   - **no business documents**, asked separately for exactly the same reason and added in the
+    ///     same round that made asking necessary. D-6 took `business_documents` and
+    ///     `business_document_items` out of `otherRecordTables` — correctly, because the page now
+    ///     lists those very rows — and that alone would have turned a migrated ledger holding a
+    ///     year of somebody's quotations and invoices into a "provably new" one, and written a
+    ///     currency into it. The list moved because the rows became VISIBLE; nothing about them
+    ///     became NEW. Unreadable rows count here too.
     ///
     /// The probe pair is the one `canLoadDemoData` already uses, for the same reason. That
     /// predicate is deliberately NOT given the products conjunct: it guards a DEBUG-only seed of
-    /// demo transactions, which no product row conflicts with.
+    /// demo transactions, which no product row conflicts with. **The documents conjunct is withheld
+    /// from it on the same grounds and by the same reasoning**, stated rather than inherited: what
+    /// `DemoData.seed` writes is transactions, `Q5` gives a document no link to one, and the seed
+    /// is a no-op on a ledger that already holds transactions. A quotation sitting in the file
+    /// changes nothing about that.
     ///
     /// The value is the chosen regime's existing `AccountingProfile` currency — the one the
     /// screen displayed and the one `applyRegimeSwitch` would have written. No currency is
@@ -1031,7 +1057,8 @@ final class AppModel: ObservableObject {
               // A read that FAILS is not "no products", for the same reason a failed probe is not
               // "no legacy records": `nil` here means the catalogue could not be inspected, and a
               // ledger this app could not inspect is not one it may write into.
-              productCatalogIsProvablyEmpty(store) == true
+              productCatalogIsProvablyEmpty(store) == true,
+              businessDocumentsAreProvablyEmpty(store) == true
         else { return }
         do {
             try store.settings.setString(AccountingProfile.profile(for: accountingLocale).currency,
@@ -1051,6 +1078,22 @@ final class AppModel: ObservableObject {
     func productCatalogIsProvablyEmpty(_ store: LedgerStore) -> Bool? {
         guard let page = try? store.productCatalog() else { return nil }
         return page.products.isEmpty && page.unreadableCount == 0
+    }
+
+    /// Whether the ledger provably holds no business documents: no decoded headers AND none that
+    /// failed to decode. `nil` when the table could not be read at all.
+    ///
+    /// The documents twin of ``productCatalogIsProvablyEmpty(_:)``, and it exists for the same
+    /// reason on the same date the same hole was opened: D-6 removed both business-document tables
+    /// from `LegacyLedgerSummary.otherRecordTables`, so `holdsHiddenRecords` stopped answering for
+    /// them. Every type is asked for — the list is unfiltered — because a ledger holding only
+    /// statements is no newer than one holding only quotations.
+    ///
+    /// Internal rather than private so the hosted test can isolate this one conjunct without
+    /// driving the other five.
+    func businessDocumentsAreProvablyEmpty(_ store: LedgerStore) -> Bool? {
+        guard let page = try? store.businessDocuments() else { return nil }
+        return page.documents.isEmpty && page.unreadableCount == 0
     }
 
     // MARK: - Reports (R8 P3a state model; reached from the `.reports` sidebar section since P3e)
@@ -1388,7 +1431,7 @@ final class AppModel: ObservableObject {
     /// The products a movement can be recorded against.
     ///
     /// Loaded LAZILY rather than with the app-wide refresh, for two reasons: the page is one
-    /// section of six and a session that never opens it must not pay for it, and the reads
+    /// section of seven and a session that never opens it must not pay for it, and the reads
     /// behind it are heavier — a product's whole movement history, with no paging under it.
     ///
     /// Rows that could not be decoded are not here and are not counted here. An undecodable row
@@ -1811,14 +1854,14 @@ final class AppModel: ObservableObject {
         (try? AppPaths.databaseURL().path) ?? "—"
     }
 
-    // MARK: - Business documents (D-4 page state; NOT reachable — the sidebar entry is D-6's)
+    // MARK: - Business documents (D-4 page state; reachable from the sidebar since D-6)
 
     /// The list as last read, together with the headers that could not be decoded.
     ///
     /// Loaded LAZILY — `DocumentsView` asks for it when it appears, and `reloadAll()` deliberately
     /// does not. A session that never opens that page must not pay for its query on every refresh
-    /// of every other screen; and while the page has no sidebar entry, that laziness is also what
-    /// keeps each intermediate `main` byte-for-byte identical to the one before it.
+    /// of every other screen — one section of seven, the same arrangement the products and inventory
+    /// pages already use.
     @Published private(set) var documents = BusinessDocumentPage(documents: [], unreadableCount: 0)
 
     /// Which type the list is showing. The filter is applied by the QUERY, not by this class —
@@ -2236,17 +2279,23 @@ final class AppModel: ObservableObject {
 
     func cancelDocumentDelete() { pendingDocumentDelete = nil }
 
-    /// Delete the row. The store hands back the attachment reference the document held; this round
-    /// deliberately does NOT act on it — ruling ③ — so the copy stays on disk. The value is dropped
-    /// here rather than passed anywhere, and this is one of the two seams **D-6** connects. The
-    /// storage-atomicity round landed what that connection requires — the conditional writes and
-    /// `AttachmentDeletion` — but left the wiring alone, and D-6 is gated on TWO rulings that
-    /// primitive's registered residuals demand, neither of which answers the other: **race E** (a
-    /// freed name re-claimed) and **the `fstatat`→`unlinkat` gap** inside the unlink itself.
+    /// Delete the row, then ask for the copy it was holding.
+    ///
+    /// **Seam 5 of 5 — delete the document.** The orphan is the one `deleteBusinessDocument` returns,
+    /// and that matters: it comes back by `RETURNING` from the row the conditional `DELETE` actually
+    /// removed, so it is the path that row really held rather than the path this screen last read.
+    /// A refusal returns no orphan and nothing is asked for.
+    ///
+    /// The cleanup runs AFTER `performDocumentWrite` has come back, which is after the store's
+    /// transaction has committed. Inside it the primitive's own `BEGIN IMMEDIATE` could not nest, it
+    /// would fail closed to `unavailable`, and the copy would silently survive. A cleanup that fails
+    /// anyway leaves this a success, because the row is gone either way.
     func confirmDocumentDelete() {
         guard let store, let document = pendingDocumentDelete else { return }
         pendingDocumentDelete = nil
-        performDocumentWrite { _ = try store.deleteBusinessDocument(id: document.id) }
+        var orphan: String?
+        let deleted = performDocumentWrite { orphan = try store.deleteBusinessDocument(id: document.id) }
+        if deleted { discardOrphanedAttachmentCopy(orphan) }
     }
 
     // MARK: The association sheet
@@ -2256,14 +2305,36 @@ final class AppModel: ObservableObject {
         taxInvoiceDraft = TaxInvoiceDraft(document: document)
     }
 
-    func cancelTaxInvoice() { taxInvoiceDraft = nil }
+    /// Close the sheet without saving, and ask for a copy this session made and never stored.
+    ///
+    /// **Seam 3 of 5 — cancel.** Escape, the sheet's own dismiss binding and the Cancel button all
+    /// arrive here, and none of them may grow a new way to fail: the discard returns nothing, so
+    /// there is no outcome to turn into a message and no new sentence for this panel to draw.
+    ///
+    /// The draft is cleared BEFORE the discard, so a cancelled panel cannot re-store a path it has
+    /// let go of. Whether that path is disposable is the primitive's call, not this one's: a document
+    /// that already holds the same reference — the panel was opened, the file left alone, and the
+    /// user changed nothing — comes back `stillReferenced` and keeps its copy.
+    func cancelTaxInvoice() {
+        let unsaved = taxInvoiceDraft?.attachmentPath
+        taxInvoiceDraft = nil
+        discardOrphanedAttachmentCopy(unsaved)
+    }
 
     func setTaxInvoiceIssued(_ value: Bool) { taxInvoiceDraft?.issued = value }
     func setTaxInvoiceNumber(_ text: String) { taxInvoiceDraft?.number = text }
     func setTaxInvoiceDate(_ text: String) { taxInvoiceDraft?.date = text }
 
-    /// Save the association. The store hands back a reference that has just become unreferenced;
-    /// ruling ③ says this round does not delete it, so it is dropped here at the single seam.
+    /// Save the association, then ask for the copy it replaced or cleared.
+    ///
+    /// **Seam 4 of 5 — replace or clear on save.** The orphan is whatever `updateTaxInvoice` returns
+    /// from its own conditional `UPDATE`, so it is the path the row really held; one of that
+    /// statement's predicates is that the row still holds the copy this request believes it is
+    /// replacing, which is what makes the returned value trustworthy rather than a re-read.
+    ///
+    /// After the commit, never inside it, and a failed cleanup leaves the save a success — the
+    /// association is written either way, and saying otherwise would report a write that happened as
+    /// one that did not.
     func saveTaxInvoice() {
         guard let store, let draft = taxInvoiceDraft else { return }
         // This sheet's save is NOT inside a `<form>` over there. `TaxInvoiceModal.tsx` has no
@@ -2274,10 +2345,14 @@ final class AppModel: ObservableObject {
         // saves. Here the field is a plain `TextField`, so this gate makes the first guarantee and
         // — by B10 — narrows the second, which is why the sheet draws `dateHintKey` beside it.
         guard DocumentPageComposition.isOptionalCalendarDate(draft.date) else { return }
+        var orphan: String?
         let saved = performDocumentWrite {
-            _ = try store.updateTaxInvoice(documentID: draft.document.id, draft.edit)
+            orphan = try store.updateTaxInvoice(documentID: draft.document.id, draft.edit)
         }
-        if saved { taxInvoiceDraft = nil }
+        if saved {
+            taxInvoiceDraft = nil
+            discardOrphanedAttachmentCopy(orphan)
+        }
     }
 
     /// One catalogue read, turned into the page's own choice type.

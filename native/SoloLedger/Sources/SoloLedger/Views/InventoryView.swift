@@ -45,7 +45,7 @@ struct InventoryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .navigationTitle(model.t(page.titleKey))
         // Lazy on purpose: this product's movements are read when the page appears and never as
-        // part of the app-wide refresh, so the five sections that are not this one cost no query
+        // part of the app-wide refresh, so the six sections that are not this one cost no query
         // — and the read is a whole history with no paging behind it.
         .task { model.reloadInventory() }
         .sheet(isPresented: Binding(

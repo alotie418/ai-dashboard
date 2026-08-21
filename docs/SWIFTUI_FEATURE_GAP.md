@@ -36,7 +36,7 @@
 
 | Electron 功能 | 状态 | 备注 |
 | --- | --- | --- |
-| 发票 / 报价单 / 商业单据（`business_documents`） | ⏸️ | 暂缓（Phase 3）。**口径确认书已落库**：`docs/BUSINESS_DOCUMENTS_SPEC.md`（D-0 轮，记录用户对测绘九问的裁定）。**状态不变**——该轮只写确认书、零代码，实现轮 D-1…D-6 均未开工 |
+| 发票 / 报价单 / 商业单据（`business_documents`） | ✅（单据章 #486–#494 + D-6） | `DocumentsView` + `DocumentPageComposition` + `Core/Documents/`。侧栏「业务单据」可达。**口径依据**：`docs/BUSINESS_DOCUMENTS_SPEC.md`（D-0 确认书 + 十四次裁定）。半径 = 五个单据类型（报价 / 销售订单 / 形式发票 / 商业发票 / 对账单）+ 编号与状态机 + 正式发票关联面板 + 自包含 HTML 导出。**按 Q9 甲案写 v11 既有表**，所以 Electron 迁移来的单据直接在这一页上；`business_documents` 与 `business_document_items` 因此在 D-6 移出 `LegacyLedgerProbe.otherRecordTables`。**Q5 零联动**——单据不产生会计分录、不动库存、不进任何报表 |
 | 产品 / 服务项（`products`） | ✅（阶段 2b） | `ProductsView` + `ProductPageComposition` + `Inventory/ProductCatalog.swift`（逐行镜像 `electron/handlers/products.js`）。侧栏「商品 / 服务项目」可达。**仅主数据**：`default_unit_cost` 只登记，不参与任何计算——它在 Electron 里同时被用作采购行、销售行与单据行的默认单价，语义不唯一，因此**原生库存引擎不迁移、不读取该列**（N-11）；库存计价走 v24 起的原生新引擎，见 §2 与 §4 |
 | 库存（原生独有，Electron 无对应页） | ✅（N 章 #452–#458） | `InventoryView` + `InventoryPageComposition` + `InventoryOpeningView` + `Core/Inventory/`（`InventoryLedger` / `InventoryPosting` / `InventoryOpeningPlan`）。侧栏「库存」可达。**按 N0 口径确认书新写的移动加权平均引擎，不镜像 `electron/handlers/inventory.js`**（见 §2）。首版半径 = 手工流水录入 + 期初盘点向导；禁负库存、拒迟到交易、拒混币、整数分存储。**出库成本流水不接入任何报表 COGS**——是否接入属另行裁定的独立事项 |
 | 客户 / 供应商 | 🟡 | 目前 `counterparty` 为自由文本 |

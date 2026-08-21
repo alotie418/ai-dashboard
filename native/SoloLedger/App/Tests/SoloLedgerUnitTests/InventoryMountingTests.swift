@@ -510,7 +510,7 @@ final class InventoryMountingTests: XCTestCase {
     func testIM8bTheSidebarCarriesTheInventoryEntryInItsAdjudicatedPlace() {
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
                        ["overview", "transactions", "categories", "products", "inventory",
-                        "reports"],
+                        "documents", "reports"],
                        "stock reads after the products it counts; reports stay last")
         XCTAssertEqual(SidebarSection(rawValue: "inventory"), .inventory)
         XCTAssertEqual(SidebarSection.inventory.titleKey, "nav.inventory")

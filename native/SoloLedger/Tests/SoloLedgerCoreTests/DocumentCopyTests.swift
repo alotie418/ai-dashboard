@@ -543,8 +543,9 @@ final class DocumentCopyTests: XCTestCase {
     /// `nav.documents` stays at zero, and not because of a general ban: `ResourceCheck.swift` spells
     /// `"nav.overview"` out today. It stays at zero because `SidebarSection.titleKey` DERIVES the
     /// key from the case's raw value, so the string only appears when someone writes a literal the
-    /// enum already produces. The sidebar entry itself is D-6's — this round adds no section, which
-    /// is what the case-name probe below still measures.
+    /// enum already produces. **That zero survived D-6 giving the page its sidebar entry** — the case
+    /// arrived, the literal did not — and the probe below now measures the section instead of its
+    /// absence.
     func testDC9EveryDrawnKeyIsNamedByTheCompositionAndByNothingElse() throws {
         let sources = try Self.productionSources()
         XCTAssertGreaterThan(sources.count, 100, "the walk found \(sources.count) files — it is broken")
@@ -587,21 +588,25 @@ final class DocumentCopyTests: XCTestCase {
             """)
 
         // `nav.documents` cannot be scanned for as a literal, for the reason in the doc comment. So
-        // the dormancy check is the MECHANISM: the sidebar has no documents section yet. D-6 adds
-        // it, and §6 of the spec calls it the seventh.
+        // what is pinned is the MECHANISM: the sidebar carries the documents section, in the slot
+        // D-6 put it in — after the stock it is sold on and still ahead of the reports that read
+        // everything above. §6 of the spec calls it the seventh, and this is the ordered list that
+        // says which seventh.
         XCTAssertEqual(SidebarSectionProbe.caseNames, ["overview", "transactions", "categories",
-                                                       "products", "inventory", "reports"],
-                       "the sidebar gained a section; nav.documents may no longer be dormant")
+                                                       "products", "inventory", "documents",
+                                                       "reports"],
+                       "the sidebar's sections moved; the documents entry is D-6's and is pinned here")
         XCTAssertNil(named["nav.documents"], """
             nav.documents is written out somewhere in production. SidebarSection derives that key \
-            from its raw value rather than naming it.
+            from its raw value rather than naming it — the case arriving in D-6 does not make the \
+            literal legal.
             """)
 
         // Neither half is vacuous: the same walk sees a literal key that IS drawn today, and the
-        // same reader sees the six sections that exist.
+        // same reader sees the seven sections that exist.
         XCTAssertTrue(sources.contains { $0.text.contains("\"inventory.page.title\"") },
                       "the walk cannot see a key known to be drawn — it is not scanning code")
-        XCTAssertEqual(SidebarSectionProbe.caseNames.count, 6)
+        XCTAssertEqual(SidebarSectionProbe.caseNames.count, 7)
     }
 
     // MARK: - DC10 · no two keys in one screen region read the same

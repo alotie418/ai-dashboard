@@ -21,12 +21,13 @@ import SoloLedgerCore
 ///    ``deferredPrefixes`` rather than merged in, so "this page draws every key it names" stays an
 ///    equality instead of becoming a filtered comparison, and `DocumentCopyTests` can keep
 ///    asserting that nothing names those nine yet.
-///  * `nav.documents` — the sidebar entry, D-6. It is not a literal anywhere: `SidebarSection`
-///    spells it `"nav.\(rawValue)"`, so it arrives with the enum case and not before.
+///  * the sidebar entry's key, D-6. It is not a literal anywhere: `SidebarSection` builds it from
+///    the case's raw value, so it arrived with the enum case and not before.
 ///
-/// **This page is not reachable.** There is no `SidebarSection` case, no `RootView` branch and no
-/// construction site, exactly as the inventory page shipped between N-PR-4 and N-PR-6.
-/// `DocumentMountingTests` pins all three zeroes.
+/// **The page became reachable in D-6**, which added the `SidebarSection` case and the one
+/// `RootView` branch that builds it — the same two steps the inventory page took at N-PR-6, after
+/// shipping unreachable since N-PR-4. `DocumentMountingTests` pins the construction site as a closed
+/// set of one.
 ///
 /// ## Three rulings are wired into the shapes below rather than into comments
 ///
@@ -34,12 +35,14 @@ import SoloLedgerCore
 ///    statement means generating it; editing one edits the header and shows the lines read-only.
 ///    The consequence is structural: ``EditorBody`` has no case in which a statement carries
 ///    editable lines, so `BusinessDocumentEdit.lines` cannot be reached with them.
-///  * **Nothing here deletes an attachment** (ruling ③). ``AttachmentBlock`` offers pick, open and
-///    remove-the-reference; removing clears the association and leaves the copy on disk. The
-///    registered cost is a disk leak, and the seam is a single one for the atomicity round to
-///    connect.
-///  * **The sidebar is D-6's** (ruling ②). Nothing in this file names a section, a count of
-///    sections or an icon.
+///  * **Nothing in THIS file deletes an attachment.** ``AttachmentBlock`` offers pick, open and
+///    remove-the-reference, and those are still the only three controls it draws. Ruling ③ once
+///    meant the copy stayed on disk as a registered leak; the storage-atomicity round landed the
+///    safe-delete primitive and D-6 connected all five seams to it — in `FilePanels` and `AppModel`,
+///    never here. This shape is unchanged either way, which is the point of it being a value.
+///  * **The sidebar was D-6's** (ruling ②), and it stayed out of this file: D-6 put the case, the
+///    icon and the branch in `AppModel` and `RootView`. Nothing here names a section, a count of
+///    sections or an icon, which is why activating the page changed no byte of this file's shapes.
 enum DocumentPageComposition {
 
     // MARK: - Regions

@@ -91,16 +91,24 @@ final class LegacyConversionCopyTests: XCTestCase {
             "ko": "이 장부에는 이 앱이 아직 표시하지 않는 기록이 있습니다",
             "fr": "Cette comptabilité contient des enregistrements que cette app n'affiche pas encore",
         ],
-        // The product example left this sentence in 2b-A4, when the products page landed: an
-        // example of what the app does NOT show cannot be a thing it shows. Invoices and fixed
-        // assets are still hidden, so the sentence keeps its point and loses only that item.
+        // Rewritten TWICE by the same rule, and the rule is: an example of what the app does NOT
+        // show cannot be a thing it shows. 2b-A4 dropped the product example when the products page
+        // landed. D-6 dropped the INVOICE example — `business_documents` and
+        // `business_document_items` left `otherRecordTables` when the business-documents page became
+        // reachable, so a ledger's quotations and invoices are on screen now.
+        //
+        // D-6 also had to replace the closing clause outright. "This app currently shows only
+        // transactions" was a promise about the whole app, not about this notice, and by D-6 it was
+        // false four times over (categories, products, inventory, documents). The replacement says
+        // what this notice can actually vouch for: these particular records are not shown yet. That
+        // is the same thing `legacy.other.title` says, which is why the title needed no change.
         "legacy.other.message": [
-            "zh-Hans": "账本文件中存在发票、固定资产等类型的记录。它们完整保存在文件中，没有丢失；本 App 目前只显示「流水」。",
-            "zh-Hant": "帳本檔案中存在發票、固定資產等類型的紀錄。它們完整保存在檔案中，沒有遺失；本 App 目前只顯示「流水」。",
-            "en": "The file contains records such as invoices and fixed assets. They are stored intact — nothing was lost. This app currently shows only transactions.",
-            "ja": "台帳ファイルには請求書・固定資産などの記録が保存されています。これらはそのまま保存されており、失われていません。本アプリは現在「取引」のみを表示します。",
-            "ko": "장부 파일에는 청구서·고정자산 등의 기록이 저장되어 있습니다. 그대로 보관되어 있으며 사라지지 않았습니다. 이 앱은 현재 '거래'만 표시합니다.",
-            "fr": "Le fichier contient des enregistrements tels que factures et immobilisations. Ils sont conservés intacts — rien n'a été perdu. Cette app n'affiche pour l'instant que les écritures.",
+            "zh-Hans": "账本文件中存在固定资产、负债等类型的记录。它们完整保存在文件中，没有丢失；本 App 目前尚未显示这类记录。",
+            "zh-Hant": "帳本檔案中存在固定資產、負債等類型的紀錄。它們完整保存在檔案中，沒有遺失；本 App 目前尚未顯示這類紀錄。",
+            "en": "The file contains records such as fixed assets and liabilities. They are stored intact — nothing was lost. This app does not show records of those kinds yet.",
+            "ja": "台帳ファイルには固定資産・負債などの記録が保存されています。これらはそのまま保存されており、失われていません。本アプリはこれらの記録をまだ表示していません。",
+            "ko": "장부 파일에는 고정자산·부채 등의 기록이 저장되어 있습니다. 그대로 보관되어 있으며 사라지지 않았습니다. 이 앱은 이러한 기록을 아직 표시하지 않습니다.",
+            "fr": "Le fichier contient des enregistrements tels que des immobilisations et des passifs. Ils sont conservés intacts — rien n'a été perdu. Cette app n'affiche pas encore ce type d'enregistrements.",
         ],
     ]
 
@@ -758,7 +766,7 @@ final class LegacyConversionCopyTests: XCTestCase {
 
     // MARK: - T8 — the other-records notice promises nothing
 
-    /// `legacy.other.*` renders when `hasUnconverted` is FALSE — invoices, fixed assets and
+    /// `legacy.other.*` renders when `hasUnconverted` is FALSE — fixed assets, liabilities and
     /// the rest. `LegacyConversionPlan` does not scan those tables and the runner cannot carry
     /// them, so a conversion entry point there would be a button that can only ever report
     /// "nothing to convert". Keeping the promise out of the copy is the half of that this stage

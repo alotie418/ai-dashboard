@@ -389,14 +389,22 @@ final class DocumentMountingTests: XCTestCase {
         }
     }
 
-    // MARK: - DM8 · the page is reachable from nowhere
+    // MARK: - DM8 · the page is reachable, from exactly one place
 
-    func testDM8TheDocumentsPageIsConstructedNowhereAtAll() throws {
+    /// **D-6 flipped this from an absence to a census**, in the shape PM8 / IM8 already use: the page
+    /// is constructed exactly once, and that once is the detail switch's own branch.
+    ///
+    /// The absence form it replaces ("nothing constructs it") stops carrying information the moment
+    /// something must. What has to be pinned instead is that the ONE construction site is the branch
+    /// — a second `DocumentsView()` anywhere else would give the app two of this page with two
+    /// independent states, which is exactly what a data-driven sidebar plus one switch is arranged to
+    /// prevent.
+    func testDM8TheDocumentsPageIsConstructedExactlyOnceByTheDetailSwitch() throws {
         let sources = try Self.appSources()
         XCTAssertGreaterThan(sources.count, 10, "the scan must have seen the app target")
 
-        XCTAssertEqual(Self.mentions(of: "DocumentsView(", in: sources), [],
-                       "nothing may construct the documents page yet — the entry point is D-6's")
+        XCTAssertEqual(Self.mentions(of: "DocumentsView(", in: sources), ["Views/RootView.swift"],
+                       "the documents page must be built by the detail switch and by nothing else")
         XCTAssertEqual(Self.mentions(of: "DocumentPageComposition", in: sources),
                        ["App/AppModel.swift", "App/DocumentPageComposition.swift",
                         "App/FilePanels.swift", "Views/DocumentsView.swift"])
@@ -407,20 +415,55 @@ final class DocumentMountingTests: XCTestCase {
                        "the file-panel extension moves the model's property, never the type")
 
         let root = try Self.appSource("Views/RootView.swift")
-        XCTAssertEqual(Self.occurrences(of: "case .documents", inCodeOf: root), 0)
-        XCTAssertEqual(Self.occurrences(of: "DocumentsView(", inCodeOf: root), 0)
+        XCTAssertEqual(Self.occurrences(of: "case .documents: DocumentsView()", inCodeOf: root), 1,
+                       "the one call site must be the `.documents` branch of the detail switch")
+        XCTAssertEqual(Self.occurrences(of: "case .documents", inCodeOf: root), 1)
+        XCTAssertEqual(Self.occurrences(of: "DocumentsView(", inCodeOf: root), 1)
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
-                       ["overview", "transactions", "categories", "products", "inventory", "reports"],
-                       "ruling ②: the sidebar is untouched by this round")
+                       ["overview", "transactions", "categories", "products", "inventory", "documents",
+                        "reports"],
+                       "D-6: the section reads after the stock it is sold on, and reports stay last")
 
-        // Scanner self-proof, so a zero above means "nothing is there" and not "the scan is broken".
+        // Scanner self-proof, so a count above means "this is really there" and not "the scan matches
+        // anything" — and the two negatives keep the comment and the longer identifier out.
         XCTAssertEqual(Self.mentions(of: "DocumentsView(", in: [("X.swift", "  DocumentsView()")]),
                        ["X.swift"])
         XCTAssertEqual(Self.mentions(of: "DocumentsView(",
-                                     in: [("X.swift", "  // DocumentsView() lands in D-6")]), [])
+                                     in: [("X.swift", "  // DocumentsView() is D-6's")]), [])
         XCTAssertEqual(Self.mentions(of: "DocumentsView(",
                                      in: [("X.swift", "  DocumentsViewModel()")]), [],
                        "whole-prefix matching only")
+    }
+
+    /// The sidebar row itself: its key, its icon, and that the icon is not the one the row below it
+    /// draws. IM8b / PM8b for the documents section.
+    func testDM8bTheSidebarCarriesTheDocumentsEntryInItsAdjudicatedPlace() {
+        XCTAssertEqual(SidebarSection(rawValue: "documents"), .documents)
+        XCTAssertEqual(SidebarSection.documents.titleKey, "nav.documents")
+        XCTAssertEqual(SidebarSection.documents.systemImage, "doc.text",
+                       "the row takes the symbol the page's own empty state draws")
+        XCTAssertNotEqual(SidebarSection.documents.systemImage, SidebarSection.reports.systemImage, """
+            documents and reports would draw the same glyph. They sit next to each other, and the \
+            difference between them is exactly what a user picks between.
+            """)
+        for section in SidebarSection.allCases {
+            XCTAssertFalse(section.systemImage.isEmpty, "\(section.rawValue) has no icon")
+        }
+    }
+
+    /// The sidebar label resolves in all six languages and reads the same as the page's own title —
+    /// IC13's shape, for the section IC13 does not cover. A row that opens a page with a different
+    /// name is an ambiguity the user cannot resolve.
+    func testDM8cTheSidebarLabelResolvesAndMatchesThePageTitle() throws {
+        for language in languages {
+            let table = try sourceTable(language)
+            let label = try XCTUnwrap(table[SidebarSection.documents.titleKey],
+                                      "\(language) has no documents sidebar label")
+            XCTAssertFalse(label.isEmpty, "\(language) has an empty documents sidebar label")
+            XCTAssertEqual(label, table["documents.page.title"], """
+                \(language): the sidebar row and the page it opens disagree on this feature's name.
+                """)
+        }
     }
 
     // MARK: - DM9 · the view says nothing of its own
@@ -707,30 +750,85 @@ final class DocumentMountingTests: XCTestCase {
                      "and a quotation that somehow holds one does not show it")
     }
 
-    // MARK: - DM16 · ruling ③ — the attachment control never deletes
+    // MARK: - DM16 · D-6 — deletion goes through the primitive and through nothing else
 
-    func testDM16NothingInThisRoundDeletesAnAttachment() throws {
+    /// **The ban survived the flip, narrowed rather than lifted.** Ruling ③ kept this round free of
+    /// ANY path that removes a file; D-6 connected five, and the thing that must stay true is that
+    /// none of them removes a file *itself*. Every one goes through `AttachmentDeletion`, which binds
+    /// the inode, scans both authoritative reference columns under a write lock, and only then
+    /// unlinks.
+    ///
+    /// The four banned identifiers therefore stay banned — a `FileManager.removeItem` beside one of
+    /// these seams would delete by NAME, with no reference scan and no identity check, which is the
+    /// Electron behaviour this chapter is explicitly stronger than.
+    ///
+    /// Left un-narrowed this test would have gone on PASSING while its own proposition became false:
+    /// none of the four words appears in `AttachmentDeletion.deleteIfUnreferenced(`, so wiring five
+    /// deleting seams would not have moved it. That is the failure mode the assertions below add.
+    func testDM16DeletionGoesThroughThePrimitiveAndNeverThroughTheFileManager() throws {
         for relative in ["App/FilePanels.swift", "App/AppModel.swift",
                          "App/DocumentPageComposition.swift", "Views/DocumentsView.swift"] {
             let source = try Self.appSource(relative)
             for deleter in ["removeItem", "trashItem", "unlink", "removeFile"] {
                 XCTAssertFalse(Self.namesIdentifier(deleter, in: source), """
-                    \(relative) names \(deleter). Ruling ③ keeps this round free of any path that \
-                    removes a file under the attachments directory: the spec's §3 upgrade clause \
-                    turns the three registered check-then-act windows into must-fix items the \
-                    moment one exists.
+                    \(relative) names \(deleter). D-6 deletes through `AttachmentDeletion` and \
+                    through nothing else: that primitive binds the inode and scans both reference \
+                    columns first, and a by-name removal beside it would do neither.
                     """)
             }
         }
         // The probe can see a deleter — otherwise the four zeroes above mean nothing.
         XCTAssertTrue(Self.namesIdentifier("removeItem", in: "try FileManager.default.removeItem(at: url)"))
 
-        // Dropping the reference is a state change and nothing more.
+        // …and the seams really are wired, so the zeroes above are a statement about HOW they delete
+        // rather than about whether they do. One helper, five call sites, no second entry point.
+        let panels = try Self.appSource("App/FilePanels.swift")
+        let model = try Self.appSource("App/AppModel.swift")
+        XCTAssertEqual(Self.occurrences(of: "AttachmentDeletion.deleteIfUnreferenced(",
+                                        inCodeOf: panels), 1)
+        XCTAssertEqual(Self.occurrences(of: "AttachmentDeletion.deleteIfUnreferenced(",
+                                        inCodeOf: model), 0,
+                       "the model reaches the primitive through the one helper, not directly")
+        XCTAssertEqual(Self.occurrences(of: "discardOrphanedAttachmentCopy(", inCodeOf: panels), 3,
+                       "two seams plus the helper's own declaration")
+        XCTAssertEqual(Self.occurrences(of: "discardOrphanedAttachmentCopy(", inCodeOf: model), 3,
+                       "cancel, save-replace-or-clear, delete-the-document")
+
+        // Dropping the reference is still a state change on the draft; the file question is asked
+        // separately, by the primitive, against the database.
         var draft = TaxInvoiceDraft(document: doc(attachment: "attachments/docs/a.pdf"))
         XCTAssertEqual(draft.attachmentPath, "attachments/docs/a.pdf")
         draft.detach()
         XCTAssertNil(draft.attachmentPath)
         XCTAssertEqual(draft.edit.attachmentPath, "", "an empty string is what clears the column")
+    }
+
+    /// **No seam calls the primitive from inside a transaction.**
+    ///
+    /// The primitive opens its own `BEGIN IMMEDIATE`; SQLite cannot nest, so a nested call fails
+    /// closed to `unavailable` and the copy silently survives — a cleanup that looks wired and does
+    /// nothing. The two store-driven seams are the ones that could get this wrong, and the shape that
+    /// keeps them right is visible in the source: the store call BINDS the orphan, and the discard
+    /// happens after `performDocumentWrite` has returned.
+    func testDM16bTheTwoStoreDrivenSeamsCleanUpAfterTheWriteNotInsideIt() throws {
+        let model = try Self.appSource("App/AppModel.swift")
+        for pattern in ["orphan = try store.deleteBusinessDocument(", "orphan = try store.updateTaxInvoice("] {
+            XCTAssertEqual(Self.occurrences(of: pattern, inCodeOf: model), 1,
+                           "\(pattern) must bind the orphan exactly once")
+        }
+        // The old shape — throwing the orphan away — must be gone from both.
+        for pattern in ["_ = try store.deleteBusinessDocument(", "_ = try store.updateTaxInvoice("] {
+            XCTAssertEqual(Self.occurrences(of: pattern, inCodeOf: model), 0,
+                           "\(pattern) still discards the orphan it is handed")
+        }
+        // The discard is never an argument to, or a statement inside, the write closure: every
+        // occurrence sits on its own statement line, outside `performDocumentWrite { … }`.
+        for line in model.components(separatedBy: "\n")
+        where line.contains("discardOrphanedAttachmentCopy(") && !line.contains("func ") {
+            XCTAssertFalse(line.contains("performDocumentWrite"), """
+                a discard shares a line with the write it must follow: \(line.trimmingCharacters(in: .whitespaces))
+                """)
+        }
     }
 
     func testDM16bThePickedCopysNameSatisfiesTheAttachmentWhitelist() {
@@ -1922,8 +2020,303 @@ final class DocumentMountingTests: XCTestCase {
 
     private var temporaryDirectory: URL?
 
+    /// Copies these tests planted in, or asked the app to make, under the app's REAL attachments
+    /// directory. Removed here whatever the test did, so a failing assertion never leaves one behind.
+    private var plantedAttachments: [URL] = []
+
     override func tearDownWithError() throws {
         if let temporaryDirectory { try? FileManager.default.removeItem(at: temporaryDirectory) }
+        for url in plantedAttachments { try? FileManager.default.removeItem(at: url) }
+        plantedAttachments = []
+    }
+
+    // MARK: - DM31 · the five deleting seams, each proved in both directions (D-6)
+
+    /// **Seam 1 — re-pick, positive.** The copy the draft was holding goes; the new one stays.
+    func testDM31aRePickingRemovesTheCopyTheDraftWasHolding() async throws {
+        let model = try await bootedModel()
+        let document = try savedDocument(model)
+        model.openTaxInvoice(document)
+
+        model.applyPickedTaxInvoiceAttachment(at: try pickableSource())
+        try trackDraftCopy(model)
+        let first = try XCTUnwrap(model.taxInvoiceDraft?.attachmentPath)
+        XCTAssertTrue(try attachmentExists(first), "the first pick made a copy")
+
+        model.applyPickedTaxInvoiceAttachment(at: try pickableSource())
+        try trackDraftCopy(model)
+        let second = try XCTUnwrap(model.taxInvoiceDraft?.attachmentPath)
+        XCTAssertNotEqual(first, second, "a pick mints a fresh name; it never re-uses a freed one")
+        XCTAssertFalse(try attachmentExists(first), """
+            the copy the draft dropped is still on disk. That is the leak D-4 registered and D-6 \
+            was supposed to close.
+            """)
+        XCTAssertTrue(try attachmentExists(second), "…and the copy it now holds must survive")
+    }
+
+    /// **Seam 1 — refusal.** A path the DATABASE still holds survives a re-pick. The user opened a
+    /// saved association and chose a different file; nothing has been written yet, so the row still
+    /// points at the old copy and it must be there when the sheet is cancelled.
+    func testDM31bRePickingKeepsTheCopyTheSavedRowStillPointsAt() async throws {
+        let model = try await bootedModel()
+        let document = try savedDocument(model)
+        let planted = try plantAttachment("the saved association")
+        let store = try XCTUnwrap(model.store)
+        _ = try store.updateTaxInvoice(documentID: document.id,
+                                       TaxInvoiceEdit(attachmentPath: planted.stored))
+        model.reloadDocuments()
+
+        model.openTaxInvoice(try XCTUnwrap(model.documents.documents.first))
+        XCTAssertEqual(model.taxInvoiceDraft?.attachmentPath, planted.stored)
+        model.applyPickedTaxInvoiceAttachment(at: try pickableSource())
+        try trackDraftCopy(model)
+
+        XCTAssertTrue(try attachmentExists(planted.stored), """
+            the copy the SAVED row still points at was deleted on a re-pick that was never saved. \
+            The primitive scans both reference columns for exactly this.
+            """)
+        XCTAssertEqual(try String(contentsOf: planted.url, encoding: .utf8), "the saved association")
+    }
+
+    /// **Seam 1 — the ordering.** A failed copy must not cost the draft the copy it already had.
+    /// Driven with a source the pick refuses (wrong extension), which is the same branch a failed
+    /// `copyItem` takes: the draft keeps its path, so deleting first would strand it.
+    func testDM31cAFailedPickLosesNeitherTheOldCopyNorTheReference() async throws {
+        let model = try await bootedModel()
+        let document = try savedDocument(model)
+        model.openTaxInvoice(document)
+        model.applyPickedTaxInvoiceAttachment(at: try pickableSource())
+        try trackDraftCopy(model)
+        let held = try XCTUnwrap(model.taxInvoiceDraft?.attachmentPath)
+
+        model.applyPickedTaxInvoiceAttachment(at: try pickableSource("txt"))
+        XCTAssertEqual(model.taxInvoiceDraft?.attachmentOutcome, .invalidType)
+        XCTAssertEqual(model.taxInvoiceDraft?.attachmentPath, held,
+                       "a refused pick must leave the reference exactly where it was")
+        XCTAssertTrue(try attachmentExists(held), """
+            the refused pick took the copy the draft still points at. Deleting before the new copy \
+            exists is what produces that, and it leaves a reference to a file that is gone.
+            """)
+    }
+
+    /// **Seam 2 — remove, both directions in one test.** An unsaved copy goes; the copy the saved
+    /// row still points at does not.
+    func testDM31dRemovingDropsAnUnsavedCopyAndKeepsAReferencedOne() async throws {
+        let model = try await bootedModel()
+        let document = try savedDocument(model)
+
+        // Unsaved: the draft made this copy and never wrote it.
+        model.openTaxInvoice(document)
+        model.applyPickedTaxInvoiceAttachment(at: try pickableSource())
+        try trackDraftCopy(model)
+        let unsaved = try XCTUnwrap(model.taxInvoiceDraft?.attachmentPath)
+        model.removeTaxInvoiceAttachment()
+        XCTAssertNil(model.taxInvoiceDraft?.attachmentPath)
+        XCTAssertFalse(try attachmentExists(unsaved), "an unsaved copy must not survive its removal")
+        model.cancelTaxInvoice()
+
+        // Referenced: the row holds it, and clearing the field on screen writes nothing.
+        let planted = try plantAttachment("still referenced")
+        let store = try XCTUnwrap(model.store)
+        _ = try store.updateTaxInvoice(documentID: document.id,
+                                       TaxInvoiceEdit(attachmentPath: planted.stored))
+        model.reloadDocuments()
+        model.openTaxInvoice(try XCTUnwrap(model.documents.documents.first))
+        model.removeTaxInvoiceAttachment()
+        XCTAssertTrue(try attachmentExists(planted.stored), """
+            clearing the field on screen deleted the file the row still points at. Nothing has been \
+            written, so that reference is live.
+            """)
+    }
+
+    /// **Seam 3 — cancel, both directions.** Escape drops a copy this session made and never stored;
+    /// it leaves the one the row holds. And it produces no new user-facing error either way.
+    func testDM31eCancellingDropsThisSessionsCopyAndKeepsTheStoredOne() async throws {
+        let model = try await bootedModel()
+        let document = try savedDocument(model)
+
+        model.openTaxInvoice(document)
+        model.applyPickedTaxInvoiceAttachment(at: try pickableSource())
+        try trackDraftCopy(model)
+        let unsaved = try XCTUnwrap(model.taxInvoiceDraft?.attachmentPath)
+        model.cancelTaxInvoice()
+        XCTAssertNil(model.taxInvoiceDraft)
+        XCTAssertFalse(try attachmentExists(unsaved), "a cancelled panel must not leave its copy")
+        XCTAssertNil(model.documentError, "cancelling produced a user-facing error")
+        XCTAssertNil(model.actionError)
+
+        let planted = try plantAttachment("kept by the row")
+        let store = try XCTUnwrap(model.store)
+        _ = try store.updateTaxInvoice(documentID: document.id,
+                                       TaxInvoiceEdit(attachmentPath: planted.stored))
+        model.reloadDocuments()
+        model.openTaxInvoice(try XCTUnwrap(model.documents.documents.first))
+        model.cancelTaxInvoice()
+        XCTAssertTrue(try attachmentExists(planted.stored),
+                      "opening a sheet and closing it deleted the association's own copy")
+        XCTAssertNil(model.documentError)
+    }
+
+    /// **Seam 4 — save replaces or clears, both directions.** Only the orphan the STORE returns goes,
+    /// and the copy that is now stored stays.
+    func testDM31fSavingReplacesTheCopyAndRemovesOnlyTheOrphanTheStoreReturned() async throws {
+        let model = try await bootedModel()
+        let document = try savedDocument(model)
+        let original = try plantAttachment("the original")
+        let store = try XCTUnwrap(model.store)
+        _ = try store.updateTaxInvoice(documentID: document.id,
+                                       TaxInvoiceEdit(attachmentPath: original.stored))
+        model.reloadDocuments()
+
+        model.openTaxInvoice(try XCTUnwrap(model.documents.documents.first))
+        model.applyPickedTaxInvoiceAttachment(at: try pickableSource())
+        try trackDraftCopy(model)
+        let replacement = try XCTUnwrap(model.taxInvoiceDraft?.attachmentPath)
+        model.saveTaxInvoice()
+
+        XCTAssertNil(model.taxInvoiceDraft, "the save went through")
+        XCTAssertEqual(model.documents.documents.first?.taxInvoiceAttachmentPath, replacement)
+        XCTAssertFalse(try attachmentExists(original.stored),
+                       "the replaced copy is the orphan updateTaxInvoice returned; it must go")
+        XCTAssertTrue(try attachmentExists(replacement), "…and the one now stored must not")
+
+        // Clearing writes an empty column, and the same seam takes the copy that just came loose.
+        model.openTaxInvoice(try XCTUnwrap(model.documents.documents.first))
+        model.removeTaxInvoiceAttachment()
+        model.saveTaxInvoice()
+        XCTAssertNil(model.documents.documents.first?.taxInvoiceAttachmentPath)
+        XCTAssertFalse(try attachmentExists(replacement), "clearing the column orphans its copy too")
+    }
+
+    /// **Seam 5 — delete the document, both directions.** The deleted row's copy goes; a copy a
+    /// TRANSACTION points at does not, even though the document also named it.
+    func testDM31gDeletingADocumentRemovesItsCopyButNotOneATransactionPointsAt() async throws {
+        let model = try await bootedModel()
+        let store = try XCTUnwrap(model.store)
+
+        let solo = try savedDocument(model, number: "QT-2026-0010")
+        let onlyDocument = try plantAttachment("only the document")
+        _ = try store.updateTaxInvoice(documentID: solo.id,
+                                       TaxInvoiceEdit(attachmentPath: onlyDocument.stored))
+        model.reloadDocuments()
+        model.requestDocumentDelete(try XCTUnwrap(model.documents.documents.first { $0.id == solo.id }))
+        model.confirmDocumentDelete()
+        XCTAssertNil(model.documents.documents.first { $0.id == solo.id }, "the row is gone")
+        XCTAssertFalse(try attachmentExists(onlyDocument.stored),
+                       "the deleted document's own copy must go with it")
+
+        // Now the same shape, with a receipt a transaction still points at. The two features share
+        // one directory, and the reference scan reads BOTH columns for exactly this case.
+        let shared = try savedDocument(model, number: "QT-2026-0011")
+        let receipt = try plantAttachment("a receipt")
+        _ = try store.updateTaxInvoice(documentID: shared.id,
+                                       TaxInvoiceEdit(attachmentPath: receipt.stored))
+        try store.db.run("""
+            INSERT INTO transactions (id, type, date, amount, currency, counterparty, attachment_path)
+            VALUES ('d6-txn', 'income', '2026-08-21', 100, 'CNY', 'Acme', ?)
+            """, [.text(receipt.stored)])
+        model.reloadDocuments()
+        model.requestDocumentDelete(try XCTUnwrap(model.documents.documents.first { $0.id == shared.id }))
+        model.confirmDocumentDelete()
+        XCTAssertNil(model.documents.documents.first { $0.id == shared.id })
+        XCTAssertTrue(try attachmentExists(receipt.stored), """
+            deleting a document destroyed a receipt a TRANSACTION still points at. Scanning only \
+            the documents column is what does that.
+            """)
+        XCTAssertEqual(try String(contentsOf: receipt.url, encoding: .utf8), "a receipt")
+    }
+
+    /// **A cleanup that cannot happen never reverses the write it followed.**
+    ///
+    /// Driven through the primitive's `rejectedReference` branch: the row is made to hold a path
+    /// outside `attachments/docs/`, which the whitelist refuses before the filesystem is touched at
+    /// all. So the delete commits, the cleanup does nothing, and the question is what the page says.
+    /// It must say the delete succeeded, because it did — the twelfth ruling's "best-effort, silent"
+    /// is exactly this case, and the fourteenth made it structural by giving the seam nothing to
+    /// branch on.
+    func testDM31hACleanupThatCannotActNeverTurnsASucceededWriteIntoAFailure() async throws {
+        let model = try await bootedModel()
+        let store = try XCTUnwrap(model.store)
+        let document = try savedDocument(model, number: "QT-2026-0020")
+        // Written straight to the column: this is a value the app's own writer would never produce,
+        // which is the point — a foreign or corrupted reference must not break the delete.
+        try store.db.run("UPDATE business_documents SET tax_invoice_attachment_path = ? WHERE id = ?",
+                         [.text("somewhere/else/whatever.pdf"), .text(document.id)])
+        model.reloadDocuments()
+
+        model.requestDocumentDelete(try XCTUnwrap(model.documents.documents.first { $0.id == document.id }))
+        model.confirmDocumentDelete()
+
+        XCTAssertNil(model.documents.documents.first { $0.id == document.id },
+                     "the row really was deleted")
+        XCTAssertNil(model.documentError, """
+            a cleanup that could not act was reported to the user as a failed delete. The row is \
+            gone; saying otherwise is a lie about what happened.
+            """)
+        XCTAssertNil(model.actionError)
+
+        // The same on the save seam: a stored path the whitelist refuses leaves the write standing.
+        let other = try savedDocument(model, number: "QT-2026-0021")
+        try store.db.run("UPDATE business_documents SET tax_invoice_attachment_path = ? WHERE id = ?",
+                         [.text("../escape.pdf"), .text(other.id)])
+        model.reloadDocuments()
+        model.openTaxInvoice(try XCTUnwrap(model.documents.documents.first { $0.id == other.id }))
+        model.removeTaxInvoiceAttachment()
+        model.saveTaxInvoice()
+        XCTAssertNil(model.taxInvoiceDraft, "the save went through")
+        XCTAssertNil(model.documentError)
+        XCTAssertNil(model.documents.documents.first { $0.id == other.id }?.taxInvoiceAttachmentPath)
+    }
+
+    // MARK: - Attachment-seam fixtures (D-6)
+
+    /// The directory the seams really delete in — the app's own accessor, which is what the ruling
+    /// requires the capability to come from. Under DEBUG this resolves inside the clearly-marked
+    /// preview data folder, never the Electron product folder.
+    private func liveAttachmentsDirectory() throws -> URL {
+        try AppPaths.nativeAttachmentsDirectory()
+    }
+
+    /// Put a file there under a name nothing else can collide with, and register it for teardown.
+    @discardableResult
+    private func plantAttachment(_ contents: String = "payload") throws -> (stored: String, url: URL) {
+        let name = "d6test-\(UUID().uuidString.lowercased()).pdf"
+        let url = try liveAttachmentsDirectory().appendingPathComponent(name)
+        try Data(contents.utf8).write(to: url)
+        plantedAttachments.append(url)
+        return (AppPaths.attachmentsRelativeRoot + "/" + name, url)
+    }
+
+    /// A real file OUTSIDE the attachments directory, for the pick path to copy IN.
+    private func pickableSource(_ ext: String = "pdf", contents: String = "picked") throws -> URL {
+        let directory = try XCTUnwrap(temporaryDirectory, "call bootedModel() first")
+        let url = directory.appendingPathComponent("source-\(UUID().uuidString).\(ext)")
+        try Data(contents.utf8).write(to: url)
+        return url
+    }
+
+    private func attachmentExists(_ storedPath: String) throws -> Bool {
+        let name = try XCTUnwrap(AttachmentRelPath.bareName(of: storedPath))
+        return FileManager.default.fileExists(
+            atPath: try liveAttachmentsDirectory().appendingPathComponent(name).path)
+    }
+
+    /// Register whatever the draft is holding, so a copy the APP made is cleaned up too.
+    private func trackDraftCopy(_ model: AppModel) throws {
+        guard let stored = model.taxInvoiceDraft?.attachmentPath,
+              let name = AttachmentRelPath.bareName(of: stored) else { return }
+        plantedAttachments.append(try liveAttachmentsDirectory().appendingPathComponent(name))
+    }
+
+    /// One saved document, ready for the association sheet.
+    private func savedDocument(_ model: AppModel, number: String = "QT-2026-0001") throws -> BusinessDocument {
+        model.newDocument()
+        model.setDocumentEditorField(.number, to: number)
+        model.setDocumentEditorField(.customerName, to: "Acme")
+        let lineID = try XCTUnwrap(model.documentEditor?.lines.first?.id)
+        model.setDocumentLineValue(id: lineID, .description, to: "Widget")
+        model.saveDocumentEditor()
+        return try XCTUnwrap(model.documents.documents.first { $0.number == number })
     }
 
     /// A model over a REAL temporary ledger, adopted through the same Phase-B seam the production

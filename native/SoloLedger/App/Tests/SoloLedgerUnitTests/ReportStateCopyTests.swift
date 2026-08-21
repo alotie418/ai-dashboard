@@ -463,7 +463,7 @@ final class ReportStateCopyTests: XCTestCase {
     func testTheSidebarLabelMatchesThePageTitleVerbatim() {
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
                        ["overview", "transactions", "categories", "products", "inventory",
-                        "reports"])
+                        "documents", "reports"])
         for language in languages {
             XCTAssertEqual(value(language, "nav.reports"),
                            value(language, "report.page.title"),

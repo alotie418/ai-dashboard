@@ -321,7 +321,7 @@ final class ProductMountingTests: XCTestCase {
     func testPM8bTheSidebarCarriesTheProductsEntryInItsAdjudicatedPlace() {
         XCTAssertEqual(SidebarSection.allCases.map(\.rawValue),
                        ["overview", "transactions", "categories", "products", "inventory",
-                        "reports"],
+                        "documents", "reports"],
                        "master data sits beside categories; reports stay last")
         XCTAssertEqual(SidebarSection(rawValue: "products"), .products)
         XCTAssertEqual(SidebarSection.products.titleKey, "nav.products")

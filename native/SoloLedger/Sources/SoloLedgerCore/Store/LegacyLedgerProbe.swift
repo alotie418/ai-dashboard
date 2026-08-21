@@ -18,10 +18,13 @@ public struct LegacyLedgerSummary: Sendable, Equatable {
     /// have to carry over, and which the native app therefore cannot show today.
     public var salesUnconverted: Int
     public var purchasesUnconverted: Int
-    /// Rows in the OTHER Electron data tables this app does not read either (invoices,
-    /// products, fixed assets, …). They are not convertible into transactions, so they
+    /// Rows in the OTHER Electron data tables this app does not read either (fixed assets,
+    /// liabilities, tax payments, …). They are not convertible into transactions, so they
     /// get no count breakdown — but their presence still means the file is in use, and
     /// an "empty ledger" claim would be just as wrong.
+    ///
+    /// The examples are kept current on purpose: `products` left this list at 2b-A4 and the two
+    /// business-document tables left it at D-6, both because the app grew a page that shows them.
     public var otherRecords: Int
 
     public init(salesTotal: Int = 0, purchasesTotal: Int = 0,
@@ -56,11 +59,20 @@ extension LegacyLedgerSummary {
     /// here", and product rows are now on screen with their own page. Leaving it in would
     /// have told a user who had just added their first product that the ledger holds records
     /// this app does not show — while showing them.
+    ///
+    /// `business_documents` and `business_document_items` left for the same reason at D-6, when the
+    /// sidebar gained the business-documents section. The chapter's Q9 stores into those very
+    /// tables, so an Electron ledger's quotations and invoices are not merely "shown" in the
+    /// abstract — they are the rows that page lists.
+    ///
+    /// **Leaving this list is not the same as being provably new**, and the two questions must not
+    /// be read through one flag. `AppModel` asks the second one separately for both departures —
+    /// see the note on `seedCurrencyIfProvablyNew`, where a catalogue conjunct and a documents
+    /// conjunct sit beside `holdsHiddenRecords` precisely because visibility loosened this one.
     /// Table names are fixed literals here, never interpolated from input.
     static let otherRecordTables = [
-        "accounts", "business_document_items", "business_documents", "equity",
-        "fixed_assets", "liabilities", "mileage_logs", "price_history",
-        "purchase_items", "sales_items", "tax_payments",
+        "accounts", "equity", "fixed_assets", "liabilities", "mileage_logs",
+        "price_history", "purchase_items", "sales_items", "tax_payments",
     ]
 }
 
