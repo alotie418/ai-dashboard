@@ -23,9 +23,10 @@ import Foundation
 ///    swapping a parent component, cannot redirect the `unlink` onto something else: a descriptor
 ///    tracks the inode, not the path.
 ///  * **It does not trust the name either.** The file is bound as a regular-file inode first
-///    (`BoundRegularFile.open`, `O_NOFOLLOW`, `fstat` `S_IFREG`), and the `unlink` happens only while
-///    the name STILL resolves to that same device+inode (`unlinkIfStillBound`). A symlink, a
-///    directory, a device node, or a stand-in put there after the bind is left exactly where it is.
+///    (`BoundRegularFile.open`, `O_NOFOLLOW`, `fstat` `S_IFREG`), and the `unlink` runs only after the
+///    name has been seen to resolve to that same device+inode (`unlinkIfStillBound`). A symlink, a
+///    directory, a device node, or a stand-in put there before that check is left exactly where it is
+///    — but see the adjacent-syscall residual below for the part that check cannot cover.
 ///  * **It does not accept a path it cannot parse.** ``AttachmentRelPath`` is the closed set:
 ///    `attachments/docs/<name>` and nothing else. Absolute paths, traversal, extra slashes, empty or
 ///    non-ASCII names are refused before the filesystem is touched at all.
@@ -65,6 +66,23 @@ import Foundation
 /// ``SQLiteDatabase/immediateTransaction(_:)``, so the write lock is held across them and no other
 /// connection can commit a new reference in between. `AttachmentDeletionTests` proves it with a real
 /// second connection on the same file.
+///
+/// **NOT closed — the adjacent-syscall window inside the unlink itself (raised in review of #494,
+/// AWAITING A RULING).** `unlinkIfStillBound` is `fstatat` and then `unlinkat(parent.fd, name, 0)`,
+/// and `unlinkat` removes a NAME. A same-UID process that swaps the entry between those two calls has
+/// its replacement removed instead of the bound inode — so the "a stand-in survives" property holds
+/// against a swap that happens BEFORE the check and not against one landing inside those two adjacent
+/// syscalls. The `matchesChild` call above it does not narrow this: it is a second check-then-act, and
+/// it is there to REPORT ``Outcome/movedUnderUs`` rather than to prevent anything.
+///
+/// **Darwin offers no unlink-by-inode**, so this cannot be closed by writing the call differently; a
+/// rename-to-unique-then-unlink scheme moves the window rather than removing it and adds an orphan on
+/// failure. The twelfth ruling directed this primitive to REUSE `unlinkIfStillBound` and not to ship a
+/// variant of it, so the shape is not the implementation's to change. It is the same class of
+/// same-UID, point-in-time residual `PreparedImportActivator` already registers for its own
+/// fingerprint→rename gaps, and Electron's `safeDeleteAttachment` is strictly weaker (`fs.rmSync` by
+/// path, no identity check at all). **Registered, not fixed, and not defended as harmless** — it is
+/// listed in the spec beside race E as a second thing the user must rule on before D-6 wires deletion.
 ///
 /// **NOT closed — E, after the file is gone.** Nothing in this design stops a non-cooperating or
 /// stale writer from claiming the same relative path afterwards: the name is free again the moment
