@@ -22,11 +22,13 @@ import XCTest
 ///    those two adjacent syscalls has its replacement unlinked, and Darwin offers no unlink-by-inode
 ///    to close it.
 ///
-/// Both are registered in the spec as D-6 prerequisites awaiting a ruling.
-/// ``testTheResidualRaceIsRegisteredAsADSixPrerequisiteRatherThanClosed`` checks that the spec says so
-/// in as many words, which is the opposite of a green test standing in for a fix. Every "a
-/// replacement survives" claim below is scoped to a swap that is already in place when the identity
-/// check runs.
+/// Both are registered in the spec as D-6 prerequisites awaiting a ruling, and
+/// ``testBothUnresolvedResidualsAreRegisteredAsDSixPrerequisitesRatherThanClosed`` checks that BOTH
+/// registrations are still in force — in §5's two subsections, in §6's D-6 row and in §8's gate region
+/// SEPARATELY, never as a `contains` over the whole file, because §9 is a revision log that repeats
+/// every phrase and made exactly that check vacuous. That is the opposite of a green test standing in
+/// for a fix. Every "a replacement survives" claim below is scoped to a swap that is already in place
+/// when the identity check runs.
 final class AttachmentDeletionTests: LedgerTestCase {
 
     // MARK: - Fixtures
@@ -240,7 +242,8 @@ final class AttachmentDeletionTests: LedgerTestCase {
             reference("real.pdf"), in: bench.attachments, using: bench.store.db), .deleted)
     }
 
-    // MARK: - 4 · the target is an inode (kills: unlinking by name)
+    // MARK: - 4 · identity is checked against the bound inode before the by-name unlink
+    //           (kills: dropping that identity comparison)
 
     /// **Mutation killed: dropping the device+inode comparison**, i.e. calling `unlinkat` on the name
     /// instead of `unlinkIfStillBound`. A replacement that is ALREADY IN PLACE when the identity check
@@ -466,30 +469,145 @@ final class AttachmentDeletionTests: LedgerTestCase {
             "…and so does the association seam")
     }
 
-    /// Race E — a stale or non-cooperating writer re-claiming the freed name — is NOT closed by this
-    /// round. The only honest thing a test can assert about it is that the spec says so and makes it a
-    /// prerequisite, which is what this checks. Reading the spec, not a comment: a comment can be
-    /// deleted with the code it excuses.
-    func testTheResidualRaceIsRegisteredAsADSixPrerequisiteRatherThanClosed() throws {
-        let spec = try String(contentsOf: AppTargetRegistrationGuardTests.packageRoot()
-            .deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("docs/BUSINESS_DOCUMENTS_SPEC.md"), encoding: .utf8)
-        XCTAssertGreaterThan(spec.count, 10_000, "the spec was not read")
+    /// **Both** unresolved residuals are registered in the spec as D-6 prerequisites — and this is
+    /// checked against the regions that are CURRENTLY IN FORCE, not against the file as a whole.
+    ///
+    /// **Why the whole-file check was worthless, measured rather than argued.** §9 is a revision LOG:
+    /// it restates every phrase these registrations use. Deleting §5's entire "第二处残余" subsection
+    /// left the previous `spec.contains(…)` version of this test executing 1 test and passing, because
+    /// §9's record of the same ruling still carried the words. A registration that has been deleted
+    /// from the sections that govern D-6 is not a registration.
+    ///
+    /// So the spec is sliced into the four places a D-6 round would actually read — §5's two
+    /// subsections, §6's D-6 row, §8's gate region — and each is asked separately. §9 is excluded by
+    /// construction and that exclusion is itself asserted.
+    ///
+    /// No behavioural test here claims either window is closed. This one only checks that the spec
+    /// still says they are open and still says what has to be ruled on.
+    func testBothUnresolvedResidualsAreRegisteredAsDSixPrerequisitesRatherThanClosed() throws {
+        let spec = try Self.specText()
+        let regions = try Self.inForceRegions(of: spec)
 
-        // The heading is asked for by itself, and so are the two candidate rulings underneath it.
-        // Without the heading the remaining phrases still occur in the §9 revision row, so a spec that
-        // had quietly dropped the registration would still satisfy a phrase-only check.
-        for sentence in ["#### 竞态 E · 存储原子化的残余",
-                         "D-6 接删除前的强制前置裁定",
-                         "重新认领同一路径",
-                         "**无 schema 协调**",
-                         "**schema/所有权记录**"] {
-            XCTAssertTrue(spec.contains(sentence), "the spec no longer registers race E: \(sentence)")
+        // (a) §5 · race E — the name freed by the unlink, and the two candidate rulings.
+        for phrase in ["#### 竞态 E · 存储原子化的残余",
+                       "重新认领同一路径",
+                       "D-6 接删除前的强制前置裁定",
+                       "**无 schema 协调**",
+                       "**schema/所有权记录**"] {
+            XCTAssertTrue(regions.raceE.contains(phrase),
+                          "§5's race-E subsection no longer registers it: \(phrase)")
         }
-        // The registration is NOT in the B series — the ruling puts it in the atomicity residual,
-        // and a B row would file it as a settled difference instead of an open prerequisite.
+
+        // (b) §5 · the adjacent-syscall window — heading, the two syscalls, that it is undecided, that
+        // it is D-6's SECOND question, and that the three candidate directions are still open.
+        for phrase in ["#### 第二处残余",
+                       "fstatat",
+                       "unlinkat",
+                       "**待裁定**",
+                       "D-6 接删除前必须先答的第二个问题",
+                       "三个候选方向",
+                       "本轮不替用户选"] {
+            XCTAssertTrue(regions.syscallWindow.contains(phrase),
+                          "§5's adjacent-syscall subsection no longer registers it: \(phrase)")
+        }
+
+        // (c) and (d) — §6's D-6 row and §8's gate region must EACH name BOTH gates. Either one
+        // naming only race E is how a D-6 round comes to believe there is a single prerequisite.
+        for (label, region) in [("§6 的 D-6 行", regions.dSixRow),
+                                ("§8 的开工闸门", regions.sectionEightGate)] {
+            XCTAssertTrue(region.contains("竞态 E"), "\(label) does not name race E")
+            XCTAssertTrue(region.contains("fstatat") && region.contains("unlinkat"),
+                          "\(label) does not name the adjacent-syscall window")
+        }
+
+        // The registration is NOT in the B series — the ruling puts it in the atomicity residual, and
+        // a B row would file it as a settled difference instead of an open prerequisite.
         XCTAssertTrue(spec.contains("| B11 |"), "B11 registers the conditional writes themselves")
         XCTAssertFalse(spec.contains("| E |"), "race E must not be filed as a lettered difference row")
+
+        // (e) The slicing itself, proved rather than trusted — otherwise "by region" would be an empty
+        // precaution and this test would be back to reading the revision log.
+        let revisionLog = try XCTUnwrap(spec.range(of: "\n## 9. 修订").map { String(spec[$0.lowerBound...]) },
+                                        "§9 not found; the exclusion below would be vacuous")
+        XCTAssertTrue(revisionLog.contains("fstatat") && revisionLog.contains("竞态 E"), """
+            §9 no longer restates these, so the whole-file check this one replaced would not have been \
+            fooled — re-read why the slicing exists before simplifying it away.
+            """)
+        for (label, region) in regions.all {
+            XCTAssertFalse(region.contains("## 9. 修订"), "\(label) swallowed the revision log")
+            XCTAssertFalse(region.contains("### 2026-08-20 · 第十二次裁定"),
+                           "\(label) reaches into §9's record of the ruling")
+            XCTAssertGreaterThan(region.count, 60, "\(label) sliced to almost nothing")
+        }
+        // …and the two §5 subsections are genuinely different slices, not one region found twice.
+        XCTAssertNotEqual(regions.raceE, regions.syscallWindow)
+        XCTAssertFalse(regions.raceE.contains("#### 第二处残余"),
+                       "the race-E slice runs past its own subsection")
+    }
+
+    // MARK: Reading the spec by region
+
+    /// The four places a D-6 round reads to learn what blocks it. Deliberately NOT the whole file.
+    struct InForceRegions {
+        let raceE: String
+        let syscallWindow: String
+        let dSixRow: String
+        let sectionEightGate: String
+
+        var all: [(String, String)] {
+            [("§5 竞态 E", raceE), ("§5 第二处残余", syscallWindow),
+             ("§6 D-6 行", dSixRow), ("§8 开工闸门", sectionEightGate)]
+        }
+    }
+
+    static func specText() throws -> String {
+        let text = try String(contentsOf: AppTargetRegistrationGuardTests.packageRoot()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("docs/BUSINESS_DOCUMENTS_SPEC.md"), encoding: .utf8)
+        XCTAssertGreaterThan(text.count, 10_000, "the spec was not read")
+        return text
+    }
+
+    static func inForceRegions(of spec: String) throws -> InForceRegions {
+        let lines = spec.components(separatedBy: "\n")
+
+        /// From a heading line to the next heading of the same level or higher — never past it.
+        func block(startingWith prefix: String) throws -> String {
+            let start = try XCTUnwrap(lines.firstIndex { $0.hasPrefix(prefix) },
+                                      "the spec has no section starting `\(prefix)`")
+            var end = lines.count
+            var i = start + 1
+            while i < lines.count {
+                if lines[i].hasPrefix("#### ") || lines[i].hasPrefix("## ") { end = i; break }
+                i += 1
+            }
+            return lines[start..<end].joined(separator: "\n")
+        }
+
+        /// One table row, required to sit between two named `##` headings so a row of the same shape
+        /// elsewhere (or a copy in §9) cannot stand in for it.
+        func row(startingWith prefix: String, between opening: String, and closing: String) throws -> String {
+            let from = try XCTUnwrap(lines.firstIndex { $0.hasPrefix(opening) }, "no \(opening)")
+            let to = try XCTUnwrap(lines.firstIndex { $0.hasPrefix(closing) }, "no \(closing)")
+            let index = try XCTUnwrap(lines[from..<to].firstIndex { $0.hasPrefix(prefix) },
+                                      "no row `\(prefix)` between \(opening) and \(closing)")
+            return lines[index]
+        }
+
+        /// §8's gate region: from the gate paragraph to the end of §8.
+        func gateRegion() throws -> String {
+            let from = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("**两处开工闸门") },
+                                     "§8 no longer opens its gate region with a two-gate sentence")
+            let to = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("## 9.") }, "no §9 to stop at")
+            XCTAssertLessThan(from, to, "the gate region starts after §9 begins")
+            return lines[from..<to].joined(separator: "\n")
+        }
+
+        return InForceRegions(
+            raceE: try block(startingWith: "#### 竞态 E"),
+            syscallWindow: try block(startingWith: "#### 第二处残余"),
+            dSixRow: try row(startingWith: "| **D-6 激活** |", between: "## 6.", and: "## 7."),
+            sectionEightGate: try gateRegion())
     }
 
     // MARK: - 9 · the wide match, measured END TO END rather than as a pure function
