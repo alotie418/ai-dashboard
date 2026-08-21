@@ -202,7 +202,115 @@ public extension LedgerStore {
     /// totals in the SAME transaction; not supplying them leaves both alone. Registered form A8
     /// describes the storage semantics and they are reproduced — what is not reproduced is a path
     /// to a stale total, because there is no way through this API to move one without the other.
+    ///
+    /// ## A9 is closed by a conditional write (twelfth ruling)
+    ///
+    /// The status is still read first — the errors above are decided from it — but the rule that read
+    /// establishes is now also spelled INTO the write, and the affected row count is checked. A second
+    /// connection that moves the status in between makes the `UPDATE` match nothing instead of writing
+    /// anyway, and the caller gets the same stable error. See
+    /// ``LedgerStore/applyDocumentEdit(id:_:interleave:)``.
     func updateBusinessDocument(id: String, _ edit: BusinessDocumentEdit) throws {
+        try applyDocumentEdit(id: id, edit, interleave: nil)
+    }
+
+    // MARK: - Delete
+
+    /// `DELETE /api/documents/:id` — `documents.js remove`.
+    ///
+    /// An **issued** document is refused (``BusinessDocumentError/issuedMustBeVoidedFirst``); a
+    /// draft or a void one goes, and its lines go with it through the schema's
+    /// `ON DELETE CASCADE`. Deleting is also the ONLY thing that gives a number back (Q3): the row
+    /// stops occupying `(doc_type, doc_number)` and stops feeding the numbering suggestion.
+    ///
+    /// **Returns the attachment reference the deleted document held**, or `nil`. Electron deletes
+    /// that file itself, best-effort, right after the row; Core owns no directories and does no
+    /// filesystem work, so it hands the reference back instead of dropping it silently. Deleting
+    /// the copy is the caller's, and until a round owns the attachments directory nobody does it —
+    /// registered here rather than hidden.
+    ///
+    /// ## A10 is closed by a conditional delete (twelfth ruling)
+    ///
+    /// `… WHERE id = ? AND status != 'issued'`, and the returned reference comes out of the row the
+    /// statement actually removed rather than out of the read that preceded it. See
+    /// ``LedgerStore/applyDocumentDelete(id:interleave:)``.
+    @discardableResult
+    func deleteBusinessDocument(id: String) throws -> String? {
+        try applyDocumentDelete(id: id, interleave: nil)
+    }
+
+    // MARK: - The formal-tax-invoice association
+
+    /// `PUT /api/documents/:id/tax-invoice` — `documents.js updateTaxInvoice`.
+    ///
+    /// **It records an invoice that already exists. It cannot issue one and it cannot invent a
+    /// number** — the number written is exactly the number handed in.
+    ///
+    /// Deliberately NOT part of ``updateBusinessDocument(id:_:)``, because the two obey different
+    /// rules and `documents.js:6-7` says why: an association must be recordable on an **issued**
+    /// document, which the draft-only edit rule would forbid. Void is the one state that freezes it,
+    /// and that check comes first — so a void document refuses even an empty request.
+    ///
+    /// **Returns the attachment reference that just became unreferenced**, or `nil` — same
+    /// arrangement, and same registered gap, as ``deleteBusinessDocument(id:)``.
+    ///
+    /// ## A11 is closed by a conditional write (twelfth ruling)
+    ///
+    /// Three judged facts move into the one `UPDATE`'s predicate: the document is not void, the file
+    /// being pointed at is not spoken for by another document, and the row still holds the copy this
+    /// request believes it is replacing. See ``LedgerStore/applyTaxInvoiceEdit(documentID:_:interleave:)``.
+    @discardableResult
+    func updateTaxInvoice(documentID: String, _ edit: TaxInvoiceEdit) throws -> String? {
+        try applyTaxInvoiceEdit(documentID: documentID, edit, interleave: nil)
+    }
+}
+
+// MARK: - The three conditional writes (A9 / A10 / A11)
+
+/// The twelfth ruling's first item, in one place: `update`, `remove` and `updateTaxInvoice` fold the
+/// facts they judged into the PREDICATE of the statement that acts on them, and check how many rows
+/// that statement actually touched.
+///
+/// Registered forms A9–A11 stay in the spec with their evidence and their numbers; their disposition
+/// column now records that this ruling supersedes "照搬" for them, and **B11** registers the
+/// resulting deliberate difference from Electron, which still writes unconditionally.
+///
+/// ## Why each worker takes an `interleave`
+///
+/// A conditional write is only worth something against a SECOND connection, and no test can produce
+/// that race by luck. Each worker therefore takes an internal closure fired **after the facts are
+/// read and before the write** — precisely when the window is open — so a test can commit a
+/// conflicting change from a real second connection to the same file at that instant, every time.
+/// It is `nil` on every shipped path (the three public entry points pass nothing), it is internal so
+/// the App target cannot reach it, and it is a parameter rather than global mutable state, which is
+/// the discipline ``LedgerStore/HardenedOpenHooks`` already sets for a test seam in this package.
+///
+/// ## What a zero-row outcome may become
+///
+/// Never a silent success, never a second unconditional write, and never a blanket
+/// ``BusinessDocumentError/notFound``. Each worker RE-READS the row and re-derives the refusal
+/// through the same guards, in the same order, the pre-checks use — so the caller sees the error that
+/// fact would have produced had it been visible from the start.
+extension LedgerStore {
+
+    /// ``updateBusinessDocument(id:_:)``, plus the seam.
+    ///
+    /// **The predicate carries the JUDGED RULE, not the OBSERVED VALUE**, and the difference is not
+    /// stylistic. `status = <what we read>` would refuse a request that is still perfectly legal
+    /// against the new status — a draft asked to become void, which someone else issued in between,
+    /// is `issued → void`, an edge the machine allows — and there is no stable error for "legal, but
+    /// not written". Pinning the rule refuses exactly what the pre-check refuses and nothing else:
+    ///
+    ///  * an edit of fields or lines admits `draft` alone (the draft-only rule);
+    ///  * a status change to `W` admits the statuses `W` is reachable FROM (the machine's own edges).
+    ///
+    /// Both terms apply when both are asked for, which is how a draft can be edited and issued in one
+    /// request. ``statusesAdmitting(_:observed:)`` is that intersection, and it is never empty for a
+    /// request that got this far — proved rather than assumed by the exhaustive walk in
+    /// `DocumentLifecycleTests`, because an empty set would have to be spelled `AND 0` and would then
+    /// be a silent refusal of everything.
+    func applyDocumentEdit(id: String, _ edit: BusinessDocumentEdit,
+                           interleave: (() throws -> Void)?) throws {
         guard let existing = try db.query("SELECT id, status FROM business_documents WHERE id = ?",
                                           [.text(id)]).first,
               let statusRaw = existing.string("status"),
@@ -270,34 +378,49 @@ public extension LedgerStore {
         assignments.append("updated_at = datetime('now')")
         values.append(.text(id))
 
+        let admitted = Self.statusesAdmitting(edit, observed: currentStatus)
+        let condition = admitted.isEmpty
+            ? "0"
+            : "status IN (\(admitted.map { _ in "?" }.joined(separator: ", ")))"
+        values.append(contentsOf: admitted.map { SQLiteValue.text($0.rawValue) })
+
+        try interleave?()
+
+        var affected = 0
         try Self.mappingConstraintToNumberExists {
             try db.transaction {
-                try db.run("UPDATE business_documents SET \(assignments.joined(separator: ", ")) WHERE id = ?",
-                           values)
+                affected = try db.run("""
+                    UPDATE business_documents SET \(assignments.joined(separator: ", ")) \
+                    WHERE id = ? AND \(condition)
+                    """, values)
+                // A9's other half: the header and the lines move together or not at all. Returning
+                // here leaves the transaction with nothing in it, so a refused header cannot be
+                // followed by a rewritten set of lines.
+                guard affected > 0 else { return }
                 if let lines {
                     try db.run("DELETE FROM business_document_items WHERE doc_id = ?", [.text(id)])
                     try insertDocumentLines(lines, documentID: id)
                 }
             }
         }
+        guard affected > 0 else {
+            if let refusal = try refusalForDocumentEdit(id: id, edit) { throw refusal }
+            return
+        }
+        // A `nil` refusal is the request having asked for the status the row already holds, which the
+        // pre-check itself answers by writing nothing. `DocumentLifecycleTests` walks the whole
+        // request space to show that is the only way to get one.
     }
 
-    // MARK: - Delete
-
-    /// `DELETE /api/documents/:id` — `documents.js remove`.
+    /// ``deleteBusinessDocument(id:)``, plus the seam.
     ///
-    /// An **issued** document is refused (``BusinessDocumentError/issuedMustBeVoidedFirst``); a
-    /// draft or a void one goes, and its lines go with it through the schema's
-    /// `ON DELETE CASCADE`. Deleting is also the ONLY thing that gives a number back (Q3): the row
-    /// stops occupying `(doc_type, doc_number)` and stops feeding the numbering suggestion.
-    ///
-    /// **Returns the attachment reference the deleted document held**, or `nil`. Electron deletes
-    /// that file itself, best-effort, right after the row; Core owns no directories and does no
-    /// filesystem work, so it hands the reference back instead of dropping it silently. Deleting
-    /// the copy is the caller's, and until a round owns the attachments directory nobody does it —
-    /// registered here rather than hidden.
-    @discardableResult
-    func deleteBusinessDocument(id: String) throws -> String? {
+    /// `RETURNING` rather than a read followed by a delete, because the reference handed back has to
+    /// describe the row that was ACTUALLY removed. A path read before the statement can be stale by
+    /// the time the statement runs, and a stale path handed to a deleter is a NEW leak — it names a
+    /// file somebody may still be pointing at while the file that really came free goes unreported.
+    /// One statement decides both: the row count is the number of rows it gave back, and the path is
+    /// the one that row held.
+    func applyDocumentDelete(id: String, interleave: (() throws -> Void)?) throws -> String? {
         guard let row = try db.query(
             "SELECT id, status, tax_invoice_attachment_path FROM business_documents WHERE id = ?",
             [.text(id)]).first,
@@ -306,28 +429,60 @@ public extension LedgerStore {
         else { throw BusinessDocumentError.notFound }
         guard status != .issued else { throw BusinessDocumentError.issuedMustBeVoidedFirst }
 
-        try db.run("DELETE FROM business_documents WHERE id = ?", [.text(id)])
+        try interleave?()
+
+        let removed = try db.query("""
+            DELETE FROM business_documents WHERE id = ? AND status != ?
+            RETURNING tax_invoice_attachment_path
+            """, [.text(id), .text(BusinessDocumentStatus.issued.rawValue)])
+        guard let deleted = removed.first else {
+            // `id` is the primary key and `status != 'issued'` is the only other term, so a row that
+            // is still there was `issued` at the instant the statement ran. A later change to `void`
+            // does not make the refused attempt retroactively legal, and naming the fact that refused
+            // it is the same stable error the handler gives.
+            let stillThere = try db.query("SELECT id FROM business_documents WHERE id = ?", [.text(id)])
+            throw stillThere.isEmpty
+                ? BusinessDocumentError.notFound
+                : BusinessDocumentError.issuedMustBeVoidedFirst
+        }
         // Truthiness, as `if (row.tax_invoice_attachment_path)` is on the other side: an empty
         // stored path is no path.
-        return row.string("tax_invoice_attachment_path").flatMap { $0.isEmpty ? nil : $0 }
+        return deleted.string("tax_invoice_attachment_path").flatMap { $0.isEmpty ? nil : $0 }
     }
 
-    // MARK: - The formal-tax-invoice association
-
-    /// `PUT /api/documents/:id/tax-invoice` — `documents.js updateTaxInvoice`.
+    /// ``updateTaxInvoice(documentID:_:)``, plus the seam.
     ///
-    /// **It records an invoice that already exists. It cannot issue one and it cannot invent a
-    /// number** — the number written is exactly the number handed in.
+    /// Three terms beyond `id`, each one a fact this function judged in Swift and used to be willing
+    /// to write against:
     ///
-    /// Deliberately NOT part of ``updateBusinessDocument(id:_:)``, because the two obey different
-    /// rules and `documents.js:6-7` says why: an association must be recordable on an **issued**
-    /// document, which the draft-only edit rule would forbid. Void is the one state that freezes it,
-    /// and that check comes first — so a void document refuses even an empty request.
+    ///  1. `status != 'void'` — the association is frozen once the document is void.
+    ///  2. `NOT EXISTS (… tax_invoice_attachment_path = ? AND id != ?)` — the copy being pointed at is
+    ///     not spoken for. Added under exactly the condition the pre-check runs under, so re-pointing
+    ///     a document at the path it already holds still skips the question, as it does over there.
+    ///  3. `tax_invoice_attachment_path IS ?` — the row still holds the copy this request believes it
+    ///     is replacing. Only when the column is being written, and it is what makes the returned
+    ///     orphan PROVABLE: `UPDATE … RETURNING` in SQLite hands back post-update values, so the
+    ///     pre-image cannot be recovered from the statement and has to be pinned by the predicate
+    ///     instead. Bound as the RAW cell rather than the decoded string, with `IS` rather than `=`,
+    ///     so `NULL` compares and a cell holding a non-TEXT value compares as itself.
     ///
-    /// **Returns the attachment reference that just became unreferenced**, or `nil` — same
-    /// arrangement, and same registered gap, as ``deleteBusinessDocument(id:)``.
-    @discardableResult
-    func updateTaxInvoice(documentID: String, _ edit: TaxInvoiceEdit) throws -> String? {
+    /// **Term 3 has one registered cost.** `SQLiteDatabase.readColumn` decodes TEXT lossily — invalid
+    /// UTF-8 becomes U+FFFD — so a cell a foreign writer filled with bytes that are not UTF-8 cannot be
+    /// bound back byte-for-byte, and this term can never match it. The effect is bounded and it is the
+    /// safe direction: on THAT row, a request that writes the attachment column is refused (nothing is
+    /// written, nothing is reported as orphaned), while a request that only touches the issued flag,
+    /// the number or the date carries no such term and works normally. Refusing is also the honest
+    /// answer — a request that cannot name what it is replacing has no business reporting what it
+    /// displaced.
+    ///
+    /// Term 3 is the one with no stable error of its own: a zero-row outcome that survives the re-read
+    /// means another writer re-pointed this document while the sheet was open. That is not
+    /// ``BusinessDocumentError/attachmentInUse`` (no other document is involved) and not
+    /// ``BusinessDocumentError/notFound`` (the row is there), so it leaves as a non-`BusinessDocumentError`
+    /// and the page reports its generic "save failed, try again" — accurate, because nothing was
+    /// written. No new error case, no new key, no new copy.
+    func applyTaxInvoiceEdit(documentID: String, _ edit: TaxInvoiceEdit,
+                             interleave: (() throws -> Void)?) throws -> String? {
         guard let row = try db.query(
             "SELECT id, status, tax_invoice_attachment_path FROM business_documents WHERE id = ?",
             [.text(documentID)]).first,
@@ -341,6 +496,7 @@ public extension LedgerStore {
         // falsy there. Measured on the handler with `''` written straight into the column: it
         // neither reports nor deletes anything. Nothing either API writes produces that cell; a
         // foreign writer can.
+        let storedCell = row["tax_invoice_attachment_path"]
         let existingPath = row.string("tax_invoice_attachment_path").flatMap { $0.isEmpty ? nil : $0 }
         var assignments: [String] = []
         var values: [SQLiteValue] = []
@@ -359,6 +515,7 @@ public extension LedgerStore {
         if let date = edit.date { set("tax_invoice_date", Self.clamped(date, 30)) }
 
         var orphaned: String?
+        var ownership: (sql: String, values: [SQLiteValue])?
         if let rawPath = edit.attachmentPath {
             // The handler's own shape: `null` and `''` both mean "clear it"; anything else is taken
             // as written, with NO length clamp — the whitelist below is the only thing narrowing it.
@@ -384,6 +541,10 @@ public extension LedgerStore {
                          WHERE tax_invoice_attachment_path = ? AND id != ? LIMIT 1
                         """, [.text(path), .text(documentID)])
                     guard claimed.isEmpty else { throw BusinessDocumentError.attachmentInUse }
+                    ownership = ("""
+                         AND NOT EXISTS (SELECT 1 FROM business_documents
+                                          WHERE tax_invoice_attachment_path = ? AND id != ?)
+                        """, [.text(path), .text(documentID)])
                 }
             }
             set("tax_invoice_attachment_path", path.map { SQLiteValue.text($0) } ?? .null)
@@ -394,10 +555,107 @@ public extension LedgerStore {
 
         if assignments.isEmpty { return nil }
         assignments.append("updated_at = datetime('now')")
+
+        var predicate = "WHERE id = ? AND status != ?"
         values.append(.text(documentID))
-        try db.run("UPDATE business_documents SET \(assignments.joined(separator: ", ")) WHERE id = ?",
-                   values)
+        values.append(.text(BusinessDocumentStatus.void.rawValue))
+        if edit.attachmentPath != nil {
+            predicate += " AND tax_invoice_attachment_path IS ?"
+            values.append(storedCell)
+        }
+        if let ownership {
+            predicate += ownership.sql
+            values.append(contentsOf: ownership.values)
+        }
+
+        try interleave?()
+
+        let affected = try db.run(
+            "UPDATE business_documents SET \(assignments.joined(separator: ", ")) \(predicate)", values)
+        guard affected > 0 else { throw try refusalForTaxInvoiceEdit(documentID: documentID, edit) }
         return orphaned
+    }
+
+    // MARK: The refusals a zero-row write is allowed to become
+
+    /// The stable error for an edit that matched no row, or `nil` when the request's effect already
+    /// holds. Re-reads, then walks the SAME two guards in the SAME order the pre-check uses.
+    ///
+    /// **`nil` is granted only to the one case that has earned it**: a status-only request whose
+    /// wanted status the row now already holds. That case IS the pre-check's own answer — it compares
+    /// before it validates, finds nothing to write, and returns. Every other way of reaching the end
+    /// of this function means the row moved between the write and this re-read (a writer running an
+    /// edge the machine does not have, e.g. back to `draft`), and answering `nil` there would report
+    /// success for a request that did not happen. That gets the same non-`BusinessDocumentError`
+    /// ``DocumentRowMovedUnderTheWrite`` the association path uses, for the same reason: no stable
+    /// code says it, and the page's generic "save failed, try again" is true.
+    func refusalForDocumentEdit(id: String, _ edit: BusinessDocumentEdit) throws -> Error? {
+        guard let row = try db.query("SELECT id, status FROM business_documents WHERE id = ?",
+                                     [.text(id)]).first,
+              let statusRaw = row.string("status"),
+              let status = BusinessDocumentStatus(rawValue: statusRaw)
+        else { return BusinessDocumentError.notFound }
+
+        if let wanted = edit.status, wanted != status,
+           !Self.statusTransitions[status, default: []].contains(wanted) {
+            return BusinessDocumentError.invalidStatusTransition(from: status, to: wanted)
+        }
+        if edit.changesFieldsOrLines, status != .draft { return BusinessDocumentError.onlyDraftCanBeEdited }
+        if edit.status == status, !edit.changesFieldsOrLines { return nil }
+        return DocumentRowMovedUnderTheWrite(term: "status")
+    }
+
+    /// The refusal for a tax-invoice write that matched no row. The three terms, re-asked in the
+    /// order the function asks them; the last one has no stable code and says so.
+    func refusalForTaxInvoiceEdit(documentID: String, _ edit: TaxInvoiceEdit) throws -> Error {
+        guard let row = try db.query("SELECT id, status FROM business_documents WHERE id = ?",
+                                     [.text(documentID)]).first,
+              let statusRaw = row.string("status"),
+              let status = BusinessDocumentStatus(rawValue: statusRaw)
+        else { return BusinessDocumentError.notFound }
+        if status == .void { return BusinessDocumentError.voidTaxInvoiceReadOnly }
+        if let rawPath = edit.attachmentPath, !rawPath.isEmpty {
+            let claimed = try db.query("""
+                SELECT 1 FROM business_documents
+                 WHERE tax_invoice_attachment_path = ? AND id != ? LIMIT 1
+                """, [.text(rawPath), .text(documentID)])
+            if !claimed.isEmpty { return BusinessDocumentError.attachmentInUse }
+        }
+        return DocumentRowMovedUnderTheWrite(term: "tax_invoice_attachment_path")
+    }
+
+    /// The stored statuses under which THIS request is legal — the intersection of every rule the
+    /// pre-check applied, expressed as a set of rows the write is allowed to touch.
+    ///
+    /// Returned in ``BusinessDocumentStatus``'s own declaration order so the SQL is deterministic.
+    static func statusesAdmitting(_ edit: BusinessDocumentEdit,
+                                  observed: BusinessDocumentStatus) -> [BusinessDocumentStatus] {
+        var admitted = Set(BusinessDocumentStatus.allCases)
+        if edit.changesFieldsOrLines { admitted.formIntersection([.draft]) }
+        if let wanted = edit.status, wanted != observed {
+            admitted.formIntersection(statusPredecessors(of: wanted))
+        }
+        return BusinessDocumentStatus.allCases.filter { admitted.contains($0) }
+    }
+
+    /// The statuses `wanted` is reachable FROM, read off ``statusTransitions`` rather than restated —
+    /// so the machine has exactly one spelling and an edge cannot be added to one and not the other.
+    static func statusPredecessors(of wanted: BusinessDocumentStatus) -> Set<BusinessDocumentStatus> {
+        Set(statusTransitions.filter { $0.value.contains(wanted) }.keys)
+    }
+}
+
+/// The one refusal these writers raise that is NOT a ``BusinessDocumentError``.
+///
+/// It exists so that "another writer moved the fact under us" cannot be dressed up as one of the
+/// chapter's user-facing codes: none of them says that, and inventing one would need six languages of
+/// copy for a state the shipping single-connection app cannot reach. The page's write helper turns any
+/// non-`BusinessDocumentError` into its generic save-failed sentence, which is exactly true here —
+/// nothing was written.
+struct DocumentRowMovedUnderTheWrite: Error, CustomStringConvertible {
+    let term: String
+    var description: String {
+        "a conditional document write matched no row: \(term) no longer holds the value it was read with"
     }
 }
 
@@ -570,13 +828,15 @@ extension LedgerStore {
     /// `_PRIMARYKEY`. All five share the prefix, so the JS predicate is "the primary code is
     /// `SQLITE_CONSTRAINT`", and this is that predicate rather than a narrower guess at it.
     ///
-    /// ## Why the neighbouring `"(code 19)"` predicate must not be copied
+    /// ## Why the neighbouring `"(code 19)"` predicate could not be copied
     ///
-    /// `ProductCatalog.mapWriteFailure` discriminates by matching the literal `"(code 19)"`. That
-    /// works on a connection opened without `SQLITE_OPEN_EXRESCODE` and **stops working on the one
-    /// the app actually ships**, which sets it: `sqlite3_step` then returns the extended code, and
-    /// the message reads `(code 2067)`. Measured on this machine, SQLite 3.51.0, the same five
-    /// violations on the two connection kinds:
+    /// `ProductCatalog.mapWriteFailure` used to discriminate by matching the literal `"(code 19)"`.
+    /// That works on a connection opened without `SQLITE_OPEN_EXRESCODE` and **stops working on the
+    /// one the app actually ships**, which sets it: `sqlite3_step` then returns the extended code, and
+    /// the message reads `(code 2067)`. D-2 measured it and left the evidence here; the twelfth ruling
+    /// fixed that predicate, and it now asks ``isConstraintViolation(_:)`` — this one — rather than
+    /// carrying a second spelling of the same question. Measured on this machine, SQLite 3.51.0, the
+    /// same five violations on the two connection kinds:
     ///
     /// ```text
     ///                 default open   activeExistingNoFollow (EXRESCODE)
@@ -589,8 +849,9 @@ extension LedgerStore {
     ///
     /// `idx_docs_type_number` is a unique INDEX, so the number that matters here is 2067 — and a
     /// `"(code 19)"` test would call it "not a duplicate number" on the shipping path while passing
-    /// every test written on a default connection. `HardenedDocumentNumberConflictTests` measures
-    /// this mapping on a real `SQLITE_OPEN_EXRESCODE` connection for exactly that reason.
+    /// every test written on a default connection. `DocumentNumberingTests` measures this mapping on a
+    /// real `SQLITE_OPEN_EXRESCODE` connection for exactly that reason, and `ProductCatalogTests` now
+    /// measures the whole matrix on `products` itself, both connection kinds side by side.
     ///
     /// The code is read with `LegacyConversionRunner.resultCodes(in:)` — the complete form of the
     /// `(code N)` / `(rc N)` extraction, reused rather than re-spelled — and the LAST match is the

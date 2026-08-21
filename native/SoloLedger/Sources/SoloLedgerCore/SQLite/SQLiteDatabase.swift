@@ -361,6 +361,36 @@ public final class SQLiteDatabase {
         }
     }
 
+    /// An IMMEDIATE transaction that RETURNS a value: the write lock is taken by `BEGIN` itself, not
+    /// deferred to the first write.
+    ///
+    /// **The one thing this buys that ``transaction(_:)`` cannot** is a window in which a decision
+    /// READ from the database still holds when a non-database act is performed on the strength of it.
+    /// ``AttachmentDeletion`` is the caller and the only one: it asks "does any row still reference
+    /// this file", and then unlinks. Under a DEFERRED `BEGIN` the read takes a read lock only, and
+    /// another connection may commit a new reference in the gap before the `unlink` — the file would
+    /// go while a row still points at it. `BEGIN IMMEDIATE` closes that gap by refusing every other
+    /// writer for its whole duration.
+    ///
+    /// **It does not pretend to nest.** SQLite has no nested transactions; a second `BEGIN` inside
+    /// this one throws from SQLite itself, and the `catch` below then rolls the OUTER transaction back
+    /// rather than leaving it open. That is deliberate — a helper that silently swallowed the nested
+    /// `BEGIN` would leave a caller believing it had a lock it never took.
+    ///
+    /// **Internal on purpose**, exactly as ``readSnapshot(_:)`` is: the App has no business opening a
+    /// general-purpose write transaction, and this exists for one Core caller.
+    func immediateTransaction<T>(_ block: () throws -> T) throws -> T {
+        try execute("BEGIN IMMEDIATE")
+        do {
+            let value = try block()
+            try execute("COMMIT")
+            return value
+        } catch {
+            try? execute("ROLLBACK")
+            throw error
+        }
+    }
+
     /// A DEFERRED (read) transaction that RETURNS a value — one consistent view of the
     /// database for every statement inside it.
     ///

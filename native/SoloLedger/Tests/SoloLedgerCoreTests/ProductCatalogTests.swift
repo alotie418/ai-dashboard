@@ -598,4 +598,189 @@ final class ProductCatalogTests: LedgerTestCase {
         }
         return out
     }
+
+    // MARK: - The twelfth ruling · the constraint predicate on the connection that ships
+
+    /// A ledger reopened `.activeExistingNoFollow` — the mode the app's active store really uses, and
+    /// the one that sets `SQLITE_OPEN_EXRESCODE`. Built by creating and migrating through the normal
+    /// path first, because that mode refuses to create.
+    private func hardenedStore() throws -> LedgerStore {
+        let url = try symlinkFreeTempDir().appendingPathComponent("active.db")
+        let seed = try LedgerStore(databaseURL: url)
+        try seed.db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        try seed.db.close()
+        return try LedgerStore(adopting: SQLiteDatabase(path: url.path, mode: .activeExistingNoFollow))
+    }
+
+    /// `SQLITE_OPEN_NOFOLLOW` refuses a symlink ANYWHERE in the resolved path, and `/var` is one on
+    /// macOS — so every hardened open below has to name the real directory.
+    private func symlinkFreeTempDir() throws -> URL {
+        let directory = try trackedTempDir()
+        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+        guard realpath(directory.path, &buffer) != nil else { return directory }
+        return URL(fileURLWithPath: String(cString: buffer), isDirectory: true)
+    }
+
+    /// The raw `sqlite3_step` message a violation produces, so the extended code in it is a
+    /// MEASUREMENT and not a string this test wrote for itself.
+    private func stepMessage(_ body: () throws -> Void) -> String {
+        do { try body() } catch let error as SQLiteError {
+            if case .step(let message) = error { return message }
+            return "not a step failure: \(error)"
+        } catch {
+            return "not a SQLite failure: \(error)"
+        }
+        return "no failure at all"
+    }
+
+    private func seedProductAndMovement(_ store: LedgerStore, id: String = "p1") throws {
+        try store.db.run("""
+            INSERT INTO products (id, name, unit) VALUES (?, 'Widget', 'piece')
+            """, [.text(id)])
+        try store.db.run("""
+            INSERT INTO inventory_movements
+              (id, product_id, occurred_on, seq, movement_type, quantity_milli, currency)
+            VALUES ('m1', ?, '2026-01-01', 1, 'purchase_in', 1000, 'CNY')
+            """, [.text(id)])
+    }
+
+    /// Every violation `products` can raise, on BOTH connection kinds, in one table.
+    ///
+    /// Without the left column this would be a test that passes for the wrong reason — which is
+    /// exactly how the `"(code 19)"` predicate survived: written on a default connection, where it is
+    /// true, and shipped on a connection where it never matches anything.
+    func testTheConstraintCodesAreDifferentOnTheTwoConnectionKinds() throws {
+        var plain: [String: String] = [:]
+        var hardened: [String: String] = [:]
+
+        for (label, store) in [("plain", try makeStore()), ("hardened", try hardenedStore())] {
+            defer { try? store.db.close() }
+            try seedProductAndMovement(store)
+
+            var measured: [String: String] = [:]
+            measured["PRIMARY KEY"] = stepMessage {
+                try store.db.run("INSERT INTO products (id, name, unit) VALUES ('p1', 'Dup', 'piece')")
+            }
+            measured["NOT NULL"] = stepMessage {
+                try store.db.run("INSERT INTO products (id, name, unit) VALUES ('p2', NULL, 'piece')")
+            }
+            measured["FOREIGN KEY RESTRICT"] = stepMessage {
+                try store.db.run("DELETE FROM products WHERE id = 'p1'")
+            }
+            measured["CHECK"] = stepMessage {
+                try store.db.run("""
+                    INSERT INTO inventory_movements
+                      (id, product_id, occurred_on, seq, movement_type, quantity_milli, currency)
+                    VALUES ('m2', 'p1', '2026-01-02', 1, 'not_a_movement', 1000, 'CNY')
+                    """)
+            }
+            if label == "plain" { plain = measured } else { hardened = measured }
+        }
+
+        for (kind, message) in plain {
+            XCTAssertTrue(message.contains("(code 19)"),
+                          "default open collapses \(kind) onto the primary code: \(message)")
+        }
+        XCTAssertEqual(hardened["PRIMARY KEY"].map { $0.contains("(code 1555)") }, true,
+                       "PRIMARY KEY: \(hardened["PRIMARY KEY"] ?? "")")
+        XCTAssertEqual(hardened["NOT NULL"].map { $0.contains("(code 1299)") }, true,
+                       "NOT NULL: \(hardened["NOT NULL"] ?? "")")
+        XCTAssertEqual(hardened["CHECK"].map { $0.contains("(code 275)") }, true,
+                       "CHECK: \(hardened["CHECK"] ?? "")")
+        // 1811 is SQLITE_CONSTRAINT_TRIGGER, not _FOREIGNKEY: `ON DELETE RESTRICT` is an ACTION, and
+        // SQLite reports an action's refusal with the trigger code. This is the one the shipped
+        // schema really produces, and the reason 787 cannot simply be renamed 1811.
+        XCTAssertEqual(hardened["FOREIGN KEY RESTRICT"].map { $0.contains("(code 1811)") }, true,
+                       "FOREIGN KEY RESTRICT: \(hardened["FOREIGN KEY RESTRICT"] ?? "")")
+        for (kind, message) in hardened {
+            XCTAssertFalse(message.contains("(code 19)"),
+                           "a literal \"(code 19)\" test finds nothing here — \(kind): \(message)")
+        }
+    }
+
+    /// The comparison row: a plain `NO ACTION` reference reports `SQLITE_CONSTRAINT_FOREIGNKEY` = 787.
+    /// Measured in a throwaway database of its own, because the shipped schema has no such reference —
+    /// which is the whole reason 787 is the backstop here and the message is the discriminator.
+    func testAPlainForeignKeyReportsTheOtherExtendedCodeAndStillMaps() throws {
+        let url = try symlinkFreeTempDir().appendingPathComponent("scratch.db")
+        let seed = try SQLiteDatabase(path: url.path, mode: .readWriteCreate)
+        try seed.execute("""
+            CREATE TABLE parent (id TEXT PRIMARY KEY);
+            CREATE TABLE child (id TEXT PRIMARY KEY, pid TEXT REFERENCES parent(id));
+            INSERT INTO parent (id) VALUES ('a');
+            INSERT INTO child (id, pid) VALUES ('c', 'a');
+            """)
+        try seed.close()
+
+        let db = try SQLiteDatabase(path: url.path, mode: .activeExistingNoFollow)
+        defer { try? db.close() }
+        try db.execute("PRAGMA foreign_keys = ON")
+        let message = stepMessage { try db.run("DELETE FROM parent WHERE id = 'a'") }
+
+        XCTAssertTrue(message.contains("(code 787)"), message)
+        XCTAssertTrue(message.contains("FOREIGN KEY"), message)
+        XCTAssertEqual(ProductCatalogError.mapping(SQLiteError.step(message)), .hasInventoryMovements)
+        // …and the code alone is enough, with the text taken away.
+        XCTAssertTrue(ProductCatalogError.isForeignKeyRefusal("constraint failed (code 787)"))
+        XCTAssertFalse(ProductCatalogError.isForeignKeyRefusal("constraint failed (code 1811)"),
+                       "1811 is SQLITE_CONSTRAINT_TRIGGER and is not a foreign key on its own")
+    }
+
+    /// **Reverse proof — put `"(code 19)"` back.** A real primary-key collision, produced on the
+    /// shipping connection, must map to `.idCollision`; a literal-19 predicate answers
+    /// `.storageFailure` for it, which the user sees as "save failed, try again" instead of a sentence
+    /// about a duplicate identifier.
+    func testARealPrimaryKeyCollisionOnTheShippingConnectionMapsToIdCollision() throws {
+        let store = try hardenedStore()
+        defer { try? store.db.close() }
+        try store.db.run("INSERT INTO products (id, name, unit) VALUES ('dup', 'A', 'piece')")
+
+        var captured: Error?
+        do {
+            try store.db.run("INSERT INTO products (id, name, unit) VALUES ('dup', 'B', 'piece')")
+        } catch { captured = error }
+        let error = try XCTUnwrap(captured)
+        XCTAssertTrue("\(error)".contains("(code 1555)"), "\(error)")
+        XCTAssertFalse("\(error)".contains("(code 19)"))
+        XCTAssertEqual(ProductCatalogError.mapping(error), .idCollision)
+    }
+
+    /// **Reverse proof — take the foreign-key test out of the front.** A real `ON DELETE RESTRICT`
+    /// refusal is ALSO a constraint violation, so a mapping that asked "is it a constraint" first
+    /// would call it `.idCollision` — a sentence about duplicate identifiers, telling the user to try
+    /// again, where trying again fails identically.
+    func testARealRestrictRefusalStillMapsToHasInventoryMovements() throws {
+        let store = try hardenedStore()
+        defer { try? store.db.close() }
+        try seedProductAndMovement(store)
+
+        XCTAssertThrowsError(try store.deleteProduct(id: "p1")) {
+            XCTAssertEqual($0 as? ProductCatalogError, .hasInventoryMovements)
+        }
+        // The same error, seen raw, is a constraint violation too — which is what makes the ORDER of
+        // the two questions load-bearing rather than incidental.
+        var captured: Error?
+        do { try store.db.run("DELETE FROM products WHERE id = 'p1'") } catch { captured = error }
+        let raw = try XCTUnwrap(captured)
+        XCTAssertTrue(LedgerStore.isConstraintViolation(try XCTUnwrap(raw as? SQLiteError)),
+                      "the generic test also fires on it: \(raw)")
+        XCTAssertEqual(ProductCatalogError.mapping(raw), .hasInventoryMovements)
+        XCTAssertEqual(try store.db.query("SELECT id FROM products").count, 1,
+                       "the product is still there")
+    }
+
+    /// Everything that is not a constraint is still `.storageFailure`, and nothing else was widened.
+    func testANonConstraintFailureIsStillAStorageFailure() {
+        XCTAssertEqual(ProductCatalogError.mapping(SQLiteError.step("disk I/O error (code 10)")),
+                       .storageFailure)
+        XCTAssertEqual(ProductCatalogError.mapping(SQLiteError.step("no code at all")), .storageFailure)
+        XCTAssertEqual(ProductCatalogError.mapping(SQLiteError.prepare("constraint failed (code 1555)")),
+                       .storageFailure, "only a step failure is mapped, as before")
+        XCTAssertEqual(ProductCatalogError.mapping(ProductCatalogError.notFound), .storageFailure)
+        // The extraction takes the LAST code, so a decoy earlier in the message cannot win.
+        XCTAssertEqual(ProductCatalogError.mapping(
+            SQLiteError.step("CHECK constraint failed: c IN ('x') (code 5) (code 275)")), .idCollision)
+        XCTAssertEqual(ProductCatalogError.mapping(
+            SQLiteError.step("constraint failed (code 1555) (code 5)")), .storageFailure)
+    }
 }

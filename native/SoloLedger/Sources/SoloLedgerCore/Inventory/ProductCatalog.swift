@@ -240,10 +240,6 @@ private func newProductID() -> String {
 
 /// Map a raw database failure onto the closed set above, so no SQLite text can travel further.
 ///
-/// The constraint code is matched as a delimiter-bearing token, never as a bare substring: the
-/// message is assembled as `"… (code N)"` by `SQLiteDatabase.run`, and a loose search for a
-/// number would match digits belonging to the statement instead.
-///
 /// **Code 19 stopped meaning one thing when schema v24 landed, and the foreign key is checked
 /// FIRST because of it.** This function used to reason that `products` carries exactly one unique
 /// index — its primary key, `idx_products_active` not being unique — and therefore that a
@@ -254,12 +250,64 @@ private func newProductID() -> String {
 /// to `.idCollision` — a sentence about duplicate identifiers, telling the user to try again,
 /// where trying again fails identically. The FK text is what distinguishes them; `products` has
 /// exactly one inbound foreign key, so the discrimination is unambiguous.
+///
+/// ## The `"(code 19)"` literal never matched on the connection that ships (twelfth ruling)
+///
+/// The active store is opened `.activeExistingNoFollow`, which sets `SQLITE_OPEN_EXRESCODE`;
+/// `sqlite3_step` then returns the EXTENDED code and the message reads `(code 2067)`, `(code 1555)`
+/// and so on. A literal `"(code 19)"` test therefore found NOTHING on that path, and every
+/// constraint refusal fell through to `.storageFailure` — while passing every test written against a
+/// default connection. D-2 measured it and left the evidence; this is the fix.
+///
+/// The predicate is now the PRIMARY result code, through the same
+/// ``LedgerStore/isConstraintViolation(_:)`` `documents.js`'s number-conflict guard uses — one
+/// spelling of "is this a constraint", not two. It reads the code with
+/// `LegacyConversionRunner.resultCodes(in:)` (the complete `(code N)` / `(rc N)` extraction) and
+/// takes the LAST match, because the wrapper appends its own after whatever SQLite said.
+///
+/// **The matrix, measured on `products` itself with both connection kinds** (`ProductCatalogTests`):
+///
+/// ```text
+///                                       default open   activeExistingNoFollow (EXRESCODE)
+///   PRIMARY KEY (products.id)                 19                1555
+///   NOT NULL                                  19                1299
+///   CHECK                                     19                 275
+///   FOREIGN KEY, ON DELETE RESTRICT           19                1811
+///   FOREIGN KEY, NO ACTION (comparison)       19                 787
+///   UNIQUE index (comparison, other tables)   19                2067
+/// ```
+///
+/// **1811 is `SQLITE_CONSTRAINT_TRIGGER`, and that is not a typo.** `ON DELETE RESTRICT` is an
+/// ACTION, and SQLite reports an action's refusal with the trigger code rather than with
+/// `SQLITE_CONSTRAINT_FOREIGNKEY` = 787 — which is what a plain NO ACTION reference gives. So the
+/// two numbers are NOT interchangeable and 787 is kept here only as the second, unambiguous channel:
+/// the one `inventory_movements.product_id` really produces is 1811, and 1811 alone would be an
+/// ambiguous signal in a schema that had triggers. This one has none (`CREATE TRIGGER` appears zero
+/// times in the native schema and in `electron/db/index.js`), which is why the message text is the
+/// leading discriminator and the codes are the backstop rather than the other way round.
 private func mapWriteFailure(_ error: Error) -> ProductCatalogError {
-    guard let sqlite = error as? SQLiteError, case .step(let message) = sqlite else {
-        return .storageFailure
+    ProductCatalogError.mapping(error)
+}
+
+extension ProductCatalogError {
+
+    /// ``mapWriteFailure(_:)``'s predicate, hoisted to a testable place so the mapping can be fed a
+    /// REAL error off a real hardened connection instead of a synthesised string. Internal: the
+    /// public surface of this file does not grow.
+    static func mapping(_ error: Error) -> ProductCatalogError {
+        guard let sqlite = error as? SQLiteError, case .step(let message) = sqlite else {
+            return .storageFailure
+        }
+        if isForeignKeyRefusal(message) { return .hasInventoryMovements }
+        return LedgerStore.isConstraintViolation(sqlite) ? .idCollision : .storageFailure
     }
-    if message.contains("FOREIGN KEY") { return .hasInventoryMovements }
-    return message.contains("(code 19)") ? .idCollision : .storageFailure
+
+    /// A foreign-key refusal, by the text SQLite writes for BOTH enforcement shapes, or by the one
+    /// extended code that can mean nothing else.
+    static func isForeignKeyRefusal(_ message: String) -> Bool {
+        if message.contains("FOREIGN KEY") { return true }
+        return LegacyConversionRunner.resultCodes(in: message).last == 787
+    }
 }
 
 // MARK: - Store

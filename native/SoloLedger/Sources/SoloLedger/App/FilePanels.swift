@@ -219,8 +219,20 @@ extension AppModel {
 /// replaced; both of those are paths that really unlink something under `attachments/docs/`, and
 /// the spec's §3 upgrade clause turns the three registered check-then-act windows into must-fix
 /// items the moment one exists. So this round copies IN and never out: a replaced or dropped
-/// attachment leaves its copy behind. That leak is registered in the spec rather than hidden, and
-/// the storage-atomicity round is where the deleting seam gets connected.
+/// attachment leaves its copy behind. That leak is registered in the spec rather than hidden.
+///
+/// The storage-atomicity round has since landed the three conditional writes and the safe-delete
+/// primitive (`AttachmentDeletion`), which is what the upgrade clause demanded be in place FIRST.
+/// **Connecting the seam is still D-6's**, and it now carries TWO independent gates — both registered
+/// in the spec, both awaiting a ruling, and answering one does not answer the other:
+///
+///  1. **Race E** — once the file is unlinked the relative name is free, and a stale or
+///     non-cooperating writer can claim it again.
+///  2. **The `fstatat`→`unlinkat` gap** inside `unlinkIfStillBound` — a same-UID swap landing between
+///     those two adjacent syscalls has its replacement unlinked, and Darwin offers no
+///     unlink-by-inode to close it.
+///
+/// Neither may be left unruled before any of these five sites deletes anything.
 extension AppModel {
 
     /// `MAX_BYTES` from `electron/handlers/index.js`: twenty mebibytes, and the comparison is a
